@@ -832,7 +832,8 @@ class ConaryClient:
         return neededJob
             
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
-                         recurse = True, updateMode = True):
+                         recurse = True, updateMode = True, 
+                         allowMissing=False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -841,6 +842,8 @@ class ConaryClient:
         in the list must be a ChangeSetFromFile, the name of a trove to
         update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
+        @param allowMissing: If true, only warn if the troves listed 
+        are missing on update.
         """
 
         def _removeDuplicateErasures(cs):
@@ -893,6 +896,8 @@ class ConaryClient:
         finalCs = UpdateChangeSet()
         splittable = True
 
+        toFind = []
+        toFindNoDb = []
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
                 splittable = False
@@ -936,38 +941,20 @@ class ConaryClient:
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
             elif isinstance(versionStr, versions.Branch):
-                l = self.repos.findTrove(None, 
-                                          (troveName, 
-                                           versionStr.asString(), 
-                                           flavor),
-                                          self.cfg.flavor, 
-                                          affinityDatabase=self.db)
-                newItems += l
+                toFind.append((troveName, versionStr.asString(), flavor))
             elif (versionStr and versionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
-                l = self.repos.findTrove(None, 
-                                          (troveName, versionStr, flavor), 
-                                          self.cfg.flavor, 
-                                          affinityDatabase=self.db)
-                newItems += l
+                toFind.append((troveName, versionStr, flavor))
             else:
                 if keepExisting:
                     # when using keepExisting, branch affinity doesn't make 
                     # sense - we are installing a new, generally unrelated 
                     # version of this trove
-                    affinityDb = None
+                    toFindNoDb.append((troveName, versionStr, flavor))
                 else:
-                    affinityDb = self.db
+                    toFind.append((troveName, versionStr, flavor))
 
-                try:
-                    l = self.repos.findTrove(self.cfg.installLabelPath, 
-                                             (troveName, versionStr, flavor),
-                                             self.cfg.flavor, 
-                                             affinityDatabase = affinityDb)
-                except repository.TroveNotFound, e:
-                    raise
-                newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
                 #if True in [isinstance(x, versions.CookLabel) or
@@ -981,6 +968,17 @@ class ConaryClient:
                 #        labels = [ None ]
                 #    
                 #    pass
+        if toFind:
+            results = self.repos.findTroves(self.cfg.installLabelPath, toFind, 
+                                           self.cfg.flavor,
+                                           affinityDatabase=self.db)
+            for troveTups in results.itervalues():
+                newItems += troveTups
+        if toFindNoDb:
+            results = self.repos.findTroves(self.cfg.installLabelPath, 
+                                           toFindNoDb, self.cfg.flavor)
+            for troveTups in results.itervalues():
+                newItems += troveTups
 
         # items which are already installed shouldn't be installed again
         present = self.db.hasTroves(newItems)
