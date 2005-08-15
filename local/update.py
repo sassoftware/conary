@@ -23,20 +23,21 @@ rollbacks)
 the way of a newly created file will be overwritten.  Otherwise an error
 is produced.
 """
-
-from callbacks import UpdateCallback
-from repository import changeset
 import errno
-from repository import filecontents
-import files
-from lib import log
-import os
-from lib import patch
-from lib import sha1helper
 import sha
 import stat
 import sys
 import tempfile
+import os
+
+from callbacks import UpdateCallback
+from repository import changeset
+from repository import filecontents
+from deps import deps
+import files
+from lib import log
+from lib import patch
+from lib import sha1helper
 import trove
 from lib import util
 import versions
@@ -546,7 +547,10 @@ class FilesystemJob:
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
 	    if headPath[0] == '/':
-		headRealPath = root + headPath
+                if root != '/':
+                    headRealPath = root + headPath
+                else:
+                    headRealPath = headPath
 	    else:
 		headRealPath = cwd + "/" + headPath
 
@@ -578,8 +582,11 @@ class FilesystemJob:
                     # this is a non-empty directory that's in the way of
                     # a new file.  Even --replace-files can't help here
                     self.errors.append("non-empty directory %s is in "
-                                       "the way of a newly created "
-                                       "file" % headRealPath)
+                                   "the way of a newly created "
+                                   "file in %s=%s[%s]" % (headRealPath,
+                                   troveCs.getName(), 
+                                   troveCs.getNewVersion().asString(),
+                                   deps.formatFlavor(troveCs.getNewFlavor())))
                 elif (headFile.flags.isInitialContents()  and 
                       not self.removes.has_key(headRealPath)):
                     # don't replace InitialContents files if they already
@@ -595,7 +602,10 @@ class FilesystemJob:
 
                     if inWay:
                         self.errors.append("%s is in the way of a newly " 
-                                           "created file" % headRealPath)
+                           "created file in %s=%s[%s]" % (headRealPath, 
+                               troveCs.getName(), 
+                               troveCs.getNewVersion().asString(),
+                               deps.formatFlavor(troveCs.getNewFlavor())))
                         fullyUpdated = False
                         continue
             except OSError:
