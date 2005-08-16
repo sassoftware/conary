@@ -369,7 +369,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 6
+    schemaVersion = 7
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -389,7 +389,7 @@ class Database:
             # XXX this index is used to enforce that TroveTroves  
             # only contains unique TroveTrove (instanceId, includedId)
             # pairs.
-	    cu.execute("CREATE UNIQUE INDEX TroveTrovesUnique ON "
+	    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
 			    "TroveTroves(instanceId,includedId)")
 
     def __init__(self, path):
@@ -457,7 +457,7 @@ class Database:
                         self.p = deps.deps.DependencySet()
 
                 try:
-                    cu.execute("UPDATE DatabaseVersion SET version=6")
+                    cu.execute("UPDATE DatabaseVersion SET version=7")
                 except sqlite3.ProgrammingError:
                     raise OldDatabaseSchema(
                       "The Conary database on this system is too old. "      \
@@ -523,7 +523,10 @@ class Database:
                 version = 6
                 print "\r%s\r" %(' ' * len(msg)),
                 sys.stdout.flush()
-
+            if version == 6:
+                cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
+                                "TroveTroves(instanceId,includedId)")
+                version = 7
             if version != self.schemaVersion:
                 return False
 
