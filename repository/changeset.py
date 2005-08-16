@@ -978,8 +978,6 @@ class ReadOnlyChangeSet(ChangeSet):
         return 0
 
     def merge(self, otherCs):
-        import lib
-        lib.epdb.st()
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
 
