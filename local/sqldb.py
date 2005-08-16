@@ -386,6 +386,12 @@ class Database:
 	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
 			    "TroveTroves(includedId)")
 
+            # XXX this index is used to enforce that TroveTroves  
+            # only contains unique TroveTrove (instanceId, includedId)
+            # pairs.
+	    cu.execute("CREATE UNIQUE INDEX TroveTrovesUnique ON "
+			    "TroveTroves(instanceId,includedId)")
+
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
 
@@ -1276,6 +1282,10 @@ class Database:
                                 mapInst.versionId == mapVers.versionId
                             JOIN TroveTroves ON
                                 TroveTroves.includedId == mapInst.instanceId
+                            LEFT JOIN TroveTroves AS dup ON
+                                (dup.instanceId == TroveTroves.instanceId AND
+                                 dup.includedId == lockedInst.instanceId)
+                            WHERE dup.instanceId IS NULL
                     """)
 
         cu.execute("DROP TABLE mlt")
