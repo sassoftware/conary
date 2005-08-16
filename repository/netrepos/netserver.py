@@ -914,6 +914,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 (cs, trovesNeeded, filesNeeded) = ret
 
+                # look up the version w/ timestamps
+                primary = (l[0], l[2][0], l[2][1])
+                trvCs = cs.getNewTroveVersion(*primary)
+                primary = (l[0], trvCs.getNewVersion(), l[2][1])
+                cs.addPrimaryTrove(*primary)
+
                 (key, path) = self.cache.addEntry(l, recurse, withFiles, 
                                                   withFileContents, 
                                                   excludeAutoSource,
