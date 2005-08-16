@@ -29,6 +29,12 @@ from streams import StringVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
+#Added for cryptographic signature
+#from lib.openpgpfile import getPublicKey
+#from lib.openpgpfile import getPrivateKey
+from Crypto.PublicKey import DSA
+from Crypto.PublicKey import RSA
+
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
     _SINGLE_TROVE_TUP_VERSION = 1
@@ -279,6 +285,27 @@ class Trove(streams.LargeStreamSet):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
                                                       'versionStrings' : True })
+    def RandFunc(N):
+        rand=open('/dev/random','r')
+        r=rand.read(N)
+        rand.close()
+        return r
+    
+    def createDigitalSignature(self,privateKey):
+        #### K MUST BE COMPLETELY RANDOM ####
+        #### MAKE ABSOLUTELY SURE THIS IS TRUE BEFORE DEPLOYMENT ####        
+        if 'DSAobj_c' in privateKey.__class__.__name__:
+            K=privateKey.q+1
+            while K>privateKey.q:
+                K=getPrime(160,RandFunc)
+        else:
+            K=0
+        digSig=privateKey.sign(self.sigs.sha1(),K)
+        self.sigs.digSig=digSig
+
+    def verifyDigitalSignature(self,publicKey):
+        return publicKey.verify(self.sigs.sha1(),digSig)
+
 
     def computeSignatures(self):
         s = self._sigString()
