@@ -627,12 +627,25 @@ class VersionSequence(AbstractVersion):
         return [ x.timeStamp for x in self.versions if 
                                             isinstance(x, AbstractRevision)]
 
-    def setTimeStamps(self, timeStamps):
+    def setTimeStamps(self, timeStamps, clearCache=True):
+        strStr = self.asString()
+
+        if clearCache:
+            if max(self.timeStamps()) != 0:
+                # we're changing the timeStamps, invalidate the cache
+                frzStr = self.freeze()
+                if self is thawedVersionCache.get(frzStr, None):
+                    del thawedVersionCache[frzStr]
+
+            # if it has timeStamps, its not allowed in the from-string cache
+            stringVersionCache.pop(self.asString(), None)
+
         i = 0
         for item in self.versions:
             if isinstance(item, AbstractRevision):
                 item.timeStamp = timeStamps[i]
                 i += 1
+        
 
     def iterLabels(self):
         """
@@ -1128,11 +1141,13 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if ver == "@NEW@":
 	return NewVersion()
 
-    v = stringVersionCache.get(ver, None)
-    if v is not None and (not timeStamps or v.timeStamps() == timeStamps):
-	return v
+    if timeStamps:
+        # timeStamped VFSs are not allowed in the cache
+        return _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
 
-    v = _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
+    v = stringVersionCache.get(ver, None)
+    if v is None:
+        v = _VersionFromString(ver, defaultBranch)
     stringVersionCache[ver] = v
     return v
 
@@ -1199,7 +1214,7 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
         ver = Branch(vList)
 
     if timeStamps:
-        ver.setTimeStamps(timeStamps)
+        ver.setTimeStamps(timeStamps, clearCache=False)
 
     return ver
 
