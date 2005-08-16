@@ -15,6 +15,7 @@
 
 from Crypto.PublicKey import DSA
 from Crypto.PublicKey import RSA
+from Crypto.Util.number import getPrime
 from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
 from openpgpfile import getFingerprint
@@ -26,7 +27,6 @@ from openpgpfile import getFingerprint
 #     revoked:          bool   indicates if key is revoked
 #     trustLevel:       int    Higher is more trusted
 #                              0 is untrusted
-#                              -1 is ultimate trust
 #-----#
 
 class OpenPGPKey:
@@ -34,7 +34,7 @@ class OpenPGPKey:
         ###change when implement revocation functionality
         self.revoked=0
         ###change when implement trust levels
-        self.trustLevel = -1
+        self.trustLevel = 255
         #translate the keyId to the fingerprint for consistency
         self.fingerprint = getFingerprint (keyId)
         if private:
@@ -61,13 +61,21 @@ class OpenPGPKey:
         if 'DSAobj_c' in self.cryptoKey.__class__.__name__:
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
-                K= getPrime( 160, self._RandFunc)
+                K = getPrime(160, self._RandFunc)
         else:
             K=0
-        return self.cryptoKey.sign( data, K )
+        return (self.fingerprint, self.cryptoKey.sign( data, K ))
 
+    #the result of this verification process:
+    # -1 indicates FAILURE. the string has been modified since it was signed,
+    # or you gave this key a signature it didn't make.
+    # any other value will be the trust level of the key itself
+    # (which is always 0 or greater)
     def verifyString(self, data, sig):
-        return self.cryptoKey.verify( data, sig )
+        if self.fingerprint == sig[0] and self.cryptoKey.verify( data, sig[1] ):
+            return self.trustLevel
+        else:
+            return -1
 
 class OpenPGPPublicKey(OpenPGPKey):
     def __init__ (self, keyId, keyFile = ''):
@@ -76,3 +84,23 @@ class OpenPGPPublicKey(OpenPGPKey):
 class OpenPGPPrivateKey(OpenPGPKey):
     def __init__ (self, keyId, passPhrase = '', keyFile = ''):
         OpenPGPKey.__init__(self, keyId, 1, passPhrase, keyFile)
+
+
+class OpenPGPKeyCache:
+    def __init__(self, keyFile = ''):
+        self.publicDict = {}
+        self.privateDict = {}
+        self.keyFile = keyFile
+
+    def getPublicKey(self, keyId):
+        if keyId not in self.publicDict:
+            self.publicDict[keyId] = OpenPGPPublicKey(keyId, self.keyFile)
+        return self.publicDict[keyId]
+
+    def getPrivateKey(self, keyId, passPhrase = ''):
+        if keyId not in self.privateDict:
+            self.privateDict[keyId] = OpenPGPPrivateKey(keyId, passPhrase, self.keyFile)
+        return self.privateDict[keyId]
+
+global keyCache
+keyCache = OpenPGPKeyCache()
