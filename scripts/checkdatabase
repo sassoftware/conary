@@ -57,11 +57,15 @@ def main(argv):
     except options.OptionError, s:
         print s
         sys.exit(1)
-    
-    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
 
     db = database.Database(cfg.root, cfg.dbPath)
-    for troveName in db.iterAllTroveNames():
+    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
+
+    troveList = otherArgs[1:]
+    if not troveList:
+        troveList = db.iterAllTroveNames()
+
+    for troveName in troveList:
         for dbTrove in db.db.iterFindByName(troveName, pristine = True):
             troveVersion = dbTrove.getVersion()
             troveFlavor = dbTrove.getFlavor()
@@ -121,9 +125,7 @@ def main(argv):
                              path,
                              files.fieldsChanged(dbFileObj.diff(fileObj)),
                              files.fieldsChanged(fileObj.diff(dbFileObj))))
-                    from lib import epdb
-                    epdb.st()
-                    
+
 if __name__ == '__main__':
     main(sys.argv)
 
