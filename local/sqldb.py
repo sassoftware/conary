@@ -524,8 +524,17 @@ class Database:
                 print "\r%s\r" %(' ' * len(msg)),
                 sys.stdout.flush()
             if version == 6:
+                cu.execute('''DELETE FROM TroveTroves 
+                              WHERE TroveTroves.ROWID in (
+                                SELECT Second.ROWID
+                                 FROM TroveTroves AS First
+                                 JOIN TroveTroves as Second 
+                                 ON(First.instanceId=Second.instanceId AND
+                                    First.includedId=Second.includedId AND
+                                    First.ROWID < Second.ROWID))''')
                 cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
-                                "TroveTroves(instanceId,includedId)")
+                           "TroveTroves(instanceId,includedId)")
+                cu.execute("UPDATE DatabaseVersion SET version=7")
                 version = 7
             if version != self.schemaVersion:
                 return False
