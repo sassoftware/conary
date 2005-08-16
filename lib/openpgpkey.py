@@ -76,13 +76,3 @@ class OpenPGPPublicKey(OpenPGPKey):
 class OpenPGPPrivateKey(OpenPGPKey):
     def __init__ (self, keyId, passPhrase = '', keyFile = ''):
         OpenPGPKey.__init__(self, keyId, 1, passPhrase, keyFile)
-
-
-
-
-#code to execute if file is booted directly
-if __name__ == "__main__":
-    key=OpenPGPPrivateKey('DA44E4BD','111111','/home/smg/.gnupg/secring.gpg')
-    sig=key.signString('crap')
-    print key.getFingerprint()
-    print key.verifyString('crap',sig)
