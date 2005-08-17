@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005 rPath, Inc.
 # All rights reserved.
 #
 # This program is distributed under the terms of the Common Public License,
