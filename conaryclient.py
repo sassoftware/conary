@@ -649,7 +649,10 @@ class ConaryClient:
             if not keepList and deferredList:
                 newCs = self.repos.createChangeSet(deferredList, 
                                                    withFiles = False)
-                cs.merge(newCs)
+                # merge the old cs on top of the newCs -- this makes sure the
+                # primaries come from newCs
+                newCs.merge(cs)
+                cs = newCs
                 keepList = deferredList
                 deferredList = []
             if not keepList:
