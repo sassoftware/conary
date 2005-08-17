@@ -232,7 +232,7 @@ class FilesystemJob:
             restoreIndex += 1
 
             if not fileObj:
-                # this means we've reached some contents that is the
+                # this means we've reached some contents that are the
                 # target of ptr's, but not a ptr itself. look through
                 # the delayedRestore list for someplace to put this file
                 match = None
@@ -292,6 +292,16 @@ class FilesystemJob:
                                 (ptrId, None, None, None, None),
                                 self.ptrCmp)
 
+                        continue
+                    elif contType == changeset.ChangedFileTypes.hldr:
+                        # missing contents; skip it and hope someone else
+                        # figures it out later (probably in the local part
+                        # of the rollback)
+                        
+                        # XXX we need to create this or conary thinks it
+                        # was removed by the user if it doesn't already
+                        # exist, when that's not what we mean here
+                        open(target, "w")
                         continue
 
 	    restoreFile(fileObj, contents, self.root, target, journal)

@@ -35,9 +35,12 @@ import versions
 
 from StringIO import StringIO
 
-# refr being the same length as file matters
+# "refr" being the same length as "file" matters
+# "ptr" is for links
+# "hldr" means there are no contents and the file should be skipped
+#    (used for rollbacks)
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr",
-                                       "refr")
+                                       "refr", "hldr")
 
 _STREAM_CS_PRIMARY  = 1
 _STREAM_CS_TROVES     = 2
@@ -334,6 +337,9 @@ class ChangeSet(streams.LargeStreamSet):
         rollback = ChangeSet()
 
 	for troveCs in self.iterNewTroveList():
+            import lib
+            lib.epdb.st('f')
+
 	    if not troveCs.getOldVersion():
 		# this was a new trove, and the inverse of a new
 		# trove is an old trove
@@ -428,14 +434,15 @@ class ChangeSet(streams.LargeStreamSet):
 
 		    if fsFile and fsFile == origFile:
 			cont = filecontents.FromFilesystem(fullPath)
+                        contType = ChangedFileTypes.file
 		    else:
 			# a file which was removed in this changeset is
 			# missing from the files; we need to to put an
 			# empty file in here so we can apply the rollback
 			cont = filecontents.FromString("")
+                        contType = ChangedFileTypes.hldr
 
-		    rollback.addFileContents(pathId, ChangedFileTypes.file, 
-					     cont, 0)
+		    rollback.addFileContents(pathId, contType, cont, 0)
 
 	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
 		if not trv.hasFile(pathId):
