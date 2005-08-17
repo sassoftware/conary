@@ -326,7 +326,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
                 print "%s=%s[%s]" % (name, version.asString(),
                                      deps.formatFlavor(flavor))
             elif flavor:
-                print "%s=[%s]" % (name, deps.formatFlavor(flavor))
+                print "%s[%s]" % (name, deps.formatFlavor(flavor))
             elif version:
                 print "%s=%s" % (name, version.asString())
             else:
