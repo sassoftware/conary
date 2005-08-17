@@ -988,7 +988,7 @@ class ConaryClient:
                             in itertools.izip(newItems, present) 
                             if not isPresent )
 
-        # newItems should be unique 
+        # newItems and oldItems should be unique 
         newItems = set(newItems)
         oldItems = set(oldItems)
 
