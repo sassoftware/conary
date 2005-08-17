@@ -631,10 +631,13 @@ class Database:
         cu.execute("CREATE TEMPORARY TABLE tlList (name STRING, "
                                 "version STRING, flavor STRING)",
                    start_transaction = False)
-        for (name, version, flavor) in troveList:
+        # count the number of items we're inserting
+        count = 0
+        for name, version, flavor in troveList:
             cu.execute("INSERT INTO tlList VALUES(?, ?, ?)", name, 
                        version.asString(), flavor.freeze(),
                        start_transaction = False)
+            count += 1
         cu.execute("""SELECT locked FROM tlList
                             JOIN DBInstances ON
                                 DBInstances.troveName = tlList.name
@@ -649,7 +652,8 @@ class Database:
                                 DBInstances.flavorId = DBFlavors.flavorId
                     """)
         results = [ x[0] for x in cu ]
-        assert(len(results) == len(troveList))
+        # make sure that we got the same number of results as our query
+        assert(len(results) == count)
         cu.execute("DROP TABLE tlList", start_transaction = False)
 
         return results

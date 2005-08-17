@@ -161,9 +161,8 @@ class ConaryClient:
                                              localRepository = self.db)
 
     def _rootChangeSet(self, cs, keepExisting = False):
-	troveList = [ (x.getName(), x.getNewVersion(), 
-		       x.getNewFlavor()) 
-			    for x in cs.iterNewTroveList() ]
+	troveList = ((x.getName(), x.getNewVersion(), x.getNewFlavor()) 
+                     for x in cs.iterNewTroveList())
 
 	if keepExisting:
 	    outdated = None
@@ -204,7 +203,7 @@ class ConaryClient:
                                 nextCheck)
                 lastCheck = nextCheck
 
-            troves = {}
+            troves = set()
             if sugg:
                 for (troveName, depSet) in depList:
                     if sugg.has_key(depSet):
@@ -260,13 +259,12 @@ class ConaryClient:
                                     # to be filled
                                     break
 
-			troves.update(dict.fromkeys(suggList))
+			troves.update(suggList)
 
-                troves = troves.keys()
                 # if we've found good suggestions, merge in those troves
                 if troves:
                     newCs = self._updateChangeSet(troves, uJob,
-                                          keepExisting = keepExisting)[0]
+                                                  keepExisting = keepExisting)[0]
                     cs.merge(newCs)
 
                     (depList, cannotResolve, changeSetList) = \
@@ -436,7 +434,7 @@ class ConaryClient:
         def _removeObsoleteUpdates(cs, obsoletes):
             rmvd = {}
 
-            for (name, (oldVersion, oldFlavor), 
+            for (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) in obsoletes:
                 if newVersion:
                     if not oldVersion:
@@ -590,7 +588,7 @@ class ConaryClient:
                     node = nodeList[nodeIdx[info]]
                     if node[1] == UNKNOWN:
                         node[1] = KEEP
-		    
+
 	    seen = [ False ] * len(nodeList)
             # DFS to mark troves as KEEP
             keepNodes = [ nodeId for nodeId, node in enumerate(nodeList)
@@ -601,13 +599,12 @@ class ConaryClient:
                 seen[nodeId] = True
                 nodeList[nodeId][1] = KEEP
                 keepNodes += nodeList[nodeId][2] 
-                
+
             # anything which isn't to KEEP is to erase, but skip those which
             # are already being removed by a trvCs
-            eraseList = [ (x[0][0], (x[0][1], x[0][2]), (None, None), False)
-                                for x in nodeList if x[1] != KEEP 
-						    and not x[3]]
-            
+            eraseList = ((x[0][0], (x[0][1], x[0][2]), (None, None), False)
+                         for x in nodeList if x[1] != KEEP and not x[3])
+
             return set(eraseList)
 
         # Updates a change set by removing troves which don't need
@@ -743,33 +740,30 @@ class ConaryClient:
         if not keepExisting:
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
-            removeSet = set([(x[0], x[1][0], x[1][1]) 
-                                    for x in newJob if x[1][0] is not None ])
+            removeSet = set(((x[0], x[1][0], x[1][1])
+                             for x in newJob if x[1][0] is not None))
 
             absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
-                                [ (x[0], x[2][0], x[2][1]) for x in absJob ],
-                                ineligible = removeSet | ineligible | 
-                                                referencedTroves)
+                ((x[0], x[2][0], x[2][1]) for x in absJob),
+                ineligible = removeSet | ineligible | referencedTroves)
             newJob = newJob - set(absJob)
 
-            outdatedItems = outdated.items()
-
-            newTroves = [ x[0] for x in outdatedItems if x[1][1] is None ]
-            replacedTroves = [ (x[0], x[1]) for x in outdatedItems 
-                                                      if x[1][1] is not None ]
+            newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
+            replacedTroves = [ (x[0], x[1]) for x in outdated.iteritems()
+                               if x[1][1] is not None ]
 
             for info in newTroves:
                 newJob.add((info[0], (None, None), (info[1], info[2]), 0))
 
-            replacedAreLocked = self.db.trovesAreLocked(
-                                    [ x[1] for x in replacedTroves ] )
+            replacedAreLocked = self.db.trovesAreLocked((x[1] for x
+                                                         in replacedTroves))
 
-            for (newInfo, oldInfo), oldIsLocked in zip(replacedTroves, 
+            for (newInfo, oldInfo), oldIsLocked in zip(replacedTroves,
                                                        replacedAreLocked):
                 if not oldIsLocked:
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
-                                      (newInfo[1], newInfo[2]), 0))
+                                (newInfo[1], newInfo[2]), 0))
 
         origJob = set(origJob)
 
@@ -846,7 +840,6 @@ class ConaryClient:
         update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
         """
-
         def _removeDuplicateErasures(cs):
             # We don't have to worry about the erase list in the changeset;
             # _mergeGroupChanges will take care of that. This needs to make
@@ -987,16 +980,16 @@ class ConaryClient:
         # we keep track of items that are considered for update but
         # are already installed so they don't get removed as a part
         # of some other update/install
-        oldItems = [ item for item, isPresent 
+        oldItems = ( item for item, isPresent 
                             in itertools.izip(newItems, present) 
-                            if isPresent ]
+                            if isPresent )
 
-        newItems = [ item for item, isPresent 
+        newItems = ( item for item, isPresent 
                             in itertools.izip(newItems, present) 
-                            if not isPresent ]
+                            if not isPresent )
 
         # newItems should be unique 
-        newItems = list(set(newItems))
+        newItems = set(newItems)
         oldItems = set(oldItems)
 
         if keepExisting:
@@ -1044,7 +1037,7 @@ class ConaryClient:
 
     def fullUpdateItemList(self):
         items = self.db.findUnreferencedTroves()
-        installed = self.db.findByNames([ x[0] for x in items ])
+        installed = self.db.findByNames(x[0] for x in items)
 
         installedDict = {}
         for (name, version, release) in installed:
@@ -1201,13 +1194,13 @@ class ConaryClient:
                    isinstance(theCs, changeset.ReadOnlyChangeSet))
             cs = changeset.ReadOnlyChangeSet()
 
-            changedTroves = [ (x.getName(), 
-                               (x.getOldVersion(), x.getOldFlavor()),
-                               (x.getNewVersion(), x.getNewFlavor()), False)
-                                   for x in theCs.iterNewTroveList() ]
-            changedTroves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                                   for x in theCs.getOldTroveList() ]
-            changedTroves = dict.fromkeys(changedTroves)
+            changedTroves = set()
+            changedTroves.update((x.getName(),
+                                  (x.getOldVersion(), x.getOldFlavor()),
+                                  (x.getNewVersion(), x.getNewFlavor()), False)
+                                 for x in theCs.iterNewTroveList())
+            changedTroves.update((x[0], (x[1], x[2]), (None, None), False) 
+                                 for x in theCs.getOldTroveList())
 
             if standalone:
                 for (how, what) in theCs.contents:
@@ -1222,8 +1215,8 @@ class ConaryClient:
                                             for x in newCs.getOldTroveList() ]
 
                         for item in troves:
-                            if changedTroves.has_key(item):
-                                del changedTroves[item]
+                            if item in changedTroves:
+                                changedTroves.remove(item)
                             elif item[2][0]:
                                 newCs.delNewTrove(item[0], item[2][0], 
                                                   item[2][1])
@@ -1233,9 +1226,9 @@ class ConaryClient:
                         cs.merge(newCs)
 
             if changedTroves:
-                newCs = repos.createChangeSet(changedTroves.keys(), 
-                                                   recurse = False,
-                                                   callback = callback)
+                newCs = repos.createChangeSet(changedTroves,
+                                              recurse = False,
+                                              callback = callback)
                 cs.merge(newCs)
 
             return cs
@@ -1396,7 +1389,7 @@ class ConaryClient:
 	    for trove in troves:
 
                 # add contained troves to the todo-list
-                newTroves = [ x for x in trove.iterTroveList() if x not in seen]
+                newTroves = [ x for x in trove.iterTroveList() if x not in seen ]
                 troveList.update(newTroves)
                 seen.update(newTroves)
 
@@ -1413,14 +1406,12 @@ class ConaryClient:
                         troveList.add(key)
                         seen.add(key)
                     continue
-                    
+
                 if shadow:
-                    branchedVersion = \
-                        trove.getVersion().createShadow(newLabel)
+                    branchedVersion = trove.getVersion().createShadow(newLabel)
                 else:
-                    branchedVersion = \
-                        trove.getVersion().createBranch(newLabel, 
-                                                        withVerRel = 1)
+                    branchedVersion = trove.getVersion().createBranch(newLabel,
+                                                                    withVerRel = 1)
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
@@ -1429,7 +1420,7 @@ class ConaryClient:
                     if shadow:
                         branchedVersion = version.createShadow(newLabel)
                     else:
-                        branchedVersion = version.createBranch(newLabel, 
+                        branchedVersion = version.createBranch(newLabel,
                                                                withVerRel = 1)
 		    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False)
@@ -1448,8 +1439,8 @@ class ConaryClient:
             matches = self.repos.getAllTroveFlavors(queryDict)
 
             for (name, version, flavor), troveCs in branchedTroves.iteritems():
-                if matches.has_key(name) and matches[name].has_key(version) \
-                   and flavor in matches[name][version]:
+                if (matches.has_key(name) and matches[name].has_key(version) 
+                    and flavor in matches[name][version]):
                     # this trove has already been branched
                     dupList.append((trove.getName(), 
                                     trove.getVersion().branch()))
@@ -1467,8 +1458,8 @@ class ConaryClient:
                              skipNotByDefault = False, excludeList = [],
                              callback = None):
         primaryList = []
-        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
-                                                            in csList:
+        for (name, (oldVersion, oldFlavor),
+                   (newVersion, newFlavor), abstract) in csList:
             if newVersion:
                 primaryList.append((name, newVersion, newFlavor))
             else:
@@ -1511,7 +1502,7 @@ class ConaryClient:
                 # erase it
                 inclusions[item] = True
                 cs.delNewTrove(*item)
-            
+
         # now filter excludeList
         fullCsList = []
         for troveCs in cs.iterNewTroveList():
@@ -1526,8 +1517,7 @@ class ConaryClient:
                 for reStr, regExp in excludeList:
                     if regExp.match(name):
                         skip = True
-            
-        
+
             if not skip:
                 fullCsList.append((name, 
                            (troveCs.getOldVersion(), troveCs.getOldFlavor()),
@@ -1548,7 +1538,7 @@ class ConaryClient:
         # recreate primaryList without erase-only troves for the primary trove 
         # list
         primaryList = [ (x[0], x[2][0], x[2][1]) for x in csList 
-                                                    if x[2][0] is not None ]
+                        if x[2][0] is not None ]
 
         return (fullCsList, primaryList)
 

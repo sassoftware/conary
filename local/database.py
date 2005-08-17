@@ -330,8 +330,11 @@ class Database(SqlDbRepository):
         """
 
         names = {}
-        for (name, version, flavor) in l:
+        newGroup = trove.Trove("@update", versions.NewVersion(), 
+                                deps.DependencySet(), None)
+        for name, version, flavor in l:
             names[name] = True
+            newGroup.addTrove(name, version, flavor)
 
         instList = []
         for name in names.iterkeys():
@@ -351,11 +354,6 @@ class Database(SqlDbRepository):
         for info in instList:
             if info not in ineligible:
                 instGroup.addTrove(*info)
-
-        newGroup = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
-        for (name, version, flavor) in l:
-            newGroup.addTrove(name, version, flavor)
 
         trvChgs = newGroup.diff(instGroup)[2]
 
