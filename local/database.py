@@ -550,6 +550,7 @@ class Database(SqlDbRepository):
                 except OSError:
                     pass
 
+        callback.committingTransaction()
 	self.commit()
 
     def removeFile(self, path, multipleMatches = False):

@@ -140,6 +140,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def runningPostTagHandlers(self):
         self.updateMsg("Running tag post-scripts")
 
+    def committingTransaction(self):
+        self.updateMsg("Committing database transaction")
+
     def setChangesetHunk(self, num, total):
         self.csHunk = (num, total)
 

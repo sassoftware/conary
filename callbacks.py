@@ -75,6 +75,9 @@ class UpdateCallback(ChangesetCallback):
     def runningPostTagHandlers(self):
         pass
 
+    def committingTransaction(self):
+        pass
+
     def updateDone(self):
         pass
 

@@ -12,6 +12,8 @@ Changes in 0.61.8:
   * The "conary q[uery]" command accepts a --diff option.  When --diff
     is used, the difference between installed and pristine troves is
     displayed.
+  * An additional progress callback has been added to show when database
+    transactions are committed
 
 Changes in 0.61.7:
   * Several bugs related to updating two troves with the same name have been 
