@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2004 rPath, Inc.
 # All rights reserved
 #
 

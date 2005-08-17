@@ -13,7 +13,7 @@
 **                  Michael Owens <mike@mikesclutter.com>
 **                     Gerhard Häring <gh@ghaering.de>
 **
-**          Portions Copyright (c) 2004-2005 Specifix, Inc.
+**          Portions Copyright (c) 2004-2005 rPath, Inc.
 **                                           Matt Wilson <msw@specifix.com>
 **              Portions Copyright (c) 2005  rpath, Inc.
 **                                           Matt Wilson <msw@rpath.com>
