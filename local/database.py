@@ -638,7 +638,12 @@ class Database(SqlDbRepository):
 	for name in names:
 	    rb = self.getRollback(name)
 
+            # we don't want the primary troves from reposCs to win, so get
+            # rid of them (otherwise we're left with redirects!). primaries
+            # don't really matter here anyway, so no reason to worry about
+            # them
             (reposCs, localCs) = rb.getLast() 
+            reposCs.setPrimaryTroveList([])
             while reposCs:
                 # redirects in rollbacks mean we need to go get the real
                 # changeset from a repository
@@ -651,6 +656,7 @@ class Database(SqlDbRepository):
                                 False))
 
                 newCs = repos.createChangeSet(jobList, recurse = False)
+                newCs.setPrimaryTroveList([])
                 # this overwrites old with new
                 reposCs.merge(newCs)
 
