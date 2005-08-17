@@ -168,7 +168,7 @@ class ConfigFile:
             self.__dict__[key].append(deps.deps.parseFlavor(val))
 
     def displayKey(self, key, value, type, out):
-        if type == STRING:
+        if type in (INT,STRING):
             out.write("%-25s %s\n" % (key, value))
         elif type == LABEL:
             out.write("%-25s %s\n" % (key, value.asString()))
