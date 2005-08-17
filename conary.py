@@ -90,6 +90,7 @@ def usage(rc = 1):
     print ""
     print "query flags:     --buildreqs"
     print "                 --deps"
+    print "                 --diff"
     print "                 --flavors"
     print "                 --full-versions"
     print "                 --ids"
@@ -169,6 +170,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
     argDef["deps"] = NO_PARAM
+    argDef["diff"] = NO_PARAM
     argDef["flavors"] = NO_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
@@ -320,6 +322,7 @@ def realMain(cfg, argv=sys.argv):
         info = argSet.pop('info', False)
 	ls = argSet.pop('ls', False)
 	deps = argSet.pop('deps', False)
+	showDiff = argSet.pop('diff', False)
 	ids = argSet.pop('ids', False)
 	sha1s = argSet.pop('sha1s', False)
 	fullVersions = argSet.pop('full-versions', False)
@@ -335,7 +338,7 @@ def realMain(cfg, argv=sys.argv):
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
                                       fullVersions, tags, info=info, deps=deps,
                                       showBuildReqs=showBuildReqs, 
-                                      showFlavors=showFlavors)
+                                      showFlavors=showFlavors, showDiff=showDiff)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1

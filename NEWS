@@ -9,6 +9,8 @@ Changes in 0.61.8:
     doesn't get upset
   * Unchanged troves in updated groups could be erased by items in the
     same group on a different branch
+  * Add --diff option to q - displays difference between installed and 
+    pristine troves
 
 Changes in 0.61.7:
   * Several bugs related to updating two troves with the same name have been 

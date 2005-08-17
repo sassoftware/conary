@@ -31,6 +31,7 @@ _troveFormatWithFlavor  = "%-39s %s%s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 _grpFormatWithFlavor  = "  %-37s %s%s"
+_chgFormat  = "  --> %-33s %s"
 
 class DisplayCache:
 
@@ -190,7 +191,7 @@ def _printOneTroveName(db, troveName, troveDict, fullVersions, info):
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
                   tags = False, info=False, deps=False, showBuildReqs = False,
-                  showFlavors = False):
+                  showFlavors = False, showDiff = False):
     (troveNames, hasVersions, hasFlavors) = \
         parseTroveStrings(troveNameList)
 
@@ -201,7 +202,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 	troveNames.sort()
 
     if True not in (hasVersions, hasFlavors, ls, ids, sha1s, tags, deps, 
-                    showBuildReqs, info):
+                    showBuildReqs, info, showDiff):
         troveDict = {}
         for path in pathList:
             for trove in db.iterTrovesByPath(path):
@@ -228,16 +229,22 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
         return
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
-	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, 
-                              info, deps, showBuildReqs, showFlavors)
+	    localTrv = db.getTrove(trove.getName(), trove.getVersion(),
+				   trove.getFlavor(), pristine = False)
+	    _displayTroveInfo(db, trove, localTrv, 
+			      ls, ids, sha1s, fullVersions, tags, 
+                              info, deps, showBuildReqs, showFlavors,
+                              showDiff)
 
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            for trove in db.findTrove(None, troveName, flavor, versionStr):
+            for (n,v,f) in db.findTrove(None, troveName, flavor, versionStr):
                 # db.getTrove returns the pristine trove by default
-                trove = db.getTrove(*trove)
-                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
-                                  tags, info, deps, showBuildReqs, showFlavors)
+                trv = db.getTrove(n,v,f)
+                localTrv = db.getTrove(n,v,f, pristine = False)
+                _displayTroveInfo(db, trv, localTrv, ls, ids, sha1s, 
+				  fullVersions, tags, info, deps, 
+                                  showBuildReqs, showFlavors, showDiff)
         except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
@@ -245,9 +252,9 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             else:
                 log.error("trove %s is not installed", troveName)
         
-def _displayTroveInfo(db, trove, ls, ids, sha1s, 
+def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s, 
                       fullVersions, tags, info, showDeps, showBuildReqs,
-                      showFlavors):
+                      showFlavors, showDiff):
 
     version = trove.getVersion()
     flavor = trove.getFlavor()
@@ -346,12 +353,48 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s,
         _displayOneTrove(trove.getName(), trove.getVersion(),
                          trove.getFlavor(), fullVersions,
                          showFlavors)
-        for (troveName, ver, fla) in sorted(trove.iterTroveList()):
+	changes = localTrv.diff(trove)[2]
+	changesByOld = dict(((x[0], x[1], x[3]), x) for x in changes)
+        if showDiff:
+            troveList = trove.iterTroveList()
+        else:
+            troveList = localTrv.iterTroveList()
+        for (troveName, ver, fla) in sorted(troveList):
+	    change = changesByOld.get((troveName, ver, fla), None)
+	    if change: 
+		newVer, newFla = change[2], change[4]
+		needFlavor = newFla is not None and newFla != fla
+	    else:
+		needFlavor = showFlavors
 
             _displayOneTrove(troveName, ver, fla,
                              fullVersions or ver.branch() != version.branch(),
-                             showFlavors, format=_grpFormat)
-        fileL = [ (x[1], x[0], x[2], x[3]) for x in trove.iterFileList() ]
+                             needFlavor, format=_grpFormat)
+	    change = changesByOld.get((troveName, ver, fla), None)
+	    if change: 
+		if newVer is None:
+                    try:
+                        tups = db.findTrove(None, troveName)
+                    except:
+                        print '  --> (Deleted or Not Installed)'
+                    else:
+                        print ('  --> Not linked to parent trove - potential'
+                               ' replacements:')
+                        for (dummy, newVer, newFla) in tups:
+                            _displayOneTrove(troveName, newVer, newFla,
+                             fullVersions or newVer.branch() != ver.branch(),
+                             needFlavor, format=_chgFormat)
+		else:
+		    _displayOneTrove(troveName, newVer, newFla,
+			 fullVersions or newVer.branch() != ver.branch(),
+                             needFlavor, format=_chgFormat)
+
+
+	    
+        if showDiff:
+            fileL = [ (x[1], x[0], x[2], x[3]) for x in trove.iterFileList() ]
+        else:
+            fileL = [ (x[1], x[0], x[2], x[3]) for x in localTrv.iterFileList()]
         fileL.sort()
         for (path, pathId, fileId, version) in fileL:
             if fullVersions:
