@@ -3,7 +3,12 @@ Changes in 0.61.8:
     either the Users table or Groups table was empty when creating a new group.
   * Add --buildreqs, --flavors options to q and rq
   * Primary troves should not have their trove change sets overridden by
-    items recursively included
+    items recursively included (and fixed a pile of things this broke)
+  * Locally stored change sets can't always get access to pristine files
+    from the local filesystem; when it can't, make sure file sha1 checking
+    doesn't get upset
+  * Unchanged troves in updated groups could be erased by items in the
+    same group on a different branch
 
 Changes in 0.61.7:
   * Several bugs related to updating two troves with the same name have been 
