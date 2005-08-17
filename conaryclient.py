@@ -643,7 +643,7 @@ class ConaryClient:
 
         newJob = set()
         deferredList = []
-        referencedTroves = []
+        referencedTroves = set()
 
         while True:
             if not keepList and deferredList:
@@ -709,7 +709,7 @@ class ConaryClient:
 
             del finalTrvCs
 
-            referencedTroves += [ x for x in newTrv.iterTroveList() ]
+            referencedTroves.update(x for x in newTrv.iterTroveList())
 
             alreadyInstalled = _alreadyInstalled(newTrv)
             locked = _lockedList(neededTroveList)
@@ -746,7 +746,8 @@ class ConaryClient:
             absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
                                 [ (x[0], x[2][0], x[2][1]) for x in absJob ],
-                                ineligible = removeSet | ineligible)
+                                ineligible = removeSet | ineligible | 
+                                                referencedTroves)
             newJob = newJob - set(absJob)
 
             outdatedItems = outdated.items()
