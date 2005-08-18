@@ -564,8 +564,7 @@ class ConaryClient:
                                                         alreadyHandled)
 				in enumerate(nodeList) if state == UNKNOWN ]
 	    while needParents:
-		containers = self.db.getTroveContainers([ x[1] for x
-							    in needParents ])
+		containers = self.db.getTroveContainers(x[1] for x in needParents)
                 newNeedParents = []
 		for (nodeId, nodeInfo), containerList in \
 				itertools.izip(needParents, containers):
@@ -888,6 +887,7 @@ class ConaryClient:
         changeSetList = []
         newItems = []
         finalCs = UpdateChangeSet()
+
         splittable = True
 
         toFind = []
@@ -1483,6 +1483,8 @@ class ConaryClient:
                                 inclusions.setdefault((name, version, flavor), 
                                                       False)
 
+            # use a list comprehension here because we're modifying the
+            # underlying dict in the cs instance
             for troveCs in [ x for x in cs.iterNewTroveList() ]:
                 if not troveCs.getNewVersion():
                     # erases get to stay since they don't have a byDefault flag

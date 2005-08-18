@@ -1312,10 +1312,12 @@ class Database:
                                               "version STRING, "
                                               "flavor STRING)", 
                                               start_transaction = False)
+        result = []
         for idx, info in enumerate(l):
             cu.execute("INSERT INTO ftc VALUES(?, ?, ?, ?)", idx, info[0],
                        info[1].asString(), info[2].freeze(), 
                        start_transaction = False)
+            result.append([])
 
         cu.execute("""SELECT idx, DBInstances.troveName, Versions.version,
                              DBFlavors.flavor
@@ -1337,7 +1339,6 @@ class Database:
                         JOIN Versions ON
                             DBInstances.versionId = Versions.versionId
                 """)
-        result = [ [] for x in l ]
         for (idx, name, version, flavor) in cu:
             result[idx].append((name, versions.VersionFromString(version),
                                 deps.deps.ThawDependencySet(flavor)))
