@@ -337,9 +337,6 @@ class ChangeSet(streams.LargeStreamSet):
         rollback = ChangeSet()
 
 	for troveCs in self.iterNewTroveList():
-            import lib
-            lib.epdb.st('f')
-
 	    if not troveCs.getOldVersion():
 		# this was a new trove, and the inverse of a new
 		# trove is an old trove
