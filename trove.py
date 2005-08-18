@@ -29,6 +29,12 @@ from streams import StringVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
+class DigitalSignatureVerificationError(Exception):
+    def __str__(self):
+        return self.message
+    def __init__(self, fingerprints):
+        self.message = "The following keys have bad digital signatures! %s" % (' '.join(fingerprints))
+
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
     _SINGLE_TROVE_TUP_VERSION = 1
@@ -113,12 +119,84 @@ class TroveInfo(streams.StreamSet):
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
-_TROVESIG_SHA1 = 0
+_DIGSIG_FINGERPRINT   = 0
+_DIGSIG_SIGNATURE     = 1
+
+class DigitalSignature(streams.StreamSet):
+    streamDict = {
+        _DIGSIG_FINGERPRINT     : ( streams.StringStream,    'fingerprint' ),
+        _DIGSIG_SIGNATURE       : ( streams.StringStream,    'signature'   ),
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+    def _mpiToLong(self, data):
+        length = ((ord(data[0]) << 8) + ord(data[1]) + 7) / 8
+        r = 0L
+        for i in range(length):
+            r <<= 8
+            r += ord(data[i + 2])
+        return r
+
+    def _longToMpi(self, data):
+        bits = data
+        l = 0
+        while bits:
+            bits /= 2
+            l += 1
+        r = chr((l >> 8) & 0xFF) + chr(l & 0xFF)
+        buf = ''
+        while data:
+            buf = chr(data & 0xFF) + buf
+            data = data >> 8
+        return r + buf
+
+    def set(self, val):
+        self.fingerprint.set(val[0])
+        numMPIs = len(val[1])
+        buf = ''
+        for i in range(0,len(val[1])):
+            buf += self._longToMpi(val[1][i])
+        self.signature.set(chr(numMPIs) + buf)
+
+    def getHexString(self,buf):
+        r=''
+        for i in range(0, len(buf)):
+            r += ( "%02X"% ord(buf[i]))
+        return r
+
+    def get(self):
+        data = self.signature()
+        numMPIs = ord(data[0])
+        index = 1
+        mpiList = []
+        for i in range(0,numMPIs):
+            lengthMPI = ((ord(data[index]) * 256) +
+                         (ord(data[index + 1]) + 7)) / 8 + 2
+            mpiList.append(self._mpiToLong(data[index:index + lengthMPI]))
+            index += lengthMPI
+        return (self.fingerprint(), tuple(mpiList))
+
+_DIGSIGS_DIGSIGNATURE     = 1
+class DigitalSignatures(streams.StreamCollection):
+    streamDict = { _DIGSIGS_DIGSIGNATURE: DigitalSignature }
+
+    def add(self, val):
+        signature = DigitalSignature()
+        signature.set(val)
+        self.addStream(1, signature)
+
+    def iter(self):
+        for signature in self.getStreams(_DIGSIGS_DIGSIGNATURE):
+            yield signature.get()
+
+_TROVESIG_SHA1   = 0
+_TROVESIG_DIGSIG = 1
 
 class TroveSignatures(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVESIG_SHA1            : ( streams.Sha1Stream,    'sha1'       ),
+        _TROVESIG_SHA1            : ( streams.Sha1Stream,    'sha1'        ),
+        _TROVESIG_DIGSIG          : ( DigitalSignatures,     'digitalSigs' ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -279,6 +357,42 @@ class Trove(streams.LargeStreamSet):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
                                                       'versionStrings' : True })
+    def addDigitalSignature(self, keyId, passPhrase):
+        from lib.openpgpkey import keyCache
+        from lib import openpgpfile
+        self.computeSignatures()
+        try:
+            key = keyCache.getPrivateKey(keyId, passPhrase)
+        except openpgpfile.KeyNotFound:
+            # FIXME: perhaps we should notify the user their secret key doesn't exist?
+            raise
+        sig = key.signString(self.sigs.sha1())
+        self.sigs.digitalSigs.add(sig)
+
+    # return codes:
+    # 0 completely unknown voracity:
+    #    either we didn't have the key or we have no reason to trust the signing key
+    # positive values indicate a successful verification
+    #   the higher the value, the more we trust the signing key
+    # missingKeys is a list of missing fingerprints. pass a (blank?) list if you care to collect them...
+    def verifyDigitalSignatures(self):
+        from lib.openpgpkey import keyCache
+        missingKeys = []
+        badFingerprints = []
+        maxTrust = 0
+        for signature in self.sigs.digitalSigs.iter():
+            try:
+                key = keyCache.getPublicKey(signature[0])
+            except openpgpfile.KeyNotFound:
+                missingKeys.append(signature[0])
+                continue
+            lev = key.verifyString(self.sigs.sha1(), signature)
+            if lev == -1:
+                badFingerprints.append(key.getFingerprint())
+            maxTrust = max(lev,maxTrust)
+        if len(badFingerprints):
+            raise DigitalSignatureVerificationError(badFingerprints)
+        return maxTrust, missingKeys
     
     def computeSignatures(self):
         s = self._sigString()
