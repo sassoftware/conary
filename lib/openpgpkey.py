@@ -51,17 +51,34 @@ class OpenPGPKey:
     def getFingerprint(self):
         return self.fingerprint
 
-    def _RandFunc(self, N):
+    def _gcf(self, a, b):
+        while b:
+            a, b = b, a%b
+        return a
+
+    def _bitLen(self, a):
+        r=0
+        while a:
+            a, r = a/2, r+1
+        return r
+
+    def _getRelPrime(self, q):
         rand=open('/dev/random','r')
-        r=rand.read(N)
+        b = self._bitLen(q)/8 + 1
+        r= 0L
+        for i in range(b):
+            r = r*256 + ord(rand.read(1))
         rand.close()
+        r %= q
+        while self._gcf(r, q-1) != 1:
+            r = (r+1) % q
         return r
 
     def signString(self, data):
         if 'DSAobj_c' in self.cryptoKey.__class__.__name__:
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
-                K = getPrime(160, self._RandFunc)
+                K = self._getRelPrime(self.cryptoKey.q)
         else:
             K=0
         return (self.fingerprint, self.cryptoKey.sign( data, K ))

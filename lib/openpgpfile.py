@@ -36,6 +36,12 @@ class IncompatibleKey:
     def __init__(self,reason="Incompatible Key"):
         error = "Incompatible Key: %s"% reason
 
+class KeyNotFound:
+    def __str__self():
+        return error
+    def __init__(self,reason = "Key Not Found"):
+        error = reason
+
 #def getHexString(buf):
 #    r=''
 #    for i in range(0, len(buf)):
@@ -259,7 +265,7 @@ def getGPGKeyTuple(keyId, secret=0, passPhrase='', keyFile=''):
     while (keyId not in getKeyId(keyRing)):
         seekNextKey(keyRing)
         if keyRing.tell() == limit:
-            return ()
+            raise KeyNotFound()
     startLoc=keyRing.tell()
     packetType=ord(keyRing.read(1))
     if secret and (not ((packetType>>2) & 1)):
