@@ -19,6 +19,8 @@ python_files=	    __init__.py		\
 		    log.py		\
 		    logger.py		\
 		    magic.py		\
+		    openpgpfile.py	\
+		    openpgpkey.py	\
 		    options.py		\
 		    patch.py		\
 		    sha1helper.py	\
