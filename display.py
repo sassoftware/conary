@@ -355,10 +355,13 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                          showFlavors)
 	changes = localTrv.diff(trove)[2]
 	changesByOld = dict(((x[0], x[1], x[3]), x) for x in changes)
-        if showDiff:
-            troveList = trove.iterTroveList()
-        else:
-            troveList = localTrv.iterTroveList()
+        troveList = trove.iterTroveList()
+        # XXX we _could_ display the local trove version for conary q,
+        # but that would be a change in behavior...
+        #if showDiff:
+        #    troveList = trove.iterTroveList()
+        #else:
+        #    troveList = localTrv.iterTroveList()
         for (troveName, ver, fla) in sorted(troveList):
 	    change = changesByOld.get((troveName, ver, fla), None)
 	    if change: 
