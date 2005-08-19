@@ -38,8 +38,8 @@ import files
 from lib import log
 from lib import patch
 from lib import sha1helper
-import trove
 from lib import util
+import trove
 import versions
 
 from build import tags
@@ -590,7 +590,8 @@ class FilesystemJob:
                     # a new file.  Even --replace-files can't help here
                     self.errors.append("non-empty directory %s is in "
                                    "the way of a newly created "
-                                   "file in %s=%s[%s]" % (headRealPath,
+                                   "file in %s=%s[%s]" % (
+                                   util.normpath(headRealPath),
                                    troveCs.getName(), 
                                    troveCs.getNewVersion().asString(),
                                    deps.formatFlavor(troveCs.getNewFlavor())))
@@ -609,7 +610,8 @@ class FilesystemJob:
 
                     if inWay:
                         self.errors.append("%s is in the way of a newly " 
-                           "created file in %s=%s[%s]" % (headRealPath, 
+                           "created file in %s=%s[%s]" % (  
+                               util.normpath(headRealPath), 
                                troveCs.getName(), 
                                troveCs.getNewVersion().asString(),
                                deps.formatFlavor(troveCs.getNewFlavor())))
@@ -665,7 +667,7 @@ class FilesystemJob:
 		    pathOkay = False
 		    finalPath = fsPath	# let updates work still
 		    self.errors.append("path conflict for %s (%s on head)" % 
-                                       (fsPath, headPath))
+                                       (util.normpath(fsPath), headPath))
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -808,7 +810,7 @@ class FilesystemJob:
 		    else:
 			contentsOkay = False
 			self.errors.append("file attributes conflict for %s"
-						% realPath)
+						% util.normpath(realPath))
 		else:
 		    # this forces the change to apply
 		    fsFile.twm(headChanges, fsFile, 
@@ -910,11 +912,12 @@ class FilesystemJob:
                                 "".join([x.asString() for x in failedHunks]),
                                 "conflicts from merging changes from " 
                                 "head into %s saved as %s.conflicts" % 
-                                (realPath, realPath))
+                            (util.normpath(realPath), util.normpath(realPath)))
 
 			contentsOkay = True
 		else:
-		    self.errors.append("file contents conflict for %s" % realPath)
+		    self.errors.append(
+                      "file contents conflict for %s" % util.normpath(realPath))
 		    contentsOkay = False
             elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.
@@ -1126,12 +1129,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 	except OSError:
             if isSrcTrove:
 		log.error("%s is missing (use remove if this is intentional)" 
-		    % path)
+		    % util.normpath(path))
                 return None
 
 	    if (flags & MISSINGFILESOKAY) == 0:
 		log.warning("%s is missing (use remove if this is intentional)" 
-		    % path)
+		    % util.normpath(path))
 
             newTrove.removeFile(pathId)
             continue

@@ -1,3 +1,6 @@
+Changes in 0.61.9:
+  * Fix a bug added in 0.61.8 that breaks tag handlers 
+
 Changes in 0.61.8:
   * Fix a bug introduced in 0.61.7 that occurred when, in the repository,
     either the Users table or Groups table was empty when creating a new group.
