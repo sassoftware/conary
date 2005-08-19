@@ -984,16 +984,8 @@ class ReadOnlyChangeSet(ChangeSet):
     def merge(self, otherCs):
         self.files.update(otherCs.files)
 
-        # update newTroves w/o overwriting this changesets primary troves
-        primaries = {}
-        for x in self.primaryTroveList:
-            trvCs = self.newTroves.get(x, None)
-            if trvCs is not None:
-                primaries[x] = trvCs
-        self.newTroves.update(otherCs.newTroves)
-        self.newTroves.update(primaries)
-
         self.primaryTroveList += otherCs.primaryTroveList
+        self.newTroves.update(otherCs.newTroves)
 
         # keep the old trove lists unique on merge.  we erase all the
         # entries and extend the existing oldTroves object because it
