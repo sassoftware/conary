@@ -253,7 +253,7 @@ def readBlockSize(keyRing,sizeType):
         raise MalformedPacekt("Can't get size of pacekt of indeterminate length")
 
 def getGPGKeyTuple(keyId, secret=0, passPhrase='', keyFile=''):
-    if keyFile == '':
+    if len(keyFile) == '':
         if secret:
             keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
         else:
@@ -320,18 +320,10 @@ def makeKey(keyTuple):
         return DSA.construct(keyTuple)
 
 def getPublicKey(keyId, keyFile=''):
-    if keyFile:
-        keyTuple = getGPGKeyTuple(keyId, 0, '', keyFile)
-    else:
-        keyTuple = getGPGKeyTuple(keyId)
-    return makeKey(keyTuple)
+    return makeKey(getGPGKeyTuple(keyId, 0, '', keyFile))
 
 def getPrivateKey(keyId,passPhrase='', keyFile=''):
-    if keyFile:
-        keyTuple = getGPGKeyTuple(keyId, 1, passPhrase, keyFile)
-    else:
-        keyTuple = getGPGKeyTuple(keyId, 1, passPhrase)
-    return makeKey(keyTuple)
+    return makeKey(getGPGKeyTuple(keyId, 1, passPhrase, keyFile))
 
 def getFingerprint( keyId, keyFile=''):
     if keyFile == '':

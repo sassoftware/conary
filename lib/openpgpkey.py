@@ -36,7 +36,7 @@ class OpenPGPKey:
         ###change when implement trust levels
         self.trustLevel = 255
         #translate the keyId to the fingerprint for consistency
-        self.fingerprint = getFingerprint (keyId)
+        self.fingerprint = getFingerprint (keyId, keyFile)
         if private:
             self.cryptoKey = getPrivateKey(keyId, passPhrase, keyFile)
         else:
