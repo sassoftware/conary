@@ -363,34 +363,39 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
         #else:
         #    troveList = localTrv.iterTroveList()
         for (troveName, ver, fla) in sorted(troveList):
-	    change = changesByOld.get((troveName, ver, fla), None)
-	    if change: 
-		newVer, newFla = change[2], change[4]
-		needFlavor = newFla is not None and newFla != fla
-	    else:
-		needFlavor = showFlavors
+            if not showDiff:
+                _displayOneTrove(troveName, ver, fla,
+                             fullVersions or ver.branch() != version.branch(),
+                             showFlavors, format=_grpFormat)
+            else:
+                change = changesByOld.get((troveName, ver, fla), None)
+                if change: 
+                    newVer, newFla = change[2], change[4]
+                    needFlavor = newFla is not None and newFla != fla
+                else:
+                    needFlavor = showFlavors
 
-            _displayOneTrove(troveName, ver, fla,
+                _displayOneTrove(troveName, ver, fla,
                              fullVersions or ver.branch() != version.branch(),
                              needFlavor, format=_grpFormat)
-	    change = changesByOld.get((troveName, ver, fla), None)
-	    if change: 
-		if newVer is None:
-                    try:
-                        tups = db.findTrove(None, troveName)
-                    except:
-                        print '  --> (Deleted or Not Installed)'
+                change = changesByOld.get((troveName, ver, fla), None)
+                if change: 
+                    if newVer is None:
+                        try:
+                            tups = db.findTrove(None, troveName)
+                        except:
+                            print '  --> (Deleted or Not Installed)'
+                        else:
+                            print ('  --> Not linked to parent trove - potential'
+                                   ' replacements:')
+                            for (dummy, newVer, newFla) in tups:
+                                _displayOneTrove(troveName, newVer, newFla,
+                                 fullVersions or newVer.branch() != ver.branch(),
+                                 needFlavor, format=_chgFormat)
                     else:
-                        print ('  --> Not linked to parent trove - potential'
-                               ' replacements:')
-                        for (dummy, newVer, newFla) in tups:
-                            _displayOneTrove(troveName, newVer, newFla,
+                        _displayOneTrove(troveName, newVer, newFla,
                              fullVersions or newVer.branch() != ver.branch(),
-                             needFlavor, format=_chgFormat)
-		else:
-		    _displayOneTrove(troveName, newVer, newFla,
-			 fullVersions or newVer.branch() != ver.branch(),
-                             needFlavor, format=_chgFormat)
+                                 needFlavor, format=_chgFormat)
 
 
 	    
