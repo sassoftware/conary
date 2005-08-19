@@ -557,10 +557,7 @@ class FilesystemJob:
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
 	    if headPath[0] == '/':
-                if root != '/':
-                    headRealPath = root + headPath
-                else:
-                    headRealPath = headPath
+                headRealPath = root + headPath
 	    else:
 		headRealPath = cwd + "/" + headPath
 
