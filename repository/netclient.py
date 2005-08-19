@@ -551,12 +551,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     continue
 
                 serverName = new.branch().label().getHost()
-                if not serverJobs.has_key(serverName):
-                    serverJobs[serverName] = []
 
                 if old:
                     if old.branch().label().getHost() == serverName:
-                        serverJobs[serverName].append((troveName, 
+                        l = serverJobs.setdefault(serverName, [])
+                        l.append((troveName, 
                                   (self.fromVersion(old), 
                                    self.fromFlavor(oldFlavor)), 
                                   (self.fromVersion(new), 
@@ -566,7 +565,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         ourJobList.append((troveName, (old, oldFlavor),
                                            (new, newFlavor), absolute))
                 else:
-                    serverJobs[serverName].append((troveName, 
+                    l = serverJobs.setdefault(serverName, [])
+                    l.append((troveName, 
                               (0, 0),
                               (self.fromVersion(new), 
                                self.fromFlavor(newFlavor)),
