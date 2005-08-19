@@ -253,7 +253,7 @@ def readBlockSize(keyRing,sizeType):
         raise MalformedPacekt("Can't get size of pacekt of indeterminate length")
 
 def getGPGKeyTuple(keyId, secret=0, passPhrase='', keyFile=''):
-    if len(keyFile) == '':
+    if keyFile == '':
         if secret:
             keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
         else:
