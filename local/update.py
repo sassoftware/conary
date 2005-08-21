@@ -347,13 +347,16 @@ class FilesystemJob:
 	    f.close()
 	    log.warning(msg)
 
-        if 'user-info' in self.tagUpdates and not _checkHandler('user-info', self.root):
+        if ('group-info' in self.tagUpdates
+            and not _checkHandler('group-info', self.root)):
+            groupAction(self.root, self.tagUpdates['group-info'])
+	    del self.tagUpdates['group-info']
+
+        if ('user-info' in self.tagUpdates
+            and not _checkHandler('user-info', self.root)):
             userAction(self.root, self.tagUpdates['user-info'])
 	    del self.tagUpdates['user-info']
 
-        if 'group-info' in self.tagUpdates and not _checkHandler('group-info', self.root):
-            groupAction(self.root, self.tagUpdates['group-info'])
-	    del self.tagUpdates['group-info']
 
 	if 'shlib' in self.tagUpdates:
 	    shlibAction(self.root, self.tagUpdates['shlib'],
