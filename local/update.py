@@ -102,7 +102,7 @@ class FilesystemJob:
     def preapply(self, tagSet = {}, tagScript = None):
 	# this is run before the change make it to the database
 	rootLen = len(self.root)
-	tagCommands = tagCommand()
+	tagCommands = TagCommand()
 
         for path in self.tagRemoves.get('taghandler', []):
             path = path[rootLen:]
@@ -185,7 +185,7 @@ class FilesystemJob:
 
 	# this is run after the changes are in the database (but before
 	# they are committed
-	tagCommands = tagCommand()
+	tagCommands = TagCommand()
 	runLdconfig = False
 	rootLen = len(self.root)
 
@@ -1415,7 +1415,7 @@ def _checkHandler(root, tag):
     # the handler (at least in rpath linux) is multitag
     return os.access('/'.join((root, '/etc/conary/tags', tag)), os.R_OK)
 
-class _infoFile(dict):
+class _InfoFile(dict):
     """
     Simple object for bootstrapping editing /etc/passwd and /etc/group
     This object is only used before the user-info and group-info tag
@@ -1458,8 +1458,8 @@ class _infoFile(dict):
         while self.hasId(str(id)):
             id += 1
         return str(id)
-    
-    def Id(self, name):
+
+    def id(self, name):
         return self[name][self._idfield]
 
     def getList(self, name):
@@ -1478,6 +1478,16 @@ class _infoFile(dict):
             l = [item]
         self[name][self._listfield] = ','.join(l)
 
+    def cmpLine(self, a, b):
+        # sort numerically on id
+        x = int(a[self._idfield])
+        y = int(b[self._idfield])
+        if x > y:
+            return 1
+        if x < y:
+            return -1
+        return 0
+
     def write(self):
         if self._modified:
             # this is only a bootstrap for when the taghandler isn't
@@ -1486,11 +1496,13 @@ class _infoFile(dict):
             fileName = '/'.join((self._root, self._path))
             f = file(fileName, 'w+')
             os.chmod(fileName, 0644)
-            f.writelines(['%s\n' %(':'.join(x)) for x in self._lines])
+            # sort lines based on id
+            lines = sorted(self._lines, self.cmpLine)
+            f.writelines(['%s\n' %(':'.join(x)) for x in lines])
             f.close()
 
 
-class _keyVal(dict):
+class _KeyVal(dict):
     def __init__(self, path):
         f = file(path)
         for line in f.readlines():
@@ -1498,21 +1510,20 @@ class _keyVal(dict):
             self[key] = val.split('\n')[0]
         f.close()
 
-
 def userAction(root, userFileList):
-    passwd = _infoFile(root, '/etc/passwd', 0, 2, None,
+    passwd = _InfoFile(root, '/etc/passwd', 0, 2, None,
                        ['root', '*', '0', '0', 'root', '/root', '/bin/bash'])
-    group = _infoFile(root, '/etc/group', 0, 2, 3,
+    group = _InfoFile(root, '/etc/group', 0, 2, 3,
                       ['root', '*', '0', 'root' ])
     for path in userFileList:
-        f = _keyVal(path)
+        f = _KeyVal(path)
         f.setdefault('USER', os.path.basename(path))
         f.setdefault('PREFERRED_UID', '1')
         if passwd.hasId(f['PREFERRED_UID']):
             f['PREFERRED_UID'] = passwd.newId()
         f.setdefault('GROUP', f['USER'])
         if f['GROUP'] in group:
-            f['GROUPID'] = group.Id(f['GROUP'])
+            f['GROUPID'] = group.id(f['GROUP'])
         else:
             f.setdefault('GROUPID', f['PREFERRED_UID'])
             if group.hasId(f['GROUPID']):
@@ -1537,13 +1548,13 @@ def userAction(root, userFileList):
             group.extendList(groupName, f['USER'])
     passwd.write()
     group.write()
-        
+
 
 def groupAction(root, groupFileList):
-    group = _infoFile(root, '/etc/group', 0, 2, 3,
+    group = _InfoFile(root, '/etc/group', 0, 2, 3,
                       ['root', '*', '0', 'root' ])
     for path in groupFileList:
-        f = _keyVal(path)
+        f = _KeyVal(path)
         f.setdefault('GROUP', os.path.basename(path))
         if f['GROUP'] not in group:
             if group.hasId(f['PREFERRED_GID']):
@@ -1555,7 +1566,7 @@ def groupAction(root, groupFileList):
     group.write()
 
 
-class handlerInfo:
+class HandlerInfo:
     def __init__(self):
         self.tagToFile = {} # {tagInfo: fileList}
         self.fileToTag = {} # {fileName: tagInfoList}
@@ -1566,7 +1577,7 @@ class handlerInfo:
             l = self.fileToTag.setdefault(file, [])
             l.append(tagInfo)
 
-class tagCommand:
+class TagCommand:
     def __init__(self):
         self.commandOrder = (
             ('handler', 'preremove'),
@@ -1577,7 +1588,7 @@ class tagCommand:
         )
         self.commands = {
             'handler': {
-                'update':    {}, # {handler: handlerInfo}
+                'update':    {}, # {handler: HandlerInfo}
                 'preremove': {},
             },
             'files': {
@@ -1589,7 +1600,7 @@ class tagCommand:
 
     def addCommand(self, tagInfo, updateType, updateClass, fileList):
         h = self.commands[updateType][updateClass].setdefault(
-            tagInfo.file, handlerInfo())
+            tagInfo.file, HandlerInfo())
         h.update(tagInfo, fileList)
 
     def _badMultiTag(self, tagInfoList):
