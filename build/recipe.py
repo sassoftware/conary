@@ -21,7 +21,7 @@ import errno
 from fnmatch import fnmatchcase
 import imp
 import inspect
-from itertools import izip
+from itertools import chain,izip
 import new
 import os
 import string
@@ -44,7 +44,7 @@ from lib import util
 from local import database
 import macros
 import packagepolicy
-from repository import repository
+from repository import repository,trovesource
 import source
 import use
 import updatecmd
@@ -481,7 +481,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         """
         # first search on the labelPath.  
         try:
-            troves = db.findTrove(labelPath, (name, flavor, versionStr))
+            troves = db.findTrove(labelPath, (name, versionStr, flavor))
             if len(troves) > 1:
                 raise RuntimeError, (
                                 'Multiple troves could match loadInstalled' 
@@ -493,7 +493,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if labelPath is None:
             return None
         try:
-            troves = db.findTrove(None, (name, flavor, versionStr))
+            troves = db.findTrove(None, (name, versionStr, flavor))
             if len(troves) > 1:
                 raise RuntimeError, (
                                 'Multiple troves could match loadRecipe' 
@@ -1280,139 +1280,149 @@ RecipeLoader.addRecipeToCopy(AutoPackageRecipe)
 class SingleGroup:
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True):
-        assert(flavor is None or isinstance(flavor, str))
+                 byDefault = None, ref = None):
+        self.addTroveList.append((name, versionStr, flavor, source, 
+				  byDefault, ref)) 
 
-        if flavor is not None:
-            flavorObj = deps.parseFlavor(flavor)
-            if flavorObj is None:
-                raise ValueError, 'invalid flavor: %s' % flavor
-        else:
-            flavorObj = None
+    def removeTrove(self, name, versionStr = None, flavor = None):
+        self.removeTroveList.append((name, versionStr, flavor))
 
-        self.addTroveList.append((name, versionStr, flavorObj, source, 
-				  byDefault))
+    def addAllTroves(self, reference, byDefault = None):
+        self.addReferenceList.append((reference, byDefault))
 
-    def addNewGroup(self, name, byDefault):
+    def addNewGroup(self, name, byDefault = None):
 	self.newGroupList.append([ name, byDefault ])
 
-    def findTroves(self, cfg, repos, labelPath):
+    def setByDefault(self, byDefault):
+        assert(isinstance(byDefault, bool))
+	self.byDefault = byDefault
+
+    def _foundTrove(self, troveTup, size, byDefault, isRedirect):
+        self.troves[troveTup] = (size, byDefault)
+        if isRedirect:
+            # we check later to ensure that all redirects added 
+            # by addTrove lines (or other means) are removed
+            # by removeTrove lines later.
+            self.redirects.add(troveTup)
+
+    def findTroves(self, troveMap, cfg, repos, labelPath, flavor):
+        self._findTroves(troveMap)
+        self._removeTroves(repos)
+
+        if self.autoResolve:
+            self._resolveDependencies(cfg, repos, labelPath)
+        elif self.depCheck:
+            failedDeps = self._checkDependencies(cfg, repos, labelPath)
+            if failedDeps:
+                return failedDeps
+
+        self._checkForRedirects()
+
         self.size = 0
-
-        def _findTroves(addTroveList):
-            validSize = True
-            troveList = []
-            flavorMap = {}
-            findTroveList = []
-            size = 0
-            troveVersionFlavors = {}
-            for (name, versionStr, flavor, source, byDefault) in addTroveList:
-                desFlavor = cfg.buildFlavor.copy()
-                if flavor is not None:
-                    desFlavor = deps.overrideFlavor(desFlavor, flavor)
-                findTroveList.append((name, versionStr, desFlavor))
-                flavorMap[flavor] = desFlavor
-            try:
-                results = repos.findTroves(labelPath, findTroveList)
-            except repository.TroveNotFound, e:
-                raise RecipeFileError, str(e)
-            for (name, versionStr, flavor, source, byDefault) in addTroveList:
-                desFlavor = flavorMap[flavor]
-                pkgList = results[name, versionStr, desFlavor]
-                troveList.append((pkgList[0], byDefault))
-                assert(desFlavor.score(pkgList[0][2]) is not False)
-
-            troves = repos.getTroves([ x[0] for x in troveList ], 
-                                          withFiles = False)
-
-            for (((name, v, f), byDefault), trove) in izip(troveList, troves):
-                if trove.isRedirect():
-                    raise RecipeFileError, \
-                            "%s is a redirect, which are not allowed in groups" \
-                            % name
-
-                l = troveVersionFlavors.get(name, [])
-                if (v, f) not in l:
-                    l.append((v,f, byDefault))
-                troveVersionFlavors[name] = l
-                # XXX this code is to deal with troves that existed 
-                # before troveInfo was added
-                if validSize:
-                    size = trove.getSize()
-                    # allow older changesets that are missing size
-                    # info to be added ( this will make the size
-                    # invalid, so don't store it)
-                    if size is not None:
-                        size += trove.getSize()
-                    else:
-                        validSize = False
-
-            if not validSize:
-                size = None
-
-            return (troveVersionFlavors, size)
-
-        troveDict, self.size = _findTroves(self.addTroveList)
-        self.troveVersionFlavors.update(troveDict)
-
-        failedList = []
-
-        if self.depCheck:
-            troves = []
-            for name, l in self.troveVersionFlavors.iteritems():
-                troves += [ (name, (None, None),
-                              (x[0], x[1]), True ) for x in l ]
-            depCs = repos.createChangeSet(troves, recurse = True, 
-                                          withFiles = False)
-            db = database.Database(':memory:', ':memory:')
-            failedList = db.depCheck(depCs)[0]
-        elif self.autoResolve:
-            # set up configuration
-            oldDbPath = cfg.dbPath
-            cfg.setValue('dbPath', ':memory:')
-            oldRoot = cfg.root
-            cfg.setValue('root', ':memory:')
-            oldInstallLabelPath = cfg.installLabelPath
-            if not self.autoResolveLabelPath:
-                resolveLabelPath = labelPath
-            else:
-                resolveLabelPath = [versions.Label(x)
-                                    for x in self.autoResolveLabelPath]
-            cfg.installLabelPath = resolveLabelPath
-            oldAutoResolve = cfg.autoResolve
-            cfg.autoResolve = True
-            # set up a conaryclient to do the dep solving
-            client = conaryclient.ConaryClient(cfg)
-
-            # build a list of the troves that we're checking so far
-            troves = []
-            for name, l in self.troveVersionFlavors.iteritems():
-                troves += [ (name, x[0], x[1]) for x in l ]
-            updJob, suggMap = client.updateChangeSet(troves, recurse = True,
-                                                     resolveDeps = True,
-                                                     test = True)
-            # restore config
-            cfg.setValue('dbPath', oldDbPath)
-            cfg.setValue('root', oldRoot)
-            cfg.installLabelPath = oldInstallLabelPath
-            cfg.autoResolve = oldAutoResolve
-
-            # build the list of things to include
-            needed = set()
-            for suggList in suggMap.itervalues():
-                # remove duplicates and build up tuple of
-                # (name, versionStr, flavor, source, byDefault)
-                needed.update(set((x[0], x[1].asString(), x[2], False, True)
-                                  for x in suggList))
-
-            # add things required to satisfy deps to troveVersionFlavors
-            # and update our size
-            troveDict, size = _findTroves(list(needed))
-            if size:
+        validSize = True
+        for (n,v,f), (size, byDefault) in self.troves.iteritems():
+            if size is None:
+                validSize = False
+                self.size = None
+            if validSize:
                 self.size += size
-            self.troveVersionFlavors.update(troveDict)
+            l = self.troveVersionFlavors.setdefault(n,[])
+            l.append((v,f,byDefault))
 
-        return failedList
+        return []
+
+    def _findTroves(self, troveMap):
+        """ given a trove map which already contains a dict for all queries
+            needed for all groups cooked, pick out those troves that 
+            are relevant to this group.
+        """
+        validSize = True
+        self.troves = {}
+
+        for (name, versionStr, flavor, source, byDefault, refSource) \
+                                                    in self.addTroveList:
+            troveList = troveMap[refSource][name, versionStr, flavor]
+
+            if byDefault is None:
+                byDefault = self.byDefault
+            
+            for (troveTup, size, isRedirect) in troveList:
+                self._foundTrove(troveTup, size, byDefault, isRedirect)
+
+        # these are references which were used in addAllTroves() commands
+        for refSource, byDefault in self.addReferenceList:
+            troveList = refSource.getSourceTroves()
+            troveTups = [ x for x in chain(
+                                *[x.iterTroveList() for x in troveList])]
+            troveList = refSource.getTroves(troveTups, withFiles=False)
+
+            if byDefault is None:
+                byDefault = self.byDefault
+
+            for (troveTup, trv) in izip(troveTups, troveList):
+                self._foundTrove(troveTup, trv.getSize(), byDefault, 
+                                 trv.isRedirect())
+
+    def _resolveDependencies(self, cfg, repos, labelPath):
+        """ adds the troves needed to to resolve all open dependencies 
+            in this group.  Will raise an error if not all dependencies
+            can be resolved.  
+        """
+        #FIXME: this should probably be able to resolve against
+        # other trove source than the repository.
+
+        # set up configuration
+        oldDbPath = cfg.dbPath
+        cfg.setValue('dbPath', ':memory:')
+        oldRoot = cfg.root
+        cfg.setValue('root', ':memory:')
+        oldInstallLabelPath = cfg.installLabelPath
+        resolveLabelPath = labelPath
+        cfg.installLabelPath = labelPath
+        oldAutoResolve = cfg.autoResolve
+        cfg.autoResolve = True
+        # set up a conaryclient to do the dep solving
+        client = conaryclient.ConaryClient(cfg)
+
+        # build a list of the troves that we're checking so far
+        updJob, suggMap = client.updateChangeSet(self.troves, recurse = True,
+                                                 resolveDeps = True,
+                                                 test = True)
+        # restore config
+        cfg.setValue('dbPath', oldDbPath)
+        cfg.setValue('root', oldRoot)
+        cfg.installLabelPath = oldInstallLabelPath
+        cfg.autoResolve = oldAutoResolve
+        neededTups = set(chain(*suggMap.itervalues()))
+        troves = repos.getTroves(neededTups, withFiles=False)
+        for troveTup, trv in izip(neededTups, troves):
+            self._foundTrove(troveTup, trv.getSize(), self.byDefault,
+                             trv.isRedirect())
+
+    def _checkDependencies(self, repos):
+        troves = [ (n, (None, None), (v, f), True) \
+                                        for (n,v,f) in self.troves ]
+        depCs = repos.createChangeSet(troves, recurse = True, 
+                                      withFiles = False)
+        db = database.Database(':memory:', ':memory:')
+        return db.depCheck(depCs)[0]
+
+    def _removeTroves(self, source):
+        groupSource = trovesource.GroupRecipeSource(source, self)
+        groupSource.searchAsDatabase()
+        results = groupSource.findTroves(None, self.removeTroveList)
+        troveTups = chain(*results.itervalues())
+        for troveTup in troveTups:
+            del self.troves[troveTup]
+            self.redirects.discard(troveTup)
+
+    def _checkForRedirects(self):
+        if self.redirects:
+            redirects = [('%s=%s[%s]' % (n,v.asString(),deps.formatFlavor(f))) \
+                                        for (n,v,f) in sorted(self.redirects)]
+            raise RecipeFileError, \
+                "found redirects, which are not allowed in groups: \n%s" \
+                    % '\n'.join(redirects)
 
     def getRequires(self):
         return self.requires
@@ -1423,24 +1433,67 @@ class SingleGroup:
     def getNewGroupList(self):
 	return self.newGroupList
 
-    def __init__(self, depCheck, autoResolve, autoResolveLabelPath):
+    def __init__(self, depCheck, autoResolve, byDefault = True):
+        self.redirects = set()
         self.addTroveList = []
+        self.addReferenceList = []
+        self.removeTroveList = []
         self.newGroupList = []
         self.requires = deps.DependencySet()
 	self.troveVersionFlavors = {}
+
         self.depCheck = depCheck
         self.autoResolve = autoResolve
-        self.autoResolveLabelPath = autoResolveLabelPath
+        self.byDefault = byDefault
 
     def Requires(self, requirement):
         self.requires.addDep(deps.TroveDependencies, 
                              deps.Dependency(requirement))
 
+class _GroupReference:
+    """ A reference to a set of troves, created by a trove spec, that 
+        can be searched like a repository using findTrove.  Hashable
+        by the trove spec(s) given.  Note the references can be 
+        recursive -- This reference could be relative to another 
+        reference, passed in as the upstreamSource.
+    """
+    def __init__(self, troveSpecs, upstreamSource=None):
+        self.troveSpecs = troveSpecs
+        self.upstreamSource = upstreamSource
+
+    def __hash__(self):
+        return hash((self.troveSpecs, self.upstreamSource))
+
+    def findSources(self, repos, labelPath, flavorPath):
+        """ Find the troves that make up this trove reference """
+        if self.upstreamSource is None:
+            source = repos
+        else:
+            source = self.upstreamSource
+
+        results = source.findTroves(labelPath, self.troveSpecs, flavorPath)
+        troveTups = [ x for x in chain(*results.itervalues())]
+        self.sourceTups = troveTups
+        self.source = trovesource.TroveListTroveSource(source, troveTups)
+        self.source.searchAsRepository()
+
+    def findTroves(self, *args, **kw):
+        return self.source.findTroves(*args, **kw)
+
+    def getTroves(self, *args, **kw):
+        return self.source.getTroves(*args, **kw)
+
+    def getSourceTroves(self):
+        """ Returns the list of troves that form this reference 
+            (without their children).
+        """
+        return self.getTroves(self.sourceTups, withFiles=False)
+
+
 class GroupRecipe(Recipe):
     Flags = use.LocalFlags
     depCheck = False
     autoResolve = False
-    autoResolveLabelPath = []
 
     def Requires(self, requirement, groupName = None):
         if requirement[0] == '/':
@@ -1449,18 +1502,84 @@ class GroupRecipe(Recipe):
 
         self.groups[groupName].Requires(requirement)
 
-    def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True, groupName = None):
-        if groupName is None:
-            groupName = [self.name]
-        elif not isinstance(groupName, (list, tuple)):
-            groupName = [groupName]
+    def _parseFlavor(self, flavor):
+        assert(flavor is None or isinstance(flavor, str))
+        if flavor is None:
+            return None
+        flavorObj = deps.parseFlavor(flavor)
+        if flavorObj is None:
+            raise ValueError, 'invalid flavor: %s' % flavor
+        return flavorObj
 
-        for thisGroupName in groupName:
-            self.groups[thisGroupName].addTrove(name, versionStr = versionStr,
+    def _parseGroupNames(self, groupName):
+        if groupName is None:
+            return [self.name]
+        elif not isinstance(groupName, (list, tuple)):
+            return [groupName]
+        else:
+            return groupName
+
+    def addTrove(self, name, versionStr = None, flavor = None, source = None,
+                 byDefault = None, groupName = None, ref=None):
+        groupNames = self._parseGroupNames(groupName)
+        flavor = self._parseFlavor(flavor)
+        # track this trove in the GroupRecipe so that it can be found
+        # as a group with the rest of the troves.
+        self.toFind.setdefault(ref, set()).add((name, versionStr, flavor))
+        if ref is not None:
+            self.sources.add(ref)
+
+        for groupName in groupNames:
+            self.groups[groupName].addTrove(name, versionStr = versionStr,
                                                 flavor = flavor,
                                                 source = source,
-                                                byDefault = byDefault)
+                                                byDefault = byDefault, 
+                                                ref = ref)
+
+    def setByDefault(self, byDefault=True, groupName=None):
+        """ Set whether troves added to this group are installed by default 
+            or not.  (This default value can be overridden by the byDefault
+            parameter to individual addTrove commands).  If you set the 
+            byDefault value for the main group, you set it for any 
+            future groups created.
+        """
+        groupNames = self._parseGroupNames()
+        for groupName in groupNames:
+            self.groups[groupName].setByDefault(byDefault)
+
+    def addAllTroves(self, reference, groupName=None):
+        """ Add all of the troves directly contained in the given 
+            reference to groupName.  For example, if the cooked group-foo 
+            contains references to the troves 
+            foo1=<version>[flavor] and foo2=<version>[flavor],
+            the lines 
+            ref = r.addReference('group-foo')
+            followed by
+            r.addAllTroves(ref)
+            would be equivalent to you having added the addTrove lines
+            r.addTrove('foo1', <version>) 
+            r.addTrove('foo2', <version>) 
+        """
+        assert(reference is not None)
+        self.sources.add(reference)
+
+        groupNames = self._parseGroupNames(groupName)
+        for groupName in groupNames:
+            self.groups[groupName].addAllTroves(reference)
+
+    def removeTrove(self, name, versionStr=None, flavor=None, 
+                    groupName=None):
+        """ Remove a trove added to this group, either by an addAllTroves
+            line or by an addTrove line. 
+        """
+        groupNames = self._parseGroupNames(groupName)
+        flavor = self._parseFlavor(flavor)
+        for groupName in groupNames:
+            self.groups[groupName].removeTrove(name, versionStr, flavor)
+
+    def addReference(self, name, versionStr=None, flavor=None, ref=None):
+        flavor = self._parseFlavor(flavor)
+        return _GroupReference(((name, versionStr, flavor),), ref)
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
 	if groupName is None:
@@ -1470,11 +1589,6 @@ class GroupRecipe(Recipe):
 	    raise RecipeFileError, 'group %s has not been created' % name
 
 	self.groups[groupName].addNewGroup(name, byDefault)
-
-    def findTroves(self, groupName = None):
-        if groupName is None: groupName = self.name
-        return self.groups[groupName].findTroves(self.cfg, self.repos, 
-                                                 self.labelPath)
 
     def getRequires(self, groupName = None):
         if groupName is None: groupName = self.name
@@ -1496,16 +1610,83 @@ class GroupRecipe(Recipe):
         self.labelPath = [ versions.Label(x) for x in path ]
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
-                    autoResolveLabelPath = []):
+                    byDefault = None):
         if self.groups.has_key(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
-        self.groups[groupName] = SingleGroup(depCheck, autoResolve,
-                                             autoResolveLabelPath)
+        if byDefault is None:
+            byDefault = self.groups[self.name].byDefault
+        self.groups[groupName] = SingleGroup(depCheck, autoResolve, byDefault)
 
     def getGroupNames(self):
         return self.groups.keys()
+
+    def findTroves(self, groupName=None):
+        if groupName is None:
+            groupName = self.name
+
+        if self.toFind is not None:
+            self._findSources()
+            self._findTroves()
+            self.toFind = None
+        return self.groups[groupName].findTroves(self.troveSpecMap, 
+                                                 self.cfg, self.repos, 
+                                                 self.labelPath, self.flavor)
+
+    def _findSources(self):
+        for troveSource in self.sources:
+            if troveSource is None:
+                continue
+            troveSource.findSources(self.repos, self.labelPath, self.flavor)
+
+    def _findTroves(self):
+        """ Finds all the troves needed by all groups, and then 
+            stores the information for retrieval by the individual 
+            groups (stored in troveSpecMap).
+        """
+        repos = self.repos
+        cfg = self.cfg
+
+        troveTups = set()
+
+        results = {}
+        for troveSource, toFind in self.toFind.iteritems():
+            try:
+                if troveSource is None:
+                    source = repos
+                else:
+                    source = troveSource
+
+                results[troveSource] = source.findTroves(self.labelPath, 
+                                                         toFind, 
+                                                         cfg.buildFlavor)
+            except repository.TroveNotFound, e:
+                raise RecipeFileError, str(e)
+            for result in results.itervalues():
+                troveTups.update(chain(*result.itervalues()))
+
+        troveTups = list(troveTups)
+        troves = repos.getTroves(troveTups, withFiles=False)
+
+        foundTroves = dict(izip(troveTups, troves))
+
+        troveSpecMap = {}
+        # store the pertinent information in troveSpecMap
+        # keyed off of source, then troveSpec
+        # note - redirect troves are not allowed in group recipes.
+        # we track whether a trove is a redirect because it's possible
+        # it could be added at one point (say, by an overly general
+        # addTrove line) and then removed afterwards by a removeTrove.
+        for troveSource, toFind in self.toFind.iteritems():
+            d = {}
+            for troveSpec in toFind:
+                d[troveSpec] = [ (x,
+                                  foundTroves[x].getSize(), 
+                                  foundTroves[x].isRedirect()) 
+                                    for x in results[troveSource][troveSpec] ]
+            troveSpecMap[troveSource] = d
+        self.troveSpecMap = troveSpecMap
 
     def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
@@ -1514,9 +1695,14 @@ class GroupRecipe(Recipe):
 	self.flavor = flavor
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
+
+        self.toFind = {}
+        self.troveSpecMap = {}
+        self.foundTroves = {}
+        self.sources = set()
+
         self.groups = {}
-        self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve,
-                                             self.autoResolveLabelPath)
+        self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve)
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
