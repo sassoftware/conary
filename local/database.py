@@ -12,24 +12,28 @@
 # full details.
 #
 
-import datastore
-from callbacks import UpdateCallback
-from repository import changeset
+#stdlib
 import errno
+import os
+import shutil
+
+#conary
+from build import tags
+from callbacks import UpdateCallback
+import datastore
+from deps import deps
+from lib import log
+from lib import util
+import localrep
+from repository import changeset
 from repository import filecontents
 from repository import filecontainer
-from lib import log
-import localrep
-import os
 from repository import repository
-import shutil
+from repository import trovesource
 import sqldb
 import trove
 import update
-from lib import util
 import versions
-from build import tags
-from deps import deps
 
 OldDatabaseSchema = sqldb.OldDatabaseSchema
 
@@ -101,7 +105,8 @@ class UpdateJob:
         self.lockMapping = set()
         self.rollback = None
 
-class SqlDbRepository(datastore.DataStoreRepository,
+class SqlDbRepository(trovesource.SimpleTroveSource,
+                      datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 
     def iterAllTroveNames(self):
@@ -160,11 +165,12 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def hasTroveByName(self, name):
 	return self.db.hasByName(name)
 
+    def trovesByName(self, name):
+	return [ (name, x[0], x[1]) \
+                    for x in self.db.iterVersionByName(name, True) ]
+
     def hasTroves(self, troves):
         return self.db.hasTroves(troves)
-
-    def trovesByName(self, names):
-        return self.db.trovesByName(names)
 
     def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
@@ -301,6 +307,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
         datastore.DataStoreRepository.__init__(self, path,
                            dataStore = localrep.SqlDataStore(self.db.db))
         repository.AbstractRepository.__init__(self)
+        trovesource.SimpleTroveSource.__init__(self)
 
 class Database(SqlDbRepository):
 
@@ -340,7 +347,7 @@ class Database(SqlDbRepository):
         for name in names.iterkeys():
             # get the current troves installed
             try:
-                instList += self.findTrove(None, name)
+                instList += self.trovesByName(name)
             except repository.TroveNotFound, e:
                 pass
 
@@ -684,107 +691,6 @@ class Database(SqlDbRepository):
         """
         return self.db.getTrovesWithProvides(depSetList)
     
-    def findTrove(self, labelPath, troveName, reqFlavor=None, 
-                                              versionStr = None):
-        # unlike with netclient.findTrove, lack of a label path 
-        # means search _all_ labels.
-        versionList = self.getTroveVersionList(troveName)
-        if not versionList:
-            raise repository.TroveNotFound, \
-                    "trove %s is not installed" % troveName
-        if not labelPath:
-            # we create a set of all labels that this trove is on
-            # this allows us to treat requests that use a labelPath and
-            # those that don't equivalently, but may be slightly slower 
-            # generally this list should be relatively short, though.
-            labelPath = set([x.branch().label() for x in versionList])
-            labelPath = list(labelPath)
-        if not type(labelPath) == list:
-            labelPath = [ labelPath ]
-        if not versionStr:
-            versionList = [ x for x in versionList \
-                                        if x.branch().label() in labelPath ] 
-        elif versionStr[0] == '/':
-            versionList = self.getTroveVersionList(troveName)
-            try:
-                version = versions.VersionFromString(versionStr)
-            except ParseError:
-                raise repository.TroveNotFound, \
-                                    "invalid version %s" % versionStr
-            if isinstance(version, versions.Version):
-                versionList = [ v for v in versionList if v == version ]
-            elif isinstance(version, versions.Branch):
-                versionList = [ v for v in versionList if \
-                                                    v.branch() == version ]
-        elif not versionStr.count('@') and versionStr[0] != ':':
-            versionList = self.getTroveVersionList(troveName)
-            if versionStr.find('-') != -1:
-                try:
-                    verRel = versions.Revision(versionStr)
-                    versionList = [ x for x in versionList \
-                                    if (x.trailingRevision() == verRel 
-                                        and x.branch().label() in labelPath) ] 
-                except versions.ParseError, e:
-                    raise RuntimeError, 'invalid revision %s' % versionStr
-            else:
-                versionList = [ x for x in versionList \
-                                if (x.trailingRevision().version == versionStr 
-                                    and x.branch().label() in labelPath) ] 
-        else:
-            if versionStr.count('/') != 0:
-                raise repository.TroveNotFound, \
-                            "invalid version %s" % versionStr
-            # these versionStrs affect the labels on the labelPath
-
-            if versionStr[0] == ':':
-                # just a branch tag was specified
-                if (versionStr.count('@'), versionStr.count(':')) != (0,1): 
-                    raise repository.TroveNotFound, \
-                            "invalid branch name %s" % versionStr
-
-                repositories = [(x.getHost(), x.getNamespace()) \
-                                                        for x in labelPath ]
-                labelPath = []
-                for serverName, namespace in repositories:
-                    labelPath.append(
-                        versions.Label("%s@%s%s" % (serverName, namespace, 
-                                                                versionStr)))
-            elif versionStr[0] == '@':
-                # just a branch name was specified
-                if (versionStr.count('@'), versionStr.count(':')) != (1,1): 
-                    raise repository.TroveNotFound, \
-                                             "invalid branch %s" % versionStr
-                repositories = [ x.getHost() for x in labelPath ]
-                labelPath = []
-                for serverName in repositories:
-                    labelPath.append(versions.Label("%s%s" % 
-                                                    (serverName, versionStr)))
-            else:
-                # something approximating a label was given
-                try:
-                    label = versions.Label(versionStr)
-                except ParseError:
-                    raise repository.TroveNotFound, \
-                                                "invalid label %s" % versionStr
-                labelPath = [label]
-            versionList = [ x for x in versionList \
-                                    if x.branch().label() in labelPath ] 
-        if not versionList and versionStr:
-            raise repository.TroveNotFound, \
-                    "version %s of %s was not on found" % (versionStr, 
-                                                           troveName)
-        troveList = []
-        if reqFlavor is None:
-            for version in versionList:
-                for flavor in self.troveVersionFlavors(troveName, version):
-                    troveList.append((troveName, version, flavor))
-        else:
-            for version in versionList:
-                for flavor in self.troveVersionFlavors(troveName, version):
-                    if flavor.stronglySatisfies(reqFlavor):
-                        troveList.append((troveName, version, flavor))
-        return troveList
-
     def __init__(self, root, path):
 	self.root = root
 

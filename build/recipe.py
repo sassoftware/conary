@@ -481,7 +481,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         """
         # first search on the labelPath.  
         try:
-            troves = db.findTrove(labelPath, name, flavor, versionStr)
+            troves = db.findTrove(labelPath, (name, flavor, versionStr))
             if len(troves) > 1:
                 raise RuntimeError, (
                                 'Multiple troves could match loadInstalled' 
@@ -493,7 +493,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if labelPath is None:
             return None
         try:
-            troves = db.findTrove(None, name, flavor, versionStr)
+            troves = db.findTrove(None, (name, flavor, versionStr))
             if len(troves) > 1:
                 raise RuntimeError, (
                                 'Multiple troves could match loadRecipe' 
@@ -794,7 +794,7 @@ class PackageRecipe(Recipe):
             # XXX move this to use more of db.findTrove's features, instead
             # of hand parsing
             try:
-                troves = db.findTrove(None, name)
+                troves = db.trovesByName(name)
                 troves = db.getTroves(troves)
             except repository.TroveNotFound:
                 missingReqs.append(buildReq)

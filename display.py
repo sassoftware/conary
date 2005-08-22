@@ -238,7 +238,8 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            for (n,v,f) in db.findTrove(None, troveName, flavor, versionStr):
+            for (n,v,f) in db.findTrove(None, 
+                                        (troveName, versionStr, flavor)):
                 # db.getTrove returns the pristine trove by default
                 trv = db.getTrove(n,v,f)
                 localTrv = db.getTrove(n,v,f, pristine = False)
@@ -382,7 +383,7 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                 if change: 
                     if newVer is None:
                         try:
-                            tups = db.findTrove(None, troveName)
+                            tups = db.trovesByName(troveName)
                         except:
                             print '  --> (Deleted or Not Installed)'
                         else:

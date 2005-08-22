@@ -146,7 +146,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	troveList = repos.findTrove(cfg.installLabelPath, 
                                     (troveName, versionStr, flavor),
                                     cfg.flavor, 
-                                    acrossRepositories = True,
+                                    acrossLabels = True,
                                     acrossFlavors = True)
     except repository.TroveNotFound, e:
 	log.error(str(e))

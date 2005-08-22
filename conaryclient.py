@@ -221,9 +221,7 @@ class ConaryClient:
                                 affTroveList = []
                                 for choice in choiceList:
                                     try:
-                                        affinityTroves = self.db.findTrove(
-                                                                        None, 
-                                                                    choice[0])
+                                        affinityTroves = self.db.trovesByName(choice[0])
                                         affTroveList.append(affinityTroves)
                                     except repository.TroveNotFound:
                                         affTroveList.append([])
@@ -875,9 +873,8 @@ class ConaryClient:
                 troveName = troveName[1:]
 
             if not isInstall:
-                troves = self.db.findTrove([], troveName, 
-                                           versionStr = versionStr, 
-                                           reqFlavor = flavor)
+                troves = self.db.findTrove(None, 
+                                           (troveName, versionStr, flavor))
                 troves = self.db.getTroves(troves)
                 for outerTrove in troves:
                     changeSetList.append((outerTrove.getName(), 

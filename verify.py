@@ -46,7 +46,7 @@ def verify(troveNameList, db, cfg, all=False):
 	troveNames.sort()
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            troves = db.findTrove(None, troveName, flavor, versionStr)
+            troves = db.findTrove(None, (troveName, versionStr, flavor))
             troves = db.getTroves(troves)
             for trove in troves:
                 verifyTrove(trove, db, cfg)

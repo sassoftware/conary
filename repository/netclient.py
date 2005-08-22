@@ -1068,7 +1068,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return result
 
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
-                  acrossRepositories = False, acrossFlavors = False,
+                  acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
@@ -1097,9 +1097,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param defaultFlavor: flavor to use for those troves specifying None
         as their flavor.  Overridden by relevant flavors found in affinityDb
         @type flavor or None
-        @param acrossRepositories: if True, for each trove, return the best 
-        result for each repository listed in the labelPath used.  If False, 
-        for each trove, return the best result for the first host that 
+        @param acrossLabels: if True, for each trove, return the best 
+        result for each label listed in the labelPath used.  If False, 
+        for each trove, return the best result for the first label that 
         matches.
         @type boolean
         @param acrossFlavors: if True, for each trove, return the best 
@@ -1123,17 +1123,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         If allowMissing is True, trove specs passed in that do not match any 
         trove in the repository will not be listed in the return value.
         """
-        troveFinder = findtrove.TroveFinder(labelPath, defaultFlavor, 
-                                            acrossRepositories,
-                                            acrossFlavors,
-                                            affinityDatabase)
-        return troveFinder.findTroves(self, troves, allowMissing)
+        troveFinder = findtrove.TroveFinder(self, labelPath, 
+                                            defaultFlavor, acrossLabels,
+                                            acrossFlavors, affinityDatabase)
+        return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
-                  defaultFlavor=None, acrossRepositories = False, 
+                  defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
-                              defaultFlavor, acrossRepositories, acrossFlavors,
+                              defaultFlavor, acrossLabels, acrossFlavors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
 	    

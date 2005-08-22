@@ -353,8 +353,7 @@ def changeLocks(cfg, troveStrList, lock = True):
     troveList = [] 
     for item in troveStrList:
         name, ver, flv = parseTroveSpec(item)
-        troves = client.db.findTrove([], name, versionStr = ver,
-                                     reqFlavor = flv)
+        troves = client.db.findTrove(None, (name, ver, flv))
         troveList += troves
 
     client.lockTroves(troveList, lock = lock)
