@@ -940,39 +940,6 @@ class ParseManifest(policy.Policy):
 		    self.recipe.Ownership(owner, group,
                                           util.literalRegex(target))
 
-
-class MakeDevices(policy.Policy):
-    """
-    Makes device nodes:
-    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c}.
-
-    These nodes are only in the package, not in the filesystem, in order
-    to enable Conary's policy of non-root builds (only root can actually
-    create device nodes).
-    """
-    def __init__(self, *args, **keywords):
-	self.devices = []
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
-	"""
-	if args:
-	    l = len(args)
-	    # perms is optional, all other arguments must be there
-	    assert((l > 5) and (l < 8))
-	    if l == 6:
-                args = list(args)
-		args.append(0400)
-	    self.devices.append(args)
-	policy.Policy.updateArgs(self, **keywords)
-
-    def do(self):
-        for device in self.devices:
-            self.recipe.autopkg.addDevice(*device)
-
-
 class DanglingSymlinks(policy.Policy):
     # This policy must run after all modifications to the packaging
     # are complete because it counts on self.recipe.autopkg.pathMap
@@ -1274,6 +1241,45 @@ class _UserGroup:
             pkg.requiresMap[path] = deps.DependencySet()
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, []))
 
+class MakeDevices(policy.Policy, _UserGroup):
+    """
+    Makes device nodes:
+    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c}.
+
+    These nodes are only in the package, not in the filesystem, in order
+    to enable Conary's policy of non-root builds (only root can actually
+    create device nodes).
+    """
+    def __init__(self, *args, **keywords):
+	self.devices = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
+	"""
+	if args:
+	    l = len(args)
+	    # perms is optional, all other arguments must be there
+	    assert((l > 5) and (l < 8))
+	    if l == 6:
+                args = list(args)
+		args.append(0400)
+	    self.devices.append(args)
+	policy.Policy.updateArgs(self, **keywords)
+
+    def do(self):
+        for device in self.devices:
+            self.recipe.autopkg.addDevice(*device)
+            filename = device[0]
+            owner = device[4]
+            group = device[5]
+            # FIXME: this needs to track systemusers/systemgroups
+            #        in the Ownership policy
+            if owner != 'root':
+                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
+            if group != 'root':
+                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 class Ownership(policy.Policy, _UserGroup):
     """
