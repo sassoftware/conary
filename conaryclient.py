@@ -291,9 +291,9 @@ class ConaryClient:
         # Looks for redirects in the change set, and returns a list of
         # troves which need to be included in the update. 
         troveSet = {}
-        delDict = {}
+        toDelete = set()
         redirectHack = {}
-        primaries = dict.fromkeys(cs.getPrimaryTroveList())
+        primaries = set(cs.getPrimaryTroveList())
 
         for troveCs in cs.iterNewTroveList():
             if not troveCs.getIsRedirect():
@@ -306,7 +306,7 @@ class ConaryClient:
                     troveCs.getNewFlavor())
 
             # don't install the redirection itself
-            delDict[item] = True
+            toDelete.add(item)
 
             # but do remove the trove this redirection replaces. if it
             # isn't installed, we don't want this redirection or the
@@ -323,7 +323,7 @@ class ConaryClient:
                     # erase the target(s) of the redirection
                     for (name, changeList) in troveCs.iterChangedTroves():
                         for (changeType, version, flavor, byDef) in changeList:
-                            delDict[(name, version, flavor)] = True
+                            toDelete.add((name, version, flavor))
 
             targets = []
             for (name, changeList) in troveCs.iterChangedTroves():
@@ -339,7 +339,7 @@ class ConaryClient:
                 for target in targets:
                     cs.addPrimaryTrove(*target)
 
-        for item in delDict.iterkeys():
+        for item in toDelete:
             if cs.hasNewTrove(*item):
                 cs.delNewTrove(*item)
 
@@ -432,21 +432,10 @@ class ConaryClient:
             return r
 
         def _removeObsoleteUpdates(cs, obsoletes):
-            rmvd = {}
-
             for (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) in obsoletes:
                 if newVersion:
-                    if not oldVersion:
-                        # we may need to put this back later (and going over
-                        # the network for something we already have is 1. dumb
-                        # and 2. inappropriate for changeset files being
-                        # installed)
-                        rmvd[(name, newVersion, newFlavor)] = \
-                            cs.getNewTroveVersion(name, newVersion, newFlavor)
                     cs.delNewTrove(name, newVersion, newFlavor)
-
-            return rmvd
 
 	def _replaceErasures(cs, oldJob, newJob, newErasures):
 	    # replace all erasures in newJob with things from newErasures
@@ -614,13 +603,12 @@ class ConaryClient:
         primaries = cs.getPrimaryTroveList()
         keepList = []
         origJob = []
-
-        # XXX it's crazy that we have to use the name of the trove to
-        # figure out if it's a collection or not, but these changesets
-        # are sans files (for performance), so that's what we're left
-        # with
+        toOutdate = set()
 
         for trvCs in cs.iterNewTroveList():
+            item = (trvCs.getName(), trvCs.getNewVersion(), 
+                    trvCs.getNewFlavor())
+
             if trvCs.getOldVersion():
                 origJob.append((trvCs.getName(), 
                                 (trvCs.getOldVersion(), trvCs.getOldFlavor()),
@@ -630,25 +618,40 @@ class ConaryClient:
                 origJob.append((trvCs.getName(), (None, None),
                                 (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 False))
-
-            item = (trvCs.getName(), trvCs.getNewVersion(),
-                    trvCs.getNewFlavor())
+                toOutdate.add(item)
 
             if item in primaries:
                 keepList.append(origJob[-1])
 
+        # Find out what the primaries outdate (we need to know that to
+        # find the collection deltas). While we're at it, remove anything
+        # which is the target of a redirect
+        redirects = set(itertools.chain(*redirectHack.values()))
+
+        outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
+                                                     ineligible)
+        for i, job in enumerate(keepList):
+            item = (job[0], job[2][0], job[2][1])
+
+            if item in outdated:
+                job = (job[0], outdated[item][1:], job[2], False)
+                keepList[i] = job
+
         newJob = set()
+
+        for info in redirects:
+            newJob.add((info[0], (info[1], info[2]), (None, None), False))
+
+        del toOutdate
+
         deferredList = []
         referencedTroves = set()
 
+        trvCsSource = cs
         while True:
             if not keepList and deferredList:
-                newCs = self.repos.createChangeSet(deferredList, 
+                trvCsSource = self.repos.createChangeSet(deferredList, 
                                                    withFiles = False)
-                # merge the old cs on top of the newCs -- this makes sure the
-                # primaries come from newCs
-                newCs.merge(cs)
-                cs = newCs
                 keepList = deferredList
                 deferredList = []
             if not keepList:
@@ -662,12 +665,17 @@ class ConaryClient:
             if not recurse:
                 continue
 
+            # XXX it's crazy that we have to use the name of the trove to
+            # figure out if it's a collection or not, but these changesets
+            # are sans files (for performance), so that's what we're left
+            # with
             if trvName.startswith('fileset-') or trvName.find(":") != -1:
                 continue
 
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
-            trvCs = cs.getNewTroveVersion(trvName, newVersion, newFlavor)
+            trvCs = trvCsSource.getNewTroveVersion(trvName, newVersion, 
+                                                   newFlavor)
 
             if oldFlavor is None:
                 oldFlavorSet = deps.DependencySet()
@@ -676,6 +684,8 @@ class ConaryClient:
 
             if trvCs.getOldVersion() != oldVersion or \
                     trvCs.oldFlavor() != oldFlavorSet:
+                # XXX maybe we could just make it from the database and
+                # an abstract troveCs that's in the change set?
                 deferredList.append(job)
                 continue
 
@@ -744,8 +754,9 @@ class ConaryClient:
 
             absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
-                ((x[0], x[2][0], x[2][1]) for x in absJob),
-                ineligible = removeSet | ineligible | referencedTroves)
+                [ (x[0], x[2][0], x[2][1]) for x in absJob ],
+                ineligible = removeSet | ineligible | referencedTroves | 
+                             redirects)
             newJob = newJob - set(absJob)
 
             newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
@@ -766,65 +777,54 @@ class ConaryClient:
 
         origJob = set(origJob)
 
+        if keepExisting:
+            # convert everything relative to new installs
+            keepJobSet = set()
+            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
+                 absolute) in newJob:
+                    keepJobSet.add((name, (None, None),
+                                          (newVersion, newFlavor), absolute))
+
+            newJob = keepJobSet
+
         # remove the trvCs entries we don't need any more. this keeps
         # _findErasures from stubbing it's toe on trvCs entries which don't
         # matter
-        removedTroves = _removeObsoleteUpdates(cs, origJob - newJob)
+        _removeObsoleteUpdates(cs, origJob - newJob)
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
 				 recurse)
         # _findErasures picks what gets erased; nothing else gets to vote
 	_replaceErasures(cs, origJob, newJob, eraseSet)
         neededJob = newJob - origJob
 
-        if keepExisting:
-            # convert everything relative to new installs
-            jobList = []
-            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
-                 absolute) in neededJob:
-                if (name, newVersion, newFlavor) in removedTroves:
-                    cs.newTrove(removedTroves[(name, newVersion, newFlavor)])
-                else:
-                    jobList.append((name, (None, None),
-                                          (newVersion, newFlavor), absolute))
+        # Make sure a single trove doesn't get removed multiple times.
+        # This can happen if (for example) a single trove is updated
+        # to two new versions of that trove simultaneously. This assumes
+        # that the cs passed in to us doesn't have this problem; we only
+        # check neededJob for it
 
-            for trvCs in cs.iterNewTroveList():
-                if trvCs.getOldVersion() is not None:
-                    jobList.append((name, (None, None),
-                                          (trvCs.getNewVersion(), 
-                                           trvCs.getNewFlavor()), absolute))
-                    cs.delNewTrove(name, trvCs.getNewVersion(),
-                                   trvCs.getNewFlavor())
+        # XXX it seems like findErasures should actually be the one
+        # responsible for this
+        removed = {}
+        for trvCs in cs.iterNewTroveList():
+            if trvCs.getOldVersion() is not None:
+                removed[(trvCs.getName(), trvCs.getOldVersion(),
+                         trvCs.getOldFlavor())] = None
 
-            neededJob = jobList
-        else:
-            # Make sure a single trove doesn't get removed multiple times.
-            # This can happen if (for example) a single trove is updated
-            # to two new versions of that trove simultaneously. This assumes
-            # that the cs passed in to us doesn't have this problem; we only
-            # check neededJob for it
+        jobList = []
+        for job in neededJob:
+            if job[1][0] is None:
+                jobList.append(job)
+                continue
 
-	    # XXX it seems like findErasures should actually be the one
-	    # responsible for this
-            removed = {}
-            for trvCs in cs.iterNewTroveList():
-                if trvCs.getOldVersion() is not None:
-                    removed[(trvCs.getName(), trvCs.getOldVersion(),
-                             trvCs.getOldFlavor())] = None
+            if removed.has_key((job[0], job[1][0], job[1][1])):
+                if job[2][1] is not None:
+                    jobList.append((job[0], (None, None), job[2], job[3]))
+            else:
+                jobList.append(job)
+                removed[(job[0], job[1][0], job[1][1])] = True
 
-            jobList = []
-            for job in neededJob:
-                if job[1][0] is None:
-                    jobList.append(job)
-                    continue
-
-                if removed.has_key((job[0], job[1][0], job[1][1])):
-                    if job[2][1] is not None:
-                        jobList.append((job[0], (None, None), job[2], job[3]))
-                else:
-                    jobList.append(job)
-                    removed[(job[0], job[1][0], job[1][1])] = True
-
-            neededJob = jobList
+        neededJob = jobList
 
         return neededJob
             
@@ -839,51 +839,6 @@ class ConaryClient:
         update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
         """
-        def _removeDuplicateErasures(cs):
-            # We don't have to worry about the erase list in the changeset;
-            # _mergeGroupChanges will take care of that. This needs to make
-            # sure we don't have two troves trying to outdate the same target
-            # XXX doing it here is a hack -- it causes extra calls to
-            # getChangeSet. 
-            outdated = {}
-            for trvCs in cs.iterNewTroveList():
-                old = (trvCs.getName(), trvCs.getOldVersion(), 
-                       trvCs.getOldFlavor())
-                if old[1] is None:
-                    continue
-                new = (trvCs.getName(), trvCs.getNewVersion(), 
-                       trvCs.getNewFlavor())
-
-                l = outdated.setdefault(old, [])
-                l.append(new)
-
-            inelligible = []
-            newItems = []
-            for old, l in outdated.iteritems():
-                if len(l) == 1: 
-                    inelligible.append(old)
-                else:
-                    newItems += l
-
-            if not newItems:
-                return
-
-            # Everything left in outdated conflicts with itself. we'll
-            # let outdated sort things out.
-            outdated, eraseList = self.db.outdatedTroves(newItems, inelligible)
-            needed = []
-            for newInfo, oldInfo in outdated.iteritems():
-                trvCs = cs.getNewTroveVersion(*newInfo)
-                if trvCs.getOldVersion() != oldInfo[1] or \
-                   trvCs.getOldFlavor() != oldInfo[2]:
-                    cs.delNewTrove(*newInfo)
-                    needed.append((newInfo[0], (oldInfo[1], oldInfo[2]),
-                                               (newInfo[1], newInfo[2]), False))
-            
-            newCs = self.repos.createChangeSet(needed, recurse = False, 
-                                               withFiles = False)
-            cs.merge(newCs)
-
         changeSetList = []
         newItems = []
         finalCs = UpdateChangeSet()
@@ -992,18 +947,8 @@ class ConaryClient:
         newItems = set(newItems)
         oldItems = set(oldItems)
 
-        if keepExisting:
-            for (name, version, flavor) in newItems:
-                changeSetList.append((name, (None, None), (version, flavor), 0))
-            eraseList = []
-        else:
-            # everything which needs to be installed is in this list; if 
-            # it's not here, it's a duplicate
-            outdated, eraseList = self.db.outdatedTroves(newItems, oldItems)
-            for (name, newVersion, newFlavor), \
-                  (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-                changeSetList.append((name, (oldVersion, oldFlavor),
-                                            (newVersion, newFlavor), 0))
+        for (name, version, flavor) in newItems:
+            changeSetList.append((name, (None, None), (version, flavor), 0))
 
         if finalCs.empty  and not changeSetList:
             raise NoNewTrovesError
@@ -1019,10 +964,6 @@ class ConaryClient:
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         redirectHack = self._processRedirects(finalCs, recurse) 
-
-        # while we've been careful to avoid duplicate erasures, some can
-        # crop in due to the recursive nature of primaries
-        _removeDuplicateErasures(finalCs)
 
         mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
                                                 keepExisting, recurse,
