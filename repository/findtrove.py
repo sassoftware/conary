@@ -577,11 +577,16 @@ class QueryRevisionByLabel(QueryByLabelPath):
         return matching
 
     def missingMsg(self, name):
-        labelPath = set(x.keys()[0] for x in self.query[name])
+        labelPath = set(x.keys()[0] for x in self.query[name] if x.keys())
         versionStr = self.map[name][1]
-        return "revision %s of %s was not found on label(s) %s" \
-                % (versionStr, name, 
-                   ', '.join(x.asString() for x in labelPath))
+        if labelPath:
+            return "revision %s of %s was not found on label(s) %s" \
+                    % (versionStr, name, 
+                       ', '.join(x.asString() for x in labelPath))
+        else:
+            return "revision %s of %s was not found" \
+                    % (versionStr, name, 
+                       ', '.join(x.asString() for x in labelPath))
 
 ##############################################
 # 
