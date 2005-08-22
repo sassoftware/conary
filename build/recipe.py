@@ -1329,8 +1329,6 @@ class SingleGroup:
             l = self.troveVersionFlavors.setdefault(n,[])
             l.append((v,f,byDefault))
 
-        return []
-
     def _findTroves(self, troveMap):
         """ given a trove map which already contains a dict for all queries
             needed for all groups cooked, pick out those troves that 
