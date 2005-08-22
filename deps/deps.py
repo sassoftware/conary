@@ -146,6 +146,25 @@ class Dependency(BaseDependency):
 
         return score
 
+    def emptyDepsScore(self):
+        """ 
+        Like score where this trove is the "requires" and the other trove
+        provides nothing.  If all the requires are negative, (!foo)
+        this could return something other than False
+        """
+        score = 0
+        if not self.flags:
+            # if there are no flags associated with this dependency,
+            # then missing the base dep has to be enough to disqualify this
+            # flavor
+            return False
+	for (requiredFlag, requiredSense) in self.flags.iteritems():
+            thisScore = flavorScores[(FLAG_SENSE_UNSPECIFIED, requiredSense)]
+            if thisScore is None:
+                return False
+            score += thisScore
+        return score
+
     def satisfies(self, required):
 	"""
 	Returns whether or not this dependency satisfies the argument
@@ -292,14 +311,23 @@ class DependencyClass(object):
         score = 0
 	for requiredDep in requirements.members.itervalues():
 	    if not self.members.has_key(requiredDep.name):
-                return False
-
-            thisScore = self.members[requiredDep.name].score(requiredDep)
+                thisScore = requiredDep.emptyDepsScore()
+            else:
+                thisScore = self.members[requiredDep.name].score(requiredDep)
             if thisScore is False:
                 return False
 
             score += thisScore
 
+        return thisScore
+
+    def emptyDepsScore(self):
+        score = 0
+	for requiredDep in self.members.itervalues():
+            thisScore = requiredDep.emptyDepsScore()
+            if thisScore is False:
+                return False
+            score += thisScore
         return thisScore
 
     def toStrongFlavor(self):
@@ -548,9 +576,9 @@ class DependencySet(object):
             if not other.members[tag].members:
                 continue
 	    if tag not in self.members: 
-		return False
-
-	    thisScore = self.members[tag].score(other.members[tag])
+                thisScore = other.members[tag].emptyDepsScore()
+            else:
+                thisScore = self.members[tag].score(other.members[tag])
             if thisScore is False:
 		return False
 
