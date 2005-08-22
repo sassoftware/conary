@@ -661,33 +661,6 @@ class Database:
     def hasByName(self, name):
 	return self.instances.hasName(name)
 
-    def trovesByName(self, names):
-        cu = self.db.cursor()
-
-        cu.execute("CREATE TEMPORARY TABLE tbn (idx INTEGER, name STRING)",
-                   start_transaction = False)
-
-        result = [ None ] * len(names)
-        for i, name in enumerate(names):
-            cu.execute("INSERT INTO tbn VALUES(?, ?)", i, name)
-            result[i] = list()
-
-        cu.execute("""SELECT idx, name, version, flavor FROM 
-                        tbn JOIN DBInstances ON
-                            tbn.name = DBInstances.name
-                        JOIN Versions ON
-                            Versions.version = DBInstnances.versionId
-                        JOIN Flavors ON
-                            Flavors.flavorId = DBInstances.flavorId""")
-        
-        for (i, name, versionStr, flavorStr) in cu:
-            result[i].append((name, versions.VersionFromString(versionStr),
-                              deps.deps.ThawDependencySet(flavorStr)))
-
-        cu.execute("DROP TABLE tbn")
-
-        return result
-
     def getVersionId(self, version, cache):
 	theId = cache.get(version, None)
 	if theId:
