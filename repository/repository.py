@@ -366,6 +366,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
+    def checkTroveSignatures(self, trv):
+        pass
+
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False):
 	self.repos = repos
@@ -423,6 +426,7 @@ class ChangeSetJob:
                                         troveFlavor, csTrove.getChangeLog())
 
 	    newFileMap = newTrove.applyChangeSet(csTrove)
+            self.checkTroveSignatures(newTrove)
 
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove)

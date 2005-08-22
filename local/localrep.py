@@ -209,6 +209,9 @@ class SqlDataStore:
     def removeFile(self, hash):
 	self.decrementCount(hash)
 
+    def checkTroveSignatures(self, trv):
+        pass
+
     def __init__(self, db):
         cu = db.cursor()
         self.db = db
