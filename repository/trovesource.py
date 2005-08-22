@@ -1,4 +1,7 @@
+import changeset
 import findtrove
+import itertools
+import trove
 
 class AbstractTroveSource:
     """ Provides the interface necessary for performing
@@ -323,3 +326,129 @@ class ReferencedTrovesSource(SimpleTroveSource):
 
     def trovesByName(self, name):
         return self.source.findTroveReferences([name])[0]
+
+class ChangesetFilesTroveSource(SimpleTroveSource):
+
+    # Provide a trove source based on both absolute and relative change
+    # set files. Changesets withFiles=False can be generated from this
+    # source. Conflicting troves added to this cause an exception, and
+    # if the old version for a relative trovechangeset is not available,
+    # an exception is thrown.
+
+    # it's likely this should all be indexed by troveName instead of
+    # full tuples
+
+    def __init__(self, db):
+        SimpleTroveSource.__init__(self)
+        self.db = db
+        self.troveCsMap = {}
+
+    def addChangeSet(self, cs):
+        relative = []
+        for trvCs in cs.iterNewTroveList():
+            info = (trvCs.getName(), trvCs.getNewVersion(), 
+                    trvCs.getNewFlavor())
+            if trvCs.getOldVersion() is None:
+                if info in self.troveCsMap:
+                    raise DuplicateTrove
+                self.troveCsMap[info] = cs
+                continue
+
+            relative.append((trvCs, info))
+
+        present = self.db.hasTroves([ (x[0].getName(), x[0].getOldVersion(),
+                                       x[0].getOldFlavor()) for x in relative ])
+        for (trvCs, info), isPresent in itertools.izip(relative, present):
+            if not isPresent:
+                raise MissingTrove
+            
+            if info in self.troveCsMap:
+                raise DuplicateTrove
+            self.troveCsMap[info] = cs
+
+    def trovesByName(self, name):
+        l = []
+        for info in self.troveCsMap:
+            if info[0] == name:
+                l.append(info)
+
+        return l
+
+    def getTroves(self, troveList, withFiles = True):
+        assert(not withFiles)
+        retList = []
+
+        for info in troveList:
+            trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
+            if trvCs.getOldVersion() is None:
+		newTrove = trove.Trove(trvCs.getName(), trvCs.getNewVersion(),
+                                       trvCs.getNewFlavor(), 
+                                       trvCs.getChangeLog())
+            else:
+                newTrove = self.db.getTrove(trvCs.getName(), 
+                                            trvCs.getOldVersion(),
+                                            trvCs.getOldFlavor())
+
+            newTrove.applyChangeSet(trvCs)
+            retList.append(newTrove)
+
+        return retList
+
+    def createChangeSet(self, jobList, withFiles = True, recurse = False):
+        # Returns the changeset plus a remainder list of the bits it
+        # couldn't do
+        assert(0)
+
+        def _findTroveObj(self, availSet, name, version, flavor):
+            info = (name, version, flavor)
+            (fromCs, inDb) = availSet[info]
+
+            if fromCs:
+                trv = self.getTroves([info])
+            elif inDb:
+                # XXX this should be parallelized...
+                trv = self.db.getTroves([info])
+            else:
+                trv = None
+
+            return trv
+
+        assert(not withFiles)
+        assert(not False)
+        troves = []
+        for job in jobList:
+            if job[1][0] is not None:
+                troves.append((job[0], job[1][0], job[1][1]))
+            if job[2][0] is not None:
+                troves.append((job[0], job[2][0], job[2][1]))
+
+        inDatabase = self.db.hasTroves(troves)
+        asChangeset = [ info in self.troveCsMap for info in troves ]
+        trovesAvailable = dict((x[0], (x[1], x[2])) for x in 
+                            itertools.izip(troves, inDatabase, asChangeset))
+
+        cs = changeset.ChangeSet()
+        remainder = []
+
+        for job in jobList:
+            if job[2][0] is None:
+                cs.oldTrove(job[0], job[1][0], job[1][1])
+                continue
+
+            newTrv = _findTroveObj(trovesAvailable, job[0], job[2][0], 
+                                   job[2][1])
+            if newTrv is None:
+                remainder.append(job)
+                continue
+
+            if job[1][0] is None:
+                oldTrv = None
+            else:
+                oldTrv = _findTroveObj(trovesAvailable, job[0], job[1][0], 
+                                       job[1][1])
+                if oldTrv is None:
+                    remainder.append(job)
+
+            cs.newTrove(newTrv.diff(oldTrv)[0])
+
+        return (cs, remainder)
