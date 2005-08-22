@@ -980,8 +980,6 @@ class ConaryClient:
 
         redirectHack = self._processRedirects(finalCs, recurse) 
 
-        import lib
-        lib.epdb.st('f')
         mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
                                                 keepExisting, recurse,
                                                 oldItems)
