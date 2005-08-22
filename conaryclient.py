@@ -27,6 +27,7 @@ from lib import util
 from local import database
 from repository import changeset
 from repository import repository
+from repository import changeset
 from repository import trovesource
 from repository.netclient import NetworkRepositoryClient
 
@@ -594,6 +595,35 @@ class ConaryClient:
 
             return set(eraseList)
 
+        def _removeDuplicateErasures(jobSet):
+            outdated = {}
+            for job in jobSet:
+                if job[2][0] is not None:
+                    l = outdated.setdefault((job[0], job[1][0], job[1][1]), [])
+                    l.append(job)
+
+            inelligible = []
+            newItems = []
+            toRemove = set()
+            for old, l in outdated.iteritems():
+                if len(l) == 1: 
+                    inelligible.append(old)
+                else:
+                    newItems += [ (x[0], x[2][0], x[2][1]) for x in l ]
+                    toRemove.update(set(l))
+
+            if not newItems:
+                return
+
+            jobSet.difference_update(toRemove)
+
+            # Everything left in outdated conflicts with itself. we'll
+            # let outdated sort things out.
+            outdated, eraseList = self.db.outdatedTroves(newItems, inelligible)
+            needed = []
+            for newInfo, oldInfo in outdated.iteritems():
+                jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
+            
         # Updates a change set by removing troves which don't need
         # to be updated due to local state. It also removes new troves which
         # don't need to be installed because their byDefault is False
@@ -617,10 +647,14 @@ class ConaryClient:
                 origJob.append((trvCs.getName(), (None, None),
                                 (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 False))
-                toOutdate.add(item)
 
+        for job in origJob:
+            item = (job[0], job[2][0], job[2][1])
+        
             if item in primaries:
-                keepList.append(origJob[-1])
+                if job[1][0] is None:
+                    toOutdate.add(item)
+                keepList.append(job)
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -643,19 +677,11 @@ class ConaryClient:
 
         del toOutdate
 
-        deferredList = []
         referencedTroves = set()
+        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
+        troveSource.addChangeSet(cs)
 
-        trvCsSource = cs
-        while True:
-            if not keepList and deferredList:
-                trvCsSource = self.repos.createChangeSet(deferredList, 
-                                                   withFiles = False)
-                keepList = deferredList
-                deferredList = []
-            if not keepList:
-                break
-
+        while keepList:
             job = keepList.pop()
             newJob.add(job)
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
@@ -673,26 +699,13 @@ class ConaryClient:
 
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
-            trvCs = trvCsSource.getNewTroveVersion(trvName, newVersion, 
-                                                   newFlavor)
-
-            if oldFlavor is None:
-                oldFlavorSet = deps.DependencySet()
-            else:
-                oldFlavorSet = oldFlavor
-
-            if trvCs.getOldVersion() != oldVersion or \
-                    trvCs.oldFlavor() != oldFlavorSet:
-                # XXX maybe we could just make it from the database and
-                # an abstract troveCs that's in the change set?
-                deferredList.append(job)
-                continue
+            [ newPristine ] = troveSource.getTroves([(trvName, newVersion,
+                                                  newFlavor)], 
+                                                withFiles = False)
 
             if oldVersion is None:
                 # Read the comments at the top of _newBase if you hope
                 # to understand any of this.
-                newPristine = trove.Trove(trvName, newVersion, newFlavor, None)
-                newPristine.applyChangeSet(trvCs)
                 (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
                 newTrv = pristineTrv.copy()
                 newTrv.mergeCollections(localTrv, newPristine)
@@ -702,18 +715,14 @@ class ConaryClient:
                                        pristine = True)
                 localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                             pristine = False)
-                assert(not oldTrv.hasFiles())
-                assert(not localTrv.hasFiles())
-
-                newPristine = oldTrv.copy()
-                newPristine.applyChangeSet(trvCs)
                 newTrv = oldTrv.copy()
-
                 newTrv.mergeCollections(localTrv, newPristine)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
-                del oldTrv
-                assert(not fileList)
-                alreadyInstalled = []
+
+            assert(not oldTrv.hasFiles())
+            assert(not localTrv.hasFiles())
+            del oldTrv
+            assert(not fileList)
 
             del finalTrvCs
 
@@ -744,6 +753,8 @@ class ConaryClient:
             if (name, version, flavor) in primaries:
 		erasePrimaryList.append((name, version, flavor))
                 newJob.add(job)
+
+        _removeDuplicateErasures(newJob)
 
         if not keepExisting:
             # try and match up everything absolute with something already
@@ -969,6 +980,8 @@ class ConaryClient:
 
         redirectHack = self._processRedirects(finalCs, recurse) 
 
+        import lib
+        lib.epdb.st('f')
         mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
                                                 keepExisting, recurse,
                                                 oldItems)
