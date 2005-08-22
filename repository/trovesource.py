@@ -9,6 +9,11 @@ class AbstractTroveSource:
         well.
     """
 
+    def __init__(self):
+        self._allowNoLabel = True
+        self._bestFlavor = False
+        self._getLeavesOnly = False
+
     def getTroveLeavesByLabel(self, query, bestFlavor=True):
         raise NotImplementedError
 
@@ -33,14 +38,15 @@ class AbstractTroveSource:
     def getTroveVersionList(self, name, withFlavors=False):
         raise NotImplementedError
 
-    def findTroves(self, labelPath, troves, defaultFlavor, acrossSources=True, 
-                   acrossFlavors=True, affinityDatabase=None, 
-                   allowMissing=False):
+    def findTroves(self, labelPath, troves, defaultFlavor=None, 
+                   acrossLabels=True, acrossFlavors=True, 
+                   affinityDatabase=None, allowMissing=False):
         troveFinder = findtrove.TroveFinder(self, labelPath, 
-                                            defaultFlavor, acrossSources,
+                                            defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
-                                            getLeaves=False, bestFlavor=False,
-                                            allowNoLabel=True)
+                                            allowNoLabel=self._allowNoLabel,
+                                            bestFlavor=self._bestFlavor,
+                                            getLeaves=self._getLeavesOnly)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
@@ -75,14 +81,27 @@ class SimpleTroveSource(AbstractTroveSource):
         in terms of trovesByName, which is left for subclasses to 
         implement.
     """
-    defaultFlavorCheck = _CHECK_TROVE_STRONG_FLAVOR
-    
-    def __init__(self, defaultFlavorCheck=None):
-        if defaultFlavorCheck is not None:
-            self.defaultFlavorCheck = defaultFlavorCheck
 
     def trovesByName(self, name):
         raise NotImplementedError
+
+    def getTroves(self, troveList, withFiles = True):
+        raise NotImplementedError
+    
+    def __init__(self):
+        self.searchAsDatabase()
+
+    def searchAsRepository(self):
+        self._allowNoLabel = False
+        self._bestFlavor = True
+        self._getLeavesOnly = True
+        self._flavorCheck = _CHECK_TROVE_REG_FLAVOR
+
+    def searchAsDatabase(self):
+        self._allowNoLabel = True
+        self._bestFlavor = False
+        self._getLeavesOnly = False
+        self._flavorCheck = _CHECK_TROVE_STRONG_FLAVOR
 
     def getTroveVersionList(self, name, withFlavors=False):
         if withFlavors:
@@ -97,10 +116,9 @@ class SimpleTroveSource(AbstractTroveSource):
         return d
 
     def _getTrovesByType(self, troveSpecs, 
-                      versionType=_GTL_VERSION_TYPE_NONE,
-                      latestFilter=_GET_TROVE_ALL_VERSIONS, 
-                      bestFlavor=True,
-                      flavorCheck=None):
+                         versionType=_GTL_VERSION_TYPE_NONE,
+                         latestFilter=_GET_TROVE_ALL_VERSIONS, 
+                         bestFlavor=False):
         """ Implements the various getTrove methods by grabbing
             information from trovesByName.  Note it takes an 
             extra parameter over the netrepos/netserver version - 
@@ -112,12 +130,33 @@ class SimpleTroveSource(AbstractTroveSource):
             ~foo.  The mode is useful when the troveSpec is specified
             by the user and is matching against a limited set of troves.
         """
+        # some cases explained: 
+        # if latestFilter ==  _GET_TROVE_ALL_VERSIONS and 
+        # flavorFilter == _GET_TROVE_BEST_FLAVOR,
+        # for each version, return the best flavor for that version.
+
+        # if latestFilter == _GET_TROVE_VERY_LATEST and flavorFilter
+        # == _GET_TROVE_BEST_FLAVOR
+        # get the latest version that has an allowed flavor, then get
+        # only the best one of the flavors at that latest version
+
         if bestFlavor:
             flavorFilter = _GET_TROVE_BEST_FLAVOR
         else:
-            flavorFilter = _GET_TROVE_ALLOWED_FLAVOR
-        if flavorCheck is None:
-            flavorCheck = self.defaultFlavorCheck
+            flavorFilter = _GET_TROVE_ALL_FLAVORS
+            # if any flavor query specified is not None, assume
+            # that we want all _allowed_ flavors, not all 
+            # flavors
+            for name, versionQuery in troveSpecs.iteritems():
+                for version, flavorQuery in versionQuery.iteritems():
+                    if flavorQuery is not None:
+                        flavorFilter = _GET_TROVE_ALLOWED_FLAVOR
+                        break
+                if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+                    break
+
+
+        flavorCheck = self._flavorCheck
 
         allTroves = {}
         for name, versionQuery in troveSpecs.iteritems():
@@ -127,88 +166,97 @@ class SimpleTroveSource(AbstractTroveSource):
             if not versionQuery:
                 allTroves[name] = troves[name]
                 continue
-            versionList = []
+            versionResults = {}
             for version in troves[name].iterkeys():
                 if versionType == _GTL_VERSION_TYPE_LABEL:
                     theLabel = version.branch().label()
                     if theLabel not in versionQuery:
                         continue
-                    versionList.append((version, theLabel))
+                    versionResults.setdefault(theLabel, []).append(version)
                 elif versionType == _GTL_VERSION_TYPE_BRANCH:
                     theBranch = version.branch()
                     if theBranch not in versionQuery:
                         continue
-                    versionList.append((version, theBranch))
+                    versionResults.setdefault(theBranch, []).append(version)
                 elif versionType == _GTL_VERSION_TYPE_VERSION:
                     if version not in versionQuery:
                         continue
-                    versionList.appned((version, version))
+                    versionResults.setdefault(version, []).append(version)
                 else:
                     assert(False)
-            if latestFilter == _GET_TROVE_VERY_LATEST:
-                versionList = sort(versionList)[-1:]
-
-            for version, queryKey in versionList:
-                flavorList = troves[name][version]
+            for queryKey, versionList in versionResults.iteritems():
+                if latestFilter == _GET_TROVE_VERY_LATEST:
+                    versionList.sort()
+                    versionList.reverse()
                 flavorQuery = versionQuery[queryKey]
+                if (flavorFilter == _GET_TROVE_ALL_FLAVORS or
+                                                 flavorQuery is None):
 
-                if flavorFilter == _GET_TROVE_ALL_FLAVORS:
-                    troveFlavors = flavorList
-                elif flavorQuery is None:
-                    troveFlavors = flavorList
+                    if latestFilter == _GET_TROVE_VERY_LATEST:
+                        versionList = versionList[:1]
+                    for version in versionList:
+                        vDict = allTroves.setdefault(name, {})
+                        fSet = vDict.setdefault(version, set())
+                        fSet.update(troves[name][version])
                 else:
-                    troveFlavors = set() 
-                    if flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
-                        strongFlavors = [x.toStrongFlavor() for x in flavorList]
-                        flavorList = zip(strongFlavors, flavorList)
-
                     for qFlavor in flavorQuery:
-                        if flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
-                            scores = ((x[0].score(qFlavor), x[1]) \
-                                                        for x in flavorList)
-                        else:
-                            scores = ((qFlavor.score(x), x) for x in flavorList)
-
-                        scores = [ x for x in scores if x[0] is not False]
-                        if scores:
-                            if flavorFilter == _GET_TROVE_BEST_FLAVOR:
-                                troveFlavors.add(max(scores)[1])
-                            elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
-                                troveFlavors.update([x[1] for x in scores])
+                        for version in versionList:
+                            flavorList = troves[name][version]
+                            troveFlavors = set() 
+                            if flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
+                                strongFlavors = [x.toStrongFlavor() for x in flavorList]
+                                flavorList = zip(strongFlavors, flavorList)
+                                scores = ((x[0].score(qFlavor), x[1]) \
+                                                            for x in flavorList)
                             else:
-                                assert(false)
-                if troveFlavors:
-                    allTroves.setdefault(name, {})[version] = list(troveFlavors)
+                                scores = ((qFlavor.score(x), x) for x in flavorList)
+                            scores = [ x for x in scores if x[0] is not False]
+                            if scores:
+                                if flavorFilter == _GET_TROVE_BEST_FLAVOR:
+                                    troveFlavors.add(max(scores)[1])
+                                elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+                                    troveFlavors.update([x[1] for x in scores])
+                                else:
+                                    assert(false)
+
+                        
+                            if troveFlavors: 
+                                vDict = allTroves.setdefault(name, {})
+                                fSet = vDict.setdefault(version, set())
+                                fSet.update(troveFlavors)
+                                if latestFilter == _GET_TROVE_VERY_LATEST:
+                                    break
         return allTroves
 
     def getTroveLeavesByLabel(self, troveSpecs, bestFlavor=True):
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL, 
-                                     _GET_TROVE_VERY_LATEST, bestFlavor)
+                                 _GET_TROVE_VERY_LATEST, bestFlavor)
 
     def getTroveVersionsByLabel(self, troveSpecs, bestFlavor=True):
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL, 
                                      _GET_TROVE_ALL_VERSIONS, bestFlavor)
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor=True):
+        """ Takes {n : { Version : [f,...]} dict """
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH,
                                      _GET_TROVE_VERY_LATEST, bestFlavor)
 
-    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor):
-        return self._getTrovesByType(_GTL_VERSION_TYPE_BRANCH, 
+    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor=True):
+        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH, 
                                      _GET_TROVE_ALL_VERSIONS, bestFlavor)
 
     def getTroveVersionFlavors(self, troveSpecs, bestFlavor=True):
+        """ Takes {n : { Version : [f,...]} dict """
         return self._getTrovesByType(troveSpecs, 
                                      _GTL_VERSION_TYPE_VERSION, 
                                      _GET_TROVE_ALL_VERSIONS, 
                                      bestFlavor)
 
 class TroveListTroveSource(SimpleTroveSource):
-
     def __init__(self, source, troveTups, withDeps=False):
+        SimpleTroveSource.__init__(self)
         troveTups = [ x for x in troveTups ]
         self.deps = {}
-        self.labels = set()
         self._trovesByName = {}
         self.source = source
         self.sourceTups = troveTups[:]
@@ -217,10 +265,11 @@ class TroveListTroveSource(SimpleTroveSource):
             self._trovesByName.setdefault(n, []).append((n,v,f))
 
         foundTups = set()
-
+        
+        # recurse into the given trove tups to include all child troves
         while troveTups:
             self._trovesByName.setdefault(n, []).append((n,v,f))
-            newTroves = source.getTroves(troveTups)
+            newTroves = source.getTroves(troveTups, withFiles=False)
             foundTups.update(newTroves)
             troveTups = []
             for newTrove in newTroves:
@@ -228,7 +277,6 @@ class TroveListTroveSource(SimpleTroveSource):
                     self._trovesByName.setdefault(tup[0], []).append(tup)
                     if tup not in foundTups:
                         troveTups.append(tup)
-                    self.labels.add(tup[1].branch().label())
 
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)
@@ -236,35 +284,28 @@ class TroveListTroveSource(SimpleTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
-    def getLabelList(self):
-        return self.labels
-
     def trovesByName(self, name):
         return self._trovesByName.get(name, [])
 
 
-
 class GroupRecipeSource(SimpleTroveSource):
+    """ A TroveSource that contains all the troves in a cooking 
+        (but not yet committed) recipe.  Useful for modifying a recipe
+        in progress using findTrove.
+    """
 
     def __init__(self, source, groupRecipe):
+        self.searchAsDatabase()
         self.deps = {}
-        self.labels = set()
         self._trovesByName = {}
         self.source = source
         self.sourceTups = groupRecipe.troves
 
         for (n,v,f) in self.sourceTups:
             self._trovesByName.setdefault(n, []).append((n,v,f))
-            self.labels.add(v.branch().label())
-
-    def getSourceTroves(self):
-        return self.getTroves(self.sourceTups)
 
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
-
-    def getLabelList(self):
-        return self.labels
 
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
