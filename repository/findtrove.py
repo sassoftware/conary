@@ -345,8 +345,7 @@ class QueryByLabelPath(Query):
             return "%s was not found on path %s" \
                     % (name, ', '.join(x.asString() for x in labelPath))
         else:
-            return "%s was not on found" % name
-
+            return "%s was not found" % name
 
 class QueryByBranch(Query):
 
