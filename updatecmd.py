@@ -220,7 +220,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split = True):
+                                  callback = None, split = True, 
+                                  sync = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -252,7 +253,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       depsRecurse = depsRecurse, test = test,
                       justDatabase = justDatabase, recurse = recurse,
                       info = info, updateByDefault = updateByDefault,
-                      callback = callback, split = split)
+                      callback = callback, split = split, sync = sync)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -271,7 +272,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split=True):
+                                  callback = None, split=True,
+                                  sync = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -285,7 +287,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                            keepExisting = keepExisting,
                            test = test, recurse = recurse,
                            updateByDefault = updateByDefault,
-                           callback = callback, split = split)
+                           callback = callback, split = split,
+                           sync = sync)
 
     if info:
         callback.done()

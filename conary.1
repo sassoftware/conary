@@ -90,6 +90,12 @@ If you want conary to update anyway, replacing the contents
 of the file with the new version from the changeset, you will need
 to provide the \-\-replace-files option.
 .TP
+.B \-\-sync
+Only allow updates to versions that are referenced by other troves on the 
+system.  This allows you to easily update a trove to a version specified 
+within a group, or ensure you match the :lib component with an out-of-date
+version of a trove you have installed.
+.TP
 .B \-\-test
 Perform all actions up to the point of writing to the filesystem.
 .RE

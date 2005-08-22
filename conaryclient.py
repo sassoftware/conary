@@ -25,8 +25,9 @@ import metadata
 from deps import deps
 from lib import util
 from local import database
-from repository import repository
 from repository import changeset
+from repository import repository
+from repository import trovesource
 from repository.netclient import NetworkRepositoryClient
 
 class ClientError(Exception):
@@ -827,7 +828,7 @@ class ConaryClient:
         return neededJob
             
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
-                         recurse = True, updateMode = True):
+                         recurse = True, updateMode = True, sync = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -893,7 +894,7 @@ class ConaryClient:
                 # but they do use flavor affinity
                 toFind.append((troveName, versionStr, flavor))
             else:
-                if keepExisting:
+                if keepExisting and not sync:
                     # when using keepExisting, branch affinity doesn't make 
                     # sense - we are installing a new, generally unrelated 
                     # version of this trove
@@ -914,16 +915,22 @@ class ConaryClient:
                 #        labels = [ None ]
                 #    
                 #    pass
-        if toFind:
-            results = self.repos.findTroves(self.cfg.installLabelPath, toFind, 
-                                           self.cfg.flavor,
-                                           affinityDatabase=self.db)
-            for troveTups in results.itervalues():
-                newItems += troveTups
-        if toFindNoDb:
-            results = self.repos.findTroves(self.cfg.installLabelPath, 
-                                           toFindNoDb, self.cfg.flavor)
-            for troveTups in results.itervalues():
+        results = []
+        if sync:
+            source = trovesource.ReferencedTrovesSource(self.db)
+            results.append(source.findTroves(None, toFind))
+        else:
+            if toFind:
+                results.append(self.repos.findTroves(
+                                        self.cfg.installLabelPath, toFind, 
+                                        self.cfg.flavor,
+                                        affinityDatabase=self.db))
+            if toFindNoDb:
+                results.append(self.repos.findTroves(
+                                           self.cfg.installLabelPath, 
+                                           toFindNoDb, self.cfg.flavor))
+        for result in results:
+            for troveTups in result.itervalues():
                 newItems += troveTups
 
         # items which are already installed shouldn't be installed again
@@ -1015,7 +1022,7 @@ class ConaryClient:
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
-                        split = False):
+                        split = False, sync = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations.
@@ -1046,6 +1053,9 @@ class ConaryClient:
         @type L{callbacks.UpdateCallback}
         @param split: Split large update operations into separate jobs.
         @type split: bool
+        @param sync: Limit acceptabe trove updates only to versions 
+        referenced in the local database.
+        @type sync: bool
         @rtype: tuple
         """
         callback.preparingChangeSet()
@@ -1055,7 +1065,8 @@ class ConaryClient:
         finalCs, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
                                         recurse = recurse,
-                                        updateMode = updateByDefault)
+                                        updateMode = updateByDefault,
+                                        sync = sync)
 
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold

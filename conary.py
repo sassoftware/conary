@@ -132,6 +132,7 @@ def usage(rc = 1):
     print "                 --quiet"
     print "                 --replace-files"
     print "                 --resolve"
+    print "                 --sync"
     print "                 --test"
     print "updateall flags:"
     print "                 --exclude-troves <patterns>"
@@ -192,6 +193,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["replace-files"] = NO_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
+    argDef["sync"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
@@ -462,14 +464,6 @@ def realMain(cfg, argv=sys.argv):
             del argSet['quiet']
         kwargs['callback'] = callback
 
-	if argSet.has_key('replace-files'):
-	    kwargs['replaceFiles'] = True
-	    del argSet['replace-files']
-
-	if argSet.has_key('no-deps'):
-	    kwargs['depCheck'] = False
-	    del argSet['no-deps']
-
 	if argSet.has_key('resolve'):
             cfg.autoResolve = True
 	    del argSet['resolve']
@@ -478,34 +472,16 @@ def realMain(cfg, argv=sys.argv):
             cfg.autoResolve = False
 	    del argSet['no-resolve']
 
-	if argSet.has_key('no-deps-recurse'):
-	    kwargs['depsRecurse'] = False
-	    del argSet['no-deps-recurse']
-
-	if argSet.has_key('no-recurse'):
-            kwargs['recurse'] = False
-	    del argSet['no-recurse']
-
-	if argSet.has_key('just-db'):
-	    kwargs['justDatabase'] = True
-	    del argSet['just-db']
-
-	if argSet.has_key('info'):
-	    kwargs['info'] = True
-	    del argSet['info']
-
-	keepExisting = argSet.has_key('keep-existing')
-	if keepExisting:
-	    kwargs['keepExisting'] = True
-	    del argSet['keep-existing']
-
-	if argSet.has_key('tag-script'):
-	    kwargs['tagScript'] = argSet['tag-script']
-	    del argSet['tag-script']
-
-	if argSet.has_key('test'):
-	    kwargs['test'] = argSet['test']
-	    del argSet['test']
+        kwargs['replaceFiles'] = argSet.pop('replace-files', False)
+        kwargs['depCheck'] = not argSet.pop('no-deps', False)
+        kwargs['depsRecurse'] = not argSet.pop('no-deps-recurse', False)
+        kwargs['recurse'] = not argSet.pop('no-recurse', False)
+        kwargs['just-db'] = argSet.pop('just-db', False)
+        kwargs['info'] = argSet.pop('info', False)
+        kwargs['keepExisting'] = argSet.pop('keep-existing', False)
+        kwargs['tagScript'] = argSet.pop('tag-script', False)
+        kwargs['test'] = argSet.pop('test', False)
+        kwargs['sync'] = argSet.pop('sync', False)
 
         kwargs['updateByDefault'] = (otherArgs[1] == "update")
 

@@ -121,6 +121,12 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)
 
+    def findTroveReferences(self, names):
+        """ Return references to a trove on the system, whether or not
+            that trove is actually installed
+        """
+        return self.db.findTroveReferences(names)
+
     def getTrove(self, name, version, flavor, pristine = True):
 	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		 if version == x.getVersion() and flavor == x.getFlavor()]

@@ -1352,6 +1352,41 @@ class Database:
 
         return result
 
+    def findTroveReferences(self, names):
+        """ return troves contained in troves on this system, whether
+            or not they are installed
+        """
+        cu = self.db.cursor()
+        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
+                                              start_transaction = False)
+        for idx, name in enumerate(names):
+            cu.execute("INSERT INTO ftc VALUES(?, ?)", idx, name,
+                       start_transaction = False)
+
+        # the JOIN TroveTroves on includedId ensures that this trove
+        # is pointed to somewhere!
+        cu.execute("""SELECT idx, DBInstances.troveName, Versions.version,
+                             DBFlavors.flavor
+                        FROM ftc
+                        JOIN DBInstances AS IncInst ON
+                            ftc.name = IncInst.troveName 
+                        JOIN TroveTroves ON
+                            (IncInst.instanceId = TroveTroves.includedId 
+                             AND TroveTroves.inPristine = 1)
+                        JOIN DBInstances ON
+                            IncInst.instanceId = DBInstances.instanceId
+                        JOIN DBFlavors ON
+                            IncInst.flavorId = DBFlavors.flavorId
+                        JOIN Versions ON
+                            IncInst.versionId = Versions.versionId
+                """)
+        result = [ [] for x in names ]
+        for (idx, name, version, flavor) in cu:
+            result[idx].append((name, versions.VersionFromString(version),
+                                deps.deps.ThawDependencySet(flavor)))
+        cu.execute("DROP TABLE ftc", start_transaction = False)
+        return result
+
     def findUnreferencedTroves(self):
         cu = self.db.cursor()
         cu.execute("""

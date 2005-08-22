@@ -309,3 +309,17 @@ class GroupRecipeSource(SimpleTroveSource):
 
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
+
+class ReferencedTrovesSource(SimpleTroveSource):
+    """ A TroveSource that only (n,v,f) pairs for troves that are
+        referenced by other, installed troves.
+    """
+    def __init__(self, source):
+        self.searchAsDatabase()
+        self.source = source
+
+    def getTroves(self, troveTups, *args, **kw):
+        return self.source.getTroves(troveTups, *args, **kw)
+
+    def trovesByName(self, name):
+        return self.source.findTroveReferences([name])[0]
