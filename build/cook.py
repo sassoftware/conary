@@ -51,7 +51,6 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     p.setRequires(bldPkg.requires)
-    provides = bldPkg.provides
     p.setProvides(bldPkg.provides)
 
     linkGroups = {}
