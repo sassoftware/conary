@@ -249,9 +249,13 @@ class Policy(action.RecipeAction):
 	path=dirname[rootdirlen:]
 	for name in names:
 	   thispath = util.normpath(path + os.sep + name)
-	   if self.policyInclusion(thispath) and \
-	      not self.policyException(thispath):
+	   if self._pathAllowed(thispath):
 	       self.doFile(thispath)
+
+    def _pathAllowed(self, path):
+        if self.policyInclusion(path) and not self.policyException(path):
+            return True
+        return False
 
     def policyInclusion(self, filespec):
 	if not self.inclusionFilters:

@@ -940,6 +940,44 @@ class ParseManifest(policy.Policy):
 		    self.recipe.Ownership(owner, group,
                                           util.literalRegex(target))
 
+
+class MakeDevices(policy.Policy):
+    """
+    Makes device nodes:
+    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c}.
+
+    These nodes are only in the package, not in the filesystem, in order
+    to enable Conary's policy of non-root builds (only root can actually
+    create device nodes).
+    """
+    def __init__(self, *args, **keywords):
+	self.devices = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
+	"""
+	if args:
+	    l = len(args)
+	    # perms is optional, all other arguments must be there
+	    assert((l > 5) and (l < 8))
+	    if l == 6:
+                args = list(args)
+		args.append(0400)
+	    self.devices.append(args)
+	policy.Policy.updateArgs(self, **keywords)
+
+    def do(self):
+        for device in self.devices:
+            r = self.recipe
+            r.autopkg.addDevice(*device)
+            filename = device[0]
+            owner = device[4]
+            group = device[5]
+            r.Ownership(owner, group, filename)
+
+
 class DanglingSymlinks(policy.Policy):
     # This policy must run after all modifications to the packaging
     # are complete because it counts on self.recipe.autopkg.pathMap
@@ -1222,6 +1260,39 @@ class Group(policy.Policy):
         return False
 
 
+class ExcludeDirectories(policy.Policy):
+    """
+    Causes directories to be excluded from the package by default; set
+    exceptions to this policy with
+    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
+    matching the regular expression will be included in the package.
+
+    There are only two reasons to package a directory: the directory needs
+    permissions other than 0755, or it must exist even if it is empty.
+
+    It should generally not be necessary to invoke this policy directly,
+    because the most common reason to include a directory in a package
+    is that it needs permissions other than 0755, so simply call
+    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
+    and the directory will automatically included.
+
+    Packages do not need to explicitly include a directory just to ensure
+    that there is a place to put a file; Conary will appropriately create
+    the directory, and delete it later if the directory becomes empty.
+    """
+    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+
+    def doFile(self, path):
+	fullpath = self.recipe.macros.destdir + os.sep + path
+	s = os.lstat(fullpath)
+	mode = s[stat.ST_MODE]
+	if mode & 0777 != 0755:
+            self.dbg('excluding directory %s with mode %o', path, mode&0777)
+	elif not os.listdir(fullpath):
+            self.dbg('excluding empty directory %s', path)
+	self.recipe.autopkg.delFile(path)
+
+
 class _UserGroup:
     """
     Abstract base class that implements marking owner/group dependencies.
@@ -1241,47 +1312,20 @@ class _UserGroup:
             pkg.requiresMap[path] = deps.DependencySet()
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, []))
 
-class MakeDevices(policy.Policy, _UserGroup):
+
+class _BuildPackagePolicy(policy.Policy):
     """
-    Makes device nodes:
-    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c}.
-
-    These nodes are only in the package, not in the filesystem, in order
-    to enable Conary's policy of non-root builds (only root can actually
-    create device nodes).
+    Abstract base class for policy that walks the buildpackage
+    rather than the %(destdir)s
     """
-    def __init__(self, *args, **keywords):
-	self.devices = []
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
-	"""
-	if args:
-	    l = len(args)
-	    # perms is optional, all other arguments must be there
-	    assert((l > 5) and (l < 8))
-	    if l == 6:
-                args = list(args)
-		args.append(0400)
-	    self.devices.append(args)
-	policy.Policy.updateArgs(self, **keywords)
-
     def do(self):
-        for device in self.devices:
-            self.recipe.autopkg.addDevice(*device)
-            filename = device[0]
-            owner = device[4]
-            group = device[5]
-            # FIXME: this needs to track systemusers/systemgroups
-            #        in the Ownership policy
-            if owner != 'root':
-                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
-            if group != 'root':
-                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+        pkg = self.recipe.autopkg
+        for thispath in sorted(pkg.pathMap):
+            if self._pathAllowed(thispath):
+                self.doFile(thispath)
 
-class Ownership(policy.Policy, _UserGroup):
+
+class Ownership(_BuildPackagePolicy, _UserGroup):
     """
     Sets user and group ownership of files when the default of
     root:root is not appropriate:
@@ -1338,40 +1382,7 @@ class Ownership(policy.Policy, _UserGroup):
                 self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 
-class ExcludeDirectories(policy.Policy):
-    """
-    Causes directories to be excluded from the package by default; set
-    exceptions to this policy with
-    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
-    matching the regular expression will be included in the package.
-
-    There are only two reasons to package a directory: the directory needs
-    permissions other than 0755, or it must exist even if it is empty.
-
-    It should generally not be necessary to invoke this policy directly,
-    because the most common reason to include a directory in a package
-    is that it needs permissions other than 0755, so simply call
-    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
-    and the directory will automatically included.
-
-    Packages do not need to explicitly include a directory just to ensure
-    that there is a place to put a file; Conary will appropriately create
-    the directory, and delete it later if the directory becomes empty.
-    """
-    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
-
-    def doFile(self, path):
-	fullpath = self.recipe.macros.destdir + os.sep + path
-	s = os.lstat(fullpath)
-	mode = s[stat.ST_MODE]
-	if mode & 0777 != 0755:
-            self.dbg('excluding directory %s with mode %o', path, mode&0777)
-	elif not os.listdir(fullpath):
-            self.dbg('excluding empty directory %s', path)
-	self.recipe.autopkg.delFile(path)
-
-
-class _Utilize(policy.Policy, _UserGroup):
+class _Utilize(_BuildPackagePolicy, _UserGroup):
     """
     Pure virtual base class for C{UtilizeUser} and C{UtilizeGroup}
     """
@@ -1555,7 +1566,9 @@ def _getmonodis(macros, recipe, path):
     return None
 
 
-class Requires(_addInfo):
+class Requires(_addInfo, _BuildPackagePolicy):
+    # _addInfo must come first to use its updateArgs() member
+    # _BuildPackagePolicy provides package-walking do() member
     """
     Drives requirement mechanism: to avoid adding requirements for a file,
     such as example shell scripts outside C{%(docdir)s},
@@ -1570,15 +1583,12 @@ class Requires(_addInfo):
     )
     monodisPath = None
 
-    def runInfo(self, path):
+    def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
 	    return
 	pkg = componentMap[path]
 	f = pkg.getFile(path)
-        if not (f.hasContents and isinstance(f, files.RegularFile)) and \
-           not isinstance(f, files.SymbolicLink):
-            return
         macros = self.recipe.macros
 
         # now go through explicit requirements
@@ -1675,7 +1685,7 @@ class Requires(_addInfo):
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
 
-class Provides(policy.Policy):
+class Provides(_BuildPackagePolicy):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
     such as for package-private plugin modules installed in system library
@@ -1713,6 +1723,40 @@ class Provides(policy.Policy):
 	del self.provisions
 	policy.Policy.doProcess(self, recipe)
 
+    def _ELFNonProvide(self, path, m, pkg, mode):
+        if path in pkg.providesMap and m and m.name == 'ELF' and \
+           'soname' in m.contents and not mode & 0111 and \
+           not path.endswith('.so'):
+            # libraries must be executable for ldconfig to work --
+            # see ExecutableLibraries policy
+            del pkg.providesMap[path]
+
+    def _AddCILDeps(self, path, m, pkg, macros):
+        if not m or m.name != 'CIL':
+            return
+        fullpath = macros.destdir + path
+        if not self.monodisPath:
+            self.monodisPath = _getmonodis(macros, self, path)
+            if not self.monodisPath:
+                return
+        p = util.popen('%s --assembly %s' %(
+                       self.monodisPath, fullpath))
+        name = None
+        ver = None
+        for line in [ x.strip() for x in p.readlines() ]:
+            if 'Name:' in line:
+                name = line.split()[1]
+            elif 'Version:' in line:
+                ver = line.split()[1]
+        p.close()
+        # monodis did not give us any info
+        if not name or not ver:
+            return
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        pkg.providesMap[path].addDep(deps.CILDependencies,
+                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
@@ -1722,52 +1766,20 @@ class Provides(policy.Policy):
         macros = self.recipe.macros
 
         fullpath = macros.destdir + path
-        mode = os.lstat(fullpath)[stat.ST_MODE]
-        m = self.recipe.magic[path]
-        if path in pkg.providesMap and m and m.name == 'ELF' and \
-           'soname' in m.contents and not mode & 0111 and \
-           not path.endswith('.so'):
-            # libraries must be executable for ldconfig to work --
-            # see ExecutableLibraries policy
-            del pkg.providesMap[path]
-
-        if m and m.name == 'CIL':
-            fullpath = macros.destdir + path
-            if not self.monodisPath:
-                self.monodisPath = _getmonodis(macros, self, path)
-                if not self.monodisPath:
-                    return
-            p = util.popen('%s --assembly %s' %(
-                           self.monodisPath, fullpath))
-            name = None
-            ver = None
-            for line in [ x.strip() for x in p.readlines() ]:
-                if 'Name:' in line:
-                    name = line.split()[1]
-                elif 'Version:' in line:
-                    ver = line.split()[1]
-            p.close()
-            # monodis did not give us any info
-            if not name or not ver:
-                return
-            if path not in pkg.providesMap:
-                pkg.providesMap[path] = deps.DependencySet()
-            pkg.providesMap[path].addDep(deps.CILDependencies,
-                    deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+        if os.path.exists(fullpath):
+            m = self.recipe.magic[path]
+            mode = os.lstat(fullpath)[stat.ST_MODE]
+            self._ELFNonProvide(path, m, pkg, mode)
+            self._AddCILDeps(path, m, pkg, macros)
 
         for (filter, provision) in self.fileFilters:
             if filter.match(path):
                 self._markProvides(path, provision, pkg, m, f)
 
-        if f.hasContents and isinstance(f, files.RegularFile):
-            # only regular files can provide
-            if path not in pkg.providesMap:
-                return
-            f.provides.set(pkg.providesMap[path])
-            pkg.provides.union(f.provides())
-
-        elif path in pkg.providesMap:
-            del pkg.providesMap[path]
+        if path not in pkg.providesMap:
+            return
+        f.provides.set(pkg.providesMap[path])
+        pkg.provides.union(f.provides())
 
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
@@ -1816,7 +1828,7 @@ class Provides(policy.Policy):
             return
 
 
-class Flavor(policy.Policy):
+class Flavor(_BuildPackagePolicy):
     """
     Drives flavor mechanism: to avoid marking a file's flavor:
     C{r.Flavor(exceptions=I{filterexp})}
@@ -2015,8 +2027,8 @@ def DefaultPolicy(recipe):
         User(recipe),
         SupplementalGroup(recipe),
         Group(recipe),
-	Ownership(recipe),
 	ExcludeDirectories(recipe),
+	Ownership(recipe),
         UtilizeUser(recipe),
         UtilizeGroup(recipe),
 	ComponentRequires(recipe),

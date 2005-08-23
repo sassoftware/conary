@@ -250,9 +250,16 @@ class File(streams.StreamSet):
     skipChmod = False
     streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
                    FILE_STREAM_FLAGS : (FlagsStream, "flags"),
+                   FILE_STREAM_PROVIDES :
+                       (streams.DependenciesStream, 'provides'  ),
+                   FILE_STREAM_REQUIRES :
+                       (streams.DependenciesStream, 'requires'  ),
+                   FILE_STREAM_FLAVOR   :
+                       (streams.DependenciesStream, 'flavor'    ),
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
     _streamDict = streams.StreamSetDef(streamDict)
-    __slots__ = [ "thePathId", "inode", "flags", "tags" ]
+    __slots__ = [ "thePathId", "inode", "flags", "tags",
+                  'provides', 'requires', 'flavor' ]
 
     def __deepcopy__(self, mem):
         return ThawFile(self.freeze(), self.thePathId)
@@ -357,13 +364,12 @@ class SymbolicLink(File):
     lsTag = "l"
     streamDict = {
         FILE_STREAM_TARGET :   (streams.StringStream, "target"),
-        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
     }
     streamDict.update(File.streamDict)
     _streamDict = streams.StreamSetDef(streamDict)
     # chmod() on a symlink follows the symlink
     skipChmod = True
-    __slots__ = [ "target", "requires" ]
+    __slots__ = [ "target", ]
 
     def sizeString(self):
 	return "%8d" % len(self.target())
@@ -468,15 +474,12 @@ class RegularFile(File):
 
     streamDict = { 
 	FILE_STREAM_CONTENTS : (RegularFileStream,          'contents'  ),
-        FILE_STREAM_PROVIDES : (streams.DependenciesStream, 'provides'  ),
-        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
-        FILE_STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor'    ),
         FILE_STREAM_LINKGROUP: (LinkGroupStream,            'linkGroup' ),
     }
 
     streamDict.update(File.streamDict)
     _streamDict = streams.StreamSetDef(streamDict)
-    __slots__ = ('contents', 'provides', 'requires', 'flavor', 'linkGroup')
+    __slots__ = ('contents', 'linkGroup')
 
     lsTag = "-"
     hasContents = True
