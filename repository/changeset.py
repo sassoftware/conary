@@ -139,6 +139,11 @@ class ChangeSet(streams.LargeStreamSet):
 
     ignoreUnknown = True
 
+    def _resetTroveLists(self):
+        # XXX hack
+        self.newTroves = ChangeSetNewTroveList()
+        self.oldTroves = streams.ReferencedTroveList()
+
     def isAbsolute(self):
 	return self.absolute
 

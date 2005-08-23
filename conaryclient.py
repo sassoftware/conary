@@ -353,8 +353,8 @@ class ConaryClient:
 
         return redirectHack
 
-    def _mergeGroupChanges(self, cs, uJob, redirectHack, keepExisting, recurse,
-                           ineligible):
+    def _mergeGroupChanges(self, cs, troveSource, uJob, redirectHack, 
+                           keepExisting, recurse, ineligible):
 
         def _newBase(newTrv):
             """
@@ -430,26 +430,6 @@ class ConaryClient:
                     r.append(False)
 
             return r
-
-        def _removeObsoleteUpdates(cs, obsoletes):
-            for (name, (oldVersion, oldFlavor),
-                       (newVersion, newFlavor), absolute) in obsoletes:
-                if newVersion:
-                    cs.delNewTrove(name, newVersion, newFlavor)
-
-	def _replaceErasures(cs, oldJob, newJob, newErasures):
-	    # replace all erasures in newJob with things from newErasures
-	    newJobErasures = set([ x for x in newJob if x[2][1] is None ])
-	    newJob.difference_update(newJobErasures)
-	    newJob.update(newErasures)
-
-	    oldJobErasures = set([ x for x in oldJob if x[2][1] is None ])
-	    obsoletes = oldJob - newErasures
-
-            for (name, (oldVersion, oldFlavor), 
-                       (newVersion, newFlavor), absolute) in obsoletes:
-                if not newVersion:
-                    cs.delOldTrove(name, oldVersion, oldFlavor)
 
 	def _findErasures(primaryErases, newJob, referencedTroves, 
                           recurse):
@@ -648,6 +628,12 @@ class ConaryClient:
                                 (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 False))
 
+        for (name, version, flavor) in cs.getOldTroveList():
+            job = (name, (version, flavor), (None, None), False)
+            origJob.append(job)
+
+        del cs
+
         for job in origJob:
             item = (job[0], job[2][0], job[2][1])
         
@@ -678,8 +664,6 @@ class ConaryClient:
         del toOutdate
 
         referencedTroves = set()
-        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
-        troveSource.addChangeSet(cs)
 
         while keepList:
             job = keepList.pop()
@@ -746,12 +730,14 @@ class ConaryClient:
                                                (newVersion, newFlavor), False))
 
         erasePrimaryList = []
-        for (name, version, flavor) in cs.getOldTroveList():
-            job = (name, (version, flavor), (None, None), False)
-            origJob.append(job)
+        for job in origJob:
+            if job[2][0] is not None:
+                continue
 
-            if (name, version, flavor) in primaries:
-		erasePrimaryList.append((name, version, flavor))
+            info = (job[0], job[1][0], job[1][1])
+
+            if info in primaries:
+		erasePrimaryList.append(info)
                 newJob.add(job)
 
         _removeDuplicateErasures(newJob)
@@ -785,8 +771,6 @@ class ConaryClient:
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
                                 (newInfo[1], newInfo[2]), 0))
 
-        origJob = set(origJob)
-
         if keepExisting:
             # convert everything relative to new installs
             keepJobSet = set()
@@ -797,17 +781,13 @@ class ConaryClient:
 
             newJob = keepJobSet
 
-        # remove the trvCs entries we don't need any more. this keeps
-        # _findErasures from stubbing it's toe on trvCs entries which don't
-        # matter
-        _removeObsoleteUpdates(cs, origJob - newJob)
+        # _findErasures picks what gets erased; nothing else gets to vote
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
 				 recurse)
-        # _findErasures picks what gets erased; nothing else gets to vote
-	_replaceErasures(cs, origJob, newJob, eraseSet)
-        neededJob = newJob - origJob
+        newJob -= set([ x for x in newJob if x[2][0] is None ])
+        newJob.update(eraseSet)
 
-        return neededJob
+        return newJob
             
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False):
@@ -951,14 +931,22 @@ class ConaryClient:
 
         redirectHack = self._processRedirects(finalCs, recurse) 
 
-        mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
-                                                keepExisting, recurse,
-                                                oldItems)
-        if mergeItemList:
-            cs = self.repos.createChangeSet(mergeItemList, withFiles = False,
-                                            primaryTroveList = [], 
-                                            recurse = False)
-            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
+        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
+        troveSource.addChangeSet(finalCs)
+
+        mergeItemList = self._mergeGroupChanges(finalCs, troveSource, uJob, 
+                                                redirectHack, keepExisting, 
+                                                recurse, oldItems)
+        # XXX this _resetTroveLists a hack, but building a whole new changeset
+        # is a bit tricky due to changeset files
+        cs1, remainder = troveSource.createChangeSet(mergeItemList, 
+                                                 withFiles = False)
+        finalCs._resetTroveLists()
+        cs2 = self.repos.createChangeSet(remainder, withFiles = False,
+                                        primaryTroveList = [], 
+                                        recurse = False)
+        finalCs.merge(cs1, (self.repos.createChangeSet, changeSetList))
+        finalCs.merge(cs2, (self.repos.createChangeSet, changeSetList))
 
         return finalCs, splittable
 
