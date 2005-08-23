@@ -353,7 +353,7 @@ class ConaryClient:
 
         return redirectHack
 
-    def _mergeGroupChanges(self, jobList, primaries, troveSource, uJob, 
+    def _mergeGroupChanges(self, primaryJobList, troveSource, uJob, 
                            redirectHack, keepExisting, recurse, ineligible):
 
         def _newBase(newTrv):
@@ -609,20 +609,18 @@ class ConaryClient:
         toOutdate = set()
         newJob = set()
 
-        for job in jobList:
+        for job in primaryJobList:
             if job[2][0] is not None:
                 item = (job[0], job[2][0], job[2][1])
             
-                if item in primaries:
-                    if job[1][0] is None:
-                        toOutdate.add(item)
-                    keepList.append(job)
+                if job[1][0] is None:
+                    toOutdate.add(item)
+                keepList.append(job)
             else:
                 item = (job[0], job[1][0], job[1][1])
 
-                if item in primaries:
-                    erasePrimaryList.append(item)
-                    newJob.add(job)
+                erasePrimaryList.append(item)
+                newJob.add(job)
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -903,8 +901,7 @@ class ConaryClient:
         troveSource = trovesource.ChangesetFilesTroveSource(self.db)
         troveSource.addChangeSet(finalCs)
 
-        mergeItemList = self._mergeGroupChanges(finalCs.getJobSet(), 
-                                                finalCs.getPrimaryTroveList(),
+        mergeItemList = self._mergeGroupChanges(finalCs.getPrimaryJobSet(), 
                                                 troveSource, uJob, 
                                                 redirectHack, keepExisting, 
                                                 recurse, oldItems)
