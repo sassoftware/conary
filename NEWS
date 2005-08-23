@@ -4,8 +4,8 @@ Changes in 0.61.10:
   * Groups now allow you to create a reference to another cooked trove, 
     and use that reference to add troves that are contained in that trove.
     For example, if you want to create a group-python based on the troves in
-    an already cooked group-dist, you add a reference to the group-dist in the
-    group-python reference, and pass the group-dist reference in when you call
+    an already cooked group-dist, you add a reference to the group-dist in 
+    group-python, and pass the group-dist reference in when you call
     addTroves.
   * Work has begun towards generalizing the concept of a trove source.  
     A class SimpleTroveSource has been added that, when subclassed and given
