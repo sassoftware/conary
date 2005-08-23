@@ -645,6 +645,29 @@ class ChangeSet(streams.LargeStreamSet):
 	# this has to be true, I think...
 	self.local = 0
 
+    def getJobSet(self):
+        """
+        Regenerates the change set job (passed to change set creation)
+        for this change set.
+        """
+        jobList = []
+        for trvCs in self.newTroves.values():
+            if trvCs.getOldVersion():
+                jobList.append((trvCs.getName(), 
+                             (trvCs.getOldVersion(), trvCs.getOldFlavor()),
+                             (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                             False))
+            else:
+                jobList.append((trvCs.getName(), (None, None),
+                             (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                             False))
+
+        for (name, version, flavor) in self.oldTroves:
+            job = (name, (version, flavor), (None, None), False)
+            jobList.append(job)
+
+        return jobList
+            
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
 	self.configCache = {}
