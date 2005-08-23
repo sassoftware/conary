@@ -1309,9 +1309,12 @@ class ConaryClient:
                     else:
                         branchedVersion = version.createBranch(newLabel,
                                                                withVerRel = 1)
+                    byDefault = trove.includeTroveByDefault(name, 
+                                                            version, flavor)
 		    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False)
-		    branchedTrove.addTrove(name, branchedVersion, flavor)
+		    branchedTrove.addTrove(name, branchedVersion, flavor,
+                                            byDefault=byDefault)
 
                 key = (trove.getName(), branchedTrove.getVersion(),
                        trove.getFlavor())
