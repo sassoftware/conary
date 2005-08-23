@@ -397,24 +397,22 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
     def createChangeSet(self, jobList, withFiles = True, recurse = False):
         # Returns the changeset plus a remainder list of the bits it
         # couldn't do
-        assert(0)
-
-        def _findTroveObj(self, availSet, name, version, flavor):
+        def _findTroveObj(availSet, name, version, flavor):
             info = (name, version, flavor)
-            (fromCs, inDb) = availSet[info]
+            (inDb, fromCs) = availSet[info]
 
             if fromCs:
-                trv = self.getTroves([info])
+                [ trv ] = self.getTroves([info], withFiles = False)
             elif inDb:
                 # XXX this should be parallelized...
-                trv = self.db.getTroves([info])
+                trv = self.db.getTrove(*info)
             else:
                 trv = None
 
             return trv
 
         assert(not withFiles)
-        assert(not False)
+        assert(not recurse)
         troves = []
         for job in jobList:
             if job[1][0] is not None:
