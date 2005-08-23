@@ -807,35 +807,6 @@ class ConaryClient:
 	_replaceErasures(cs, origJob, newJob, eraseSet)
         neededJob = newJob - origJob
 
-        # Make sure a single trove doesn't get removed multiple times.
-        # This can happen if (for example) a single trove is updated
-        # to two new versions of that trove simultaneously. This assumes
-        # that the cs passed in to us doesn't have this problem; we only
-        # check neededJob for it
-
-        # XXX it seems like findErasures should actually be the one
-        # responsible for this
-        removed = {}
-        for trvCs in cs.iterNewTroveList():
-            if trvCs.getOldVersion() is not None:
-                removed[(trvCs.getName(), trvCs.getOldVersion(),
-                         trvCs.getOldFlavor())] = None
-
-        jobList = []
-        for job in neededJob:
-            if job[1][0] is None:
-                jobList.append(job)
-                continue
-
-            if removed.has_key((job[0], job[1][0], job[1][1])):
-                if job[2][1] is not None:
-                    jobList.append((job[0], (None, None), job[2], job[3]))
-            else:
-                jobList.append(job)
-                removed[(job[0], job[1][0], job[1][1])] = True
-
-        neededJob = jobList
-
         return neededJob
             
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
