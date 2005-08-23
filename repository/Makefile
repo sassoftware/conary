@@ -23,6 +23,7 @@ python_files = __init__.py	\
 		shimclient.py	\
 		repository.py	\
 		transport.py	\
+		trovesource.py	\
 		xmlshims.py
 
 extra_dist = Makefile
