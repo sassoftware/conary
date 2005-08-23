@@ -479,7 +479,7 @@ def realMain(cfg, argv=sys.argv):
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
-        kwargs['tagScript'] = argSet.pop('tag-script', False)
+        kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync', False)
 
