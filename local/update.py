@@ -347,6 +347,9 @@ class FilesystemJob:
 	    f.close()
 	    log.warning(msg)
 
+        # FIXME: the next two operations need to be combined into one;
+        # groups can depend on users, and vice-versa.  This ordering
+        # merely happens to work for all cases we have at the moment.
         if ('group-info' in self.tagUpdates
             and not _checkHandler('group-info', self.root)):
             groupAction(self.root, self.tagUpdates['group-info'])
