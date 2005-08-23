@@ -605,15 +605,24 @@ class ConaryClient:
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
             
         keepList = []
+        erasePrimaryList = []
         toOutdate = set()
+        newJob = set()
 
         for job in jobList:
-            item = (job[0], job[2][0], job[2][1])
-        
-            if item in primaries:
-                if job[1][0] is None:
-                    toOutdate.add(item)
-                keepList.append(job)
+            if job[2][0] is not None:
+                item = (job[0], job[2][0], job[2][1])
+            
+                if item in primaries:
+                    if job[1][0] is None:
+                        toOutdate.add(item)
+                    keepList.append(job)
+            else:
+                item = (job[0], job[1][0], job[1][1])
+
+                if item in primaries:
+                    erasePrimaryList.append(item)
+                    newJob.add(job)
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -628,8 +637,6 @@ class ConaryClient:
             if item in outdated:
                 job = (job[0], outdated[item][1:], job[2], False)
                 keepList[i] = job
-
-        newJob = set()
 
         for info in redirects:
             newJob.add((info[0], (info[1], info[2]), (None, None), False))
@@ -701,17 +708,6 @@ class ConaryClient:
                     else:
                         keepList.append((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), False))
-
-        erasePrimaryList = []
-        for job in jobList:
-            if job[2][0] is not None:
-                continue
-
-            info = (job[0], job[1][0], job[1][1])
-
-            if info in primaries:
-		erasePrimaryList.append(info)
-                newJob.add(job)
 
         _removeDuplicateErasures(newJob)
 
