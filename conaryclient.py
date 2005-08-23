@@ -1313,7 +1313,8 @@ class ConaryClient:
                                            missingOkay = False)
 		    branchedTrove.addTrove(name, branchedVersion, flavor)
 
-                key = (trove.getName(), branchedVersion, trove.getFlavor())
+                key = (trove.getName(), branchedTrove.getVersion(),
+                       trove.getFlavor())
                 branchedTroves[key] = branchedTrove.diff(None)[0]
 
             # check for duplicates - XXX this could be more efficient with
