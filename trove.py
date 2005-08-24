@@ -1112,56 +1112,72 @@ class Trove(streams.LargeStreamSet):
 	    # can't do that either, throw up our hands in a fit of pique
 
 	    for version in newVersionList:
-		branch = version.branch()
-		if branch.hasParentBranch():
-		    parent = branch.parentBranch()
-		else:
-		    parent = None
+
 
 		if not oldVersionList:
 		    # no nice match, that's too bad
 		    trvList.append((name, None, version, None, newFlavor))
+                    continue
 		elif len(oldVersionList) == 1:
 		    trvList.append((name, oldVersionList[0], version, 
 				    oldFlavor, newFlavor))
 		    del oldVersionList[0]
+                    continue
+
+		branch = version.branch()
+
+		if branch.hasParentBranch():
+		    parentBranch = branch.parentBranch()
 		else:
-		    sameBranch = None
+		    parentBranch = None
+
+                if version.hasParentVersion():
+                    parentVersion = version.parentVersion()
+		else:
 		    parentVersion = None
-		    childNode = None
-		    childBranch = None
 
-		    for other in oldVersionList:
-			if other.branch() == branch:
-			    sameBranch = other
-			if parent and other == parent:
-			    parentVersion = other
-			if other.hasParentVersion():
-			    if other.parentVersion() == version:
-				childNode = other
-                        if other.branch().hasParentBranch():
-                            if other.branch().parentBranch() == branch:
-                                childBranch = other
 
-		    # none is a sentinel
-		    priority = [ sameBranch, parentVersion, childNode, 
-				 childBranch, None ]
 
-		    for match in priority:
-			if match is not None:
-			    break
+                sameBranches = []
+                parentBranches = []
+                childBranches = []
+                parentNodes = []
+                childNodes = []
 
-		    if match is not None:
-			oldVersionList.remove(match)
-			trvList.append((name, match, version, 
-					oldFlavor, newFlavor))
-		    else:
-			# Here's the fit of pique. This shouldn't happen
-			# except for the most ill-formed of groups.
-                        raise TroveDiffError, "Cannot determine what trove is " \
-                            "being replaced for %s=%s[%s]" %  \
-                                (name, version.asString(), 
-                                 deps.formatFlavor(newFlavor))
+                for other in oldVersionList:
+                    if other.branch() == branch:
+                        sameBranches.append(other)
+                    if parentVersion and other == parentVersion:
+                        parentNodes.append(other)
+                    if parentBranch and other.branch() == parentBranch:
+                        parentBranches.append(other)
+                    if other.hasParentVersion():
+                        if other.parentVersion() == version:
+                            childNodes.append(other)
+                    if other.branch().hasParentBranch():
+                        if other.branch().parentBranch() == branch:
+                            childBranches.append(other)
+
+                # none is a sentinel
+                priority = [ sameBranches, parentNodes, childNodes, 
+                             parentBranches, childBranches, None ]
+
+                for match in priority:
+                    if match:
+                        break
+
+                if match and len(match) == 1:
+                    match = match[0]
+                    oldVersionList.remove(match)
+                    trvList.append((name, match, version, 
+                                    oldFlavor, newFlavor))
+                else:
+                    # Here's the fit of pique. This shouldn't happen
+                    # except for the most ill-formed of groups.
+                    raise TroveDiffError, "Cannot determine what trove is " \
+                        "being replaced for %s=%s[%s]" %  \
+                            (name, version.asString(), 
+                             deps.formatFlavor(newFlavor))
 
 	    # remove old versions which didn't get matches
 	    for oldVersion in oldVersionList:
