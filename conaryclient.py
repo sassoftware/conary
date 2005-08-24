@@ -1074,7 +1074,8 @@ class ConaryClient:
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
-                    localRollbacks = False, callback = UpdateCallback()):
+                    localRollbacks = False, callback = UpdateCallback(),
+                    autoLockList = conarycfg.RegularExpressionList()):
 
         def _createCs(repos, theCs, uJob, standalone = False):
             assert(not standalone or 
@@ -1346,7 +1347,8 @@ class ConaryClient:
 	return dupList
 
     def _createChangeSetList(self, csList, recurse = True, 
-                             skipNotByDefault = False, excludeList = [],
+                             skipNotByDefault = False, 
+                             excludeList = conarycfg.RegularExpressionList(),
                              callback = None):
         primaryList = []
         for (name, (oldVersion, oldFlavor),
@@ -1435,7 +1437,8 @@ class ConaryClient:
         return (fullCsList, primaryList)
 
     def createChangeSet(self, csList, recurse = True, 
-                        skipNotByDefault = True, excludeList = [],
+                        skipNotByDefault = True, 
+                        excludeList = conarycfg.RegularExpressionList(),
                         callback = None, withFiles = False,
                         withFileContents = False):
         """
@@ -1454,7 +1457,8 @@ class ConaryClient:
                                        withFileContents = withFileContents)
 
     def createChangeSetFile(self, path, csList, recurse = True, 
-                            skipNotByDefault = True, excludeList = [],
+                            skipNotByDefault = True, 
+                            excludeList = conarycfg.RegularExpressionList(),
                             callback = None):
         """
         Creates <path> as a change set file.
