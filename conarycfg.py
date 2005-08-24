@@ -45,6 +45,18 @@ import versions
 
 BOOLEAN=BOOL
 
+class RegularExpressionList(list):
+
+    def append(self, pattern):
+        list.append(self, pattern, re.compile(pattern))
+
+    def match(self, s):
+        for reStr, regExp in excludeList:
+            if regExp.match(s):
+                return True
+
+        return False
+
 class ConfigFile:
 
     defaults = {}
@@ -146,11 +158,10 @@ class ConfigFile:
                 except versions.ParseError, e:
                     raise versions.ParseError, str(e)
 	elif type == REGEXPLIST:
-            self.__dict__[key] = []
+            self.__dict__[key] = RegularExpressionList()
             for regexpStr in val.split():
                 try:
-                    self.__dict__[key].append(
-                                        (regexpStr, re.compile(regexpStr)))
+                    self.__dict__[key].append(regexpStr)
                 except sre_constants.error, e:
                     raise versions.ParseError, str(e)
 	elif type == BOOL:
@@ -299,10 +310,11 @@ class ConaryConfiguration(ConfigFile):
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
-        'excludeTroves'         : [ REGEXPLIST, [] ],
+        'excludeTroves'         : [ REGEXPLIST, RegularExpressionList() ],
         'flavor'                : [ FLAVORLIST, [] ],
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
+	'lockTroves'		: [ REGEXPLIST, RegularExpressionList() ],
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'updateThreshold'       : [ INT, 10],

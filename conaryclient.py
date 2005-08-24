@@ -1407,9 +1407,8 @@ class ConaryClient:
 
             # troves explicitly listed should never be excluded
             if (name, newVersion, newFlavor) not in primaryList:
-                for reStr, regExp in excludeList:
-                    if regExp.match(name):
-                        skip = True
+                if excludeList.match(name):
+                    skip = True
 
             if not skip:
                 fullCsList.append((name, 
