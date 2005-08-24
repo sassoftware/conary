@@ -213,7 +213,7 @@ class DBInstanceTable:
 	    yield match
 
     def addId(self, troveName, versionId, flavorId, timeStamps, 
-	      isPresent = True):
+	      isPresent = True, locked = False):
 	assert(min(timeStamps) > 0)
 	if isPresent:
 	    isPresent = 1
@@ -225,7 +225,7 @@ class DBInstanceTable:
 						   "?, ?, ?)",
                    (troveName, versionId, flavorId, 
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
-                    False))
+                    locked))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -684,7 +684,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, oldTroveSpec, trove):
+    def addTrove(self, oldTroveSpec, trove, lock = False):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
@@ -748,7 +748,8 @@ class Database:
 	else:
 	    assert(min(troveVersion.timeStamps()) > 0)
 	    troveInstanceId = self.instances.addId(troveName, troveVersionId, 
-				       troveFlavorId, troveVersion.timeStamps())
+				       troveFlavorId, troveVersion.timeStamps(),
+                                       locked = lock)
 	
         assert(cu.execute("SELECT COUNT(*) FROM TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)

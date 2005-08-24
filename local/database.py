@@ -19,6 +19,7 @@ import shutil
 
 #conary
 from build import tags
+from conarycfg import RegularExpressionList
 from callbacks import UpdateCallback
 import datastore
 from deps import deps
@@ -263,8 +264,8 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
-    def addTrove(self, oldTroveSpec, trove):
-	return self.db.addTrove(oldTroveSpec, trove)
+    def addTrove(self, oldTroveSpec, trove, lock = False):
+	return self.db.addTrove(oldTroveSpec, trove, lock = lock)
 
     def addTroveDone(self, troveInfo):
 	pass
@@ -392,7 +393,8 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        removeHints = {}):
+                        removeHints = {}, 
+                        autoLockList = RegularExpressionList()):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -511,7 +513,8 @@ class Database(SqlDbRepository):
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
-            localrep.LocalRepositoryChangeSetJob(self, cs, callback)
+            localrep.LocalRepositoryChangeSetJob(self, cs, callback,
+                                                 autoLockList)
             self.db.mapLockedTroves(uJob.getLockMaps())
 
         errList = fsJob.getErrorList()

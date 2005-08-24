@@ -1129,7 +1129,8 @@ class ConaryClient:
                                     justDatabase = justDatabase,
                                     journal = journal, callback = callback,
                                     localRollbacks = localRollbacks,
-                                    removeHints = removeHints)
+                                    removeHints = removeHints,
+                                    autoLockList = autoLockList)
             except database.CommitError, e:
                 raise UpdateError, "changeset cannot be applied"
 

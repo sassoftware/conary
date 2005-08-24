@@ -31,7 +31,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     """
 
     def addTrove(self, oldTroveSpec, trove):
-	return self.repos.addTrove(oldTroveSpec, trove)
+        lock = self.autoLockList.match(trove.getName())
+	return self.repos.addTrove(oldTroveSpec, trove, lock = lock)
 
     def addTroveDone(self, troveId):
 	pass
@@ -75,13 +76,14 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, callback):
+    def __init__(self, repos, cs, callback, autoLockList):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
 	self.repos = repos
 	self.oldTroves = []
 	self.oldFiles = []
+        self.autoLockList = autoLockList
 
 	# remove old versions of the packages which are being added. this has
 	# to be done before FilesystemRepository.__init__() is called, as

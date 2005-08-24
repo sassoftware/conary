@@ -23,6 +23,7 @@ import sys
 import deps
 import deps.arch
 import deps.deps
+import copy
 from build import use
 from lib import log,util
 import versions
@@ -48,10 +49,10 @@ BOOLEAN=BOOL
 class RegularExpressionList(list):
 
     def append(self, pattern):
-        list.append(self, pattern, re.compile(pattern))
+        list.append(self, (pattern, re.compile(pattern)))
 
     def match(self, s):
-        for reStr, regExp in excludeList:
+        for reStr, regExp in self:
             if regExp.match(s):
                 return True
 
@@ -246,7 +247,7 @@ class ConfigFile:
 		self.types[key] = STRING
 		self.__dict__[key] = value
             if isinstance(self.__dict__[key], (list, tuple)):
-                self.__dict__[key] = self.__dict__[key][:]
+                self.__dict__[key] = copy.deepcopy(self.__dict__[key])
             if isinstance(self.__dict__[key], dict):
                 self.__dict__[key] = self.__dict__[key].copy()
 
