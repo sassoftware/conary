@@ -1339,7 +1339,10 @@ class CacheSet:
             excludeAutoSource)
 
         row = None
-        for (row, returnVal, size) in cu:
+        # since we begin and commit a transaction inside the loop
+        # over the returned rows, we must use fetchall() here so that we
+        # release our read lock.
+        for (row, returnVal, size) in cu.fetchall():
             path = self.filePattern % (self.tmpDir, row)
             try:
                 fd = os.open(path, os.O_RDONLY)
