@@ -362,24 +362,65 @@ class RecipeLoader:
         except:
             pass
 
+
+
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
-                                    ignoreInstalled=False):
+                                    ignoreInstalled=False, 
+                                    filterVersions=False):
+    def _scoreVersion(labelPath, version):
+        """ These labels all match the given labelPath.
+            We score them based on the number of matching labels in 
+            the label path, and return the one that's "best".
+
+            The following rules should apply:
+            * if the labelPath is [bar, foo] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
+              is that any other shadow/branch in the path may be from a 
+              maintenance branch.
+            * if the labelPath is [bar] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.
+        """
+        # FIXME I'm quite sure this heuristic will get replaced with
+        # something smarter/more sane as time progresses
+        score = 0
+        labelPath = [ x for x in reversed(labelPath)]
+        branch = version.branch()
+        while True:
+            label = branch.label()
+            try:
+                index = labelPath.index(label)
+            except ValueError:
+                index = -1
+            score += index
+            if not branch.hasParentBranch():
+                break
+            branch = branch.parentBranch()
+        return score
+
+    def _getBestTroveTups(labelPath, troveTups):
+        scores = [ (_scoreVersion(labelPath, x[1]), x) for x in troveTups ]
+        maxScore = max(scores)[0]
+        return [x[1] for x in scores if x[0] == maxScore ]
+
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
     if not labelPath:
-	labelPath = cfg.buildLabel
+	labelPath = [cfg.buildLabel]
     try:
 	pkgs = repos.findTrove(labelPath, 
                                (component, versionStr, deps.DependencySet()))
-	if len(pkgs) > 1:
-	    raise RecipeFileError("source component %s has multiple versions "
-				  "with label %s" %(component,
-                                                    cfg.buildLabel.asString()))
-        sourceComponent = repos.getTrove(*pkgs[0])
     except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
+    if filterVersions:
+        pkgs = _getBestTroveTups(labelPath, pkgs)
+    if len(pkgs) > 1:
+        raise RecipeFileError("source component %s has multiple versions "
+                              "on labelPath %s: %s" %(component,
+                            ', '.join(x.asString() for x in labelPath),
+                            pkgs))
+    sourceComponent = repos.getTrove(*pkgs[0])
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
     outF = os.fdopen(fd, "w")
@@ -573,7 +614,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
-                                     ignoreInstalled=alwaysIgnoreInstalled)[0]
+                                     ignoreInstalled=alwaysIgnoreInstalled,
+                                     filterVersions=True)[0]
 
 
     for name, recipe in loader.allRecipes().items():
