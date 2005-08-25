@@ -46,6 +46,7 @@ VERSION_STR_BRANCHNAME           = 4 # @namespace:tag
 VERSION_STR_TAG                  = 5 # :tag
 VERSION_STR_REVISION             = 6 # troveversion-sourcecount[-buildcount]
 VERSION_STR_TROVE_VER            = 7 # troveversion (no source or build count)
+VERSION_STR_HOST                 = 8 # host@
 
 class Query:
     def __init__(self, defaultFlavorPath, labelPath, 
@@ -679,6 +680,7 @@ class TroveFinder:
         if not versionStr:
             return VERSION_STR_NONE
         firstChar = versionStr[0]
+        lastChar = versionStr[-1]
         if firstChar == '/':
             try:
                 version = versions.VersionFromString(versionStr)
@@ -697,6 +699,8 @@ class TroveFinder:
             return VERSION_STR_BRANCHNAME
         elif firstChar == ':':
             return VERSION_STR_TAG
+        elif lastChar == '@':
+            return VERSION_STR_HOST
         elif versionStr.count('@'):
             return VERSION_STR_LABEL
         else:
@@ -798,6 +802,17 @@ class TroveFinder:
                                (serverName, namespace, versionStr)))
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
+    def sortHost(self, troveTup, affinityTroves):
+        labelPath = self._getLabelPath(troveTup)
+        repositories = [(x.getNamespace(), x.getLabel()) \
+                         for x in labelPath ]
+        newLabelPath = []
+        serverName = troveTup[1]
+        for nameSpace, branchName in repositories:
+            newLabelPath.append(versions.Label("%s%s:%s" %
+                               (serverName, nameSpace, branchName)))
+        return self._sortLabel(newLabelPath, troveTup, affinityTroves)
+
     def _sortLabel(self, labelPath, troveTup, affinityTroves):
         if self.query[QUERY_BY_LABEL_PATH].hasName(troveTup[0]): 
             self.remaining.append(troveTup)
@@ -885,6 +900,7 @@ class TroveFinder:
                VERSION_STR_LABEL        : sortLabel,
                VERSION_STR_BRANCHNAME   : sortBranchName,
                VERSION_STR_TAG          : sortTag,
+               VERSION_STR_HOST         : sortHost,
                VERSION_STR_REVISION     : sortTroveVersion,
                VERSION_STR_TROVE_VER    : sortTroveVersion }
 
