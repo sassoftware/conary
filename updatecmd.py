@@ -159,60 +159,89 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateText = None
         self.lock = thread.allocate_lock()
 
-def displayUpdateInfo(updJob):
+def displayUpdateJobInfo(cs, verbose=False):
+    indent = '    '
+    new = []
+    for x in cs.iterNewTroveList():
+        oldVersion = x.getOldVersion()
+        newVersion = x.getNewVersion()
+        oldFlavor = x.getOldFlavor()
+        newFlavor = x.getNewFlavor()
+        if newVersion:
+            newTVersion = newVersion.trailingRevision()
+        if oldVersion:
+            oldTVersion = oldVersion.trailingRevision()
+
+        if verbose:
+            if newVersion:
+                newInfo = '%s[%s]' % (newVersion.asString(), 
+                                      deps.formatFlavor(newFlavor))
+            if oldVersion:
+                oldInfo = '%s[%s]' % (oldVersion.asString(), 
+                                      deps.formatFlavor(oldFlavor))
+        else:
+            if oldVersion:
+                oldInfo = oldTVersion.asString()
+
+            if newVersion:
+                newInfo = newTVersion.asString()
+
+        if not oldVersion:
+            # if there is no oldVersion, this is a new trove
+            new.append(("%s (%s)" % (x.getName(), newInfo, 'N')))
+            continue
+
+        if oldVersion.branch() != newVersion.branch():
+            kind = 'Br'
+            oldInfo = oldVersion.asString()
+            newInfo = newVersion.asString()
+        elif oldTVersion.getVersion() != newTVersion.getVersion():
+            kind = 'V'
+        elif oldTVersion.getSourceCount() != \
+                                    newTVersion.getSourceCount():
+            kind = 'S'
+        else:
+            kind = 'B'
+        if oldFlavor != newFlavor:
+            flavors = deps.flavorDifferences([oldFlavor, newFlavor])
+            oldFlavor = flavors[oldFlavor]
+            newFlavor = flavors[newFlavor]
+            if not verbose and oldFlavor:
+                oldInfo = '%s[%s]' % (oldInfo, deps.formatFlavor(oldFlavor))
+            if not verbose and newFlavor:
+                newInfo = '%s[%s]' % (newInfo, deps.formatFlavor(newFlavor))
+
+        new.append(("%s (%s -> %s)" % (x.getName(), oldInfo, newInfo), kind))
+
+    new.sort()
+    new = [ "%s %s" % (x[1], x[0]) for x in new ]
+    if verbose:
+        formatter = lambda x: '%s[%s]' % (x[1].asString(),
+                                          deps.formatFlavor(x[2]))
+    else:
+        formatter = lambda x: x[1].trailingRevision().asString()
+
+    old = []
+    old += [ "D %s (%s deleted)" % (x[0], formatter(x)) 
+                                     for x in cs.getOldTroveList() ]
+    old.sort()
+
+    if not new and not old:
+        print indent + "Nothing is affected by this update."
+
+    if new:
+        print indent + ("\n%s" %indent).join(new)
+
+    if old:
+        print indent + ("\n%s" %indent).join(old)
+
+
+def displayUpdateInfo(updJob, verbose=False):
     totalJobs = len(updJob.getChangeSets())
     for num, cs in enumerate(updJob.getChangeSets()):
         if totalJobs > 1:
             print 'Job %d of %d:' %(num + 1, totalJobs)
-            indent = '    '
-        else:
-            indent = '    '
-        new = []
-        for x in cs.iterNewTroveList():
-            oldVersion = x.getOldVersion()
-            newVersion = x.getNewVersion()
-            if oldVersion:
-                oldTVersion = oldVersion.trailingRevision()
-            else:
-                # if there is no oldVersion, this is a new trove
-                new.append(("%s (%s)" %
-                            (x.getName(),
-                             newVersion.trailingRevision().asString()),
-                            'N'))
-                continue
-
-            newTVersion = newVersion.trailingRevision()
-
-            if oldVersion.branch() != newVersion.branch():
-                kind = 'B'
-            elif oldTVersion.getVersion() != newTVersion.getVersion():
-                kind = 'V'
-            elif oldTVersion.getSourceCount() != \
-                                        newTVersion.getSourceCount():
-                kind = 'S'
-            else:
-                kind = 'B'
-
-            new.append(("%s (%s -> %s)" % 
-                            (x.getName(), oldTVersion.asString(),
-                             newTVersion.asString()), kind))
-
-        new.sort()
-        new = [ "%s %s" % (x[1], x[0]) for x in new ]
-
-        old = []
-        old += [ "D %s (%s deleted)" % (x[0], x[1].trailingRevision().asString()) 
-                 for x in cs.getOldTroveList() ]
-        old.sort()
-
-        if not new and not old:
-            print indent + "Nothing is affected by this update."
-
-        if new:
-            print indent + ("\n%s" %indent).join(new)
-
-        if old:
-            print indent + ("\n%s" %indent).join(old)
+        displayUpdateJobInfo(cs, verbose)
     return
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
