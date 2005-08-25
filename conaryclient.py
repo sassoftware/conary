@@ -645,9 +645,11 @@ class ConaryClient:
 
         while keepList:
             job = keepList.pop()
-            newJob.add(job)
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
                                 = job
+            
+            if oldVersion != newVersion or oldFlavor != newFlavor:
+                newJob.add(job)
 
             if not recurse:
                 continue
@@ -657,6 +659,21 @@ class ConaryClient:
             # are sans files (for performance), so that's what we're left
             # with
             if trvName.startswith('fileset-') or trvName.find(":") != -1:
+                continue
+
+            if oldVersion == newVersion and oldFlavor == newFlavor:
+                # We need to install something which is already installed.
+                # Needless to say, that's a bit silly. We don't need to
+                # go through all of that, but we do need to recursively
+                # update the referncedTroves set.
+                trv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                          pristine = False)
+                referencedTroves.update(x for x in trv.iterTroveList())
+                for name, version, flavor in trv.iterTroveList():
+                    keepList.append((name, (version, flavor),
+                                           (version, flavor), False))
+
+                del trv
                 continue
 
             # collections should be in the changeset already. after all, it's
@@ -706,6 +723,9 @@ class ConaryClient:
                     else:
                         keepList.append((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), False))
+                else:
+                    keepList.append((name, (newVersion, newFlavor),
+                                           (newVersion, newFlavor), False))
 
         _removeDuplicateErasures(newJob)
 
