@@ -3,6 +3,8 @@ Changes in 0.61.11:
     changeset cache in the repository server has been fixed.
   * Added RegularExpressionList in conarycfg
   * Added lockTroves configuration option for autolock
+  * Recurisvely included troves could be removed incorrectly when those
+    troves were already present
 
 Changes in 0.61.10:
   * The conary update command now takes a --sync parameter, documented in 
