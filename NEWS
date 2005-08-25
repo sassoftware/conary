@@ -1,3 +1,8 @@
+Changes in 0.61.12:
+  * you can now search for troves by <trove>=<host>@ 
+  * a bug when cooking groups with depCheck = True (introduced in 0.61.10) 
+    has been fixed
+
 Changes in 0.61.11:
   * A bug that caused a database deadlock when removing entries from the
     changeset cache in the repository server has been fixed.
