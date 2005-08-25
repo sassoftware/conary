@@ -110,7 +110,7 @@ def getrealhost(host):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rpath, Inc.)" % xmlrpclib.__version__
+    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
     def __init__(self, https=False):
         self.https = https
