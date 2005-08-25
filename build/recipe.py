@@ -1354,7 +1354,7 @@ class SingleGroup:
         if self.autoResolve:
             self._resolveDependencies(cfg, repos, labelPath)
         elif self.depCheck:
-            failedDeps = self._checkDependencies(cfg, repos, labelPath)
+            failedDeps = self._checkDependencies(repos)
             if failedDeps:
                 return failedDeps
 
