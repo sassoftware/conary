@@ -881,7 +881,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
         p.setInstallBucket(buildPkg.getInstallBucket())
         p.setIsCollection(False)
 	
-	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
+	byDefault = recipeObj.byDefault(compName)
         grp.addTrove(compName, p.getVersion(), p.getFlavor(),
                      byDefault = byDefault)
         if byDefault:

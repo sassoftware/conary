@@ -500,6 +500,7 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
+
 class InstallBucket(policy.Policy):
     """
         Set key/value pairs that determine whether conary assumes that two 
@@ -1293,6 +1294,29 @@ class ExcludeDirectories(policy.Policy):
 	self.recipe.autopkg.delFile(path)
 
 
+class ByDefault(policy.Policy):
+    """
+    Determines which components should be installed by default when
+    the package is installed; set a component as not installed by
+    default with C{r.ByDefault(exceptions=':I{comp}')} or
+    C{r.ByDefault(exceptions='I{pkgname}:I{comp}')}.
+    The default is that :test and :debuginfo packages are not installed
+    by default.
+    """
+    # Must follow ExcludeDirectories as well as PackageSpec
+
+    invariantexceptions = [':test', ':debuginfo']
+
+    def doProcess(self, recipe):
+        if not self.inclusions:
+            self.inclusions = []
+        if not self.exceptions:
+            self.exceptions = []
+        recipe.setByDefaultOn(frozenset(self.inclusions))
+        recipe.setByDefaultOff(frozenset(self.exceptions +
+                                         self.invariantexceptions))
+
+
 class _UserGroup:
     """
     Abstract base class that implements marking owner/group dependencies.
@@ -2028,6 +2052,7 @@ def DefaultPolicy(recipe):
         SupplementalGroup(recipe),
         Group(recipe),
 	ExcludeDirectories(recipe),
+        ByDefault(recipe),
 	Ownership(recipe),
         UtilizeUser(recipe),
         UtilizeGroup(recipe),

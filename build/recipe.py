@@ -965,10 +965,25 @@ class PackageRecipe(Recipe):
 	    policy.doProcess(self)
         return self.autopkg.getComponents()
 
-    def getUnpackagedComponentNames(self):
-        # someday, this will probably be per-branch policy
-        return ('test', 'debuginfo')
+    def setByDefaultOn(self, includeSet):
+        self.byDefaultIncludeSet = includeSet
 
+    def setByDefaultOff(self, excludeSet):
+        self.byDefaultExcludeSet = excludeSet
+
+    def byDefault(self, compName):
+        c = compName[compName.index(':'):]
+        if compName in self.byDefaultIncludeSet:
+            # intended for foo:bar overrides :bar in excludelist
+            return True
+        if compName in self.byDefaultExcludeSet:
+            # explicitly excluded
+            return False
+        if c in self.byDefaultIncludeSet:
+            return True
+        if c in self.byDefaultExcludeSet:
+            return False
+        return True
 
     def disableParallelMake(self):
         self.macros._override('parallelmflags', '')
@@ -1100,6 +1115,8 @@ class PackageRecipe(Recipe):
         self._includeSuperClassBuildReqs()
         self.destdirPolicy = destdirpolicy.DefaultPolicy(self)
         self.packagePolicy = packagepolicy.DefaultPolicy(self)
+        self.byDefaultIncludeSet = frozenset()
+        self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
