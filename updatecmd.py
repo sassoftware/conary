@@ -188,7 +188,7 @@ def displayUpdateJobInfo(cs, verbose=False):
 
         if not oldVersion:
             # if there is no oldVersion, this is a new trove
-            new.append(("%s (%s)" % (x.getName(), newInfo, 'N')))
+            new.append(("%s (%s -> N)" % (x.getName(), newInfo)))
             continue
 
         if oldVersion.branch() != newVersion.branch():
