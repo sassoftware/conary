@@ -1355,8 +1355,7 @@ class ConaryClient:
                 if (matches.has_key(name) and matches[name].has_key(version) 
                     and flavor in matches[name][version]):
                     # this trove has already been branched
-                    dupList.append((trove.getName(), 
-                                    trove.getVersion().branch()))
+                    dupList.append((name, version.branch()))
                 else:
                     cs.newTrove(troveCs)
                     cs.addPrimaryTrove(name, version, flavor)
