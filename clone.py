@@ -14,6 +14,7 @@
 
 from build import cook
 from deps import deps
+import itertools
 from repository import changeset
 from repository import netclient
 import updatecmd
@@ -104,17 +105,15 @@ def CloneTrove(cfg, targetBranch, troveSpec):
     if not _isUphill(srcTroveVersion, newSourceVersion):
         log.error("clone only supports cloning troves to parent branches")
         return 1
-    elif srcTroveVersion.branch().label().getHost() != \
-         newSourceVersion.branch().label().getHost():
-        log.error("clone only supports cloning troves within a single "
-                  "repository")
-        return 1
     
     # This works because it's a package. That means that all of the troves we
     # enounter, even referenced ones, will have the same version
 
     cs = changeset.ChangeSet()
     uphillCache = {}
+
+    newVersionHost = newSourceVersion.branch().label().getHost()
+    allFilesNeeded = list()
 
     for trv in allTroves:
         trv.troveInfo.clonedFrom.set(trv.getVersion())
@@ -141,11 +140,45 @@ def CloneTrove(cfg, targetBranch, troveSpec):
             if changeVersion:
                 trv.updateFile(pathId, path, newVersion, fileId)
 
+            if version.branch().label().getHost() != newVersionHost:
+                allFilesNeeded.append((pathId, fileId, version))
+
         trvCs = trv.diff(None, absolute = True)[0]
         cs.newTrove(trvCs)
 
         if ":" not in trv.getName():
             cs.addPrimaryTrove(trv.getName(), trv.getVersion(), 
                                trv.getFlavor())
+
+    # the list(set()) removes duplicates
+    newFilesNeeded = []
+    for (pathId, newFileId, newFileVersion) in list(set(allFilesNeeded)):
+
+        fileHost = newFileVersion.branch().label().getHost()
+        if fileHost == newVersionHost:
+            # the file is already present in the repository
+            continue
+
+        newFilesNeeded.append((pathId, newFileId, newFileVersion))
+
+    fileObjs = repos.getFileVersions(newFilesNeeded)
+    contentsNeeded = []
+    pathIdsNeeded = []
+    
+    for (pathId, newFileId, newFileVersion), fileObj in \
+                        itertools.izip(newFilesNeeded, fileObjs):
+        (filecs, contentsHash) = changeset.fileChangeSet(pathId, None, fileObj)
+        cs.addFile(None, newFileId, filecs)
+        
+        if fileObj.hasContents:
+            contentsNeeded.append((newFileId, newFileVersion))
+            pathIdsNeeded.append(pathId)
+
+    contents = repos.getFileContents(contentsNeeded)
+    for pathId, (fileId, fileVersion), fileCont, fileObj in \
+            itertools.izip(pathIdsNeeded, contentsNeeded, contents, fileObjs):
+        cs.addFileContents(pathId, changeset.ChangedFileTypes.file, 
+                           fileCont, cfgFile = fileObj.flags.isConfig(), 
+                           compressed = False)
 
     repos.commitChangeSet(cs)

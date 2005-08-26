@@ -5,6 +5,7 @@ Changes in 0.61.12:
   * A new r.ByDefault policy controls how components are included in their
     enclosing packages; the default is True except for :test and :debuginfo
     components that default to False.
+  * Cloning across repositories works
 
 Changes in 0.61.11:
   * A bug that caused a database deadlock when removing entries from the
