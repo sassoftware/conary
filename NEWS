@@ -1,4 +1,8 @@
 Changes in 0.61.12:
+  * Change set generation on the command line is more flexible. It can generate
+    erasure changesets as well as relative to nothing changesets
+
+Changes in 0.61.12:
   * You can now search for troves by <trove>=<host>@ 
   * A bug when cooking groups with depCheck = True (introduced in 0.61.10) 
     has been fixed.

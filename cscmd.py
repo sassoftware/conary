@@ -22,65 +22,67 @@ import versions
 
 def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
                      callback = None):
+    def _findTrove(troveName, versionStr, flavorStr):
+        troveList = repos.findTrove(cfg.installLabelPath, 
+                                    (troveName, versionStr, flavorStr),
+                                    cfg.flavor)
+        if len(troveList) > 1:
+            log.error("trove %s has multiple matches on "
+                      "installLabelPath", troveName)
+
+        return (troveList[0][1], troveList[0][2])
+
     client = conaryclient.ConaryClient(cfg)
 
     primaryCsList = []
 
     for item in troveList:
         l = item.split("--")
+        isAbstract = False
+        add = True
 
         if len(l) == 1:
-            l = [''] + l
+            (troveName, versionStr, flavor) = parseTroveSpec(l[0])
+
+            if troveName[0] == '-':
+                troveName = troveName[1:]
+                oldVersion, oldFlavor = _findTrove(troveName, versionStr,
+                                                   flavor)
+                newVersion, newFlavor = None, None
+            else:
+                isAbstract = True
+                if troveName[0] == '+':
+                    troveName = troveName[1:]
+                oldVersion, oldFlavor = None, None
+                newVersion, newFlavor = _findTrove(troveName, versionStr,
+                                                   flavor)
         elif len(l) != 2:
             log.error("one = expected in '%s' argument to changeset", item)
             return
-        if l[0]:
+        else:
             (troveName, oldVersionStr, oldFlavor) = parseTroveSpec(l[0])
-        else:
-            oldVersionStr = None
-            oldFlavor = None
-        if l[1]:
-            if l[0]:
-                l[1] = troveName + "=" + l[1]
-            (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1])
-        else:
-            newVersionStr = None
-            newFlavor = None
 
-        if l[0]:
-            troveList = repos.findTrove(cfg.installLabelPath, 
-                                        (troveName, oldVersionStr, oldFlavor),
-                                        cfg.flavor)
-            if len(troveList) > 1:
-                log.error("trove %s has multiple branches named %s",
-                          troveName, oldVersionStr)
+            if l[1]:
+                if l[0]:
+                    l[1] = troveName + "=" + l[1]
+                (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1])
+                newVersion, newFlavor = _findTrove(troveName, newVersionStr, 
+                                                   newFlavor)
+            else:
+                newVersion, newFlavor = None, None
 
-            oldVersion = troveList[0][1]
-            oldFlavor = troveList[0][2]
-        else:
-            oldVersion = None
-
-        if l[1]:
-            troveList = repos.findTrove(cfg.installLabelPath, 
-                                        (troveName, newVersionStr, newFlavor),
-                                        cfg.flavor)
-            if len(troveList) > 1:
-                if newVersionStr:
-                    log.error("trove %s has multiple branches named %s",
-                              troveName, newVersionStr)
-                else:
-                    log.error("trove %s has multiple matches on installLabelPath",
-                              troveName)
-
-            newVersion = troveList[0][1]
-            newFlavor = troveList[0][2]
-        else:
-            newVersion = None
+            if newVersion and not oldVersionStr:
+                # foo=--1.2
+                oldVersion, oldFlavor = None, None
+            else:
+                # foo=1.1--1.2
+                oldVersion, oldFlavor = _findTrove(troveName, oldVersionStr, 
+                                                   oldFlavor)
 
         primaryCsList.append((troveName, (oldVersion, oldFlavor), 
                                          (newVersion, newFlavor),
-                              not oldVersion))
-        
+                              isAbstract))
+
     client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
                                callback = callback, 
                                excludeList = cfg.excludeTroves)
