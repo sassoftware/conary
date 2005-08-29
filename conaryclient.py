@@ -850,20 +850,6 @@ class ConaryClient:
                     toFindNoDb.append((troveName, versionStr, flavor))
                 else:
                     toFind.append((troveName, versionStr, flavor))
-
-                # XXX where does this go now?                    
-                # updating locally cooked troves needs a label override
-                #if True in [isinstance(x, versions.CookLabel) or
-                #            isinstance(x, versions.EmergeLabel)
-                #            for x in labels]:
-                #    if not versionStr:
-                #        raise UpdateError, \
-                #         "Package %s cooked locally; version, branch, or " \
-                #         "label must be specified for update" % troveName
-                #    else:
-                #        labels = [ None ]
-                #    
-                #    pass
         results = []
         if sync:
             source = trovesource.ReferencedTrovesSource(self.db)
