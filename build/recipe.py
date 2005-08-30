@@ -1442,9 +1442,10 @@ class SingleGroup:
         client = conaryclient.ConaryClient(cfg)
 
         # build a list of the troves that we're checking so far
-        updJob, suggMap = client.updateChangeSet(self.troves, recurse = True,
-                                                 resolveDeps = True,
-                                                 test = True)
+        updJob, suggMap = client.updateChangeSet(
+                            [ (x[0], (None, None), x[1:], True) for x 
+                                        in self.troves ], 
+                               recurse = True, resolveDeps = True, test = True)
         # restore config
         cfg.setValue('dbPath', oldDbPath)
         cfg.setValue('root', oldRoot)

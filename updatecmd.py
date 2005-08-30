@@ -271,7 +271,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 sys.exit(1)
             applyList.append(cs)
         else:
-            applyList.append(parseTroveSpec(pkgStr))
+            troveSpec = parseTroveSpec(pkgStr)
+            if updateByDefault:
+                applyList.append((troveSpec[0], (None, None), 
+                                  troveSpec[1:], True))
+            else:
+                applyList.append((troveSpec[0], troveSpec[1:],
+                                  (None, None), False))
 
     # dedup
     applyList = set(applyList)

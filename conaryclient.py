@@ -259,7 +259,8 @@ class ConaryClient:
                                     # to be filled
                                     break
 
-			troves.update(suggList)
+			troves.update([ (x[0], (None, None), x[1:], True) 
+                                        for x in suggList ])
 
                 # if we've found good suggestions, merge in those troves
                 if troves:
@@ -783,8 +784,9 @@ class ConaryClient:
         in the respository that the trove was initially installed from.
 
         @param itemList: List specifying the changes to apply. Each item
-        in the list must be a ChangeSetFromFile, the name of a trove to
-        update, a (name, versionString, flavor) tuple, or a 
+        in the list must be a ChangeSetFromFile, or a standard job tuple.
+        Versions in the job tuple may be strings, versions, branches, or 
+        None. Flavors may be None.
         @type itemList: list
         """
         changeSetList = []
@@ -805,26 +807,15 @@ class ConaryClient:
 
                 continue
 
-            if type(item) == str:
-                troveName = item
-                versionStr = None
-                flavor = None
-            else:
-                troveName = item[0]
-                versionStr = item[1]
-                flavor = item[2]
+            (troveName, (oldVersionStr, oldFlavorStr),
+                        (newVersionStr, newFlavorStr), isAbsolute) = item
 
-            isInstall = updateMode
-            if troveName[0] == '-':
-                isInstall = False
-                troveName = troveName[1:]
-            elif troveName[0] == '+':
-                isInstall = True
-                troveName = troveName[1:]
-
-            if not isInstall:
+            if oldVersionStr and not newVersionStr or \
+               (not oldVersionStr and not newVersionStr and not updateMode):
+                assert(not newFlavorStr)
+                assert(not isAbsolute)
                 troves = self.db.findTrove(None, 
-                                           (troveName, versionStr, flavor))
+                                   (troveName, oldVersionStr, oldFlavorStr))
                 troves = self.db.getTroves(troves)
                 for outerTrove in troves:
                     changeSetList.append((outerTrove.getName(), 
@@ -833,23 +824,28 @@ class ConaryClient:
                 # skip ahead to the next itemList
                 continue                    
 
-            if isinstance(versionStr, versions.Version):
-                assert(isinstance(flavor, deps.DependencySet))
-                newItems.append((troveName, versionStr, flavor))
-            elif isinstance(versionStr, versions.Branch):
-                toFind.append((troveName, versionStr.asString(), flavor))
-            elif (versionStr and versionStr[0] == '/'):
+            assert(not oldVersionStr and not oldFlavorStr)
+            assert(isAbsolute)
+
+            if isinstance(newVersionStr, versions.Version):
+                assert(isinstance(newFlavorStr, deps.DependencySet))
+                newItems.append((troveName, newVersionStr, newFlavorStr))
+            elif isinstance(newVersionStr, versions.Branch):
+                assert(isinstance(newFlavorStr, deps.DependencySet))
+                toFind.append((troveName, newVersionStr.asString(), 
+                               newFlavorStr))
+            elif (newVersionStr and newVersionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
-                toFind.append((troveName, versionStr, flavor))
+                toFind.append((troveName, newVersionStr, newFlavorStr))
             else:
                 if keepExisting and not sync:
                     # when using keepExisting, branch affinity doesn't make 
                     # sense - we are installing a new, generally unrelated 
                     # version of this trove
-                    toFindNoDb.append((troveName, versionStr, flavor))
+                    toFindNoDb.append((troveName, newVersionStr, newFlavorStr))
                 else:
-                    toFind.append((troveName, versionStr, flavor))
+                    toFind.append((troveName, newVersionStr, newFlavorStr))
         results = []
         if sync:
             source = trovesource.ReferencedTrovesSource(self.db)
