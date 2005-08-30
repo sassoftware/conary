@@ -372,7 +372,8 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                 change = changesByOld.get((troveName, ver, fla), None)
                 if change: 
                     newVer, newFla = change[2], change[4]
-                    needFlavor = newFla is not None and newFla != fla
+                    needFlavor = (showFlavors or 
+                                  (newFla is not None and newFla != fla))
                 else:
                     needFlavor = showFlavors
 
