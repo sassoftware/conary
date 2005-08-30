@@ -401,30 +401,6 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     normal trove.
     """
 
-    def _findCycle(graph):
-	"""
-	Looks for a cycle in the graph (which is a dictionary indexed
-	by nodes, each entry in which is a list of edges. Returns a 
-	list of the nodes in the first cycle found.
-	"""
-
-	def _handleOne(node, path):
-	    seen[node] = True
-
-	    for target in graph[node]:
-		if target in path:
-		    return path + [ target ]
-
-		cycle = _handleOne(target, path + [ target ])
-		if cycle:
-		    return cycle
-
-	seen = {}
-	for node in graph:
-	    if seen.has_key(node): continue
-	    cycle = _handleOne(node, [])
-	    if cycle: return cycle
-
     fullName = recipeClass.name
     changeSet = changeset.ChangeSet()
 
@@ -442,21 +418,22 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
     groupNames = recipeObj.getGroupNames()
+    try:
+        failedDeps = recipeObj.findAllTroves()
+    except recipe.RecipeFileError, msg:
+	raise CookError(str(msg))
+
+    if failedDeps:
+        groupName, failedDeps = failedDeps
+        lns = ["Dependency failure\n"]
+        lns.append("Group %s has unresolved dependencies:\n" % groupName)
+        for (name, depSet) in failedDeps:
+            lns.append(name)
+            lns.append('\n\t')
+            lns.append("\n\t".join(str(depSet).split("\n")))
+        raise CookError(''.join(lns))
+
     for groupName in groupNames:
-        try:
-            failedDeps = recipeObj.findTroves(groupName = groupName)
-        except recipe.RecipeFileError, msg:
-            raise CookError(str(msg))
-
-        if failedDeps:
-            lns = ["Dependency failure\n"]
-            lns.append("Group %s has unresolved dependencies:\n" % groupName)
-            for (name, depSet) in failedDeps:
-                lns.append(name)
-                lns.append('\n\t')
-                lns.append("\n\t".join(str(depSet).split("\n")))
-            raise CookError(''.join(lns))
-
         for (name, versionFlavorList) in recipeObj.getTroveList(
                                             groupName = groupName).iteritems():
             for (version, flavor, byDefault) in versionFlavorList:
@@ -468,7 +445,6 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     buildTime = time.time()
 
     groups = {}
-    newGroupGraph = {}
     for groupName in groupNames:
         grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
                           isRedirect = False)
@@ -489,9 +465,6 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 	for name, byDefault in recipeObj.getNewGroupList(groupName = groupName):
 	    grp.addTrove(name, targetVersion, grpFlavor, byDefault = byDefault)
 
-	newGroupGraph[groupName] = [ x[0] for x in 
-			    recipeObj.getNewGroupList(groupName = groupName) ]
-
         grp.setBuildTime(buildTime)
         grp.setSourceName(fullName + ':source')
         grp.setSize(recipeObj.getSize(groupName = groupName))
@@ -500,10 +473,6 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
-
-    cycle = _findCycle(newGroupGraph)
-    if cycle:
-	raise CookError("cycle in groups: %s" % cycle)
 
     built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) 
               for grp in groups.itervalues()]

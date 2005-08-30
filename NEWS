@@ -1,6 +1,14 @@
-Changes in 0.61.12:
+Changes in 0.62.0:
   * Change set generation on the command line is more flexible. It can generate
     erasure changesets as well as relative to nothing changesets
+  * When creating multiple groups from the same recipe using newGroup(), 
+    Conary now searches all subgroups when resolving dependencies within 
+    a parent group
+  * Conary no longer resolves dependencies for troves with byDefault=False
+    (such as :test and :debuginfo).  Conary will now resolve dependencies in
+    those troves only if you set checkOnlyByDefaultDeps=False.  When creating
+    subgroups using newGroup(), pass the checkOnlyByDefaultDeps flag as an
+    argument to the newGroup() function.
 
 Changes in 0.61.12:
   * You can now search for troves by <trove>=<host>@ 

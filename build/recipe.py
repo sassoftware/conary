@@ -1364,19 +1364,22 @@ class SingleGroup:
             # by removeTrove lines later.
             self.redirects.add(troveTup)
 
-    def findTroves(self, troveMap, cfg, repos, labelPath, flavor):
+    def findTroves(self, troveMap, repos):
         self._findTroves(troveMap)
         self._removeTroves(repos)
+        self._checkForRedirects()
 
+    def autoResolveDeps(self, cfg, repos, labelPath, includedTroves):
         if self.autoResolve:
-            self._resolveDependencies(cfg, repos, labelPath)
-        elif self.depCheck:
-            failedDeps = self._checkDependencies(repos)
+            self._resolveDependencies(cfg, repos, labelPath, includedTroves)
+
+    def checkDependencies(self, cfg, includedTroves):
+        if self.depCheck:
+            failedDeps = self._checkDependencies(cfg, includedTroves)
             if failedDeps:
                 return failedDeps
 
-        self._checkForRedirects()
-
+    def calcSize(self):
         self.size = 0
         validSize = True
         for (n,v,f), (size, byDefault) in self.troves.iteritems():
@@ -1420,7 +1423,10 @@ class SingleGroup:
                 self._foundTrove(troveTup, trv.getSize(), byDefault, 
                                  trv.isRedirect())
 
-    def _resolveDependencies(self, cfg, repos, labelPath):
+    def getDefaultTroves(self):
+        return [ x[0] for x in self.troves.iteritems() if x[1][1] ]
+
+    def _resolveDependencies(self, cfg, repos, labelPath, includedTroves):
         """ adds the troves needed to to resolve all open dependencies 
             in this group.  Will raise an error if not all dependencies
             can be resolved.  
@@ -1441,11 +1447,17 @@ class SingleGroup:
         # set up a conaryclient to do the dep solving
         client = conaryclient.ConaryClient(cfg)
 
+        if self.checkOnlyByDefaultDeps:
+            troveList = list(self.troves) + includedTroves
+        else:
+            troveList = self.getDefaultTroves() + includedTroves
+        
         # build a list of the troves that we're checking so far
-        updJob, suggMap = client.updateChangeSet(
-                            [ (x[0], (None, None), x[1:], True) for x 
-                                        in self.troves ], 
-                               recurse = True, resolveDeps = True, test = True)
+        troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
+
+        updJob, suggMap = client.updateChangeSet(troves, recurse = True,
+                                                 resolveDeps = True,
+                                                 test = True)
         # restore config
         cfg.setValue('dbPath', oldDbPath)
         cfg.setValue('root', oldRoot)
@@ -1457,13 +1469,33 @@ class SingleGroup:
             self._foundTrove(troveTup, trv.getSize(), self.byDefault,
                              trv.isRedirect())
 
-    def _checkDependencies(self, repos):
-        troves = [ (n, (None, None), (v, f), True) \
-                                        for (n,v,f) in self.troves ]
-        depCs = repos.createChangeSet(troves, recurse = True, 
-                                      withFiles = False)
-        db = database.Database(':memory:', ':memory:')
-        return db.depCheck(depCs)[0]
+    def _checkDependencies(self, cfg, includedTroves):
+        if self.checkOnlyByDefaultDeps:
+            troveList = list(self.troves)
+        else:
+            troveList = self.getDefaultTroves()
+        troveList += includedTroves
+
+        troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
+
+        oldDbPath = cfg.dbPath
+        cfg.setValue('dbPath', ':memory:')
+        oldRoot = cfg.root
+        cfg.setValue('root', ':memory:')
+
+        client = conaryclient.ConaryClient(cfg)
+        if self.checkOnlyByDefaultDeps:
+            cs = client.repos.createChangeSet(troves, 
+                                              recurse = True, withFiles=False)
+        else:
+            depCs = client.updateChangeSet(troves, recurse = True,
+                                            resolveDeps=False, split=False)[0]
+            cs = depCs.csList[0]
+
+        failedDeps = client.db.depCheck(cs)[0]
+        cfg.setValue('dbPath', oldDbPath)
+        cfg.setValue('root', oldRoot)
+        return failedDeps
 
     def _removeTroves(self, source):
         groupSource = trovesource.GroupRecipeSource(source, self)
@@ -1491,7 +1523,9 @@ class SingleGroup:
     def getNewGroupList(self):
 	return self.newGroupList
 
-    def __init__(self, depCheck, autoResolve, byDefault = True):
+    def __init__(self, depCheck, autoResolve, checkOnlyByDefaultDeps,
+                 byDefault = True):
+
         self.redirects = set()
         self.addTroveList = []
         self.addReferenceList = []
@@ -1502,6 +1536,7 @@ class SingleGroup:
 
         self.depCheck = depCheck
         self.autoResolve = autoResolve
+        self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
         self.byDefault = byDefault
 
     def Requires(self, requirement):
@@ -1552,6 +1587,7 @@ class GroupRecipe(Recipe):
     Flags = use.LocalFlags
     depCheck = False
     autoResolve = False
+    checkOnlyByDefaultDeps = True
 
     def Requires(self, requirement, groupName = None):
         if requirement[0] == '/':
@@ -1668,29 +1704,141 @@ class GroupRecipe(Recipe):
         self.labelPath = [ versions.Label(x) for x in path ]
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
-                    byDefault = None):
+                    byDefault = None, checkOnlyByDefaultDeps = None):
         if self.groups.has_key(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
         if byDefault is None:
             byDefault = self.groups[self.name].byDefault
-        self.groups[groupName] = SingleGroup(depCheck, autoResolve, byDefault)
+        if checkOnlyByDefaultDeps is None:
+            checkOnlyByDefaultDeps  = self.groups[self.name].checkOnlyByDefaultDeps
+
+        self.groups[groupName] = SingleGroup(depCheck, autoResolve, 
+                                             checkOnlyByDefaultDeps, byDefault)
 
     def getGroupNames(self):
         return self.groups.keys()
 
-    def findTroves(self, groupName=None):
-        if groupName is None:
-            groupName = self.name
+    def _orderGroups(self):
+        """ Order the groups so that each group is after any group it 
+            contains.  Raises an error if a cycle is found.
+        """
+        # boy using a DFS for such a small graph seems like overkill.
+        # but its handy since we're also trying to find a cycle at the same
+        # time.
+        children = {}
+        groupNames = self.getGroupNames()
+        for groupName in groupNames:
+            children[groupName] = \
+                    set([x[0] for x in self.getNewGroupList(groupName)])
 
+        timeStamp = 0
+
+        # the different items in the seen dict
+        VISITED = 0 # True if we've added this node to the stack
+        START = 1   # time at which the node was first visited
+        FINISH = 2  # time at which all the nodes child nodes were finished
+                    # with
+        PATH = 3    # path to get to this node from wherever it was 
+                    # started.
+        seen = dict((x, [False, None, None, []]) for x in groupNames)
+
+        for groupName in groupNames:
+            if seen[groupName][VISITED]: continue
+            stack = [groupName]
+            seen[groupName][VISITED] = True
+
+            while stack:
+                timeStamp += 1
+                node = stack[-1]
+
+                if not seen[node][START]:
+                    seen[node][START] = timeStamp
+
+                childList = []
+                if children[node]:
+                    path = seen[node][PATH] + [node]
+                    for child in children[node]:
+                        if child in path:
+                            cycle = path[path.index(child):] + [child]
+                            raise RecipeFileError('cycle in groups: %s' % cycle)
+
+                        if not seen[child][VISITED]:
+                            childList.append(child)
+
+                if not childList:
+                    # we've finished with all this nodes children 
+                    # mark it as done
+                    seen[node][FINISH] = timeStamp
+                    stack = stack[:-1]
+                else:
+                    path = seen[node][PATH] + [node]
+                    for child in childList:
+                        seen[child] = [True, None, None, path]
+                        stack.append(child)
+
+        groupsByLastSeen = ( (seen[x][FINISH], x) for x in groupNames)
+        return [x[1] for x in sorted(groupsByLastSeen)]
+
+    def _getIncludedTroves(self, groupName, checkOnlyByDefaultDeps):
+        """ 
+            Returns the troves in all subGroups included by this trove.
+            If checkOnlyByDefaultDeps is False, exclude troves that are 
+            not included by default.
+        """
+        allTroves = []
+        childGroups = []
+        for childGroup, byDefault in self.groups[groupName].getNewGroupList(): 
+            if byDefault or checkOnlyByDefaultDeps:
+                childGroups.append(childGroup)
+
+        while childGroups:
+            childGroup = childGroups.pop()
+            groupObj = self.groups[childGroup]
+
+            if checkOnlyByDefaultDeps:
+                allTroves.extend(groupObj.troves)
+            else:
+                allTroves.extend(groupObj.getDefaultTroves())
+
+            for childGroup, byDft in self.groups[childGroup].getNewGroupList(): 
+                if byDft or checkOnlyByDefaultDeps:
+                    childGroups.append(childGroup)
+        return allTroves
+
+    def findAllTroves(self):
         if self.toFind is not None:
+            # find all troves needed by all included groups together, at 
+            # once.  We then pass that information into the individual
+            # groups.
             self._findSources()
             self._findTroves()
             self.toFind = None
-        return self.groups[groupName].findTroves(self.troveSpecMap, 
-                                                 self.cfg, self.repos, 
-                                                 self.labelPath, self.flavor)
+
+        groupNames = self._orderGroups()
+
+        for groupName in groupNames:
+            groupObj = self.groups[groupName]
+
+            # assign troves to this group
+            groupObj.findTroves(self.troveSpecMap, self.repos)
+
+            # if ordering is right, we now should be able to recurse through
+            # the groups included by this group and get all recursively
+            # included troves
+            includedTroves = self._getIncludedTroves(groupName, 
+                                             groupObj.checkOnlyByDefaultDeps)
+
+            # include those troves when doing dependency resolution/checking
+            groupObj.autoResolveDeps(self.cfg, self.repos, self.labelPath, 
+                                                           includedTroves)
+
+            failedDeps = groupObj.checkDependencies(self.cfg, includedTroves)
+            if failedDeps:
+                return groupName, failedDeps
+
+            groupObj.calcSize()
 
     def _findSources(self):
         for troveSource in self.sources:
@@ -1760,7 +1908,8 @@ class GroupRecipe(Recipe):
         self.sources = set()
 
         self.groups = {}
-        self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve)
+        self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve,   
+                                             self.checkOnlyByDefaultDeps)
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
