@@ -1,4 +1,14 @@
 Changes in 0.62.0:
+  * Initial OpenPGP (RFC 2440) based signature support has been
+    added. Conary reads public keys from ~/.gnupg/pubring.gpg and
+    /etc/conary/pubring.pgp.  Conary reads private keys from
+    ~/.gnupg/secring.pgp.  Setting the "signatureKey" configuration
+    variable to a key ID will select which key to use from the
+    keyring. If signatureKey is not set, and there is a valid private
+    keyring, the first key on the keyring will automatically be used
+    to sign changesets when committing them to the repository.
+    "cvc sign" adds a signature to a trove that already exists in the
+    repository.
   * Change set generation on the command line is more flexible. It can generate
     erasure changesets as well as relative to nothing changesets
   * When creating multiple groups from the same recipe using newGroup(), 
