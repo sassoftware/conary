@@ -211,14 +211,14 @@ def getKeyId(keyRing):
         data = convertPrivateKey(data)
     # This is a holdover from the days of PGP 2.6.2
     # RFC 2440 section 11.2 does a really bad job of explaining this
-    # One of the least documented gotcha's of Key fingerprints:
+    # One of the least documented gotchas of Key fingerprints:
     # they're ALWAYS calculated as if they were a public key main key block.
     # this means private keys will be treated as public keys, and subkeys
     # will be treated as main keys for the purposes of this test.
     # Furthermore if the length was one byte long it must be translated
     # into a 2 byte long length (upper octet is 0)
     # not doing this will result in key fingerprints which do not match the
-    # outpuf produced by OpenPGP compliant programs.
+    # output produced by OpenPGP compliant programs.
     # this will result in the first octet ALWYAS being 0x99
     # in binary 10 0110 01
     # 10 indicates old style PGP packet
