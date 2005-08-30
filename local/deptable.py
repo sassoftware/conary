@@ -1040,14 +1040,19 @@ class DependencyTables:
 
         result = {}
 
+	# depSolutions and depList are based on individual dependencies.
+	# depList has a pointer into depSetList 
+
         for depId, troveSet in enumerate(depSolutions):
             if not troveSet: continue
-            depNum = depList[-depId][0]
-            depSet = depSetList[depNum]
-            result[depSet] = \
-                [ [ (x[0][0], 
+	    # depSetList is indexed by 0, depList pointers 
+	    # are such that -1 -> depSetList[0], -2 -> depSetList[1]
+            depSetId = -depList[depId][0] - 1
+            depSet = depSetList[depSetId]
+            result.setdefault(depSet, []).append(
+                  [ (x[0][0], 
                      versions.strToFrozen(x[1][0], x[1][1].split(":")),
-                     x[0][1]) for x in troveSet.items() ] ]
+                     x[0][1]) for x in troveSet.items() ])
 
         self.db.rollback()
 
