@@ -650,7 +650,7 @@ class ChangeSet(streams.LargeStreamSet):
         Regenerates the primary change set job (passed to change set creation)
         for this change set.
         """
-        jobList = []
+        jobSet = set()
 
         for trvCs in self.newTroves.values():
             if trvCs.getOldVersion():
@@ -664,15 +664,15 @@ class ChangeSet(streams.LargeStreamSet):
                        False)
 
             if (job[0], job[2][0], job[2][1]) in self.primaryTroveList:
-                jobList.append(job)
+                jobSet.add(job)
 
 
         for item in self.oldTroves:
             if item in self.primaryTroveList:
-                jobList.append((item[0], (item[1], item[2]), 
+                jobSet.add((item[0], (item[1], item[2]), 
                                 (None, None), False))
 
-        return jobList
+        return jobSet
             
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)

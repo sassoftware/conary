@@ -288,61 +288,62 @@ class ConaryClient:
 
         return (cs, depList, suggMap, cannotResolve, changeSetList)
 
-    def _processRedirects(self, cs, recurse):
+    def _processRedirects(self, jobSet, troveSource, recurse):
+        # this returns redirectHack, which maps targets of redirections
+        # to the sources of those redirections
+
         # Looks for redirects in the change set, and returns a list of
         # troves which need to be included in the update. 
         troveSet = {}
-        toDelete = set()
         redirectHack = {}
-        primaries = set(cs.getPrimaryTroveList())
 
-        for troveCs in cs.iterNewTroveList():
-            if not troveCs.getIsRedirect():
+        toDoList = list(jobSet)
+
+        # We only have to look through primaries. Troves which aren't
+        # primaries can't be redirects because collections cannot include
+        # redirects. Nice, huh?
+        while toDoList:
+            job = toDoList.pop()
+            
+            (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
+                isAbsolute) = job
+
+            if newVersion is None:
+                # skip erasure
+                continue
+
+            trv = troveSource.getTrove(name, newVersion, newFlavor, 
+                                       withFiles = False)
+
+            if not trv.isRedirect():
                 continue
 
             if not recurse:
                 raise UpdateError,  "Redirect found with --no-recurse set"
 
-            item = (troveCs.getName(), troveCs.getNewVersion(),
-                    troveCs.getNewFlavor())
+            item = (name, newVersion, newFlavor)
 
-            # don't install the redirection itself
-            toDelete.add(item)
-
-            # but do remove the trove this redirection replaces. if it
-            # isn't installed, we don't want this redirection or the
-            # item it points to
-            if troveCs.getOldVersion():
-                oldItem = (troveCs.getName(), troveCs.getOldVersion(),
-                           troveCs.getOldFlavor())
-
-                if self.db.hasTrove(*oldItem):
-                    cs.oldTrove(*oldItem)
-                    # make all removals due to redirects be primary
-                    cs.addPrimaryTrove(*oldItem)
-                else:
-                    # erase the target(s) of the redirection
-                    for (name, changeList) in troveCs.iterChangedTroves():
-                        for (changeType, version, flavor, byDef) in changeList:
-                            toDelete.add((name, version, flavor))
+            isPrimary = job in jobSet
+            if isPrimary: 
+                # The redirection is a primary. Remove it.
+                jobSet.remove(job)
 
             targets = []
-            for (name, changeList) in troveCs.iterChangedTroves():
-                for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '-': continue
-                    if (":" not in name and ":" not in item[0]) or \
-                       (":"     in name and ":"     in item[0]):
-                        l = redirectHack.setdefault((name, version, flavor), [])
-                        l.append(item)
-                        targets.append((name, version, flavor))
+            for (subName, subVersion, subFlavor) in trv.iterTroveList():
+                if (":" not in subName and ":" not in name) or \
+                   (":"     in subName and ":"     in name):
+                    l = redirectHack.setdefault((subName, subVersion,
+                                                 subFlavor), [])
+                    l.append(item)
+                    targets.append((subName, subVersion, subFlavor))
+                else:
+                    toDoList.append((subName, (None, None), 
+                                              (subVersion, subFlavor), True))
 
-            if item in primaries:
+            if isPrimary:
                 for target in targets:
-                    cs.addPrimaryTrove(*target)
-
-        for item in toDelete:
-            if cs.hasNewTrove(*item):
-                cs.delNewTrove(*item)
+                    jobSet.add((subName, (None, None), (subVersion, subFlavor),
+                                True))
 
         for l in redirectHack.itervalues():
 	    outdated, eraseList = self.db.outdatedTroves(l)
@@ -398,7 +399,7 @@ class ConaryClient:
 
                 # if this is the target of a redirection, make sure we have
                 # the source of that redirection installed
-                if redirectHack.has_key(info):
+                if info in redirectHack:
                     l = redirectHack[info]
                     present = self.db.hasTroves(l)
                     if sum(present) == 0:
@@ -604,6 +605,8 @@ class ConaryClient:
             needed = []
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
+
+        # def _mergeGroupChanges -- main body begins here
             
         keepList = []
         erasePrimaryList = []
@@ -792,6 +795,7 @@ class ConaryClient:
         newJob = []
         changeSetJob = []
         finalCs = UpdateChangeSet()
+        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
 
         splittable = True
 
@@ -921,15 +925,14 @@ class ConaryClient:
                                             primaryTroveList = primaries)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetJob))
 
-        redirectHack = self._processRedirects(finalCs, recurse) 
-
-        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
         troveSource.addChangeSet(finalCs)
+        job = finalCs.getPrimaryJobSet()
 
-        mergeItemList = self._mergeGroupChanges(finalCs.getPrimaryJobSet(), 
-                                                troveSource, uJob, 
+        redirectHack = self._processRedirects(job, troveSource, recurse) 
+        mergeItemList = self._mergeGroupChanges(job, troveSource, uJob, 
                                                 redirectHack, keepExisting, 
                                                 recurse, oldItems)
+
         # XXX this _resetTroveLists a hack, but building a whole new changeset
         # is a bit tricky due to changeset files
         cs1, remainder = troveSource.createChangeSet(mergeItemList, 

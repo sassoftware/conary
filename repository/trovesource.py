@@ -50,7 +50,7 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def getTrove(self, name, version, flavor, withFiles = True):
-        return self.getTroves((name, version, flavor), withFiles)[0]
+        return self.getTroves([(name, version, flavor)], withFiles)[0]
 
     def getTroveVersionList(self, name, withFlavors=False):
         raise NotImplementedError
