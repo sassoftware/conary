@@ -26,6 +26,7 @@ python_files = __init__.py	\
 	packagepolicy.py	\
 	policy.py		\
 	recipe.py		\
+	signtrove.py		\
 	source.py		\
 	tags.py			\
 	use.py                  \
