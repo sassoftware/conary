@@ -209,10 +209,30 @@ def getKeyId(keyRing):
     # handle private keys
     if ((keyBlock >> 2) & 15) in PKT_TAG_ALL_SECRET:
         data = convertPrivateKey(data)
+    # This is a holdover from the days of PGP 2.6.2
+    # RFC 2440 section 11.2 does a really bad job of explaining this
+    # One of the least documented gotcha's of Key fingerprints:
+    # they're ALWAYS calculated as if they were a public key main key block.
+    # this means private keys will be treated as public keys, and subkeys
+    # will be treated as main keys for the purposes of this test.
+    # Furthermore if the length was one byte long it must be translated
+    # into a 2 byte long length (upper octet is 0)
+    # not doing this will result in key fingerprints which do not match the
+    # outpuf produced by OpenPGP compliant programs.
+    # this will result in the first octet ALWYAS being 0x99
+    # in binary 10 0110 01
+    # 10 indicates old style PGP packet
+    # 0110 indicates public key
+    # 01 indicates 2 bytes length
     keyBlock = ord(data[0])
+    # Translate 1 byte length blocks to two byte length blocks
     if not (keyBlock & 1):
         data = chr(keyBlock|1) + chr(0) + data[1:]
-    # FIXME: document what these numbers mean
+    # promote subkeys to main keys
+    # 0xB9 is the packet tag for a public subkey with two byte length
+    # 0x9D is the packet tag for a private subkey with two byte length
+    # 0x9D is a catchall at this point in the code. key data should already
+    # be a public key
     if keyBlock in (0xb9, 0x9d):
         data = chr(0x99) + data[1:]
     m = sha.new()
@@ -463,8 +483,6 @@ def verifySHAChecksum(data):
     m.update(data[:-20])
     return m.digest() == data[-20:]
 
-# Triple-DES isn't working... says incorrect password...
-# AES works fine in 128 bit mode and breaks in 192 and 256
 def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
     hashes = ('Unknown', md5, sha, 'RIPE-MD/160', 'Double Width SHA',
               'MD2', 'Tiger/192', 'HAVAL-5-160')
