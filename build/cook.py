@@ -444,9 +444,9 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     if failedDeps:
         groupName, failedDeps = failedDeps
         lns = ["Dependency failure\n"]
-        lns.append("Group %s has unresolved dependencies:\n" % groupName)
+        lns.append("Group %s has unresolved dependencies:" % groupName)
         for (name, depSet) in failedDeps:
-            lns.append(name)
+            lns.append("\n" + name)
             lns.append('\n\t')
             lns.append("\n\t".join(str(depSet).split("\n")))
         raise CookError(''.join(lns))
