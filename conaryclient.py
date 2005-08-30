@@ -789,14 +789,14 @@ class ConaryClient:
         None. Flavors may be None.
         @type itemList: list
         """
-        changeSetList = []
-        newItems = []
+        newJob = []
+        changeSetJob = []
         finalCs = UpdateChangeSet()
 
         splittable = True
 
-        toFind = []
-        toFindNoDb = []
+        toFind = {}
+        toFindNoDb = {}
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
                 splittable = False
@@ -809,94 +809,117 @@ class ConaryClient:
 
             (troveName, (oldVersionStr, oldFlavorStr),
                         (newVersionStr, newFlavorStr), isAbsolute) = item
+            assert(oldVersionStr is None or not isAbsolute)
+
+            if oldVersionStr or (not newVersionStr and not updateMode):
+                oldTroves = self.db.findTrove(None, 
+                                   (troveName, oldVersionStr, oldFlavorStr))
+            else:
+                oldTroves = []
 
             if oldVersionStr and not newVersionStr or \
                (not oldVersionStr and not newVersionStr and not updateMode):
                 assert(not newFlavorStr)
                 assert(not isAbsolute)
-                troves = self.db.findTrove(None, 
-                                   (troveName, oldVersionStr, oldFlavorStr))
-                troves = self.db.getTroves(troves)
-                for outerTrove in troves:
-                    changeSetList.append((outerTrove.getName(), 
-                        (outerTrove.getVersion(), outerTrove.getFlavor()),
-                        (None, None), False))
+                for troveInfo in oldTroves:
+                    changeSetJob.append((troveInfo[0], 
+                                         (troveInfo[1], troveInfo[2]),
+                                         (None, None), False))
                 # skip ahead to the next itemList
                 continue                    
 
-            assert(not oldVersionStr and not oldFlavorStr)
-            assert(isAbsolute)
+            if len(oldTroves) > 2:
+                raise UpdateError, "Update of %s specifies multiple " \
+                            "troves for removal" % troveName
+            elif oldTroves:
+                oldTrove = (oldTroves[0][1], oldTroves[0][2])
+            else:
+                oldTrove = (None, None)
+            del oldTroves
 
             if isinstance(newVersionStr, versions.Version):
                 assert(isinstance(newFlavorStr, deps.DependencySet))
-                newItems.append((troveName, newVersionStr, newFlavorStr))
+                newJob.append((troveName, oldTrove,
+                                    (newVersionStr, newFlavorStr), isAbsolute))
             elif isinstance(newVersionStr, versions.Branch):
                 assert(isinstance(newFlavorStr, deps.DependencySet))
-                toFind.append((troveName, newVersionStr.asString(), 
-                               newFlavorStr))
+                toFind[(troveName, newVersionStr.asString(), 
+                               newFlavorStr)] = oldTrove, isAbsolute
             elif (newVersionStr and newVersionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
-                toFind.append((troveName, newVersionStr, newFlavorStr))
+                toFind[(troveName, newVersionStr, newFlavorStr)] = \
+                                        oldTrove, isAbsolute
             else:
                 if keepExisting and not sync:
                     # when using keepExisting, branch affinity doesn't make 
                     # sense - we are installing a new, generally unrelated 
                     # version of this trove
-                    toFindNoDb.append((troveName, newVersionStr, newFlavorStr))
+                    toFindNoDb[(troveName, newVersionStr, newFlavorStr)] \
+                                    = oldTrove, isAbsolute
                 else:
-                    toFind.append((troveName, newVersionStr, newFlavorStr))
-        results = []
+                    toFind[(troveName, newVersionStr, newFlavorStr)] \
+                                    = oldTrove, isAbsolute
+
+        results = {}
         if sync:
             source = trovesource.ReferencedTrovesSource(self.db)
-            results.append(source.findTroves(None, toFind))
+            results.update(source.findTroves(None, toFind))
         else:
             if toFind:
-                results.append(self.repos.findTroves(
+                results.update(self.repos.findTroves(
                                         self.cfg.installLabelPath, toFind, 
                                         self.cfg.flavor,
                                         affinityDatabase=self.db))
             if toFindNoDb:
-                results.append(self.repos.findTroves(
+                results.update(self.repos.findTroves(
                                            self.cfg.installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
-        for result in results:
-            for troveTups in result.itervalues():
-                newItems += troveTups
+
+        for troveSpec, (oldTroveInfo, isAbsolute) in \
+                itertools.chain(toFind.iteritems(), toFindNoDb.iteritems()):
+            resultList = results[troveSpec]
+
+            if len(resultList) > 1 and oldTroveInfo[0] is not None:
+                raise UpdateError, "Relative update of %s specifies multiple " \
+                            "troves for install" % troveName
+
+            newJob += [ (x[0], oldTroveInfo, x[1:], isAbsolute) for x in 
+                                    resultList ]
 
         # items which are already installed shouldn't be installed again
-        present = self.db.hasTroves(newItems)
+        present = self.db.hasTroves([ (x[0], x[2][0], x[2][1]) for x in 
+                                                newJob ] )
 
         # we keep track of items that are considered for update but
         # are already installed so they don't get removed as a part
         # of some other update/install
-        oldItems = ( item for item, isPresent 
-                            in itertools.izip(newItems, present) 
-                            if isPresent )
+        oldItems = [ (job[0], job[2][0], job[2][1]) for job, isPresent 
+                            in itertools.izip(newJob, present) 
+                            if isPresent ]
 
-        newItems = ( item for item, isPresent 
-                            in itertools.izip(newItems, present) 
-                            if not isPresent )
+        newJob = [ job for job, isPresent 
+                            in itertools.izip(newJob, present) 
+                            if not isPresent ]
+        changeSetJob += newJob
+        del newJob
 
-        # newItems and oldItems should be unique 
-        newItems = set(newItems)
+        # changeSetJob and oldItems should be unique 
+        changeSetJob = set(changeSetJob)
         oldItems = set(oldItems)
 
-        for (name, version, flavor) in newItems:
-            changeSetList.append((name, (None, None), (version, flavor), 0))
-
-        if finalCs.empty  and not changeSetList:
+        if finalCs.empty and not changeSetJob:
             raise NoNewTrovesError
 
-        if changeSetList:
-            primaries = ([ (x[0], x[2][0], x[2][1]) for x in changeSetList
+        if changeSetJob:
+            primaries = ([ (x[0], x[2][0], x[2][1]) for x in  changeSetJob
                                 if x[2][0] is not None ] +
-                         [ (x[0], x[1][0], x[1][1]) for x in changeSetList
+                         [ (x[0], x[1][0], x[1][1]) for x in  changeSetJob
                                 if x[2][0] is     None ])
-            cs = self.repos.createChangeSet(changeSetList, withFiles = False,
+            cs = self.repos.createChangeSet(changeSetJob, withFiles = False,
                                             recurse = recurse,
                                             primaryTroveList = primaries)
-            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
+            finalCs.merge(cs, (self.repos.createChangeSet, changeSetJob))
 
         redirectHack = self._processRedirects(finalCs, recurse) 
 
@@ -915,8 +938,8 @@ class ConaryClient:
         cs2 = self.repos.createChangeSet(remainder, withFiles = False,
                                         primaryTroveList = [], 
                                         recurse = False)
-        finalCs.merge(cs1, (self.repos.createChangeSet, changeSetList))
-        finalCs.merge(cs2, (self.repos.createChangeSet, changeSetList))
+        finalCs.merge(cs1, (self.repos.createChangeSet, changeSetJob))
+        finalCs.merge(cs2, (self.repos.createChangeSet, changeSetJob))
 
         return finalCs, splittable
 
