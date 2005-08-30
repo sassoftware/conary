@@ -239,50 +239,53 @@ def getKeyId(keyRing):
     m.update(data)
     return m.hexdigest().upper()
 
-def seekNextKey(keyRing):
-    done=0
+# find the next PGP packet regardless of type.
+def seekNextPacket(keyRing):
     packetType=getBlockType(keyRing)
     if packetType == -1:
         return
-    while not done:
-        dataSize = -1
-        if not packetType & 64:
-            # RFC 2440 4.2.1 - Old-Format Packet Lengths
-            if not (packetType & 3):
-                sizeLen = 1
-            elif (packetType & 3) == 1:
-                sizeLen = 2
-            elif (packetType & 3) == 2:
-                sizeLen = 4
-            else:
-                raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
+    dataSize = -1
+    if not packetType & 64:
+        # RFC 2440 4.2.1 - Old-Format Packet Lengths
+        if not (packetType & 3):
+            sizeLen = 1
+        elif (packetType & 3) == 1:
+            sizeLen = 2
+        elif (packetType & 3) == 2:
+            sizeLen = 4
         else:
-            # RFC 2440 4.2.2 - New-Format Packet Lengths
-            octet=ord(keyRing.read(1))
-            if octet < 192:
-                sizeLen=1
-                keyRing.seek(-1, SEEK_CUR)
-            elif octet < 224:
-                dataSize = (ord(keyRing.read(1)) - 192 ) * 256 + \
-                           ord(keyRing.read(1)) + 192
-            elif octet < 255:
-                dataSize = 1 << (ord(keyRing.read(1)) & 0x1f)
-            else:
-                sizeLen=4
-        # if we have not already calculated datasize (for special new format
-        # packet lengths), calculate it now
-        if dataSize == -1:
-            dataSize = 0
-            for i in range(0, sizeLen):
-                dataSize = (dataSize * 256) + ord(keyRing.read(1))
-        keyRing.seek(dataSize, SEEK_CUR)
+            raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
+    else:
+        # RFC 2440 4.2.2 - New-Format Packet Lengths
+        octet=ord(keyRing.read(1))
+        if octet < 192:
+            sizeLen=1
+            keyRing.seek(-1, SEEK_CUR)
+        elif octet < 224:
+            dataSize = (ord(keyRing.read(1)) - 192 ) * 256 + \
+                       ord(keyRing.read(1)) + 192
+        elif octet < 255:
+            dataSize = 1 << (ord(keyRing.read(1)) & 0x1f)
+        else:
+            sizeLen=4
+    # if we have not already calculated datasize, calculate it now
+    if dataSize == -1:
+        dataSize = 0
+        for i in range(0, sizeLen):
+            dataSize = (dataSize * 256) + ord(keyRing.read(1))
+    keyRing.seek(dataSize, SEEK_CUR)
+
+def seekNextKey(keyRing):
+    done =0
+    while not done:
+        seekNextPacket(keyRing)
         packetType = getBlockType(keyRing)
+        if packetType != -1:
+            keyRing.seek(-1, SEEK_CUR)
         if ((packetType == -1)
             or ((not (packetType & 64))
                 and (((packetType >> 2) & 15) in PKT_TAG_ALL_KEYS))):
             done=1
-            if packetType != -1:
-                keyRing.seek(-1, SEEK_CUR)
 
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
