@@ -135,9 +135,14 @@ class OpenPGPKeyCache:
     def __init__(self):
         self.publicDict = {}
         self.privateDict = {}
-        self.publicPaths = [ os.environ['HOME']+'/.gnupg/pubring.gpg', '/etc/conary/pubring.gpg' ]
+
+        if 'HOME' not in os.environ:
+            self.publicPaths = [ '/etc/conary/pubring.gpg' ]
+            self.privatePath = None
+        else:
+            self.publicPaths = [ os.environ['HOME']+'/.gnupg/pubring.gpg', '/etc/conary/pubring.gpg' ]
+            self.privatePath = os.environ['HOME']+'/.gnupg/secring.gpg'
         self.source = _KC_SRC_PUBLIC
-        self.privatePath = os.environ['HOME']+'/.gnupg/secring.gpg'
         self.keyTable = None
 
     def getPublicKey(self, keyId):

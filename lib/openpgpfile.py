@@ -422,7 +422,10 @@ def makeKey(keyTuple):
 
 def getPublicKey(keyId, keyFile=''):
     if keyFile == '':
-        keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
+        if 'HOME' not in os.environ:
+            keyFile = None
+        else:
+            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
     try:
         keyRing=open(keyFile)
     except IOError:
@@ -433,7 +436,10 @@ def getPublicKey(keyId, keyFile=''):
 
 def getPrivateKey(keyId,passPhrase='', keyFile=''):
     if keyFile == '':
-        keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
+        if 'HOME' not in os.environ:
+            keyFile = None
+        else:
+            keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
     try:
         keyRing=open(keyFile)
     except IOError:
@@ -451,7 +457,10 @@ def getDBKey(keyId, keyTable):
 
 def getFingerprint(keyId, keyFile=''):
     if keyFile == '':
-        keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
+        if 'HOME' not in os.environ:
+            keyFile = None
+        else:
+            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
     try:
         keyRing=open(keyFile)
     except IOError:
