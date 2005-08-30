@@ -1148,7 +1148,6 @@ class ConaryClient:
 
         def _applyCs(cs, uJob, removeHints = {}):
             try:
-		# SMG
                 rb = self.db.commitChangeSet(cs, uJob,
                                     replaceFiles = replaceFiles,
                                     tagScript = tagScript, test = test, 

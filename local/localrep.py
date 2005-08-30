@@ -73,7 +73,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldFile(pathId, fileId, fileObj)
 
     def checkTroveSignatures(self, trv):
-	# SMG
         trv.verifyDigitalSignatures()
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
