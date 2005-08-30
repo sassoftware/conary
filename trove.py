@@ -19,6 +19,8 @@ import changelog
 import copy
 import files
 from lib import sha1helper
+from lib.openpgpkey import keyCache
+from lib.openpgpfile import KeyNotFound
 import streams
 import struct
 import versions
@@ -28,12 +30,6 @@ from streams import FrozenVersionStream
 from streams import StringVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
-
-class DigitalSignatureVerificationError(Exception):
-    def __str__(self):
-        return self.message
-    def __init__(self, fingerprints):
-        self.message = "The following keys have bad digital signatures! %s" % (' '.join(fingerprints))
 
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
@@ -94,38 +90,15 @@ class InstallBucket(streams.StreamCollection):
     def iter(self):
         return self.iterAll()
 
-_TROVEINFO_TAG_SIZE           = 0
-_TROVEINFO_TAG_SOURCENAME     = 1
-_TROVEINFO_TAG_BUILDTIME      = 2
-_TROVEINFO_TAG_CONARYVER      = 3
-_TROVEINFO_TAG_BUILDDEPS      = 4
-_TROVEINFO_TAG_LOADEDTROVES   = 5
-_TROVEINFO_TAG_INSTALLBUCKET  = 6
-_TROVEINFO_TAG_ISCOLLECTION   = 7
-_TROVEINFO_TAG_CLONEDFROM     = 8
-
-class TroveInfo(streams.StreamSet):
-    ignoreUnknown = True
-    streamDict = {
-        _TROVEINFO_TAG_SIZE          : ( streams.LongLongStream,'size'        ),
-        _TROVEINFO_TAG_SOURCENAME    : ( streams.StringStream,  'sourceName'  ),
-        _TROVEINFO_TAG_BUILDTIME     : ( streams.LongLongStream,'buildTime'   ),
-        _TROVEINFO_TAG_CONARYVER     : ( streams.StringStream, 'conaryVersion'),
-        _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
-        _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
-        _TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,        'installBucket'),
-        _TROVEINFO_TAG_ISCOLLECTION  : ( streams.ShortStream,  'isCollection' ),
-        _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom' ),
-    }
-    _streamDict = streams.StreamSetDef(streamDict)
-
 _DIGSIG_FINGERPRINT   = 0
 _DIGSIG_SIGNATURE     = 1
+_DIGSIG_TIMESTAMP     = 2
 
 class DigitalSignature(streams.StreamSet):
     streamDict = {
         _DIGSIG_FINGERPRINT     : ( streams.StringStream,    'fingerprint' ),
         _DIGSIG_SIGNATURE       : ( streams.StringStream,    'signature'   ),
+        _DIGSIG_TIMESTAMP       : ( streams.IntStream,       'timestamp'   ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -152,17 +125,12 @@ class DigitalSignature(streams.StreamSet):
 
     def set(self, val):
         self.fingerprint.set(val[0])
-        numMPIs = len(val[1])
+        self.timestamp.set(val[1])
+        numMPIs = len(val[2])
         buf = ''
-        for i in range(0,len(val[1])):
-            buf += self._longToMpi(val[1][i])
+        for i in range(0,len(val[2])):
+            buf += self._longToMpi(val[2][i])
         self.signature.set(chr(numMPIs) + buf)
-
-    def getHexString(self,buf):
-        r=''
-        for i in range(0, len(buf)):
-            r += ( "%02X"% ord(buf[i]))
-        return r
 
     def get(self):
         data = self.signature()
@@ -174,7 +142,7 @@ class DigitalSignature(streams.StreamSet):
                          (ord(data[index + 1]) + 7)) / 8 + 2
             mpiList.append(self._mpiToLong(data[index:index + lengthMPI]))
             index += lengthMPI
-        return (self.fingerprint(), tuple(mpiList))
+        return (self.fingerprint(), self.timestamp(), tuple(mpiList))
 
 _DIGSIGS_DIGSIGNATURE     = 1
 class DigitalSignatures(streams.StreamCollection):
@@ -183,11 +151,19 @@ class DigitalSignatures(streams.StreamCollection):
     def add(self, val):
         signature = DigitalSignature()
         signature.set(val)
-        self.addStream(1, signature)
+        self.addStream(_DIGSIGS_DIGSIGNATURE, signature)
 
     def iter(self):
         for signature in self.getStreams(_DIGSIGS_DIGSIGNATURE):
             yield signature.get()
+
+    #this function is for convenience. It reduces code duplication in
+    #netclient and netauth (since I need to pass the frozen form thru xmlrpc)
+    def getSignature(self, keyId):
+        for sig in self.iter():
+            if keyId in sig[0]:
+                return sig
+        raise KeyNotFound('Signature by key: %s does not exist'% keyId)
 
 _TROVESIG_SHA1   = 0
 _TROVESIG_DIGSIG = 1
@@ -200,11 +176,47 @@ class TroveSignatures(streams.StreamSet):
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
+    # this code needs to be called any time we're making a derived
+    # trove esp. shadows. since some info in the trove gets changed
+    # we cannot allow the signatures to persist.
+    def reset(self):
+        self.digitalSigs = DigitalSignatures()
+        self.sha1 = streams.Sha1Stream()
+
     def freeze(self, skipSet = {}):
         if not self.sha1():
             return ""
 
         return streams.StreamSet.freeze(self, skipSet = skipSet)
+
+_TROVEINFO_TAG_SIZE           = 0
+_TROVEINFO_TAG_SOURCENAME     = 1
+_TROVEINFO_TAG_BUILDTIME      = 2
+_TROVEINFO_TAG_CONARYVER      = 3
+_TROVEINFO_TAG_BUILDDEPS      = 4
+_TROVEINFO_TAG_LOADEDTROVES   = 5
+_TROVEINFO_TAG_INSTALLBUCKET  = 6
+_TROVEINFO_TAG_ISCOLLECTION   = 7
+_TROVEINFO_TAG_CLONEDFROM     = 8
+_TROVEINFO_TAG_SIGS           = 9
+
+class TroveInfo(streams.StreamSet):
+    ignoreUnknown = True
+    streamDict = {
+        _TROVEINFO_TAG_SIZE          : ( streams.LongLongStream,'size'        ),
+        _TROVEINFO_TAG_SOURCENAME    : ( streams.StringStream,  'sourceName'  ),
+        _TROVEINFO_TAG_BUILDTIME     : ( streams.LongLongStream,'buildTime'   ),
+        _TROVEINFO_TAG_CONARYVER     : ( streams.StringStream, 'conaryVersion'),
+        _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
+        _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
+        _TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,        'installBucket'),
+        _TROVEINFO_TAG_ISCOLLECTION  : ( streams.ShortStream,  'isCollection' ),
+        _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom'   ),
+        _TROVEINFO_TAG_SIGS          : ( TroveSignatures,      'sigs'         ),
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -338,7 +350,6 @@ class Trove(streams.LargeStreamSet):
         _STREAM_TRV_TROVES    : (TroveRefsTrovesStream,       "troves"    ), 
         _STREAM_TRV_FILES     : (TroveRefsFilesStream,        "idMap"     ), 
         _STREAM_TRV_REDIRECT  : (ByteStream,                  "redirect"  ),
-        _STREAM_TRV_SIGS      : (TroveSignatures,             "sigs"      ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
     ignoreUnknown = False
@@ -348,7 +359,7 @@ class Trove(streams.LargeStreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "troves", "idMap", "redirect",
-                  "sigs", "immutable" ]
+                  "immutable" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -357,17 +368,33 @@ class Trove(streams.LargeStreamSet):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
                                                       'versionStrings' : True })
-    def addDigitalSignature(self, keyId, passPhrase):
-        from lib.openpgpkey import keyCache
-        from lib import openpgpfile
+    def addDigitalSignature(self, keyId, skipIntegrityChecks = 0):
+        if(skipIntegrityChecks):
+            self.computeSignatures()
+        else:
+            sha1_orig = self.troveInfo.sigs.sha1()
+            self.computeSignatures()
+            sha1_new = self.troveInfo.sigs.sha1()
+            if sha1_orig:
+                assert(sha1_orig == sha1_new)
+        key = keyCache.getPrivateKey(keyId)
+        sig = key.signString(self.troveInfo.sigs.sha1())
+        self.troveInfo.sigs.digitalSigs.add(sig)
+
+    #these functions reduce code duplication in netauth and netserver
+    #since we're going to need to pass the frozen form over the net
+    def addPrecomputedDigitalSignature(self, sig):
+        sha1_orig = self.troveInfo.sigs.sha1()
         self.computeSignatures()
-        try:
-            key = keyCache.getPrivateKey(keyId, passPhrase)
-        except openpgpfile.KeyNotFound:
-            # FIXME: perhaps we should notify the user their secret key doesn't exist?
-            raise
-        sig = key.signString(self.sigs.sha1())
-        self.sigs.digitalSigs.add(sig)
+        sha1_new = self.troveInfo.sigs.sha1()
+        if sha1_orig:
+            assert(sha1_orig == sha1_new)
+        signature = DigitalSignature()
+        signature.set(sig)
+        self.troveInfo.sigs.digitalSigs.addStream(_DIGSIGS_DIGSIGNATURE, signature)
+
+    def getDigitalSignature(self, keyId):
+        return self.troveInfo.sigs.digitalSigs.getSignature(keyId)
 
     # return codes:
     # 0 completely unknown voracity:
@@ -375,34 +402,42 @@ class Trove(streams.LargeStreamSet):
     # positive values indicate a successful verification
     #   the higher the value, the more we trust the signing key
     # missingKeys is a list of missing fingerprints. pass a (blank?) list if you care to collect them...
-    def verifyDigitalSignatures(self):
-        from lib.openpgpkey import keyCache
+    #raise an exception if there were any bad signatures
+    #raise an exception if the trust level is beneath threshold
+    def verifyDigitalSignatures(self, threshold = 0):
         missingKeys = []
         badFingerprints = []
         maxTrust = 0
-        for signature in self.sigs.digitalSigs.iter():
+        sha1_orig = self.troveInfo.sigs.sha1()
+        self.computeSignatures()
+        sha1_new = self.troveInfo.sigs.sha1()
+        if sha1_orig:
+            assert(sha1_orig == sha1_new)
+        for signature in self.troveInfo.sigs.digitalSigs.iter():
             try:
                 key = keyCache.getPublicKey(signature[0])
-            except openpgpfile.KeyNotFound:
+            except KeyNotFound:
                 missingKeys.append(signature[0])
                 continue
-            lev = key.verifyString(self.sigs.sha1(), signature)
+            lev = key.verifyString(self.troveInfo.sigs.sha1(), signature)
             if lev == -1:
                 badFingerprints.append(key.getFingerprint())
             maxTrust = max(lev,maxTrust)
         if len(badFingerprints):
-            raise DigitalSignatureVerificationError(badFingerprints)
+            raise DigitalSignatureVerificationError("The following keys have bad digital signatures: %s" % (' '.join(badFingerprints)))
+        if maxTrust < threshold:
+            raise DigitalSignatureVerificationError("This trove does not meet minimum trust level")
         return maxTrust, missingKeys
     
     def computeSignatures(self):
         s = self._sigString()
         sha1 = sha1helper.sha1String(s)
-        self.sigs.sha1.set(sha1)
+        self.troveInfo.sigs.sha1.set(sha1)
 
     def verifySignatures(self):
-        s = self.freeze()
+        s = self._sigString()
         sha1 = sha1helper.sha1String(s)
-        return sha1 == self.sigs.sha1()
+        return sha1 == self.troveInfo.sigs.sha1()
 
     def copy(self, classOverride = None):
         if not classOverride:
@@ -419,7 +454,6 @@ class Trove(streams.LargeStreamSet):
         new.requires.thaw(self.requires.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
         new.troveInfo.thaw(self.troveInfo.freeze())
-        new.sigs.thaw(self.sigs.freeze())
         return new
 
     def getName(self):
@@ -439,14 +473,14 @@ class Trove(streams.LargeStreamSet):
 
     def getSigs(self):
         self.computeSignatures()
-        return self.sigs
+        return self.troveInfo.sigs
 
     def setSigs(self, sigs):
         # make sure the signature block being applied to this trove is
         # correct for this trove
         self.computeSignatures()
-        assert(self.sigs.sha1() == sigs.sha1())
-        self.sigs = sigs
+        assert(self.troveInfo.sigs.sha1() == sigs.sha1())
+        self.troveInfo.sigs = sigs
 
     def isRedirect(self):
         return self.redirect()
@@ -745,8 +779,13 @@ class Trove(streams.LargeStreamSet):
             self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
 
         if not skipIntegrityChecks:
-            pass
-            #assert(self.getSigs() == trvCs.getNewSigs())
+            # if we have a sha1 in our troveinfo, verify it
+            if self.troveInfo.sigs.sha1():
+                if not self.verifySignatures():
+                    raise TroveIntegrityError
+            else:
+                #log.warning('changeset does not contain a sha1 checksum')
+                pass
 
         assert((not self.idMap) or (not self.troves))
 
@@ -839,19 +878,22 @@ class Trove(streams.LargeStreamSet):
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
+            # always compute the sha1 signature of the trove before
+            # creating the diff so we know it's current
+            self.computeSignatures()
             troveInfoDiff = self.troveInfo.diff(them.troveInfo)
             if troveInfoDiff is None:
                 troveInfoDiff = ""
 
 	    themMap = them.idMap
 	    chgSet = TroveChangeSet(self.name(), self.changeLog,
-				      them.getVersion(),	
-				      self.getVersion(),
-				      them.getFlavor(), self.getFlavor(),
-                                      them.getSigs(), self.getSigs(),
-				      absolute = False,
-                                      isRedirect = self.redirect(),
-                                      troveInfoDiff = troveInfoDiff)
+                                    them.getVersion(),
+                                    self.getVersion(),
+                                    them.getFlavor(), self.getFlavor(),
+                                    them.getSigs(), self.getSigs(),
+                                    absolute = False,
+                                    isRedirect = self.redirect(),
+                                    troveInfoDiff = troveInfoDiff)
 	else:
 	    themMap = {}
 	    chgSet = TroveChangeSet(self.name(), self.changeLog,
@@ -1777,9 +1819,24 @@ class PatchError(TroveError):
     pass
 
 class TroveDiffError(TroveError):
-
     """
     Indicates that an error occurred calculating differences between troves.
     """
-    
+
+    pass
+
+class DigitalSignatureVerificationError(TroveError):
+    """
+    Indicates that a digital signature did not verify.
+    """
+    def __str__(self):
+        return self.message
+
+    def __init__(self, message):
+        self.message = message
+
+class TroveIntegrityError(TroveError):
+    """
+    Indicates that a checksum did not match
+    """
     pass

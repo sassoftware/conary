@@ -37,6 +37,8 @@ import transport
 import trove
 import versions
 import xmlshims
+from lib import openpgpfile
+
 
 shims = xmlshims.NetworkConvertors()
 
@@ -99,6 +101,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == 'FileStreamNotFound':
             raise FileStreamNotFound((self.toFileId(exceptionArgs[0]),
                                       self.toVersion(exceptionArgs[1])))
+        elif exceptionName == 'KeyNotFound':
+            raise openpgpfile.KeyNotFound(exceptionArgs[0])
+        elif exceptionName == 'DigitalSignatureVerificationError':
+            raise trove.DigitalSignatureVerificationError(exceptionArgs[0])
+        elif exceptionName == 'AlreadySignedError':
+            raise repository.netrepos.netserver.AlreadySignedError(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
@@ -256,6 +264,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def addUserByMD5(self, label, user, salt, password):
         #Base64 encode salt
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
+
+    def addDigitalSignature(self, name, version, flavor, digsig):
+        from trove import DigitalSignature
+        signature = DigitalSignature()
+        signature.set(digsig)
+        encSig = base64.b64encode(signature.freeze())
+        self.c[version].addDigitalSignature(name, self.fromVersion(version),
+                                            self.fromFlavor(flavor),
+                                            encSig)
+
+    def addNewAsciiPGPKey(self, label, user, keyData):
+        self.c[label].addNewAsciiPGPKey(user, keyData)
+
+    def addNewPGPKey(self, label, user, keyData):
+        import base64
+        encKeyData = base64.b64encode(keyData)
+        self.c[label].addNewPGPKey(user, encKeyData)
 
     def deleteUserByName(self, label, user):
         self.c[label].deleteUserByName(user)

@@ -1148,6 +1148,7 @@ class ConaryClient:
 
         def _applyCs(cs, uJob, removeHints = {}):
             try:
+		# SMG
                 rb = self.db.commitChangeSet(cs, uJob,
                                     replaceFiles = replaceFiles,
                                     tagScript = tagScript, test = test, 
@@ -1329,6 +1330,10 @@ class ConaryClient:
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
+                #this clears the digital signatures from the shadow
+                branchedTrove.troveInfo.sigs.reset()
+                # FIXME we should add a new digital signature in cases
+                # where we can (aka user is at kb and can provide secret key
 
 		for (name, version, flavor) in trove.iterTroveList():
                     if shadow:

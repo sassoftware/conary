@@ -374,6 +374,14 @@ class NetworkAuthorization:
 
         return cu.next()[0]
 
+    def getUserIdByName(self, userName):
+        cu = self.db.cursor()
+
+        cu.execute("SELECT userId FROM Users WHERE user=?",
+                   userName)
+
+        return cu.next()[0]
+
     def addGroup(self, userGroupName):
         cu = self.db.cursor()
     

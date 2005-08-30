@@ -90,6 +90,22 @@ class UpdateCallback(ChangesetCallback):
     def __init__(self):
         pass
 
+class SignatureCallback:
+
+    def getTroveInfo(self, got, need):
+        pass
+
+    def signTrove(self, got, need):
+        pass
+
+    def sendSignature(self, got, need):
+        pass
+
+    def __init(self):
+        pass
+
+
+
 class LineOutput:
 
     def _message(self, msg):

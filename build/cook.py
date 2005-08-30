@@ -162,6 +162,23 @@ class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
             self._message("Committing changeset (%d%% of %dk)..." 
                           % ((got * 100) / need, need / 1024))
 
+def signAbsoluteChangeset(cs, fingerprint):
+    # go through all the trove change sets we have in this changeset.
+    # use a list comprehension here as we will be modifying the newTroves
+    # dictionary inside the changeset
+    for troveCs in [ x for x in cs.iterNewTroveList() ]:
+        # instantiate each trove from the troveCs so we can generate
+        # the signature
+        t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
+                        troveCs.getNewFlavor(), troveCs.getChangeLog())
+        t.applyChangeSet(troveCs)
+        t.addDigitalSignature(fingerprint)
+        # create a new troveCs that has the new signature included in it
+        newTroveCs = t.diff(None, absolute = 1)[0]
+        # replace the old troveCs with the new one in the changeset
+        cs.newTrove(newTroveCs)
+    return cs
+
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={}, 
                targetLabel = None, resume = None, alwaysBumpCount = False, 
@@ -281,6 +298,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         return []
     
     (cs, built, cleanup) = ret
+
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
     else:
@@ -602,8 +620,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     changeSet, built = _createPackageChangeSet(repos, bldList, recipeObj,
                                                sourceVersion, 
                                                targetLabel=targetLabel, 
-                                               alwaysBumpCount=alwaysBumpCount)
-                                               
+                                               alwaysBumpCount=alwaysBumpCount,
+                                               signatureKey=cfg.signatureKey)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
@@ -742,7 +760,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     return bldList, recipeObj, builddir, destdir
 
 def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
-                            targetLabel=None, alwaysBumpCount=False):
+                            targetLabel=None, alwaysBumpCount=False,
+                            signatureKey=None):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
         components created by cooking a package recipe.  RecipeObj is
@@ -863,6 +882,9 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
+
+    if signatureKey:
+        signAbsoluteChangeset(changeSet, signatureKey)
 
     return changeSet, built
 

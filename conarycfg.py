@@ -331,6 +331,8 @@ class ConaryConfiguration(ConfigFile):
                                                   '/etc/conary/distro/arch',
                                                   '~/.conary/arch')],
         'quiet'                 : [ BOOL, False ],
+        'signatureKey'          : '',
+        'trustThreshold'        : [ INT, 0],
     }
 
     def __init__(self, readConfigFiles=True):

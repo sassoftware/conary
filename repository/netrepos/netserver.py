@@ -37,6 +37,8 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 from datastore import IntegrityError
+from lib.openpgpfile import KeyNotFound
+from trove import DigitalSignatureVerificationError
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
@@ -121,6 +123,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except IntegrityError, e:
             condRollback()
 	    return (True, ("IntegrityError", str(e)))
+	except trove.TroveIntegrityError, e:
+            condRollback()
+            return (True, ("TroveIntegrityError", str(e) +
+                           # add a helpful error message for now
+                        ' (you may need to update to conary 0.62.0 or later)'))
         except FileContentsNotFound, e:
             condRollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
@@ -129,6 +136,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             condRollback()
             return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
+        except KeyNotFound, e:
+            condRollback()
+            return (True, ('KeyNotFound', str(e)))
+        except DigitalSignatureVerificationError, e:
+            condRollback()
+            return (True, ('DigitalSignatureVerificationError', str(e)))
+        except AlreadySignedError, e:
+            condRollback()
+            return (True, ('AlreadySignedError',str(e)))
 	except Exception, e:
             condRollback()
             raise 
@@ -1141,6 +1157,79 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return matches
 
+    def addDigitalSignature(self, authToken, clientVersion, name, version,
+                            flavor, encSig):
+        import base64
+        from trove import DigitalSignature
+        from lib.openpgpkey import keyCache
+        from lib.openpgpfile import KeyNotFound
+        version = self.toVersion(version)
+        flavor = self.toFlavor(flavor)
+	if not self.auth.check(authToken, write = True, trove = name,
+                   label = version.branch().label()):
+	    raise InsufficientPermission
+
+        trv = self.repos.getTrove(name, version, flavor)
+
+        signature = DigitalSignature()
+        signature.thaw(base64.b64decode(encSig))
+
+        sig = signature.get()
+        #ensure repo knows this key
+        keyCache.getPublicKey(sig[0])
+        #need to verify this key hasn't signed this trove already
+        try:
+            trv.getDigitalSignature(sig[0])
+            foundSig = 1
+        except KeyNotFound:
+            foundSig = 0
+
+        if foundSig:
+            raise AlreadySignedError("Trove already signed by key")
+
+        trv.addPrecomputedDigitalSignature(sig)
+
+        #verify the new signature is actually good
+        trv.verifyDigitalSignatures()
+
+        self.db._begin()
+        cu = self.db.cursor()
+        trv = self.repos.getTrove(name, version, flavor)
+        trv.addPrecomputedDigitalSignature(sig)
+        # FIXME get instanceId in a better fashion.
+        if flavor:
+            cu.execute("select InstanceId from Instances left join Items on Items.itemId=Instances.itemId left join Versions on Versions.versionId=Instances.versionId left join flavors on Flavors.flavorId=Instances.flavorId WHERE item=? AND version=? AND flavor=?", name, version.asString(), flavor.freeze())
+        else:
+            cu.execute("select InstanceId from Instances left join Items on Items.itemId=Instances.itemId left join Versions on Versions.versionId=Instances.versionId WHERE item=? AND version=?", name, version.asString())
+        r = cu.fetchone()
+
+        instanceId = r[0]
+        r = cu.execute('SELECT COUNT(*) FROM TroveInfo WHERE instanceId=? AND infoType=9',instanceId)
+        if r.fetchone()[0]:
+            cu.execute('UPDATE TroveInfo SET data=? WHERE instanceId=? AND infoType=9', trv.troveInfo.sigs.freeze(),instanceId)
+        else:
+            cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)', instanceId, trv.troveInfo.sigs.freeze())
+        self.db.commit()
+        return True
+
+    def addNewAsciiPGPKey(self, authToken, label, user, keyData):
+        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+            and user != authToken[0]):
+            raise InsufficientPermission
+        uid = self.auth.getUserIdByName(user)
+        self.repos.troveStore.keyTable.addNewAsciiKey(uid, keyData)
+        return True
+
+    def addNewPGPKey(self, authToken, label, user, encKeyData):
+        import base64
+        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+            and user != authToken[0]):
+            raise InsufficientPermission
+        uid = self.auth.getUserIdByName(user)
+        keyData = base64.b64decode(encKeyData)
+        self.repos.troveStore.keyTable.addNewKey(uid, keyData)
+        return True
+
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
@@ -1467,6 +1556,12 @@ class GetFileContentsError(Exception):
     def __init__(self, val):
         Exception.__init__(self)
         self.val = val
+
+class AlreadySignedError(Exception):
+    def __str__(self):
+        return self.error
+    def __init__(self, error = "Already signed"):
+        self.error=error
 
 class FileContentsNotFound(GetFileContentsError):
     def __init__(self, val):

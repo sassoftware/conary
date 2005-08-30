@@ -528,3 +528,28 @@ class HttpHandler(WebHandler):
             self._write("notice", message = "Password successfully changed",
                         link = returnLink[0], url = returnLink[1])
         return apache.OK
+
+    @checkAuth(write = True)
+    def pgpAdminForm(self, auth):
+        self._write("pgp_admin", keyTable = self.troveStore.keyTable,
+                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+        return apache.OK
+
+    @checkAuth(write = True)
+    def pgpNewKeyForm(self, auth):
+        self._write("pgp_submit_key",
+                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+        return apache.OK
+
+    @checkAuth(write = True)
+    @strFields(keyData = "", userId = 0)
+    def submitPGPKey(self, auth, keyData, userId):
+        userId = int(userId)
+        # FIXME we need to check if the user has admin rights
+        # to alter somebody else's key
+        #not a problem yet since admins can only touch their own keys att
+        if (userId == self.repServer.auth.getUserIdByName(auth[0])):
+            self.troveStore.keyTable.addNewAsciiKey(userId, keyData)
+        self._write("pgp_admin", keyTable = self.troveStore.keyTable,
+                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+        return apache.OK

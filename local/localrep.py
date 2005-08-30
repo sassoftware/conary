@@ -72,6 +72,10 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	fileObj = self.repos.getFileVersion(pathId, fileId, None)
 	self.oldFile(pathId, fileId, fileObj)
 
+    def checkTroveSignatures(self, trv):
+	# SMG
+        trv.verifyDigitalSignatures()
+
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
@@ -210,9 +214,6 @@ class SqlDataStore:
 
     def removeFile(self, hash):
 	self.decrementCount(hash)
-
-    def checkTroveSignatures(self, trv):
-        pass
 
     def __init__(self, db):
         cu = db.cursor()

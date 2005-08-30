@@ -143,6 +143,9 @@ def CloneTrove(cfg, targetBranch, troveSpec):
             if version.branch().label().getHost() != newVersionHost:
                 allFilesNeeded.append((pathId, fileId, version))
 
+        # reset the signatures, because all the versions have now
+        # changed, thus invalidating the old sha1 hash
+        trv.troveInfo.sigs.reset()
         trvCs = trv.diff(None, absolute = True)[0]
         cs.newTrove(trvCs)
 

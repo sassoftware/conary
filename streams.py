@@ -176,8 +176,9 @@ class Sha1Stream(StringStream):
 
     def twm(self, diff, base):
 	assert(len(diff) == 20)
-	assert(len(base()) == 20)
-	assert(len(self()) == 20)
+        # FIXME these need to be re-enabled after repo is upgraded
+	#assert(len(base()) == 20)
+	#assert(len(self()) == 20)
 	StringStream.twm(self, diff, base)
 
     def set(self, val):

@@ -33,6 +33,7 @@ from lib import magic
 import os
 import repository
 from lib import sha1helper
+from lib import openpgpfile
 import sys
 import time
 import trove
@@ -263,6 +264,23 @@ def _getRecipeLoader(cfg, repos, recipeFile):
 
     return loader
 
+def verifyAbsoluteChangeset(cs, trustThreshold = 0):
+    # go through all the trove change sets we have in this changeset.
+    # verify the digital signatures on each piece
+    # return code should be the minimum trust on the entire set
+    #verifyDigitalSignatures can raise a
+    #DigitalSignatureVerificationError
+    r = 256
+    for troveCs in [ x for x in cs.iterNewTroveList() ]:
+        # instantiate each trove from the troveCs so we can verify
+        # the signature
+        t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
+                        troveCs.getNewFlavor(), troveCs.getChangeLog())
+        t.applyChangeSet(troveCs, True)
+        r = min(t.verifyDigitalSignatures(trustThreshold)[0], r)
+        # create a new troveCs that has the new signature included in it
+        # replace the old troveCs with the new one in the changeset
+    return r
 
 def checkout(repos, cfg, workDir, name, callback=None):
     if not callback:
@@ -306,6 +324,8 @@ def checkout(repos, cfg, workDir, name, callback=None):
 			        True)],
                                excludeAutoSource = True,
                                callback=callback)
+
+    verifyAbsoluteChangeset(cs, cfg.trustThreshold)
 
     troveCs = cs.iterNewTroveList().next()
 
@@ -510,6 +530,14 @@ def commit(repos, cfg, message, callback=None):
 	return
 
     newState.changeChangeLog(cl)
+    try:
+        newState.addDigitalSignature(cfg.signatureKey, 1)
+    except openpgpfile.KeyNotFound:
+        # ignore the case where there was no signature key specified
+        if not cfg.signatureKey:
+            pass
+        else:
+            raise
 
     if not srcPkg:
         troveCs = newState.diff(None, absolute = True)[0]
@@ -553,6 +581,7 @@ def commit(repos, cfg, message, callback=None):
 
     newState.setLastMerged(None)
     newState.write("CONARY")
+    #FIXME: SIGN HERE
 
 def annotate(repos, filename):
     state = SourceStateFromFile("CONARY")

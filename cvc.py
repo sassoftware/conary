@@ -22,7 +22,7 @@ from lib import options
 from lib import util
 from lib import log
 from local import database
-from build import cook,use
+from build import cook,use,signtrove
 import deps
 from repository import netclient
 from repository.netclient import NetworkRepositoryClient
@@ -35,6 +35,7 @@ import repository
 import updatecmd
 import versions
 import xmlrpclib
+from lib import openpgpfile
 
 sys.excepthook = util.genExcepthook()
 
@@ -48,12 +49,15 @@ def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
-    print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
+    print "       cvc checkout [--dir <dir>] [--trust-threshold <int>]"
+    print "                    <trove>[=<version>]"
     print "       cvc clone <target-branch> <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
+    print '                  [--signature-key "<fingerprint>"]'
     print "       cvc config"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
     print '                [--flavor  "<flavor>"] '
+    print '                [--signature-key "<fingerprint>"]'
     print '                [--macro "<macro> <value>"]+ '
     print '                <file.recipe|troveName=<version>>[[flavor]]+'
     print '       cvc describe <xml file>'
@@ -65,6 +69,9 @@ def usage(rc = 1):
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
+    print '       cvc sign [--signature-key "<fingerprint>"]'
+    print '                [--quiet] <trove>[=version][[flavor]]'
+    print "                <trove2>[=version2][[flavor2]]..."
     print "       cvc update <version>"
     print 
     print "branch flags:  --sources"
@@ -74,6 +81,8 @@ def usage(rc = 1):
     print '               --config "<item> <value>"'
     print '               --install-label <label>'
     print "               --root <root>"
+    print '               --signature-key "<fingerprint>"'
+    print '               --trust-threshold <int>'
     print ""
     print "cook flags:    --macros"
     print "               --no-clean"
@@ -86,6 +95,10 @@ def usage(rc = 1):
     print "               --debug-exceptions"
     print "               --quiet"
     print ""
+    print ""
+    print "sign flags:    --quiet"
+    print '               --signature-key "<fingerprint>"'
+    print ""
     print "commit flags:  --message <msg>"
     print ""
     print "shadow flags:  --sources"
@@ -96,6 +109,8 @@ def realMain(cfg, argv=sys.argv):
     cfgMap = {}
 
     cfgMap["build-label"] = "buildLabel"
+    cfgMap["signature-key"] = "signatureKey"
+    cfgMap["trust-threshold"] = "trustThreshold"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
@@ -249,6 +264,12 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
     elif (args[0] == "rename"):
 	if len(args) != 3: return usage()
 	checkin.renameFile(args[1], args[2])
+    elif (args[0] == "sign"):
+        if len(args) <2: return usage()
+        if argSet.has_key('quiet'):
+            cfg.quiet = True
+            del argSet['quiet']
+        signtrove.signTroves(cfg, args[1:])
     elif (args[0] == "newpkg"):
 	if argSet.has_key("dir"):
 	    dir = argSet['dir']
@@ -396,8 +417,11 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except checkin.CONARYFileMissing, e:
         print >> sys.stderr, str(e)
+    except openpgpfile.KeyNotFound, e:
+        print >> sys.stderr, str(e)
     except KeyboardInterrupt, e:
         pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

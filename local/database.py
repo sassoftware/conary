@@ -513,6 +513,7 @@ class Database(SqlDbRepository):
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
+            # SMG
             localrep.LocalRepositoryChangeSetJob(self, cs, callback,
                                                  autoLockList)
             self.db.mapLockedTroves(uJob.getLockMaps())

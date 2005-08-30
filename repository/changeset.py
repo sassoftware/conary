@@ -846,7 +846,9 @@ class ReadOnlyChangeSet(ChangeSet):
 		filecs = self.files[(oldFileId, fileId)]
 		neededFiles.append((pathId, oldFileId, fileId, oldVersion,
                                     version, filecs))
-		
+
+            # we've mucked around with this troveCs, it won't pass
+            # integrity checks
 	    trv.applyChangeSet(troveCs, skipIntegrityChecks = True)
 	    newCs = trv.diff(None, absolute = True)[0]
 	    absCs.newTrove(newCs)

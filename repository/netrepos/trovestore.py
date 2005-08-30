@@ -19,6 +19,7 @@ from deps import deps
 from local import deptable
 import instances
 import items
+import keytable
 import files
 import flavors
 import metadata
@@ -93,6 +94,7 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
+        self.keyTable = keytable.OpenPGPKeyTable(self.db)
         flavors.FlavorScores(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db)

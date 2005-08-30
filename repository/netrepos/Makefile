@@ -20,6 +20,7 @@ python_files = __init__.py	\
 		instances.py	\
 		instructionsets.py	\
 		items.py	\
+		keytable.py	\
                 netauth.py      \
 		netserver.py	\
 		trovefiles.py	\

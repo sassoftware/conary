@@ -161,6 +161,7 @@ def realMain(cfg, argv=sys.argv):
     cfgMap["build-label"] = "buildLabel"
     cfgMap["exclude-troves"] = "excludeTroves"
     cfgMap["root"] = "root"
+    cfgMap["trust-threshold"] = "trustThreshold"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)

@@ -367,7 +367,13 @@ class ChangeSetJob:
                                           precompressed = precompressed)
 
     def checkTroveSignatures(self, trv):
-        pass
+        from lib.openpgpkey import keyCache
+        from lib.openpgpfile import KeyNotFound
+#        for fingerprint,timestamp,sig in trv.troveInfo.sigs.digitalSigs.iter():
+#            keyCache.getPublicKey(fingerprint)
+        res = trv.verifyDigitalSignatures()
+        if len(res[1]):
+            raise KeyNotFound('Repository does not recignize key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False):

@@ -15,19 +15,32 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
+    <!-- table of pgp keys -->
     <head/>
     <body>
         <div id="inner">
-            <h2>Main Menu</h2>
-
-            <p>Welcome to the Conary Repository.</p>
-            <ul>
-            <li><a href="browse">Browse Repository</a></li>
-            <li><a href="metadata">Metadata Management</a></li>
-            <li><a href="userlist">User Administration</a></li>
-            <li><a href="chPassForm">Change Password</a></li>
-            <li><a href="pgpAdminForm">PGP Keys</a></li>
-            </ul>
+            <h2>PGP Key Submission</h2>
+	    <form method="POST" action="submitPGPKey">
+		<input type="hidden" name="userId" value="${userId}"/>
+	    	<table class="user-admin" id="users">
+        		<thead>
+				<tr>
+					<td>Paste PGP Key Here</td>
+				</tr>
+                	</thead>
+                	<tbody>
+                    		<tr>
+					<td witdh="100%"><textarea name="keyData" rows="40" cols="80"/></td>
+	                	</tr>
+                	</tbody>
+            	</table>
+	    <font size="1">
+	    <p>* Submit only one key at a time</p>
+	    <p>* Submit ONLY your own public keys</p>
+	    <p>* Once a key is submitted it CANNOT be removed</p>
+	    </font>
+            <p><button type="submit">Submit Key</button></p>
+	    </form>
         </div>
     </body>
 </html>
