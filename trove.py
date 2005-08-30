@@ -368,8 +368,8 @@ class Trove(streams.LargeStreamSet):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
                                                       'versionStrings' : True })
-    def addDigitalSignature(self, keyId, skipIntegrityChecks = 0):
-        if(skipIntegrityChecks):
+    def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
+        if skipIntegrityChecks:
             self.computeSignatures()
         else:
             sha1_orig = self.troveInfo.sigs.sha1()

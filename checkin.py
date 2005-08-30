@@ -531,7 +531,10 @@ def commit(repos, cfg, message, callback=None):
 
     newState.changeChangeLog(cl)
     try:
-        newState.addDigitalSignature(cfg.signatureKey, 1)
+        # skip integrity checks since we just want to compute the
+        # new sha1 with all our changes accounted for
+        newState.addDigitalSignature(cfg.signatureKey,
+                                     skipIntegrityChecks=True)
     except openpgpfile.KeyNotFound:
         # ignore the case where there was no signature key specified
         if not cfg.signatureKey:
