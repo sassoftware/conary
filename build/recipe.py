@@ -1448,9 +1448,9 @@ class SingleGroup:
         client = conaryclient.ConaryClient(cfg)
 
         if self.checkOnlyByDefaultDeps:
-            troveList = list(self.troves) + includedTroves
-        else:
             troveList = self.getDefaultTroves() + includedTroves
+        else:
+            troveList = list(self.troves) + includedTroves
         
         # build a list of the troves that we're checking so far
         troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
@@ -1471,9 +1471,10 @@ class SingleGroup:
 
     def _checkDependencies(self, cfg, includedTroves):
         if self.checkOnlyByDefaultDeps:
-            troveList = list(self.troves)
-        else:
             troveList = self.getDefaultTroves()
+        else:
+            troveList = list(self.troves)
+
         troveList += includedTroves
 
         troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
@@ -1485,12 +1486,12 @@ class SingleGroup:
 
         client = conaryclient.ConaryClient(cfg)
         if self.checkOnlyByDefaultDeps:
-            cs = client.repos.createChangeSet(troves, 
-                                              recurse = True, withFiles=False)
-        else:
             depCs = client.updateChangeSet(troves, recurse = True,
                                             resolveDeps=False, split=False)[0]
             cs = depCs.csList[0]
+        else:
+            cs = client.repos.createChangeSet(troves, 
+                                              recurse = True, withFiles=False)
 
         failedDeps = client.db.depCheck(cs)[0]
         cfg.setValue('dbPath', oldDbPath)
@@ -1790,7 +1791,7 @@ class GroupRecipe(Recipe):
         allTroves = []
         childGroups = []
         for childGroup, byDefault in self.groups[groupName].getNewGroupList(): 
-            if byDefault or checkOnlyByDefaultDeps:
+            if byDefault or not checkOnlyByDefaultDeps:
                 childGroups.append(childGroup)
 
         while childGroups:
@@ -1798,12 +1799,12 @@ class GroupRecipe(Recipe):
             groupObj = self.groups[childGroup]
 
             if checkOnlyByDefaultDeps:
-                allTroves.extend(groupObj.troves)
-            else:
                 allTroves.extend(groupObj.getDefaultTroves())
+            else:
+                allTroves.extend(groupObj.troves)
 
             for childGroup, byDft in self.groups[childGroup].getNewGroupList(): 
-                if byDft or checkOnlyByDefaultDeps:
+                if byDft or not checkOnlyByDefaultDeps:
                     childGroups.append(childGroup)
         return allTroves
 
