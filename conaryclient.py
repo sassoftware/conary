@@ -830,14 +830,26 @@ class ConaryClient:
                         (newVersionStr, newFlavorStr), isAbsolute) = item
             assert(oldVersionStr is None or not isAbsolute)
 
-            if oldVersionStr or (not newVersionStr and not updateMode):
+            if troveName[0] == '-':
+                needsOld = True
+                needsNew = newVersionStr or newFlavorStr
+                troveName = troveName[1:]
+            elif troveName[0] == '+':
+                needsNew = True
+                needsOld = oldVersionStr or oldFlavorStr
+                troveName = troveName[1:]
+            else:
+                needsOld = not updateMode or oldVersionStr or oldFlavorStr
+                needsNew = updateMode or newVersionStr or newFlavorStr
+
+
+            if needsOld:
                 oldTroves = self.db.findTrove(None, 
                                    (troveName, oldVersionStr, oldFlavorStr))
             else:
                 oldTroves = []
 
-            if oldVersionStr and not newVersionStr or \
-               (not oldVersionStr and not newVersionStr and not updateMode):
+            if not needsNew:
                 assert(not newFlavorStr)
                 assert(not isAbsolute)
                 for troveInfo in oldTroves:
