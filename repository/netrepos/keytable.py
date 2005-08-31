@@ -67,7 +67,7 @@ class OpenPGPKeyTable:
         # make sure it's a public key
         keyType = openpgpfile.getBlockType(keyRing)
         keyRing.seek(-1,1)
-        if (keyType >> 2) & 15 != openpgpfile.PKT_TAG_PUBLIC_KEY:
+        if (keyType >> 2) & 15 != openpgpfile.PKT_PUBLIC_KEY:
             raise IncompatibleKey('Key must be a public key')
 
         if openpgpfile.countKeys(keyRing) != 1:
