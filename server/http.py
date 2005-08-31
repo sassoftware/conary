@@ -45,10 +45,10 @@ def checkAuth(write = False, admin = False):
         def wrapper(self, **kwargs):
             # XXX two xmlrpc calls here could possibly be condensed to one
             # first check the password only
-            if not self.repServer.auth.check(kwargs['auth']):
+            if not self.repServer.auth.check(self.authToken):
                 raise InvalidPassword
             # now check for proper permissions
-            if not self.repServer.auth.check(kwargs['auth'], write=write, admin=admin):
+            if not self.repServer.auth.check(self.authToken, write=write, admin=admin):
                 raise netserver.InsufficientPermission
             else:
                 return func(self, **kwargs)
@@ -272,7 +272,7 @@ class HttpHandler(WebHandler):
        
         source = source.lower()
         
-        versions = self.repServer.getTroveVersionList(auth,
+        versions = self.repServer.getTroveVersionList(self.authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None })
         
         branches = {}
@@ -371,7 +371,7 @@ class HttpHandler(WebHandler):
         admin = (admin == "on")
        
         try:
-            self.repServer.addAcl(auth, 0, group, trove, label,
+            self.repServer.addAcl(self.authToken, 0, group, trove, label,
                writeperm, capped, admin)
         except PermissionAlreadyExists, e:
             self._write("error", shortError="Duplicate Permission",
@@ -477,8 +477,8 @@ class HttpHandler(WebHandler):
     @strFields(user = None, password = None)
     @boolFields(write = False, admin = False)
     def addUser(self, auth, user, password, write, admin):
-        self.repServer.addUser(auth, 0, user, password)
-        self.repServer.addAcl(auth, 0, user, "", "", write, True, admin)
+        self.repServer.addUser(self.authToken, 0, user, password)
+        self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin)
 
         return self._redirect("userlist")
 
@@ -495,7 +495,7 @@ class HttpHandler(WebHandler):
         if username:
             askForOld = False
         else:
-            username = auth[0]
+            username = self.authToken[0]
             askForOld = True
         
         self._write("change_password", username = username, askForOld = askForOld)
@@ -506,13 +506,13 @@ class HttpHandler(WebHandler):
                password1 = None, password2 = None)
     def chPass(self, auth, username, oldPassword,
                password1, password2):
-        admin = self.repServer.auth.check(auth, admin=True)
+        admin = self.repServer.auth.check(self.authToken, admin=True)
         
-        if username != auth[0]:
+        if username != self.authToken[0]:
             if not admin:
                 raise netserver.InsufficientPermission
         
-        if auth[1] != oldPassword and auth[0] == username and not admin:
+        if self.authToken[1] != oldPassword and self.authToken[0] == username and not admin:
             self._write("error", error = "Error: old password is incorrect")
         elif password1 != password2:
             self._write("error", error = "Error: passwords do not match")
@@ -532,13 +532,13 @@ class HttpHandler(WebHandler):
     @checkAuth(write = True)
     def pgpAdminForm(self, auth):
         self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
         return apache.OK
 
     @checkAuth(write = True)
     def pgpNewKeyForm(self, auth):
         self._write("pgp_submit_key",
-                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
         return apache.OK
 
     @checkAuth(write = True)
@@ -548,8 +548,8 @@ class HttpHandler(WebHandler):
         # FIXME we need to check if the user has admin rights
         # to alter somebody else's key
         #not a problem yet since admins can only touch their own keys att
-        if (userId == self.repServer.auth.getUserIdByName(auth[0])):
+        if (userId == self.repServer.auth.getUserIdByName(self.authToken[0])):
             self.troveStore.keyTable.addNewAsciiKey(userId, keyData)
         self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    userId = self.repServer.auth.getUserIdByName(auth[0]))
+                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
         return apache.OK
