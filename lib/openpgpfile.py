@@ -39,8 +39,8 @@ PK_ALGO_ALL_RSA = (PK_ALGO_RSA, PK_ALGO_RSA_ENCRYPT_ONLY,
                    PK_ALGO_RSA_SIGN_ONLY)
 PK_ALGO_ALL_ELGAMAL = (PK_ALGO_ELGAMAL_ENCRYPT_ONLY, PK_ALGO_ELGAMAL)
 
-# packet tags are defined in RFC 2440 pages 15-16
-PKT_TYPE_RESERVED           = 0  # a packet tag must not have this value
+# packet tags are defined in RFC 2440 - 4.3. Packet Tags
+PKT_TYPE_RESERVED           = 0  # a packet type must not have this value
 PKT_TYPE_PUB_SESSION_KEY    = 1  # Public-Key Encrypted Session Key Packet
 PKT_TYPE_SIG                = 2  # Signature Packet
 PKT_TYPE_SYM_SESSION_KEY    = 3  # Symmetric-Key Encrypted Session Key Packet
