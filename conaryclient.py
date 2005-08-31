@@ -960,6 +960,9 @@ class ConaryClient:
                                                 redirectHack, keepExisting, 
                                                 recurse, oldItems)
 
+        if not mergeItemList:
+            raise NoNewTrovesError
+
         # XXX this _resetTroveLists a hack, but building a whole new changeset
         # is a bit tricky due to changeset files
         cs1, remainder = troveSource.createChangeSet(mergeItemList, 
