@@ -121,25 +121,6 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
         self.contents = []
         self.empty = True
 
-# use a special sort because:
-# l = [ False, -1, 1 ]
-# l.sort()
-# l == [ -1, False, 1 ]
-# note that also False == 0 sometimes
-#
-# secondary scoring is done on the final timestamp (so ties get broken
-# by an explicit rule)
-def _scoreSort(x, y):
-    if x[0] is False:
-        return -1
-    if y[0] is False:
-        return 1
-    rc = cmp(x[0], y[0])
-    if rc:
-        return rc
-
-    return cmp(x[1], y[1])
-
 class ConaryClient:
     """
     ConaryClient is a high-level class to some useful Conary operations,
@@ -181,6 +162,66 @@ class ConaryClient:
     def _resolveDependencies(self, cs, uJob, keepExisting = None, 
                              depsRecurse = True, split = False,
                              resolve = True):
+
+        def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
+            """ determine which of the given set of troveTups is the 
+                best choice for installing on this system.  Because the
+                repository didn't try to determine which flavors are best for 
+                our system, we have to filter the troves locally.  
+            """
+            # we filter the troves in the following ways:
+            # 1. remove trove tups that don't match this installFlavor
+            #    (after modifying the flavor by any affinity flavor found
+            #     in an installed trove by the same name)
+            # 2. filter so that only the latest version of a trove is left
+            #    for each name,branch pair. (this ensures that a really old
+            #    version of a trove doesn't get preferred over a new one 
+            #    just because its got a better flavor)
+            # 3. pick the best flavor out of the remaining
+
+            flavoredList = []
+
+            for troveTup in troveTups:
+                f = installFlavor.copy()
+                affFlavors = affFlavorDict[troveTup[0]]
+                if affFlavors:
+                    affFlavor = affFlavors[0][2]
+                    flavorsMatch = True
+                    for newF in [x[2] for x in affFlavors[1:]]:
+                        if newF != affFlavor:
+                            flavorsMatch = False
+                            break
+                    if flavorsMatch:
+                        f.union(affFlavor,
+                                mergeType=deps.DEP_MERGE_TYPE_PREFS)
+
+                flavoredList.append((f, troveTup))
+
+            trovesByNB = {}
+            for installFlavor, (n,v,f) in flavoredList:
+                b = v.branch()
+                myTimeStamp = v.timeStamps()[-1]
+                myScore = installFlavor.score(f)
+                if myScore is False:
+                    continue
+
+                if (n,b) in trovesByNB:
+                    curScore, curTimeStamp, curTup = trovesByNB[n,b]
+                    if curTimeStamp > myTimeStamp:
+                        continue
+                    if curTimeStamp == myTimeStamp:
+                        if myScore < curScore:
+                            continue
+
+                trovesByNB[n,b] = (myScore, myTimeStamp, (n,v,f))
+
+            scoredList = sorted(trovesByNB.itervalues())
+            if not scoredList:
+                return None
+            else:
+                return scoredList[-1][-1]
+
+
         pathIdx = 0
         foundSuggestions = False
         (depList, cannotResolve, changeSetList) = \
@@ -211,52 +252,26 @@ class ConaryClient:
                     if sugg.has_key(depSet):
                         suggList = []
                         for choiceList in sugg[depSet]:
-                            # XXX what if multiple troves are on this branch,
-                            # but with different flavors? we could be
-                            # (much) smarter here
-                            scoredList = []
+                            troveNames = set(x[0] for x in choiceList)
 
-                            # set up a list of affinity troves for each choice
                             if keepExisting:
-                                affTroveList = [[]] * len(choiceList)
+                                affTroveDict = dict((x, []) for x in troveNames)
                             else:
-                                affTroveList = []
-                                for choice in choiceList:
-                                    try:
-                                        affinityTroves = self.db.trovesByName(choice[0])
-                                        affTroveList.append(affinityTroves)
-                                    except repository.TroveNotFound:
-                                        affTroveList.append([])
+                                affTroveDict = \
+                                    dict((x, self.db.trovesByName(x))
+                                                      for x in troveNames)
 
-                            found = False
                             # iterate over flavorpath -- use suggestions 
                             # from first flavor on flavorpath that gets a match 
-                            for flavor in self.cfg.flavor:
-
-                                for choice, affinityTroves in itertools.izip(
-                                                                 choiceList, 
-                                                                 affTroveList):
-                                    f = flavor.copy()
-                                    if affinityTroves:
-                                        f.union(affinityTroves[0][2],
-                                        mergeType=deps.DEP_MERGE_TYPE_PREFS)
-                                    scoredList.append((f.score(choice[2]), 
-                                       choice[1].trailingRevision().getTimestamp(),
-                                       choice))
-                                scoredList.sort(_scoreSort)
-                                if scoredList[-1][0] is not False:
-                                    choice = scoredList[-1][-1]
+                            for installFlavor in self.cfg.flavor:
+                                choice = _selectResolutionTrove(choiceList, 
+                                                                installFlavor,
+                                                                affTroveDict)
+                                                                
+                                if choice:
                                     suggList.append(choice)
-
                                     l = suggMap.setdefault(troveName, [])
                                     l.append(choice)
-                                    found = True
-                                    break
-
-                                if found:
-                                    # break out of searching flavor path
-                                    # move on to the next dep that needs
-                                    # to be filled
                                     break
 
 			troves.update([ (x[0], (None, None), x[1:], True) 
@@ -265,7 +280,7 @@ class ConaryClient:
                 # if we've found good suggestions, merge in those troves
                 if troves:
                     newCs = self._updateChangeSet(troves, uJob,
-                                                  keepExisting = keepExisting)[0]
+                                               keepExisting = keepExisting)[0]
                     cs.merge(newCs)
 
                     (depList, cannotResolve, changeSetList) = \
