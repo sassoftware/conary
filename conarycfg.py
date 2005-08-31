@@ -372,6 +372,11 @@ class ConaryConfiguration(ConfigFile):
         ConfigFile.initDisplayOptions(self)
         self.setDisplayOptions(hidePasswords=False)
 
+    def requireInstallLabelPath(self):
+        if not self.installLabelPath:
+            print >> sys.stderr, "installLabelPath is not set"
+            sys.exit(1)
+
     def display(self, out=None):
         if out is None:
             out = sys.stdout

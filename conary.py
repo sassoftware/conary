@@ -223,11 +223,9 @@ def realMain(cfg, argv=sys.argv):
         cfg.installLabelPath = l
         del argSet['install-label']
 
-    if not cfg.installLabelPath:
-        print >> sys.stderr, "installLabelPath is not set"
-        sys.exit(1)
-
-    cfg.installLabel = cfg.installLabelPath[0]
+    if cfg.installLabelPath:
+        cfg.installLabel = cfg.installLabelPath[0]
+    
 
     cfg.initializeFlavors()
 
@@ -348,6 +346,7 @@ def realMain(cfg, argv=sys.argv):
 	else:
 	    return usage()
     elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq"):
+        cfg.requireInstallLabelPath()
 	all = argSet.pop('all', False)
 	ls = argSet.pop('ls', False)
 	fullVersions = argSet.pop('full-versions', False)
@@ -455,6 +454,7 @@ def realMain(cfg, argv=sys.argv):
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
     elif (otherArgs[1] == "update" or otherArgs[1] == "erase"):
+        cfg.requireInstallLabelPath()
 	kwargs = {}
 
         callback = updatecmd.UpdateCallback()
@@ -492,6 +492,7 @@ def realMain(cfg, argv=sys.argv):
 	else:
 	    return usage()
     elif (otherArgs[1] == "updateall"):
+        cfg.requireInstallLabelPath()
 	kwargs = {}
 
 	if argSet.has_key('info'):
