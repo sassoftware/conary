@@ -276,7 +276,7 @@ def seekNextPacket(keyRing):
     keyRing.seek(dataSize, SEEK_CUR)
 
 def seekNextKey(keyRing):
-    done =0
+    done = 0
     while not done:
         seekNextPacket(keyRing)
         packetType = getBlockType(keyRing)
@@ -285,7 +285,96 @@ def seekNextKey(keyRing):
         if ((packetType == -1)
             or ((not (packetType & 64))
                 and (((packetType >> 2) & 15) in PKT_TAG_ALL_KEYS))):
-            done=1
+            done = 1
+
+def seekNextSignature(keyRing):
+    done = 0
+    while not done:
+        seekNextPacket(keyRing)
+        packetType = getBlockType(keyRing)
+        if packetType != -1:
+            keyRing.seek(-1,SEEK_CUR)
+        if ((packetType == -1)
+            or ((not (packetType&64))
+                and (((packetType >> 2) & 15) == PKT_TAG_SIG))):
+            done = 1
+
+def fingerprintToInternalKeyId(fingerprint):
+    data = int(fingerprint[-16:],16)
+    r = ''
+    while data:
+        r = chr(data%256) + r
+        data /= 256
+    return r
+
+def getSigId(keyRing):
+    startPoint = keyRing.tell()
+    blockType = getBlockType(keyRing)
+    lenBits = blockType & 3
+    if lenBits == 3:
+        raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
+    elif lenBits == 2:
+        keyRing.seek(4, SEEK_CUR)
+    else:
+        keyRing.seek(lenBits+1, SEEK_CUR)
+    assert (ord(keyRing.read(1)) == 4)
+    keyRing.seek(3, SEEK_CUR)
+    hashedLen = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1))
+    # hashedLen plus two to skip len of unhashed data.
+    keyRing.seek(hashedLen + 2, SEEK_CUR)
+    done = 0
+    while not done:
+        subLen = ord(keyRing.read(1))
+        if ord(keyRing.read(1)) == 16:
+            done = 1
+    data = keyRing.read(subLen - 1)
+    keyRing.seek(startPoint)
+    return data
+
+def assertSigningKey(keyId,keyRing):
+    startPoint = keyRing.tell()
+    keyRing.seek(0, SEEK_END)
+    limit = keyRing.tell()
+    if limit == 0:
+        # no keys in a zero length file
+        raise KeyNotFound(keyId, "Couldn't open keyring")
+    keyRing.seek(0, SEEK_SET)
+    while (keyRing.tell() < limit) and (keyId not in getKeyId(keyRing)):
+        seekNextKey(keyRing)
+    if keyRing.tell() >= limit:
+        raise KeyNotFound(keyId)
+    # keyring now points to the beginning of the key we wanted
+    # find self signature of this key
+    # FIXME: ensure we don't wander outside of this key...
+    fingerprint = getKeyId(keyRing)
+    intKeyId = fingerprintToInternalKeyId(fingerprint)
+    seekNextSignature(keyRing)
+    while (intKeyId != getSigId(keyRing)):
+        seekNextSignature(keyRing)
+    # we now point to the self signature.
+    # now go find the Key Flags subpacket
+    blockType = getBlockType(keyRing)
+    lenBits = blockType & 3
+    if lenBits == 3:
+        raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
+    elif lenBits == 2:
+        keyRing.seek(4, SEEK_CUR)
+    else:
+        keyRing.seek(lenBits+1, SEEK_CUR)
+    assert (ord(keyRing.read(1)) == 4)
+    keyRing.seek(5, SEEK_CUR)
+    done = 0
+    while not done:
+        subLen = ord(keyRing.read(1))
+        subType = ord(keyRing.read(1))
+        if (subType != 27):
+            keyRing.seek(subLen - 1, SEEK_CUR)
+        else:
+            done = 1
+    Flags = ord(keyRing.read(1))
+    if not (Flags & 2):
+        raise InvalidKey('Key %s is not a signing key.'% fingerprint)
+    keyRing.seek(startPoint)
 
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
@@ -361,6 +450,8 @@ def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
     if limit == 0:
         # empty file, there can be no keys in it
         raise KeyNotFound(keyId)
+    if secret:
+        assertSigningKey(keyId, keyRing)
     keyRing.seek(0)
     while (keyId not in getKeyId(keyRing)):
         seekNextKey(keyRing)
