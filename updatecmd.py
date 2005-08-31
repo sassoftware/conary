@@ -272,7 +272,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(cs)
         else:
             troveSpec = parseTroveSpec(pkgStr)
-            if updateByDefault:
+            if troveSpec[0][0] == '-':
+                applyList.append((troveSpec[0][1:], troveSpec[1:],
+                                  (None, None), False))
+            elif troveSpec[0][0] == '+':
+                applyList.append((troveSpec[0][1:], (None, None), 
+                                  troveSpec[1:], True))
+            elif updateByDefault:
                 applyList.append((troveSpec[0], (None, None), 
                                   troveSpec[1:], True))
             else:
