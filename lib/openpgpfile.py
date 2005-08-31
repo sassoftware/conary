@@ -40,29 +40,29 @@ PK_ALGO_ALL_RSA = (PK_ALGO_RSA, PK_ALGO_RSA_ENCRYPT_ONLY,
 PK_ALGO_ALL_ELGAMAL = (PK_ALGO_ELGAMAL_ENCRYPT_ONLY, PK_ALGO_ELGAMAL)
 
 # packet tags are defined in RFC 2440 - 4.3. Packet Tags
-PKT_TYPE_RESERVED           = 0  # a packet type must not have this value
-PKT_TYPE_PUB_SESSION_KEY    = 1  # Public-Key Encrypted Session Key Packet
-PKT_TYPE_SIG                = 2  # Signature Packet
-PKT_TYPE_SYM_SESSION_KEY    = 3  # Symmetric-Key Encrypted Session Key Packet
-PKT_TYPE_ONE_PASS_SIG       = 4  # One-Pass Signature Packet
-PKT_TYPE_SECRET_KEY         = 5  # Secret Key Packet
-PKT_TYPE_PUBLIC_KEY         = 6  # Public Key Packet
-PKT_TYPE_SECRET_SUBKEY      = 7  # Secret Subkey Packet
-PKT_TYPE_COMPRESSED_DATA    = 8  # Compressed Data Packet
-PKT_TYPE_SYM_ENCRYPTED_DATA = 9  # Symmetrically Encrypted Data Packet
-PKT_TYPE_MARKER             = 10 # Marker Packet
-PKT_TYPE_LITERAL_DATA       = 11 # Literal Data Packet
-PKT_TYPE_TRUST              = 12 # Trust Packet
-PKT_TYPE_USERID             = 13 # User ID Packet
-PKT_TYPE_PUBLIC_SUBKEY      = 14 # Public Subkey Packet
-PKT_TYPE_PRIVATE1           = 60 # 60 to 63 -- Private or Experimental Values
-PKT_TYPE_PRIVATE2           = 61
-PKT_TYPE_PRIVATE3           = 62
-PKT_TYPE_PRIVATE4           = 63
+PKT_RESERVED           = 0  # a packet type must not have this value
+PKT_PUB_SESSION_KEY    = 1  # Public-Key Encrypted Session Key Packet
+PKT_SIG                = 2  # Signature Packet
+PKT_SYM_SESSION_KEY    = 3  # Symmetric-Key Encrypted Session Key Packet
+PKT_ONE_PASS_SIG       = 4  # One-Pass Signature Packet
+PKT_SECRET_KEY         = 5  # Secret Key Packet
+PKT_PUBLIC_KEY         = 6  # Public Key Packet
+PKT_SECRET_SUBKEY      = 7  # Secret Subkey Packet
+PKT_COMPRESSED_DATA    = 8  # Compressed Data Packet
+PKT_SYM_ENCRYPTED_DATA = 9  # Symmetrically Encrypted Data Packet
+PKT_MARKER             = 10 # Marker Packet
+PKT_LITERAL_DATA       = 11 # Literal Data Packet
+PKT_TRUST              = 12 # Trust Packet
+PKT_USERID             = 13 # User ID Packet
+PKT_PUBLIC_SUBKEY      = 14 # Public Subkey Packet
+PKT_PRIVATE1           = 60 # 60 to 63 -- Private or Experimental Values
+PKT_PRIVATE2           = 61
+PKT_PRIVATE3           = 62
+PKT_PRIVATE4           = 63
 
-PKT_TYPE_ALL_SECRET = (PKT_TYPE_SECRET_KEY, PKT_TYPE_SECRET_SUBKEY)
-PKT_TYPE_ALL_PUBLIC = (PKT_TYPE_PUBLIC_KEY, PKT_TYPE_PUBLIC_SUBKEY)
-PKT_TYPE_ALL_KEYS = PKT_TYPE_ALL_SECRET + PKT_TYPE_ALL_PUBLIC
+PKT_ALL_SECRET = (PKT_SECRET_KEY, PKT_SECRET_SUBKEY)
+PKT_ALL_PUBLIC = (PKT_PUBLIC_KEY, PKT_PUBLIC_SUBKEY)
+PKT_ALL_KEYS = PKT_ALL_SECRET + PKT_ALL_PUBLIC
 
 # 3.6.2.1. Secret key encryption
 ENCRYPTION_TYPE_UNENCRYPTED    = 0x00
@@ -132,10 +132,10 @@ def convertPrivateKey(privateBlock):
         raise MalformedKeyRing("Not an OpenPGP packet.")
     if packetType & 64:
         return ''
-    if ((packetType >> 2) & 15) in PKT_TYPE_ALL_PUBLIC:
+    if ((packetType >> 2) & 15) in PKT_ALL_PUBLIC:
         # if it's already a public key, there's nothing to do
         return privateBlock
-    if ((packetType >> 2) & 15) not in PKT_TYPE_ALL_SECRET:
+    if ((packetType >> 2) & 15) not in PKT_ALL_SECRET:
         # other types of packets aren't secret, so return empty string
         return ''
     blockSize=0
@@ -145,10 +145,10 @@ def convertPrivateKey(privateBlock):
     # 0x80 with the correct packet type shifted left 2 (which happens
     # to correspond to the correct packet type bits) to get the CTB
     # (with no size set yet, that will come later)
-    if ((packetType >> 2) & 15) == PKT_TYPE_SECRET_KEY:
-        ctb = 0x80 | (PKT_TYPE_PUBLIC_KEY & 0xf) << 2
-    elif ((packetType >> 2) & 15) == PKT_TYPE_SECRET_SUBKEY:
-        ctb = 0x80 | (PKT_TYPE_PUBLIC_SUBKEY & 0xf) << 2
+    if ((packetType >> 2) & 15) == PKT_SECRET_KEY:
+        ctb = 0x80 | (PKT_PUBLIC_KEY & 0xf) << 2
+    elif ((packetType >> 2) & 15) == PKT_SECRET_SUBKEY:
+        ctb = 0x80 | (PKT_PUBLIC_SUBKEY & 0xf) << 2
     else:
         assert(0)
 
@@ -220,7 +220,7 @@ def getKeyId(keyRing):
         raise MalformedKeyRing("Not an OpenPGP packet.")
 
     if ((keyBlock == -1) or (keyBlock & 64)
-        or (((keyBlock >> 2) & 15) not in PKT_TYPE_ALL_KEYS)):
+        or (((keyBlock >> 2) & 15) not in PKT_ALL_KEYS)):
         return ''
 
     # RFC 2440 4.2.1 - Old-Format Packet Lengths
@@ -248,7 +248,7 @@ def getKeyId(keyRing):
     keyRing.seek(-1 * dataSize, SEEK_CUR)
 
     # convert private keys to a public key
-    if ((keyBlock >> 2) & 15) in PKT_TYPE_ALL_SECRET:
+    if ((keyBlock >> 2) & 15) in PKT_ALL_SECRET:
         data = convertPrivateKey(data)
     # This is a holdover from the days of PGP 2.6.2
     # RFC 2440 section 11.2 does a really bad job of explaining this
@@ -326,7 +326,7 @@ def seekNextKey(keyRing):
             keyRing.seek(-1, SEEK_CUR)
         if ((packetType == -1)
             or ((not (packetType & 64))
-                and (((packetType >> 2) & 15) in PKT_TYPE_ALL_KEYS))):
+                and (((packetType >> 2) & 15) in PKT_ALL_KEYS))):
             done = 1
 
 def seekNextSignature(keyRing):
@@ -338,7 +338,7 @@ def seekNextSignature(keyRing):
             keyRing.seek(-1,SEEK_CUR)
         if ((packetType == -1)
             or ((not (packetType&64))
-                and (((packetType >> 2) & 15) == PKT_TYPE_SIG))):
+                and (((packetType >> 2) & 15) == PKT_SIG))):
             done = 1
 
 def fingerprintToInternalKeyId(fingerprint):
@@ -724,7 +724,7 @@ def countKeys(keyRing):
     while keyRing.tell() < limit:
         keyType = getBlockType(keyRing)
         keyRing.seek(-1,1)
-        if (keyType >> 2) & 15 in (PKT_TYPE_SECRET_KEY, PKT_TYPE_PUBLIC_KEY):
+        if (keyType >> 2) & 15 in (PKT_SECRET_KEY, PKT_PUBLIC_KEY):
             keyCount += 1
         seekNextKey(keyRing)
     keyRing.seek(start)
