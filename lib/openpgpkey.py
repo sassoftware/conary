@@ -1,4 +1,3 @@
-#!/usr/bin/python2.4
 #
 # Copyright (c) 2005 rPath, Inc.
 #
@@ -22,35 +21,37 @@ from Crypto.PublicKey import RSA
 from Crypto.Util.number import getPrime
 from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
+from openpgpfile import getPublicKeyFromString
 from openpgpfile import getFingerprint
 from openpgpfile import getBlockType
 from openpgpfile import seekNextKey
-from openpgpfile import getDBKey
 from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
 from openpgpfile import KeyNotFound
 
 #-----#
 #OpenPGPKey structure:
-#     cyptoKey:         class  (either DSA or RSA object)
-#     fingerprint:      string key fingerprint of this key
-#     revoked:          bool   indicates if key is revoked
-#     trustLevel:       int    Higher is more trusted
-#                              0 is untrusted
 #-----#
 
 class OpenPGPKey:
-    def __init__(self, keyId, private, passPhrase = '', keyFile = ''):
-        ###change when implement revocation functionality
-        self.revoked=0
-        ###change when implement trust levels
-        self.trustLevel = 255
-        #translate the keyId to the fingerprint for consistency
-        self.fingerprint = getFingerprint (keyId, keyFile)
-        if private:
-            self.cryptoKey = getPrivateKey(keyId, passPhrase, keyFile)
-        else:
-            self.cryptoKey = getPublicKey(keyId, keyFile)
+    def __init__(self, fingerprint, cryptoKey, revoked=False, trustLevel=255):
+        """
+        instantiates a OpenPGPKey object
+
+        @param fingerprint: string key fingerprint of this key
+        @type fingerprint: str
+        @param cyptoKey: DSA or RSA key object
+        @type cryptoKey: instance
+        @param revoked: is this key revoked
+        @type revoked: bool
+        @param trustLevel: the trust level of this key, as stored locally
+        @type trustLevel: int
+        """
+
+        self.fingerprint = fingerprint
+        self.cryptoKey = cryptoKey
+        self.revoked = revoked
+        self.trustLevel = trustLevel
 
     def getTrustLevel(self):
         return self.trustLevel
@@ -63,7 +64,7 @@ class OpenPGPKey:
 
     def _gcf(self, a, b):
         while b:
-            a, b = b, a%b
+            a, b = b, a % b
         return a
 
     def _bitLen(self, a):
@@ -72,12 +73,12 @@ class OpenPGPKey:
             a, r = a/2, r+1
         return r
 
-    # We /dev/random instead of /dev/urandom. This was not a mistake;
-    # we want the most random data available
     def _getRelPrime(self, q):
+        # We /dev/random instead of /dev/urandom. This was not a mistake;
+        # we want the most random data available
         rand=open('/dev/random','r')
         b = self._bitLen(q)/8 + 1
-        r= 0L
+        r = 0L
         for i in range(b):
             r = r*256 + ord(rand.read(1))
         rand.close()
@@ -87,106 +88,68 @@ class OpenPGPKey:
         return r
 
     def signString(self, data):
-        if 'DSAobj_c' in self.cryptoKey.__class__.__name__:
+        if isinstance(self.cryptoKey, DSA.DSAobj_c):
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
                 K = self._getRelPrime(self.cryptoKey.q)
         else:
-            K=0
+            K = 0
         timeStamp = int(time())
-        return (self.fingerprint, timeStamp, self.cryptoKey.sign( data+str(timeStamp), K))
+        return (self.fingerprint, timeStamp,
+                self.cryptoKey.sign(data+str(timeStamp), K))
 
-    # the result of this verification process:
-    # -1 indicates FAILURE. the string has been modified since it was signed,
-    # or you gave this key a signature it didn't make.
-    # any other value will be the trust level of the key itself
-    # (which is always 0 or greater)
-    # this function was not designed to throw an exception at this level
-    # because in some cases the calling function wants to aggregate a list
-    # of failed/passed signatures all at once.
     def verifyString(self, data, sig):
-        if self.fingerprint == sig[0] and self.cryptoKey.verify( data+str(sig[1]), sig[2] ):
+        """
+        verifies a digital signature
+
+        returns -1 if the signature does not verify.  Otherwise it returns
+        the trust value of the public key that corresponds to the private
+        key that signed the data.
+
+        @param data: the data that has been signed
+	@type name: str
+	@param sig: the digital signature to verify
+	@type sig: 4-tuple (fingerprint, timestamp, signature, K)
+        @rtype int
+        """
+        # this function was not designed to throw an exception at this level
+        # because in some cases the calling function wants to aggregate a list
+        # of failed/passed signatures all at once.
+
+        if (self.fingerprint == sig[0]
+            and self.cryptoKey.verify(data+str(sig[1]), sig[2])):
             return self.trustLevel
         else:
             return -1
 
-class OpenPGPDBKey(OpenPGPKey):
-    def __init__(self, keyId, keyTable):
-        ###change when implement revocation functionality
-        self.revoked=0
-        ###change when implement trust levels
-        self.trustLevel = 255
-        #set fingerprint for consistency
-        self.fingerprint = keyTable.getFingerprint(keyId)
-        self.cryptoKey = getDBKey(keyId, keyTable)
-
-class OpenPGPPublicKey(OpenPGPKey):
-    def __init__ (self, keyId, keyFile = ''):
-        OpenPGPKey.__init__(self, keyId, 0, '', keyFile)
-
-class OpenPGPPrivateKey(OpenPGPKey):
-    def __init__ (self, keyId, passPhrase = '', keyFile = ''):
-        OpenPGPKey.__init__(self, keyId, 1, passPhrase, keyFile)
-
-_KC_SRC_PUBLIC  = 1
-_KC_SRC_DB      = 2
-
 class OpenPGPKeyCache:
+    """
+    Base class for a key cache
+    """
     def __init__(self):
         self.publicDict = {}
         self.privateDict = {}
 
+    def getPublicKey(self, keyId):
+        raise NotImplementedError
+
+    def getPrivateKey(self, keyId, passphrase=None):
+        raise NotImplementedError
+
+class OpenPGPKeyFileCache(OpenPGPKeyCache):
+    """
+    OpenPGPKeyCash based object that reads keys from public and private
+    keyrings
+    """
+    def __init__(self):
+        OpenPGPKeyCache.__init__(self)
         if 'HOME' not in os.environ:
             self.publicPaths = [ '/etc/conary/pubring.gpg' ]
             self.privatePath = None
         else:
-            self.publicPaths = [ os.environ['HOME']+'/.gnupg/pubring.gpg', '/etc/conary/pubring.gpg' ]
-            self.privatePath = os.environ['HOME']+'/.gnupg/secring.gpg'
-        self.source = _KC_SRC_PUBLIC
-        self.keyTable = None
-
-    def getPublicKey(self, keyId):
-        if keyId not in self.publicDict:
-            if self.source == _KC_SRC_PUBLIC:
-                failures = 0
-                for publicPath in self.publicPaths:
-                    try:
-                        self.publicDict[keyId] = OpenPGPPublicKey(keyId, publicPath)
-                        break
-                    except KeyNotFound:
-                        failures += 1
-                if failures == len(self.publicPaths):
-                    raise KeyNotFound(keyId)
-            elif self.source == _KC_SRC_DB:
-                if self.keyTable is not None:
-                    self.publicDict[keyId] = OpenPGPDBKey(keyId, self.keyTable)
-                else:
-                    raise KeyNotFound("Can't open database")
-            else:
-                assert(0)
-        return self.publicDict[keyId]
-
-    def getPrivateKey(self, keyId):
-        if keyId not in self.privateDict:
-            #first see if the key has no passphrase (WHY???)
-            #if it's readable, there's no need to prompt the user
-            try:
-                self.privateDict[keyId] = OpenPGPPrivateKey(keyId, '', self.privatePath)
-                badPass = 0
-            except BadPassPhrase:
-                badPass = 1
-            print "\nsignature key is: %s"% keyId
-            while badPass:
-                passPhrase=getpass("Passphrase: ")
-                try:
-                    self.privateDict[keyId] = OpenPGPPrivateKey(keyId, passPhrase, self.privatePath)
-                    badPass = 0
-                except BadPassPhrase:
-                    print "Bad passphrase. please try again."
-        return self.privateDict[keyId]
-
-    def setKeyTable(self, keyTable):
-        self.keyTable = keyTable
+            self.publicPaths = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
+                                 '/etc/conary/pubring.gpg' ]
+            self.privatePath = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
         self.publicPaths = [ path ]
@@ -197,10 +160,70 @@ class OpenPGPKeyCache:
     def setPrivatePath(self, path):
         self.privatePath = path
 
-    #this is used to distinguish source of public keys only
-    #private keys will always come from a file
-    def setSource(self, type):
-        self.source = type
+    def getPublicKey(self, keyId):
+        # if we have this key cached, return it immediately
+        if keyId in self.publicDict:
+            return self.publicDict[keyId]
 
-global keyCache
-keyCache = OpenPGPKeyCache()
+        # otherwise search for it
+        for publicPath in self.publicPaths:
+            try:
+                # translate the keyId to a full fingerprint for consistency
+                fingerprint = getFingerprint(keyId, publicPath)
+                cryptoKey = getPublicKey(keyId, publicPath)
+                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+                return self.publicDict[keyId]
+            except KeyNotFound:
+                pass
+        raise KeyNotFound(keyId)
+
+    def getPrivateKey(self, keyId, passphrase=None):
+        if keyId in self.privateDict:
+            return self.privateDict[keyId]
+
+        # translate the keyId to a full fingerprint for consistency
+        fingerprint = getFingerprint(keyId, self.privatePath)
+
+        # if we were supplied a password, use it.  The caller will need
+        # to deal with handling BadPassPhrase exceptions
+        if passphrase is not None:
+            cryptoKey = getPrivateKey(keyId, passphrase, self.privatePath)
+            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+            return self.privateDict[keyId]
+
+        # next, see if the key has no passphrase (WHY???)
+        # if it's readable, there's no need to prompt the user
+        try:
+            cryptoKey = getPrivateKey(keyId, '', self.privatePath)
+            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+            return self.privateDict[keyId]
+        except BadPassPhrase:
+            pass
+
+        # FIXME: make this a callback
+        print "\nsignature key is: %s"% keyId
+
+        trys = 0
+        while trys < 3:
+            # FIXME: make this a callback
+            passPhrase = getpass("Passphrase: ")
+            try:
+                cryptoKey = getPrivateKey(keyId, passPhrase, self.privatePath)
+                self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+                return self.privateDict[keyId]
+            except BadPassPhrase:
+                print "Bad passphrase. Please try again."
+            tries += 1
+
+        raise BadPassPhrase
+
+_keyCache = OpenPGPKeyFileCache()
+
+def getKeyCache():
+    global _keyCache
+    return _keyCache
+
+def setKeyCache(keyCache):
+    global _keyCache
+    _keyCache = keyCache
+

@@ -13,15 +13,12 @@
 #
 
 import StringIO
-import base64
 
 import sqlite3
 from lib import openpgpfile, openpgpkey
 
 class OpenPGPKeyTable:
     def __init__(self, db):
-        openpgpkey.keyCache.setKeyTable(self)
-        openpgpkey.keyCache.setSource(openpgpkey._KC_SRC_DB)
         self.db = db
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -39,6 +36,10 @@ class OpenPGPKeyTable:
                                              PRIMARY KEY(fingerprint))""")
         db.commit()
 
+        # set the global key cache to refer to the keys in the database
+        keyCache = OpenPGPKeyDBCache(self)
+        openpgpkey.setKeyCache(keyCache)
+
     def getFingerprint(self, keyId):
         cu = self.db.cursor()
         r = cu.execute('SELECT fingerprint FROM PGPFingerprints '
@@ -48,70 +49,39 @@ class OpenPGPKeyTable:
             raise openpgpkey.KeyNotFound(keyId)
         return keyList[0][0]
 
-    def _getFingerprints(self, keyRing):
-        r = []
-        keyRing.seek(0,2)
-        limit = keyRing.tell()
-        keyRing.seek(0)
-        while (keyRing.tell() < limit):
-            r.append(openpgpfile.getKeyId(keyRing))
-            openpgpfile.seekNextKey(keyRing)
-        return r
-
     def addNewAsciiKey(self, userId, asciiData):
-        data = StringIO.StringIO(asciiData)
-        nextLine=' '
-
-        try:
-            while(nextLine[0] != '-'):
-                nextLine = data.readline()
-            while (nextLine[0] != "\r") and (nextLine[0] != "\n"):
-                nextLine = data.readline()
-            buf = ""
-            nextLine = data.readline()
-            while(nextLine[0] != '='):
-                buf = buf + nextLine
-                nextLine = data.readline()
-        except IndexError:
-            data.close()
-            return
-        data.close()
-        self.addNewKey(userId, base64.b64decode(buf))
-
-    def _countKeys(self, keyRing):
-        keyType = openpgpfile.getBlockType(keyRing)
-        keyRing.seek(-1,1)
-        if (keyType >> 2) & 15 != 6:
-            raise IncompatibleKey('Key must be a public key')
-        keyCount = 0
-        start = keyRing.tell()
-        keyRing.seek(0, 2)
-        limit = keyRing.tell()
-        keyRing.seek(start)
-        while keyRing.tell() < limit:
-            keyType = openpgpfile.getBlockType(keyRing)
-            keyRing.seek(-1,1)
-            if (keyType >> 2) & 15 in [ 5, 6 ]:
-                keyCount+=1
-            openpgpfile.seekNextKey(keyRing)
-        keyRing.seek(start)
-        return keyCount
+        keyData = openpgpfile.parseAsciiArmorKey(asciiData)
+        if not keyData:
+            raise IncompatibleKey('Unable to parse ASCII armored key')
+        self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
         cu = self.db.cursor()
+        # start a transaction so that our SELECT is protected against
+        # race conditions
+        self.db._begin()
         r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
         keyId = r.fetchone()[0]
         keyRing = StringIO.StringIO(pgpKeyData)
-        if(self._countKeys(keyRing) != 1):
+
+        # make sure it's a public key
+        keyType = openpgpfile.getBlockType(keyRing)
+        keyRing.seek(-1,1)
+        if (keyType >> 2) & 15 != openpgpfile.PKT_TAG_PUBLIC_KEY:
+            raise IncompatibleKey('Key must be a public key')
+
+        if openpgpfile.countKeys(keyRing) != 1:
             raise IncompatibleKey('Submit only one key at a time.')
+
         mainFingerprint = openpgpfile.getKeyId(keyRing)
         try:
             cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
                        (keyId, userId, mainFingerprint, pgpKeyData))
         except sqlite3.ProgrammingError:
+            # potentially a duplicate fingerprint
             # FIXME: make a new error for this
             raise
-        keyFingerprints = self._getFingerprints(keyRing)
+        keyFingerprints = openpgpfile.getFingerprints(keyRing)
         for fingerprint in keyFingerprints:
             cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
                        (keyId, fingerprint))
@@ -121,22 +91,27 @@ class OpenPGPKeyTable:
     def deleteKey(self, keyId):
         fingerprint = self.getFingerprint(keyId)
         cu = self.db.cursor()
-        r = cu.execute('SELECT keyId FROM PGPFingerprints '
+        cu.execute('SELECT keyId FROM PGPFingerprints '
                        'WHERE fingerprint=?', (fingerprint,))
-        keyId=r.fetchone()[0]
+        keyIds = cu.fetchall()
+        if (len(keyIds) != 1):
+            raise openpgpkey.KeyNotFound(keyId)
+        keyId = keyIds[0]
         cu.execute('DELETE FROM PGPFingerprints WHERE keyId=?', (keyId,))
         cu.execute('DELETE FROM PGPKeys WHERE keyId=?', (keyId,))
         self.db.commit()
 
     def getPGPKeyData(self, keyId):
         cu = self.db.cursor()
-        r = cu.execute("""SELECT pgpKey FROM PGPKeys
-                             LEFT JOIN PGPFingerprints ON
-                               PGPKeys.keyId=PGPFingerprints.keyId
-                          WHERE PGPFingerprints.fingerprint like "%%%s%%"
-                          """ 
-                       %keyId)
-        return r.fetchone()[0]
+        cu.execute("""SELECT pgpKey FROM PGPKeys
+                           LEFT JOIN PGPFingerprints ON
+                             PGPKeys.keyId=PGPFingerprints.keyId
+                        WHERE PGPFingerprints.fingerprint like "%%%s%%"
+                        """ %keyId)
+        keys = cu.fetchall()
+        if (len(keys) != 1):
+            raise openpgpkey.KeyNotFound(keyId)
+        return keys[0][0]
 
     def getUsersMainKeys(self, userId):
         cu = self.db.cursor()
@@ -153,3 +128,30 @@ class OpenPGPKeyTable:
                      AND PGPFingerprints.fingerprint != PGPKeys.fingerprint""",
                        (fingerprint,))
         return [ x[0] for x in r.fetchall() ]
+
+class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
+    def __init__(self, keyTable = None):
+        openpgpkey.OpenPGPKeyCache.__init__(self)
+        self.keyTable = keyTable
+
+    def setKeyTable(self, keyTable):
+        self.keyTable = keyTable
+
+    def getPublicKey(self, keyId):
+        if keyId in self.publicDict:
+            return self.publicDict[keyId]
+
+        if self.keyTable is None:
+            raise KeyNotFound(keyId, "Can't open database")
+
+        # get the key data from the database
+        fingerprint = self.keyTable.getFingerprint(keyId)
+        keyData = self.keyTable.getPGPKeyData(keyId)
+
+        # instantiate the crypto key object from the raw key data
+        cryptoKey = openpgpfile.getPublicKeyFromString(keyId, keyData)
+
+        # populate the cache
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey)
+        return self.publicDict[keyId]
+

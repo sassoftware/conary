@@ -12,6 +12,7 @@
 # full details.
 #
 
+import base64
 import os
 import sha
 import md5
@@ -71,6 +72,10 @@ ENCRYPTION_TYPE_S2K_SPECIFIED  = 0xff
 #     for now: experimentally determined to be 0xFE
 ENCRYPTION_TYPE_SHA1_CHECK = 0xfe
 
+OLD_PKT_LEN_ONE_OCTET  = 0
+OLD_PKT_LEN_TWO_OCTET  = 1
+OLD_PKT_LEN_FOUR_OCTET = 2
+
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -116,34 +121,56 @@ def getBlockType(keyRing):
         return -1
 
 def convertPrivateKey(privateBlock):
-    if not len(privateBlock):
+    # converts a private key into a public one, used for generating
+    # keyids
+    if not privateBlock:
+        # give us nothing, you get nothing from us
         return ''
+
     packetType = ord(privateBlock[0])
     if not (packetType & 128):
         raise MalformedKeyRing("Not an OpenPGP packet.")
     if packetType & 64:
         return ''
     if ((packetType >> 2) & 15) in PKT_TAG_ALL_PUBLIC:
+        # if it's already a public key, there's nothing to do
         return privateBlock
     if ((packetType >> 2) & 15) not in PKT_TAG_ALL_SECRET:
+        # other types of packets aren't secret, so return empty string
         return ''
     blockSize=0
+
+    # form up a cipher type byte (CTB). See RFC 1991 - 4.1
+    # the high 2 bits are 10b (binary) to indicate a normal CTB. So OR
+    # 0x80 with the correct packet type shifted left 2 (which happens
+    # to correspond to the correct packet type bits) to get the CTB
+    # (with no size set yet, that will come later)
     if ((packetType >> 2) & 15) == PKT_TAG_SECRET_KEY:
-        newPacketType = 0x98
+        ctb = 0x80 | (PKT_TAG_PUBLIC_KEY & 0xf) << 2
+    elif ((packetType >> 2) & 15) == PKT_TAG_SECRET_SUBKEY:
+        ctb = 0x80 | (PKT_TAG_PUBLIC_SUBKEY & 0xf) << 2
     else:
-        newPacketType = 0xb8
-    if not (packetType & 3):
+        assert(0)
+
+    # figure out how much of the size we need to skip
+    if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
         index = 2
-    elif (packetType & 3) == PKT_TAG_PUB_SESSION_KEY:
+    elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
         index = 3
-    elif (packetType & 3) == PKT_TAG_SIG:
+    elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
         index = 5
     else:
         raise MalformedKeyRing("Packet of indeterminate size.")
+
+    # check the packet version, we only handle version 4
     if ord(privateBlock[index]) != 4:
         return ''
+
+    # get the key data
     buf = privateBlock[index:index + 6]
     index += 5
+
+    # get the algorithm type
     algType = ord(privateBlock[index])
     index += 1
     if algType in PK_ALGO_ALL_RSA:
@@ -153,27 +180,41 @@ def convertPrivateKey(privateBlock):
     elif algType == PK_ALGO_DSA:
         numMPI = 4
     else:
+        # unhandled algorithm
         return ''
+
+    # parse the MPIs from the key block
     for i in range(0, numMPI):
         mLen = ((ord(privateBlock[index]) * 256 +
                  ord(privateBlock[index + 1])) + 7) / 8 + 2
         buf = buf + privateBlock[index:index + mLen]
         index += mLen
+
+    # calculate the new key length, record the size in the ctb
+    # see RFC 1991 for the low end bit definitions
     bufLen = len(buf)
     if bufLen > 65535:
-        newPacketType |= 2
+        # 4-byte packet-length field
+        ctb |= 2
         sizeBytes = 4
     elif bufLen > 255:
-        newPacketType |= 1
+        # 2-byte packet length field
+        ctb |= 1
         sizeBytes = 2
     else:
+        # 1 byte packet-length field (no changes to ctb needed)
         sizeBytes = 1
+
+    # prepare the size octets
     sizeBuf=''
     for i in range(1, sizeBytes + 1):
         sizeBuf += chr((bufLen >> ((sizeBytes - i) << 3)) & 0xff)
-    return (chr(newPacketType) + sizeBuf + buf)
+
+    # complete the new key packet
+    return (chr(ctb) + sizeBuf + buf)
 
 def getKeyId(keyRing):
+    # see RFC 2440 11.2 - Key IDs and Fingerprints
     keyBlock=getBlockType(keyRing)
     if not (keyBlock & 128):
         raise MalformedKeyRing("Not an OpenPGP packet.")
@@ -183,18 +224,18 @@ def getKeyId(keyRing):
         return ''
 
     # RFC 2440 4.2.1 - Old-Format Packet Lengths
-    if (keyBlock & 3) == 2:
+    if (keyBlock & 3) == OLD_PKT_LEN_FOUR_OCTET:
         # Four-Octet length is 5 octets long
         dataSize = (ord(keyRing.read(1)) * (1 << 24) +
                     ord(keyRing.read(1)) * (1 << 16) +
                     ord(keyRing.read(1)) * (1 << 8) +
                     ord(keyRing.read(1)) + 5)
         keyRing.seek(-5, SEEK_CUR)
-    elif (keyBlock & 3) == 1:
+    elif (keyBlock & 3) == OLD_PKT_LEN_TWO_OCTET:
         # Two-Octet length is 3 octets long
         dataSize = ord(keyRing.read(1)) * (1 << 8) + ord(keyRing.read(1)) + 3
         keyRing.seek(-3, SEEK_CUR)
-    elif (keyBlock & 3) == 0:
+    elif (keyBlock & 3) == OLD_PKT_LEN_ONE_OCTET:
         # One-Octet length is 2 octets long
         dataSize = ord(keyRing.read(1)) + 2
         keyRing.seek(-2, SEEK_CUR)
@@ -206,7 +247,7 @@ def getKeyId(keyRing):
     # move the current posititon back to the beginning of the data
     keyRing.seek(-1 * dataSize, SEEK_CUR)
 
-    # handle private keys
+    # convert private keys to a public key
     if ((keyBlock >> 2) & 15) in PKT_TAG_ALL_SECRET:
         data = convertPrivateKey(data)
     # This is a holdover from the days of PGP 2.6.2
@@ -229,11 +270,12 @@ def getKeyId(keyRing):
     if not (keyBlock & 1):
         data = chr(keyBlock|1) + chr(0) + data[1:]
     # promote subkeys to main keys
-    # 0xB9 is the packet tag for a public subkey with two byte length
-    # 0x9D is the packet tag for a private subkey with two byte length
+    # 0xB9 is the ctb for a public subkey with two byte length
+    # 0x9D is the ctb for a private subkey with two byte length
     # 0x9D is a catchall at this point in the code. key data should already
     # be a public key
     if keyBlock in (0xb9, 0x9d):
+        # 0x99 is the ctb for a public key packet with two byte length
         data = chr(0x99) + data[1:]
     m = sha.new()
     m.update(data)
@@ -247,11 +289,11 @@ def seekNextPacket(keyRing):
     dataSize = -1
     if not packetType & 64:
         # RFC 2440 4.2.1 - Old-Format Packet Lengths
-        if not (packetType & 3):
+        if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
             sizeLen = 1
-        elif (packetType & 3) == 1:
+        elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
             sizeLen = 2
-        elif (packetType & 3) == 2:
+        elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
             sizeLen = 4
         else:
             raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
@@ -427,15 +469,15 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
 def readMPI(keyRing):
     MPIlen=(ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + 7 ) / 8
     r=0L
-    for i in range(0,MPIlen):
+    for i in range(MPIlen):
         r = r * 256 + ord(keyRing.read(1))
     return r
 
 def readBlockSize(keyRing, sizeType):
-    if not sizeType:
+    if sizeType == 0:
         return ord(keyRing.read(1))
     elif sizeType == 1:
-        return ord(keyRing.read(1)) * 256 + ord(keyRing.read(1))
+        return ord(keyRing.read(1)) * 0x100 + ord(keyRing.read(1))
     elif sizeType == 2:
         return (ord(keyRing.read(1)) * 0x1000000 +
                 ord(keyRing.read(1)) * 0x10000 +
@@ -460,7 +502,7 @@ def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
     startLoc=keyRing.tell()
     packetType=ord(keyRing.read(1))
     if secret and (not ((packetType>>2) & 1)):
-        raise IncompatibleKey("Can't get private key from public keyring!")
+        raise IncompatibleKey("Can't get private key from public keyring")
     limit = (readBlockSize(keyRing, packetType & 3) +
              (packetType & 3) + 1 + startLoc)
     if ord(keyRing.read(1)) != 4:
@@ -525,7 +567,7 @@ def getPublicKey(keyId, keyFile=''):
     keyRing.close()
     return key
 
-def getPrivateKey(keyId,passPhrase='', keyFile=''):
+def getPrivateKey(keyId, passPhrase='', keyFile=''):
     if keyFile == '':
         if 'HOME' not in os.environ:
             keyFile = None
@@ -539,9 +581,8 @@ def getPrivateKey(keyId,passPhrase='', keyFile=''):
     keyRing.close()
     return key
 
-def getDBKey(keyId, keyTable):
-    keyData = keyTable.getPGPKeyData(keyId)
-    keyRing = StringIO.StringIO(keyData)
+def getPublicKeyFromString(keyId, data):
+    keyRing = StringIO.StringIO(data)
     key = makeKey(getGPGKeyTuple(keyId, keyRing, 0, ''))
     keyRing.close()
     return key
@@ -672,3 +713,52 @@ def xorStr(str1, str2):
     for i in range(0, min(len(str1), len(str2))):
         r += chr(ord(str1[i]) ^ ord(str2[i]))
     return r
+
+def countKeys(keyRing):
+    # counts the public and private key in a key ring (does not count subkeys)
+    keyCount = 0
+    start = keyRing.tell()
+    keyRing.seek(0, SEEK_END)
+    limit = keyRing.tell()
+    keyRing.seek(start)
+    while keyRing.tell() < limit:
+        keyType = getBlockType(keyRing)
+        keyRing.seek(-1,1)
+        if (keyType >> 2) & 15 in (PKT_TAG_SECRET_KEY, PKT_TAG_PUBLIC_KEY):
+            keyCount += 1
+        seekNextKey(keyRing)
+    keyRing.seek(start)
+    return keyCount
+
+def getFingerprints(keyRing):
+    # returns the fingerprints for all keys in a key ring file
+    r = []
+    keyRing.seek(0, SEEK_END)
+    limit = keyRing.tell()
+    keyRing.seek(0, SEEK_SET)
+    while (keyRing.tell() < limit):
+        r.append(getKeyId(keyRing))
+        seekNextKey(keyRing)
+    return r
+
+def parseAsciiArmorKey(asciiData):
+    data = StringIO.StringIO(asciiData)
+    nextLine=' '
+
+    try:
+        while(nextLine[0] != '-'):
+            nextLine = data.readline()
+        while (nextLine[0] != "\r") and (nextLine[0] != "\n"):
+            nextLine = data.readline()
+        buf = ""
+        nextLine = data.readline()
+        while(nextLine[0] != '='):
+            buf = buf + nextLine
+            nextLine = data.readline()
+    except IndexError:
+        data.close()
+        return
+    data.close()
+
+    keyData = base64.b64decode(buf)
+    return keyData

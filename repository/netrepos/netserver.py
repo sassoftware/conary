@@ -1161,7 +1161,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             flavor, encSig):
         import base64
         from trove import DigitalSignature
-        from lib.openpgpkey import keyCache
+        from lib.openpgpkey import getKeyCache
         from lib.openpgpfile import KeyNotFound
         version = self.toVersion(version)
         flavor = self.toFlavor(flavor)
@@ -1176,6 +1176,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         sig = signature.get()
         #ensure repo knows this key
+        keyCache = getKeyCache()
         keyCache.getPublicKey(sig[0])
         #need to verify this key hasn't signed this trove already
         try:

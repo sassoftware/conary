@@ -367,8 +367,9 @@ class ChangeSetJob:
                                           precompressed = precompressed)
 
     def checkTroveSignatures(self, trv):
-        from lib.openpgpkey import keyCache
+        from lib.openpgpkey import getKeyCache
         from lib.openpgpfile import KeyNotFound
+        keyCache = getKeyCache()
 #        for fingerprint,timestamp,sig in trv.troveInfo.sigs.digitalSigs.iter():
 #            keyCache.getPublicKey(fingerprint)
         res = trv.verifyDigitalSignatures()
