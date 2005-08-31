@@ -1243,6 +1243,14 @@ def fullLabel(defaultLabel, version, versionStr):
 	    label = defaultLabel
 	elif versionStr[0] == "@":
             label = versions.Label(defaultLabel.getHost() + versionStr)
+        elif versionStr[0] == ":":
+            label = versions.Label('%s@%s:%s' % (defaultLabel.getHost(),
+                                                defaultLabel.getNamespace(),
+                                                versionStr))
+	elif versionStr[-1] == "@":
+            label = versions.Label('%s%s:%s' % (versionStr, 
+                                                defaultLabel.getNamespace(),
+                                                defaultLabel.getLabel()))
 	else:
 	    label = versions.Label(versionStr)
 
