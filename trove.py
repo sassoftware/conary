@@ -409,8 +409,7 @@ class Trove(streams.LargeStreamSet):
         badFingerprints = []
         maxTrust = 0
         sha1_orig = self.troveInfo.sigs.sha1()
-        self.computeSignatures()
-        sha1_new = self.troveInfo.sigs.sha1()
+        sha1_new = self.computeSignatures(store = False)
         if sha1_orig:
             assert(sha1_orig == sha1_new)
         for signature in self.troveInfo.sigs.digitalSigs.iter():
@@ -429,10 +428,12 @@ class Trove(streams.LargeStreamSet):
             raise DigitalSignatureVerificationError("This trove does not meet minimum trust level")
         return maxTrust, missingKeys
     
-    def computeSignatures(self):
+    def computeSignatures(self, store = True):
         s = self._sigString()
         sha1 = sha1helper.sha1String(s)
-        self.troveInfo.sigs.sha1.set(sha1)
+        if store:
+            self.troveInfo.sigs.sha1.set(sha1)
+        return sha1
 
     def verifySignatures(self):
         s = self._sigString()
