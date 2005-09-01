@@ -333,28 +333,31 @@ class DependencyClass(object):
         """
         if not class_.allowParseDep:
             raise ParseError, "Invalid dependency class %s" % class_.tagName
+
         match = class_.regexp.match(s)
         if match is None:
-            raise ParseError, "Invalid %s dependency: %s" % (class_.tagName, s)
+            raise ParseError, "Invalid %s dependency: '%s'" % (class_.tagName, 
+                                                               s)
 
-        depName = match.groups()[0]
+        depName, flagStr = match.groups() # a dep is <depName>[(<flagStr>)]
+                                          # flagStr is None if () not 
+                                          # in the depStr
 
-        flagStr = match.groups()[1]
-
+        flags = [] 
         if class_.flags == DEP_CLASS_NO_FLAGS:
-            if flagStr is not None:
+            if flagStr is not None: 
+                # the dep string specified at least () -
+                # not allowed when the dep has no flags
                 raise ParseError, ("bad %s dependency '%s':"
                                    " flags not allowed" % (class_.tagName, s))
-            flags = []
-        elif flagStr:
-            flags = flagStr.split()
-            flags = [ (x, FLAG_SENSE_REQUIRED) for x in flags]
+        elif flagStr: 
+            flags = [ (x, FLAG_SENSE_REQUIRED) for x in flagStr.split()]
         elif class_.flags == DEP_CLASS_HAS_FLAGS:
             raise ParseError, ("bad %s dependency '%s':"
                                " flags required" % (class_.tagName, s))
         else:
             assert(class_.flags == DEP_CLASS_OPT_FLAGS)
-            flags = []
+
         return Dependency(depName, flags)
 
 
@@ -1099,7 +1102,7 @@ flavorScores = {
 class ParseError(Exception):
 
     """
-    Indicates that an error occured turning a string into an object
+    Indicates that an error occurred turning a string into an object
     in the dependency module.
     """
 
