@@ -364,6 +364,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
 
+    applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
+
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
             if version and flavor:
@@ -380,7 +382,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
     try:
         callback = UpdateCallback()
-        _updateTroves(cfg, updateItems, replaceFiles = replaceFiles, 
+        _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
                       test = test, info = info, callback = callback)
     except conaryclient.DependencyFailure, e:
