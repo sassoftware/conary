@@ -322,6 +322,7 @@ class ConaryClient:
             
             (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
                 isAbsolute) = job
+            item = (name, newVersion, newFlavor)
 
             if newVersion is None:
                 # skip erasure
@@ -335,8 +336,6 @@ class ConaryClient:
 
             if not recurse:
                 raise UpdateError,  "Redirect found with --no-recurse set"
-
-            item = (name, newVersion, newFlavor)
 
             isPrimary = job in jobSet
             if isPrimary: 
@@ -356,7 +355,7 @@ class ConaryClient:
                                               (subVersion, subFlavor), True))
 
             if isPrimary:
-                for target in targets:
+                for subName, subVersion, subFlavor in targets:
                     jobSet.add((subName, (None, None), (subVersion, subFlavor),
                                 True))
 
@@ -390,6 +389,9 @@ class ConaryClient:
                    system.
             """
 
+            import lib
+            lib.epdb.st('f')
+
             localTrv = newTrv.copy()
             pristineTrv = newTrv.copy()
             oldTrv = trove.Trove(localTrv.getName(), localTrv.getVersion(),
@@ -415,7 +417,6 @@ class ConaryClient:
                     if sum(present) == 0:
                         # sum of booleans -- tee-hee
                         delList.append(info)
-                        break
 
             for info in delList:
                 localTrv.delTrove(*(info + (False,)))
