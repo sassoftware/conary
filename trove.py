@@ -592,7 +592,8 @@ class Trove(streams.LargeStreamSet):
     def hasTrove(self, name, version, flavor):
 	return self.troves.has_key((name, version, flavor))
 
-    def mergeCollections(self, primaryDeriv, secondaryDeriv):
+    def mergeCollections(self, primaryDeriv, secondaryDeriv, excludeTroveList):
+
         def diffJob(derivativeTrove):
             trvCs, files, troves = derivativeTrove.diff(self)
             assert(not files)
@@ -619,15 +620,16 @@ class Trove(streams.LargeStreamSet):
                                           (version, flavor), byDef))
             return set(job)
 
-        def applyJob(jobSet, skipNotByDefault = False):
+        def applyJob(jobSet, skipNotByDefault = False, excludeTroves = None):
             for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                  byDef) in jobSet:
                 if oldVersion is not None:
                     self.delTrove(name, oldVersion, oldFlavor, byDef)
                 if newVersion is not None and \
                         (oldVersion or not skipNotByDefault or byDef):
-                    self.addTrove(name, newVersion, newFlavor, 
-                                  byDefault = byDef)
+                    if not excludeTroves or not excludeTroves.match(name):
+                        self.addTrove(name, newVersion, newFlavor, 
+                                      byDefault = byDef)
 
         # Trove changesets suck. They don't store the A->B for a trove
         # inclusion, they store -A and +B. The A->B relationship can
@@ -643,7 +645,7 @@ class Trove(streams.LargeStreamSet):
         secondaryJob = secondaryJob - common
 
         applyJob(common)
-         
+
         # build an index to the secondary job set
         secondaryIndex = {}
         for job in secondaryJob:
@@ -727,7 +729,8 @@ class Trove(streams.LargeStreamSet):
             primaryJob.remove(job)
 
         applyJob(primaryJob)
-        applyJob(secondaryJob, skipNotByDefault = True)
+        applyJob(secondaryJob, skipNotByDefault = True,
+                 excludeTroves = excludeTroveList)
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False):

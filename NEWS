@@ -19,6 +19,8 @@ Changes in 0.62.0:
     those troves only if you set checkOnlyByDefaultDeps=False.  When creating
     subgroups using newGroup(), pass the checkOnlyByDefaultDeps flag as an
     argument to the newGroup() function.
+  * excludeTroves now applies to troves which have been added to 
+    already installed collections
 
 Changes in 0.61.12:
   * You can now search for troves by <trove>=<host>@ 

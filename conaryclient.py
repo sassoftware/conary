@@ -403,14 +403,9 @@ class ConaryClient:
                     continue
 
                 # in excludeTroves
-                for reStr, regExp in self.cfg.excludeTroves:
-                    match = False
-                    if regExp.match(info[0]):
-                        delList.append(info)
-                        match = True
-                        break
-
-                    if match: continue
+                if self.cfg.excludeTroves.match(info[0]):
+                    delList.append(info)
+                    continue
 
                 # if this is the target of a redirection, make sure we have
                 # the source of that redirection installed
@@ -706,7 +701,8 @@ class ConaryClient:
                 # to understand any of this.
                 (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
                 newTrv = pristineTrv.copy()
-                newTrv.mergeCollections(localTrv, newPristine)
+                newTrv.mergeCollections(localTrv, newPristine, 
+                                        self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
             else:
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
@@ -714,7 +710,8 @@ class ConaryClient:
                 localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                             pristine = False)
                 newTrv = oldTrv.copy()
-                newTrv.mergeCollections(localTrv, newPristine)
+                newTrv.mergeCollections(localTrv, newPristine, 
+                                        self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
 
             assert(not oldTrv.hasFiles())
