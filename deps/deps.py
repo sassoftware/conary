@@ -529,6 +529,7 @@ class InstructionSetDependency(DependencyClass):
     justOne = False
     depClass = Dependency
     allowParseDep = False
+    flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(InstructionSetDependency)
 
 class OldSonameDependencies(DependencyClass):
@@ -547,7 +548,7 @@ class SonameDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
     depFormat = 'IDENT/WORD'
-    hasFlags = True
+    flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(SonameDependencies)
 
 class UserInfoDependencies(DependencyClass):
