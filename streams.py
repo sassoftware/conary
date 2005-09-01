@@ -469,6 +469,25 @@ class StreamCollection(InfoStream):
         else:
             self.items = dict([ (x, {}) for x in self.streamDict ])
 
+class AbsoluteStreamCollection(StreamCollection):
+    """
+    AbsolteStreamCollection is like a StreamCollection.  It
+    collects sets of stream objects.  It differs from StreamCollection
+    in that diff and twm are never relative.  This is similar to the
+    way that a StringStream works, for example.
+
+    streamDict needs to be defined as an index of small ints to
+    Stream class types.
+    """
+
+    def diff(self, other):
+        assert(self.__class__ == other.__class__)
+        return self.freeze()
+
+    def twm(self, diff, base):
+        assert(self == base)
+        self.thaw(diff)
+
 class UnknownStream(Exception):
 
     pass
