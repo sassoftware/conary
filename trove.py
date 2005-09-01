@@ -145,7 +145,10 @@ class DigitalSignature(streams.StreamSet):
         return (self.fingerprint(), self.timestamp(), tuple(mpiList))
 
 _DIGSIGS_DIGSIGNATURE     = 1
-class DigitalSignatures(streams.StreamCollection):
+# since digital signatures can be added to the server over time, we
+# should always send the whole stream collection as a
+# AbsoluteStreamCollection
+class DigitalSignatures(streams.AbsoluteStreamCollection):
     streamDict = { _DIGSIGS_DIGSIGNATURE: DigitalSignature }
 
     def add(self, val):
@@ -157,13 +160,14 @@ class DigitalSignatures(streams.StreamCollection):
         for signature in self.getStreams(_DIGSIGS_DIGSIGNATURE):
             yield signature.get()
 
-    #this function is for convenience. It reduces code duplication in
-    #netclient and netauth (since I need to pass the frozen form thru xmlrpc)
+    # this function is for convenience. It reduces code duplication in
+    # netclient and netauth (since I need to pass the frozen form thru
+    # xmlrpc)
     def getSignature(self, keyId):
         for sig in self.iter():
             if keyId in sig[0]:
                 return sig
-        raise KeyNotFound('Signature by key: %s does not exist'% keyId)
+        raise KeyNotFound('Signature by key: %s does not exist' %keyId)
 
 _TROVESIG_SHA1   = 0
 _TROVESIG_DIGSIG = 1
