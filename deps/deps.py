@@ -335,7 +335,7 @@ class DependencyClass(object):
             raise ParseError, "Invalid dependency class %s" % class_.tagName
         match = class_.regexp.match(s)
         if match is None:
-            raise ParseError, "Invaid %s dependency: %s" % (class_.tagName, s)
+            raise ParseError, "Invalid %s dependency: %s" % (class_.tagName, s)
 
         depName = match.groups()[0]
 
