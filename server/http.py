@@ -86,6 +86,7 @@ class HttpHandler(WebHandler):
         """Handle either an HTTP POST or GET command."""
 
         auth = self._getAuth()
+        self.authToken = auth
         
         if type(auth) is int:
             return auth
