@@ -188,7 +188,7 @@ class RecipeLoader:
         # XXX HACK - get rid of this when we move the
         # recipe classes to the repository.
         # makes copies of some of the superclass recipes that are 
-        # created in this trove.  (specifically, the ones with buildreqs)
+        # created in this module.  (specifically, the ones with buildreqs)
         for recipeClass in self._recipesToCopy:
             name = recipeClass.__name__
             # when we create a new class object, it needs its superclasses.
@@ -362,47 +362,47 @@ class RecipeLoader:
         except:
             pass
 
+def _scoreLoadRecipeChoice(labelPath, version):
+    """ These labels all match the given labelPath.
+        We score them based on the number of matching labels in 
+        the label path, and return the one that's "best".
+
+        The following rules should apply:
+        * if the labelPath is [bar, foo] and you are choosing between
+          /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
+          is that any other shadow/branch in the path may be from a 
+          maintenance branch.
+        * if the labelPath is [bar] and you are choosing between
+          /foo/bar/ and /foo/blah/bar, choose /foo/bar.
+    """
+    # FIXME I'm quite sure this heuristic will get replaced with
+    # something smarter/more sane as time progresses
+    score = 0
+    labelPath = [ x for x in reversed(labelPath)]
+    branch = version.branch()
+    while True:
+        label = branch.label()
+        try:
+            index = labelPath.index(label)
+        except ValueError:
+            index = -1
+        score += index
+        if not branch.hasParentBranch():
+            break
+        branch = branch.parentBranch()
+    return score
+
+def getBestLoadRecipeChoices(labelPath, troveTups):
+    scores = [ (_scoreLoadRecipeChoice(labelPath, x[1]), x) for x in troveTups ]
+    maxScore = max(scores)[0]
+    return [x[1] for x in scores if x[0] == maxScore ]
+
 
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
                                     ignoreInstalled=False, 
                                     filterVersions=False):
-    def _scoreVersion(labelPath, version):
-        """ These labels all match the given labelPath.
-            We score them based on the number of matching labels in 
-            the label path, and return the one that's "best".
-
-            The following rules should apply:
-            * if the labelPath is [bar, foo] and you are choosing between
-              /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
-              is that any other shadow/branch in the path may be from a 
-              maintenance branch.
-            * if the labelPath is [bar] and you are choosing between
-              /foo/bar/ and /foo/blah/bar, choose /foo/bar.
-        """
-        # FIXME I'm quite sure this heuristic will get replaced with
-        # something smarter/more sane as time progresses
-        score = 0
-        labelPath = [ x for x in reversed(labelPath)]
-        branch = version.branch()
-        while True:
-            label = branch.label()
-            try:
-                index = labelPath.index(label)
-            except ValueError:
-                index = -1
-            score += index
-            if not branch.hasParentBranch():
-                break
-            branch = branch.parentBranch()
-        return score
-
-    def _getBestTroveTups(labelPath, troveTups):
-        scores = [ (_scoreVersion(labelPath, x[1]), x) for x in troveTups ]
-        maxScore = max(scores)[0]
-        return [x[1] for x in scores if x[0] == maxScore ]
-
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
@@ -414,7 +414,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
     if filterVersions:
-        pkgs = _getBestTroveTups(labelPath, pkgs)
+        pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:
         raise RecipeFileError("source component %s has multiple versions "
                               "on labelPath %s: %s" %(component,
