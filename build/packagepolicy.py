@@ -1453,6 +1453,7 @@ class UtilizeUser(_Utilize):
     after they start.
     """
     def _markItem(self, path, user):
+        self.info('user %s: %s' % (user, path))
         self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
 
@@ -1466,7 +1467,8 @@ class UtilizeGroup(_Utilize):
     after they start.
     """
     def _markItem(self, path, group):
-        self.setUserGroupDep(path, user, deps.GroupInfoDependencies)
+        self.info('group %s: %s' % (group, path))
+        self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
 
 
 class ComponentRequires(policy.Policy):
