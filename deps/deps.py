@@ -28,6 +28,10 @@ DEP_CLASS_GROUPINFO     = 8
 DEP_CLASS_CIL           = 9
 DEP_CLASS_JAVA          = 10
 
+DEP_CLASS_NO_FLAGS      = 0
+DEP_CLASS_HAS_FLAGS     = 1
+DEP_CLASS_OPT_FLAGS     = 2
+
 FLAG_SENSE_UNSPECIFIED  = 0         # used FlavorScore indices
 FLAG_SENSE_REQUIRED     = 1
 FLAG_SENSE_PREFERRED    = 2
@@ -49,10 +53,13 @@ for key, val in senseMap.iteritems():
     senseReverseMap[val] = key
 
 dependencyClasses = {}
+dependencyClassesByName = {}
 
 def _registerDepClass(classObj):
     global dependencyClasses
+    classObj.compileRegexp()
     dependencyClasses[classObj.tag] = classObj
+    dependencyClassesByName[classObj.tagName] = classObj
 
 class BaseDependency(object):
 
@@ -284,7 +291,72 @@ class Dependency(BaseDependency):
 
 class DependencyClass(object):
 
-    __slots__ = ( 'tag', 'members' )
+    __slots__ = ( 'tag', 'members', 'depFormat', 'flagFormat', 
+                  'flags', 'allowParseDep')
+
+    depFormat = 'WORD'
+    flagFormat = 'WORD'
+    flagOption = DEP_CLASS_NO_FLAGS
+    allowParseDep = True
+
+    @classmethod
+    def compileRegexp(class_):
+        """ Class method that takes the abstract information about the format
+            of this dependency class and turns it into a regexp that will
+            match dep strings that can be parsed into a dependency of this 
+            class.
+        """
+        if not class_.allowParseDep:
+            return
+
+        d = dict(flagFormat=class_.flagFormat,
+                 depFormat=class_.depFormat)
+
+        # zero or more space-separated flags 
+        flagFmt = '(?:\( *(%(flagFormat)s?(?: +%(flagFormat)s)*) *\))?' 
+        # add ^ and $ to ensure we match the entire string passed in
+        regexp = ('^ *(%(depFormat)s) *' + flagFmt + ' *$') % d
+        # word is a slightly larger group of chars than ident - 
+        # includes . and +, because those are used in paths and 
+        # sonames.  May need to be larger some day, and probably 
+        # could be more restrictive for some groups.  Should not contain
+        # /, as that's used as a special char in many dep classes.
+        regexp = regexp.replace('WORD', '(?:[.0-9A-Za-z_+-]+)')
+        regexp = regexp.replace('IDENT', '(?:[0-9A-Za-z_-]+)')
+        class_.regexpStr = regexp
+        class_.regexp = re.compile(regexp)
+
+    @classmethod
+    def parseDep(class_, s):
+        """ Parses a dependency string of this class and returns the
+            result.  Raises a ParseError on failure.
+        """
+        if not class_.allowParseDep:
+            raise ParseError, "Invalid dependency class %s" % class_.tagName
+        match = class_.regexp.match(s)
+        if match is None:
+            raise ParseError, "Invaid %s dependency: %s" % (class_.tagName, s)
+
+        depName = match.groups()[0]
+
+        flagStr = match.groups()[1]
+
+        if class_.flags == DEP_CLASS_NO_FLAGS:
+            if flagStr is not None:
+                raise ParseError, ("bad %s dependency '%s':"
+                                   " flags not allowed" % (class_.tagName, s))
+            flags = []
+        elif flagStr:
+            flags = flagStr.split()
+            flags = [ (x, FLAG_SENSE_REQUIRED) for x in flags]
+        elif class_.flags == DEP_CLASS_HAS_FLAGS:
+            raise ParseError, ("bad %s dependency '%s':"
+                               " flags required" % (class_.tagName, s))
+        else:
+            assert(class_.flags == DEP_CLASS_OPT_FLAGS)
+            flags = []
+        return Dependency(depName, flags)
+
 
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
@@ -447,6 +519,7 @@ class AbiDependency(DependencyClass):
     tagName = "abi"
     justOne = False
     depClass = Dependency
+    hasFlags = True
 _registerDepClass(AbiDependency)
 
 class InstructionSetDependency(DependencyClass):
@@ -455,6 +528,7 @@ class InstructionSetDependency(DependencyClass):
     tagName = "is"
     justOne = False
     depClass = Dependency
+    allowParseDep = False
 _registerDepClass(InstructionSetDependency)
 
 class OldSonameDependencies(DependencyClass):
@@ -463,6 +537,7 @@ class OldSonameDependencies(DependencyClass):
     tagName = "oldsoname"
     justOne = False
     depClass = Dependency
+    allowParseDep = False
 _registerDepClass(OldSonameDependencies)
 
 class SonameDependencies(DependencyClass):
@@ -471,6 +546,8 @@ class SonameDependencies(DependencyClass):
     tagName = "soname"
     justOne = False
     depClass = Dependency
+    depFormat = 'IDENT/WORD'
+    hasFlags = True
 _registerDepClass(SonameDependencies)
 
 class UserInfoDependencies(DependencyClass):
@@ -479,6 +556,7 @@ class UserInfoDependencies(DependencyClass):
     tagName = "userinfo"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_NO_FLAGS
 _registerDepClass(UserInfoDependencies)
 
 class GroupInfoDependencies(DependencyClass):
@@ -487,6 +565,7 @@ class GroupInfoDependencies(DependencyClass):
     tagName = "groupinfo"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_NO_FLAGS
 _registerDepClass(GroupInfoDependencies)
 
 class CILDependencies(DependencyClass):
@@ -495,6 +574,9 @@ class CILDependencies(DependencyClass):
     tagName = "CIL"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_HAS_FLAGS
+    depFormat = 'IDENT(?:\.IDENT)*' # foo[.bar]*
+    flagFormat = '[0-9.]+'          # 0-9[.0-9]*
 _registerDepClass(CILDependencies)
 
 class JavaDependencies(DependencyClass):
@@ -503,6 +585,7 @@ class JavaDependencies(DependencyClass):
     tagName = "java"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(JavaDependencies)
 
 class FileDependencies(DependencyClass):
@@ -511,6 +594,9 @@ class FileDependencies(DependencyClass):
     tagName = "file"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_NO_FLAGS
+    depFormat = '(?:/WORD)+' # /path[/path]*
+
 _registerDepClass(FileDependencies)
 
 class TroveDependencies(DependencyClass):
@@ -519,6 +605,8 @@ class TroveDependencies(DependencyClass):
     tagName = "trove"
     justOne = False
     depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+    depFormat = 'IDENT(?::IDENT)?' # trove[:comp] 
 
     def thawDependency(frozen):
         d = DependencyClass.thawDependency(frozen)
@@ -535,6 +623,7 @@ class UseDependency(DependencyClass):
     tagName = "use"
     justOne = True
     depClass = Dependency
+    allowParseDep = False
 _registerDepClass(UseDependency)
 
 class DependencySet(object):
@@ -881,6 +970,39 @@ def parseFlavor(s, mergeBase = None):
 
     return set
 
+def parseDep(s):
+    """ 
+    Parses dependency strings (not flavors) of the format 
+    (<depClass>: dep[(flags)])* and returns a dependency set
+    containing those dependencies.
+    Raises ParseError if the parsing fails.
+    """
+    
+    depSet = DependencySet()
+    while s:
+        match = depRegexp.match(s)
+
+        if not match:
+            raise ParseError, ('depString starting at %s'
+                               ' is not a valid dep string' % s)
+
+        tagName = match.groups()[0]
+        depClause = match.groups()[1]
+        wholeMatch = match.group()
+        s = s[len(wholeMatch):]
+
+        if tagName not in dependencyClassesByName:
+            raise ParseError, ('no such dependency class %s' % tagName)
+
+        depClass = dependencyClassesByName[tagName]
+
+        # depRegexp matches a generic depClass: dep(flags) set
+        # - pass the dep to the given depClass for parsing
+        dep = depClass.parseDep(depClause)
+        assert(dep is not None)
+        depSet.addDep(depClass, dep)
+    return depSet
+
 def flavorDifferences(flavors):
     """ Takes a set of flavors, returns a dict of flavors such that 
         the value of a flavor's dict entry is a flavor that includes 
@@ -909,6 +1031,13 @@ archFlags = '\(( *FLAG(?: *, *FLAG)*)\)'
 archClause = '(?:(IDENT)(?:ARCHFLAGS)?)?'
 archGroup = '(?:ARCHCLAUSE(?:  *(ARCHCLAUSE))*)'
 useClause = '(USEFLAG *(?:, *USEFLAG)*)?'
+
+
+depFlags = ' *(?:\([^)]*\))? *' # anything inside parens
+depName = r'(?:[^ (]+)' # anything except for a space or an opening paren
+depClause = depName + depFlags
+depRegexpStr = r'(IDENT): *(DEPCLAUSE) *'
+
 flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)?$'
 
 flavorRegexpStr = flavorRegexpStr.replace('ARCHGROUP', archGroup)
@@ -928,8 +1057,13 @@ archGroupStr = archGroupStr.replace('FLAG', flag)
 archGroupStr = archGroupStr.replace('IDENT', ident)
 archGroupRegexp = re.compile(archGroupStr)
 
+depRegexpStr = depRegexpStr.replace('DEPCLAUSE', depClause)
+depRegexpStr = depRegexpStr.replace('IDENT', ident)
+depRegexp = re.compile(depRegexpStr)
+
 
 del ident, flag, useFlag, archClause, useClause, flavorRegexpStr
+del depFlags, depName, depClause, depRegexpStr
 del archGroupStr
 
 # None means disallowed match
@@ -959,3 +1093,17 @@ flavorScores = {
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERRED) :   -1,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1 
 }
+
+
+class ParseError(Exception):
+
+    """
+    Indicates that an error occured turning a string into an object
+    in the dependency module.
+    """
+
+    def __str__(self):
+	return self.str
+
+    def __init__(self, str):
+	self.str = str
