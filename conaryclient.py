@@ -389,9 +389,6 @@ class ConaryClient:
                    system.
             """
 
-            import lib
-            lib.epdb.st('f')
-
             localTrv = newTrv.copy()
             pristineTrv = newTrv.copy()
             oldTrv = trove.Trove(localTrv.getName(), localTrv.getVersion(),
