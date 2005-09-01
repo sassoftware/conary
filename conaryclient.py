@@ -250,7 +250,7 @@ class ConaryClient:
             if sugg:
                 for (troveName, depSet) in depList:
                     if sugg.has_key(depSet):
-                        suggList = []
+                        suggList = set()
                         for choiceList in sugg[depSet]:
                             troveNames = set(x[0] for x in choiceList)
 
@@ -269,9 +269,9 @@ class ConaryClient:
                                                                 affTroveDict)
                                                                 
                                 if choice:
-                                    suggList.append(choice)
-                                    l = suggMap.setdefault(troveName, [])
-                                    l.append(choice)
+                                    suggList.add(choice)
+                                    l = suggMap.setdefault(troveName, set())
+                                    l.add(choice)
                                     break
 
 			troves.update([ (x[0], (None, None), x[1:], True) 
@@ -959,9 +959,6 @@ class ConaryClient:
         mergeItemList = self._mergeGroupChanges(job, troveSource, uJob, 
                                                 redirectHack, keepExisting, 
                                                 recurse, oldItems)
-
-        if not mergeItemList:
-            raise NoNewTrovesError
 
         # XXX this _resetTroveLists a hack, but building a whole new changeset
         # is a bit tricky due to changeset files
