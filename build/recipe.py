@@ -1839,10 +1839,11 @@ class GroupRecipe(Recipe):
             if failedDeps:
                 return groupName, failedDeps
 
+            groupObj.calcSize()
+
             if not groupObj.getTroveList():
                 raise RecipeFileError('%s has no troves in it' % groupName)
 
-            groupObj.calcSize()
 
     def _findSources(self):
         for troveSource in self.sources:
