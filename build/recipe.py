@@ -1740,36 +1740,39 @@ class GroupRecipe(Recipe):
         timeStamp = 0
 
         # the different items in the seen dict
-        VISITED = 0 # True if we've added this node to the stack
-        START = 1   # time at which the node was first visited
-        FINISH = 2  # time at which all the nodes child nodes were finished
+        START = 0   # time at which the node was first visited
+        FINISH = 1  # time at which all the nodes child nodes were finished
                     # with
-        PATH = 3    # path to get to this node from wherever it was 
+        PATH = 2    # path to get to this node from wherever it was 
                     # started.
-        seen = dict((x, [False, None, None, []]) for x in groupNames)
+        seen = dict((x, [None, None, []]) for x in groupNames)
 
         for groupName in groupNames:
-            if seen[groupName][VISITED]: continue
+            if seen[groupName][START]: continue
             stack = [groupName]
-            seen[groupName][VISITED] = True
 
             while stack:
                 timeStamp += 1
                 node = stack[-1]
 
+                if seen[node][FINISH]:
+                    # we already visited this node through 
+                    # another path that was longer.  
+                    stack = stack[:-1]
+                    continue
+                childList = []
                 if not seen[node][START]:
                     seen[node][START] = timeStamp
 
-                childList = []
-                if children[node]:
-                    path = seen[node][PATH] + [node]
-                    for child in children[node]:
-                        if child in path:
-                            cycle = path[path.index(child):] + [child]
-                            raise RecipeFileError('cycle in groups: %s' % cycle)
+                    if children[node]:
+                        path = seen[node][PATH] + [node]
+                        for child in children[node]:
+                            if child in path:
+                                cycle = path[path.index(child):] + [child]
+                                raise RecipeFileError('cycle in groups: %s' % cycle)
 
-                        if not seen[child][VISITED]:
-                            childList.append(child)
+                            if not seen[child][START]:
+                                childList.append(child)
 
                 if not childList:
                     # we've finished with all this nodes children 
@@ -1779,7 +1782,7 @@ class GroupRecipe(Recipe):
                 else:
                     path = seen[node][PATH] + [node]
                     for child in childList:
-                        seen[child] = [True, None, None, path]
+                        seen[child] = [None, None, path]
                         stack.append(child)
 
         groupsByLastSeen = ( (seen[x][FINISH], x) for x in groupNames)
