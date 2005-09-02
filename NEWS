@@ -1,5 +1,6 @@
 Changes in 0.62.1:
   * UtilizeGroup fixed
+  * conary updateall fixed
 
 Changes in 0.62.0:
   * Initial OpenPGP (RFC 2440) based signature support has been
