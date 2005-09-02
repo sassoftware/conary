@@ -377,8 +377,7 @@ class Trove(streams.LargeStreamSet):
             self.computeSignatures()
         else:
             sha1_orig = self.troveInfo.sigs.sha1()
-            self.computeSignatures()
-            sha1_new = self.troveInfo.sigs.sha1()
+            sha1_new = self.computeSignatures()
             if sha1_orig:
                 assert(sha1_orig == sha1_new)
         keyCache = getKeyCache()
@@ -390,8 +389,7 @@ class Trove(streams.LargeStreamSet):
     #since we're going to need to pass the frozen form over the net
     def addPrecomputedDigitalSignature(self, sig):
         sha1_orig = self.troveInfo.sigs.sha1()
-        self.computeSignatures()
-        sha1_new = self.troveInfo.sigs.sha1()
+        sha1_new = self.computeSignatures()
         if sha1_orig:
             assert(sha1_orig == sha1_new)
         signature = DigitalSignature()
@@ -414,7 +412,7 @@ class Trove(streams.LargeStreamSet):
         badFingerprints = []
         maxTrust = 0
         sha1_orig = self.troveInfo.sigs.sha1()
-        sha1_new = self.computeSignatures(store = False)
+        sha1_new = self.computeSignatures(store=False)
         if sha1_orig:
             assert(sha1_orig == sha1_new)
 
@@ -482,14 +480,13 @@ class Trove(streams.LargeStreamSet):
         self.flavor.set(flavor)
 
     def getSigs(self):
-        self.computeSignatures()
         return self.troveInfo.sigs
 
     def setSigs(self, sigs):
         # make sure the signature block being applied to this trove is
         # correct for this trove
-        self.computeSignatures()
-        assert(self.troveInfo.sigs.sha1() == sigs.sha1())
+        check = self.computeSignatures(store=False)
+        assert(check == sigs.sha1())
         self.troveInfo.sigs = sigs
 
     def isRedirect(self):
@@ -891,9 +888,6 @@ class Trove(streams.LargeStreamSet):
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
-            # always compute the sha1 signature of the trove before
-            # creating the diff so we know it's current
-            self.computeSignatures()
             troveInfoDiff = self.troveInfo.diff(them.troveInfo)
             if troveInfoDiff is None:
                 troveInfoDiff = ""
