@@ -26,7 +26,9 @@ kid_files =	add_group.kid		\
 		permission.kid		\
 		pick_trove.kid		\
 		trove_info.kid		\
-		user_admin.kid
+		user_admin.kid		\
+		pgp_admin.kid		\
+		pgp_submit_key.kid
 
 extra_dist = Makefile
 
