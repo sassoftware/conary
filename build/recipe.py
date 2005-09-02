@@ -1524,6 +1524,9 @@ class SingleGroup:
     def getNewGroupList(self):
 	return self.newGroupList
 
+    def hasTroves(self):
+        return bool(self.newGroupList or self.getTroveList())
+
     def __init__(self, depCheck, autoResolve, checkOnlyByDefaultDeps,
                  byDefault = True):
 
@@ -1841,7 +1844,7 @@ class GroupRecipe(Recipe):
 
             groupObj.calcSize()
 
-            if not groupObj.getTroveList():
+            if not groupObj.hasTroves():
                 raise RecipeFileError('%s has no troves in it' % groupName)
 
 
