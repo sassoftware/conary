@@ -374,7 +374,7 @@ class ChangeSetJob:
 #            keyCache.getPublicKey(fingerprint)
         res = trv.verifyDigitalSignatures()
         if len(res[1]):
-            raise KeyNotFound('Repository does not recignize key: %s'% res[1][0])
+            raise KeyNotFound('Repository does not recognize key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False):
