@@ -63,6 +63,8 @@ PKT_PRIVATE4           = 63
 PKT_ALL_SECRET = (PKT_SECRET_KEY, PKT_SECRET_SUBKEY)
 PKT_ALL_PUBLIC = (PKT_PUBLIC_KEY, PKT_PUBLIC_SUBKEY)
 PKT_ALL_KEYS = PKT_ALL_SECRET + PKT_ALL_PUBLIC
+PKT_MAIN_KEYS = (PKT_SECRET_KEY, PKT_PUBLIC_KEY)
+PKT_SUB_KEYS = (PKT_SECRET_SUBKEY, PKT_PUBLIC_SUBKEY)
 
 # 3.6.2.1. Secret key encryption
 ENCRYPTION_TYPE_UNENCRYPTED    = 0x00
@@ -113,7 +115,7 @@ class BadPassPhrase(Exception):
     def __init__(self, reason="Bad passphrase"):
         self.error = reason
 
-def getBlockType(keyRing):
+def readBlockType(keyRing):
     r=keyRing.read(1)
     if r != '':
         return ord(r)
@@ -213,9 +215,10 @@ def convertPrivateKey(privateBlock):
     # complete the new key packet
     return (chr(ctb) + sizeBuf + buf)
 
-def getKeyId(keyRing):
+#turn the current key into a form usable for keyId's and self signatures
+def getHashableKeyData(keyRing):
     # see RFC 2440 11.2 - Key IDs and Fingerprints
-    keyBlock=getBlockType(keyRing)
+    keyBlock=readBlockType(keyRing)
     if not (keyBlock & 128):
         raise MalformedKeyRing("Not an OpenPGP packet.")
 
@@ -251,7 +254,8 @@ def getKeyId(keyRing):
     if ((keyBlock >> 2) & 15) in PKT_ALL_SECRET:
         data = convertPrivateKey(data)
     # This is a holdover from the days of PGP 2.6.2
-    # RFC 2440 section 11.2 does a really bad job of explaining this
+    # RFC 2440 section 11.2 does a really bad job of explaining this.
+    # RFC 2440 section 5.2.4 refers to this for self signature computation.
     # One of the least documented gotchas of Key fingerprints:
     # they're ALWAYS calculated as if they were a public key main key block.
     # this means private keys will be treated as public keys, and subkeys
@@ -277,13 +281,22 @@ def getKeyId(keyRing):
     if keyBlock in (0xb9, 0x9d):
         # 0x99 is the ctb for a public key packet with two byte length
         data = chr(0x99) + data[1:]
+    return data
+
+def getKeyId(keyRing):
+    startPoint = keyRing.tell()
+    keyRing.seek(0, SEEK_END)
+    if keyRing.tell() == startPoint:
+        return ''
+    keyRing.seek(startPoint)
+    data = getHashableKeyData(keyRing)
     m = sha.new()
     m.update(data)
     return m.hexdigest().upper()
 
-# find the next PGP packet regardless of type.
+# find the next OpenPGP packet regardless of type.
 def seekNextPacket(keyRing):
-    packetType=getBlockType(keyRing)
+    packetType=readBlockType(keyRing)
     if packetType == -1:
         return
     dataSize = -1
@@ -321,7 +334,7 @@ def seekNextKey(keyRing):
     done = 0
     while not done:
         seekNextPacket(keyRing)
-        packetType = getBlockType(keyRing)
+        packetType = readBlockType(keyRing)
         if packetType != -1:
             keyRing.seek(-1, SEEK_CUR)
         if ((packetType == -1)
@@ -333,7 +346,7 @@ def seekNextSignature(keyRing):
     done = 0
     while not done:
         seekNextPacket(keyRing)
-        packetType = getBlockType(keyRing)
+        packetType = readBlockType(keyRing)
         if packetType != -1:
             keyRing.seek(-1,SEEK_CUR)
         if ((packetType == -1)
@@ -351,7 +364,7 @@ def fingerprintToInternalKeyId(fingerprint):
 
 def getSigId(keyRing):
     startPoint = keyRing.tell()
-    blockType = getBlockType(keyRing)
+    blockType = readBlockType(keyRing)
     lenBits = blockType & 3
     if lenBits == 3:
         raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
@@ -379,44 +392,80 @@ def assertSigningKey(keyId,keyRing):
     limit = keyRing.tell()
     if limit == 0:
         # no keys in a zero length file
+        keyRing.seek(startPoint)
         raise KeyNotFound(keyId, "Couldn't open keyring")
     keyRing.seek(0, SEEK_SET)
     while (keyRing.tell() < limit) and (keyId not in getKeyId(keyRing)):
         seekNextKey(keyRing)
     if keyRing.tell() >= limit:
+        keyRing.seek(startPoint)
         raise KeyNotFound(keyId)
     # keyring now points to the beginning of the key we wanted
     # find self signature of this key
-    # FIXME: ensure we don't wander outside of this key...
+    keyStart = keyRing.tell()
+    seekNextKey(keyRing)
+    keyLim = keyRing.tell()
+    keyRing.seek(keyStart)
     fingerprint = getKeyId(keyRing)
     intKeyId = fingerprintToInternalKeyId(fingerprint)
-    seekNextSignature(keyRing)
-    while (intKeyId != getSigId(keyRing)):
-        seekNextSignature(keyRing)
-    # we now point to the self signature.
-    # now go find the Key Flags subpacket
-    blockType = getBlockType(keyRing)
-    lenBits = blockType & 3
-    if lenBits == 3:
-        raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
-    elif lenBits == 2:
+    # first search for the public key algortihm octet. if the key is really
+    # old, this might be the only hint that it's legal to use this key to
+    # make digital signatures.
+
+    blockType = readBlockType(keyRing)
+    if blockType & 3 == 3:
+        raise IncompatibleKey("Can't seek past packet of indeterminate length")
+    elif blockType & 3 == 2:
         keyRing.seek(4, SEEK_CUR)
     else:
-        keyRing.seek(lenBits+1, SEEK_CUR)
-    assert (ord(keyRing.read(1)) == 4)
-    keyRing.seek(5, SEEK_CUR)
-    done = 0
-    while not done:
-        subLen = ord(keyRing.read(1))
-        subType = ord(keyRing.read(1))
-        if (subType != 27):
-            keyRing.seek(subLen - 1, SEEK_CUR)
+        keyRing.seek((blockType & 3) + 1, SEEK_CUR)
+    if (ord(keyRing.read(1)) != 4):
+        raise IncompatibleKey("Can only use V4 keys")
+    keyRing.seek(4, SEEK_CUR)
+    if ord(keyRing.read(1)) in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
+        # the public key algorithm octet satisfies this test. no more checks required
+        keyRing.seek(startPoint)
+        return
+    # return to beginning of key so we can skip chunks.
+    keyRing.seek(keyStart)
+    keyFlagsFound = 0
+    while (not keyFlagsFound) and (keyRing.tell() < keyLim):
+        seekNextSignature(keyRing)
+        while (intKeyId != getSigId(keyRing)):
+            seekNextSignature(keyRing)
+        # we now point to the self signature. now find the Key Flags subpacket
+        # remember where we are in case we didn't find what we need.
+        sigStart = keyRing.tell()
+        blockType = readBlockType(keyRing)
+        lenBits = blockType & 3
+        if lenBits == 3:
+            keyRing.seek(startPoint)
+            raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
+        elif lenBits == 2:
+            keyRing.seek(4, SEEK_CUR)
         else:
-            done = 1
+            keyRing.seek(lenBits+1, SEEK_CUR)
+        assert (ord(keyRing.read(1)) == 4)
+        keyRing.seek(3, SEEK_CUR)
+        subLim = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + keyRing.tell()
+        done = 0
+        while (not done) and (keyRing.tell() < subLim):
+            subLen = ord(keyRing.read(1))
+            subType = ord(keyRing.read(1))
+            if (subType != 27):
+                keyRing.seek(subLen - 1, SEEK_CUR)
+            else:
+                keyFlagsFound = 1
+                done = 1
+        if not keyFlagsFound:
+            keyRing.seek(sigStart)
+    if not keyFlagsFound:
+        keyRing.seek(startPoint)
+        raise IncompatibleKey("Key %s has no key flags block. Can't determine suitabilty for use as a signature key"% fingerprint)
     Flags = ord(keyRing.read(1))
-    if not (Flags & 2):
-        raise InvalidKey('Key %s is not a signing key.'% fingerprint)
     keyRing.seek(startPoint)
+    if not (Flags & 2):
+        raise IncompatibleKey('Key %s is not a signing key.'% fingerprint)
 
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
@@ -487,6 +536,7 @@ def readBlockSize(keyRing, sizeType):
         raise MalformedKeyRing("Can't get size of packet of indeterminate length")
 
 def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
+    startPoint = keyRing.tell()
     keyRing.seek(0, SEEK_END)
     limit = keyRing.tell()
     if limit == 0:
@@ -542,7 +592,7 @@ def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
             r = (p, g, y)
     else:
         raise MalformedKeyRing("Wrong key type")
-    keyRing.close()
+    keyRing.seek(startPoint)
     return r
 
 def makeKey(keyTuple):
@@ -635,7 +685,7 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
     keySizes = (0, 0, 192, 128, 128, 0, 0, 128, 192, 256)
     legalCiphers = (2, 3, 4, 7, 8, 9)
 
-    encryptType = getBlockType(keyRing)
+    encryptType = readBlockType(keyRing)
 
     if encryptType == ENCRYPTION_TYPE_UNENCRYPTED:
         mpiList = []
@@ -645,14 +695,14 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
 
     if encryptType in (ENCRYPTION_TYPE_SHA1_CHECK,
                        ENCRYPTION_TYPE_S2K_SPECIFIED):
-        algType=getBlockType(keyRing)
+        algType=readBlockType(keyRing)
         if algType not in legalCiphers:
             if algType > len(ciphers) - 1:
                 algType = 0
             raise IncompatibleKey('Cipher: %s unusable' %ciphers[algType])
         cipherAlg = ciphers[algType]
-        s2kType = getBlockType(keyRing)
-        hashType = getBlockType(keyRing)
+        s2kType = readBlockType(keyRing)
+        hashType = readBlockType(keyRing)
         if hashType in (1, 2):
             hashAlg = hashes[hashType]
         else:
@@ -722,7 +772,7 @@ def countKeys(keyRing):
     limit = keyRing.tell()
     keyRing.seek(start)
     while keyRing.tell() < limit:
-        keyType = getBlockType(keyRing)
+        keyType = readBlockType(keyRing)
         keyRing.seek(-1,1)
         if (keyType >> 2) & 15 in (PKT_SECRET_KEY, PKT_PUBLIC_KEY):
             keyCount += 1
