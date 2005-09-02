@@ -23,7 +23,6 @@ from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
 from openpgpfile import getPublicKeyFromString
 from openpgpfile import getFingerprint
-from openpgpfile import getBlockType
 from openpgpfile import seekNextKey
 from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
@@ -79,16 +78,17 @@ class OpenPGPKey:
         rand=open('/dev/random','r')
         b = self._bitLen(q)/8 + 1
         r = 0L
-        for i in range(b):
-            r = r*256 + ord(rand.read(1))
+        while r < 2:
+            for i in range(b):
+                r = r*256 + ord(rand.read(1))
+                r %= q
+            while self._gcf(r, q-1) != 1:
+                r = (r+1) % q
         rand.close()
-        r %= q
-        while self._gcf(r, q-1) != 1:
-            r = (r+1) % q
         return r
 
     def signString(self, data):
-        if isinstance(self.cryptoKey, DSA.DSAobj_c):
+        if isinstance(self.cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
                 K = self._getRelPrime(self.cryptoKey.q)
