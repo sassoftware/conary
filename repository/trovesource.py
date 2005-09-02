@@ -403,7 +403,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                                             trvCs.getOldVersion(),
                                             trvCs.getOldFlavor())
 
-            newTrove.applyChangeSet(trvCs)
+            newTrove.applyChangeSet(trvCs, skipIntegrityChecks = not withFiles)
             retList.append(newTrove)
 
         return retList

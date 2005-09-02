@@ -344,7 +344,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         
         t = trove.Trove(trvCs.getName(), trvCs.getOldVersion(),
                         trvCs.getNewFlavor(), trvCs.getChangeLog())
-        t.applyChangeSet(trvCs)
+        t.applyChangeSet(trvCs, skipIntegrityChecks = not withFiles)
         # if we're sorting, we'll need to pull out all the paths ahead
         # of time.  We'll use a generator that returns the items
         # in the same order as iterFileList() to reuse code.

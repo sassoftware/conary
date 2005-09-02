@@ -1,6 +1,8 @@
 Changes in 0.62.1:
   * UtilizeGroup fixed
   * conary updateall fixed
+  * Disable SHA-1 integrity checks when trove changesets don't include
+    files in various places
 
 Changes in 0.62.0:
   * Initial OpenPGP (RFC 2440) based signature support has been

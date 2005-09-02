@@ -276,7 +276,7 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0):
         # the signature
         t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor(), troveCs.getChangeLog())
-        t.applyChangeSet(troveCs, True)
+        t.applyChangeSet(troveCs, skipIntegrityChecks = True)
         r = min(t.verifyDigitalSignatures(trustThreshold)[0], r)
         # create a new troveCs that has the new signature included in it
         # replace the old troveCs with the new one in the changeset
