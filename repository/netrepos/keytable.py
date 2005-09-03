@@ -16,6 +16,7 @@ import StringIO
 
 import sqlite3
 from lib import openpgpfile, openpgpkey
+import StringIO
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -72,6 +73,12 @@ class OpenPGPKeyTable:
 
         if openpgpfile.countKeys(keyRing) != 1:
             raise IncompatibleKey('Submit only one key at a time.')
+
+        limit = len(pgpKeyData)
+        while keyRing.tell() < limit:
+            openpgpfile.verifySelfSignatures(openpgpfile.getKeyId(keyRing), keyRing)
+            openpgpfile.seekNextKey(keyRing)
+        keyRing.seek(0)
 
         mainFingerprint = openpgpfile.getKeyId(keyRing)
         try:

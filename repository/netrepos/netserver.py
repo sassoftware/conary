@@ -37,7 +37,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 from datastore import IntegrityError
-from lib.openpgpfile import KeyNotFound
+from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from trove import DigitalSignatureVerificationError
 
 # a list of the protocols we understand
@@ -144,7 +144,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return (True, ('DigitalSignatureVerificationError', str(e)))
         except AlreadySignedError, e:
             condRollback()
-            return (True, ('AlreadySignedError',str(e)))
+            return (True, ('AlreadySignedError', str(e)))
+        except BadSelfSignature, e:
+            condRollback()
+            return (True, ('BadSelfSignature', str(e)))
+        except IncompatibleKey, e:
+            condRollback()
+            return (True, ('IncompatibleKey', str(e)))
 	except Exception, e:
             condRollback()
             raise 

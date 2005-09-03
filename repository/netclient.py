@@ -107,6 +107,10 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise trove.DigitalSignatureVerificationError(exceptionArgs[0])
         elif exceptionName == 'AlreadySignedError':
             raise repository.netrepos.netserver.AlreadySignedError(exceptionArgs[0])
+        elif exceptionName == 'BadSelfSignature':
+            raise openpgpfile.BadSelfSignature(exceptionArgs)
+        elif exceptionName == 'IncompatibleKey':
+            raise openpgpfile.IncompatibleKey(exceptionArgs)
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
