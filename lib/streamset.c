@@ -646,6 +646,9 @@ static long StreamSet_Hash(PyObject * self) {
     args = PyTuple_New(0);
     kwargs = PyDict_New();
     frozen = StreamSet_Freeze((StreamSetObject *) self, args, kwargs);
+    if (!frozen) {
+	return -1;
+    }
     rc = PyObject_Hash(frozen);
     Py_DECREF(args);
     Py_DECREF(kwargs);

@@ -657,11 +657,11 @@ class ChangeSet(streams.LargeStreamSet):
                 job = (trvCs.getName(), 
                        (trvCs.getOldVersion(), trvCs.getOldFlavor()),
                        (trvCs.getNewVersion(), trvCs.getNewFlavor()),
-                       False)
+                       trvCs.isAbsolute())
             else:
                 job = (trvCs.getName(), (None, None),
                        (trvCs.getNewVersion(), trvCs.getNewFlavor()),
-                       False)
+                       trvCs.isAbsolute())
 
             if (job[0], job[2][0], job[2][1]) in self.primaryTroveList:
                 jobSet.add(job)
@@ -712,7 +712,7 @@ class PathIdsConflictError(Exception):
 
     def __str__(self):
         if self.trove1 is None:
-            return 'PathIdsConflict: %s' % self.pathId
+            return 'PathIdsConflict: %s' % sha1helper.md5ToString(self.pathId)
         else:
             path1, path2 = self.getPaths()
             trove1, trove2 = self.getTroves()
@@ -906,11 +906,9 @@ class ReadOnlyChangeSet(ChangeSet):
 	set. The second parameter, troveMap, specifies the old trove
 	for each trove listed in this change set. It is a dictionary
 	mapping (troveName, newVersion, newFlavor) tuples to 
-	(oldVersion, oldFlavor) pairs. If troveMap is None, then old
-	versions are preserved (this is used to implement keepExisting),
-	otherwise it is an error if no mapping exists (the mapping
-	can specify (None, None) if their is no previous version available
-	to compare against.
+	(oldVersion, oldFlavor) pairs. The troveMap may be (None, None)
+	if a new install is desired (the trove is switched from absolute
+        to relative to nothing in this case).
 	"""
 	assert(self.absolute)
 
@@ -929,19 +927,8 @@ class ReadOnlyChangeSet(ChangeSet):
 	    newFlavor = troveCs.getNewFlavor()
 	    assert(not troveCs.getOldVersion())
 
-	    if troveMap is not None and not troveMap.has_key(key):
-		log.warning("trove %s %s is already installed -- skipping",
-			    troveName, newVersion.asString())
-                del self.newTroves[key]
-                if key in self.primaryTroveList:
-                    self.primaryTroveList.remove(key)
-		continue
-
-            if troveMap is None:
-                oldVersion = None
-                oldFlavor = None
-            else:
-                (oldVersion, oldFlavor) = troveMap[key]
+            assert(key in troveMap)
+            (oldVersion, oldFlavor) = troveMap[key]
 
 	    if not oldVersion:
 		# new trove; the Trove.diff() right after this never

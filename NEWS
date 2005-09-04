@@ -1,3 +1,9 @@
+Changes in 0.62.2:
+  * Further reworkings of update code to be fully based on job sets. The
+    absolute flag now defines whether a trove is newly installed or if
+    it should be an update from an existing trove (when possible). Network
+    changesets and changesets from files are treated almost identically now.
+
 Changes in 0.62.1:
   * UtilizeGroup fixed
   * conary updateall fixed

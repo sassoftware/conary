@@ -23,6 +23,7 @@ import versions
 import trove
 import metadata
 from deps import deps
+from lib import log
 from lib import util
 from local import database
 from repository import changeset
@@ -143,23 +144,7 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
-    def _rootChangeSet(self, cs, keepExisting = False):
-	troveList = ((x.getName(), x.getNewVersion(), x.getNewFlavor()) 
-                     for x in cs.iterNewTroveList())
-
-	if keepExisting:
-	    outdated = None
-	else:
-	    # this ignores eraseList, just like we do when trove names
-	    # are specified
-	    outdated, eraseList = self.db.outdatedTroves(troveList)
-
-	    for key, tup in outdated.items():
-		outdated[key] = tup[1:3]
-
-	cs.rootChangeSet(self.db, outdated)
-
-    def _resolveDependencies(self, cs, uJob, keepExisting = None, 
+    def _resolveDependencies(self, uJob, jobSet, keepExisting = None, 
                              depsRecurse = True, split = False,
                              resolve = True):
 
@@ -222,6 +207,13 @@ class ConaryClient:
                 return scoredList[-1][-1]
 
 
+        cs = changeset.ReadOnlyChangeSet()
+        baseCs, remainder = uJob.getTroveSource().createChangeSet(jobSet, 
+                                            withFiles = False, recurse = False)
+        assert(not remainder)
+        cs.merge(baseCs)
+        del baseCs
+
         pathIdx = 0
         foundSuggestions = False
         (depList, cannotResolve, changeSetList) = \
@@ -274,13 +266,20 @@ class ConaryClient:
                                     l.add(choice)
                                     break
 
-			troves.update([ (x[0], (None, None), x[1:], True) 
+			troves.update([ (x[0], (None, None), x[1:], 
+                                            not keepExisting) 
                                         for x in suggList ])
 
                 # if we've found good suggestions, merge in those troves
                 if troves:
-                    newCs = self._updateChangeSet(troves, uJob,
-                                               keepExisting = keepExisting)[0]
+                    newJob = self._updateChangeSet(troves, uJob,
+                                              keepExisting = keepExisting)[0]
+                    assert(not (newJob & jobSet))
+                    jobSet.update(newJob)
+                    newCs, remainder = uJob.getTroveSource().createChangeSet(
+                                            newJob, withFiles = False, 
+                                            recurse = False)
+                    assert(not remainder)
                     cs.merge(newCs)
 
                     (depList, cannotResolve, changeSetList) = \
@@ -296,14 +295,14 @@ class ConaryClient:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
                     if not foundSuggestions or not depsRecurse:
-                        return (cs, depList, suggMap, cannotResolve,
+                        return (depList, suggMap, cannotResolve,
                                 changeSetList)
                     pathIdx = 0
                     foundSuggestions = False
 
-        return (cs, depList, suggMap, cannotResolve, changeSetList)
+        return (depList, suggMap, cannotResolve, changeSetList)
 
-    def _processRedirects(self, jobSet, troveSource, recurse):
+    def _processRedirects(self, uJob, jobSet, recurse):
         # this returns redirectHack, which maps targets of redirections
         # to the sources of those redirections
 
@@ -328,8 +327,8 @@ class ConaryClient:
                 # skip erasure
                 continue
 
-            trv = troveSource.getTrove(name, newVersion, newFlavor, 
-                                       withFiles = False)
+            trv = uJob.getTroveSource().getTrove(name, newVersion, newFlavor, 
+                                                 withFiles = False)
 
             if not trv.isRedirect():
                 continue
@@ -369,8 +368,8 @@ class ConaryClient:
 
         return redirectHack
 
-    def _mergeGroupChanges(self, primaryJobList, troveSource, uJob, 
-                           redirectHack, keepExisting, recurse, ineligible):
+    def _mergeGroupChanges(self, uJob, primaryJobList, redirectHack, 
+                           keepExisting, recurse, ineligible):
 
         def _newBase(newTrv):
             """
@@ -625,7 +624,9 @@ class ConaryClient:
             if job[2][0] is not None:
                 item = (job[0], job[2][0], job[2][1])
             
-                if job[1][0] is None:
+                if job[3]:
+                    # try and outdate absolute change sets
+                    assert(not job[1][0])
                     toOutdate.add(item)
                 keepList.append(job)
             else:
@@ -657,8 +658,8 @@ class ConaryClient:
 
         while keepList:
             job = keepList.pop()
-            (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
-                                = job
+            (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
+                    isAbsolute) = job
             
             if oldVersion != newVersion or oldFlavor != newFlavor:
                 newJob.add(job)
@@ -690,8 +691,8 @@ class ConaryClient:
 
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
-            [ newPristine ] = troveSource.getTroves([(trvName, newVersion,
-                                                  newFlavor)], 
+            newPristine = uJob.getTroveSource().getTrove(trvName, 
+                                                newVersion, newFlavor,
                                                 withFiles = False)
 
             if oldVersion is None:
@@ -735,21 +736,37 @@ class ConaryClient:
                         newJob.add((name, (oldVersion, oldFlavor),
                                           (None, None), False))
                     else:
+                        if oldVersion is None and job[1][0] is None:
+                            # this is absolute if the original job for the
+                            # parents was absolute. primaries will have
+                            # been rooted by now though, so look in the 
+                            # original job as well
+                            if isAbsolute:
+                                makeAbs = True
+                            else:
+                                absJob = (job[0], job[1], job[2], True)
+                                makeAbs = absJob in primaryJobList
+                        else:
+                            makeAbs = False
+                                
                         keepList.append((name, (oldVersion, oldFlavor),
-                                               (newVersion, newFlavor), False))
+                                               (newVersion, newFlavor), 
+                                         makeAbs))
                 else:
+                    # recurse through this trove's collection even though
+                    # it doesn't need to be installed
                     keepList.append((name, (newVersion, newFlavor),
                                            (newVersion, newFlavor), False))
 
         _removeDuplicateErasures(newJob)
 
-        if not keepExisting:
+        absJob = [ x for x in newJob if x[3] is True ]
+        if absJob:
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
             removeSet = set(((x[0], x[1][0], x[1][1])
                              for x in newJob if x[1][0] is not None))
 
-            absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in absJob ],
                 ineligible = removeSet | ineligible | referencedTroves | 
@@ -761,6 +778,8 @@ class ConaryClient:
                                if x[1][1] is not None ]
 
             for info in newTroves:
+                # these are considered relative now; they're being newly
+                # installed
                 newJob.add((info[0], (None, None), (info[1], info[2]), 0))
 
             replacedAreLocked = self.db.trovesAreLocked((x[1] for x
@@ -771,16 +790,6 @@ class ConaryClient:
                 if not oldIsLocked:
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
                                 (newInfo[1], newInfo[2]), 0))
-
-        if keepExisting:
-            # convert everything relative to new installs
-            keepJobSet = set()
-            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
-                 absolute) in newJob:
-                    keepJobSet.add((name, (None, None),
-                                          (newVersion, newFlavor), absolute))
-
-            newJob = keepJobSet
 
         # _findErasures picks what gets erased; nothing else gets to vote
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
@@ -802,10 +811,27 @@ class ConaryClient:
         None. Flavors may be None.
         @type itemList: list
         """
-        newJob = []
-        changeSetJob = []
-        finalCs = UpdateChangeSet()
-        troveSource = trovesource.ChangesetFilesTroveSource(self.db)
+
+        def _separateInstalledItems(jobSet):
+            present = self.db.hasTroves([ (x[0], x[2][0], x[2][1]) for x in 
+                                                    jobSet ] )
+            oldItems = set([ (job[0], job[2][0], job[2][1]) for job, isPresent 
+                                in itertools.izip(jobSet, present) 
+                                if isPresent ])
+            newItems = set([ job for job, isPresent 
+                                in itertools.izip(jobSet, present) 
+                                if not isPresent ])
+            return newItems, oldItems
+
+        # def _updateChangeSet -- body starts here
+
+        # This job describes updates from a networked repository. Duplicates
+        # (including installing things already installed) are skipped.
+        newJob = set()
+        # This job is from a changeset file.
+        jobsFromChangeSetFiles = set()
+        # These are items being removed.
+        removeJob = set()
 
         splittable = True
 
@@ -813,12 +839,30 @@ class ConaryClient:
         toFindNoDb = {}
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
+                if keepExisting:
+                    # We need to mark absolute troves in this changeset
+                    # as relative to preserve proper keepExisting behavior.
+                    newList = []
+                    for troveCs in item.iterNewTroveList():
+                        if troveCs.isAbsolute():
+                            # XXX we could just flip the absolute bit instead
+                            # of going through all of this...
+                            newTrove = trove.Trove(troveCs.getName(), 
+                                            troveCs.getNewVersion(), 
+                                            troveCs.getNewFlavor(), 
+                                            troveCs.getChangeLog())
+                            newTrove.applyChangeSet(troveCs)
+                            newCs = newTrove.diff(None, absolute = False)[0]
+                            newList.append(newCs)
+
+                    for troveCs in newList:
+                        # new replaces old
+                        item.newTrove(troveCs)
+
                 splittable = False
-                if item.isAbsolute():
-		    self._rootChangeSet(item, keepExisting = keepExisting)
-
-                finalCs.merge(item, (changeset.ChangeSetFromFile, item))
-
+                uJob.getTroveSource().addChangeSet(item, 
+                                                   includesFileContents = True)
+                jobsFromChangeSetFiles.update(item.getPrimaryJobSet())
                 continue
 
             (troveName, (oldVersionStr, oldFlavorStr),
@@ -848,9 +892,8 @@ class ConaryClient:
                 assert(not newFlavorStr)
                 assert(not isAbsolute)
                 for troveInfo in oldTroves:
-                    changeSetJob.append((troveInfo[0], 
-                                         (troveInfo[1], troveInfo[2]),
-                                         (None, None), False))
+                    removeJob.add((troveInfo[0], (troveInfo[1], troveInfo[2]),
+                                   (None, None), False))
                 # skip ahead to the next itemList
                 continue                    
 
@@ -865,8 +908,8 @@ class ConaryClient:
 
             if isinstance(newVersionStr, versions.Version):
                 assert(isinstance(newFlavorStr, deps.DependencySet))
-                newJob.append((troveName, oldTrove,
-                                    (newVersionStr, newFlavorStr), isAbsolute))
+                newJob.add((troveName, oldTrove,
+                            (newVersionStr, newFlavorStr), isAbsolute))
             elif isinstance(newVersionStr, versions.Branch):
                 assert(isinstance(newFlavorStr, deps.DependencySet))
                 toFind[(troveName, newVersionStr.asString(), 
@@ -877,10 +920,11 @@ class ConaryClient:
                 toFind[(troveName, newVersionStr, newFlavorStr)] = \
                                         oldTrove, isAbsolute
             else:
-                if keepExisting and not sync:
-                    # when using keepExisting, branch affinity doesn't make 
-                    # sense - we are installing a new, generally unrelated 
-                    # version of this trove
+                if not isAbsolute and not sync:
+                    # not isAbsolute means keepExisting. when using
+                    # keepExisting, branch affinity doesn't make sense - we are
+                    # installing a new, generally unrelated version of this
+                    # trove
                     toFindNoDb[(troveName, newVersionStr, newFlavorStr)] \
                                     = oldTrove, isAbsolute
                 else:
@@ -910,63 +954,55 @@ class ConaryClient:
                 raise UpdateError, "Relative update of %s specifies multiple " \
                             "troves for install" % troveName
 
-            newJob += [ (x[0], oldTroveInfo, x[1:], isAbsolute) for x in 
-                                    resultList ]
+            newJob.update([ (x[0], oldTroveInfo, x[1:], isAbsolute) for x in 
+                                    resultList ])
 
-        # items which are already installed shouldn't be installed again
-        present = self.db.hasTroves([ (x[0], x[2][0], x[2][1]) for x in 
-                                                newJob ] )
+        # Items which are already installed shouldn't be installed again. We
+        # want to track them though to ensure they aren't removed by some
+        # other action.
+        changeSetList, oldItems = _separateInstalledItems(newJob)
+        jobSet, oldItems2 = _separateInstalledItems(jobsFromChangeSetFiles)
 
-        # we keep track of items that are considered for update but
-        # are already installed so they don't get removed as a part
-        # of some other update/install
-        oldItems = [ (job[0], job[2][0], job[2][1]) for job, isPresent 
-                            in itertools.izip(newJob, present) 
-                            if isPresent ]
+        # Give nice warnings for things in oldItems2 (whose installs were
+        # requested, but are already there). XXX It seems like this would
+        # be a good idea for all jobs, not just ones which came from change
+        # set files?
+        for item in oldItems2:
+            log.warning("trove %s %s is already installed -- skipping",
+                        item[0], item[1].asString())
 
-        newJob = [ job for job, isPresent 
-                            in itertools.izip(newJob, present) 
-                            if not isPresent ]
-        changeSetJob += newJob
-        del newJob
+        oldItems.update(oldItems2)
 
-        # changeSetJob and oldItems should be unique 
-        changeSetJob = set(changeSetJob)
-        oldItems = set(oldItems)
+        changeSetList.update(removeJob)
+        del newJob, removeJob, oldItems2, jobsFromChangeSetFiles
 
-        if finalCs.empty and not changeSetJob:
+        # we now have three things
+        #   1. jobFromChangeSetFiles -- job which came from .ccs files
+        #   2. oldItems -- items which we should not remove as a side effect
+        #   3. changeListList -- job we need to create a change set for
+
+        if not changeSetList and not jobSet:
             raise NoNewTrovesError
 
-        if changeSetJob:
-            primaries = ([ (x[0], x[2][0], x[2][1]) for x in  changeSetJob
-                                if x[2][0] is not None ] +
-                         [ (x[0], x[1][0], x[1][1]) for x in  changeSetJob
-                                if x[2][0] is     None ])
-            cs = self.repos.createChangeSet(changeSetJob, withFiles = False,
-                                            recurse = recurse,
-                                            primaryTroveList = primaries)
-            finalCs.merge(cs, (self.repos.createChangeSet, changeSetJob))
+        if changeSetList:
+            cs = self.repos.createChangeSet(changeSetList, withFiles = False,
+                                            recurse = recurse)
+            uJob.getTroveSource().addChangeSet(cs)
+            jobSet.update(changeSetList)
+            del cs
+        del changeSetList
 
-        troveSource.addChangeSet(finalCs)
-        job = finalCs.getPrimaryJobSet()
+        import lib
+        lib.epdb.st('f')
 
-        redirectHack = self._processRedirects(job, troveSource, recurse) 
-        mergeItemList = self._mergeGroupChanges(job, troveSource, uJob, 
-                                                redirectHack, keepExisting, 
-                                                recurse, oldItems)
+        redirectHack = self._processRedirects(uJob, jobSet, recurse) 
+        newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
+                                         keepExisting, recurse, oldItems)
 
-        # XXX this _resetTroveLists a hack, but building a whole new changeset
-        # is a bit tricky due to changeset files
-        cs1, remainder = troveSource.createChangeSet(mergeItemList, 
-                                                 withFiles = False)
-        finalCs._resetTroveLists()
-        cs2 = self.repos.createChangeSet(remainder, withFiles = False,
-                                        primaryTroveList = [], 
-                                        recurse = False)
-        finalCs.merge(cs1, (self.repos.createChangeSet, changeSetJob))
-        finalCs.merge(cs2, (self.repos.createChangeSet, changeSetJob))
+        if not newJob:
+            raise NoNewTrovesError
 
-        return finalCs, splittable
+        return newJob, splittable
 
     def fullUpdateItemList(self):
         items = self.db.findUnreferencedTroves()
@@ -1048,9 +1084,9 @@ class ConaryClient:
         """
         callback.preparingChangeSet()
 
-        uJob = database.UpdateJob()
+        uJob = database.UpdateJob(self.db)
 
-        finalCs, splittable = self._updateChangeSet(itemList, uJob,
+        jobSet, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
                                         recurse = recurse,
                                         updateMode = updateByDefault,
@@ -1063,15 +1099,17 @@ class ConaryClient:
         # be relative (since relative change sets, by definition, cause
         # something on the system to get replaced).
         if keepExisting:
-            for troveCs in finalCs.iterNewTroveList():
-                if troveCs.getOldVersion() is not None:
+            for job in jobSet:
+                if job[1][0] is not None:
                     raise UpdateError, 'keepExisting specified for a ' \
                                        'relative change set'
 
         callback.resolvingDependencies()
 
-        (cs, depList, suggMap, cannotResolve, splitJob) = \
-            self._resolveDependencies(finalCs, uJob, 
+        # this updates jobSet w/ resolutions, and splitJob reflects the
+        # jobs in the updated jobSet
+        (depList, suggMap, cannotResolve, splitJob) = \
+            self._resolveDependencies(uJob, jobSet,
                                       resolve = resolveDeps,
                                       keepExisting = keepExisting, 
                                       depsRecurse = depsRecurse,
@@ -1085,38 +1123,34 @@ class ConaryClient:
 
         if split:
             startNew = True
-            for job in splitJob:
+            newJob = []
+            for jobList in splitJob:
                 if startNew:
-                    newCs = changeset.ChangeSet()
+                    newJob = []
                     startNew = False
                     count = 0
 
                 foundCollection = False
 
-                count += len(job)
-                for (name, (oldVersion, oldFlavor),
-                           (newVersion, newFlavor), absolute) in job:
+                count += len(jobList)
+                for job in jobList:
+                    (name, (oldVersion, oldFlavor),
+                           (newVersion, newFlavor), absolute) = job
+
                     if newVersion is not None and ':' not in name:
                         foundCollection = True
 
-                    if not newVersion:
-                        newCs.oldTrove(name, oldVersion, oldFlavor)
-                    else:
-                        trvCs = cs.getNewTroveVersion(name, newVersion,
-                                                      newFlavor)
-                        assert(trvCs.getOldVersion() == oldVersion)
-                        assert(trvCs.getOldFlavor() == oldFlavor)
-                        newCs.newTrove(trvCs)
+                    newJob.append(job)
 
                 if (foundCollection or 
                     (updateThreshold and (count >= updateThreshold))): 
-                    uJob.addChangeSet(newCs)
+                    uJob.addJob(newJob)
                     startNew = True
 
             if not startNew:
-                uJob.addChangeSet(newCs)
+                uJob.addJob(newJob)
         else:
-            uJob.addChangeSet(cs)
+            uJob.addJob(jobSet)
 
         callback.updateDone()
 
@@ -1127,49 +1161,19 @@ class ConaryClient:
                     localRollbacks = False, callback = UpdateCallback(),
                     autoLockList = conarycfg.RegularExpressionList()):
 
-        def _createCs(repos, theCs, uJob, standalone = False):
-            assert(not standalone or 
-                   isinstance(theCs, changeset.ReadOnlyChangeSet))
-            cs = changeset.ReadOnlyChangeSet()
-
-            changedTroves = set()
-            changedTroves.update((x.getName(),
-                                  (x.getOldVersion(), x.getOldFlavor()),
-                                  (x.getNewVersion(), x.getNewFlavor()), False)
-                                 for x in theCs.iterNewTroveList())
-            changedTroves.update((x[0], (x[1], x[2]), (None, None), False) 
-                                 for x in theCs.getOldTroveList())
-
-            if standalone:
-                for (how, what) in theCs.contents:
-                    if how == changeset.ChangeSetFromFile:
-                        newCs = what
-
-                        troves = [ (x.getName(), 
-                                   (x.getOldVersion(), x.getOldFlavor()),
-                                   (x.getNewVersion(), x.getNewFlavor()), False)
-                                        for x in newCs.iterNewTroveList() ]
-                        troves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                                            for x in newCs.getOldTroveList() ]
-
-                        for item in troves:
-                            if item in changedTroves:
-                                changedTroves.remove(item)
-                            elif item[2][0]:
-                                newCs.delNewTrove(item[0], item[2][0], 
-                                                  item[2][1])
-                            else:
-                                newCs.delOldTrove(item[0], item[1][0],
-                                                  item[1][1])
-                        cs.merge(newCs)
-
-            if changedTroves:
-                newCs = repos.createChangeSet(changedTroves,
-                                              recurse = False,
+        def _createCs(repos, job, uJob, standalone = False):
+            baseCs = changeset.ReadOnlyChangeSet()
+            cs, remainder = uJob.getTroveSource().createChangeSet(job, 
+                                        recurse = False, withFiles = True,
+                                        withFileContents = True,
+                                        useDatabase = False)
+            baseCs.merge(cs)
+            if remainder:
+                newCs = repos.createChangeSet(remainder, recurse = False,
                                               callback = callback)
-                cs.merge(newCs)
+                baseCs.merge(newCs)
 
-            return cs
+            return baseCs
 
         def _applyCs(cs, uJob, removeHints = {}):
             try:
@@ -1186,46 +1190,42 @@ class ConaryClient:
 
             return rb
 
-        def _createAllCs(q, csSet, uJob, cfg):
+        def _createAllCs(q, allJobs, uJob, cfg):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
 	    db = database.Database(cfg.root, cfg.dbPath)
 	    repos = NetworkRepositoryClient(cfg.repositoryMap,
 					    localRepository = db)
 
-            for i, theCs in enumerate(csSet):
-                callback.setChangesetHunk(i + 1, len(csSet))
-                newCs = _createCs(repos, theCs, uJob)
+            for i, job in enumerate(allJobs):
+                callback.setChangesetHunk(i + 1, len(allJobs))
+                newCs = _createCs(repos, job, uJob)
                 q.put(newCs)
 
             q.put(None)
             thread.exit()
 
-        csSet = uJob.getChangeSets()
-        if isinstance(csSet[0], changeset.ReadOnlyChangeSet):
+        # def applyUpdate -- body begins here
+
+        allJobs = uJob.getJobs()
+        if len(allJobs) == 1:
             # this handles change sets which include change set files
-            assert(len(csSet) == 1)
             callback.setChangesetHunk(0, 0)
-            newCs = _createCs(self.repos, csSet[0], uJob, standalone = True)
+            newCs = _createCs(self.repos, allJobs[0], uJob, standalone = True)
             callback.setUpdateHunk(0, 0)
             _applyCs(newCs, uJob)
         else:
             # build a set of everything which is being removed
             removeHints = set()
-            for theCs in csSet:
-                for trvCs in theCs.iterNewTroveList():
-                    if trvCs.getOldVersion() is not None:
-                        removeHints.add((trvCs.getName(), trvCs.getOldVersion(),
-                                         trvCs.getOldFlavor()))
-
-                for info in theCs.getOldTroveList():
-                    removeHints.add(info)
-
+            for job in allJobs:
+                removeHints.update([ (x[0], x[1][0], x[1][1])
+                                        for x in job if x[1][0] is not None ])
+                
             if not self.cfg.threaded:
-                for i, theCs in enumerate(csSet):
-                    callback.setChangesetHunk(i + 1, len(csSet))
-                    newCs = _createCs(self.repos, theCs, uJob)
-                    callback.setUpdateHunk(i + 1, len(csSet))
+                for i, job in enumerate(allJobs):
+                    callback.setChangesetHunk(i + 1, len(allJobs))
+                    newCs = _createCs(self.repos, job, uJob)
+                    callback.setUpdateHunk(i + 1, len(allJobs))
                     _applyCs(newCs, uJob, removeHints = removeHints)
             else:
                 from Queue import Queue
@@ -1233,12 +1233,12 @@ class ConaryClient:
 
                 csQueue = Queue(5)
                 thread.start_new_thread(_createAllCs,
-                                        (csQueue, csSet, uJob, self.cfg))
+                                        (csQueue, allJobs, uJob, self.cfg))
 
                 newCs = csQueue.get()
                 i = 1
                 while newCs is not None:
-                    callback.setUpdateHunk(i, len(csSet))
+                    callback.setUpdateHunk(i, len(allJobs))
                     i += 1
                     _applyCs(newCs, uJob, removeHints = removeHints)
                     callback.updateDone()

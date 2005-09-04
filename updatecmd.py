@@ -159,14 +159,11 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateText = None
         self.lock = thread.allocate_lock()
 
-def displayUpdateJobInfo(cs, verbose=False):
+def displayUpdateJobInfo(jobList, verbose=False):
     indent = '    '
     new = []
-    for x in cs.iterNewTroveList():
-        oldVersion = x.getOldVersion()
-        newVersion = x.getNewVersion()
-        oldFlavor = x.getOldFlavor()
-        newFlavor = x.getNewFlavor()
+    for name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute \
+                                                        in jobList:
         if newVersion:
             newTVersion = newVersion.trailingRevision()
         if oldVersion:
@@ -188,7 +185,11 @@ def displayUpdateJobInfo(cs, verbose=False):
 
         if not oldVersion:
             # if there is no oldVersion, this is a new trove
-            new.append(("%s (%s)" % (x.getName(), newInfo), 'N'))
+            new.append(("%s (%s)" % (name, newInfo), 'N'))
+            continue
+        elif not newVersion:
+            # if there is no newVersion, this is a new trove
+            new.append(("%s (%s deleted)" % (name, oldVersion.asString()), 'D'))
             continue
 
         if oldVersion.branch() != newVersion.branch():
@@ -211,20 +212,20 @@ def displayUpdateJobInfo(cs, verbose=False):
             if not verbose and newFlavor:
                 newInfo = '%s[%s]' % (newInfo, deps.formatFlavor(newFlavor))
 
-        new.append(("%s (%s -> %s)" % (x.getName(), oldInfo, newInfo), kind))
+        new.append(("%s (%s -> %s)" % (name, oldInfo, newInfo), kind))
 
     new.sort()
     new = [ "%s %s" % (x[1], x[0]) for x in new ]
-    if verbose:
-        formatter = lambda x: '%s[%s]' % (x[1].asString(),
-                                          deps.formatFlavor(x[2]))
-    else:
-        formatter = lambda x: x[1].trailingRevision().asString()
+    #if verbose:
+    #    formatter = lambda x: '%s[%s]' % (x[1].asString(),
+    #                                      deps.formatFlavor(x[2]))
+    #else:
+    #    formatter = lambda x: x[1].trailingRevision().asString()
 
-    old = []
-    old += [ "D %s (%s deleted)" % (x[0], formatter(x)) 
-                                     for x in cs.getOldTroveList() ]
-    old.sort()
+    #old = []
+    #old += [ "D %s (%s deleted)" % (x[0], formatter(x)) 
+    #                                 for x in cs.getOldTroveList() ]
+    #old.sort()
 
     if not new and not old:
         print indent + "Nothing is affected by this update."
@@ -232,16 +233,16 @@ def displayUpdateJobInfo(cs, verbose=False):
     if new:
         print indent + ("\n%s" %indent).join(new)
 
-    if old:
-        print indent + ("\n%s" %indent).join(old)
+    #if old:
+    #    print indent + ("\n%s" %indent).join(old)
 
 
 def displayUpdateInfo(updJob, verbose=False):
-    totalJobs = len(updJob.getChangeSets())
-    for num, cs in enumerate(updJob.getChangeSets()):
+    totalJobs = len(updJob.getJobs())
+    for num, job in enumerate(updJob.getJobs()):
         if totalJobs > 1:
             print 'Job %d of %d:' %(num + 1, totalJobs)
-        displayUpdateJobInfo(cs, verbose)
+        displayUpdateJobInfo(job, verbose)
     return
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
@@ -258,6 +259,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
     if type(pkgList) is str:
         pkgList = ( pkgList, )
+
+    # If keepExisting is true, we want our specifications to be relative
+    # to nothing. If it's false, they should be absolute as updateChangeSet
+    # interperts absolute jobs as ones which should be rooted (if there is
+    # anything available to root them to).
+    areAbsolute = not keepExisting
+
     for pkgStr in pkgList:
         if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
             try:
@@ -277,10 +285,10 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   (None, None), False))
             elif troveSpec[0][0] == '+':
                 applyList.append((troveSpec[0], (None, None), 
-                                  troveSpec[1:], True))
+                                  troveSpec[1:], areAbsolute))
             elif updateByDefault:
                 applyList.append((troveSpec[0], (None, None), 
-                                  troveSpec[1:], True))
+                                  troveSpec[1:], areAbsolute))
             else:
                 applyList.append((troveSpec[0], troveSpec[1:],
                                   (None, None), False))

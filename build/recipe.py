@@ -1486,9 +1486,11 @@ class SingleGroup:
 
         client = conaryclient.ConaryClient(cfg)
         if self.checkOnlyByDefaultDeps:
-            depCs = client.updateChangeSet(troves, recurse = True,
+            uJob = client.updateChangeSet(troves, recurse = True,
                                             resolveDeps=False, split=False)[0]
-            cs = depCs.csList[0]
+            troves = uJob.getJobs()[0]
+            cs = client.repos.createChangeSet(troves, 
+                                              recurse = False, withFiles=False)
         else:
             cs = client.repos.createChangeSet(troves, 
                                               recurse = True, withFiles=False)

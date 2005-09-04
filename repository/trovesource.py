@@ -356,8 +356,11 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
         SimpleTroveSource.__init__(self)
         self.db = db
         self.troveCsMap = {}
+        self.jobMap = {}
+        self.csList= []
+        self.invalidated = False
 
-    def addChangeSet(self, cs):
+    def addChangeSet(self, cs, includesFileContents = False):
         relative = []
         for trvCs in cs.iterNewTroveList():
             info = (trvCs.getName(), trvCs.getNewVersion(), 
@@ -366,6 +369,8 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                 if info in self.troveCsMap:
                     raise DuplicateTrove
                 self.troveCsMap[info] = cs
+                self.jobMap[(info[0], (None, None), info[1:], 
+                             trvCs.isAbsolute())] = cs, includesFileContents
                 continue
 
             relative.append((trvCs, info))
@@ -379,6 +384,12 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
             if info in self.troveCsMap:
                 raise DuplicateTrove
             self.troveCsMap[info] = cs
+            self.jobMap[(info[0], (trvCs.getOldVersion(), 
+                                   trvCs.getOldFlavor()), 
+                         info[1:], trvCs.isAbsolute())] = \
+                                            (cs, includesFileContents)
+
+        self.csList.append(cs)
 
     def trovesByName(self, name):
         l = []
@@ -408,10 +419,11 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
 
         return retList
 
-    def createChangeSet(self, jobList, withFiles = True, recurse = False):
+    def createChangeSet(self, jobList, withFiles = True, recurse = False,
+                        withFileContents = False, useDatabase = True):
         # Returns the changeset plus a remainder list of the bits it
         # couldn't do
-        def _findTroveObj(availSet, name, version, flavor):
+        def _findTroveObj(availSet, (name, version, flavor)):
             info = (name, version, flavor)
             (inDb, fromCs) = availSet[info]
 
@@ -425,7 +437,10 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
 
             return trv
 
-        assert(not withFiles)
+        assert(not self.invalidated)
+        assert((withFiles and withFileContents) or
+               (not withFiles and not withFileContents))
+
         assert(not recurse)
         troves = []
         for job in jobList:
@@ -434,33 +449,115 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
             if job[2][0] is not None:
                 troves.append((job[0], job[2][0], job[2][1]))
 
-        inDatabase = self.db.hasTroves(troves)
+        if useDatabase:
+            inDatabase = self.db.hasTroves(troves)
+        else:
+            inDatabase = [ False ] * len(troves)
+            
         asChangeset = [ info in self.troveCsMap for info in troves ]
         trovesAvailable = dict((x[0], (x[1], x[2])) for x in 
                             itertools.izip(troves, inDatabase, asChangeset))
 
-        cs = changeset.ChangeSet()
+        cs = changeset.ReadOnlyChangeSet()
         remainder = []
 
+        # Track jobs we need to go get directly from change sets later, and
+        # jobs which need to be rooted relative to a change set.
+        changeSetJobs = set()
+        needsRooting = []
+        
+        jobFromCs = set()
+
         for job in jobList:
-            if job[2][0] is None:
-                cs.oldTrove(job[0], job[1][0], job[1][1])
+            oldInfo = (job[0], job[1][0], job[1][1])
+            newInfo = (job[0], job[2][0], job[2][1])
+
+            if newInfo[1] is None:
+                cs.oldTrove(*oldInfo)
                 continue
 
-            newTrv = _findTroveObj(trovesAvailable, job[0], job[2][0], 
-                                   job[2][1])
+            # if this job is available from a changeset already, just deliver
+            # it w/o computing it
+            if job in self.jobMap:
+                subCs, filesAvailable = self.jobMap[job]
+                if (not withFileContents or filesAvailable):
+                    changeSetJobs.add(job)
+                    continue
+
+            if withFileContents:
+                # is this available as an absolute change set with files?
+                absJob = (job[0], (None, None), job[2], True)
+                if absJob in self.jobMap and self.jobMap[absJob][1] is True:
+                    needsRooting.append((job, absJob))
+                    continue
+                else:
+                    # otherwise we can't deliver files
+                    remainder.append(job)
+                    continue
+
+            newTrv = _findTroveObj(trovesAvailable, newInfo)
             if newTrv is None:
                 remainder.append(job)
                 continue
 
-            if job[1][0] is None:
+            if oldInfo[1] is None:
                 oldTrv = None
             else:
-                oldTrv = _findTroveObj(trovesAvailable, job[0], job[1][0], 
-                                       job[1][1])
+                oldTrv = _findTroveObj(trovesAvailable, oldInfo)
                 if oldTrv is None:
                     remainder.append(job)
 
             cs.newTrove(newTrv.diff(oldTrv)[0])
+
+        # we can't combine these (yet; we should work on that)
+        assert(not changeSetJobs or not needsRooting)
+
+        rootMap = {}
+        for (relJob, absJob) in needsRooting:
+            assert(relJob[0] == absJob[0])
+            assert(relJob[2] == absJob[2])
+            rootMap[(absJob[0], absJob[2][0], absJob[2][1])] = relJob[1]
+            # and let the normal changeset handling assemble the final
+            # changesets for us. the relative job will exist after the
+            # rooting.
+            changeSetJobs.add(relJob)
+
+        if rootMap:
+            # we can't root changesets multiple times
+            self.invalidated = True
+            for subCs in self.csList:
+                subCs.rootChangeSet(self.db, rootMap)
+
+        # assemble jobs directly from changesets and update those changesets
+        # to not have jobs we don't need
+        if changeSetJobs:
+            # this trick only works once
+            self.invalidated = withFiles
+            for subCs in self.csList:
+                toDel = []
+                for trvCs in subCs.iterNewTroveList():
+                    if trvCs.getOldVersion() is None:
+                        job = (trvCs.getName(), 
+                                  (None, None),
+                                  (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                                trvCs.isAbsolute())
+                    else:
+                        job = (trvCs.getName(), 
+                                  (trvCs.getOldVersion(), trvCs.getOldFlavor()),
+                                  (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                                trvCs.isAbsolute())
+
+                    if job not in changeSetJobs:
+                        toDel.append((job[0], job[2][0], job[2][1]))
+
+                for info in toDel:
+                    subCs.delNewTrove(*info)
+
+                # we generate our own deletions. we don't need to get them
+                # from here
+                for info in subCs.getOldTroveList():
+                    subCs.delOldTrove(*info)
+
+            cs.merge(subCs)
 
         return (cs, remainder)

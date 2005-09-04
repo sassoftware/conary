@@ -83,12 +83,6 @@ class Rollback:
 
 class UpdateJob:
 
-    def addChangeSet(self, cs):
-        self.csList.append(cs)
-
-    def getChangeSets(self):
-        return self.csList
-
     def addLockMapping(self, name, lockedVersion, neededVersion):
         self.lockMapping.add((name, lockedVersion, neededVersion))
     
@@ -101,10 +95,20 @@ class UpdateJob:
     def setRollback(self, rollback):
         self.rollback = rollback
 
-    def __init__(self):
-        self.csList = []
+    def getTroveSource(self):
+        return self.troveSource
+
+    def addJob(self, job):
+        self.jobs.append(job)
+
+    def getJobs(self):
+        return self.jobs
+
+    def __init__(self, db):
+        self.jobs = []
         self.lockMapping = set()
         self.rollback = None
+        self.troveSource = trovesource.ChangesetFilesTroveSource(db)
 
 class SqlDbRepository(trovesource.SimpleTroveSource,
                       datastore.DataStoreRepository,
@@ -676,10 +680,10 @@ class Database(SqlDbRepository):
                 reposCs.merge(newCs)
 
                 try:
-                    self.commitChangeSet(reposCs, UpdateJob(),
+                    self.commitChangeSet(reposCs, UpdateJob(None),
                                          isRollback = True,
                                          replaceFiles = replaceFiles)
-                    self.commitChangeSet(localCs, UpdateJob(),
+                    self.commitChangeSet(localCs, UpdateJob(None),
                                          isRollback = True,
                                          toStash = False,
                                          replaceFiles = replaceFiles)
