@@ -426,8 +426,8 @@ class DependencyTables:
                             BrokenDeps.depNum = Requires.DepNum
                         INNER JOIN Dependencies ON
                             Requires.depId = Dependencies.depId
-                        INNER JOIN DBInstances ON
-                            Requires.instanceId = DBInstances.instanceId
+                        INNER JOIN Instances ON
+                            Requires.instanceId = Instances.instanceId
                 """, start_transaction = False)
 
             failedSets = {}
@@ -756,14 +756,14 @@ class DependencyTables:
                                 RemovedTroves 
                             INNER JOIN Versions ON
                                 RemovedTroves.version = Versions.version
-                            INNER JOIN DBFlavors ON
-                                RemovedTroves.flavor = DBFlavors.flavor OR
+                            INNER JOIN Flavors ON
+                                RemovedTroves.flavor = Flavors.flavor OR
                                 (RemovedTroves.flavor is NULL AND
-                                 DBFlavors.flavor is NULL)
-                            INNER JOIN DBInstances ON
-                                DBInstances.troveName = RemovedTroves.name AND
-                                DBInstances.versionId = Versions.versionId AND
-                                DBInstances.flavorId  = DBFlavors.flavorId""")
+                                 Flavors.flavor is NULL)
+                            INNER JOIN Instances ON
+                                Instances.troveName = RemovedTroves.name AND
+                                Instances.versionId = Versions.versionId AND
+                                Instances.flavorId  = Flavors.flavorId""")
 
             # no need to remove RemovedTroves -- this is all in a transaction
             # which gets rolled back
@@ -1079,13 +1079,13 @@ class DependencyTables:
                             multiplier = -1)
 
         full = """SELECT depNum, troveName, Versions.version, 
-                         timeStamps, DBFlavors.flavor FROM 
+                         timeStamps, Flavors.flavor FROM 
                         (%s)
-                      INNER JOIN DBInstances ON
-                        provInstanceId == DBInstances.instanceId
+                      INNER JOIN Instances ON
+                        provInstanceId == Instances.instanceId
                       INNER JOIN Versions USING(versionId)
-                      INNER JOIN DBFlavors 
-                            ON (DBInstances.flavorId == DBFlavors.flavorId)
+                      INNER JOIN Flavors 
+                            ON (Instances.flavorId == Flavors.flavorId)
                     """ % self._resolveStmt( "TmpRequires", 
                                 ("Provides",), ("Dependencies",))
 

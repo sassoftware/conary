@@ -145,10 +145,10 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
 
     def getTroveLatestVersion(self, name, branch):
         cu = self.db.db.cursor()
-	cu.execute("""SELECT version, timeStamps FROM DBInstances 
+	cu.execute("""SELECT version, timeStamps FROM Instances 
 			JOIN Versions ON
-			    DBInstances.versionId == Versions.versionId
-			WHERE DBInstances.troveName == ? AND
+			    Instances.versionId == Versions.versionId
+			WHERE Instances.troveName == ? AND
 			      isPresent == 1
 		   """, name)
 
@@ -191,16 +191,16 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
         else:
             flavorTest = "is NULL";
 
-        cu.execute("""SELECT count(*) FROM DBInstances
+        cu.execute("""SELECT count(*) FROM Instances
                         JOIN Versions ON
-                            DBInstances.versionId == Versions.versionId
-                        JOIN DBFlavors ON
-                            DBInstances.flavorId == DBFlavors.flavorId
+                            Instances.versionId == Versions.versionId
+                        JOIN Flavors ON
+                            Instances.flavorId == Flavors.flavorId
                         WHERE
-                            DBInstances.troveName == ? AND
-                            DBInstances.isPresent != 0 AND
+                            Instances.troveName == ? AND
+                            Instances.isPresent != 0 AND
                             Versions.version == ? AND
-                            DBFlavors.flavor %s
+                            Flavors.flavor %s
                    """ % flavorTest, troveName, version.asString())
 
         result = cu.next()[0] != 0

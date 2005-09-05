@@ -4,6 +4,8 @@ Changes in 0.62.2:
     it should be an update from an existing trove (when possible). Network
     changesets and changesets from files are treated almost identically now.
   * Swapped lock terminology for pin
+  * Changed table names in database schema to better match the repository
+    schema
 
 Changes in 0.62.1:
   * UtilizeGroup fixed
