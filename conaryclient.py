@@ -911,9 +911,8 @@ class ConaryClient:
                 newJob.add((troveName, oldTrove,
                             (newVersionStr, newFlavorStr), isAbsolute))
             elif isinstance(newVersionStr, versions.Branch):
-                assert(isinstance(newFlavorStr, deps.DependencySet))
-                toFind[(troveName, newVersionStr.asString(), 
-                               newFlavorStr)] = oldTrove, isAbsolute
+                toFind[(troveName, newVersionStr.asString(),
+                        newFlavorStr)] = oldTrove, isAbsolute
             elif (newVersionStr and newVersionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
