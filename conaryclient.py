@@ -991,9 +991,6 @@ class ConaryClient:
             del cs
         del changeSetList
 
-        import lib
-        lib.epdb.st('f')
-
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
         newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
                                          keepExisting, recurse, oldItems)
