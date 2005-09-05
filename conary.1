@@ -22,9 +22,103 @@ cvc(1).
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
+.B changeset <\fItrovename\fP[[=\fIoldver\fP\fI[<flavor>]\fP>]--[\fInewver\fP\fI[<flavor>]]\fP>]+ \fIoutfile\fP
+Creates an absolute changeset for \fItrovename newver\fP, or a relative
+changeset between \fItrovename oldver\fP and \fItrovename newver\fP, and stores
+it in outfile.
+.RS 4
+.TP
+.B \-\-no-recurse
+Don't recursively include troves referenced by the groups and packages
+listed.  Normally referenced troves which do not match troves in the
+\fBexcludeList\fR are included in the changeset.
+.RE
+.TP
+.B commit \fIchangeset\fP [\-\-target-branch \fI<branch>\fP]
+Commits a changeset to the repository.  This is not a reversible
+operation, so take care.  The \fB\-\-target-branch\fP option
+is only appropriate when you commit a \fBlocal changeset\fP
+to a repository.
+.TP
+.B config  
+Shows the configuration that conary will use for any 
+subsequent commands executed, based on the configuration files it has 
+loaded and the configuration-altering command-line options that were 
+supplied.  See the \fIFILES\fP section of this manual for more information.
+Arguments include
+.RS 4
+.TP 4
+.B \-\-show-passwords
+Normally, conary config will mask paswords in repository maps, to avoid their
+accidental display.  You can override this masking with --show-passwords.  
+.RE
+.TP
+.B emerge \fI<component>...\fP
+Builds the recipe for the given component (which it finds by searching the
+\fIinstallLabelPath\fP) onto the \fBlocalhost@local:EMERGE\fP branch
+and updates the local system to the new build. Dependency checks are
+not performed.
+.TP
+.B erase [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
+from the local system. It has the same syntax as \fBupdate\fR, but trove
+names which are not preceded by a plus or minus are removed instead of
+updated.
+.TP
+.B localcommit
+Applies a local changeset to the local system.  This is exactly
+equivalent to making every change represented in the changeset
+by hand on the local system, the locally-installed versions still
+reference the repository as their source, future updates will still
+come from the repository, and the changes represented in the local
+changeset will be preserved as if they had been made by hand
+locally.
+.TP
+.B localcs \fItrovename outfile\fP
+Creates a local changeset, which represents the changes made on the
+local system to \fItrovename\fP, relative to the package as it is
+represented in the repository.
+.TP
 .B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
 Lists troves installed on the local system. Any number of trove names or
-absolute paths may be given.
+absolute paths may be given. Extra arguments may be given to change what
+information is displayed (but they cannot be combined, unfortunately).
+.RS 4
+.TP 4
+.B \-\-deps
+Displays full dependency information
+.TP
+.B \-\-full-versions
+Full version strings are displayed instead of abbreviated version numbers
+.TP
+.B \-\-info
+Displays information on the specified troves, including flavors, requirements
+and pin status.
+.RE
+.TP
+.B rblist
+Lists available rollbacks.
+.TP
+.B remove \fIpath\fP
+Remove the file named \fIpath\fP from the system, and record in the
+Conary database that the file has been removed.  After this, doing
+\fBconary update\fP will not replace the file.  (If future versions
+of the component rename the file, the removal will track the rename;
+that is; if you run \fBconary remove /foo/bar\fP and \fI/foo/bar\fP
+is later renamed \fI/foo/blah\fP, when you update to a version of
+the component that now contains \fI/foo/blah\fP instead of
+\fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
+as a new file.)
+.TP
+.B rollback \fIrollback\fP [\fIargs\fP] 
+Applies rollback \fIrollback\fP.  (Syntax may change in future versions
+of Conary.)
+Arguments include
+.RS 4
+.TP 4
+.B \-\-replace-files
+See \-\-replace-files description from \fBconary update\fP
+.RE
 .TP
 .B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>* <\fIchangeset-file\fP>*
 Updates the trove \fItrovename\fR from the appropriate repository to 
@@ -100,87 +194,6 @@ version of a trove you have installed.
 Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
-.B erase [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
-Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
-from the local system. It has the same syntax as \fBupdate\fR, but trove
-names which are not preceded by a plus or minus are removed instead of
-updated.
-.TP
-.B remove \fIpath\fP
-Remove the file named \fIpath\fP from the system, and record in the
-Conary database that the file has been removed.  After this, doing
-\fBconary update\fP will not replace the file.  (If future versions
-of the component rename the file, the removal will track the rename;
-that is; if you run \fBconary remove /foo/bar\fP and \fI/foo/bar\fP
-is later renamed \fI/foo/blah\fP, when you update to a version of
-the component that now contains \fI/foo/blah\fP instead of
-\fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
-as a new file.)
-.TP
-.B changeset <\fItrovename\fP[[=\fIoldver\fP\fI[<flavor>]\fP>]--[\fInewver\fP\fI[<flavor>]]\fP>]+ \fIoutfile\fP
-Creates an absolute changeset for \fItrovename newver\fP, or a relative
-changeset between \fItrovename oldver\fP and \fItrovename newver\fP, and stores
-it in outfile.
-.RS 4
-.TP
-.B \-\-no-recurse
-Don't recursively include troves referenced by the groups and packages
-listed.  Normally referenced troves which do not match troves in the
-\fBexcludeList\fR are included in the changeset.
-.RE
-.TP
-.B localcs \fItrovename outfile\fP
-Creates a local changeset, which represents the changes made on the
-local system to \fItrovename\fP, relative to the package as it is
-represented in the repository.
-.TP
-.B localcommit
-Applies a local changeset to the local system.  This is exactly
-equivalent to making every change represented in the changeset
-by hand on the local system, the locally-installed versions still
-reference the repository as their source, future updates will still
-come from the repository, and the changes represented in the local
-changeset will be preserved as if they had been made by hand
-locally.
-.TP
-.B commit \fIchangeset\fP [\-\-target-branch \fI<branch>\fP]
-Commits a changeset to the repository.  This is not a reversible
-operation, so take care.  The \fB\-\-target-branch\fP option
-is only appropriate when you commit a \fBlocal changeset\fP
-to a repository.
-.TP
-.B config  
-Shows the configuration that conary will use for any 
-subsequent commands executed, based on the configuration files it has 
-loaded and the configuration-altering command-line options that were 
-supplied.  See the \fIFILES\fP section of this manual for more information.
-Arguments include
-.RS 4
-.TP 4
-.B \-\-show-passwords
-Normally, conary config will mask paswords in repository maps, to avoid their
-accidental display.  You can override this masking with --show-passwords.  
-.RE
-.TP
-.B emerge \fI<component>...\fP
-Builds the recipe for the given component (which it finds by searching the
-\fIinstallLabelPath\fP) onto the \fBlocalhost@local:EMERGE\fP branch
-and updates the local system to the new build. Dependency checks are
-not performed.
-.TP
-.B rblist
-Lists available rollbacks.
-.TP
-.B rollback \fIrollback\fP [\fIargs\fP] 
-Applies rollback \fIrollback\fP.  (Syntax may change in future versions
-of Conary.)
-Arguments include
-.RS 4
-.TP 4
-.B \-\-replace-files
-See \-\-replace-files description from \fBconary update\fP
-.RE
-.TP
 .B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Lists troves in the repository.
 Arguments include
@@ -218,6 +231,7 @@ Displays flavors of the troves
 .TP
 .B \-\-tags
 .\" FIXME: document
+.RE
 .RE
 .TP
 .B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
