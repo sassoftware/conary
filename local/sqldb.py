@@ -1377,8 +1377,11 @@ class Database:
         return result
 
     def findTroveReferences(self, names):
-        """ return troves contained in troves on this system, whether
-            or not they are installed
+        """ return trove tuples that a) have a name in the given list of 
+            names and b) are referenced by the pristine version of troves 
+            installed in this system.
+            Note that the trove tuples returned may not be installed - they 
+            merely must be referenced by an installed trove.
         """
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
