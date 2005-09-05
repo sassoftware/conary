@@ -144,9 +144,8 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
-    def _resolveDependencies(self, uJob, jobSet, keepExisting = None, 
-                             depsRecurse = True, split = False,
-                             resolve = True):
+    def _resolveDependencies(self, uJob, jobSet, depsRecurse = True, 
+                             split = False, resolve = True):
 
         def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
             """ determine which of the given set of troveTups is the 
@@ -246,12 +245,9 @@ class ConaryClient:
                         for choiceList in sugg[depSet]:
                             troveNames = set(x[0] for x in choiceList)
 
-                            if keepExisting:
-                                affTroveDict = dict((x, []) for x in troveNames)
-                            else:
-                                affTroveDict = \
-                                    dict((x, self.db.trovesByName(x))
-                                                      for x in troveNames)
+                            affTroveDict = \
+                                dict((x, self.db.trovesByName(x))
+                                                  for x in troveNames)
 
                             # iterate over flavorpath -- use suggestions 
                             # from first flavor on flavorpath that gets a match 
@@ -266,14 +262,13 @@ class ConaryClient:
                                     l.add(choice)
                                     break
 
-			troves.update([ (x[0], (None, None), x[1:], 
-                                            not keepExisting) 
+			troves.update([ (x[0], (None, None), x[1:], True)
                                         for x in suggList ])
 
                 # if we've found good suggestions, merge in those troves
                 if troves:
                     newJob = self._updateChangeSet(troves, uJob,
-                                              keepExisting = keepExisting)[0]
+                                              keepExisting = False)[0]
                     assert(not (newJob & jobSet))
                     jobSet.update(newJob)
                     newCs, remainder = uJob.getTroveSource().createChangeSet(
@@ -369,7 +364,7 @@ class ConaryClient:
         return redirectHack
 
     def _mergeGroupChanges(self, uJob, primaryJobList, redirectHack, 
-                           keepExisting, recurse, ineligible):
+                           recurse, ineligible):
 
         def _newBase(newTrv):
             """
@@ -993,7 +988,7 @@ class ConaryClient:
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
         newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
-                                         keepExisting, recurse, oldItems)
+                                         recurse, oldItems)
 
         if not newJob:
             raise NoNewTrovesError
@@ -1107,7 +1102,6 @@ class ConaryClient:
         (depList, suggMap, cannotResolve, splitJob) = \
             self._resolveDependencies(uJob, jobSet,
                                       resolve = resolveDeps,
-                                      keepExisting = keepExisting, 
                                       depsRecurse = depsRecurse,
                                       split = split)
         if depList:
