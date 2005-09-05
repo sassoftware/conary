@@ -6,6 +6,7 @@ Changes in 0.62.2:
   * Swapped lock terminology for pin
   * Changed table names in database schema to better match the repository
     schema
+  * Don't link troves to groups when the branch has changed
 
 Changes in 0.62.1:
   * UtilizeGroup fixed

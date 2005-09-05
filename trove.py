@@ -699,7 +699,9 @@ class Trove(streams.LargeStreamSet):
                 #      to be removed
                 #   3. If the new troves are on the same branch, take the
                 #      newer one.
-                #   4. Otherwise, take the trove from the primary.
+                #   4. Otherwise, take the trove from the primary (it's
+                #      not clear this case is possible given how linkages
+                #      are maintained)
                 assert(newOverlap is None)
                 if job[2] == (None, None):
                     keepSecondary = False
