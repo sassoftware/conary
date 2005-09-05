@@ -1,3 +1,6 @@
+Changes in 0.62.3:
+  * Don't link troves to groups when the branch has changed
+
 Changes in 0.62.2:
   * Further reworkings of update code to be fully based on job sets. The
     absolute flag now defines whether a trove is newly installed or if
@@ -6,7 +9,6 @@ Changes in 0.62.2:
   * Swapped lock terminology for pin
   * Changed table names in database schema to better match the repository
     schema
-  * Don't link troves to groups when the branch has changed
 
 Changes in 0.62.1:
   * UtilizeGroup fixed
