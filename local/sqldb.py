@@ -707,7 +707,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, oldTroveSpec, trove, pin = False):
+    def addTrove(self, oldTroveList, trove, pin = False):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
@@ -821,13 +821,50 @@ class Database:
 
         cu.execute("DROP TABLE IncludedTroves")
 
+        # Now find all the troves which are referenced by this one, but
+        # are not present. There might be good alternatives to link those
+        # troves to?
+        cu.execute("""
+            SELECT Instances.instanceId, Versions.version, 
+                    AvailableVersions.version,
+                    AvailableInstances.instanceId
+                FROM TroveTroves JOIN Instances ON
+                    TroveTroves.includedId = Instances.instanceId 
+                JOIN Versions ON
+                    Instances.versionId = Versions.versionId
+                JOIN Instances AS AvailableInstances ON
+                    Instances.troveName = AvailableInstances.troveName
+                JOIN Versions AS AvailableVersions ON
+                    AvailableInstances.versionId = AvailableVersions.versionId
+                WHERE
+                    TroveTroves.instanceId = ? AND
+                    Instances.isPresent = 0 AND
+                    AvailableInstances.isPresent = 1
+                   """, troveInstanceId)
+        l = []
+        for (missingInstanceId, missingVersion, availableVersion, 
+                                    availableInstanceId) in cu:
+            missingVersion = versions.VersionFromString(missingVersion)
+            availableVersion = versions.VersionFromString(availableVersion)
+            if missingVersion.branch() == availableVersion.branch():
+                l.append((missingInstanceId, availableInstanceId))
+        
+        for missingInstanceId, availableInstanceId in l:
+            cu.execute("""
+                INSERT INTO TroveTroves 
+                    SELECT instanceId, ?, byDefault, 0 
+                        FROM TroveTroves 
+                    WHERE
+                        instanceId = ? AND includedId = ?
+            """, availableInstanceId, troveInstanceId, missingInstanceId)
+
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
         
         # add this trove to any groups the old trove was part of (which could
         # already be in the list, if we're reverting to something the group
         # already references)
-        if oldTroveSpec[1] is not None:
+        for oldTroveSpec in oldTroveList:
             flavorStr = oldTroveSpec[2].freeze()
             if flavorStr:
                 flavorStr = "= '%s'" % flavorStr
@@ -1439,6 +1476,25 @@ class Database:
             l.append((name, versions.VersionFromString(version), flavorStr))
                     
         return l
+
+    def findRemovedByName(self, name):
+        """
+        Returns information on erased troves with a given name.
+        """
+
+        cu = self.db.cursor()
+
+        cu.execute("""SELECT troveName, version, flavor FROM
+                            Instances JOIN Versions ON
+                                Instances.versionId = Versions.versionId
+                            JOIN Flavors ON
+                                Instances.flavorId = Flavors.flavorId
+                            WHERE
+                                isPresent = 0 AND
+                                troveName = (?)""", name)
+
+        return [ (n, versions.VersionFromString(v),
+                  deps.deps.ThawDependencySet(f)) for (n, v, f) in cu ]
 
     def findByNames(self, nameList):
         cu = self.db.cursor()

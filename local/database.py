@@ -117,6 +117,9 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def iterAllTroveNames(self):
 	return self.db.iterAllTroveNames()
 
+    def findRemovedByName(self, name):
+        return self.db.findRemovedByName(name)
+
     def findByNames(self, nameList):
         return self.db.findByNames(nameList)
 
@@ -269,10 +272,6 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
     def addTrove(self, oldTroveSpec, trove, pin = False):
-        if oldTroveSpec[1] and oldTroveSpec[1].branch() != \
-                                    trove.getVersion().branch():
-            oldTroveSpec = (None, None, None)
-
 	return self.db.addTrove(oldTroveSpec, trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
