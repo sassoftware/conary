@@ -42,7 +42,7 @@ from trove import DigitalSignatureVerificationError
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
-CACHE_SCHEMA_VERSION = 15
+CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
