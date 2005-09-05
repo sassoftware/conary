@@ -60,14 +60,14 @@ def usage(rc = 1):
     print "       conary erase        <pkgname>[=<version>][[flavor]]+"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
-    print "       conary lock         <pkgname>[=<version>][[flavor]]*"
+    print "       conary pin          <pkgname>[=<version>][[flavor]]*"
     print "       conary query        <pkgname>[=<version>][[flavor]]*"
     print "       conary remove       <path>"
     print "       conary repquery     <pkgname>[=<version>][[flavor]]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset> <trove>[=<version>]*"
-    print "       conary unlock       <pkgname>[=<version>][[flavor]]*"
+    print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
     print "       conary usage"
@@ -313,10 +313,10 @@ def realMain(cfg, argv=sys.argv):
 	db = database.Database(cfg.root, cfg.dbPath)
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
-    elif (otherArgs[1] == "lock" or otherArgs[1] == "unlock"):
+    elif (otherArgs[1] == "pin" or otherArgs[1] == "unpin"):
 	if argSet: return usage()
 
-        updatecmd.changeLocks(cfg, otherArgs[2:], lock = otherArgs[1] == "lock")
+        updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
     elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
         paths = argSet.pop('path', [])
 	tags = argSet.pop('tags', False)

@@ -83,11 +83,11 @@ class Rollback:
 
 class UpdateJob:
 
-    def addLockMapping(self, name, lockedVersion, neededVersion):
-        self.lockMapping.add((name, lockedVersion, neededVersion))
+    def addPinMapping(self, name, pinnedVersion, neededVersion):
+        self.pinMapping.add((name, pinnedVersion, neededVersion))
     
-    def getLockMaps(self):
-        return self.lockMapping
+    def getPinMaps(self):
+        return self.pinMapping
 
     def getRollback(self):
         return self.rollback
@@ -106,7 +106,7 @@ class UpdateJob:
 
     def __init__(self, db):
         self.jobs = []
-        self.lockMapping = set()
+        self.pinMapping = set()
         self.rollback = None
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
 
@@ -268,25 +268,25 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
-    def addTrove(self, oldTroveSpec, trove, lock = False):
-	return self.db.addTrove(oldTroveSpec, trove, lock = lock)
+    def addTrove(self, oldTroveSpec, trove, pin = False):
+	return self.db.addTrove(oldTroveSpec, trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
 	pass
 
-    def lockTroves(self, troveList, lock):
+    def pinTroves(self, troveList, pin):
         troves = self.getTroves(troveList)
 
         for trove in troves:
             for subTrove in self.walkTroveSet(trove):
-                self.db.lockTrove(subTrove.getName(),
+                self.db.pinTroves(subTrove.getName(),
                                   subTrove.getVersion(),
-                                  subTrove.getFlavor(), lock = lock)
+                                  subTrove.getFlavor(), pin = pin)
 
         self.db.commit()
 
-    def trovesAreLocked(self, troveList):
-        return self.db.trovesAreLocked(troveList)
+    def trovesArePinned(self, troveList):
+        return self.db.trovesArePinned(troveList)
 
     def commit(self):
 	self.db.commit()
@@ -398,7 +398,7 @@ class Database(SqlDbRepository):
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
                         removeHints = {}, 
-                        autoLockList = RegularExpressionList()):
+                        autoPinList = RegularExpressionList()):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -518,8 +518,8 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             localrep.LocalRepositoryChangeSetJob(self, cs, callback,
-                                                 autoLockList)
-            self.db.mapLockedTroves(uJob.getLockMaps())
+                                                 autoPinList)
+            self.db.mapPinnedTroves(uJob.getPinMaps())
 
         errList = fsJob.getErrorList()
         if errList:

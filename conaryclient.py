@@ -430,7 +430,7 @@ class ConaryClient:
         def _lockedList(neededList):
             l = [ (x[0], x[1], x[3]) for x in neededList if x[1] is not None ]
             l.reverse()
-            lockList = self.db.trovesAreLocked(l)
+            lockList = self.db.trovesArePinned(l)
             r = []
             for item in neededList:
                 if item[1] is not None:
@@ -461,7 +461,7 @@ class ConaryClient:
             # get considered for removal. Ones which need to be removed
             # for a new trove to be installed are guaranteed to be removed.
             #
-	    # Locks for updated troves are handled when the update trvCs
+	    # Pins for updated troves are handled when the update trvCs
 	    # is checked; no need to check it again here
             oldTroves = [ ((job[0], job[1][0], job[1][1]), True, ERASE) for
                                 job in newJob
@@ -519,16 +519,16 @@ class ConaryClient:
 
 		refTroveInfo = [ x for x in trv.iterTroveList() ]
 		present = self.db.hasTroves(refTroveInfo)
-		locked = self.db.trovesAreLocked(refTroveInfo)
+		locked = self.db.trovesArePinned(refTroveInfo)
 		areContainers = [ not(x[0].startswith('fileset-') or 
 				    x[0].find(":") != -1)
 				    for x in refTroveInfo ]
 
 		contList = []
-		for (subInfo, isPresent, isLocked, isContainer) in \
+		for (subInfo, isPresent, isPinned, isContainer) in \
 			itertools.izip(refTroveInfo, present, locked, 
 				       areContainers):
-		    if not isPresent or isLocked: continue
+		    if not isPresent or isPinned: continue
 		    if not isContainer:
 			troveList.append((subInfo, None, nodeId))
 		    else:   
@@ -725,11 +725,11 @@ class ConaryClient:
             alreadyInstalled = _alreadyInstalled(newTrv)
             locked = _lockedList(neededTroveList)
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
-                    oldIsLocked in itertools.izip(neededTroveList, locked):
+                    oldIsPinned in itertools.izip(neededTroveList, locked):
                 if (name, newVersion, newFlavor) not in alreadyInstalled:
-                    if oldIsLocked:
+                    if oldIsPinned:
                         if newVersion is not None:
-                            uJob.addLockMapping(name, 
+                            uJob.addPinMapping(name, 
                                                 (oldVersion, oldFlavor),
                                                 (newVersion, newFlavor))
                     elif newVersion is None:
@@ -782,12 +782,12 @@ class ConaryClient:
                 # installed
                 newJob.add((info[0], (None, None), (info[1], info[2]), 0))
 
-            replacedAreLocked = self.db.trovesAreLocked((x[1] for x
+            replacedArePinned = self.db.trovesArePinned((x[1] for x
                                                          in replacedTroves))
 
-            for (newInfo, oldInfo), oldIsLocked in zip(replacedTroves,
-                                                       replacedAreLocked):
-                if not oldIsLocked:
+            for (newInfo, oldInfo), oldIsPinned in zip(replacedTroves,
+                                                       replacedArePinned):
+                if not oldIsPinned:
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
                                 (newInfo[1], newInfo[2]), 0))
 
@@ -1155,7 +1155,7 @@ class ConaryClient:
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback(),
-                    autoLockList = conarycfg.RegularExpressionList()):
+                    autoPinList = conarycfg.RegularExpressionList()):
 
         def _createCs(repos, job, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
@@ -1180,7 +1180,7 @@ class ConaryClient:
                                     journal = journal, callback = callback,
                                     localRollbacks = localRollbacks,
                                     removeHints = removeHints,
-                                    autoLockList = autoLockList)
+                                    autoPinList = autoPinList)
             except database.CommitError, e:
                 raise UpdateError, "changeset cannot be applied"
 
@@ -1550,6 +1550,6 @@ class ConaryClient:
             raise UpdateError, \
                 "Write permission denied on conary database %s" % self.db.dbpath
 
-    def lockTroves(self, troveList, lock = True):
-        self.db.lockTroves(troveList, lock = lock)
+    def pinTroves(self, troveList, pin = True):
+        self.db.pinTroves(troveList, pin = pin)
 

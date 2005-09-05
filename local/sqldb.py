@@ -185,7 +185,7 @@ class DBInstanceTable:
 				flavorId INT,
 				timeStamps STR,
 				isPresent INT,
-                                locked BOOLEAN)""")
+                                pinned BOOLEAN)""")
 	    cu.execute("CREATE INDEX InstancesNameIdx ON "
 		       "DBInstances(troveName)")
 	    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
@@ -213,7 +213,7 @@ class DBInstanceTable:
 	    yield match
 
     def addId(self, troveName, versionId, flavorId, timeStamps, 
-	      isPresent = True, locked = False):
+	      isPresent = True, pinned = False):
 	assert(min(timeStamps) > 0)
 	if isPresent:
 	    isPresent = 1
@@ -225,7 +225,7 @@ class DBInstanceTable:
 						   "?, ?, ?)",
                    (troveName, versionId, flavorId, 
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
-                    locked))
+                    pinned))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -369,7 +369,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 7
+    schemaVersion = 8
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -470,7 +470,7 @@ class Database:
                 sys.stdout.flush()
 
                 if version == 2:
-                    cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
+                    cu.execute("ALTER TABLE DBInstances ADD COLUMN pinned "
                                "BOOLEAN")
 
                 instances = [ x[0] for x in 
@@ -523,6 +523,7 @@ class Database:
                 version = 6
                 print "\r%s\r" %(' ' * len(msg)),
                 sys.stdout.flush()
+
             if version == 6:
                 cu.execute('''DELETE FROM TroveTroves 
                               WHERE TroveTroves.ROWID in (
@@ -536,6 +537,7 @@ class Database:
                            "TroveTroves(instanceId,includedId)")
                 cu.execute("UPDATE DatabaseVersion SET version=7")
                 version = 7
+
             if version != self.schemaVersion:
                 return False
 
@@ -606,7 +608,7 @@ class Database:
                     outD[name][version].append(deps.deps.ThawDependencySet(flavor))
         return outD
 
-    def lockTrove(self, name, version, flavor, lock = True):
+    def pinTroves(self, name, version, flavor, pin = True):
         if flavor.freeze() == "":
             flavorClause = "IS NULL"
         else:
@@ -614,7 +616,7 @@ class Database:
 
         cu = self.db.cursor()
         cu.execute("""
-            UPDATE DBInstances set locked=? WHERE
+            UPDATE DBInstances set pinned=? WHERE
                 instanceId = (SELECT instanceId FROM DBInstances 
                     JOIN DBFlavors ON
                         DBInstances.flavorId = DBFlavors.flavorId
@@ -624,9 +626,9 @@ class Database:
                         troveName=? AND
                         version = ? AND
                         flavor %s)
-        """ % flavorClause, lock, name, version.asString())
+        """ % flavorClause, pin, name, version.asString())
 
-    def trovesAreLocked(self, troveList):
+    def trovesArePinned(self, troveList):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE tlList (name STRING, "
                                 "version STRING, flavor STRING)",
@@ -638,7 +640,7 @@ class Database:
                        version.asString(), flavor.freeze(),
                        start_transaction = False)
             count += 1
-        cu.execute("""SELECT locked FROM tlList
+        cu.execute("""SELECT pinned FROM tlList
                             JOIN DBInstances ON
                                 DBInstances.troveName = tlList.name
                             JOIN Versions ON
@@ -684,7 +686,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, oldTroveSpec, trove, lock = False):
+    def addTrove(self, oldTroveSpec, trove, pin = False):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
@@ -749,7 +751,7 @@ class Database:
 	    assert(min(troveVersion.timeStamps()) > 0)
 	    troveInstanceId = self.instances.addId(troveName, troveVersionId, 
 				       troveFlavorId, troveVersion.timeStamps(),
-                                       locked = lock)
+                                       pinned = pin)
 	
         assert(cu.execute("SELECT COUNT(*) FROM TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
@@ -1216,25 +1218,25 @@ class Database:
 	    else:
 		yield (pathId, path, fileId, version)
 
-    def mapLockedTroves(self, mapList):
+    def mapPinnedTroves(self, mapList):
         if not mapList:
             return
 
         cu = self.db.cursor()
         cu.execute("""CREATE TEMPORARY TABLE mlt(
                             name STRING,
-                            lockedVersion STRING,
-                            lockedFlavor STRING,
+                            pinnedVersion STRING,
+                            pinnedFlavor STRING,
                             mappedVersion STRING,
                             mappedTimestamps STRING,
                             mappedFlavor STRING)""")
         
-        for (name, lockedInfo, mapInfo) in mapList:
+        for (name, pinnedInfo, mapInfo) in mapList:
             assert(sum(mapInfo[0].timeStamps()) > 0)
-            if not lockedInfo[1]:
-                lockedFlavor = None
+            if not pinnedInfo[1]:
+                pinnedFlavor = None
             else:
-                lockedFlavor = lockedInfo[1].freeze()
+                pinnedFlavor = pinnedInfo[1].freeze()
 
             if not mapInfo[1]:
                 mapFlavor = None
@@ -1242,7 +1244,7 @@ class Database:
                 mapFlavor = mapInfo[1].freeze()
 
             cu.execute("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)", 
-                       name, lockedInfo[0].asString(), lockedFlavor,
+                       name, pinnedInfo[0].asString(), pinnedFlavor,
                        mapInfo[0].asString(), 
                         ":".join([ "%.3f" % x for x in 
                                     mapInfo[0].timeStamps()]),
@@ -1250,17 +1252,17 @@ class Database:
 
         # now add link collections to these troves
         cu.execute("""INSERT INTO TroveTroves 
-                        SELECT TroveTroves.instanceId, lockedInst.instanceId,
+                        SELECT TroveTroves.instanceId, pinnedInst.instanceId,
                                TroveTroves.byDefault, 0 FROM
-                            mlt JOIN DBFlavors AS lockFlv ON
-                                lockedFlavor == lockFlv.flavor OR
-                                lockedFlavor IS NULL and lockFlv.flavor IS NULL
-                            JOIN Versions AS lockVers ON
-                                lockedVersion == lockVers.version
-                            JOIN DBInstances as lockedInst ON
-                                lockedInst.troveName == mlt.name AND
-                                lockedInst.flavorId == lockFlv.flavorId AND
-                                lockedInst.versionId == lockVers.versionId
+                            mlt JOIN DBFlavors AS pinFlv ON
+                                pinnedFlavor == pinFlv.flavor OR
+                                pinnedFlavor IS NULL and pinFlv.flavor IS NULL
+                            JOIN Versions AS pinVers ON
+                                pinnedVersion == pinVers.version
+                            JOIN DBInstances as pinnedInst ON
+                                pinnedInst.troveName == mlt.name AND
+                                pinnedInst.flavorId == pinFlv.flavorId AND
+                                pinnedInst.versionId == pinVers.versionId
                             JOIN DBFlavors AS mapFlv ON
                                 mappedFlavor == mapFlv.flavor OR
                                 mappedFlavor IS NULL and mapFlv.flavor IS NULL
@@ -1274,7 +1276,7 @@ class Database:
                                 TroveTroves.includedId == mapInst.instanceId
                             LEFT JOIN TroveTroves AS dup ON
                                 (dup.instanceId == TroveTroves.instanceId AND
-                                 dup.includedId == lockedInst.instanceId)
+                                 dup.includedId == pinnedInst.instanceId)
                             WHERE dup.instanceId IS NULL
                     """)
 

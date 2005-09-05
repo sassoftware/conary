@@ -313,7 +313,7 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
 
         print "%-30s %s" % \
             (("Size      : %s" % size,
-             ("Locked    : %s" % db.trovesAreLocked([ (trove.getName(), 
+             ("Pinned    : %s" % db.trovesArePinned([ (trove.getName(), 
                               trove.getVersion(), trove.getFlavor()) ])[0])))
         print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
         print "Requires  : %s" % trove.getRequires()

@@ -364,7 +364,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoLockList = cfg.lockTroves)
+                       callback = callback, autoPinList = cfg.pinTroves)
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
@@ -402,7 +402,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     except changeset.PathIdsConflictError, e:
         log.error(e)
 
-def changeLocks(cfg, troveStrList, lock = True):
+def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
     troveList = [] 
     for item in troveStrList:
@@ -410,7 +410,7 @@ def changeLocks(cfg, troveStrList, lock = True):
         troves = client.db.findTrove(None, (name, ver, flv))
         troveList += troves
 
-    client.lockTroves(troveList, lock = lock)
+    client.pinTroves(troveList, pin = pin)
 
 def parseTroveSpec(specStr):
     if specStr.find('[') > 0 and specStr[-1] == ']':

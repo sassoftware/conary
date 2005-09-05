@@ -315,7 +315,7 @@ class ConaryConfiguration(ConfigFile):
         'flavor'                : [ FLAVORLIST, [] ],
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
-	'lockTroves'		: [ REGEXPLIST, RegularExpressionList() ],
+	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'updateThreshold'       : [ INT, 10],
