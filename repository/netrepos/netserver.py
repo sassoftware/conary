@@ -1549,7 +1549,7 @@ class CacheSet:
 	self.tmpDir = tmpDir
         self.createSchema(dbpath, schemaVersion)
         self.db._begin()
-        self.flavors = sqldb.DBFlavors(self.db)
+        self.flavors = sqldb.Flavors(self.db)
         self.versions = versiontable.VersionTable(self.db)
         self.db.commit()
 
