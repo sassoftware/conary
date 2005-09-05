@@ -1790,6 +1790,7 @@ class Provides(_BuildPackagePolicy):
 	pkg = componentMap[path]
 	f = pkg.getFile(path)
         macros = self.recipe.macros
+        m = None
 
         fullpath = macros.destdir + path
         if os.path.exists(fullpath):
