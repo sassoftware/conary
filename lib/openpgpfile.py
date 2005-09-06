@@ -847,7 +847,7 @@ def getPublicKey(keyId, keyFile=''):
         keyRing=open(keyFile)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    verifySelfSignatures(keyId, keyRing)
+    #verifySelfSignatures(keyId, keyRing)
     key = makeKey(getGPGKeyTuple(keyId, keyRing, 0, ''))
     keyRing.close()
     return key
@@ -862,7 +862,7 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
         keyRing=open(keyFile)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    verifySelfSignatures(keyId, keyRing)
+    #verifySelfSignatures(keyId, keyRing)
     key =  makeKey(getGPGKeyTuple(keyId, keyRing, 1, passPhrase))
     keyRing.close()
     return key
