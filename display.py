@@ -16,6 +16,7 @@ Provides the output for the "conary query" command
 """
 
 import files
+import itertools
 import os
 from lib import util
 from lib import log
@@ -356,7 +357,8 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                          showFlavors)
 	changes = localTrv.diff(trove)[2]
 	changesByOld = dict(((x[0], x[1], x[3]), x) for x in changes)
-        troveList = trove.iterTroveList()
+        troveList = itertools.chain(trove.iterTroveList(),
+                    [ (x[0], x[2], x[4]) for x in changes if x[1] is None ])
         # XXX we _could_ display the local trove version for conary q,
         # but that would be a change in behavior...
         #if showDiff:
@@ -380,7 +382,6 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                 _displayOneTrove(troveName, ver, fla,
                              fullVersions or ver.branch() != version.branch(),
                              needFlavor, format=_grpFormat)
-                change = changesByOld.get((troveName, ver, fla), None)
                 if change: 
                     if newVer is None:
                         try:
