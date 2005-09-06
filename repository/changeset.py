@@ -908,7 +908,8 @@ class ReadOnlyChangeSet(ChangeSet):
 	mapping (troveName, newVersion, newFlavor) tuples to 
 	(oldVersion, oldFlavor) pairs. The troveMap may be (None, None)
 	if a new install is desired (the trove is switched from absolute
-        to relative to nothing in this case).
+        to relative to nothing in this case). If an entry is missing for
+        a trove, that trove is left absolute.
 	"""
 	assert(self.absolute)
 
@@ -927,7 +928,9 @@ class ReadOnlyChangeSet(ChangeSet):
 	    newFlavor = troveCs.getNewFlavor()
 	    assert(not troveCs.getOldVersion())
 
-            assert(key in troveMap)
+            if key not in troveMap:
+                continue
+
             (oldVersion, oldFlavor) = troveMap[key]
 
 	    if not oldVersion:
