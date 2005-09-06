@@ -849,14 +849,29 @@ class Database:
             if missingVersion.branch() == availableVersion.branch():
                 l.append((missingInstanceId, availableInstanceId))
         
+        cu.execute("""CREATE TEMPORARY TABLE AlternateIncludes(
+                                missingId INTEGER,
+                                availableId INTEGER)
+                   """)
         for missingInstanceId, availableInstanceId in l:
-            cu.execute("""
-                INSERT INTO TroveTroves 
-                    SELECT instanceId, ?, byDefault, 0 
-                        FROM TroveTroves 
-                    WHERE
-                        instanceId = ? AND includedId = ?
-            """, availableInstanceId, troveInstanceId, missingInstanceId)
+            cu.execute("INSERT INTO AlternateIncludes VALUES (?, ?)",
+                        missingInstanceId, availableInstanceId)
+
+        # don't insert duplicate entries (which would otherwise occur
+        # when the new trove references two troves with the same name)
+        cu.execute("""
+            INSERT INTO TroveTroves
+                SELECT ?, availableId, TroveTroves.byDefault, 0
+                    FROM AlternateIncludes JOIN TroveTroves ON
+                        TroveTroves.includedId = missingId AND
+                        TroveTroves.instanceId = ?
+                    LEFT OUTER JOIN TroveTroves AS Done ON
+                        Done.instanceId = ? AND
+                        Done.includedId = availableId
+                    WHERE 
+                        Done.instanceId IS NULL
+        """, troveInstanceId, troveInstanceId, troveInstanceId)
+        cu.execute("DROP TABLE AlternateIncludes")
 
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
