@@ -3,6 +3,7 @@ Changes in 0.62.3:
   * Link new troves to collections (and new collections to old troves) when 
     a trove isn't installed but a suitable replacement (meaning on the same
     branch) is available
+  * Installing changesets w/ not by default from files broke
 
 Changes in 0.62.2:
   * Further reworkings of update code to be fully based on job sets. The
