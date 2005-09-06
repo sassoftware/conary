@@ -973,7 +973,7 @@ class ConaryClient:
         # we now have three things
         #   1. jobFromChangeSetFiles -- job which came from .ccs files
         #   2. oldItems -- items which we should not remove as a side effect
-        #   3. changeListList -- job we need to create a change set for
+        #   3. changeSetList -- job we need to create a change set for
 
         if not changeSetList and not jobSet:
             raise NoNewTrovesError
