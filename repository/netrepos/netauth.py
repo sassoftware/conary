@@ -196,6 +196,17 @@ class NetworkAuthorization:
 
         self.db.commit()
 
+    def deleteAcl(self, userGroupId, labelId, itemId):
+        cu = self.db.cursor()
+        
+        stmt = """DELETE FROM Permissions
+                  WHERE userGroupId=? AND
+                        (labelId=? OR (labelId IS NULL AND ? IS NULL)) AND
+                        (itemId=? OR (itemId IS NULL AND ? IS NULL))"""
+
+        cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
+        self.db.commit()
+
 
     def addUser(self, user, password):
         salt = os.urandom(4)
@@ -436,17 +447,6 @@ class NetworkAuthorization:
         #another group.
         if commit:
             self.db.commit()
-
-    def deletePermission(self, userGroupId, labelId, itemId):
-        cu = self.db.cursor()
-        
-        stmt = """DELETE FROM Permissions
-                  WHERE userGroupId=? AND
-                        (labelId=? OR (labelId IS NULL AND ? IS NULL)) AND
-                        (itemId=? OR (itemId IS NULL AND ? IS NULL))"""
-
-        cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
-        self.db.commit()
 
     def iterItems(self):
         cu = self.db.cursor()

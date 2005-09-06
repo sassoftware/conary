@@ -466,7 +466,7 @@ class HttpHandler(WebHandler):
             labelId = None
         if not itemId:
             itemId = None
-        self.repServer.auth.deletePermission(groupId, labelId, itemId)
+        self.repServer.auth.deleteAcl(groupId, labelId, itemId)
         return self._redirect("userlist")
 
     @checkAuth(write = True, admin = True)

@@ -46,7 +46,7 @@
                 <td py:content="row[4] and 'yes' or 'no'"/>
                 <td py:content="row[5] and 'yes' or 'no'"/>
                 <td py:content="row[6] and 'yes' or 'no'"/>
-                <td><a href="deletePerm?groupId=${groupId};labelId=${row[1]}&amp;itemId=${row[2]}" title="Delete Permission">X</a></td>
+                <td><a href="deletePerm?groupId=${groupId};labelId=${row[0]}&amp;itemId=${row[2]}" title="Delete Permission">X</a></td>
                 <td><a href="editPermForm?group=${group};label=${label};trove=${item};writeperm=${row[4]};capped=${row[5]};admin=${row[6]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
