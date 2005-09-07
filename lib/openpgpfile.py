@@ -1065,8 +1065,6 @@ def parseAsciiArmorKey(asciiData):
 # rules one and two are to prevent repo breakage
 # rule three is to enforce a modicum of sanity to the security posture
 def assertReplaceKeyAllowed(origKey, newKey):
-    from lib import epdb
-    epdb.st()
     origRing = StringIO.StringIO(origKey)
     newRing = StringIO.StringIO(newKey)
     fingerprint = getKeyId(origRing)
