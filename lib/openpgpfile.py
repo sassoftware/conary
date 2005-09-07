@@ -1117,7 +1117,7 @@ def assertReplaceKeyAllowed(origKey, newKey):
             origRing.seek((blockType & 3) +1, SEEK_CUR)
         if ord(origRing.read(1)) != 4:
             raise IncompatibleKey("Only V4 signatures allowed")
-        sigType = origRing.read(1)
+        sigType = ord(origRing.read(1))
         origRing.seek(sigStartPoint)
         # if it is a revocation, read in the entire revocation packet
         if sigType in (SIG_TYPE_KEY_REVOC, SIG_TYPE_SUBKEY_REVOC, SIG_TYPE_CERT_REVOC):
