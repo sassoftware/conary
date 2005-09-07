@@ -66,6 +66,11 @@ PKT_ALL_KEYS = PKT_ALL_SECRET + PKT_ALL_PUBLIC
 PKT_MAIN_KEYS = (PKT_SECRET_KEY, PKT_PUBLIC_KEY)
 PKT_SUB_KEYS = (PKT_SECRET_SUBKEY, PKT_PUBLIC_SUBKEY)
 
+# 5.2.1 Signature Types
+SIG_TYPE_KEY_REVOC     = 0x20
+SIG_TYPE_SUBKEY_REVOC  = 0x28
+SIG_TYPE_CERT_REVOC    = 0x30
+
 # 3.6.2.1. Secret key encryption
 ENCRYPTION_TYPE_UNENCRYPTED    = 0x00
 ENCRYPTION_TYPE_S2K_SPECIFIED  = 0xff
@@ -1052,3 +1057,84 @@ def parseAsciiArmorKey(asciiData):
 
     keyData = base64.b64decode(buf)
     return keyData
+
+# this function will enforce the following rules
+# rule 1: cannot switch main keys
+# rule 2: a PGP Key in the repo may never lose a subkey
+# rule 3: No revocations may be lost
+# rules one and two are to prevent repo breakage
+# rule three is to enforce a modicum of sanity to the security posture
+def assertReplaceKeyAllowed(origKey, newKey):
+    from lib import epdb
+    epdb.st()
+    origRing = StringIO.StringIO(origKey)
+    newRing = StringIO.StringIO(newKey)
+    fingerprint = getKeyId(origRing)
+    if fingerprint != getKeyId(newRing):
+        origRing.close()
+        newRing.close()
+        raise IncompatibleKey("Attempting to replace key %s with a different key is not allowed" %fingerprint)
+    origKeyIds = []
+    newKeyIds = []
+    # make a list of keyIds from the original key
+    origRing.seek(0, SEEK_END)
+    limit = origRing.tell()
+    origRing.seek(0)
+    while origRing.tell() < limit:
+        origKeyIds.append(getKeyId(origRing))
+        seekNextKey(origRing)
+    # make a list of keyIds from the new key
+    newRing.seek(0, SEEK_END)
+    limit = newRing.tell()
+    newRing.seek(0)
+    while newRing.tell() < limit:
+        newKeyIds.append(getKeyId(newRing))
+        seekNextKey(newRing)
+    # ensure no keys were lost
+    origRing.seek(0)
+    newRing.seek(0)
+    for keyId in origKeyIds:
+        if keyId not in newKeyIds:
+            origRing.close()
+            newRing.close()
+            raise IncompatibleKey("Attempting to remove a subkey from key %s is not allowed" %fingerprint)
+    # for the main key and all subkeys in the original key:
+    # loop thru all the revocations and ensure the new key contains at least
+    # those revocations
+    origRing.seek(0, SEEK_END)
+    limit = origRing.tell()
+    origRing.seek(0)
+    seekNextSignature(origRing)
+    while origRing.tell() < limit:
+        # ensure sig is in fact a revocation.
+        sigStartPoint = origRing.tell()
+        blockType = readBlockType(origRing)
+        if blockType & 3 == 3:
+            origRing.close()
+            newRing.close()
+            raise MalformedKeyRing("Can't seek past packet of indeterminate length")
+        elif blockType & 3 == 2:
+            origRing.seek(4, SEEK_CUR)
+        else:
+            origRing.seek((blockType & 3) +1, SEEK_CUR)
+        if ord(origRing.read(1)) != 4:
+            raise IncompatibleKey("Only V4 signatures allowed")
+        sigType = origRing.read(1)
+        origRing.seek(sigStartPoint)
+        # if it is a revocation, read in the entire revocation packet
+        if sigType in (SIG_TYPE_KEY_REVOC, SIG_TYPE_SUBKEY_REVOC, SIG_TYPE_CERT_REVOC):
+            seekNextPacket(origRing)
+            packetLength = origRing.tell() - sigStartPoint
+            origRing.seek(sigStartPoint)
+            revocPacket = origRing.read(packetLength)
+            origRing.seek(sigStartPoint)
+            # use substring matching to ensure revocation is still in new key
+            if revocPacket not in newKey:
+                origRing.close()
+                newRing.close()
+                raise IncompatibleKey("Removing a revocation from key %s is not allowed" %fingerprint)
+        # seek to next signature
+        seekNextSignature(origRing)
+    origRing.close()
+    newRing.close()
+
