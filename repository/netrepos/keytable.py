@@ -81,20 +81,38 @@ class OpenPGPKeyTable:
         keyRing.seek(0)
 
         mainFingerprint = openpgpfile.getKeyId(keyRing)
+
+        # if this key already exists we need to ensure it's safe to overwrite
+        # the old one, and then just do it.
+        r = cu.execute('SELECT pgpKey FROM PGPKeys WHERE fingerprint=?',mainFingerprint)
+        origKey = cu.fetchone()
+        if origKey:
+            # ensure new key is a superset of old key. we can't allow the repo
+            # to let go of subkeys or revocations.
+            openpgpfile.assertReplaceKeyAllowed(origKey[0], pgpKeyData)
+            #reset the key cache so the changed key shows up
+            keyCache = openpgpkey.getKeyCache()
+            keyCache.reset()
         try:
             cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
                        (keyId, userId, mainFingerprint, pgpKeyData))
         except sqlite3.ProgrammingError:
-            # potentially a duplicate fingerprint
-            # FIXME: make a new error for this
-            raise
+            # controlled replacement of OpenPGP Keys is allowed. do NOT disable
+            # assertReplaceKeyAllowed without disabling this
+            cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
+                       (pgpKeyData, mainFingerprint))
         keyFingerprints = openpgpfile.getFingerprints(keyRing)
         for fingerprint in keyFingerprints:
-            cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
+            try:
+                cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
                        (keyId, fingerprint))
+            except sqlite3.ProgrammingError:
+                # ignore duplicate fingerprint errors.
+                pass
         self.db.commit()
         keyRing.close()
 
+    # to be used only with extreme caution. it can damage the repository.
     def deleteKey(self, keyId):
         fingerprint = self.getFingerprint(keyId)
         cu = self.db.cursor()

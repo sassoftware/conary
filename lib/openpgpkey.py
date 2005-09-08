@@ -136,9 +136,13 @@ class OpenPGPKeyCache:
     def getPrivateKey(self, keyId, passphrase=None):
         raise NotImplementedError
 
+    def reset(self):
+        self.publicDict = {}
+        self.privateDict = {}
+
 class OpenPGPKeyFileCache(OpenPGPKeyCache):
     """
-    OpenPGPKeyCash based object that reads keys from public and private
+    OpenPGPKeyCache based object that reads keys from public and private
     keyrings
     """
     def __init__(self):
