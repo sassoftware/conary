@@ -821,94 +821,112 @@ class Database:
 
         cu.execute("DROP TABLE IncludedTroves")
 
-        # Now find all the troves which are referenced by this one, but
-        # are not present. There might be good alternatives to link those
-        # troves to?
-        cu.execute("""
-            SELECT Instances.instanceId, Versions.version, 
-                    AvailableVersions.version,
-                    AvailableInstances.instanceId
-                FROM TroveTroves JOIN Instances ON
-                    TroveTroves.includedId = Instances.instanceId 
-                JOIN Versions ON
-                    Instances.versionId = Versions.versionId
-                JOIN Instances AS AvailableInstances ON
-                    Instances.troveName = AvailableInstances.troveName
-                JOIN Versions AS AvailableVersions ON
-                    AvailableInstances.versionId = AvailableVersions.versionId
-                WHERE
-                    TroveTroves.instanceId = ? AND
-                    Instances.isPresent = 0 AND
-                    AvailableInstances.isPresent = 1
-                   """, troveInstanceId)
-        l = []
-        for (missingInstanceId, missingVersion, availableVersion, 
-                                    availableInstanceId) in cu:
-            missingVersion = versions.VersionFromString(missingVersion)
-            availableVersion = versions.VersionFromString(availableVersion)
-            if missingVersion.branch() == availableVersion.branch():
-                l.append((missingInstanceId, availableInstanceId))
-        
-        cu.execute("""CREATE TEMPORARY TABLE AlternateIncludes(
-                                missingId INTEGER,
-                                availableId INTEGER)
-                   """)
-        for missingInstanceId, availableInstanceId in l:
-            cu.execute("INSERT INTO AlternateIncludes VALUES (?, ?)",
-                        missingInstanceId, availableInstanceId)
-
-        # don't insert duplicate entries (which would otherwise occur
-        # when the new trove references two troves with the same name)
-        cu.execute("""
-            INSERT INTO TroveTroves
-                SELECT ?, availableId, TroveTroves.byDefault, 0
-                    FROM AlternateIncludes JOIN TroveTroves ON
-                        TroveTroves.includedId = missingId AND
-                        TroveTroves.instanceId = ?
-                    LEFT OUTER JOIN TroveTroves AS Done ON
-                        Done.instanceId = ? AND
-                        Done.includedId = availableId
-                    WHERE 
-                        Done.instanceId IS NULL
-        """, troveInstanceId, troveInstanceId, troveInstanceId)
-        cu.execute("DROP TABLE AlternateIncludes")
-
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
         
-        # add this trove to any groups the old trove was part of (which could
-        # already be in the list, if we're reverting to something the group
-        # already references)
-        for oldTroveSpec in oldTroveList:
-            flavorStr = oldTroveSpec[2].freeze()
-            if flavorStr:
-                flavorStr = "= '%s'" % flavorStr
-            else:
-                flavorStr = "IS NULL"
+        cu.execute("select instanceId from trovetroves where includedid=?", troveInstanceId)
+        for x, in cu:
+            self._sanitizeTroveCollection(cu, x, nameHint = trove.getName())
 
-            cu.execute("""
-                INSERT INTO TroveTroves SELECT 
-                        TroveTroves.instanceId, ?, TroveTroves.byDefault, ?
-                    FROM Instances JOIN Versions ON 
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = Flavors.flavorId
-                    JOIN TroveTroves ON
-                        Instances.instanceId = TroveTroves.includedId
-                    LEFT OUTER JOIN TroveTroves AS present ON
-                        present.instanceId = TroveTroves.instanceId AND
-                        present.includedId = ?
-                    WHERE
-                        present.instanceId is NULL AND
-                        troveName = ? AND
-                        version = ? AND
-                        flavor %s
-                """ % flavorStr, troveInstanceId, False, troveInstanceId,
-                     oldTroveSpec[0], oldTroveSpec[1].asString())
+        self._sanitizeTroveCollection(cu, troveInstanceId)
 
         addFile = cu.compile(self.troveFiles.addItemStmt)
 
 	return (cu, troveInstanceId, addFile)
+
+    def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
+        # examine the list of present, missing, and not inPristine troves
+        # for a collection and make sure the set is sane
+        if nameHint:
+            nameClause = "Instances.troveName = '%s' AND" % nameHint
+        else:
+            nameClause = ""
+
+        #import lib
+        #lib.epdb.st('f')
+
+        cu.execute("""
+            SELECT includedId, troveName, version, flavor, isPresent, inPristine
+                FROM TroveTroves JOIN Instances ON
+                    TroveTroves.includedId = Instances.instanceId
+                JOIN Versions ON
+                    Instances.versionId = Versions.versionId
+                JOIN Flavors ON
+                    Instances.flavorId = Flavors.flavorId
+                WHERE
+                    %s
+                    TroveTroves.instanceId = ?
+        """ % nameClause, instanceId)
+
+        pristineTrv = trove.Trove('foo', versions.NewVersion(),
+                                  deps.deps.DependencySet(), None)
+        currentTrv = trove.Trove('foo', versions.NewVersion(),
+                                  deps.deps.DependencySet(), None)
+        instanceDict = {}
+        for (includedId, name, version, flavor, isPresent, inPristine) in cu:
+            if flavor is None:
+                flavor = deps.deps.DependencySet()
+            else:
+                flavor = deps.deps.ThawDependencySet(flavor)
+
+            version = versions.VersionFromString(version)
+
+            instanceDict[(name, version, flavor)] = includedId
+            if isPresent:
+                currentTrv.addTrove(name, version, flavor)
+            if inPristine:
+                pristineTrv.addTrove(name, version, flavor)
+
+        linkByName = {}
+        trvChanges = currentTrv.diff(pristineTrv)[2]
+        makeLink = set()
+        for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChanges:
+            if oldVersion is None:
+                badInstanceId = instanceDict[(name, newVersion, newFlavor)]
+                # we know it isn't in the pristine; if it was, it would
+                # be in both currentTrv and pristineTrv, and not show up
+                # as a diff
+                cu.execute("DELETE FROM TroveTroves WHERE instanceId=? AND "
+                           "includedId=?", instanceId, badInstanceId)
+            elif newVersion is None:
+                # this thing should be linked to something else. 
+                linkByName.setdefault(name, set()).add(oldVersion.branch())
+                makeLink.add((name, oldVersion, oldFlavor))
+
+        if not linkByName: return
+
+        for (name, version, flavor) in self.findByNames(linkByName):
+            if version.branch() in linkByName[name]:
+                currentTrv.addTrove(name, version, flavor, presentOkay = True)
+
+        trvChanges = currentTrv.diff(pristineTrv)[2]
+        for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChanges:
+            if (name, oldVersion, oldFlavor) not in makeLink: continue
+            if newVersion is None: continue
+
+            oldIncludedId = instanceDict[(name, oldVersion, oldFlavor)]
+            byDefault = cu.execute("""
+                    SELECT byDefault FROM TroveTroves WHERE
+                        instanceId=? and includedId=?""",
+                    instanceId, oldIncludedId).next()[0]
+
+            if newFlavor:
+                flavorStr = "= '%s'" % newFlavor.freeze()
+            else:
+                flavorStr = "IS NULL"
+
+            cu.execute("""
+                INSERT INTO TroveTroves SELECT ?, instanceId, ?, 0
+                    FROM Instances JOIN Versions ON 
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                    WHERE
+                        troveName = ? AND
+                        version = ? AND
+                        flavor %s
+                """ % flavorStr, instanceId, byDefault, name,
+                        newVersion.asString())
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
 	(cu, troveInstanceId, addFileStmt) = troveInfo
@@ -1154,15 +1172,20 @@ class Database:
                         WHERE 
                             TroveTroves.instanceId = ?""")
 
+        wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ] 
+
 	self.troveFiles.delInstance(troveInstanceId)
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?",
                    troveInstanceId)
-        cu.execute("DELETE FROM TroveTroves WHERE includedId=? AND inPristine=0",
-                   troveInstanceId)
+        cu.execute("DELETE FROM TroveTroves WHERE includedId=? AND "
+                   "inPristine=0", troveInstanceId)
         self.depTables.delete(self.db.cursor(), troveInstanceId)
 
 	# mark this trove as not present
 	self.instances.setPresent(troveInstanceId, 0)
+
+        for x, in wasIn:
+            self._sanitizeTroveCollection(cu, x, nameHint = troveName)
 
     def commit(self):
 	if self.needsCleanup:

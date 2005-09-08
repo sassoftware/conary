@@ -41,7 +41,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         l = []
         for info in oldTroveList:
-            if info[1].branch() == trove.getVersion().branch():
+            if info[1].branch() == trove.getVersion().branch() and \
+               (info[1] != trove.getVersion() or info[2] != trove.getFlavor()):
                 l.append(info)
         del oldTroveList
 

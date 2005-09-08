@@ -817,6 +817,9 @@ class Trove(streams.LargeStreamSet):
         @type redundantOkay: boolean
         """
 
+        #import lib
+        #lib.epdb.st('f')
+
         for (name, list) in changeList:
             for (oper, version, flavor, byDefault) in list:
                 if oper == '+':
