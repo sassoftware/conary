@@ -32,21 +32,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     def addTrove(self, oldTroveSpec, trove):
         pin = self.autoPinList.match(trove.getName())
-        oldTroveList = self.repos.findRemovedByName(trove.getName())
-
-        # oldTroveSpec hasn't been removed yet, so won't show up in
-        # findRemovedByName
-        if oldTroveSpec[1] is not None:
-            oldTroveList.append(oldTroveSpec)
-
-        l = []
-        for info in oldTroveList:
-            if info[1].branch() == trove.getVersion().branch() and \
-               (info[1] != trove.getVersion() or info[2] != trove.getFlavor()):
-                l.append(info)
-        del oldTroveList
-
-	return self.repos.addTrove(l, trove, pin = pin)
+	return self.repos.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveId):
 	pass

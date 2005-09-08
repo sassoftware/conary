@@ -707,7 +707,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, oldTroveList, trove, pin = False):
+    def addTrove(self, trove, pin = False):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()

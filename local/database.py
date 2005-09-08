@@ -271,8 +271,8 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
-    def addTrove(self, oldTroveSpec, trove, pin = False):
-	return self.db.addTrove(oldTroveSpec, trove, pin = pin)
+    def addTrove(self, trove, pin = False):
+	return self.db.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
 	pass
