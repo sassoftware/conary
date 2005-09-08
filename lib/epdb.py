@@ -660,8 +660,7 @@ class Epdb(pdb.Pdb):
             curVals = tc[marker]
         except KeyError:
             curVals = [ None, 0 ]
-        curVals[0] = cond
-        tc[marker] = curVals
+        tc[marker] = (cond, 0)
     set_trace_cond = classmethod(set_trace_cond)
 
     def set_trace(self, marker='default', skip=0):
