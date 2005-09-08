@@ -306,6 +306,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
+        callback.done()
         print e
     except repository.TroveNotFound, e:
         log.error(e)
@@ -328,7 +329,6 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
     if not info:
 	client.checkWriteableRoot()
-
 
     (updJob, suggMap) = \
     client.updateChangeSet(applyList, depsRecurse = depsRecurse,
