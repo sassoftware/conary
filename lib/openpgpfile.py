@@ -650,7 +650,6 @@ def assertSigningKey(keyId,keyRing):
     # first search for the public key algortihm octet. if the key is really
     # old, this might be the only hint that it's legal to use this key to
     # make digital signatures.
-
     blockType = readBlockType(keyRing)
     if blockType & 3 == 3:
         raise IncompatibleKey("Can't seek past packet of indeterminate length")
@@ -665,6 +664,22 @@ def assertSigningKey(keyId,keyRing):
         # the public key algorithm octet satisfies this test. no more checks required
         keyRing.seek(startPoint)
         return
+    # now, if the key we are looking at is a subkey, then we need to go
+    # back and find the keyId of the parent key, since we'll need that
+    # to find the subkey binding signature
+    if (blockType >> 2) & 15 in PKT_SUB_KEYS:
+        keyRing.seek(0)
+        mainKeyStart = 0
+        while keyRing.tell() != keyStart:
+            mainBlock = readBlockType(keyRing)
+            if mainBlock != -1:
+                keyRing.seek(-1, SEEK_CUR)
+            if ((mainBlock >> 2) & 15) in PKT_MAIN_KEYS:
+                mainKeyStart = keyRing.tell()
+            seekNextKey(keyRing)
+        keyRing.seek(mainKeyStart)
+        fingerprint = getKeyId(keyRing)
+        intKeyId = fingerprintToInternalKeyId(fingerprint)
     # return to beginning of key so we can skip chunks.
     keyRing.seek(keyStart)
     keyFlagsFound = 0
