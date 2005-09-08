@@ -384,9 +384,8 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                              needFlavor, format=_grpFormat)
                 if change: 
                     if newVer is None:
-                        try:
-                            tups = db.trovesByName(troveName)
-                        except:
+                        tups = db.trovesByName(troveName)
+                        if not tups:
                             print '  --> (Deleted or Not Installed)'
                         else:
                             print ('  --> Not linked to parent trove - potential'
