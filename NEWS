@@ -1,3 +1,8 @@
+Changes in 0.62.4:
+  * Many places where lots of individual db calls were done to collect
+    file objects have been collapsed into batched calls (5-10% speedup
+    on some operations)
+
 Changes in 0.62.3:
   * Don't link troves to groups when the branch has changed
   * Link new troves to collections (and new collections to old troves) when 
