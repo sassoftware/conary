@@ -67,9 +67,57 @@ PKT_MAIN_KEYS = (PKT_SECRET_KEY, PKT_PUBLIC_KEY)
 PKT_SUB_KEYS = (PKT_SECRET_SUBKEY, PKT_PUBLIC_SUBKEY)
 
 # 5.2.1 Signature Types
+SIG_TYPE_BINARY_DOC    = 0x00
+SIG_TYPE_TEXT_DOC      = 0x01
+SIG_TYPE_STANDALONE    = 0x02
+SIG_TYPE_CERT_0        = 0x10
+SIG_TYPE_CERT_1        = 0x11
+SIG_TYPE_CERT_2        = 0x12
+SIG_TYPE_CERT_3        = 0x13
+SIG_TYPE_SUBKEY_BIND   = 0x18
+SIG_TYPE_DIRECT_KEY    = 0x1F
 SIG_TYPE_KEY_REVOC     = 0x20
 SIG_TYPE_SUBKEY_REVOC  = 0x28
 SIG_TYPE_CERT_REVOC    = 0x30
+SIG_TYPE_TIMESTAMP     = 0x40
+
+SIG_CERTS = (SIG_TYPE_CERT_0, SIG_TYPE_CERT_1,
+             SIG_TYPE_CERT_2, SIG_TYPE_CERT_3, )
+SIG_KEY_REVOCS = (SIG_TYPE_KEY_REVOC, SIG_TYPE_SUBKEY_REVOC)
+
+# 5.2.3.1 Signature Subpacket Types
+SIG_SUBPKT_CREATION       = 2
+SIG_SUBPKT_SIG_EXPIRE     = 3
+SIG_SUBPKT_EXPORTABLE     = 4
+SIG_SUBPKT_TRUST          = 5
+SIG_SUBPKT_REGEX          = 6
+SIG_SUBPKT_REVOCABLE      = 7
+SIG_SUBPKT_KEY_EXPIRE     = 9
+SIG_SUBPKT_PLACEHOLDER    = 10
+SIG_SUBPKT_PREF_SYM_ALGS  = 11
+SIG_SUBPKT_REVOC_KEY      = 12
+SIG_SUBPKT_ISSUER_KEYID   = 16
+SIG_SUBPKT_NOTATION_DATA  = 20
+SIG_SUBPKT_PREF_HASH_ALGS = 21
+SIG_SUBPKT_PREF_COMP_ALGS = 22
+SIG_SUBPKT_KEYSRVR_PREFS  = 23
+SIG_SUBPKT_PREF_KEYSRVR   = 24
+SIG_SUBPKT_PRIM_UID       = 25
+SIG_SUBPKT_POLICY_URL     = 26
+SIG_SUBPKT_KEY_FLAGS      = 27
+SIG_SUBPKT_SIGNERS_UID    = 28
+SIG_SUBPKT_REVOC_REASON   = 29
+SIG_SUBPKT_INTERNAL_0     = 100
+SIG_SUBPKT_INTERNAL_1     = 101
+SIG_SUBPKT_INTERNAL_2     = 102
+SIG_SUBPKT_INTERNAL_3     = 103
+SIG_SUBPKT_INTERNAL_4     = 104
+SIG_SUBPKT_INTERNAL_5     = 105
+SIG_SUBPKT_INTERNAL_6     = 106
+SIG_SUBPKT_INTERNAL_7     = 107
+SIG_SUBPKT_INTERNAL_8     = 108
+SIG_SUBPKT_INTERNAL_9     = 109
+SIG_SUBPKT_INTERNAL_A     = 110
 
 # 3.6.2.1. Secret key encryption
 ENCRYPTION_TYPE_UNENCRYPTED    = 0x00
@@ -380,7 +428,133 @@ def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
         if not mainKey.verify(sigString, dig_sig):
             raise BadSelfSignature("Key: %s failed self signature check"% fingerprint)
 
+def seekKeyById(keyId, keyRing):
+    keyRing.seek(0, SEEK_END)
+    limit = keyRing.tell()
+    keyRing.seek(0)
+    while (keyRing.tell() < limit) and (keyId not in getKeyId(keyRing)):
+        seekNextKey(keyRing)
 
+def seekParentKey(keyId, keyRing):
+    seekKeyById(keyId, keyRing)
+    blockType = readBlockType(keyRing)
+    if blockType != -1:
+        keyRing.seek(-1, SEEK_CUR)
+    if (blockType >> 2) & 15 in PKT_MAIN_KEYS:
+        # key in question is a main key, no need to seek
+        return
+    limit = keyRing.tell()
+    keyRing.seek(0)
+    mainKeyPoint = 0
+    while keyRing.tell() < limit:
+        blockType = readBlockType(keyRing)
+        if blockType != -1:
+            keyRing.seek(-1, SEEK_CUR)
+        if (blockType >> 2) & 15 in PKT_MAIN_KEYS:
+            mainKeyPoint = keyRing.tell()
+        seekNextKey(keyRing)
+    keyRing.seek(mainKeyPoint)
+
+# parse self signatures to find timestamp(s) of key expiration.
+# also seek out any revocation timestamps.
+# we don't need to actually verify these signatures. see verifySelfSignatures()
+def findEndOfLife(keyId, keyRing):
+    parentExpire = 0
+    expireTimestamp = 0
+    revocTimestamp = 0
+    startPoint = keyRing.tell()
+    seekKeyById(keyId, keyRing)
+    keyPoint = keyRing.tell()
+    fingerprint = getKeyId(keyRing)
+    intKeyId = fingerprintToInternalKeyId(fingerprint)
+    blockType = readBlockType(keyRing)
+    if blockType != -1:
+        keyRing.seek(-1, SEEK_CUR)
+    if (blockType >> 2) & 15 in PKT_SUB_KEYS:
+        seekParentKey(keyId, keyRing)
+        fingerprint = getKeyId(keyRing)
+        parentExpire = findEndOfLife(fingerprint, keyRing)
+        intKeyId = fingerprintToInternalKeyId(fingerprint)
+    seekNextKey(keyRing)
+    limit = keyRing.tell()
+    keyRing.seek(keyPoint)
+    seekNextSignature(keyRing)
+    while (keyRing.tell() < limit):
+        while (keyRing.tell() < limit) and (intKeyId != getSigId(keyRing)):
+            seekNextSignature(keyRing)
+        if keyRing.tell() == limit:
+            break
+        sigPoint = keyRing.tell()
+        #we found a self signature, parse it for the info we want
+        blockType = readBlockType(keyRing)
+        # reading the block size skips it
+        readBlockSize(keyRing, blockType & 3)
+        if (ord(keyRing.read(1)) != 4):
+            raise IncompatibleKey("Not a V4 signature")
+        sigType = ord(keyRing.read(1))
+        #skip ahead to the hashed subpackets
+        keyRing.seek(2, SEEK_CUR)
+        subLim = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + keyRing.tell()
+        # if the self signature is a cert or revocation we care.
+        # other self signatures are of no use.
+        if sigType in SIG_CERTS:
+            # parse this self cert to see if key expires.
+            # do not assume packet will even be present!
+            # we're ultimately looking for the least stringent expiration
+            eTimestamp = 0
+            cTimestamp = 0
+            while keyRing.tell() < subLim:
+                subLen = ord(keyRing.read(1))
+                subType = ord(keyRing.read(1))
+                if subType == SIG_SUBPKT_KEY_EXPIRE:
+                    eTimestamp = 0
+                    for i in range(subLen-1):
+                        eTimestamp = eTimestamp * 256 + ord(keyRing.read(1))
+                    keyRing.seek(-1 * (subLen - 1), SEEK_CUR)
+                elif subType == SIG_SUBPKT_CREATION:
+                    cTimestamp = 0
+                    for i in range(subLen-1):
+                        cTimestamp = cTimestamp * 256 + ord(keyRing.read(1))
+                    keyRing.seek(-1 * (subLen - 1), SEEK_CUR)
+                keyRing.seek(subLen - 1, SEEK_CUR)
+            # if there's no expiration, DON'T COMPUTE this, otherwise
+            # it will appear as if the key expired the very moment
+            # it was created.
+            if eTimestamp:
+                timestamp = eTimestamp + cTimestamp
+                expireTimestamp = max(expireTimestamp, timestamp)
+        elif sigType in SIG_KEY_REVOCS:
+            # parse this revocation to look for the creation timestamp
+            # we're ultimately looking for the most stringent revocation
+            while keyRing.tell() < subLim:
+                subLen = ord(keyRing.read(1))
+                subType = ord(keyRing.read(1))
+                if subType == SIG_SUBPKT_CREATION:
+                    timestamp = 0
+                    for i in range(subLen-1):
+                        timestamp = timestamp * 256 + ord(keyRing.read(1))
+                    if revocTimestamp:
+                        revocTimestamp = min(expireTimestamp, timestamp)
+                    else:
+                        revocTimestamp = timestamp
+                keyRing.seek(subLen - 1, SEEK_CUR)
+        keyRing.seek(sigPoint)
+        seekNextSignature(keyRing)
+    keyRing.seek(startPoint)
+    # return minimum non-zero value of the three expirations
+    # unless they're ALL zero. 8-)
+    if not (revocTimestamp or expireTimestamp or parentExpire):
+        return 0
+    # make no assumptions about how big a timestamp is.
+    timestamp = max(revocTimestamp, expireTimestamp, parentExpire)
+    if revocTimestamp:
+        timestamp = min(timestamp, revocTimestamp)
+    if expireTimestamp:
+        timestamp = min(timestamp, expireTimestamp)
+    if parentExpire:
+        timestamp = min(timestamp, parentExpire)
+    return timestamp
+    
 # it might seem counterproductive to re-create the key within this function,
 # but alas, we don't always need the key associated with the keyId we're
 # trying to verify (think subkeys)
@@ -589,6 +763,8 @@ def seekNextSignature(keyRing):
             done = 1
 
 def fingerprintToInternalKeyId(fingerprint):
+    if len(fingerprint) == 0:
+        return ''
     data = int(fingerprint[-16:],16)
     r = ''
     while data:
