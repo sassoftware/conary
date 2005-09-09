@@ -1133,8 +1133,14 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
         else:
 	    realPath = root + path
 
+        if forceSha1:
+            possibleMatch = None
+        else:
+            possibleMatch = srcFile
+
 	try:
-	    os.lstat(realPath)
+            f = files.FileFromFilesystem(realPath, pathId,
+                                         possibleMatch = possibleMatch)
 	except OSError:
             if isSrcTrove:
 		log.error("%s is missing (use remove if this is intentional)" 
@@ -1147,14 +1153,6 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
             newTrove.removeFile(pathId)
             continue
-
-        if forceSha1:
-            possibleMatch = None
-        else:
-            possibleMatch = srcFile
-
-	f = files.FileFromFilesystem(realPath, pathId,
-				     possibleMatch = possibleMatch)
 
 	if isSrcTrove:
 	    f.flags.isSource(set = True)
