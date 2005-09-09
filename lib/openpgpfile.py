@@ -413,19 +413,29 @@ def verifySelfSignatures(keyId, keyRing):
         seekNextKey(keyRing)
         limit = keyRing.tell()
         keyRing.seek(mainKeyPoint)
-        # before we go to UIDs and signatures, check if there's a revocation
+        # before we go to UIDs and signatures, check all direct key signatures
+        # find first non-sig packet. that will be the limit
         seekNextPacket(keyRing)
-        packetType = readBlockType(keyRing)
-        if packetType != -1:
-            keyRing.seek(-1, SEEK_CUR)
-        if (packetType>>2) & 15 == PKT_SIG:
-            # we found a revocation.
-            try:
-                finalizeSelfSig(mainKeyData, keyRing, fingerprint, mainKey)
-            except:
-                keyRing.seek(startPoint)
-                raise
-            pass
+        sigStart = keyRing.tell()
+        packetType = PKT_SIG << 2
+        while (packetType >> 2) & 15 == PKT_SIG:
+            seekNextPacket(keyRing)
+            packetType = readBlockType(keyRing)
+            if packetType != -1:
+                keyRing.seek(-1, SEEK_CUR)
+        limit = keyRing.tell()
+        keyRing.seek(sigStart)
+        intKeyId = fingerprintToInternalKeyId(fingerprint)
+        while keyRing.tell() < limit:
+            if intKeyId == getSigId:
+                sigPoint = keyRing.tell()
+                try:
+                    finalizeSelfSig(mainKeyData, keyRing, fingerprint, mainKey)
+                except:
+                    keyRing.seek(startPoint)
+                    raise
+                keyRing.seek(sigPoint)
+            seekNextPacket(keyRing)
         keyRing.seek(mainKeyPoint)
         numUids = 0
         while keyRing.tell() < limit:
@@ -501,33 +511,21 @@ def verifySelfSignatures(keyId, keyRing):
         data += getHashableKeyData(keyRing)
         seekNextSignature(keyRing)
         sigPoint = keyRing.tell()
-        blockType = readBlockType(keyRing)
-        if blockType & 3 == 3:
-            raise MalformedKeyRing("Can't seek past packet of indeterminate length")
-        elif blockType & 3 == 2:
-            keyRing.seek(4, SEEK_CUR)
-        else:
-            keyRing.seek((blockType & 3) + 1, SEEK_CUR)
-        keyRing.seek(1, SEEK_CUR)
-        revokeSig = 0
-        if ord(keyRing.read(1)) in ( 0x20, 0x28):
-            revokeSig = 1
+        seekNextKey(keyRing)
+        limit = keyRing.tell()
         keyRing.seek(sigPoint)
-        try:
-            finalizeSelfSig(data, keyRing, fingerprint, mainKey)
-        except:
-            keyRing.seek(startPoint)
-            raise
-        # if the sig we just verified was a revocation, there's still s
-        # subkey binding signature to verify
-        if revokeSig:
-            keyRing.seek(sigPoint)
+        #make no assumptions about how many signatures follow subkey
+        intKeyId = fingerprintToInternalKeyId(fingerprint)
+        while keyRing.tell() < limit:
+            if intKeyId == getSigId(keyRing):
+                sigPoint = keyRing.tell()
+                try:
+                    finalizeSelfSig(data, keyRing, fingerprint, mainKey)
+                except:
+                    keyRing.seek(startPoint)
+                    raise
+                keyRing.seek(sigPoint)
             seekNextSignature(keyRing)
-            try:
-                finalizeSelfSig(data, keyRing, fingerprint, mainKey)
-            except:
-                keyRing.seek(startPoint)
-                raise
     keyRing.seek(startPoint)
 
 # find the next OpenPGP packet regardless of type.
@@ -867,7 +865,7 @@ def getPublicKey(keyId, keyFile=''):
         keyRing=open(keyFile)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    #verifySelfSignatures(keyId, keyRing)
+    verifySelfSignatures(keyId, keyRing)
     key = makeKey(getGPGKeyTuple(keyId, keyRing, 0, ''))
     keyRing.close()
     return key
@@ -882,7 +880,6 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
         keyRing=open(keyFile)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    #verifySelfSignatures(keyId, keyRing)
     key =  makeKey(getGPGKeyTuple(keyId, keyRing, 1, passPhrase))
     keyRing.close()
     return key
