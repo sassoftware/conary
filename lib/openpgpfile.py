@@ -459,6 +459,7 @@ def seekParentKey(keyId, keyRing):
 # also seek out any revocation timestamps.
 # we don't need to actually verify these signatures. see verifySelfSignatures()
 def findEndOfLife(keyId, keyRing):
+    parentRevoked = False
     parentExpire = 0
     expireTimestamp = 0
     revocTimestamp = 0
@@ -473,7 +474,7 @@ def findEndOfLife(keyId, keyRing):
     if (blockType >> 2) & 15 in PKT_SUB_KEYS:
         seekParentKey(keyId, keyRing)
         fingerprint = getKeyId(keyRing)
-        parentExpire = findEndOfLife(fingerprint, keyRing)
+        parentRevoked, parentExpire = findEndOfLife(fingerprint, keyRing)
         intKeyId = fingerprintToInternalKeyId(fingerprint)
     seekNextKey(keyRing)
     limit = keyRing.tell()
@@ -544,7 +545,7 @@ def findEndOfLife(keyId, keyRing):
     # return minimum non-zero value of the three expirations
     # unless they're ALL zero. 8-)
     if not (revocTimestamp or expireTimestamp or parentExpire):
-        return 0
+        return False, 0
     # make no assumptions about how big a timestamp is.
     timestamp = max(revocTimestamp, expireTimestamp, parentExpire)
     if revocTimestamp:
@@ -553,7 +554,7 @@ def findEndOfLife(keyId, keyRing):
         timestamp = min(timestamp, expireTimestamp)
     if parentExpire:
         timestamp = min(timestamp, parentExpire)
-    return timestamp
+    return (revocTimestamp != 0) and (not parentRevoked), timestamp
     
 # it might seem counterproductive to re-create the key within this function,
 # but alas, we don't always need the key associated with the keyId we're
@@ -1090,6 +1091,20 @@ def getFingerprint(keyId, keyFile=''):
     fingerprint = getKeyId(keyRing)
     keyRing.close()
     return fingerprint
+
+def getKeyEndOfLife(keyId, keyFile=''):
+    if keyFile == '':
+        if 'HOME' not in os.environ:
+            keyFile = None
+        else:
+            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
+    try:
+        keyRing=open(keyFile)
+    except IOError:
+        raise KeyNotFound(keyId, "Couldn't open keyring")
+    res = findEndOfLife(keyId, keyRing)
+    keyRing.close()
+    return res
 
 def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum

@@ -23,6 +23,7 @@ from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
 from openpgpfile import getPublicKeyFromString
 from openpgpfile import getFingerprint
+from openpgpfile import getKeyEndOfLife
 from openpgpfile import seekNextKey
 from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
@@ -33,7 +34,7 @@ from openpgpfile import KeyNotFound
 #-----#
 
 class OpenPGPKey:
-    def __init__(self, fingerprint, cryptoKey, revoked=False, trustLevel=255):
+    def __init__(self, fingerprint, cryptoKey, revoked, timestamp, trustLevel=255):
         """
         instantiates a OpenPGPKey object
 
@@ -50,6 +51,7 @@ class OpenPGPKey:
         self.fingerprint = fingerprint
         self.cryptoKey = cryptoKey
         self.revoked = revoked
+        self.timestamp = timestamp
         self.trustLevel = trustLevel
 
     def getTrustLevel(self):
@@ -60,6 +62,9 @@ class OpenPGPKey:
 
     def getFingerprint(self):
         return self.fingerprint
+
+    def getTimestamp(self):
+        return self.timestamp
 
     def _gcf(self, a, b):
         while b:
@@ -174,8 +179,9 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             try:
                 # translate the keyId to a full fingerprint for consistency
                 fingerprint = getFingerprint(keyId, publicPath)
+                revoked, timestamp = getKeyEndOfLife(keyId, publicPath)
                 cryptoKey = getPublicKey(keyId, publicPath)
-                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
                 return self.publicDict[keyId]
             except KeyNotFound:
                 pass
@@ -187,19 +193,20 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
         # translate the keyId to a full fingerprint for consistency
         fingerprint = getFingerprint(keyId, self.privatePath)
+        revoked, timestamp = getKeyEndOfLife(keyId, self.privatePath)
 
         # if we were supplied a password, use it.  The caller will need
         # to deal with handling BadPassPhrase exceptions
         if passphrase is not None:
             cryptoKey = getPrivateKey(keyId, passphrase, self.privatePath)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
             return self.privateDict[keyId]
 
         # next, see if the key has no passphrase (WHY???)
         # if it's readable, there's no need to prompt the user
         try:
             cryptoKey = getPrivateKey(keyId, '', self.privatePath)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
             return self.privateDict[keyId]
         except BadPassPhrase:
             pass
@@ -213,7 +220,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             passPhrase = getpass("Passphrase: ")
             try:
                 cryptoKey = getPrivateKey(keyId, passPhrase, self.privatePath)
-                self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey)
+                self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
                 return self.privateDict[keyId]
             except BadPassPhrase:
                 print "Bad passphrase. Please try again."
