@@ -21,7 +21,6 @@
         <div id="inner">
             <h2>PGP Key Submission</h2>
 	    <form method="POST" action="submitPGPKey">
-		<input type="hidden" name="userId" value="${userId}"/>
 	    	<table class="user-admin" id="users">
         		<thead>
 				<tr>

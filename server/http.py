@@ -538,19 +538,14 @@ class HttpHandler(WebHandler):
 
     @checkAuth(write = True)
     def pgpNewKeyForm(self, auth):
-        self._write("pgp_submit_key",
-                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
+        self._write("pgp_submit_key")
         return apache.OK
 
     @checkAuth(write = True)
-    @strFields(keyData = "", userId = 0)
-    def submitPGPKey(self, auth, keyData, userId):
-        userId = int(userId)
+    @strFields(keyData = "")
+    def submitPGPKey(self, auth, keyData):
         # FIXME we need to check if the user has admin rights
         # to alter somebody else's key
-        #not a problem yet since admins can only touch their own keys att
-        if (userId == self.repServer.auth.getUserIdByName(self.authToken[0])):
-            self.troveStore.keyTable.addNewAsciiKey(userId, keyData)
-        self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
-        return apache.OK
+        #not a problem yet since admins can only touch their own keys atm
+        self.repServer.addNewAsciiPGPKey(self.authToken, 0, self.authToken[0], keyData)
+        return self._redirect('pgpAdminForm')
