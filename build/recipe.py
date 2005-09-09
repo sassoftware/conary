@@ -1463,6 +1463,11 @@ class SingleGroup:
         cfg.setValue('root', oldRoot)
         cfg.installLabelPath = oldInstallLabelPath
         cfg.autoResolve = oldAutoResolve
+        for trove, needs in suggMap.iteritems():
+            print "trove:%s" % trove
+	    for item in needs:
+            print "\t", item[0]
+
         neededTups = set(chain(*suggMap.itervalues()))
         troves = repos.getTroves(neededTups, withFiles=False)
         for troveTup, trv in izip(neededTups, troves):
