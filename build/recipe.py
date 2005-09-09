@@ -2066,6 +2066,10 @@ class FilesetRecipe(Recipe):
 
     def addFile(self, pattern, component, versionStr = None, recurse = True,
 		remap = []):
+        self.requestedFiles.setdefault(
+            (component, versionStr), []).append((pattern, recurse, remap))
+
+    def _addFile(self, pkg, itemList):
 	"""
 	Adds files which match pattern from version versionStr of component.
 	Pattern is glob-style, with brace expansion. If recurse is set,
@@ -2076,30 +2080,39 @@ class FilesetRecipe(Recipe):
 	newPath.
 	"""
 
-	if type(remap) == tuple:
-	    remap = [ remap ]
+        for (pattern, recurse, remap) in itemList:
+            if type(remap) == tuple:
+                remap = [ remap ]
 
-	try:
-	    pkgList = self.repos.findTrove(self.label, 
-                                           (component, versionStr, None),
-                                           self.flavor)
-	except repository.TroveNotFound, e:
-	    raise RecipeFileError, str(e)
+            foundIt = False
+            for sub in self.repos.walkTroveSet(pkg):
+                foundIt = foundIt or self.addFileFromPackage(
+                                            pattern, sub, recurse, remap)
 
-	if len(pkgList) == 0:
-	    raise RecipeFileError, "no packages match %s" % component
-	elif len(pkgList) > 1:
-	    raise RecipeFileError, "too many packages match %s" % component
+            if not foundIt:
+                raise RecipeFileError, "%s does not exist in version " \
+                                       "%s of %s" % \
+                    (pattern, pkg.getVersion().asString(), pkg.getName())
 
-	foundIt = False
-	pkg = self.repos.getTrove(*pkgList[0])
-	for sub in self.repos.walkTroveSet(pkg):
-	    foundIt = foundIt or self.addFileFromPackage(pattern, sub, recurse,
-							 remap)
+    def findAllFiles(self):
+        findList = [ (x[0], x[1], None) for x in self.requestedFiles ]
+        try:
+            troveSet = self.repos.findTroves(self.label, findList,
+                                             defaultFlavor = self.flavor)
+        except repository.TroveNotFound, e:
+            raise RecipeFileError, str(e)
 
-	if not foundIt:
-	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
-		(pattern, pkg.getVersion().asString(), pkg.getName())
+        for (component, versionStr), itemList in \
+                                        self.requestedFiles.iteritems():
+            pkgList = troveSet[(component, versionStr, None)]
+
+            if len(pkgList) == 0:
+                raise RecipeFileError, "no packages match %s" % component
+            elif len(pkgList) > 1:
+                raise RecipeFileError, "too many packages match %s" % component
+
+            pkg = self.repos.getTrove(*pkgList[0])
+            self._addFile(pkg, itemList)
 	    
     def iterFileList(self):
 	for (pathId, (path, fileId, version)) in self.files.iteritems():
@@ -2114,6 +2127,7 @@ class FilesetRecipe(Recipe):
 	self.flavor = flavor
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
+        self.requestedFiles = {}
 	
 class RecipeFileError(Exception):
     def __init__(self, msg):

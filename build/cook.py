@@ -528,6 +528,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             cfg.flavor, macros)
     recipeObj.setup()
+    recipeObj.findAllFiles()
 
     changeSet = changeset.ChangeSet()
 
