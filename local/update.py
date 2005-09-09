@@ -35,6 +35,7 @@ from repository import changeset
 from repository import filecontents
 from deps import deps
 import files
+import itertools
 from lib import log
 from lib import patch
 from lib import sha1helper
@@ -1105,12 +1106,14 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2', 'zip')
     isSrcTrove = curTrove.getName().endswith(':source')
 
-    for (pathId, srcPath, srcFileId, srcFileVersion) in fileList:
+    srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
+                                                    fileList ] )
+
+    for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
+                    itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove
 	if not pathIds.has_key(pathId): continue
 	del pathIds[pathId]
-
-	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
 
         # transient files never show up in in local changesets...
         if ignoreTransient and srcFile.flags.isTransient():
