@@ -1465,8 +1465,8 @@ class SingleGroup:
         cfg.autoResolve = oldAutoResolve
         for trove, needs in suggMap.iteritems():
             print "trove:%s" % trove
-	    for item in needs:
-            print "\t", item[0]
+            for item in needs:
+                print "\t", item[0]
 
         neededTups = set(chain(*suggMap.itervalues()))
         troves = repos.getTroves(neededTups, withFiles=False)
