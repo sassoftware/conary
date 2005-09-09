@@ -53,7 +53,7 @@ class OpenPGPKeyTable:
     def addNewAsciiKey(self, userId, asciiData):
         keyData = openpgpfile.parseAsciiArmorKey(asciiData)
         if not keyData:
-            raise IncompatibleKey('Unable to parse ASCII armored key')
+            raise openpgpfile.IncompatibleKey('Unable to parse ASCII armored key')
         self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
@@ -69,10 +69,10 @@ class OpenPGPKeyTable:
         keyType = openpgpfile.readBlockType(keyRing)
         keyRing.seek(-1,1)
         if (keyType >> 2) & 15 != openpgpfile.PKT_PUBLIC_KEY:
-            raise IncompatibleKey('Key must be a public key')
+            raise openpgpfile.IncompatibleKey('Key must be a public key')
 
         if openpgpfile.countKeys(keyRing) != 1:
-            raise IncompatibleKey('Submit only one key at a time.')
+            raise openpgpfile.IncompatibleKey('Submit only one key at a time.')
 
         limit = len(pgpKeyData)
         while keyRing.tell() < limit:
@@ -96,11 +96,14 @@ class OpenPGPKeyTable:
         try:
             cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
                        (keyId, userId, mainFingerprint, pgpKeyData))
-        except sqlite3.ProgrammingError:
+        except sqlite3.ProgrammingError, e:
             # controlled replacement of OpenPGP Keys is allowed. do NOT disable
             # assertReplaceKeyAllowed without disabling this
-            cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
+            if e.args[0].startswith("column") and e.args[0].endswith("is not unique"):
+                cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
                        (pgpKeyData, mainFingerprint))
+            else:
+                raise
         keyFingerprints = openpgpfile.getFingerprints(keyRing)
         for fingerprint in keyFingerprints:
             try:
