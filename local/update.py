@@ -474,7 +474,12 @@ class FilesystemJob:
         # have changed contents.
 	cwd = os.getcwd()
 
-	for pathId in troveCs.getOldFileList():
+        fileList = [ ((pathId,) + baseTrove.getFile(pathId)[1:])
+                        for pathId in troveCs.getOldFileList() ]
+        fileObjs = repos.getFileVersions(fileList)
+
+	for pathId, oldFile in itertools.izip(troveCs.getOldFileList(), 
+                                              fileObjs):
             if not baseTrove.hasFile(pathId):
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
@@ -486,8 +491,6 @@ class FilesystemJob:
 		log.debug("%s has already been removed" % path)
 		continue
 
-	    oldFile = repos.getFileVersion(pathId, fileId, version)
-            
 	    if path[0] == '/':
 		realPath = root + path
 	    else:
@@ -995,8 +998,10 @@ class FilesystemJob:
             self.oldTroves.append((name, oldVersion, oldFlavor))
             oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
                                    pristine = False)
-            for (pathId, path, fileId, version) in oldTrove.iterFileList():
-                fileObj = db.getFileVersion(pathId, fileId, version)
+            fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
+            fileObjs = db.getFileVersions(fileList)
+            for (pathId, path, fileId, version), fileObj in \
+                    itertools.izip(oldTrove.iterFileList(), fileObjs):
                 self._remove(fileObj, root + path, "removing %s")
 
         pkgList = []
