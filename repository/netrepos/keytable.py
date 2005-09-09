@@ -180,6 +180,6 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         cryptoKey = openpgpfile.getPublicKeyFromString(keyId, keyData)
 
         # populate the cache
-        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey)
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, 0, 0)
         return self.publicDict[keyId]
 
