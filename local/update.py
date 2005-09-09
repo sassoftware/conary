@@ -631,9 +631,15 @@ class FilesystemJob:
 	    self._restore(headFile, headRealPath, "creating %s")
 	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
 
+        # get the baseFile which was originally installed
+        baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:]) 
+                                        for x in troveCs.getChangedFileList() ]
+        baseFileList = repos.getFileVersions(baseFileList)
+
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
-	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getChangedFileList():
+	for (pathId, headPath, headFileId, headFileVersion), baseFile \
+                in itertools.izip(troveCs.getChangedFileList(), baseFileList):
 	    if not fsTrove.hasFile(pathId):
 		# the file was removed from the local system; this change
 		# wins
@@ -691,7 +697,6 @@ class FilesystemJob:
 
             # get the baseFile which was originally installed
             (baseFilePath, baseFileId, baseFileVersion) = baseTrove.getFile(pathId)
-            baseFile = repos.getFileVersion(pathId, baseFileId, baseFileVersion)
             assert(baseFile.fileId() == baseFileId)
 
             # now assemble what the file is supposed to look like on head
