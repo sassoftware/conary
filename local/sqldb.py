@@ -1049,15 +1049,17 @@ class Database:
 
         return r
 
-    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True):
+    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True,
+		 withFiles = True):
 	return self._getTrove(troveName = troveName, 
 			      troveVersion = troveVersion, 
 			      troveFlavor = troveFlavor,
-			      pristine = pristine)
+			      pristine = pristine,
+			      withFiles = withFiles)
 
     def _getTrove(self, pristine, troveName = None, troveInstanceId = None, 
 		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None):
+		  troveFlavor = 0, troveFlavorId = None, withFiles = True):
 	if not troveName:
 	    (troveName, troveVersionId, troveFlavorId) = \
 		    self.instances.getId(troveInstanceId,

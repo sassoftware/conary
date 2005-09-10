@@ -431,7 +431,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                 [ trv ] = self.getTroves([info], withFiles = False)
             elif inDb:
                 # XXX this should be parallelized...
-                trv = self.db.getTrove(*info)
+                trv = self.db.getTrove(withFiles = False, *info)
             else:
                 trv = None
 

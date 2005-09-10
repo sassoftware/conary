@@ -135,13 +135,9 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
         """
         return self.db.findTroveReferences(names)
 
-    def getTrove(self, name, version, flavor, pristine = True):
-	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
-		 if version == x.getVersion() and flavor == x.getFlavor()]
-	if not l:
-	    raise repository.TroveMissing(name, version)
-	assert(len(l) == 1)
-	return l[0]
+    def getTrove(self, name, version, flavor, pristine = True,
+		 withFiles = True):
+	return self.db.getTrove(name, version, flavor, pristine = pristine)
 
     def getTroves(self, troveList, pristine = True):
         return self.db.getTroves(troveList, pristine)
