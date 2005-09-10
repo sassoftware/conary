@@ -1067,6 +1067,34 @@ def getPublicKeyFromString(keyId, data):
     keyRing.close()
     return key
 
+def getKeyEndOfLifeFromString(keyId, data):
+    keyRing = StringIO.StringIO(data)
+    revoked, timestamp = findEndOfLife(keyId, keyRing)
+    keyRing.close()
+    return revoked, timestamp
+
+def getUserIdsFromString(keyId, data):
+    keyRing = StringIO.StringIO(data)
+    seekKeyById(keyId, keyRing)
+    startPoint = keyRing.tell()
+    seekNextKey(keyRing)
+    limit = keyRing.tell()
+    keyRing.seek(startPoint)
+    r = []
+    while keyRing.tell() < limit:
+        blockType = readBlockType(keyRing)
+        if blockType != -1:
+            keyRing.seek(-1, SEEK_CUR)
+        if (blockType >> 2) & 15 == PKT_USERID:
+            uidStart = keyRing.tell()
+            keyRing.seek(1, SEEK_CUR)
+            uidLen = readBlockSize(keyRing, blockType & 3)
+            r.append(keyRing.read(uidLen))
+            keyRing.seek(uidStart)
+        seekNextPacket(keyRing)
+    keyRing.close()
+    return r
+
 def getFingerprint(keyId, keyFile=''):
     if keyFile == '':
         if 'HOME' not in os.environ:

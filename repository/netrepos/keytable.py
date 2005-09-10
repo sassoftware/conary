@@ -157,6 +157,10 @@ class OpenPGPKeyTable:
                        (fingerprint,))
         return [ x[0] for x in r.fetchall() ]
 
+    def getUserIds(self, keyId):
+        keyData = getPGPKeyData(keyId)
+        return openpgpfile.getUserIdsFromString(keyId, keyData)
+
 class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
     def __init__(self, keyTable = None):
         openpgpkey.OpenPGPKeyCache.__init__(self)
@@ -179,7 +183,10 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         # instantiate the crypto key object from the raw key data
         cryptoKey = openpgpfile.getPublicKeyFromString(keyId, keyData)
 
+        # get end of life data
+        revoked, timestamp = openpgpfile.getKeyEndOfLifeFromString(keyId, keyData)
+
         # populate the cache
-        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, 0, 0)
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
         return self.publicDict[keyId]
 
