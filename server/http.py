@@ -530,10 +530,24 @@ class HttpHandler(WebHandler):
                         link = returnLink[0], url = returnLink[1])
         return apache.OK
 
+    @checkAuth(admin=True)
+    @strFields(key=None, owner="")
+    def pgpChangeOwner(self, auth, owner, key):
+        if not owner or owner == '--Nobody--':
+            owner = None
+        self.repServer.changePGPKeyOwner(self.authToken, 0, owner, key)
+        return self._redirect('pgpAdminForm')
+
     @checkAuth(write = True)
     def pgpAdminForm(self, auth):
+        admin = self.repServer.auth.check(self.authToken,admin=True)
+        userId = self.repServer.auth.getUserIdByName(self.authToken[0])
+        if admin:
+            users = dict(self.repServer.auth.iterUsers())
+        else:
+            users = {userId: self.authToken[0]}
         self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    userId = self.repServer.auth.getUserIdByName(self.authToken[0]))
+                    users = users, admin=admin)
         return apache.OK
 
     @checkAuth(write = True)

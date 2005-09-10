@@ -115,6 +115,11 @@ class OpenPGPKeyTable:
         self.db.commit()
         keyRing.close()
 
+    def updateOwner(self, uid, fpr):
+        cu = self.db.cursor()
+        cu.execute('UPDATE PGPKeys SET userId=? WHERE fingerprint=?', uid, fpr)
+        self.db.commit()
+
     # to be used only with extreme caution. it can damage the repository.
     def deleteKey(self, keyId):
         fingerprint = self.getFingerprint(keyId)
@@ -143,8 +148,12 @@ class OpenPGPKeyTable:
 
     def getUsersMainKeys(self, userId):
         cu = self.db.cursor()
-        r = cu.execute('SELECT fingerprint FROM PGPKeys '
-                       'WHERE userId=?', (userId,))
+        if not userId is None:
+            r = cu.execute('SELECT fingerprint FROM PGPKeys '
+                           'WHERE userId=?', (userId,))
+        else:
+            r = cu.execute('SELECT fingerprint FROM PGPKeys '
+                           'WHERE userId IS NULL')
         return [ x[0] for x in r.fetchall() ]
 
     def getSubkeys(self, fingerprint):
@@ -158,7 +167,7 @@ class OpenPGPKeyTable:
         return [ x[0] for x in r.fetchall() ]
 
     def getUserIds(self, keyId):
-        keyData = getPGPKeyData(keyId)
+        keyData = self.getPGPKeyData(keyId)
         return openpgpfile.getUserIdsFromString(keyId, keyData)
 
 class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):

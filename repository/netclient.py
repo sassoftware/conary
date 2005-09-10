@@ -286,6 +286,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         encKeyData = base64.b64encode(keyData)
         self.c[label].addNewPGPKey(user, encKeyData)
 
+    def changePGPKeyOwner(self, label, user, key):
+        self.c[label].changePGPKeyOwner(user, key)
+
     def deleteUserByName(self, label, user):
         self.c[label].deleteUserByName(user)
 

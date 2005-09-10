@@ -1244,6 +1244,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.repos.troveStore.keyTable.addNewKey(uid, keyData)
         return True
 
+    def changePGPKeyOwner(self, authToken, label, user, key):
+        if (not self.auth.checkIsFullAdmin(*authToken)):
+            raise InsufficientPermission
+        if user:
+            uid = self.auth.getUserIdByName(user)
+        else:
+            uid = None
+        self.repos.troveStore.keyTable.updateOwner(uid, key)
+
+
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
