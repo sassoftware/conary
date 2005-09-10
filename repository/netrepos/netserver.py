@@ -1183,7 +1183,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         sig = signature.get()
         #ensure repo knows this key
         keyCache = getKeyCache()
-        keyCache.getPublicKey(sig[0])
+        pubKey = keyCache.getPublicKey(sig[0])
+
+        if pubKey.isRevoked():
+            raise IncompatibleKey('Key %s has been revoked. Signature rejected'% sig[0])
+
+        if (pubKey.getTimestamp()):
+            raise IncompatibleKey('Key %s has expired. Signature rejected'% sig[0])
+
         #need to verify this key hasn't signed this trove already
         try:
             trv.getDigitalSignature(sig[0])

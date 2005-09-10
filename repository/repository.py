@@ -370,8 +370,12 @@ class ChangeSetJob:
         from lib.openpgpkey import getKeyCache
         from lib.openpgpfile import KeyNotFound
         keyCache = getKeyCache()
-#        for fingerprint,timestamp,sig in trv.troveInfo.sigs.digitalSigs.iter():
-#            keyCache.getPublicKey(fingerprint)
+        for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
+            pubKey = keyCache.getPublicKey(fingerprint)
+            if pubKey.isRevoked():
+                raise IncompatibleKey('Key %s is revoked'% pubKey.getFingerprint())
+            if pubKey.getTimestamp():
+                raise IncompatibleKey('Key %s is expired'% pubKey.getFingerprint())
         res = trv.verifyDigitalSignatures()
         if len(res[1]):
             raise KeyNotFound('Repository does not recognize key: %s'% res[1][0])
