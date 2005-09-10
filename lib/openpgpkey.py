@@ -214,8 +214,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         # FIXME: make this a callback
         print "\nsignature key is: %s"% keyId
 
-        trys = 0
-        while trys < 3:
+        tries = 0
+        while tries < 3:
             # FIXME: make this a callback
             passPhrase = getpass("Passphrase: ")
             try:
