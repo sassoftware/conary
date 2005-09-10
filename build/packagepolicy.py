@@ -512,7 +512,11 @@ class InstallBucket(policy.Policy):
         installable side by side.
     """
 
-    defaultCompKeys = { 'test' : {'version': '%(version)s'}}
+    defaultCompKeys = { 
+                        'devellib' : {'lib': '%(lib)s'},
+                        'lib'      : {'lib': '%(lib)s'},
+                        'test'     : {'version': '%(version)s'},
+                      }
 
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
@@ -546,7 +550,8 @@ class InstallBucket(policy.Policy):
         # override or fill in binKeys from user specified bin keys
         for component in self.recipe.autopkg.getComponents():
             binKeys = self.installBucketSpecs.get(component.name, {})
-            component.setInstallBucket(_expandBinKeys(binKeys))
+            if not component.getInstallBucket():
+                component.setInstallBucket(_expandBinKeys(binKeys))
 
 
 def _markConfig(policy, filename, fullpath):
