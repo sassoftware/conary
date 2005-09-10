@@ -729,7 +729,8 @@ class DependencyTables:
 
         # now build a table of all the troves which are being erased
         cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
-                        (troveId INTEGER KEY, nodeId INTEGER)""")
+                        (troveId INTEGER, nodeId INTEGER)""")
+	cu.execute("""CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)""")
 
         for oldInfo in changeSet.getOldTroveList():
             oldTroves.append((oldInfo, len(nodes)))
