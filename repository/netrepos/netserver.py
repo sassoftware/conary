@@ -1446,27 +1446,23 @@ class CacheSet:
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
                 absolute=? AND recurse=? AND withFiles=?  
-                AND withFileContents=?  AND excludeAutoSource=?
-            """, name, oldFlavorId, oldVersionId, newFlavorId, 
-            newVersionId, absolute, recurse, withFiles, withFileContents,
-            excludeAutoSource)
+                AND withFileContents=? AND excludeAutoSource=?
+            """, (name, oldFlavorId, oldVersionId, newFlavorId, 
+                  newVersionId, absolute, recurse, withFiles, withFileContents,
+                  excludeAutoSource))
 
-        row = None
         # since we begin and commit a transaction inside the loop
         # over the returned rows, we must use fetchall() here so that we
         # release our read lock.
         for (row, returnVal, size) in cu.fetchall():
             path = self.filePattern % (self.tmpDir, row)
-            try:
-                # if we have no size, this is a bad entry.  delete it.
-                if not size:
-                    raise OSError, 'no size for cache entry'
-                fd = os.open(path, os.O_RDONLY)
-                os.close(fd)
-                return (path, cPickle.loads(returnVal), size)
-            except OSError:
+            # if we have no size or we can't access the file, it's
+            # bad entry.  delete it.
+            if not size or not os.access(path, os.R_OK):
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
                 self.db.commit()
+                continue
+            return (path, cPickle.loads(returnVal), size)
 
         return None
 
