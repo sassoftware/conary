@@ -1482,7 +1482,7 @@ class SingleGroup:
 
         troveList += includedTroves
 
-        troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
+        jobSet = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
 
         oldDbPath = cfg.dbPath
         cfg.setValue('dbPath', ':memory:')
@@ -1491,16 +1491,16 @@ class SingleGroup:
 
         client = conaryclient.ConaryClient(cfg)
         if self.checkOnlyByDefaultDeps:
-            uJob = client.updateChangeSet(troves, recurse = True,
-                                            resolveDeps=False, split=False)[0]
-            troves = uJob.getJobs()[0]
-            cs = client.repos.createChangeSet(troves, 
-                                              recurse = False, withFiles=False)
-        else:
-            cs = client.repos.createChangeSet(troves, 
+            cs = client.createChangeSet(jobSet, 
                                               recurse = True, withFiles=False)
+        else:
+            cs = client.repos.createChangeSet(jobSet, recurse = True, 
+                                              withFiles=False)
 
-        failedDeps = client.db.depCheck(cs)[0]
+        jobSet = cs.getJobSet()
+        trvSrc = trovesource.ChangesetFilesTroveSource(client.db)
+        trvSrc.addChangeSet(cs, includesFileContents = False)
+        failedDeps = client.db.depCheck(jobSet, trvSrc)[0]
         cfg.setValue('dbPath', oldDbPath)
         cfg.setValue('root', oldRoot)
         return failedDeps
