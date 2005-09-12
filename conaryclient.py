@@ -261,7 +261,8 @@ class ConaryClient:
                 # if we've found good suggestions, merge in those troves
                 if troves:
                     newJob = self._updateChangeSet(troves, uJob,
-                                              keepExisting = False)[0]
+                                              keepExisting = False,
+                                              recurse = False)[0]
                     assert(not (newJob & jobSet))
                     jobSet.update(newJob)
                     #newCs, remainder = uJob.getTroveSource().createChangeSet(
@@ -974,11 +975,22 @@ class ConaryClient:
             raise NoNewTrovesError
 
         if changeSetList:
+            jobSet.update(changeSetList)
+
+            if not recurse:
+                # some of these items may already be available in troveSource;
+                # don't go back over the wire for those
+                hasTroves = uJob.getTroveSource().hasTroves(
+                        [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
+                changeSetList = [ x[1] for x in 
+                                        itertools.izip(hasTroves, changeSetList)
+                                        if x[0] is not True ]
+
             cs = self.repos.createChangeSet(changeSetList, withFiles = False,
                                             recurse = recurse)
             uJob.getTroveSource().addChangeSet(cs)
-            jobSet.update(changeSetList)
             del cs
+
         del changeSetList
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
