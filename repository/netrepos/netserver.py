@@ -1458,6 +1458,9 @@ class CacheSet:
         for (row, returnVal, size) in cu.fetchall():
             path = self.filePattern % (self.tmpDir, row)
             try:
+                # if we have no size, this is a bad entry.  delete it.
+                if not size:
+                    raise OSError, 'no size for cache entry'
                 fd = os.open(path, os.O_RDONLY)
                 os.close(fd)
                 return (path, cPickle.loads(returnVal), size)
