@@ -587,14 +587,14 @@ class ConaryClient:
                     l.append(job)
 
             inelligible = []
-            newItems = []
+            newItems = set()
             toRemove = set()
             for old, l in outdated.iteritems():
                 if len(l) == 1: 
                     inelligible.append(old)
                 else:
-                    newItems += [ (x[0], x[2][0], x[2][1]) for x in l ]
-                    toRemove.update(set(l))
+                    newItems.update((x[0], x[2][0], x[2][1]) for x in l)
+                    toRemove.update(l)
 
             if not newItems:
                 return
