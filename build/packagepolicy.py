@@ -1955,7 +1955,9 @@ class EnforceSonameBuildRequirements(policy.Policy):
                 x[0].replace(':lib', ':devel')
                 for x in localProvides[dep] if x[0].endswith(':lib') ]
             if [ x for x in develCandidates
-                 if x not in self.recipe.buildRequires ] :
+                 if x not in self.recipe.buildRequires and
+                    x.replace(':devel', ':devellib')
+                    not in self.recipe.buildRequires ] :
                 # We have at least one file that uses a library that
                 # is not reflected in the buildRequires list.  Add all
                 # the candidates to the summary message that will be
