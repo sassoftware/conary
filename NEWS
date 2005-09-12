@@ -21,6 +21,8 @@ Changes in 0.62.4:
   * Looking up changeset cache entries in the cache database no longer
     uses exception handling to determine when database entries are
     invalid or stale.
+  * The EnforceSonameBuildRequirements policy now recognizes :devellib
+    as well as :devel components in buildRequires.
 
 Changes in 0.62.3:
   * Don't link troves to groups when the branch has changed
