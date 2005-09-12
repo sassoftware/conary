@@ -5,6 +5,7 @@ Changes in 0.62.4:
   * Fix PGP key submission to not use a hidden form element.
   * Change PGP key submission to use an xmlrpc call instead of modifying the 
     database directly.
+  * Add methods to change PGP key/user associations, and thereby disable a key
   * Add an index to dependency resolution for a massive improvement on 
     local system dependency performance on large updates
   * Added ability to get troves w/o file lists from the local database
