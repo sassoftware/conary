@@ -28,16 +28,21 @@
       </form>
     </div>
 
+    <div py:def="breakKey(key)" py:strip="True">
+        <?python
+    brokenkey = ''
+    for x in range(len(key)/4):
+        brokenkey += key[x*4:x*4+4] + " "
+        ?>
+        ${brokenkey}
+    </div>
+
     <div py:def="printKeyTableEntry(key, userId)" py:strip="True">
-     <tr class='key-ids'>
-      <td colspan="3">
-          <div py:for="id in keyTable.getUserIds(key)" py:content="id"/>
-      </td>
-     </tr>
-     <tr>
-      <td>${key}</td>
-      <td><div py:for="subkey in keyTable.getSubkeys(key)"
-               py:content="subkey" />
+     <tr class="key-ids">
+      <td>
+        <div>pub: ${breakKey(key)}</div>
+        <div py:for="id in keyTable.getUserIds(key)"> uid: &#160; &#160; ${id}</div>
+        <div py:for="subkey in keyTable.getSubkeys(key)">sub: ${breakKey(subkey)}</div>
       </td>
       <td py:if="admin" style="text-align: right;">${generateOwnerListForm(key, users, userId)}</td>
      </tr>
@@ -52,13 +57,9 @@
             These keys are, for all intents and purposes, disabled.
             <table class="key-admin" id="users">
                 <thead>
-                    <tr class="key-ids">
-                        <td colspan="3">Key User Ids</td>
-                    </tr>
                     <tr>
-                        <td style="width: 40%;">Key Fingerprint</td>
-                        <td style="width: 40%">Subkey Fingerprints</td>
-                        <td py:if="admin" style="text-align: right;">User Association</td>
+                        <td>Key</td>
+                        <td py:if="admin" style="text-align: right;">Owner</td>
                     </tr>
                 </thead>
                 <tbody>
