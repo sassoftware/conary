@@ -401,6 +401,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
 
     def getTroves(self, troveList, withFiles = True):
         assert(not withFiles)
+        assert(not self.invalidated)
         retList = []
 
         for info in troveList:
@@ -418,6 +419,10 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
             retList.append(newTrove)
 
         return retList
+
+    def hasTroves(self, troveList):
+        assert(not self.invalidated)
+        return [ x in self.troveCsMap for x in troveList ]
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, useDatabase = True):
@@ -532,7 +537,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
         # to not have jobs we don't need
         if changeSetJobs:
             # this trick only works once
-            self.invalidated = withFiles
+            self.invalidated = True
             for subCs in self.csList:
                 toDel = []
                 for trvCs in subCs.iterNewTroveList():
