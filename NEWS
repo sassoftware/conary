@@ -10,6 +10,7 @@ Changes in 0.62.4:
   * Added ability to get troves w/o file lists from the local database
     and use that when getting troves through the changeset trove source
   * Dependency resolution could cause duplicate trovesource entries
+  * :lib and :devellib automatically have lib=%(lib)s install buckets
 
 Changes in 0.62.3:
   * Don't link troves to groups when the branch has changed
