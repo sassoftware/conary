@@ -853,7 +853,7 @@ class ConaryClient:
                 splittable = False
                 uJob.getTroveSource().addChangeSet(item, 
                                                    includesFileContents = True)
-                jobsFromChangeSetFiles.update(item.getPrimaryJobSet())
+                jobsFromChangeSetFiles.update(item.getJobSet(primaries = True))
                 continue
 
             (troveName, (oldVersionStr, oldFlavorStr),

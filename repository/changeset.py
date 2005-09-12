@@ -645,7 +645,7 @@ class ChangeSet(streams.LargeStreamSet):
 	# this has to be true, I think...
 	self.local = 0
 
-    def getPrimaryJobSet(self):
+    def getJobSet(self, primaries = False):
         """
         Regenerates the primary change set job (passed to change set creation)
         for this change set.
@@ -663,12 +663,12 @@ class ChangeSet(streams.LargeStreamSet):
                        (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                        trvCs.isAbsolute())
 
-            if (job[0], job[2][0], job[2][1]) in self.primaryTroveList:
+            if not primaries or \
+                    (job[0], job[2][0], job[2][1]) in self.primaryTroveList:
                 jobSet.add(job)
 
-
         for item in self.oldTroves:
-            if item in self.primaryTroveList:
+            if not primaries or item in self.primaryTroveList:
                 jobSet.add((item[0], (item[1], item[2]), 
                                 (None, None), False))
 
