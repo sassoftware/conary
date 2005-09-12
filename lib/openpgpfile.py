@@ -278,38 +278,19 @@ def convertPrivateKey(privateBlock):
 #turn the current key into a form usable for keyId's and self signatures
 def getHashableKeyData(keyRing):
     # see RFC 2440 11.2 - Key IDs and Fingerprints
+    keyPoint = keyRing.tell()
     keyBlock=readBlockType(keyRing)
     if not (keyBlock & 128):
         raise MalformedKeyRing("Not an OpenPGP packet.")
-
+    keyRing.seek(keyPoint)
     if ((keyBlock == -1) or (keyBlock & 64)
         or (((keyBlock >> 2) & 15) not in PKT_ALL_KEYS)):
         return ''
-
-    # RFC 2440 4.2.1 - Old-Format Packet Lengths
-    if (keyBlock & 3) == OLD_PKT_LEN_FOUR_OCTET:
-        # Four-Octet length is 5 octets long
-        dataSize = (ord(keyRing.read(1)) * (1 << 24) +
-                    ord(keyRing.read(1)) * (1 << 16) +
-                    ord(keyRing.read(1)) * (1 << 8) +
-                    ord(keyRing.read(1)) + 5)
-        keyRing.seek(-5, SEEK_CUR)
-    elif (keyBlock & 3) == OLD_PKT_LEN_TWO_OCTET:
-        # Two-Octet length is 3 octets long
-        dataSize = ord(keyRing.read(1)) * (1 << 8) + ord(keyRing.read(1)) + 3
-        keyRing.seek(-3, SEEK_CUR)
-    elif (keyBlock & 3) == OLD_PKT_LEN_ONE_OCTET:
-        # One-Octet length is 2 octets long
-        dataSize = ord(keyRing.read(1)) + 2
-        keyRing.seek(-2, SEEK_CUR)
-    else:
-        # We're unable to handle a packet length of indeterminate size
-        raise MalformedKeyRing("Can't parse key of indeterminate size.")
-    # read the data
+    seekNextPacket(keyRing)
+    dataSize = keyRing.tell() - keyPoint
+    keyRing.seek(keyPoint)
     data = keyRing.read(dataSize)
-    # move the current posititon back to the beginning of the data
-    keyRing.seek(-1 * dataSize, SEEK_CUR)
-
+    keyRing.seek(keyPoint)
     # convert private keys to a public key
     if ((keyBlock >> 2) & 15) in PKT_ALL_SECRET:
         data = convertPrivateKey(data)
@@ -352,12 +333,8 @@ def getKeyId(keyRing):
 def getSignatureTuple(keyRing):
     startPoint = keyRing.tell()
     blockType = readBlockType(keyRing)
-    if blockType & 3 == 3:
-        raise MalformedKeyRing("Can't read packet of indeterminate length")
-    if blockType & 3 == 2:
-        keyRing.seek(4, SEEK_CUR)
-    else:
-        keyRing.seek((blockType & 3) + 1, SEEK_CUR)
+    #reading the block size skips the length octets
+    readBlockSize(keyRing, blockType)
     if ord(keyRing.read(1)) != 4:
         raise IncompatibleKey("Must be a V4 signature")
     keyRing.seek(1, SEEK_CUR)
@@ -394,12 +371,8 @@ def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
         # append the hashable portion of the self signature
         # and record what kind of hash alorithm to use while we're at it.
         hashBlock = readBlockType(keyRing)
-        if hashBlock & 3 == 3:
-            raise MalformedKeyRing("Can't read packet of indeterminate length")
-        elif hashBlock & 3 == 2:
-            keyRing.seek(4)
-        else:
-            keyRing.seek((hashBlock & 3) + 1, SEEK_CUR)
+        # reading the block size skips the length octets
+        readBlockSize(keyRing, hashBlock)
         hashData = keyRing.read(6)
         if ord(hashData[0]) != 4:
             raise Invalidkey('Self signature is not a V4 signature')
@@ -488,7 +461,7 @@ def findEndOfLife(keyId, keyRing):
         sigPoint = keyRing.tell()
         #we found a self signature, parse it for the info we want
         blockType = readBlockType(keyRing)
-        # reading the block size skips it
+        # reading the block size skips the length octets
         readBlockSize(keyRing, blockType & 3)
         if (ord(keyRing.read(1)) != 4):
             raise IncompatibleKey("Not a V4 signature")
@@ -706,37 +679,7 @@ def verifySelfSignatures(keyId, keyRing):
 # find the next OpenPGP packet regardless of type.
 def seekNextPacket(keyRing):
     packetType=readBlockType(keyRing)
-    if packetType == -1:
-        return
-    dataSize = -1
-    if not packetType & 64:
-        # RFC 2440 4.2.1 - Old-Format Packet Lengths
-        if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
-            sizeLen = 1
-        elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
-            sizeLen = 2
-        elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
-            sizeLen = 4
-        else:
-            raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
-    else:
-        # RFC 2440 4.2.2 - New-Format Packet Lengths
-        octet=ord(keyRing.read(1))
-        if octet < 192:
-            sizeLen=1
-            keyRing.seek(-1, SEEK_CUR)
-        elif octet < 224:
-            dataSize = (ord(keyRing.read(1)) - 192 ) * 256 + \
-                       ord(keyRing.read(1)) + 192
-        elif octet < 255:
-            dataSize = 1 << (ord(keyRing.read(1)) & 0x1f)
-        else:
-            sizeLen=4
-    # if we have not already calculated datasize, calculate it now
-    if dataSize == -1:
-        dataSize = 0
-        for i in range(0, sizeLen):
-            dataSize = (dataSize * 256) + ord(keyRing.read(1))
+    dataSize = readBlockSize(keyRing, packetType)
     keyRing.seek(dataSize, SEEK_CUR)
 
 def seekNextKey(keyRing):
@@ -779,13 +722,7 @@ def getSigId(keyRing):
     if (blockType >> 2) & 15 != PKT_SIG:
         #block is not a signature. it has no sigId
         return ''
-    lenBits = blockType & 3
-    if lenBits == 3:
-        raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
-    elif lenBits == 2:
-        keyRing.seek(4, SEEK_CUR)
-    else:
-        keyRing.seek(lenBits+1, SEEK_CUR)
+    readBlockSize(keyRing, blockType)
     assert (ord(keyRing.read(1)) == 4)
     keyRing.seek(3, SEEK_CUR)
     hashedLen = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1))
@@ -826,12 +763,7 @@ def assertSigningKey(keyId,keyRing):
     # old, this might be the only hint that it's legal to use this key to
     # make digital signatures.
     blockType = readBlockType(keyRing)
-    if blockType & 3 == 3:
-        raise IncompatibleKey("Can't seek past packet of indeterminate length")
-    elif blockType & 3 == 2:
-        keyRing.seek(4, SEEK_CUR)
-    else:
-        keyRing.seek((blockType & 3) + 1, SEEK_CUR)
+    readBlockSize(keyRing, blockType)
     if (ord(keyRing.read(1)) != 4):
         raise IncompatibleKey("Can only use V4 keys")
     keyRing.seek(4, SEEK_CUR)
@@ -866,15 +798,9 @@ def assertSigningKey(keyId,keyRing):
         # remember where we are in case we didn't find what we need.
         sigStart = keyRing.tell()
         blockType = readBlockType(keyRing)
-        lenBits = blockType & 3
-        if lenBits == 3:
-            keyRing.seek(startPoint)
-            raise MalformedKeyRing("Can't seek past packet of indeterminate length.")
-        elif lenBits == 2:
-            keyRing.seek(4, SEEK_CUR)
-        else:
-            keyRing.seek(lenBits+1, SEEK_CUR)
-        assert (ord(keyRing.read(1)) == 4)
+        readBlockSize(keyRing, blockType)
+        if (ord(keyRing.read(1)) != 4):
+            raise IncompatibleKey("Can only use V4 keys")
         keyRing.seek(3, SEEK_CUR)
         subLim = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + keyRing.tell()
         done = 0
@@ -951,18 +877,40 @@ def readMPI(keyRing):
         r = r * 256 + ord(keyRing.read(1))
     return r
 
-def readBlockSize(keyRing, sizeType):
-    if sizeType == 0:
-        return ord(keyRing.read(1))
-    elif sizeType == 1:
-        return ord(keyRing.read(1)) * 0x100 + ord(keyRing.read(1))
-    elif sizeType == 2:
-        return (ord(keyRing.read(1)) * 0x1000000 +
-                ord(keyRing.read(1)) * 0x10000 +
-                ord(keyRing.read(1)) * 0x100 +
-                ord(keyRing.read(1)))
+def readBlockSize(keyRing, packetType):
+    if packetType == -1:
+        return 0
+    # check if packet is old or new style
+    dataSize = -1
+    if not packetType & 64:
+        # RFC 2440 4.2.1 - Old-Format Packet Lengths
+        if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
+            sizeLen = 1
+        elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
+            sizeLen = 2
+        elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
+            sizeLen = 4
+        else:
+            raise MalformedKeyRing("Can't get size of packet of indeterminate length.")
     else:
-        raise MalformedKeyRing("Can't get size of packet of indeterminate length")
+        # RFC 2440 4.2.2 - New-Format Packet Lengths
+        octet=ord(keyRing.read(1))
+        if octet < 192:
+            sizeLen=1
+            keyRing.seek(-1, SEEK_CUR)
+        elif octet < 224:
+            dataSize = (ord(keyRing.read(1)) - 192 ) * 256 + \
+                       ord(keyRing.read(1)) + 192
+        elif octet < 255:
+            dataSize = 1 << (ord(keyRing.read(1)) & 0x1f)
+        else:
+            sizeLen=4
+    # if we have not already calculated datasize, calculate it now
+    if dataSize == -1:
+        dataSize = 0
+        for i in range(0, sizeLen):
+            dataSize = (dataSize * 256) + ord(keyRing.read(1))
+    return dataSize
 
 def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
     startPoint = keyRing.tell()
@@ -979,11 +927,14 @@ def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
         if keyRing.tell() == limit:
             raise KeyNotFound(keyId)
     startLoc=keyRing.tell()
+    seekNextPacket(keyRing)
+    limit = keyRing.tell()
+    keyRing.seek(startLoc)
     packetType=ord(keyRing.read(1))
     if secret and (not ((packetType>>2) & 1)):
         raise IncompatibleKey("Can't get private key from public keyring")
-    limit = (readBlockSize(keyRing, packetType & 3) +
-             (packetType & 3) + 1 + startLoc)
+    # reading the block size skips the length octets
+    readBlockSize(keyRing, packetType)
     if ord(keyRing.read(1)) != 4:
         raise MalformedKeyRing("Can only read V4 packets")
     keyRing.seek(4, SEEK_CUR)
@@ -1196,7 +1147,7 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
             salt = keyRing.read(8)
             count = ord(keyRing.read(1))
             key = iteratedS2K(passPhrase,hashAlg, keySize, salt, count)
-        data = keyRing.read(limit - keyRing.tell() + 1)
+        data = keyRing.read(limit - keyRing.tell())
         if algType > 6:
             cipherBlockSize = 16
         else:
@@ -1338,15 +1289,15 @@ def assertReplaceKeyAllowed(origKey, newKey):
         # ensure sig is in fact a revocation.
         sigStartPoint = origRing.tell()
         blockType = readBlockType(origRing)
-        if blockType & 3 == 3:
+        try:
+            readBlockSize(origRing, blockType)
+        except:
             origRing.close()
             newRing.close()
-            raise MalformedKeyRing("Can't seek past packet of indeterminate length")
-        elif blockType & 3 == 2:
-            origRing.seek(4, SEEK_CUR)
-        else:
-            origRing.seek((blockType & 3) +1, SEEK_CUR)
+            raise
         if ord(origRing.read(1)) != 4:
+            origRing.close()
+            newRing.close()
             raise IncompatibleKey("Only V4 signatures allowed")
         sigType = ord(origRing.read(1))
         origRing.seek(sigStartPoint)
