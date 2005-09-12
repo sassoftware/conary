@@ -290,7 +290,13 @@ class NetworkAuthorization:
 
                 
             #Then delete the UserGroup created with the name of that user
-            self.deleteGroup(user, False)
+            try:
+                self.deleteGroup(user, False)
+            except StopIteration, e:
+                # Ignore the StopIteration error as it means there was no
+                # Group matching that name.  Probably because the group
+                # was deleted beforehand
+                pass
 
             #Now delete the user-self
             sql = "DELETE from Users WHERE userId=?"
@@ -435,6 +441,7 @@ class NetworkAuthorization:
 
     def deleteGroup(self, userGroupName, commit = True):
         return self.deleteGroupById(self.getGroupIdByName(userGroupName), commit)
+
     def deleteGroupById(self, userGroupId, commit = True):
         cu = self.db.cursor()
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
