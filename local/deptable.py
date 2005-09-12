@@ -371,7 +371,7 @@ class DependencyTables:
                         COUNT(DepCheck.troveId) == DepCheck.flagCount
                 """ % subselect
 
-    def check(self, changeSet, findOrdering = False):
+    def check(self, jobSet, troveSource, findOrdering = False):
 	"""
 	Check the database for closure against the operations in
 	the passed changeSet.
@@ -629,11 +629,7 @@ class DependencyTables:
 		    # if any item in this component is an info- trove, go
 		    # ahead and process this component now
 		    for component in compGraph[nextIndex][0]:
-			if type(component) == tuple:
-			    name = component[0]
-			else:
-			    name = component.getName()
-
+                        name = component[0]
 			if name.startswith("info-"):
 			    _orderDFS(compGraph, nextIndex, seen, order)
 			    break
@@ -694,29 +690,35 @@ class DependencyTables:
 	# indexing depList. depList is a list of (troveNum, depClass, dep) 
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
-        for i, trvCs in enumerate(changeSet.iterNewTroveList()):
+        i = 0
+        for job in jobSet:
+            # removal jobs are handled elsewhere
+            if job[2][0] is None: continue
+
+            newInfo = (job[0], job[2][0], job[2][1])
+
+            trv = troveSource.getTrove(withFiles = False, *newInfo)
+            
             troveNum = -i - 1
-            troveNames.append((trvCs.getName()))
+            troveNames.append(newInfo[0])
             self._populateTmpTable(cu, stmt, 
                                    depList = depList, 
                                    troveNum = troveNum,
-                                   requires = trvCs.getRequires(), 
-                                   provides = trvCs.getProvides(),
+                                   requires = trv.getRequires(), 
+                                   provides = trv.getProvides(),
                                    multiplier = -1)
-
-	    newInfo = (trvCs.getName(), trvCs.getNewVersion(),
-		       trvCs.getNewFlavor())
 
             troveInfo[newInfo] = i + 1
 
-            if trvCs.getOldVersion():
-		oldInfo = (trvCs.getName(), trvCs.getOldVersion(),
-			   trvCs.getOldFlavor())
+            if job[1][0] is not None:
+		oldInfo = (job[0], job[1][0], job[1][1])
                 oldTroves.append((oldInfo, len(nodes)))
 	    else:
 		oldInfo = None
 
-            nodes.append((trvCs, set(), set()))
+            nodes.append((job, set(), set()))
+
+            i += 1
 
         # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)
@@ -732,9 +734,11 @@ class DependencyTables:
                         (troveId INTEGER, nodeId INTEGER)""")
 	cu.execute("""CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)""")
 
-        for oldInfo in changeSet.getOldTroveList():
+        for job in jobSet:
+            if job[2][0] is not None: continue
+            oldInfo = (job[0], job[1][0], job[1][1])
             oldTroves.append((oldInfo, len(nodes)))
-            nodes.append((oldInfo, set(), set()))
+            nodes.append((job, set(), set()))
 
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
@@ -884,14 +888,18 @@ class DependencyTables:
             # Create dependencies from collections to the things they include.
             # This forces collections to be installed after all of their
             # elements
-            for i, trvCs in enumerate(changeSet.iterNewTroveList()):
-                for (name, changeList) in trvCs.iterChangedTroves():
-                    for (changeType, version, flavor, byDef) in changeList:
-                        if changeType == '+':
-                            targetTrove = troveInfo.get(
-                                                (name, version, flavor), -1)
-                            if targetTrove >= 0:
-                                newNewEdges.add((i + 1, targetTrove, None))
+            i = 0
+            for job in jobSet:
+                if job[2][0] is None: continue
+                trv = troveSource.getTrove(job[0], job[2][0], job[2][1], 
+                                           withFiles = False)
+
+                for name, version, flavor in trv.iterTroveList():
+                    targetTrove = troveInfo.get((name, version, flavor), -1)
+                    if targetTrove >= 0:
+                        newNewEdges.add((i + 1, targetTrove, None))
+
+                i += 1
 
             resatisfied = set(brokenByErase) & set(satisfied)
             if resatisfied:
@@ -941,17 +949,9 @@ class DependencyTables:
             ordering = _orderComponents(componentGraph)
             for component in ordering:
                 oneList = []
-                for item in component:
-                    if isinstance(item, tuple):
-                        oneList.append((item[0], (item[1], item[2]),
-                                                 (None, None), False))
-                    else:
-                        oneList.append((item.getName(),
-                                        (item.getOldVersion(),
-                                         item.getOldFlavor()),
-                                        (item.getNewVersion(),
-                                         item.getNewFlavor()),
-                                        item.isAbsolute()) )
+                for job in component:
+                    oneList.append(job)
+
                 changeSetList.append(oneList)
 
         del troveInfo

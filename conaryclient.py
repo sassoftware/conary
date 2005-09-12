@@ -205,18 +205,11 @@ class ConaryClient:
             else:
                 return scoredList[-1][-1]
 
-
-        cs = changeset.ReadOnlyChangeSet()
-        baseCs, remainder = uJob.getTroveSource().createChangeSet(jobSet, 
-                                            withFiles = False, recurse = False)
-        assert(not remainder)
-        cs.merge(baseCs)
-        del baseCs
-
         pathIdx = 0
         foundSuggestions = False
         (depList, cannotResolve, changeSetList) = \
-                        self.db.depCheck(cs, findOrdering = split)
+                        self.db.depCheck(jobSet, uJob.getTroveSource(),
+					 findOrdering = split)
         suggMap = {}
         lastCheck = []
 
@@ -271,14 +264,16 @@ class ConaryClient:
                                               keepExisting = False)[0]
                     assert(not (newJob & jobSet))
                     jobSet.update(newJob)
-                    newCs, remainder = uJob.getTroveSource().createChangeSet(
-                                            newJob, withFiles = False, 
-                                            recurse = False)
-                    assert(not remainder)
-                    cs.merge(newCs)
+                    #newCs, remainder = uJob.getTroveSource().createChangeSet(
+                                            #newJob, withFiles = False, 
+                                            #recurse = False)
+                    #assert(not remainder)
+                    #cs.merge(newCs)
 
                     (depList, cannotResolve, changeSetList) = \
-                                    self.db.depCheck(cs, findOrdering = split)
+                                    self.db.depCheck(jobSet,
+                                                     uJob.getTroveSource(), 
+                                                     findOrdering = split)
 
             if troves and depsRecurse:
                 pathIdx = 0
