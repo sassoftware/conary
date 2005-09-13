@@ -136,11 +136,11 @@ class SerialNumber(object):
         self.numList = [ int(x) for x in value.split(".") ]
 
 class Revision(AbstractRevision):
-
     """
-    Version element for a version/release pair. These are formatted as
-    "version-release", with no hyphen allowed in either portion. The
-    release must be a simple integer or two integers separated by a
+    Version element for a version, sourceCount, buildCount
+    triplet. These are formatted as "version-sourceCount-buildCount",
+    with no hyphens allowed in any portion. The sourceCount and
+    buildCounts must be simple integers or two integers separated by a
     decimal point.
     """
 
@@ -155,7 +155,7 @@ class Revision(AbstractRevision):
 
     def asString(self, versus = None, frozen = False):
 	"""
-	Returns a string representation of a version/release pair.
+	Returns a string representation of a Release.
 	"""
 	if versus and self.version == versus.version:
 	    if versus and self.sourceCount == versus.sourceCount:
@@ -217,7 +217,7 @@ class Revision(AbstractRevision):
 
     def getVersion(self):
 	"""
-	Returns the version string of a version/release pair.
+	Returns the version string of a Revision.
 
         @rtype: str
 	"""
@@ -226,7 +226,7 @@ class Revision(AbstractRevision):
 
     def getSourceCount(self):
 	"""
-	Returns the source SerialNumber object of a version/release pair.
+	Returns the source SerialNumber object of a Revision.
 
         @rtype: SerialNumber
 	"""
@@ -234,7 +234,7 @@ class Revision(AbstractRevision):
 
     def getBuildCount(self):
 	"""
-	Returns the build SerialNumber object of a version/release pair.
+	Returns the build SerialNumber object of a Revision.
 
         @rtype: SerialNumber
 	"""
@@ -242,7 +242,7 @@ class Revision(AbstractRevision):
 
     def freshlyBranched(self):
         """
-        Resets the build and source counts to reflect this version/release
+        Resets the build and source counts to reflect this Revision
         as being freshly branched.
         """
         self.sourceCount.truncateShadowCount(0, fromEnd = True)
@@ -294,13 +294,19 @@ class Revision(AbstractRevision):
 
 	@param value: String representation of a Revision
 	@type value: string
+        @param template: a Revision instance to use as the basis when
+        parsing an abbreviated revision string.
 	@type template: Revision
+        @param frozen: indicates if timestamps should be parsed from
+        the version string
+        @type frozen: bool
 	"""
 	self.timeStamp = 0
+        self.sourceCount = None
 	self.buildCount = None
 
 	version = None
-	release = None
+	sourceCount = None
 	buildCount = None
 
 	if frozen:
@@ -308,62 +314,76 @@ class Revision(AbstractRevision):
 	    self.thawTimestamp(t)
 
 	if value.find(":") != -1:
-	    raise ParseError("version/release pairs may not contain colons")
+	    raise ParseError("release strings may not contain colons")
 
 	if value.find(",") != -1:
-	    raise ParseError("version/release pairs may not contain commas")
+	    raise ParseError("release strings may not contain commas")
 
 	if value.find(" ") != -1:
-	    raise ParseError("version/release pairs may not contain spaces")
+	    raise ParseError("release strings may not contain spaces")
 
 	if value.find("@") != -1:
-	    raise ParseError("version/release pairs may not contain @ signs")
+	    raise ParseError("release strings may not contain @ signs")
 
 	fields = value.split("-")
 	if len(fields) > 3:
 	    raise ParseError("too many '-' characters in release string")
 
-	if len(fields) == 1:
-	    if template and template.buildCount is not None:
-		self.version = template.version
-		self.sourceCount = template.sourceCount
-		buildCount = fields[0]
-	    elif template:
-		self.version = template.version
-		release = fields[0]
-	    else:
-		raise ParseError("bad version/release set %s" % value)
-	elif len(fields) == 2:
-	    if template and template.buildCount is not None:
-		self.version = template.version
-		release = fields[0]
-		buildCount = fields[1]
-	    else:
-		version = fields[0]
-		release = fields[1]
-	else:
-	    (version, release, buildCount) = fields
+        # if the string we're parsing didn't include all of
+        # version-sourceCount-buildCount AND we have a template to
+        # work off of, we can use the template to build up a full
+        # version from the abbreviated information given
+        if len(fields) < 3 and template:
+            # assume we're going to use the version and sourceCount
+            # from the template (though we may change our mind)
+            version = template.version
+            self.sourceCount = template.sourceCount
 
-	if version is not None:
-	    try:
-		int(version[0])
-	    except:
-		raise ParseError, \
-		    ("version numbers must begin with a digit: %s" % value)
-	    self.version = version
+            # if our template has a buildcount, it is a full
+            # version-sourceCount-buildCount set.  The abbreviated
+            # value we are parsing can either be sourceCount-buildCount
+            # or just buildCount
+            if template.buildCount is not None:
+                buildCount = fields[-1]
+                if len(fields) == 2:
+                    # sourceCount-buildCount was provided
+                    sourceCount = fields[0]
+            else:
+                # otherwise, the template only has version-sourceCount
+                # so the value string we're parsing can provide
+                # version-sourceCount just sourceCount
+                sourceCount = fields[-1]
+                if len(fields) == 2:
+                    # version-sourceCount was provided
+                    version = fields[0]
+        else:
+            if len(fields) == 1:
+                version = fields[0]
+            elif len(fields) == 2:
+                version, sourceCount = fields
+            elif len(fields) == 3:
+                version, sourceCount, buildCount = fields
 
-	if release is not None:
+        if not version:
+            raise ParseError("bad release string: %s" % value)
+
+        self.version = version
+
+	if sourceCount is not None:
 	    try:
-		self.sourceCount = SerialNumber(release)
+		self.sourceCount = SerialNumber(sourceCount)
 	    except:
-		raise ParseError("release numbers must be all "
-                                 "numeric: %s" % release)
+		raise ParseError("source count numbers must be all "
+                                 "numeric: %s" % sourceCount)
 	if buildCount is not None:
 	    try:
 		self.buildCount = SerialNumber(buildCount)
 	    except:
-		raise ParseError("build count numbers must be "
-                                 "all numeric: %s" % buildCount)
+		raise ParseError("build count numbers must be all"
+                                 "numeric: %s" % buildCount)
+
+        if self.sourceCount is None:
+            raise ParseError("bad release string: %s" % value)
 
 class Label(AbstractLabel):
 
@@ -1093,18 +1113,18 @@ class Branch(VersionSequence):
         """ Returns True if this branch is a shadow of another branch """
         return self.hasParentBranch() and isinstance(self.versions[-2], Label)
 
-    def createVersion(self, verRel):
+    def createVersion(self, revision):
 	"""
-	Converts a branch to a version. The version/release passed in
+	Converts a branch to a version. The revision passed in
 	are appended to the branch this object represented. The time
 	stamp is reset as a new version has been created.
 
-	@param verRel: object for the version and release
+	@param verRel: object for the revision
 	@type verRel: Revision
 	"""
 
-	verRel.timeStamp = time.time()
-        return Version(self.versions + [ verRel ])
+	revision.timeStamp = time.time()
+        return Version(self.versions + [ revision ])
 
     def createShadow(self, label):
 	"""

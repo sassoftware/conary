@@ -7,6 +7,10 @@ Changes in 0.62.5:
     caused a broken dependency
   * Removed --no-deps-recurse option
   * Greatly simplify dependency resolution logic
+  * The version portion of a Release (version-sourceCount-buildCount)
+    is no longer required to begin with a digit.
+  * The Release parsing code has been cleaned up to use consistent
+    naming, API documentation, and parse error messages
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
