@@ -207,7 +207,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
         args = [repos, cfg, ] + args[1:] 
         branch.branch(*args, **extraArgs)
-    elif (args[0] == "commit"):
+    elif (args[0] == "commit") or (args[0] == "ci") # mimic cvs's shortcuts
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
 	message = argSet.get("message", None)
@@ -290,7 +290,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
         
 	checkin.merge(repos)
-    elif (args[0] == "update"):
+    elif (args[0] == "update") or (args[0] == "up"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
