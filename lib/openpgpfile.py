@@ -12,6 +12,9 @@
 # full details.
 #
 
+# use future division and // explicitly for floor division
+from __future__ import division
+
 import base64
 import os
 import sha
@@ -255,7 +258,7 @@ def convertPrivateKey(privateBlock):
     # parse the MPIs from the key block
     for i in range(0, numMPI):
         mLen = ((ord(privateBlock[index]) * 256 +
-                 ord(privateBlock[index + 1])) + 7) / 8 + 2
+                 ord(privateBlock[index + 1])) + 7) // 8 + 2
         buf = buf + privateBlock[index:index + mLen]
         index += mLen
 
@@ -390,9 +393,9 @@ def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
     data += hashData
     # then append the trailer
     dataLen = len(hashData)
-    data += chr(4) + chr(0xFF) + chr((dataLen / 0x1000000) & 0xFF) + \
-            chr((dataLen / 0x10000) & 0xFF) + \
-            chr((dataLen / 0x100) & 0xFF) + chr(dataLen & 0xFF)
+    data += chr(4) + chr(0xFF) + chr((dataLen // 0x1000000) & 0xFF) + \
+            chr((dataLen // 0x10000) & 0xFF) + \
+            chr((dataLen // 0x100) & 0xFF) + chr(dataLen & 0xFF)
     hashAlgList = [ None, md5, sha]
     hashFunc = hashAlgList[hashAlg]
     hashFunc = hashFunc.new()
@@ -403,7 +406,7 @@ def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
     if pubAlg in PK_ALGO_ALL_RSA:
         #hashPads from RFC2440 section 5.2.2
         hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-        padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) / 2 -1
+        padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
         sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
     if not mainKey.verify(sigString, dig_sig):
         raise BadSelfSignature("Key: %s failed self signature check"% fingerprint)
@@ -720,7 +723,7 @@ def fingerprintToInternalKeyId(fingerprint):
     r = ''
     while data:
         r = chr(data%256) + r
-        data /= 256
+        data //= 256
     return r
 
 def getSigId(keyRing):
@@ -833,7 +836,7 @@ def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
     r = ''
     iteration = 0
-    keyLength = ((keySize + 7) / 8)
+    keyLength = ((keySize + 7) // 8)
     while len(r) < keyLength:
         d = hash.new(chr(0) * iteration)
         d.update(passPhrase)
@@ -845,7 +848,7 @@ def saltedS2K(passPhrase, hash, keySize, salt):
     # RFC 2440 3.6.1.2.
     r = ''
     iteration = 0
-    keyLength = ((keySize + 7) / 8)
+    keyLength = ((keySize + 7) // 8)
     while(len(r) < keyLength):
         d = hash.new()
         buf = chr(0) * iteration
@@ -861,7 +864,7 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
     iteration = 0
     count=(16 + (count & 15)) << ((count >> 4) + 6)
     buf = salt + passPhrase
-    keyLength = (keySize + 7) / 8
+    keyLength = (keySize + 7) // 8
     while(len(r) < keyLength):
         d = hash.new()
         d.update(iteration * chr(0))
@@ -878,7 +881,7 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
     return r[:keyLength]
 
 def readMPI(keyRing):
-    MPIlen=(ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + 7 ) / 8
+    MPIlen=(ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + 7 ) // 8
     r=0L
     for i in range(MPIlen):
         r = r * 256 + ord(keyRing.read(1))
@@ -1180,7 +1183,7 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
         index = 0
         r = []
         for count in range(numMPIs):
-            MPIlen = (ord(data[index]) * 256 + ord(data[index+1]) + 7 ) / 8
+            MPIlen = (ord(data[index]) * 256 + ord(data[index+1]) + 7 ) // 8
             index += 2
             MPI = 0L
             for i in range(MPIlen):
