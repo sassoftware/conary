@@ -368,45 +368,45 @@ def getSignatureTuple(keyRing):
 
 
 def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
-        # find the self signature
-        intKeyId = fingerprintToInternalKeyId(fingerprint)
-        while (intKeyId != getSigId(keyRing)):
-            seekNextSignature(keyRing)
-        # we now point to the self signature.
-        # get the actual signature Tuple
-        dig_sig = getSignatureTuple(keyRing)
-        # append the hashable portion of the self signature
-        # and record what kind of hash alorithm to use while we're at it.
-        hashBlock = readBlockType(keyRing)
-        # reading the block size skips the length octets
-        readBlockSize(keyRing, hashBlock)
-        hashData = keyRing.read(6)
-        if ord(hashData[0]) != 4:
-            raise InvalidKey('Self signature is not a V4 signature')
-        pubAlg = ord(hashData[2])
-        hashAlg = ord(hashData[3])
-        hashLen = ord(hashData[4]) * 256 + ord(hashData[5])
-        hashData += keyRing.read(hashLen)
-        data += hashData
-        # then append the trailer
-        dataLen = len(hashData)
-        data += chr(4) + chr(0xFF) + chr((dataLen / 0x1000000) & 0xFF) + \
-                chr((dataLen / 0x10000) & 0xFF) + \
-                chr((dataLen / 0x100) & 0xFF) + chr(dataLen & 0xFF)
-        hashAlgList = [ None, md5, sha]
-        hashFunc = hashAlgList[hashAlg]
-        hashFunc = hashFunc.new()
-        hashFunc.update(data)
-        sigString = hashFunc.digest()
-        # if this is an RSA signature, it needs to properly padded
-        # RFC 2440 5.2.2 and RFC 2313 10.1.2
-        if pubAlg in PK_ALGO_ALL_RSA:
-            #hashPads from RFC2440 section 5.2.2
-            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-            padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) / 2 -1
-            sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
-        if not mainKey.verify(sigString, dig_sig):
-            raise BadSelfSignature("Key: %s failed self signature check"% fingerprint)
+    # find the self signature
+    intKeyId = fingerprintToInternalKeyId(fingerprint)
+    while (intKeyId != getSigId(keyRing)):
+        seekNextSignature(keyRing)
+    # we now point to the self signature.
+    # get the actual signature Tuple
+    dig_sig = getSignatureTuple(keyRing)
+    # append the hashable portion of the self signature
+    # and record what kind of hash alorithm to use while we're at it.
+    hashBlock = readBlockType(keyRing)
+    # reading the block size skips the length octets
+    readBlockSize(keyRing, hashBlock)
+    hashData = keyRing.read(6)
+    if ord(hashData[0]) != 4:
+        raise InvalidKey('Self signature is not a V4 signature')
+    pubAlg = ord(hashData[2])
+    hashAlg = ord(hashData[3])
+    hashLen = ord(hashData[4]) * 256 + ord(hashData[5])
+    hashData += keyRing.read(hashLen)
+    data += hashData
+    # then append the trailer
+    dataLen = len(hashData)
+    data += chr(4) + chr(0xFF) + chr((dataLen / 0x1000000) & 0xFF) + \
+            chr((dataLen / 0x10000) & 0xFF) + \
+            chr((dataLen / 0x100) & 0xFF) + chr(dataLen & 0xFF)
+    hashAlgList = [ None, md5, sha]
+    hashFunc = hashAlgList[hashAlg]
+    hashFunc = hashFunc.new()
+    hashFunc.update(data)
+    sigString = hashFunc.digest()
+    # if this is an RSA signature, it needs to properly padded
+    # RFC 2440 5.2.2 and RFC 2313 10.1.2
+    if pubAlg in PK_ALGO_ALL_RSA:
+        #hashPads from RFC2440 section 5.2.2
+        hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
+        padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) / 2 -1
+        sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
+    if not mainKey.verify(sigString, dig_sig):
+        raise BadSelfSignature("Key: %s failed self signature check"% fingerprint)
 
 def seekKeyById(keyId, keyRing):
     keyRing.seek(0, SEEK_END)
