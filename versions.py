@@ -321,7 +321,7 @@ class Revision(AbstractRevision):
 
 	fields = value.split("-")
 	if len(fields) > 3:
-	    raise ParseError("too many '-' characters in release")
+	    raise ParseError("too many '-' characters in release string")
 
 	if len(fields) == 1:
 	    if template and template.buildCount is not None:
