@@ -831,7 +831,7 @@ class TroveFinder:
         flavor = troveTup[2]
         if flavor is None and affinityTroves:
             if self.query[QUERY_REVISION_BY_BRANCH].hasName(name):
-                self.remaining.append(tup)
+                self.remaining.append(troveTup)
                 return
             self.query[QUERY_REVISION_BY_BRANCH].addQueryWithAffinity(troveTup,
                                                           None, affinityTroves)
