@@ -149,6 +149,13 @@ class IncompatibleKey(Exception):
     def __init__(self, reason="Incompatible Key"):
         self.error = "Incompatible Key: %s" %reason
 
+class InvalidKey(Exception):
+    def __str__(self):
+        return self.error
+
+    def __init__(self, reason="Invalid Key"):
+        self.error = "Invalid Key: %s" %reason
+
 class KeyNotFound(Exception):
     def __str__(self):
         return self.error
@@ -375,7 +382,7 @@ def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
         readBlockSize(keyRing, hashBlock)
         hashData = keyRing.read(6)
         if ord(hashData[0]) != 4:
-            raise Invalidkey('Self signature is not a V4 signature')
+            raise InvalidKey('Self signature is not a V4 signature')
         pubAlg = ord(hashData[2])
         hashAlg = ord(hashData[3])
         hashLen = ord(hashData[4]) * 256 + ord(hashData[5])
