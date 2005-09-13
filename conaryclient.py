@@ -906,7 +906,7 @@ class ConaryClient:
                 toFind[(troveName, newVersionStr, newFlavorStr)] = \
                                         oldTrove, isAbsolute
             else:
-                if not isAbsolute and not sync:
+                if not (isAbsolute or sync or restrictToTroveSource):
                     # not isAbsolute means keepExisting. when using
                     # keepExisting, branch affinity doesn't make sense - we are
                     # installing a new, generally unrelated version of this
