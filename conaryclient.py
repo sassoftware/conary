@@ -265,11 +265,6 @@ class ConaryClient:
                                               recurse = False)[0]
                     assert(not (newJob & jobSet))
                     jobSet.update(newJob)
-                    #newCs, remainder = uJob.getTroveSource().createChangeSet(
-                                            #newJob, withFiles = False, 
-                                            #recurse = False)
-                    #assert(not remainder)
-                    #cs.merge(newCs)
 
                     (depList, cannotResolve, changeSetList) = \
                                     self.db.depCheck(jobSet,
@@ -791,7 +786,8 @@ class ConaryClient:
         return newJob
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
-                         recurse = True, updateMode = True, sync = False):
+                         recurse = True, updateMode = True, sync = False,
+                         restrictToTroveSource = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -922,7 +918,9 @@ class ConaryClient:
                                     = oldTrove, isAbsolute
 
         results = {}
-        if sync:
+        if restrictToTroveSource:
+            results.update(uJob.getTroveSource().findTroves(None, toFind))
+        elif sync:
             source = trovesource.ReferencedTrovesSource(self.db)
             results.update(source.findTroves(None, toFind))
         else:
@@ -977,14 +975,13 @@ class ConaryClient:
         if changeSetList:
             jobSet.update(changeSetList)
 
-            if not recurse:
-                # some of these items may already be available in troveSource;
-                # don't go back over the wire for those
-                hasTroves = uJob.getTroveSource().hasTroves(
-                        [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
-                changeSetList = [ x[1] for x in 
-                                        itertools.izip(hasTroves, changeSetList)
-                                        if x[0] is not True ]
+            # some of these items may already be available in troveSource;
+            # don't go back over the wire for those
+            hasTroves = uJob.getTroveSource().hasTroves(
+                    [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
+            changeSetList = [ x[1] for x in 
+                                    itertools.izip(hasTroves, changeSetList)
+                                    if x[0] is not True ]
 
             cs = self.repos.createChangeSet(changeSetList, withFiles = False,
                                             recurse = recurse)
@@ -1044,7 +1041,7 @@ class ConaryClient:
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
-                        split = False, sync = False):
+                        split = False, sync = False, fromChangesets = []):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations.
@@ -1078,17 +1075,25 @@ class ConaryClient:
         @param sync: Limit acceptabe trove updates only to versions 
         referenced in the local database.
         @type sync: bool
+        @param fromChangesets: When specified, these changesets are used
+        as the source of troves instead of the repository.
+        @type fromChangesets: list of changeset.ChangeSetFromFile
         @rtype: tuple
         """
         callback.preparingChangeSet()
 
         uJob = database.UpdateJob(self.db)
 
+        for cs in fromChangesets:
+            uJob.getTroveSource().addChangeSet(cs, includesFileContents = True)
+
         jobSet, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
                                         recurse = recurse,
                                         updateMode = updateByDefault,
-                                        sync = sync)
+                                        sync = sync, 
+                                        restrictToTroveSource = 
+                                            (len(fromChangesets) > 0) )
 
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold

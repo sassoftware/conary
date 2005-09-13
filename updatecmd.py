@@ -251,7 +251,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
                                   callback = None, split = True, 
-                                  sync = False):
+                                  sync = False, fromFiles = []):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -265,6 +265,12 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     # interperts absolute jobs as ones which should be rooted (if there is
     # anything available to root them to).
     areAbsolute = not keepExisting
+
+    fromChangesets = []
+    
+    for path in fromFiles:
+        cs = changeset.ChangeSetFromFile(path)
+        fromChangesets.append(cs)
 
     for pkgStr in pkgList:
         if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
@@ -302,7 +308,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       depsRecurse = depsRecurse, test = test,
                       justDatabase = justDatabase, recurse = recurse,
                       info = info, updateByDefault = updateByDefault,
-                      callback = callback, split = split, sync = sync)
+                      callback = callback, split = split, sync = sync,
+                      fromChangesets = fromChangesets)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -323,21 +330,25 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
                                   callback = None, split=True,
-                                  sync = False):
+                                  sync = False, fromChangesets = []):
 
     client = conaryclient.ConaryClient(cfg)
 
     if not info:
 	client.checkWriteableRoot()
 
-    (updJob, suggMap) = \
-    client.updateChangeSet(applyList, depsRecurse = depsRecurse,
-                           resolveDeps = depCheck,
-                           keepExisting = keepExisting,
-                           test = test, recurse = recurse,
-                           updateByDefault = updateByDefault,
-                           callback = callback, split = split,
-                           sync = sync)
+    try:
+        (updJob, suggMap) = \
+        client.updateChangeSet(applyList, depsRecurse = depsRecurse,
+                               resolveDeps = depCheck,
+                               keepExisting = keepExisting,
+                               test = test, recurse = recurse,
+                               updateByDefault = updateByDefault,
+                               callback = callback, split = split,
+                               sync = sync, fromChangesets = fromChangesets)
+    except:
+        callback.done()
+        raise
 
     if info:
         callback.done()

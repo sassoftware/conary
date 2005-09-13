@@ -531,7 +531,8 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
             # we can't root changesets multiple times
             self.invalidated = True
             for subCs in self.csList:
-                subCs.rootChangeSet(self.db, rootMap)
+                if subCs.isAbsolute():
+                    subCs.rootChangeSet(self.db, rootMap)
 
         # assemble jobs directly from changesets and update those changesets
         # to not have jobs we don't need
@@ -563,6 +564,6 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                 for info in subCs.getOldTroveList():
                     subCs.delOldTrove(*info)
 
-            cs.merge(subCs)
+                cs.merge(subCs)
 
         return (cs, remainder)

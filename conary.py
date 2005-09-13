@@ -122,6 +122,7 @@ def usage(rc = 1):
     print ""
     print "update/erase flags:"
     print "                 --exclude-troves <patterns>"
+    print "                 --from-file <file.ccs>"
     print "                 --info"
     print "                 --just-db"
     print "                 --keep-existing"
@@ -173,6 +174,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["debug"] = NO_PARAM
     argDef["deps"] = NO_PARAM
     argDef["diff"] = NO_PARAM
+    argDef["from-file"] = MULT_PARAM
     argDef["flavors"] = NO_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
@@ -476,6 +478,7 @@ def realMain(cfg, argv=sys.argv):
         kwargs['replaceFiles'] = argSet.pop('replace-files', False)
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
         kwargs['depsRecurse'] = not argSet.pop('no-deps-recurse', False)
+        kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
@@ -483,8 +486,11 @@ def realMain(cfg, argv=sys.argv):
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync', False)
-
         kwargs['updateByDefault'] = (otherArgs[1] == "update")
+
+        if kwargs['sync'] and kwargs['fromFiles']:
+            log.error("Only one of --sync and --from-file may be used")
+            return 1
 
 	if argSet: return usage()
 	if len(otherArgs) >=3:
