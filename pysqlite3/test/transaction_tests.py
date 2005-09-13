@@ -78,6 +78,17 @@ class TransactionTests(unittest.TestCase, testsupport.TestSupport):
         assert([ x for x in cu1.execute("select * from test")] == [(1,)])
         os.unlink(fn)
 
+    def CheckExecStmtTransaction(self):
+        self.cur.execute("create table test (a)")
+        self.cnx.commit()
+        self.cur.execute("insert into test (a) values (?)", 'foo')
+        assert(self.cnx.inTransaction)
+        self.cnx.rollback()
+        stmt = self.cur.compile("insert into test (a) values (?)")
+        self.cur.execstmt(stmt, 'foo')
+        assert(self.cnx.inTransaction)
+        self.cnx.rollback()
+
 class AutocommitTests(unittest.TestCase, testsupport.TestSupport):
     def setUp(self):
         self.filename = self.getfilename()
