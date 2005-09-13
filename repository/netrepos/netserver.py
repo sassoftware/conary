@@ -38,7 +38,10 @@ import trovestore
 import versions
 from datastore import IntegrityError
 from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
-from trove import DigitalSignatureVerificationError
+from trove import DigitalSignature, DigitalSignatureVerificationError
+from lib.openpgpkey import getKeyCache
+import base64
+
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
@@ -1165,14 +1168,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
-        import base64
-        from trove import DigitalSignature
-        from lib.openpgpkey import getKeyCache
-        from lib.openpgpfile import KeyNotFound
         version = self.toVersion(version)
         flavor = self.toFlavor(flavor)
 	if not self.auth.check(authToken, write = True, trove = name,
-                   label = version.branch().label()):
+                               label = version.branch().label()):
 	    raise InsufficientPermission
 
         trv = self.repos.getTrove(name, version, flavor)
@@ -1181,15 +1180,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         signature.thaw(base64.b64decode(encSig))
 
         sig = signature.get()
-        #ensure repo knows this key
+        # ensure repo knows this key
         keyCache = getKeyCache()
         pubKey = keyCache.getPublicKey(sig[0])
 
         if pubKey.isRevoked():
-            raise IncompatibleKey('Key %s has been revoked. Signature rejected'% sig[0])
+            raise IncompatibleKey('Key %s has been revoked. '
+                                  'Signature rejected' %sig[0])
 
         if (pubKey.getTimestamp()):
-            raise IncompatibleKey('Key %s has expired. Signature rejected'% sig[0])
+            raise IncompatibleKey('Key %s has expired. '
+                                  'Signature rejected' %sig[0])
 
         #need to verify this key hasn't signed this trove already
         try:
@@ -1206,23 +1207,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         #verify the new signature is actually good
         trv.verifyDigitalSignatures()
 
+        # start a transaction now, this ensures that queries and updates
+        # are happening in a consistent way.
         self.db._begin()
         cu = self.db.cursor()
         trv = self.repos.getTrove(name, version, flavor)
         trv.addPrecomputedDigitalSignature(sig)
-        # FIXME get instanceId in a better fashion.
-        if flavor:
-            cu.execute("select InstanceId from Instances left join Items on Items.itemId=Instances.itemId left join Versions on Versions.versionId=Instances.versionId left join flavors on Flavors.flavorId=Instances.flavorId WHERE item=? AND version=? AND flavor=?", name, version.asString(), flavor.freeze())
-        else:
-            cu.execute("select InstanceId from Instances left join Items on Items.itemId=Instances.itemId left join Versions on Versions.versionId=Instances.versionId WHERE item=? AND version=?", name, version.asString())
-        r = cu.fetchone()
 
-        instanceId = r[0]
-        r = cu.execute('SELECT COUNT(*) FROM TroveInfo WHERE instanceId=? AND infoType=9',instanceId)
-        if r.fetchone()[0]:
-            cu.execute('UPDATE TroveInfo SET data=? WHERE instanceId=? AND infoType=9', trv.troveInfo.sigs.freeze(),instanceId)
+        # get the instanceId that corresponds to this trove.
+        # FIXME: get instanceId in a better fashion.
+        query = """SELECT instanceId FROM Instances
+                       LEFT JOIN Items ON Items.itemId=Instances.itemId
+                       LEFT JOIN Versions
+                           ON Versions.versionId=Instances.versionId
+                       LEFT JOIN Flavors
+                           ON Flavors.flavorId=Instances.flavorId
+                   WHERE item=? AND version=? AND flavor=?"""
+        # if this instance is unflavored, the magic value is 'none'
+        flavorStr = flavor.freeze() or 'none'
+        cu.execute(query, (name, version.asString(), flavorStr))
+        instanceId = cu.fetchone()[0]
+
+        # see if there's any troveinfo in the database now
+        cu.execute("""SELECT COUNT(*) FROM TroveInfo
+                      WHERE instanceId=? AND infoType=9""", (instanceId,))
+        if cu.fetchone()[0]:
+            # if we have TroveInfo, so update it
+            cu.execute("""UPDATE TroveInfo SET data=?
+                          WHERE instanceId=? AND infoType=9""",
+                       (trv.troveInfo.sigs.freeze(), instanceId))
         else:
-            cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)', instanceId, trv.troveInfo.sigs.freeze())
+            # otherwise we need to create a new row with the signatures
+            cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)',
+                       (instanceId, trv.troveInfo.sigs.freeze()))
         self.db.commit()
         return True
 
@@ -1264,7 +1281,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                ("Invalid client version %s.  Server accepts client versions %s"
                 " - read http://wiki.conary.com/ConaryConversion" % \
                 (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
-        
+
         return SERVER_VERSIONS
 
     def cacheChangeSets(self):
