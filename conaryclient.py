@@ -145,7 +145,7 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
-    def _resolveDependencies(self, uJob, jobSet, split = False, resolve = True):
+    def _resolveDependencies(self, uJob, jobSet, split = False):
 
         def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
             """ determine which of the given set of troveTups is the 
@@ -213,11 +213,7 @@ class ConaryClient:
 					 findOrdering = split)
         suggMap = {}
 
-        if not resolve:
-            depList = []
-            cannotResolve = []
-
-        while (depList and pathIdx < len(self.cfg.installLabelPath)):
+        while depList and pathIdx < len(self.cfg.installLabelPath):
             nextCheck = [ x[1] for x in depList ]
             sugg = self.repos.resolveDependencies(
                             self.cfg.installLabelPath[pathIdx], 
@@ -1094,9 +1090,7 @@ class ConaryClient:
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
         (depList, suggMap, cannotResolve, splitJob) = \
-            self._resolveDependencies(uJob, jobSet,
-                                      resolve = resolveDeps,
-                                      split = split)
+            self._resolveDependencies(uJob, jobSet, split = split)
         if depList:
             raise DepResolutionFailure(depList)
         elif suggMap and not self.cfg.autoResolve:
