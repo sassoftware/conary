@@ -367,6 +367,28 @@ class DBFlavorMap(idtable.IdMapping):
 	idtable.IdMapping.__init__(self, db, "DBFlavorMap", "instanceId", 
 				   "flavorId")
 
+def _doAnalyze(db):
+    if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
+        # ANALYZE didn't appear until 3.2.3
+        return
+
+    # perform table analysis to help the optimizer
+    doAnalyze = False
+    cu = db.cursor()
+    # if there are pending changes, just re-run ANALYZE
+    if db.inTransaction:
+        doAnalyze = True
+    else:
+        # check to see if the sqlite_stat1 table exists. ANALYZE
+        # creates it.
+        cu.execute("SELECT COUNT(*) FROM sqlite_master "
+                   "WHERE tbl_name='sqlite_stat1' AND type='table'")
+        if not cu.fetchone()[0]:
+            doAnalyze = True
+
+    if doAnalyze:
+        cu.execute('ANALYZE')
+
 class Database:
 
     schemaVersion = 8
@@ -414,11 +436,14 @@ class Database:
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
+
+        _doAnalyze(self.db)
+
         if self.db.inTransaction:
             self.db.commit()
-	self.needsCleanup = False
-	self.addVersionCache = {}
-	self.flavorsNeeded = {}
+        self.needsCleanup = False
+        self.addVersionCache = {}
+        self.flavorsNeeded = {}
 
     def __del__(self):
         if not self.db.closed:

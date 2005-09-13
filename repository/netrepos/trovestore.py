@@ -31,6 +31,7 @@ import versions
 
 from local import troveinfo
 from local import versiontable
+from local import sqldb
 
 class LocalRepVersionTable(versiontable.VersionTable):
 
@@ -99,8 +100,10 @@ class TroveStore:
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
+
+        sqldb._doAnalyze(self.db)
         self.db.commit()
-        
+
 	self.streamIdCache = {}
 	self.needsCleanup = False
 
