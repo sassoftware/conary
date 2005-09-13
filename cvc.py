@@ -207,7 +207,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
         args = [repos, cfg, ] + args[1:] 
         branch.branch(*args, **extraArgs)
-    elif (args[0] == "commit") or (args[0] == "ci") # mimic cvs's shortcuts
+    elif (args[0] == "commit") or (args[0] == "ci"): # mimic cvs's shortcuts
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
 	message = argSet.get("message", None)
