@@ -12,9 +12,6 @@
 # full details.
 #
 
-# use future division and // explicitly for floor division
-from __future__ import division
-
 import base64
 import os
 import sha
