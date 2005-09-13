@@ -165,13 +165,15 @@ class AbstractTroveDatabase:
 		seen[name] = [ (version, flavor) ]
 
 	    try:
-                if self.hasTrove(name, version, flavor):
-                    trv = self.getTrove(name, version, flavor)
+                trv = self.getTrove(name, version, flavor)
 
-                    yield trv
+                yield trv
 
-                    troveList += [ x for x in trv.iterTroveList() ]
+                troveList += [ x for x in trv.iterTroveList() ]
 	    except TroveMissing:
+		if not ignoreMissing:
+		    raise
+	    except KeyError:
 		if not ignoreMissing:
 		    raise
 
