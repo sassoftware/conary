@@ -257,7 +257,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
-    elif (args[0] == "remove"):
+    elif (args[0] == "remove") or (args[0] == "rm"):
 	if len(args) < 2: return usage()
         for f in args[1:]:
             checkin.removeFile(f)
