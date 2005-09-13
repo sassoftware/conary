@@ -81,6 +81,8 @@ class InstallBucketItem(streams.StreamSet):
 class InstallBucket(streams.StreamCollection):
     streamDict = { 1 : InstallBucketItem }
 
+    # XXX these aren't particularly efficient; they imitate a dict with a list
+
     def add(self, key, value):
         item = InstallBucketItem()
         item.key.set(key)
@@ -89,6 +91,45 @@ class InstallBucket(streams.StreamCollection):
 
     def iter(self):
         return self.iterAll()
+
+    def keys(self):
+        return [ x for x in self.iterkeys() ]
+
+    def __iter__(self):
+        return self.iterkeys()
+
+    def iterkeys(self):
+        for streamKey, bucket in self.iterAll():
+            yield bucket.key()
+
+    def values(self):
+        return [ x for x in self.itervalues() ]
+
+    def itervalues(self):
+        for bucket in self.iterAll():
+            yield bucket.value()
+
+    def items(self):
+        return [ x for x in self.iteritems() ]
+
+    def iteritems(self):
+        for streamKey, bucket in self.iterAll():
+            yield bucket.key(), bucket.value()
+
+    def __getitem__(self, key):
+        for streamKey, bucket in self.iterall():
+            if bucket.key() == key:
+                return bucket.value()
+
+        raise KeyError
+
+    def __setitem__(self, key, value):
+        for streamKey, bucket in self.iterall():
+            if bucket.key() == key:
+                bucket.value.set(value)
+                return
+
+        self.add(key, value)
 
 _DIGSIG_FINGERPRINT   = 0
 _DIGSIG_SIGNATURE     = 1
@@ -1319,9 +1360,7 @@ class Trove(streams.LargeStreamSet):
             self.troveInfo.installBucket.add(key, value)
 
     def getInstallBucket(self):
-        return dict( (x[1].key(), x[1].value()) 
-                     for x in self.troveInfo.installBucket.iterAll())
-
+        return self.troveInfo.installBucket
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         streams.LargeStreamSet.__init__(self)

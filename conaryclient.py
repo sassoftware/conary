@@ -61,9 +61,9 @@ class DepResolutionFailure(DependencyFailure):
 
     def __str__(self):
         res = ["The following dependencies could not be resolved:"]
-        for (troveName, depSet) in self.failures:
+        for (troveInfo, depSet) in self.failures:
             res.append("    %s:\n\t%s" %  \
-                       (troveName, "\n\t".join(str(depSet).split("\n"))))
+                       (troveInfo[0], "\n\t".join(str(depSet).split("\n"))))
         return '\n'.join(res)
 
 class EraseDepFailure(DepResolutionFailure):
@@ -74,9 +74,10 @@ class EraseDepFailure(DepResolutionFailure):
     def __str__(self):
         res = []
         res.append("Troves being removed create unresolved dependencies:")
-        for (troveName, depSet) in self.failures:
+        for (reqBy, depSet, providedBy) in self.failures:
             res.append("    %s:\n\t%s" %  \
-                        (troveName, "\n\t".join(str(depSet).split("\n"))))
+                        (reqBy[0], "\n\t".join(str(depSet).split("\n"))
+                        ))
         return '\n'.join(res)
 
 class NeededTrovesFailure(DependencyFailure):
@@ -90,9 +91,9 @@ class NeededTrovesFailure(DependencyFailure):
     def __str__(self):
         res = []
         res.append("Additional troves are needed:")
-        for (req, suggList) in self.suggMap.iteritems():
+        for ((reqName, reqVersion, reqFlavor), suggList) in self.suggMap.iteritems():
             res.append("    %s -> %s" % \
-              (req, " ".join(["%s(%s)" % 
+              (reqName, " ".join(["%s(%s)" % 
               (x[0], x[1].trailingRevision().asString()) for x in suggList])))
         return '\n'.join(res)
 
@@ -144,8 +145,7 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
-    def _resolveDependencies(self, uJob, jobSet, depsRecurse = True, 
-                             split = False, resolve = True):
+    def _resolveDependencies(self, uJob, jobSet, split = False, resolve = True):
 
         def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
             """ determine which of the given set of troveTups is the 
@@ -217,7 +217,7 @@ class ConaryClient:
             depList = []
             cannotResolve = []
 
-        while depList:
+        while depList or cannotResolve:
             nextCheck = [ x[1] for x in depList ]
             if nextCheck == lastCheck:
                 # if we didn't resolve anything last time, so we're
@@ -271,7 +271,7 @@ class ConaryClient:
                                                      uJob.getTroveSource(), 
                                                      findOrdering = split)
 
-            if troves and depsRecurse:
+            if troves:
                 pathIdx = 0
                 foundSuggestions = False
             else:
@@ -280,7 +280,7 @@ class ConaryClient:
                 if troves:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
-                    if not foundSuggestions or not depsRecurse:
+                    if not foundSuggestions:
                         return (depList, suggMap, cannotResolve,
                                 changeSetList)
                     pathIdx = 0
@@ -1039,7 +1039,7 @@ class ConaryClient:
         return updateItems
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
-                        depsRecurse = True, resolveDeps = True, test = False,
+                        resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = []):
         """
@@ -1056,9 +1056,6 @@ class ConaryClient:
         @type keepExisting: bool
         @param recurse: Apply updates/erases to troves referenced by containers.
         @type recurse: bool
-        @param depsRecurse: Resolve the dependencies the troves needed to
-	resolove dependencies.
-        @type depsRecurse: bool
         @param resolveDeps: Install troves needed to resolve dependencies.
         @type resolveDeps: bool
         @param test: If True, the operations will be attempted but the 
@@ -1114,7 +1111,6 @@ class ConaryClient:
         (depList, suggMap, cannotResolve, splitJob) = \
             self._resolveDependencies(uJob, jobSet,
                                       resolve = resolveDeps,
-                                      depsRecurse = depsRecurse,
                                       split = split)
         if depList:
             raise DepResolutionFailure(depList)

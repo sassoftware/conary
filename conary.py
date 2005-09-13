@@ -127,7 +127,6 @@ def usage(rc = 1):
     print "                 --just-db"
     print "                 --keep-existing"
     print "                 --no-deps"
-    print "                 --no-deps-recurse"
     print "                 --no-recurse"
     print "                 --no-resolve"
     print "                 --quiet"
@@ -139,7 +138,6 @@ def usage(rc = 1):
     print "                 --exclude-troves <patterns>"
     print "                 --info"
     print "                 --no-deps"
-    print "                 --no-deps-recurse"
     print "                 --no-resolve"
     print "                 --replace-files"
     print "                 --resolve"
@@ -184,9 +182,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["just-db"] = NO_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
-    argDef["no-deps-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
-    argDef["no-recurse"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
@@ -477,7 +473,6 @@ def realMain(cfg, argv=sys.argv):
 
         kwargs['replaceFiles'] = argSet.pop('replace-files', False)
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
-        kwargs['depsRecurse'] = not argSet.pop('no-deps-recurse', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
@@ -516,10 +511,6 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
-
-	if argSet.has_key('no-deps-recurse'):
-	    kwargs['depsRecurse'] = False
-	    del argSet['no-deps-recurse']
 
 	if argSet.has_key('no-resolve'):
             cfg.autoResolve = False

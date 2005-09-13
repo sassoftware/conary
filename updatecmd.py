@@ -247,11 +247,10 @@ def displayUpdateInfo(updJob, verbose=False):
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
-                                  depsRecurse = True, test = False,
-                                  justDatabase = False, recurse = True,
-                                  info = False, updateByDefault = True,
-                                  callback = None, split = True, 
-                                  sync = False, fromFiles = []):
+                                  test = False, justDatabase = False, 
+                                  recurse = True, info = False, 
+                                  updateByDefault = True, callback = None, 
+                                  split = True, sync = False, fromFiles = []):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -305,10 +304,10 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       tagScript = tagScript, 
                       keepExisting = keepExisting, depCheck = depCheck,
-                      depsRecurse = depsRecurse, test = test,
-                      justDatabase = justDatabase, recurse = recurse,
-                      info = info, updateByDefault = updateByDefault,
-                      callback = callback, split = split, sync = sync,
+                      test = test, justDatabase = justDatabase, 
+                      recurse = recurse, info = info, 
+                      updateByDefault = updateByDefault, callback = callback, 
+                      split = split, sync = sync,
                       fromChangesets = fromChangesets)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
@@ -326,11 +325,11 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
-                                  depsRecurse = True, test = False,
-                                  justDatabase = False, recurse = True,
-                                  info = False, updateByDefault = True,
-                                  callback = None, split=True,
-                                  sync = False, fromChangesets = []):
+                                  test = False, justDatabase = False, 
+                                  recurse = True, info = False, 
+                                  updateByDefault = True, callback = None, 
+                                  split=True, sync = False, 
+                                  fromChangesets = []):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -339,8 +338,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
     try:
         (updJob, suggMap) = \
-        client.updateChangeSet(applyList, depsRecurse = depsRecurse,
-                               resolveDeps = depCheck,
+        client.updateChangeSet(applyList, resolveDeps = depCheck,
                                keepExisting = keepExisting,
                                test = test, recurse = recurse,
                                updateByDefault = updateByDefault,
@@ -379,7 +377,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              depsRecurse = True, test = False, showItems = False):
+              test = False, showItems = False):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
 
@@ -402,8 +400,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     try:
         callback = UpdateCallback()
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                      depCheck = depCheck, depsRecurse = depsRecurse, 
-                      test = test, info = info, callback = callback)
+                      depCheck = depCheck, test = test, info = info, 
+                      callback = callback)
     except conaryclient.DependencyFailure, e:
         log.error(e)
     except conaryclient.UpdateError, e:

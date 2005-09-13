@@ -384,14 +384,14 @@ class StreamCollection(InfoStream):
 
     def __eq__(self, other, skipSet = {}):
         assert(self.__class__ == other.__class__)
-        return self.items == other.items
+        return self._items == other._items
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def freeze(self, skipSet = {}):
         l = []
-        for typeId, itemDict in self.items.iteritems():
+        for typeId, itemDict in self._items.iteritems():
             for item in itemDict:
                 s = item.freeze()
                 l.append(struct.pack("!BH", typeId, len(s)))
@@ -401,29 +401,29 @@ class StreamCollection(InfoStream):
 
     def thaw(self, data):
         i = 0
-        self.items = dict([ (x, {}) for x in self.streamDict ])
+        self._items = dict([ (x, {}) for x in self.streamDict ])
         while (i < len(data)):
             typeId, length = struct.unpack("!BH", data[i:i+3])
             i += 3
             s = data[i:i+length]
             item = self.streamDict[typeId](s)
-            self.items[typeId][item] = True
+            self._items[typeId][item] = True
             i += length
         
         assert(i == len(data))
 
     def addStream(self, typeId, item):
         assert(item.__class__ == self.streamDict[typeId])
-        self.items[typeId][item] = True
+        self._items[typeId][item] = True
 
     def delStream(self, typeId, item):
-        del self.items[typeId][item]
+        del self._items[typeId][item]
 
     def getStreams(self, typeId):
-        return self.items[typeId]
+        return self._items[typeId]
 
     def iterAll(self):
-        for typeId, itemDict in self.items.iteritems():
+        for typeId, itemDict in self._items.iteritems():
             for item in itemDict:
                 yield (typeId, item)
 
@@ -459,15 +459,15 @@ class StreamCollection(InfoStream):
             i += length
 
             if x < numRemoved:
-                del self.items[typeId][item]
+                del self._items[typeId][item]
             else:
-                self.items[typeId][item] = True
+                self._items[typeId][item] = True
 
     def __init__(self, data = None):
 	if data is not None:
 	    self.thaw(data)
         else:
-            self.items = dict([ (x, {}) for x in self.streamDict ])
+            self._items = dict([ (x, {}) for x in self.streamDict ])
 
 class AbsoluteStreamCollection(StreamCollection):
     """

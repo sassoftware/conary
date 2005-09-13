@@ -1464,7 +1464,7 @@ class SingleGroup:
         cfg.installLabelPath = oldInstallLabelPath
         cfg.autoResolve = oldAutoResolve
         for trove, needs in suggMap.iteritems():
-            print "trove:%s" % trove
+            print "trove:%s" % trove[0]
             for item in needs:
                 print "\t", item[0]
 

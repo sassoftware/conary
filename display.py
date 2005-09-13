@@ -336,7 +336,8 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
         while troveList:
             trove = troveList[0]
             troveList = troveList[1:]
-            newTroves = sorted([ x for x in db.walkTroveSet(trove)][1:], 
+            newTroves = sorted([ x for x in db.walkTroveSet(trove,
+                               ignoreMissing = True)][1:], 
                                 key=lambda y: y.getName())
             troveList = newTroves + troveList
 

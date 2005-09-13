@@ -1,5 +1,11 @@
 Changes in 0.62.5:
   * Allow selection of individual troves from change set files via --from-file
+  * Recursive queries on local database could get upset by a missing trove
+  * Underlying dependency code returns version and flavor for troves with
+    broken dependencies
+  * Underlying dependency code returns information on what removed trove 
+    caused a broken dependency
+  * Removed --no-recurse option
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
