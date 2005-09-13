@@ -145,7 +145,8 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
-    def _resolveDependencies(self, uJob, jobSet, split = False):
+    def _resolveDependencies(self, uJob, jobSet, split = False,
+                             resolveDeps = True):
 
         def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
             """ determine which of the given set of troveTups is the 
@@ -212,6 +213,12 @@ class ConaryClient:
                         self.db.depCheck(jobSet, uJob.getTroveSource(),
 					 findOrdering = split)
         suggMap = {}
+
+        if not resolveDeps:
+            # we're not supposed to resolve deps here; just skip the
+            # rest of this
+            depList = []
+            cannotResolve = []
 
         while depList and pathIdx < len(self.cfg.installLabelPath):
             nextCheck = [ x[1] for x in depList ]
@@ -1025,7 +1032,9 @@ class ConaryClient:
                         split = False, sync = False, fromChangesets = []):
         """
         Creates a changeset to update the system based on a set of trove update
-        and erase operations.
+        and erase operations. If self.cfg.autoResolve is set, dependencies
+        within the job are automatically closed.
+
 	@param itemList: A list of 3-length tuples: (troveName, version,
 	flavor).  If updateByDefault is True, trove names in itemList prefixed
 	by a '-' will be erased. If updateByDefault is False, troves without a
@@ -1037,7 +1046,8 @@ class ConaryClient:
         @type keepExisting: bool
         @param recurse: Apply updates/erases to troves referenced by containers.
         @type recurse: bool
-        @param resolveDeps: Install troves needed to resolve dependencies.
+        @param resolveDeps: Should dependencies error be flagged or silently
+        ignored?
         @type resolveDeps: bool
         @param test: If True, the operations will be attempted but the 
 	filesystem and database will not be updated.
@@ -1090,7 +1100,8 @@ class ConaryClient:
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
         (depList, suggMap, cannotResolve, splitJob) = \
-            self._resolveDependencies(uJob, jobSet, split = split)
+            self._resolveDependencies(uJob, jobSet, split = split,
+                                      resolveDeps = resolveDeps)
         if depList:
             raise DepResolutionFailure(depList)
         elif suggMap and not self.cfg.autoResolve:
