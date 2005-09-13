@@ -205,86 +205,71 @@ class ConaryClient:
             else:
                 return scoredList[-1][-1]
 
+        # def _resolveDependencies() begins here
+
         pathIdx = 0
-        foundSuggestions = False
         (depList, cannotResolve, changeSetList) = \
                         self.db.depCheck(jobSet, uJob.getTroveSource(),
 					 findOrdering = split)
         suggMap = {}
-        lastCheck = []
 
         if not resolve:
             depList = []
             cannotResolve = []
 
-        while depList or cannotResolve:
+        while (depList and pathIdx < len(self.cfg.installLabelPath)):
             nextCheck = [ x[1] for x in depList ]
-            if nextCheck == lastCheck:
-                # if we didn't resolve anything last time, so we're
-                # checking the exact same set of dependencies  --
-                # just give up
-                sugg = {}
-            else:
-                sugg = self.repos.resolveDependencies(
-                                self.cfg.installLabelPath[pathIdx], 
-                                nextCheck)
-                lastCheck = nextCheck
+            sugg = self.repos.resolveDependencies(
+                            self.cfg.installLabelPath[pathIdx], 
+                            nextCheck)
 
             troves = set()
-            if sugg:
-                for (troveName, depSet) in depList:
-                    if sugg.has_key(depSet):
-                        suggList = set()
-                        for choiceList in sugg[depSet]:
-                            troveNames = set(x[0] for x in choiceList)
 
-                            affTroveDict = \
-                                dict((x, self.db.trovesByName(x))
-                                                  for x in troveNames)
+            for (troveName, depSet) in depList:
+                if depSet in sugg:
+                    suggList = set()
+                    for choiceList in sugg[depSet]:
+                        troveNames = set(x[0] for x in choiceList)
 
-                            # iterate over flavorpath -- use suggestions 
-                            # from first flavor on flavorpath that gets a match 
-                            for installFlavor in self.cfg.flavor:
-                                choice = _selectResolutionTrove(choiceList, 
-                                                                installFlavor,
-                                                                affTroveDict)
-                                                                
-                                if choice:
-                                    suggList.add(choice)
-                                    l = suggMap.setdefault(troveName, set())
-                                    l.add(choice)
-                                    break
+                        affTroveDict = \
+                            dict((x, self.db.trovesByName(x))
+                                              for x in troveNames)
 
-			troves.update([ (x[0], (None, None), x[1:], True)
-                                        for x in suggList ])
+                        # iterate over flavorpath -- use suggestions 
+                        # from first flavor on flavorpath that gets a match 
+                        for installFlavor in self.cfg.flavor:
+                            choice = _selectResolutionTrove(choiceList, 
+                                                            installFlavor,
+                                                            affTroveDict)
+                                                            
+                            if choice:
+                                suggList.add(choice)
+                                l = suggMap.setdefault(troveName, set())
+                                l.add(choice)
+                                break
 
-                # if we've found good suggestions, merge in those troves
-                if troves:
-                    newJob = self._updateChangeSet(troves, uJob,
-                                              keepExisting = False,
-                                              recurse = False)[0]
-                    assert(not (newJob & jobSet))
-                    jobSet.update(newJob)
-
-                    (depList, cannotResolve, changeSetList) = \
-                                    self.db.depCheck(jobSet,
-                                                     uJob.getTroveSource(), 
-                                                     findOrdering = split)
+                    troves.update([ (x[0], (None, None), x[1:], True)
+                                    for x in suggList ])
 
             if troves:
-                pathIdx = 0
-                foundSuggestions = False
-            else:
-                pathIdx += 1
-                lastCheck = []
-                if troves:
-                    foundSuggestions = True
-                if pathIdx == len(self.cfg.installLabelPath):
-                    if not foundSuggestions:
-                        return (depList, suggMap, cannotResolve,
-                                changeSetList)
+                # we found good suggestions, merge in those troves
+                newJob = self._updateChangeSet(troves, uJob,
+                                          keepExisting = False,
+                                          recurse = False)[0]
+                assert(not (newJob & jobSet))
+                jobSet.update(newJob)
+
+                lastCheck = depList
+                (depList, cannotResolve, changeSetList) = \
+                                self.db.depCheck(jobSet,
+                                                 uJob.getTroveSource(), 
+                                                 findOrdering = split)
+                if lastCheck != depList:
                     pathIdx = 0
-                    foundSuggestions = False
+            else:
+                # we didnt find any suggestions; go on to the next label
+                # in the search path
+                pathIdx += 1
 
         return (depList, suggMap, cannotResolve, changeSetList)
 

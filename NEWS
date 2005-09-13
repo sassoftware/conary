@@ -6,6 +6,7 @@ Changes in 0.62.5:
   * Underlying dependency code returns information on what removed trove 
     caused a broken dependency
   * Removed --no-deps-recurse option
+  * Greatly simplify dependency resolution logic
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
