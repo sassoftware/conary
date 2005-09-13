@@ -147,7 +147,7 @@ class Revision(AbstractRevision):
     __slots__ = ( "version", "sourceCount", "buildCount", "timeStamp" )
 
     def __getstate__(self):
-        return (self.version, self.sourceCount, self.buildCount, 
+        return (self.version, self.sourceCount, self.buildCount,
                 self.timeStamp)
 
     def __setstate__(self, val):
@@ -267,7 +267,8 @@ class Revision(AbstractRevision):
 	return 0
 
     def __hash__(self):
-	return hash(self.version) ^ hash(self.sourceCount) ^ hash(self.buildCount)
+	return (hash(self.version) ^ hash(self.sourceCount)
+                ^ hash(self.buildCount))
 
     def _incrementSourceCount(self, shadowLength):
 	"""
@@ -307,20 +308,20 @@ class Revision(AbstractRevision):
 	    self.thawTimestamp(t)
 
 	if value.find(":") != -1:
-	    raise ParseError, "version/release pairs may not contain colons"
+	    raise ParseError("version/release pairs may not contain colons")
 
 	if value.find(",") != -1:
-	    raise ParseError, "version/release pairs may not contain commas"
+	    raise ParseError("version/release pairs may not contain commas")
 
 	if value.find(" ") != -1:
-	    raise ParseError, "version/release pairs may not contain spaces"
+	    raise ParseError("version/release pairs may not contain spaces")
 
 	if value.find("@") != -1:
-	    raise ParseError, "version/release pairs may not contain @ signs"
+	    raise ParseError("version/release pairs may not contain @ signs")
 
 	fields = value.split("-")
 	if len(fields) > 3:
-	    raise ParseError, ("too many fields in version/release set")
+	    raise ParseError("too many '-' characters in release")
 
 	if len(fields) == 1:
 	    if template and template.buildCount is not None:
@@ -331,7 +332,7 @@ class Revision(AbstractRevision):
 		self.version = template.version
 		release = fields[0]
 	    else:
-		raise ParseError, "bad version/release set %s" % value
+		raise ParseError("bad version/release set %s" % value)
 	elif len(fields) == 2:
 	    if template and template.buildCount is not None:
 		self.version = template.version
@@ -349,21 +350,20 @@ class Revision(AbstractRevision):
 	    except:
 		raise ParseError, \
 		    ("version numbers must begin with a digit: %s" % value)
-
 	    self.version = version
 
 	if release is not None:
 	    try:
 		self.sourceCount = SerialNumber(release)
 	    except:
-		raise ParseError, \
-		    ("release numbers must be all numeric: %s" % release)
+		raise ParseError("release numbers must be all "
+                                 "numeric: %s" % release)
 	if buildCount is not None:
 	    try:
 		self.buildCount = SerialNumber(buildCount)
 	    except:
-		raise ParseError, \
-		    ("build count numbers must be all numeric: %s" % buildCount)
+		raise ParseError("build count numbers must be "
+                                 "all numeric: %s" % buildCount)
 
 class Label(AbstractLabel):
 
@@ -427,35 +427,35 @@ class Label(AbstractLabel):
 	@type value: str
 	"""
 	if value.find("/") != -1:
-	    raise ParseError, "/ should not appear in a label"
+	    raise ParseError("/ should not appear in a label")
 
 	i = value.count(":")
 	if i > 1:
-	    raise ParseError, "unexpected colon"
+	    raise ParseError("unexpected colon")
 	j = value.count("@")
 	if j and not i:
-	    raise ParseError, "@ sign can only be used with a colon"
+	    raise ParseError("@ sign can only be used with a colon")
 	if j > 1:
-	    raise ParseError, "unexpected @ sign"
+	    raise ParseError("unexpected @ sign")
 
 	colon = value.find(":")
 	at = value.find("@")
 
 	if at > colon:
-	    raise ParseError, "@ sign must occur before a colon"
+	    raise ParseError("@ sign must occur before a colon")
 
 	if colon == -1:
 	    if not template:
-		raise ParseError, "colon expected before branch name"
-	    
+		raise ParseError("colon expected before branch name")
+
 	    self.host = template.host
 	    self.namespace = template.namespace
 	    self.branch = value
 	else:
 	    if value.find("@") == -1:
 		if not template:
-		    raise ParseError, "@ expected before label namespace"
-	    
+		    raise ParseError("@ expected before label namespace")
+
 		self.host = template.host
 		(self.namespace, self.branch) = value.split(":")
 	    else:
@@ -463,9 +463,9 @@ class Label(AbstractLabel):
 		(self.namespace, self.branch) = rest.split(":")
 
 	if not self.namespace:
-	    raise ParseError, ("namespace may not be empty: %s" % value)
+	    raise ParseError("namespace may not be empty: %s" % value)
 	if not self.branch:
-	    raise ParseError, ("branch tag not be empty: %s" % value)
+	    raise ParseError("branch tag not be empty: %s" % value)
 
 class StaticLabel(Label):
 
@@ -534,7 +534,7 @@ class VersionSequence(AbstractVersion):
 
 	for i in range(0, len(list)):
 	    if not list[i] == other.versions[i]: return 0
-	
+
 	return 1
 
     def __eq__(self, other):
@@ -551,7 +551,7 @@ class VersionSequence(AbstractVersion):
                 self.hash ^= hash(ver)
 
 	return self.hash
-	    
+
     def asString(self, defaultBranch = None, frozen = False):
 	"""
 	Returns a string representation of the version.
@@ -624,8 +624,8 @@ class VersionSequence(AbstractVersion):
         return copy.deepcopy(self)
 
     def timeStamps(self):
-        return [ x.timeStamp for x in self.versions if 
-                                            isinstance(x, AbstractRevision)]
+        return [ x.timeStamp for x in self.versions
+                 if isinstance(x, AbstractRevision)]
 
     def setTimeStamps(self, timeStamps, clearCache=True):
         strStr = self.asString()
@@ -645,17 +645,17 @@ class VersionSequence(AbstractVersion):
             if isinstance(item, AbstractRevision):
                 item.timeStamp = timeStamps[i]
                 i += 1
-        
+
 
     def iterLabels(self):
         """
-        Iterates through the labels that are used in this version 
+        Iterates through the labels that are used in this version
         in order, from earliest to last.
         """
         for item in self.versions:
             if isinstance(item, Label):
                 yield item
-            
+
     def __init__(self, versionList):
         """
         Creates a Version object from a list of AbstractLabel and
@@ -730,7 +730,7 @@ class Version(VersionSequence):
 
         iter = reversed(self.versions)
         iter.next()
-        
+
         for item in iter:
             if expectVersion and isinstance(item, AbstractRevision):
                 return count
@@ -745,7 +745,7 @@ class Version(VersionSequence):
         # returns the canonical version for this version. if this is a
         # shadow of a version, we return that original version
         v = self.copy()
-        
+
         release = v.trailingRevision()
         shadowCount = release.sourceCount.shadowCount()
         if release.buildCount and \
@@ -783,7 +783,7 @@ class Version(VersionSequence):
             while not isinstance(item, AbstractRevision):
                 item = iter.next()
         except StopIteration:
-            if (not trailing.sourceCount.shadowCount() 
+            if (not trailing.sourceCount.shadowCount()
                 and not trailing.buildCount.shadowCount()):
                 # this is a direct shadow of a binary trove -- it hasn't
                 # been touched on the shadow
@@ -881,7 +881,7 @@ class Version(VersionSequence):
 
     def isShadow(self):
         """ Returns True if this version is a shadow of another trove """
-        return self.branch().isShadow() 
+        return self.branch().isShadow()
 
     def isModifiedShadow(self):
         """ Returns True if this version is a shadow that has been modified
@@ -959,7 +959,7 @@ class Version(VersionSequence):
 
     def createBranch(self, label, withVerRel = False):
 	"""
-	Creates a new label from this version. 
+	Creates a new label from this version.
 
 	@param label: Branch to create for this version
 	@type label: AbstractLabel
@@ -967,7 +967,7 @@ class Version(VersionSequence):
 	on the label using the same version and release as the original
 	verison.
 	@type withVerRel: boolean
-	@rtype: Version 
+	@rtype: Version
 	"""
 	assert(isinstance(label, AbstractLabel))
         assert(self.versions[-2] != label)
@@ -983,11 +983,11 @@ class Version(VersionSequence):
 
     def createShadow(self, label):
 	"""
-	Creates a new shadow from this version. 
+	Creates a new shadow from this version.
 
 	@param label: Branch to create for this version
 	@type label: AbstractLabel
-	@rtype: Version 
+	@rtype: Version
 	"""
 	assert(isinstance(label, AbstractLabel))
         assert(self.versions[-2] != label)
@@ -1004,23 +1004,25 @@ class Version(VersionSequence):
         shadowed directly, instead of branching/shadowing a source and then
         cooking it
 
-	@rtype: bool 
+	@rtype: bool
 	"""
         # ensure this version is branched and is actually a binary
-        if not (self.hasParentVersion() and self.trailingRevision().buildCount):
+        if not (self.hasParentVersion()
+                and self.trailingRevision().buildCount):
             return False
         # check that its parent version is also a binary
         buildCount = self.parentVersion().trailingRevision().buildCount
         return buildCount is None or str(buildCount) != '0'
 
     def getSourceVersion(self):
-        """ 
-        Takes a binary version and returns its associated source version (any
-        trailing version info is left untouched).  If source is branched off of
-        <repo1>-2 into <repo2>, its new version will be <repo1>-2/<repo2>/2.
-        The corresponding build will be on branch <repo1>-2-0/<repo2>/2-1.
-        getSourceVersion converts from the latter to the former.  Always returns
-        a copy of the version, even when the two are equal.
+        """
+        Takes a binary version and returns its associated source
+        version (any trailing version info is left untouched).  If
+        source is branched off of <repo1>-2 into <repo2>, its new
+        version will be <repo1>-2/<repo2>/2.  The corresponding build
+        will be on branch <repo1>-2-0/<repo2>/2-1.  getSourceVersion
+        converts from the latter to the former.  Always returns a copy
+        of the version, even when the two are equal.
         """
         v = self.copy()
         # if a binary was branched/shadowed onto this label
@@ -1033,13 +1035,14 @@ class Version(VersionSequence):
         return v
 
     def getBinaryVersion(self):
-        """ 
-        Takes a source branch and returns its associated binary branch.  (any
-        trailing version info is left untouched).  If source is branched off of
-        <repo1>-2 into <repo2>, its new version will be <repo1>-2/<repo2>/2.
-        The corresponding build will be on branch <repo1>-2-0/<repo2>/2-1.
-        getBinaryVersion converts from the former to the latter.  Always returns
-        a copy of the branch, even when the two are equal.
+        """
+        Takes a source branch and returns its associated binary
+        branch.  (any trailing version info is left untouched).  If
+        source is branched off of <repo1>-2 into <repo2>, its new
+        version will be <repo1>-2/<repo2>/2.  The corresponding build
+        will be on branch <repo1>-2-0/<repo2>/2-1.  getBinaryVersion
+        converts from the former to the latter.  Always returns a copy
+        of the branch, even when the two are equal.
         """
         newV = self.copy()
         v = newV
@@ -1105,11 +1108,11 @@ class Branch(VersionSequence):
 
     def createShadow(self, label):
 	"""
-	Creates a new shadow from this branch. 
+	Creates a new shadow from this branch.
 
 	@param label: Label of the new shadow
 	@type label: AbstractLabel
-	@rtype: Version 
+	@rtype: Version
 	"""
 	assert(isinstance(label, AbstractLabel))
 
@@ -1124,7 +1127,7 @@ def _parseVersionString(ver, frozen):
     @param ver: version string
     @type ver: str
     """
-	
+
 def ThawVersion(ver):
     if ver == "@NEW@":
 	return NewVersion()
@@ -1151,7 +1154,7 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     stringVersionCache[ver] = v
     return v
 
-def _VersionFromString(ver, defaultBranch = None, frozen = False, 
+def _VersionFromString(ver, defaultBranch = None, frozen = False,
 		       timeStamps = []):
 
     """
@@ -1182,7 +1185,8 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
         if expectLabel:
             lastBranch = Label(part, template = lastBranch)
 
-            staticLabelClass = staticLabelTable.get(lastBranch.asString(), None)
+            staticLabelClass = staticLabelTable.get(lastBranch.asString(),
+                                                    None)
             if staticLabelClass is not None:
                 vList.append(staticLabelClass())
             else:
@@ -1204,8 +1208,8 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
             lastVersion = Revision(part, template = lastVersion,
                                          frozen = frozen)
             if lastVersion.shadowCount() > shadowCount:
-                raise ParseError, "too many shadow serial numbers in '%s'" \
-                        % part
+                raise ParseError("too many shadow serial numbers "
+                                 "in '%s'" % part)
             vList.append(lastVersion)
 
     if isinstance(vList[-1], AbstractRevision):
@@ -1233,7 +1237,7 @@ def strToFrozen(verStr, timeStamps):
     spl = verStr.split("/")
     nextIsVer = False
     ts = 0
-    
+
     for i, s in enumerate(spl):
         if not s:
             nextIsVer = False
