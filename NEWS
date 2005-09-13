@@ -1,4 +1,7 @@
 Changes in 0.62.4:
+  * Allow selection of individual troves from change set files via --from-file
+
+Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
     file objects have been collapsed into batched calls (5-10% speedup
     on some operations)
