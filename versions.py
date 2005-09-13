@@ -348,7 +348,7 @@ class Revision(AbstractRevision):
 		int(version[0])
 	    except:
 		raise ParseError, \
-		    ("version numbers must be begin with a digit: %s" % value)
+		    ("version numbers must begin with a digit: %s" % value)
 
 	    self.version = version
 
