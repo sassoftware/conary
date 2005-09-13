@@ -1620,7 +1620,7 @@ class TagCommand:
             tagInfo.file, HandlerInfo())
         h.update(tagInfo, fileList)
 
-    def _badMultiTag(self, tagInfoList):
+    def _badMultiTag(self, handler, tagInfoList):
         if len([x for x in tagInfoList if x.datasource != 'multitag']):
             # multiple description without multitag protocol
             log.error('tag handler %s used by multiple tags'
@@ -1647,7 +1647,7 @@ class TagCommand:
                     tagInfoList = hi.tagToFile.keys()
                     if (len(tagInfoList) > 1):
                         # multiple tags for one tag handler
-                        if self._badMultiTag(tagInfoList):
+                        if self._badMultiTag(handler, tagInfoList):
                             break
                         datasource = 'multitag'
                     else:
@@ -1694,7 +1694,7 @@ class TagCommand:
                 command = [handler, updateType, updateClass]
                 if (len(tagInfoList) > 1):
                     # multiple tags for one tag handler
-                    if self._badMultiTag(tagInfoList):
+                    if self._badMultiTag(handler, tagInfoList):
                         break
                     datasource = 'multitag'
                 else:
