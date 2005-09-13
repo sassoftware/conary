@@ -182,6 +182,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["just-db"] = NO_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
+    argDef["no-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
