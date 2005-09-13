@@ -1,4 +1,4 @@
-Changes in 0.62.4:
+Changes in 0.62.5:
   * Allow selection of individual troves from change set files via --from-file
 
 Changes in 0.62.4:
@@ -6,7 +6,7 @@ Changes in 0.62.4:
     file objects have been collapsed into batched calls (5-10% speedup
     on some operations)
   * Fixed PGP key submission to not use a hidden form element.
-  * Changeed PGP key submission to use an xmlrpc call instead of
+  * Changed PGP key submission to use an xmlrpc call instead of
     modifying the database directly.
   * Added methods to change PGP key/user associations, and thereby
     disable a key.
