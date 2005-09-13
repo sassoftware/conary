@@ -139,6 +139,7 @@ class HttpHandler(WebHandler):
         return apache.OK
 
     @strFields(char = 'A')
+    @checkAuth(write=False)
     def browse(self, auth, char):
         troves = self.repos.getAllTroveLeaves(self.serverName, {None: [None]})
         # keep a running total of each letter we see so that the display
@@ -174,6 +175,7 @@ class HttpHandler(WebHandler):
         return apache.OK
 
     @strFields(t = None, v = "")
+    @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
         leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
         versionList = sorted(leaves[t].keys(), reverse = True)
@@ -197,6 +199,7 @@ class HttpHandler(WebHandler):
         return apache.OK
 
     @strFields(t = None, v = None, f = "")
+    @checkAuth(write=False)
     def files(self, auth, t, v, f):
         v = versions.ThawVersion(v)
         f = deps.ThawDependencySet(f)
@@ -218,6 +221,7 @@ class HttpHandler(WebHandler):
         return apache.OK
 
     @strFields(path = None, pathId = None, fileId = None, fileV = None)
+    @checkAuth(write=False)
     def getFile(self, auth, path, pathId, fileId, fileV):
         from mimetypes import guess_type
         from lib import sha1helper
