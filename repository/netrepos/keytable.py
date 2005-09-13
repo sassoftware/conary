@@ -183,7 +183,7 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
             return self.publicDict[keyId]
 
         if self.keyTable is None:
-            raise KeyNotFound(keyId, "Can't open database")
+            raise openpgpkey.KeyNotFound(keyId, "Can't open database")
 
         # get the key data from the database
         fingerprint = self.keyTable.getFingerprint(keyId)
