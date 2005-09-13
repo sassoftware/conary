@@ -1141,8 +1141,8 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
         else:
             if hashType > len(hashes) - 1:
                 hashType = 0
-            raise IncompatibileKey('Hash algortihm %s is not implemented. '
-                                   'Key not readable' %hashes[hashType])
+            raise IncompatibleKey('Hash algortihm %s is not implemented. '
+                                  'Key not readable' %hashes[hashType])
         # RFC 2440 3.6.1.1
         keySize = keySizes[algType]
         if not s2kType:
