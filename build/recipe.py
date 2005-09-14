@@ -1176,6 +1176,8 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
         self.realfilename = None
 
     def getPackages(self):
+        # we do not package up build logs for info-* packages
+        self._autoCreatedFileCount -= 1
         comp = buildpackage.BuildComponent(
             'info-%s:%s' %(self.infoname, self.type), self)
         f = comp.addFile(self.infofilename, self.realfilename)
