@@ -42,7 +42,8 @@ import versions
     INT,
     REGEXPLIST,
     FLAVORLIST, 
-) = range(13)
+    FINGERPRINT, 
+) = range(14)
 
 BOOLEAN=BOOL
 
@@ -178,6 +179,8 @@ class ConfigFile:
             self.__dict__[key] = deps.deps.parseFlavor(val)
         elif type == FLAVORLIST:
             self.__dict__[key].append(deps.deps.parseFlavor(val))
+        elif type == FINGERPRINT:
+            self.__dict__[key] = val.replace(' ', '')
 
     def displayKey(self, key, value, type, out):
         if type in (INT,STRING):
@@ -220,6 +223,8 @@ class ConfigFile:
                 self.displayKey(key, flavor, FLAVOR, out)
         elif type == BOOL:
             out.write("%-25s %s\n" % (key, bool(value)))
+        elif type == FINGERPRINT:
+            out.write("%-25s %s\n" % (key, value))
         else:
             out.write("%-25s (unknown type)\n" % (key))
 
@@ -331,7 +336,7 @@ class ConaryConfiguration(ConfigFile):
                                                   '/etc/conary/distro/arch',
                                                   '~/.conary/arch')],
         'quiet'                 : [ BOOL, False ],
-        'signatureKey'          : '',
+        'signatureKey'          : [ FINGERPRINT, ''],
         'trustThreshold'        : [ INT, 0],
     }
 
