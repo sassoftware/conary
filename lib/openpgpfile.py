@@ -1325,3 +1325,12 @@ def assertReplaceKeyAllowed(origKey, newKey):
     origRing.close()
     newRing.close()
 
+def readKeyData(keyRing, fingerprint):
+    while (getKeyId(keyRing) != fingerprint):
+        seekNextKey(keyRing)
+    start = keyRing.tell()
+    seekNextKey(keyRing)
+    end = keyRing.tell()
+    keyRing.seek(start)
+    keyData = keyRing.read(end - start)
+    return keyData
