@@ -1240,6 +1240,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # otherwise we need to create a new row with the signatures
             cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)',
                        (instanceId, trv.troveInfo.sigs.freeze()))
+        self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
+                                   trv.getFlavor())
         self.db.commit()
         return True
 
@@ -1421,6 +1423,9 @@ class NullCacheSet:
     def setEntrySize(self, row, size):
         pass
 
+    def invalidateEntry(self, name, version, flavor):
+        pass
+
     def __init__(self, tmpPath):
         self.tmpPath = tmpPath
 
@@ -1526,6 +1531,37 @@ class CacheSet:
 
         return (row, path)
 
+    def invalidateEntry(self, name, version, flavor):
+        """
+        invalidates (and deletes) any cached changeset that matches
+        the given name, version, flavor.
+        """
+        flavorId = self.flavors.get(flavor, None)
+        versionId = self.versions.get(version, None)
+
+        if flavorId is None or versionId is None:
+            # this should not happen, but we'll handle it anyway
+            return
+
+        cu = self.db.cursor()
+        # start a transaction to retain a consistent state
+        self.db._begin()
+        cu.execute("""
+            SELECT row, returnValue, size FROM CacheContents WHERE
+                troveName=? AND newFlavorId=? AND newVersionId=?
+            """, (name, flavorId, versionId))
+
+        # delete all matching entries from the db and the file system
+        for (row, returnVal, size) in cu.fetchall():
+            cu.execute("DELETE FROM CacheContents WHERE row=?", row)
+            path = self.filePattern % (self.tmpDir, row)
+            if os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+        self.db.commit()
+
     def setEntrySize(self, row, size):
         cu = self.db.cursor()
         cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
@@ -1542,7 +1578,7 @@ class CacheSet:
             if version != schemaVersion:
                 cu.execute("SELECT row from CacheContents")
                 for (row,) in cu:
-                    fn = self.tmpDir + "/cache-%s.ccs-out"
+                    fn = self.filePattern % (self.tmpDir, row)
                     if os.path.exists(fn):
                         os.unlink(fn)
 

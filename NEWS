@@ -13,6 +13,8 @@ Changes in 0.62.5:
     naming, API documentation, and parse error messages
   * An unhandled exception when signing a trove twice with the same key
     has been fixed.
+  * Old (now invalid) changesets are now removed from the changeset
+    cache when a digital signature is added to a trove.
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
