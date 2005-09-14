@@ -15,6 +15,14 @@ Changes in 0.62.5:
     has been fixed.
   * Old (now invalid) changesets are now removed from the changeset
     cache when a digital signature is added to a trove.
+  * A package is now counted as empty if it contains only files automatically
+    found by the AutoDoc policy.
+  * CPackageRecipe now requires elfutils:runtime for eu-strip; this is
+    needed for the existing debugedit:runtime requirement to do useful
+    work.
+  * Removed DistroPackageRecipe and moved its buildRequires list to
+    PackageRecipe.  Use clearBuildReqs() to remove any of the base
+    requirements for a package.
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect

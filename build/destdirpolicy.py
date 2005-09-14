@@ -418,6 +418,8 @@ class AutoDoc(policy.Policy):
             return
         util.mkdirChain(os.path.dirname(dest))
         shutil.copy2(source, dest)
+        # this file should not be counted as making package non-empty
+        self.recipe._autoCreatedFileCount += 1
 
 
 class RemoveNonPackageFiles(policy.Policy):

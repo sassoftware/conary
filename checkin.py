@@ -414,7 +414,7 @@ def commit(repos, cfg, message, callback=None):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if issubclass(recipeClass, recipe.PackageRecipe):
+    if issubclass(recipeClass, recipe._AbstractPackageRecipe):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]

@@ -160,7 +160,6 @@ def setupRecipeDict(d, filename):
     localImport(d, 'build', ('build', 'action'))
     localImport(d, 'build.recipe', ('PackageRecipe', 'GroupRecipe',
                                     'RedirectRecipe', 'FilesetRecipe',
-                                    'DistroPackageRecipe',
                                     'BuildPackageRecipe',
                                     'CPackageRecipe',
                                     'AutoPackageRecipe',
@@ -176,36 +175,36 @@ def setupRecipeDict(d, filename):
         localImport(d, x)
     localImport(d, 'build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
     d['filename'] = filename
+    _copyReusedRecipes(d)
+
+_recipesToCopy = []
+def _addRecipeToCopy(recipeClass):
+    global recipesToCopy
+    _recipesToCopy.append(recipeClass)
+
+def _copyReusedRecipes(moduleDict):
+    # XXX HACK - get rid of this when we move the
+    # recipe classes to the repository.
+    # makes copies of some of the superclass recipes that are 
+    # created in this module.  (specifically, the ones with buildreqs)
+    global _recipesToCopy
+    for recipeClass in _recipesToCopy:
+        name = recipeClass.__name__
+        # when we create a new class object, it needs its superclasses.
+        # get the original superclass list and substitute in any 
+        # copies
+        mro = list(inspect.getmro(recipeClass)[1:])
+        newMro = []
+        for superClass in mro:
+            superName = superClass.__name__
+            newMro.append(moduleDict.get(superName, superClass))
+
+        recipeCopy = new.classobj(name, tuple(newMro),
+                                 recipeClass.__dict__.copy())
+        recipeCopy.buildRequires = recipeCopy.buildRequires[:]
+        moduleDict[name] = recipeCopy
 
 class RecipeLoader:
-    _recipesToCopy = []
-
-    @classmethod
-    def addRecipeToCopy(class_, recipeClass):
-        class_._recipesToCopy.append(recipeClass)
-
-    def _copyReusedRecipes(self, moduleDict):
-        # XXX HACK - get rid of this when we move the
-        # recipe classes to the repository.
-        # makes copies of some of the superclass recipes that are 
-        # created in this module.  (specifically, the ones with buildreqs)
-        for recipeClass in self._recipesToCopy:
-            name = recipeClass.__name__
-            # when we create a new class object, it needs its superclasses.
-            # get the original superclass list and substitute in any 
-            # copies
-            mro = list(inspect.getmro(recipeClass)[1:])
-            newMro = []
-            for superClass in mro:
-                superName = superClass.__name__
-                newMro.append(moduleDict.get(superName, superClass))
-
-            recipeCopy = new.classobj(name, tuple(newMro),
-                                     recipeClass.__dict__.copy())
-            recipeCopy.buildRequires = recipeCopy.buildRequires[:]
-            moduleDict[name] = recipeCopy
-
-
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False):
@@ -238,7 +237,6 @@ class RecipeLoader:
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
 
-        self._copyReusedRecipes(self.module.__dict__)
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -275,8 +273,8 @@ class RecipeLoader:
                 continue
             recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            if ((issubclass(obj, PackageRecipe)
-                 and obj is not PackageRecipe
+            if ((issubclass(obj, _AbstractPackageRecipe)
+                 and obj is not _AbstractPackageRecipe
                  and not issubclass(obj, UserGroupInfoRecipe)) or
                 (issubclass(obj, RedirectRecipe) 
                  and obj is not RedirectRecipe)):
@@ -673,14 +671,14 @@ def clearBuildReqs(*buildReqs):
     callerGlobals = inspect.stack()[1][0].f_globals
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, PackageRecipe):
+        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
             classes.append(value)
 
     for class_ in classes:
         _removePackages(class_, buildReqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, PackageRecipe):
+            if issubclass(base, _AbstractPackageRecipe):
                 _removePackages(base, buildReqs)
 
 class _recipeHelper:
@@ -718,7 +716,7 @@ class Recipe:
     def __repr__(self):
         return "<%s Object>" % self.__class__
 
-class PackageRecipe(Recipe):
+class _AbstractPackageRecipe(Recipe):
     buildRequires = []
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -1135,14 +1133,42 @@ class PackageRecipe(Recipe):
 	self.mainDir(self.nameVer(), explicit=False)
         self.sourcePathMap = {}
         self.pathConflicts = {}
+        self._autoCreatedFileCount = 0
 
 
-class UserGroupInfoRecipe(PackageRecipe):
+class PackageRecipe(_AbstractPackageRecipe):
+    # abstract base class
+    ignore = 1
+    # these initial buildRequires need to be cleared where they would
+    # otherwise create a requirement loop.  Also, note that each instance
+    # of :lib in here is only for runtime, not to link against.
+    # Any package that needs to link should still specify the :devel
+    # component
+    buildRequires = [
+        'filesystem:runtime',
+        'setup:runtime',
+        'python:runtime',
+        'python:lib',
+        'conary:runtime',
+        'conary:lib',
+        'conary:python',
+        'sqlite:lib',
+        'bzip2:runtime',
+        'gzip:runtime',
+        'tar:runtime',
+        'cpio:runtime',
+        'patch:runtime',
+    ]
+# need this because we have non-empty buildRequires in PackageRecipe
+_addRecipeToCopy(PackageRecipe)
+
+
+class UserGroupInfoRecipe(_AbstractPackageRecipe):
     # abstract base class
     ignore = 1
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
-        PackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
+        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
         self.destdirPolicy = []
         self.packagePolicy = []
         self.requires = []
@@ -1215,47 +1241,17 @@ class GroupInfoRecipe(UserGroupInfoRecipe):
         f.provides.set(depSet)
 
 
-# XXX the next four classes will probably migrate to the repository
+# FIXME the next three classes will probably migrate to the repository
 # somehow, but not until we have figured out how to do this without
 # requiring that every recipe have a loadSuperClass line in it.
 
-class DistroPackageRecipe(PackageRecipe):
-    """
-    Most packages in the distribution should descend from this class,
-    directly or indirectly, except for direct build requirements of
-    this class.  This package differs from the C{PackageRecipe}
-    class only by providing explicit build requirements.
-    """
-    # :lib in here is only for runtime, not to link against.
-    # Any package that needs to link should still specify the :devellib
-    buildRequires = [
-        'filesystem:runtime',
-        'setup:runtime',
-        'python:runtime',
-        'python:lib',
-        'conary:runtime',
-        'conary:lib',
-        'conary:python',
-        'sqlite:lib',
-        'bzip2:runtime',
-        'gzip:runtime',
-        'tar:runtime',
-        'cpio:runtime',
-        'patch:runtime',
-    ]
-    Flags = use.LocalFlags
-    # abstract base class
-    ignore = 1
-
-RecipeLoader.addRecipeToCopy(DistroPackageRecipe)
-
-class BuildPackageRecipe(DistroPackageRecipe):
+class BuildPackageRecipe(PackageRecipe):
     """
     Packages that need to be built with the make utility and basic standard
     shell tools should descend from this recipe in order to automatically
     have a reasonable set of build requirements.  This package differs
-    from the C{PackageRecipe} class only by providing explicit build
-    requirements.
+    from the C{PackageRecipe} class only by providing additional explicit
+    build requirements.
     """
     # Again, no :devellib here
     buildRequires = [
@@ -1269,18 +1265,19 @@ class BuildPackageRecipe(DistroPackageRecipe):
         'sed:runtime',
         'diffutils:runtime',
     ]
-    buildRequires.extend(DistroPackageRecipe.buildRequires)
     Flags = use.LocalFlags
     # abstract base class
     ignore = 1
-RecipeLoader.addRecipeToCopy(BuildPackageRecipe)
+_addRecipeToCopy(BuildPackageRecipe)
+
 
 class CPackageRecipe(BuildPackageRecipe):
     """
     Most packages should descend from this recipe in order to automatically
     have a reasonable set of build requirements for a package that builds
     C source code to binaries.  This package differs from the
-    C{PackageRecipe} class only by providing explicit build requirements.
+    C{BuildPackageRecipe} class only by providing additional explicit build
+    requirements.
     """
     buildRequires = [
         'binutils:runtime',
@@ -1294,12 +1291,12 @@ class CPackageRecipe(BuildPackageRecipe):
         'glibc:devellib',
         'glibc:devel',
         'debugedit:runtime',
+        'elfutils:runtime',
     ]
-    buildRequires.extend(BuildPackageRecipe.buildRequires)
     Flags = use.LocalFlags
     # abstract base class
     ignore = 1
-RecipeLoader.addRecipeToCopy(CPackageRecipe)
+_addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
@@ -1333,7 +1330,7 @@ class AutoPackageRecipe(CPackageRecipe):
         r.MakeInstall()
     def policy(r):
         pass
-RecipeLoader.addRecipeToCopy(AutoPackageRecipe)
+_addRecipeToCopy(AutoPackageRecipe)
 
 
 class SingleGroup:

@@ -271,7 +271,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     macros['buildbranch'] = buildBranch.asString()
     macros['buildlabel'] = buildBranch.label().asString()
 
-    if issubclass(recipeClass, recipe.PackageRecipe):
+    if issubclass(recipeClass, recipe._AbstractPackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, sourceVersion, 
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
@@ -681,6 +681,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         # that will make it more accessible for debugging.  At the end of 
         # the build, copy to the correct location
         tmpLogPath = builddir + '/' + os.path.basename(logPath)
+        # this file alone is not enough to make us build a package
+        recipeObj._autoCreatedFileCount += 1
         util.mkdirChain(os.path.dirname(logPath))
         # touch the logPath file so that the build process expects
         # a file there for packaging
@@ -727,11 +729,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
-        if  (logBuild and len(bldList) == 1 and not
-             bldList[0].keys()[0].startswith('/usr/src/debug/buildlogs/')):
-            logBuild = False
-        if not bldList or (logBuild and len(bldList) == 1):
-            # no components in packages, or no files in components
+        if (not bldList or
+            sum(len(x) for x in bldList) <= recipeObj._autoCreatedFileCount):
+            # no components in packages, or no explicit files in components
             log.error('No files were found to add to package %s'
                       %recipeClass.name)
             return
