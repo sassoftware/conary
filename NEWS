@@ -3,7 +3,7 @@ Changes in 0.62.5:
   * Recursive queries on local database could get upset by a missing trove
   * Underlying dependency code returns version and flavor for troves with
     broken dependencies
-  * Underlying dependency code returns information on what removed trove 
+  * Underlying dependency code returns information on what removed trove
     caused a broken dependency
   * Removed --no-deps-recurse option
   * Greatly simplify dependency resolution logic
@@ -11,6 +11,8 @@ Changes in 0.62.5:
     is no longer required to begin with a digit.
   * The Release parsing code has been cleaned up to use consistent
     naming, API documentation, and parse error messages
+  * An unhandled exception when signing a trove twice with the same key
+    has been fixed.
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect

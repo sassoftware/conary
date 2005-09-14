@@ -106,7 +106,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == 'DigitalSignatureVerificationError':
             raise trove.DigitalSignatureVerificationError(exceptionArgs[0])
         elif exceptionName == 'AlreadySignedError':
-            raise repository.netrepos.netserver.AlreadySignedError(exceptionArgs[0])
+            raise AlreadySignedError(exceptionArgs[0])
         elif exceptionName == 'BadSelfSignature':
             raise openpgpfile.BadSelfSignature(exceptionArgs)
         elif exceptionName == 'IncompatibleKey':
@@ -1275,3 +1275,9 @@ class FileContentsNotFound(GetFileContentsError):
 class FileStreamNotFound(GetFileContentsError):
     def __init__(self, val):
         GetFileContentsError.__init__(self, val)
+
+class AlreadySignedError(Exception):
+    def __str__(self):
+        return self.error
+    def __init__(self, error = "Already signed"):
+        self.error=error
