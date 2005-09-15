@@ -23,6 +23,7 @@ Changes in 0.62.5:
   * Removed DistroPackageRecipe and moved its buildRequires list to
     PackageRecipe.  Use clearBuildReqs() to remove any of the base
     requirements for a package.
+  * Install buckets are respected during dependency resolution
 
 Changes in 0.62.4:
   * Many places where lots of individual db calls were done to collect
