@@ -703,11 +703,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         username = authToken[0]
         cu = self.db.cursor()
         # authenticate this user first
-        cu.execute("select salt, password from Users where user = ?", [ username ])
-        for (salt, password) in cu:
-            if not self.auth.checkPassword(salt, password, authToken[1]):
-                return {}
-            break
+        if not self.auth.check(authToken):
+            return {}
         # now get them troves
         query = """
         select distinct
@@ -1366,17 +1363,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = 2
 
             # migration to version 3
-            # -- fix the indexing for the Latest table
+            # -- add a smaller index for the Latest table
             if version == 2:
-                # drop the LatestIdx, if it exists. Because it used to
-                # be a "create unique index", depending on the data,
-                # sometimes it would not even be created,
-                idx_list =  [ x[0] for x in cu.execute("""
-                SELECT name FROM sqlite_master
-                WHERE type = 'index' AND lower(name) = 'latestidx'
-                """).fetchall()]
-                if len(idx_list):
-                    cu.execute("DROP INDEX LatestIdx")
                 cu.execute("CREATE INDEX LatestItemIdx on Latest(itemId)")
                 cu.execute("UPDATE DatabaseVersion SET version=3")
                 self.db.commit()
