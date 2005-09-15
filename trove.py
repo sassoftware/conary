@@ -129,6 +129,9 @@ class InstallBucket(streams.StreamCollection):
         self.add(key, value)
 
     def compatibleWith(self, other):
+        if not other.keys() or not self.keys():
+            return False
+
         otherDict = dict(other)
 
         for key, value in self.iteritems():
