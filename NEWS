@@ -24,7 +24,7 @@ Changes in 0.62.5:
     PackageRecipe.  Use clearBuildReqs() to remove any of the base
     requirements for a package.
   * Install buckets are respected during dependency resolution
-  * Updated the troveNames() call to a faster query, wich should bring
+  * Updated the troveNames() call to a faster query, which should bring
     the run time of the "conary rq" back to a more reasonable limit
 
 Changes in 0.62.4:
