@@ -102,9 +102,8 @@ class LatestTable:
 				       "flavorId integer, "
 				       "versionId integer)")
             cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
-            # FIXME: this index is an important safeguard
-            #cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
-            #           "Latest(itemId, branchId, flavorId)")
+            cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
+                       "Latest(itemId, branchId, flavorId)")
 
     def __setitem__(self, key, val):
 	(first, second, third) = key
