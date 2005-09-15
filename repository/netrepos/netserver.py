@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 2
+    schemaVersion = 3
 
     # lets the following exceptions pass:
     #
@@ -561,7 +561,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # this is a lot like the query for troveNames()... there is probably
         # a way to unify this through some views
         cu.execute(fullQuery, argList)
-
+        
         pwChecked = False
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
@@ -700,11 +700,43 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def troveNames(self, authToken, clientVersion, labelStr):
         if labelStr is None:    
             return {}
-
-        return self._getTroveList(authToken, clientVersion, 
-                                  { None : { labelStr : None } }, 
-                                  withVersions = False, 
-                                  versionType = self._GTL_VERSION_TYPE_LABEL)
+        username = authToken[0]
+        cu = self.db.cursor()
+        # authenticate this user first
+        cu.execute("select salt, password from Users where user = ?", [ username ])
+        for (salt, password) in cu:
+            if not self.auth.checkPassword(salt, password, authToken[1]):
+                return {}
+            break
+        # now get them troves
+        query = """
+        select distinct
+            Items.Item as trove, UP.pattern as pattern
+        from
+	    ( select 
+	        Permissions.labelId as labelId, 
+	        PerItems.item as pattern
+	      from
+	        Users, UserGroupMembers, Permissions
+	        left outer join Items as PerItems on Permissions.itemId = PerItems.itemId 
+	      where
+	            Users.user = ?
+	        and Users.userId = UserGroupMembers.userId
+	        and UserGroupMembers.userGroupId = Permissions.userGroupId
+	    ) as UP join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId ),
+	    Labels, Items
+        where
+	    Labels.label = ?
+        and Labels.labelId = LabelMap.labelId
+        and LabelMap.itemId = Items.itemId
+        """
+        cu.execute(query, [username, labelStr])
+        names = {}
+        for (trove, pattern) in cu:
+            if not self.auth.checkTrove(pattern, trove):
+                continue
+            names[trove] = 1
+        return names.keys()
 
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
         troveFilter = {}
@@ -1333,6 +1365,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 self.db.commit()
                 version = 2
 
+            # migration to version 3
+            # -- fix the indexing for the Latest table
+            if version == 2:
+                # drop the LatestIdx, if it exists. Because it used to
+                # be a "create unique index", depending on the data,
+                # sometimes it would not even be created,
+                idx_list =  [ x[0] for x in cu.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type = 'index' AND lower(name) = 'latestidx'
+                """).fetchall()]
+                if len(idx_list):
+                    cu.execute("DROP INDEX LatestIdx")
+                cu.execute("CREATE INDEX LatestItemIdx on Latest(itemId)")
+                cu.execute("UPDATE DatabaseVersion SET version=3")
+                self.db.commit()
+                version = 3
+                
             if version != self.schemaVersion:
                 return False
 
