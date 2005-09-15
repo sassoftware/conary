@@ -974,11 +974,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 primary = (l[0], trvCs.getNewVersion(), l[2][1])
                 cs.addPrimaryTrove(*primary)
 
-                (key, path) = self.cache.addEntry(l, recurse, withFiles, 
-                                                  withFileContents, 
-                                                  excludeAutoSource,
-                                                  returnVal = (trovesNeeded, 
-                                                               filesNeeded))
+                try:
+                    (key, path) = self.cache.addEntry(l, recurse, withFiles, 
+                                                      withFileContents, 
+                                                      excludeAutoSource,
+                                                      (trovesNeeded,
+                                                       filesNeeded))
+                except:
+                    # something went wrong.  make sure that we roll
+                    # back any pending change
+                    if self.cache.db.inTransaction:
+                        self.cache.db.rollback()
+                    raise
                 size = cs.writeToFile(path, withReferences = True)
                 self.cache.setEntrySize(key, size)
             else:
@@ -1493,7 +1500,7 @@ class CacheSet:
             newFlavorId = self.flavors.get(newFlavor, None)
             if newFlavorId is None: 
                 return None
-        
+
         newVersionId = self.versions.get(newVersion, None)
         if newVersionId is None:
             return None
