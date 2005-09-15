@@ -467,17 +467,18 @@ class ConaryClient:
 	    # each node is a ((name, version, flavor), state, edgeList
 	    #		       fromUpdate)
 	    # state is ERASE, KEEP, or UNKNOWN
-	    # fromUpdate is True if erasing this node was suggested by
-	    # a trvCs in the newJob (an update, not an erase). We need
-	    # to track this to know what's being removed, but we don't
-	    # need to cause them to be removed.
+            #
+            # fromUpdate is True if erasing this node reflects a trove being
+            # replaced by a different one in the Job (an update, not an erase)
+            # We need to track this to know what's being removed, but we don't
+            # need to cause them to be removed.
 	    nodeList = []
 	    nodeIdx = {}
 	    ERASE = 1
 	    KEEP = 2
 	    UNKNOWN = 3
 
-	    troveList = []
+	    collectionList = []
 
             # Make sure troves which the changeset thinks should be removed
             # get considered for removal. Ones which need to be removed
@@ -498,10 +499,14 @@ class ConaryClient:
                                 itertools.izip(eraseList, present)
                                 if isPresent ]
 
+            # Create the nodes for the graph, one for each trove being
+            # removed.
             for info, fromUpdate, state in oldTroves:
                 if info in nodeIdx:
                     # the node is marked to erase multiple times in
-                    # newJob! 
+                    # newJob! this can happen, for example, on 
+                    # "update +foo=2.0 -foo=1.0" (not to mention it
+                    # happening from complex, overlapping groups)
                     idx = nodeIdx[info]
                     otherState = nodeList[idx][1]
                     assert(state is UNKNOWN or otherState is UNKNOWN)
@@ -512,53 +517,53 @@ class ConaryClient:
                 nodeIdx[info] = len(nodeList)
                 nodeList.append([ info, state, [], fromUpdate ])
 
-		if info[0].startswith('fileset-') or info[0].find(":") != -1:
-		    trv = None
-		else:
+		if not info[0].startswith('fileset-') and \
+                            info[0].find(":") == -1:
 		    trv = self.db.getTrove(info[0], info[1], info[2], 
 					   pristine = False)
-		troveList.append((info, trv, None))
+                    collectionList.append((info, trv, None))
 
             del oldTroves, present, eraseList
 
-            # primary troves need to be set to force erase (which may
-            # not be done by the above logic!)
+            # primary troves need to be set to force erase
             for info in primaryErases:
                 nodeList[nodeIdx[info]][1] = ERASE
 
-	    while troveList:
-		info, trv, fromTrove = troveList.pop()
+            # If not recurse, don't bother with this loop (since the
+            # only point of it is to recurse). This loop recursively
+            # creates nodes for items which could be removed.
+	    while recurse and collectionList:
+		info, trv, fromTrove = collectionList.pop()
 
-		if info not in nodeIdx:
-		    nodeId = len(nodeList)
-		    nodeIdx[info] = nodeId
-		    nodeList.append([info, UNKNOWN, [], False])
-		else:
-		    nodeId = nodeIdx[info]
-
-		if not trv or not recurse:
-		    continue
+                nodeId = nodeIdx[info]
 
 		refTroveInfo = [ x for x in trv.iterTroveList() ]
 		present = self.db.hasTroves(refTroveInfo)
 		locked = self.db.trovesArePinned(refTroveInfo)
-		areContainers = [ not(x[0].startswith('fileset-') or 
+		areCollections = [ not(x[0].startswith('fileset-') or 
 				    x[0].find(":") != -1)
-				    for x in refTroveInfo ]
+				        for x in refTroveInfo ]
 
 		contList = []
 		for (subInfo, isPresent, isPinned, isContainer) in \
 			itertools.izip(refTroveInfo, present, locked, 
-				       areContainers):
+                                           areCollections):
 		    if not isPresent or isPinned: continue
-		    if not isContainer:
-			troveList.append((subInfo, None, nodeId))
-		    else:   
+
+                    if subInfo not in nodeIdx:
+                        nodeId = len(nodeList)
+                        nodeIdx[subInfo] = nodeId
+                        nodeList.append([subInfo, UNKNOWN, [], False])
+
+		    if isContainer:
 			contList.append(subInfo)
 
 		trvs = self.db.getTroves(contList, pristine = False)
-		troveList += [ (info, trv, nodeId) for info, trv in
+		collectionList += [ (info, trv, nodeId) for info, trv in
 				    itertools.izip(contList, trvs) ]
+                del contList
+
+            del collectionList
 
 	    needParents = [ (nodeId, info) for nodeId, (info, state, edges,
                                                         alreadyHandled)
