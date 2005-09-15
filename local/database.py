@@ -104,11 +104,19 @@ class UpdateJob:
     def getJobs(self):
         return self.jobs
 
+    def setPrimaryJobs(self, jobs):
+        assert(type(jobs) == set)
+        self.primaries = jobs
+
+    def getPrimaryJobs(self):
+        return self.primaries
+
     def __init__(self, db):
         self.jobs = []
         self.pinMapping = set()
         self.rollback = None
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
+        self.primaries = set()
 
 class SqlDbRepository(trovesource.SimpleTroveSource,
                       datastore.DataStoreRepository,
