@@ -462,7 +462,7 @@ class ConaryClient:
 
             return r
 
-	def _findErasures(primaryErases, newJob, referencedTroves, 
+	def _findErasures(primaryErases, origNewJob, referencedTroves, 
                           recurse):
 	    # each node is a ((name, version, flavor), state, edgeList
 	    #		       fromUpdate)
@@ -478,7 +478,7 @@ class ConaryClient:
 	    KEEP = 2
 	    UNKNOWN = 3
 
-	    collectionList = []
+            newJob = set(origNewJob)
 
             # Make sure troves which the changeset thinks should be removed
             # get considered for removal. Ones which need to be removed
@@ -517,59 +517,20 @@ class ConaryClient:
                 nodeIdx[info] = len(nodeList)
                 nodeList.append([ info, state, [], fromUpdate ])
 
-		if not info[0].startswith('fileset-') and \
-                            info[0].find(":") == -1:
-		    trv = self.db.getTrove(info[0], info[1], info[2], 
-					   pristine = False)
-                    collectionList.append((info, trv, None))
-
             del oldTroves, present, eraseList
 
             # primary troves need to be set to force erase
             for info in primaryErases:
                 nodeList[nodeIdx[info]][1] = ERASE
 
-            # If not recurse, don't bother with this loop (since the
-            # only point of it is to recurse). This loop recursively
-            # creates nodes for items which could be removed.
-	    while recurse and collectionList:
-		info, trv, fromTrove = collectionList.pop()
-
-                nodeId = nodeIdx[info]
-
-		refTroveInfo = [ x for x in trv.iterTroveList() ]
-		present = self.db.hasTroves(refTroveInfo)
-		locked = self.db.trovesArePinned(refTroveInfo)
-		areCollections = [ not(x[0].startswith('fileset-') or 
-				    x[0].find(":") != -1)
-				        for x in refTroveInfo ]
-
-		contList = []
-		for (subInfo, isPresent, isPinned, isContainer) in \
-			itertools.izip(refTroveInfo, present, locked, 
-                                           areCollections):
-		    if not isPresent or isPinned: continue
-
-                    if subInfo not in nodeIdx:
-                        nodeId = len(nodeList)
-                        nodeIdx[subInfo] = nodeId
-                        nodeList.append([subInfo, UNKNOWN, [], False])
-
-		    if isContainer:
-			contList.append(subInfo)
-
-		trvs = self.db.getTroves(contList, pristine = False)
-		collectionList += [ (info, trv, nodeId) for info, trv in
-				    itertools.izip(contList, trvs) ]
-                del contList
-
-            del collectionList
-
+            # For nodes which we haven't decided to erase, we need to track
+            # down all of the collections which include those troves.
 	    needParents = [ (nodeId, info) for nodeId, (info, state, edges,
                                                         alreadyHandled)
 				in enumerate(nodeList) if state == UNKNOWN ]
 	    while needParents:
-		containers = self.db.getTroveContainers(x[1] for x in needParents)
+		containers = self.db.getTroveContainers(
+                                        x[1] for x in needParents)
                 newNeedParents = []
 		for (nodeId, nodeInfo), containerList in \
 				itertools.izip(needParents, containers):
@@ -660,7 +621,7 @@ class ConaryClient:
                 item = (job[0], job[1][0], job[1][1])
 
                 erasePrimaryList.append(item)
-                newJob.add(job)
+                keepList.append(job)
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -699,6 +660,19 @@ class ConaryClient:
             # are sans files (for performance), so that's what we're left
             # with
             if trvName.startswith('fileset-') or trvName.find(":") != -1:
+                continue
+
+            if newVersion is None:
+                # handle erase recursion
+                trv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                          pristine = False)
+                refTroveInfo = [ x for x in trv.iterTroveList() ]
+		pinned = self.db.trovesArePinned(refTroveInfo)
+                for info, pinned in itertools.izip(refTroveInfo, pinned):
+                    if not pinned:
+                        keepList.append((info[0], (info[1], info[2]),
+                                         (None, None), False))
+
                 continue
 
             if oldVersion == newVersion and oldFlavor == newFlavor:
