@@ -1606,6 +1606,7 @@ class CacheSet:
 
     def createSchema(self, dbpath, schemaVersion):
 	self.db = sqlite3.connect(dbpath, timeout = 30000)
+        self.db._begin()
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
@@ -1617,10 +1618,16 @@ class CacheSet:
                 for (row,) in cu:
                     fn = self.filePattern % (self.tmpDir, row)
                     if os.path.exists(fn):
-                        os.unlink(fn)
+                        try:
+                            os.unlink(fn)
+                        except OSError:
+                            pass
 
                 self.db.close()
-                os.unlink(dbpath)
+                try:
+                    os.unlink(dbpath)
+                except OSError:
+                    pass
                 self.db = sqlite3.connect(dbpath, timeout = 30000)
                 tables = []
 
@@ -1649,7 +1656,7 @@ class CacheSet:
 
             cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
             cu.execute("INSERT INTO CacheVersion VALUES(?)", schemaVersion)
-            self.db.commit()
+        self.db.commit()
 
     def __init__(self, dbpath, tmpDir, schemaVersion):
 	self.tmpDir = tmpDir
