@@ -1,6 +1,8 @@
 Changes in 0.62.6:
   * mergeCollections() didn't always handle referenced troves changing
     byDefault status
+  * Various cleanups and simplifications have been made to the trove
+    removal determination
 
 Changes in 0.62.5:
   * Allow selection of individual troves from change set files via --from-file
