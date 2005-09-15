@@ -206,12 +206,60 @@ class ConaryClient:
             else:
                 return scoredList[-1][-1]
 
+        def _checkDeps(jobSet, trvSrc, findOrdering):
+            while True:
+                (depList, cannotResolve, changeSetList) = \
+                                self.db.depCheck(jobSet, uJob.getTroveSource(),
+                                                 findOrdering = findOrdering)
+
+                if not cannotResolve:
+                    return (depList, cannotResolve, changeSetList)
+
+                oldIdx = {}
+                for job in jobSet:
+                    if job[1][0] is not None and job[2][0] is not None:
+                        oldIdx[(job[0], job[1][0], job[1][1])] = job
+
+                restoreSet = set()
+
+                for (reqInfo, depSet, provInfoList) in cannotResolve:
+                    for provInfo in provInfoList:
+                        if provInfo not in oldIdx: continue
+
+                        job = oldIdx[provInfo]
+                        if job in restoreSet:
+                            break
+
+                        # if erasing this was a primary job, don't break
+                        # it up
+                        if (job[0], job[1], (None, None), False) in \
+                                uJob.getPrimaryJobs():
+                            continue
+
+                        oldTrv = self.db.getTrove(withFiles = False,
+                                                  *provInfo)
+                        newTrv = trvSrc.getTrove(job[0], job[2][0], job[2][1],
+                                                 withFiles = False)
+                            
+                        if oldTrv.getInstallBucket().compatibleWith(
+                                    newTrv.getInstallBucket()):
+
+                            restoreSet.add(job)
+                            break
+
+                if not restoreSet:
+                    return (depList, cannotResolve, changeSetList)
+
+                for job in restoreSet:
+                    jobSet.remove(job)
+                    jobSet.add((job[0], (None, None), job[2], False))
+
         # def _resolveDependencies() begins here
 
         pathIdx = 0
         (depList, cannotResolve, changeSetList) = \
-                        self.db.depCheck(jobSet, uJob.getTroveSource(),
-					 findOrdering = split)
+                    _checkDeps(jobSet, uJob.getTroveSource(),
+                               findOrdering = split)
         suggMap = {}
 
         if not resolveDeps:
@@ -258,15 +306,15 @@ class ConaryClient:
                 # we found good suggestions, merge in those troves
                 newJob = self._updateChangeSet(troves, uJob,
                                           keepExisting = False,
-                                          recurse = False)[0]
+                                          recurse = False,
+                                          asPrimary = False)[0]
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
                 lastCheck = depList
                 (depList, cannotResolve, changeSetList) = \
-                                self.db.depCheck(jobSet,
-                                                 uJob.getTroveSource(), 
-                                                 findOrdering = split)
+                            _checkDeps(jobSet, uJob.getTroveSource(),
+                                       findOrdering = split)
                 if lastCheck != depList:
                     pathIdx = 0
             else:
@@ -775,7 +823,7 @@ class ConaryClient:
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
-                         restrictToTroveSource = False):
+                         restrictToTroveSource = False, asPrimary = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -904,7 +952,6 @@ class ConaryClient:
                 else:
                     toFind[(troveName, newVersionStr, newFlavorStr)] \
                                     = oldTrove, isAbsolute
-
         results = {}
         if restrictToTroveSource:
             results.update(uJob.getTroveSource().findTroves(None, toFind))
@@ -981,9 +1028,10 @@ class ConaryClient:
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
         newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
                                          recurse, oldItems)
-
         if not newJob:
             raise NoNewTrovesError
+
+        uJob.setPrimaryJobs(jobSet)
 
         return newJob, splittable
 
@@ -1081,7 +1129,8 @@ class ConaryClient:
                                         updateMode = updateByDefault,
                                         sync = sync, 
                                         restrictToTroveSource = 
-                                            (len(fromChangesets) > 0) )
+                                            (len(fromChangesets) > 0),
+                                        asPrimary = True)
 
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
@@ -1102,6 +1151,7 @@ class ConaryClient:
         (depList, suggMap, cannotResolve, splitJob) = \
             self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps)
+
         if depList:
             raise DepResolutionFailure(depList)
         elif suggMap and not self.cfg.autoResolve:
