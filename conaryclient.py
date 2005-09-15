@@ -490,14 +490,10 @@ class ConaryClient:
                                 job in newJob
                                 if job[1][0] is not None and 
                                    job[2][0] is not None ]
-            eraseList = [ (job[0], job[1][0], job[1][1]) for
+            oldTroves += [ ((job[0], job[1][0], job[1][1]), False, UNKNOWN) for
                                 job in newJob
                                 if job[1][0] is not None and 
                                    job[2][0] is None ]
-            present = self.db.hasTroves(eraseList)
-            oldTroves += [ (info, False, UNKNOWN) for info, isPresent in
-                                itertools.izip(eraseList, present)
-                                if isPresent ]
 
             # Create the nodes for the graph, one for each trove being
             # removed.
@@ -517,9 +513,9 @@ class ConaryClient:
                 nodeIdx[info] = len(nodeList)
                 nodeList.append([ info, state, [], fromUpdate ])
 
-            del oldTroves, present, eraseList
+            del oldTroves
 
-            # primary troves need to be set to force erase
+            # Primary troves are always erased.
             for info in primaryErases:
                 nodeList[nodeIdx[info]][1] = ERASE
 
