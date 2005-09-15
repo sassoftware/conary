@@ -89,9 +89,6 @@ class InstallBucket(streams.StreamCollection):
         item.value.set(value)
         self.addStream(1, item)
 
-    def iter(self):
-        return self.iterAll()
-
     def keys(self):
         return [ x for x in self.iterkeys() ]
 
@@ -99,37 +96,50 @@ class InstallBucket(streams.StreamCollection):
         return self.iterkeys()
 
     def iterkeys(self):
-        for streamKey, bucket in self.iterAll():
+        for bucket in self.getStreams(1):
             yield bucket.key()
 
     def values(self):
         return [ x for x in self.itervalues() ]
 
     def itervalues(self):
-        for bucket in self.iterAll():
+        for bucket in self.getStreams(1):
             yield bucket.value()
 
     def items(self):
         return [ x for x in self.iteritems() ]
 
     def iteritems(self):
-        for streamKey, bucket in self.iterAll():
+        for bucket in self.getStreams(1):
             yield bucket.key(), bucket.value()
 
     def __getitem__(self, key):
-        for streamKey, bucket in self.iterall():
+        for bucket in self.getStreams(1):
             if bucket.key() == key:
                 return bucket.value()
 
         raise KeyError
 
     def __setitem__(self, key, value):
-        for streamKey, bucket in self.iterall():
+        for bucket in self.getStreams(1):
             if bucket.key() == key:
                 bucket.value.set(value)
                 return
 
         self.add(key, value)
+
+    def compatibleWith(self, other):
+        otherDict = dict(other)
+
+        for key, value in self.iteritems():
+            if otherDict.get(key, value) == value:
+                return False
+            del otherDict[key]
+
+        if otherDict:
+            return False
+
+        return True
 
 _DIGSIG_FINGERPRINT   = 0
 _DIGSIG_SIGNATURE     = 1
