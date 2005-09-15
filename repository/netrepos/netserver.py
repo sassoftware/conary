@@ -1541,6 +1541,10 @@ class CacheSet:
         oldFlavorId = 0
         newFlavorId = 0
 
+        # start a transaction now to avoid race conditions when getting
+        # or adding IDs for versions and flavors
+        self.db._begin()
+
         if oldVersion:
             oldVersionId = self.versions.get(oldVersion, None)
             if oldVersionId is None:
