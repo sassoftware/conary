@@ -1,3 +1,7 @@
+Changes in 0.62.6:
+  * mergeCollections() didn't always handle referenced troves changing
+    byDefault status
+
 Changes in 0.62.5:
   * Allow selection of individual troves from change set files via --from-file
   * Recursive queries on local database could get upset by a missing trove

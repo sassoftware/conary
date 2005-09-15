@@ -691,6 +691,9 @@ class Trove(streams.LargeStreamSet):
         # be inferred, but having to do so is dumb. This operation really
         # ought to work on two trove changesets. It works on the two other
         # troves (and calculates the rest) becaues of this flaw.
+        #import lib
+        #lib.epdb.st()
+
         primaryJob = diffJob(primaryDeriv)
         secondaryJob = diffJob(secondaryDeriv)
 
@@ -778,7 +781,10 @@ class Trove(streams.LargeStreamSet):
                 if oldOverlap is not None:
                     if oldOverlap[1][0] is not None:
                         del secondaryIndex[(oldOverlap[0], oldOverlap[1])]
-                    if oldOverlap[2][0] is not None:
+                    if oldOverlap[2][0] is not None and \
+                                oldOverlap[1][0] != oldOverlap[2][0]:
+                        # the overlaps are the same if only the byDefault
+                        # flag changed
                         del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
                     secondaryJob.remove(oldOverlap)
 
