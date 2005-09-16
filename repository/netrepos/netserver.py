@@ -421,35 +421,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if singleVersionSpec:
                 labelClause = """INNER JOIN Labels ON
                             Labels.labelId = NodeLabelMap.labelId AND
-                            Labels.label = '%s'
-                """ % singleVersionSpec
+                            Labels.label = '%s'""" % singleVersionSpec
             else:
                 labelClause = """INNER JOIN Labels ON
                             Labels.labelId = NodeLabelMap.labelId AND
-                            Labels.label = gtvlTbl.versionSpec
-                """
+                            Labels.label = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
                 labelClause = """INNER JOIN Branches ON
                             Branches.branchId = NodeLabelMap.branchId AND
-                            Branches.branch = '%s'
-                """ % singleVersionSpec
+                            Branches.branch = '%s'""" % singleVersionSpec
             else:
                 labelClause = """INNER JOIN Branches ON
                             Branches.branchId = NodeLabelMap.branchId AND
-                            Branches.branch = gtvlTbl.versionSpec
-                """
+                            Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
             if singleVersionSpec:
                 labelClause = """INNER JOIN Versions AS VrsnFilter ON
                             VrsnFilter.versionId = Instances.versionId AND
-                            VrsnFilter.version = '%s'
-                """ % singleVersionSpec
+                            VrsnFilter.version = '%s'""" % singleVersionSpec
             else:
                 labelClause = """INNER JOIN Versions AS VrsnFilter ON
                             VrsnFilter.versionId = Instances.versionId AND
-                            VrsnFilter.version = gtvlTbl.versionSpec
-                """
+                            VrsnFilter.version = gtvlTbl.versionSpec"""
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             labelClause = ""
@@ -466,21 +460,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       AND
                         Instances.versionId = Latest.versionId
                       AND
-                        Instances.flavorId = Latest.flavorId
-            """
+                        Instances.flavorId = Latest.flavorId"""
         else:
-            instanceClause = """INNER JOIN Latest ON
-                        Latest.itemId = Items.itemId
-                    INNER JOIN Instances ON 
-                        Instances.itemId = Items.itemId
-            """
+            instanceClause = """INNER JOIN Instances ON 
+                        Instances.itemId = Items.itemId"""
 
         if withFlavors:
             assert(withVersions)
             getList.append("InstFlavor.flavor")
             flavorClause = """INNER JOIN Flavors AS InstFlavor ON
-                        InstFlavor.flavorId = Instances.flavorId
-            """
+                        InstFlavor.flavorId = Instances.flavorId"""
         else:
             getList.append("NULL")
             flavorClause = ""
