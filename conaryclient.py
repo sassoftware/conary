@@ -658,19 +658,6 @@ class ConaryClient:
             if trvName.startswith('fileset-') or trvName.find(":") != -1:
                 continue
 
-            if newVersion is None:
-                # handle erase recursion
-                trv = self.db.getTrove(trvName, oldVersion, oldFlavor,
-                                          pristine = False)
-                refTroveInfo = [ x for x in trv.iterTroveList() ]
-		pinned = self.db.trovesArePinned(refTroveInfo)
-                for info, pinned in itertools.izip(refTroveInfo, pinned):
-                    if not pinned:
-                        keepList.append((info[0], (info[1], info[2]),
-                                         (None, None), False))
-
-                continue
-
             if oldVersion == newVersion and oldFlavor == newFlavor:
                 # We need to install something which is already installed.
                 # Needless to say, that's a bit silly. We don't need to
@@ -688,11 +675,20 @@ class ConaryClient:
 
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
-            newPristine = uJob.getTroveSource().getTrove(trvName, 
-                                                newVersion, newFlavor,
-                                                withFiles = False)
+            if newVersion is not None:
+                newPristine = uJob.getTroveSource().getTrove(trvName, 
+                                                    newVersion, newFlavor,
+                                                    withFiles = False)
 
-            if oldVersion is None:
+            if newVersion is None:
+                # handle erase recursion
+                oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                          pristine = False)
+                newTrv = trove.Trove(trvName, versions.NewVersion(), oldFlavor,
+                                     None)
+                finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+                del finalTrvCs
+            elif oldVersion is None:
                 # Read the comments at the top of _newBase if you hope
                 # to understand any of this.
                 (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
@@ -700,6 +696,7 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+                del finalTrvCs, localTrv
             else:
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                        pristine = True)
@@ -709,18 +706,18 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
+                del finalTrvCs, localTrv
 
             assert(not oldTrv.hasFiles())
-            assert(not localTrv.hasFiles())
             del oldTrv
             assert(not fileList)
-
-            del finalTrvCs
+            del fileList
 
             referencedTroves.update(x for x in newTrv.iterTroveList())
 
             alreadyInstalled = _alreadyInstalled(newTrv)
             locked = _lockedList(neededTroveList)
+
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
                     oldIsPinned in itertools.izip(neededTroveList, locked):
                 if (name, newVersion, newFlavor) not in alreadyInstalled:
