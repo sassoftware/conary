@@ -511,7 +511,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             else:
                 grouping = "GROUP BY instanceId, aclId"
 
-            getList.append("SUM(FlavorScores.value) as flavorScore")
+            # according to some SQL standard, the SUM in the case where all 
+            # values are NULL is NULL. So we use coalesce to change NULL to 0
+            getList.append("SUM(coalesce(FlavorScores.value, 0)) "
+                           "as flavorScore")
             flavorScoreCheck = "HAVING flavorScore > -500000"
         else:
             assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
