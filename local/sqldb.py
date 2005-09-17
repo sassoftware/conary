@@ -686,19 +686,21 @@ class Database:
                        version.asString(), flavor.freeze(),
                        start_transaction = False)
             count += 1
-        cu.execute("""SELECT pinned FROM tlList
-                            JOIN Instances ON
-                                Instances.troveName = tlList.name
-                            JOIN Versions ON
-                                Versions.version = tlList.version AND
-                                Instances.versionId = Versions.versionId
-                            JOIN Flavors ON
-                                (Flavors.flavor = tlList.flavor 
-                                    OR
-                                 Flavors.flavor is NULL and
-                                 tlList.flavor = '') AND
-                                Instances.flavorId = Flavors.flavorId
-                    """)
+        cu.execute("""
+select
+    pinned
+from
+    tlList, Instances, Versions, Flavors
+where
+        Instances.troveName = tlList.name
+    and Versions.version = tlList.version
+    and Instances.versionId = Versions.versionId
+    and (    Flavors.flavor = tlList.flavor
+          or Flavors.flavor is NULL and tlList.flavor = '' )
+    and Instances.flavorId = Flavors.flavorId
+order by
+    tlList.rowId asc
+""")
         results = [ x[0] for x in cu ]
         # make sure that we got the same number of results as our query
         assert(len(results) == count)
