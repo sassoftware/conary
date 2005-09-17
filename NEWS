@@ -1,6 +1,8 @@
 Changes in 0.62.7:
   * Removed some uneeded parts of the sql query in _getTroveList,
     improving performance.
+  * Speed up the default (and most used) case of the getAllTroveLeaves
+    by using a specialized query
 
 Changes in 0.62.6:
   * mergeCollections() didn't always handle referenced troves changing

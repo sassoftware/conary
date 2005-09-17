@@ -689,11 +689,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def troveNames(self, authToken, clientVersion, labelStr):
         if labelStr is None:    
             return {}
-        username = authToken[0]
-        cu = self.db.cursor()
         # authenticate this user first
         if not self.auth.check(authToken):
             return {}
+        username = authToken[0]
+        cu = self.db.cursor()
         # now get them troves
         query = """
         select distinct
@@ -752,17 +752,71 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for name, flavors in troveSpecs.iteritems():
             if len(name) == 0:
                 name = None
-
             if type(flavors) is list:
                 troveFilter[name] = { None : flavors }
             else:
                 troveFilter[name] = { None : None }
-            
-        return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withVersions = True, 
-                                  latestFilter = self._GET_TROVE_VERY_LATEST,
-                                  withFlavors = True)
+        # dispatch the more complex version to the old getTroveList
+        if not troveSpecs == { '' : True }:
+            return self._getTroveList(authToken, clientVersion, troveFilter,
+                                      withVersions = True, 
+                                      latestFilter = self._GET_TROVE_VERY_LATEST,
+                                      withFlavors = True)
+        # faster version for the "get-all" case
+        # authenticate this user first
+        if not self.auth.check(authToken):
+            return {}
+        username = authToken[0]
+        query = """
+        select
+            Items.item as trove, 
+            Versions.version as version,
+            Flavors.flavor as flavor,
+            Nodes.timeStamps as timeStamps,
+            UP.pattern as pattern
+        from
+            ( select
+                Permissions.labelId as labelId,
+                PerItems.item as pattern
+            from
+                Users
+                join UserGroupMembers using(userId)
+                join Permissions using(userGroupId)
+                join Items as PerItems using (itemId)
+            where
+                Users.user = ?
+            ) as UP
+            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+            join Latest using (itemId, branchId)
+            join Nodes using (itemId, branchId, versionId)
+            join Items using (itemId),
+            Flavors, Versions
+        where
+                Latest.flavorId = Flavors.flavorId
+            and Latest.versionId = Versions.versionId
+            """
+        cu = self.db.cursor()
+        cu.execute(query, [username,])
+        ret = {}
+        for (trove, version, flavor, timeStamps, pattern) in cu:      
+            if not self.auth.checkTrove(pattern, trove):
+                continue
+            # NOTE: this is the "safe' way of doing it. It is very, very slow.
+            # version = versions.VersionFromString(version)
+            # version.setTimeStamps([float(x) for x in timeStamps.split(":")])
+            # version = self.freezeVersion(version)
 
+            # FIXME: prolly should use some standard thaw/freeze calls instead of
+            # hardcoding the "%.3f" format. One day I'll learn about all these calls.
+            version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
+                                                      for x in timeStamps.split(":") ])
+            if flavor is None:
+                flavor = "none"
+            retname = ret.setdefault(trove, {})
+            flist = retname.setdefault(version, [])
+            flist.append(flavor)
+        return ret
+        
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs, 
                               bestFlavor, versionType, latestFilter):
         hasFlavors = False
