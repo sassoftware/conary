@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents changemail changemail.py commitaction
+extra_dist = Makefile rpm2cpio convertcontents changemail changemail.py commitaction
 
 dist_files = $(python_files) $(extra_dist)
 
@@ -24,8 +24,6 @@ install:
 	# see conary-wrapper symlink in ../Makefile to make scripts
 	# available in $(bindir)
 	install -m 755 rpm2cpio $(DESTDIR)$(conarydir)
-	install -m 755 yuck $(DESTDIR)$(conarydir)
-	install -m 644 yuck.1 $(DESTDIR)$(mandir)/man1
 	install -m 755 convertcontents $(DESTDIR)$(conarydir)
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
