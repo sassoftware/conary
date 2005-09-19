@@ -7,7 +7,7 @@ Changes in 0.62.7:
   * Exception handling in the repository when revoked or expired keys
     are used has been corrected.
   * Signature checking now correctly checks the timestamp of the signature
-    against the revocation time (if any) of the key that signed it.  If
+    against the expiration time (if any) of the key that signed it.  If
     the signature timestamp is later than the expiration timestamp,
     the signature is rejected.
 
