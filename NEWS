@@ -10,6 +10,8 @@ Changes in 0.62.7:
     against the expiration time (if any) of the key that signed it.  If
     the signature timestamp is later than the expiration timestamp,
     the signature is rejected.
+  * Pass 'Database is locked' repository errors to the client as a
+    RepositoryLocked exception notifying user that the server is busy.
 
 Changes in 0.62.6:
   * mergeCollections() didn't always handle referenced troves changing
