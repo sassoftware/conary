@@ -24,6 +24,8 @@ import sha
 import tempfile
 import trove
 from lib import util
+from lib import openpgpkey
+from lib import openpgpfile
 import versions
 
 import filecontents
@@ -370,18 +372,19 @@ class ChangeSetJob:
                                           precompressed = precompressed)
 
     def checkTroveSignatures(self, trv):
-        from lib.openpgpkey import getKeyCache
-        from lib.openpgpfile import KeyNotFound
-        keyCache = getKeyCache()
+        keyCache = openpgpkey.getKeyCache()
         for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
             pubKey = keyCache.getPublicKey(fingerprint)
             if pubKey.isRevoked():
-                raise IncompatibleKey('Key %s is revoked'% pubKey.getFingerprint())
+                raise openpgpfile.IncompatibleKey('Key %s is revoked'
+                                                  %pubKey.getFingerprint())
             if pubKey.getTimestamp():
-                raise IncompatibleKey('Key %s is expired'% pubKey.getFingerprint())
+                raise openpgpfile.IncompatibleKey('Key %s is expired'
+                                                  %pubKey.getFingerprint())
         res = trv.verifyDigitalSignatures()
         if len(res[1]):
-            raise KeyNotFound('Repository does not recognize key: %s'% res[1][0])
+            raise openpgpfile.KeyNotFound('Repository does not recognize '
+                                          'key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False):
