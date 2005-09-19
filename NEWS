@@ -1,5 +1,5 @@
 Changes in 0.62.7:
-  * Some uneeded parts of the sql query in _getTroveList have been removed,
+  * Some unneeded parts of the sql query in _getTroveList have been removed,
     improving performance.
   * The performance of the default (and most used) case of the
     getAllTroveLeaves has been increased up by using a specialized
@@ -12,6 +12,7 @@ Changes in 0.62.7:
     the signature is rejected.
   * Pass 'Database is locked' repository errors to the client as a
     RepositoryLocked exception notifying user that the server is busy.
+  * The 'yuck' script is no longer installed.
 
 Changes in 0.62.6:
   * mergeCollections() didn't always handle referenced troves changing
