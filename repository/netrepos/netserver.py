@@ -154,6 +154,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except IncompatibleKey, e:
             condRollback()
             return (True, ('IncompatibleKey', str(e)))
+        except sqlite3.InternalError, e:
+            condRollback()
+            if str(e) == 'database is locked':
+                return (True, ('RepositoryLocked', ))
+            raise
 	except Exception, e:
             condRollback()
             raise 

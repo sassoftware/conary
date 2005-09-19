@@ -612,6 +612,10 @@ class MethodNotSupported(RepositoryError):
 class TroveNotFound(Exception):
     """Raised when findTrove failes"""
 
+class RepositoryLocked(RepositoryError):
+    def __str__(self):
+        return 'The repository is currently busy.  Try again in a few moments.'
+
 class OpenError(RepositoryError):
     """Error occured opening the repository"""
 

@@ -409,6 +409,8 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except repository.repository.TroveMissing, e:
         print >> sys.stderr, str(e)
+    except repository.repository.RepositoryLocked, e:
+        print >> sys.stderr, str(e)
     except database.OpenError, e:
         print >> sys.stderr, str(e)
     except repository.repository.OpenError, e:

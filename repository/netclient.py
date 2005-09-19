@@ -111,6 +111,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise openpgpfile.BadSelfSignature(exceptionArgs)
         elif exceptionName == 'IncompatibleKey':
             raise openpgpfile.IncompatibleKey(exceptionArgs)
+        elif exceptionName == 'RepositoryLocked':
+            raise repository.RepositoryLocked(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
