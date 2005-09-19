@@ -378,7 +378,8 @@ class ChangeSetJob:
             if pubKey.isRevoked():
                 raise openpgpfile.IncompatibleKey('Key %s is revoked'
                                                   %pubKey.getFingerprint())
-            if pubKey.getTimestamp():
+            revocationTime = pubKey.getTimestamp()
+            if revocationTime and revocationTime < timestamp:
                 raise openpgpfile.IncompatibleKey('Key %s is expired'
                                                   %pubKey.getFingerprint())
         res = trv.verifyDigitalSignatures()
