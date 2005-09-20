@@ -16,7 +16,7 @@
 
 from deps import deps
 import os
-from lib import util, stackutil, log
+from lib import util, stackutil, log, openpgpfile
 from netauth import NetworkAuthorization
 import repository
 import repository.netclient
@@ -108,6 +108,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True)
+        except openpgpfile.KeyNotFound:
+            # don't be quite so noisy, this is a common error
+            self.troveStore.rollback()
+            raise
         except:
             print >> sys.stderr, "exception occurred while committing change set"
             stackutil.printTraceBack()
