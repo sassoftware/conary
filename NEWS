@@ -13,6 +13,11 @@ Changes in 0.62.7:
   * Pass 'Database is locked' repository errors to the client as a
     RepositoryLocked exception notifying user that the server is busy.
   * The 'yuck' script is no longer installed.
+  * ComponentRequires now makes :runtime, :lib, :devellib, and :devel
+    components all require their matching :config component if the
+    :config component exists.  The :config component is not automatically
+    created, but when it exists, it's always going to be because it
+    is required by multiple other components.
 
 Changes in 0.62.6:
   * mergeCollections() didn't always handle referenced troves changing
