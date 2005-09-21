@@ -1,3 +1,7 @@
+Changes in 0.62.8:
+  * EnforceSonameBuildRequirements enhanced to use the system database to
+    find the right missing build requirements.
+
 Changes in 0.62.7:
   * Some unneeded parts of the sql query in _getTroveList have been removed,
     improving performance.

@@ -1924,9 +1924,15 @@ class EnforceSonameBuildRequirements(policy.Policy):
     Test to make sure that each requires dependency in the package
     is matched by a suitable element in the C{buildRequires} list.
     """
-    # XXX implement exceptions?  if so, regexps for str(dep) form
+    # FIXME implement exceptions before turning this from a warning
+    # to an error; they should be regexps that are compared to str(dep)
     def do(self):
         missingBuildRequires = []
+        # right now we do not enforce branches.  This could be
+        # done with more work.  There is no way I know of to
+        # enforce flavors, so we just remove them from the spec.
+        truncatedBuildRequires = [ x.split('=')[0].split('[')[0] for
+            x in self.recipe.buildRequires]
 
 	components = self.recipe.autopkg.components
         pathMap = self.recipe.autopkg.pathMap
@@ -1953,19 +1959,34 @@ class EnforceSonameBuildRequirements(policy.Policy):
         db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
         localProvides = db.getTrovesWithProvides(depSetList)
 
+        def providesNames(libname):
+            # Instead of requiring the :lib component that satisfies
+            # the dependency, our first choice, if possible, is to
+            # require :devel, because that would include header files;
+            # if it does not exist, then :devellib for a soname link;
+            # finally if neither of those exists, then :lib (though
+            # that is a degenerate case).
+            return [name.replace(':lib', ':devel'),
+                    name.replace(':lib', ':devellib'),
+                    name]
+            
         for dep in localProvides:
-            develCandidates = [
-                x[0].replace(':lib', ':devel')
-                for x in localProvides[dep] if x[0].endswith(':lib') ]
-            if [ x for x in develCandidates
-                 if x not in self.recipe.buildRequires and
-                    x.replace(':devel', ':devellib')
-                    not in self.recipe.buildRequires ] :
-                # We have at least one file that uses a library that
+            provideNameList = [x[0] for x in localProvides[dep]]
+            # normally, there is only one name in provideNameList
+
+            foundCandidates = []
+            for name in provideNameList:
+                for candidate in providesNames(name):
+                    if db.hasTroveByName(candidate):
+                        foundCandidates.append(candidate)
+                        break
+
+            if [ x for x in foundCandidates if x not in truncatedBuildRequires ]: 
+                # We have at least one file that uses this library that
                 # is not reflected in the buildRequires list.  Add all
                 # the candidates to the summary message that will be
                 # printed last (it's normally all you need)
-                missingBuildRequires.extend(develCandidates)
+                missingBuildRequires.extend(foundCandidates)
 
                 # Now give lots of specific information to help the packager
                 # in case things do not look so obvious...
@@ -1979,7 +2000,7 @@ class EnforceSonameBuildRequirements(policy.Policy):
                 if pathList:
                     self.warn('buildRequires %s needed to satisfy "%s"'
                               ' for files: %s'
-                              %(str(develCandidates), str(dep),
+                              %(str(foundCandidates), str(dep),
                                 ', '.join(sorted(pathList))))
 
         if pathReqMap:
