@@ -1,6 +1,8 @@
 Changes in 0.62.8:
   * EnforceSonameBuildRequirements enhanced to use the system database to
     find the right missing build requirements.
+  * Make users and groups in a repository such that they may not differ only
+    in case, i.e. if user foo exists, user Foo cannot register.
 
 Changes in 0.62.7:
   * Some unneeded parts of the sql query in _getTroveList have been removed,
