@@ -1112,8 +1112,11 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
-    nonCfgExt = ('ps', 'eps', 'gif', 'png', 'tiff', 'jpeg', 'jpg',
-	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2', 'zip')
+
+    nonCfgExt = ('bz2', 'ccs', 'eps', 'gif', 'gz', 'ico', 'jpeg',
+                 'jpg', 'png', 'ps', 'rpm', 'tbz', 'tbz2', 'tgz',
+                 'tiff', 'ttf', 'zip')
+
     isSrcTrove = curTrove.getName().endswith(':source')
 
     srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
