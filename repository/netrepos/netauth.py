@@ -207,6 +207,31 @@ class NetworkAuthorization:
         cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
         self.db.commit()
 
+    def _uniqueUser(self, cu, user):
+        """
+        Returns True if the username is unique.  Raises UserAlreadyExists
+        if it is not unique
+        """
+        cu.execute("""
+            SELECT COUNT(userId)
+            FROM Users WHERE LOWER(User)=LOWER(?)
+        """, user)
+        if cu.next()[0]:
+            raise UserAlreadyExists, 'user: %s' % user
+        return True
+
+    def _uniqueUserGroup(self, cu, usergroup):
+        """
+        Returns True if the username is unique.  Raises UserAlreadyExists
+        if it is not unique
+        """
+        cu.execute("""
+            SELECT COUNT(userGroupId)
+            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
+        """, usergroup)
+        if cu.next()[0]:
+            raise GroupAlreadyExists, 'usergroup: %s' % usergroup
+        return True
 
     def addUser(self, user, password):
         salt = os.urandom(4)
@@ -224,6 +249,11 @@ class NetworkAuthorization:
         #userGroupId can be in sync.  This will leave lots of holes, and
         #will probably need to be changed if conary moves to another db.
         cu = self.db.cursor()
+
+        #Check to make sure the user is unique in both the user and UserGroup
+        #tables
+        self._uniqueUserGroup(cu, user)
+        self._uniqueUser(cu, user)
 
         try:
             cu.execute("""INSERT INTO UserGroups 
@@ -401,13 +431,27 @@ class NetworkAuthorization:
 
     def addGroup(self, userGroupName):
         cu = self.db.cursor()
-    
-        cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
+
+        #Check to make sure the group is unique
+        self._uniqueUserGroup(cu, userGroupName)
+
+        try:
+            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
+        except sqlite3.ProgrammingError, e:
+            self.db.rollback()
+            if str(e) == 'column userGroup is not unique':
+                raise GroupAlreadyExists, "group: %s" % userGroupName
+            raise
+
         self.db.commit()
         return cu.lastrowid
 
     def renameGroup(self, userGroupId, userGroupName):
         cu = self.db.cursor()
+
+        #Check to make sure the group is unique
+        self._uniqueUserGroup(cu, userGroupName)
+
         try:
             cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
         except sqlite3.ProgrammingError, e:

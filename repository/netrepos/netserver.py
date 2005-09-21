@@ -1091,6 +1091,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
     def commitChangeSet(self, authToken, clientVersion, url):
+        print >>sys.stderr, url, self.urlBase()
+        sys.stderr.flush()
 	assert(url.startswith(self.urlBase()))
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
