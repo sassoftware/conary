@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <html xmlns:py="http://purl.org/kid/ns#" xmlns="http://www.w3.org/1999/xhtml">
 <!--
- Copyright (c) 2005 rpath, Inc.
+ Copyright (c) 2005 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -30,7 +30,7 @@
             <hr />
             <span class="copyright">
                 <b>Conary Repository Server</b>
-                Copyright &#169; 2005 <a href="http://www.rpath.com/">rpath, Inc.</a>
+                Copyright &#169; 2005 <a href="http://www.rpath.com/">rPath, Inc.</a>
             </span>
         </div>
     </body>
