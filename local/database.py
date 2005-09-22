@@ -711,6 +711,35 @@ class Database(SqlDbRepository):
            troves that provide each dependency set listed.
         """
         return self.db.getTrovesWithProvides(depSetList)
+
+    def getTransitiveProvidesClosure(self, depSetList):
+        """
+        Returns a dict { depSet : [troveTup, troveTup] } of local
+        troves satisfying each dependencyset in depSetList, and
+        all depSets provided by runtime requirements of any
+        troves in the set, with dependency closure.
+        """
+        closureDepDict = {}
+        closureTupSet = set()
+        def recurseOne(depSetList):
+            d = self.getTrovesWithProvides(depSetList)
+            # look only at new depSets from this iteration
+            s = set(depSet for depSet in d if depSet not in closureDepDict)
+            closureDepDict.update(d)
+
+            # flatten list of all new troveTups for fastest lookup
+            troveTupSet = set()
+            for depSet in s:
+                # look only at new troveTups from this iteration
+                troveTupSet.update(d[depSet])
+                newTupList = list(troveTupSet - closureTupSet)
+                closureTupSet.update(troveTupSet)
+                # now look up the requirements for these troves, and recurse
+                newDepSetList = [trove.getRequires()
+                    for trove in self.getTroves(newTupList)]
+                recurseOne(newDepSetList)
+        recurseOne(depSetList)
+        return closureDepDict
     
     def __init__(self, root, path):
 	self.root = root

@@ -3,6 +3,14 @@ Changes in 0.62.8:
     find the right missing build requirements.
   * Make users and groups in a repository such that they may not differ only
     in case, i.e. if user foo exists, user Foo cannot be created.
+  * EnforceConfigLogBuildRequirements policy added.  It looks through
+    all config.log files anywhere under the build directory for programs
+    that configure has found, and ensures that the transitive closure
+    of the build requirements contains each file listed.  (That is, if
+    the file /usr/bin/perl has been found, and gettext:runtime is in
+    the buildRequires list, and gettext:runtime requires perl, then the
+    requirement is satisfied.)  This policy currently produces many false
+    positives; it needs improvement.
 
 Changes in 0.62.7:
   * Some unneeded parts of the sql query in _getTroveList have been removed,

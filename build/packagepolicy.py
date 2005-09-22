@@ -1926,6 +1926,8 @@ class EnforceSonameBuildRequirements(policy.Policy):
     """
     # FIXME implement exceptions before turning this from a warning
     # to an error; they should be regexps that are compared to str(dep)
+    # or possibly two variants, one for str(dep) and one for trove
+    # names
     def do(self):
         missingBuildRequires = []
         # right now we do not enforce branches.  This could be
@@ -2021,6 +2023,77 @@ class EnforceSonameBuildRequirements(policy.Policy):
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
 
 
+class EnforceConfigLogBuildRequirements(policy.Policy):
+    """
+    This class looks through the builddir for config.log files, and looks
+    in them for mention of files that configure found on the system, and
+    makes sure that the components that contain them are listed as
+    build requirements.
+    """
+    rootdir = '%(builddir)s'
+    invariantinclusions = [ '/config.log', ]
+    # FIXME: blacklist items should be conditional on some other tests
+    blacklist = [
+        # many configure scripts check for g77 but never use it
+        # FIXME: needs to be conditional on no fortran libraries or source code
+        '%(bindir)s/g77',
+        # many configure scripts check for makedepend but never use it
+        '%(prefix)s/X11R6/bin/makedepend',
+    ]
+
+    # FIXME: handle exceptions
+
+    def preProcess(self):
+        self.foundRe = re.compile('^[^ ]+: found (/([^ ]+)?bin/[^ ]+)\n$')
+        self.blacklist = [ x % self.macros for x in self.blacklist ]
+        self.foundPaths = set()
+
+    def foundPath(self, line):
+        match = self.foundRe.match(line)
+        if match:
+            return match.group(1)
+        return False
+
+    def doFile(self, path):
+        fullpath = self.macros.builddir + path
+        # iterator to avoid reading in the whole file at once;
+        # nested iterators to avoid matching regexp twice
+        self.foundPaths.update(path for path in 
+           (self.foundPath(line) for line in file(fullpath)) if path)
+
+    def postProcess(self):
+        # first, get all the trove names in the transitive buildRequires
+        # runtime dependency closure
+        db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
+        transitiveBuildRequires = set(
+            self.recipe.buildReqMap[spec].getName()
+            for spec in self.recipe.buildRequires)
+        depSetList = [self.recipe.buildReqMap[spec].getRequires()
+                      for spec in self.recipe.buildRequires]
+        d = db.getTransitiveProvidesClosure(depSetList)
+        for depSet in d:
+            transitiveBuildRequires.update(set(tup[0] for tup in d[depSet]))
+
+        # next, for each file found, report if it is not in the
+        # transitive closure of runtime requirements of buildRequires
+        fileReqs = set()
+        for path in sorted(self.foundPaths):
+            thisFileReqs = set(trove.getName()
+                               for trove in db.iterTrovesByPath(path))
+            missingReqs = thisFileReqs - transitiveBuildRequires
+            if missingReqs:
+                self.info('path %s suggests buildRequires: %s',
+                          path, ', '.join((sorted(list(missingReqs)))))
+            fileReqs.update(thisFileReqs)
+
+        # finally, give the coalesced suggestion for cut and paste
+        # into the recipe if all the individual messages make sense
+        missingReqs = fileReqs - transitiveBuildRequires
+        if missingReqs:
+            self.info('Possibly add to buildRequires: %s',
+                      str(sorted(list(missingReqs))))
+
+
 class reportErrors(policy.Policy):
     """
     This class is used to pull together all package errors in the
@@ -2096,6 +2169,7 @@ def DefaultPolicy(recipe):
 	Provides(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
+        EnforceConfigLogBuildRequirements(recipe),
 	reportErrors(recipe),
     ]
 
