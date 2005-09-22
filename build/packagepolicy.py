@@ -2206,7 +2206,8 @@ def DefaultPolicy(recipe):
 	Provides(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
-        EnforceConfigLogBuildRequirements(recipe),
+# FIXME: enable this one it has been tested
+#        EnforceConfigLogBuildRequirements(recipe),
 	reportErrors(recipe),
     ]
 
