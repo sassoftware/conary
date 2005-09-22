@@ -1977,26 +1977,26 @@ class RedirectRecipe(Recipe):
             topFlavor = topLevelTrove.getFlavor()
             fromName = packageSet[(topName, topVersion, topFlavor)]
 
-            d = self.redirections.setdefault(fromName, {})
+            d = self.redirections.setdefault(fromName, set())
 
             # this redirects from oldTrove -> newTrove
-            d[(topName, topVersion, topFlavor)] = True
+            d.add((topName, topVersion, topFlavor))
 
             for (name, version, flavor) in topLevelTrove.iterTroveList():
                 # redirect from oldTrove -> referencedPackage
-                d[(name, version, flavor)] = True
+                d.add((name, version, flavor))
 
                 if name.find(":") != -1:
                     compName = fromName + ":" + name.split(":")[1]
                     # redirect from oldTrove -> oldTrove:component. we
                     # leave version/flavor alone; they get filled in later
-                    d[(compName, None, None)] = True
+                    d.add((compName, None, None))
 
                     # redirect from oldTrove:component -> newTrove:component
-                    d2 = self.redirections.setdefault(compName, {})
-                    d2[(name, version, flavor)] = True
+                    d2 = self.redirections.setdefault(compName, set())
+                    d2.add((name, version, flavor))
 
-        for name,d  in redirections.iteritems():
+        for name,d  in redirections:
             self.redirections[name] = [ (x[0], x[1], x[2]) for x in d ]
 
     def getRedirections(self):
