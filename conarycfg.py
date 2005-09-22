@@ -336,7 +336,7 @@ class ConaryConfiguration(ConfigFile):
                                                   '/etc/conary/distro/arch',
                                                   '~/.conary/arch')],
         'quiet'                 : [ BOOL, False ],
-        'signatureKey'          : [ FINGERPRINT, ''],
+        'signatureKey'          : [ FINGERPRINT, None],
         'trustThreshold'        : [ INT, 0],
     }
 
