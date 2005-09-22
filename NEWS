@@ -10,7 +10,8 @@ Changes in 0.62.8:
     the file /usr/bin/perl has been found, and gettext:runtime is in
     the buildRequires list, and gettext:runtime requires perl, then the
     requirement is satisfied.)  This policy currently produces many false
-    positives; it needs improvement.
+    positives; the "greylist" that tries to remove false positives needs
+    to be expanded.
   * files in /usr/%(lib)s/python/.* are no longer automatically given an 
     architecture flavor - if there are architecture-specific files in those 
     dirs, they should result in an arch-specific flavor through normal
