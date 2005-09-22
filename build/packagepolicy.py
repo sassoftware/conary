@@ -2102,9 +2102,11 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
         transitiveBuildRequires = set(
             self.recipe.buildReqMap[spec].getName()
-            for spec in self.recipe.buildRequires)
-        depSetList = [self.recipe.buildReqMap[spec].getRequires()
-                      for spec in self.recipe.buildRequires]
+            for spec in self.recipe.buildRequires
+            if spec in self.recipe.buildReqMap)
+        depSetList = [ self.recipe.buildReqMap[spec].getRequires()
+                       for spec in self.recipe.buildRequires
+                       if spec in self.recipe.buildReqMap ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
             transitiveBuildRequires.update(set(tup[0] for tup in d[depSet]))
