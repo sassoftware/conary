@@ -45,13 +45,14 @@ def checkAuth(write = False, admin = False):
         def wrapper(self, **kwargs):
             # XXX two xmlrpc calls here could possibly be condensed to one
             # first check the password only
-            if not self.repServer.auth.check(self.authToken):
+            if not self.repos.getUserGroups(self.serverName):
                 raise InvalidPassword
             # now check for proper permissions
-            if not self.repServer.auth.check(self.authToken, write=write, admin=admin):
-                raise netserver.InsufficientPermission
-            else:
-                return func(self, **kwargs)
+            if write or admin:
+                if not self.repServer.auth.check(self.authToken, write=write, admin=admin):
+                    raise netserver.InsufficientPermission
+
+            return func(self, **kwargs)
         return wrapper
     return deco
 
