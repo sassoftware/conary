@@ -2033,21 +2033,30 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
     build requirements.
     """
     rootdir = '%(builddir)s'
-    invariantinclusions = [ '/config.log', ]
-    # FIXME: blacklist items should be conditional on some other tests
+    invariantinclusions = [ '.*/config.log', ]
+    # list of regular expressions (using macros) that unconditionally
+    # cause an entry to be ignored
     blacklist = [
-        # many configure scripts check for g77 but never use it
-        # FIXME: needs to be conditional on no fortran libraries or source code
-        '%(bindir)s/g77',
-        # many configure scripts check for makedepend but never use it
-        '%(prefix)s/X11R6/bin/makedepend',
+    ]
+    # list of regular expressions (using macros) that cause an
+    # entry to be ignored unless it is found elsewhere
+    greylist = [
+        # config.log string, configure.am re, configure.in re
+        # FIXME: need to test these regular expressions for false negatives
+        ('%(prefix)s/X11R6/bin/makedepend', '.*makedepend', '.*makedepend'),
+        ('%(bindir)s/g77', '.*g77', '.*g77'),
     ]
 
     # FIXME: handle exceptions
 
     def preProcess(self):
         self.foundRe = re.compile('^[^ ]+: found (/([^ ]+)?bin/[^ ]+)\n$')
-        self.blacklist = [ x % self.macros for x in self.blacklist ]
+        self.blacklist = set(x % self.macros for x in self.blacklist)
+        self.greydict = {}
+        for greyTup in self.greylist:
+            self.greydict[greyTup[0] % self.macros] = (
+                re.compile(greyTup[1] % self.macros),
+                re.compile(greyTup[2] % self.macros))
         self.foundPaths = set()
 
     def foundPath(self, line):
@@ -2060,8 +2069,30 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         fullpath = self.macros.builddir + path
         # iterator to avoid reading in the whole file at once;
         # nested iterators to avoid matching regexp twice
-        self.foundPaths.update(path for path in 
+        foundPaths = set(path for path in 
            (self.foundPath(line) for line in file(fullpath)) if path)
+        # now remove false positives using the greylist
+        for foundPath in foundPaths:
+            if foundPath in self.greydict:
+                cam = fullpath.replace('config.log', 'configure.am')
+                if os.path.exists(cam):
+                    cam = file(cam)
+                else:
+                    cam = []
+                cin = fullpath.replace('config.log', 'configure.in')
+                if os.path.exists(cin):
+                    cin = file(cin)
+                else:
+                    cin = []
+                reCam, reCin = self.greydict[foundPath]
+                if not ((line for line in cam if reCam.match(line)) or
+                        (line for line in cin if reCin.match(line))):
+                    # greylist entry has no match, so this is a false
+                    # positive and needs to be removed from the set
+                    foundPaths -= set(path)
+            if foundPath in self.blacklist:
+                foundPaths -= set(path)
+        self.foundPaths.update(foundPaths)
 
     def postProcess(self):
         # first, get all the trove names in the transitive buildRequires
