@@ -77,7 +77,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             # only print the header if we are going to print some more
             # information or it is a primary trove in the changeset
             if (((troveName, newVer, newFla) in cs.primaryTroveList) 
-                  or trove.newFiles or trove.changedFiles):
+                or trove.newFiles or trove.changedFiles or trove.troves):
                 displayTroveHeader(cs, troveName, newVer, newFla, oldVer, 
                                    oldFla, indent, displayC, fullVersions)
             else:
