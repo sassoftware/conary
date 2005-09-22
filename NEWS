@@ -1,4 +1,6 @@
 Changes in 0.62.8:
+  * The bug, introduced in 0.62.7, that caused Conary to stop short of
+    recursing to the innermost troves when handling erasures has been fixed.
   * EnforceSonameBuildRequirements enhanced to use the system database to
     find the right missing build requirements.
   * Make users and groups in a repository such that they may not differ only
