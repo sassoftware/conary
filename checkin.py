@@ -530,7 +530,7 @@ def commit(repos, cfg, message, callback=None):
 	return
 
     newState.changeChangeLog(cl)
-    if cfg.signatureKey:
+    if cfg.signatureKey is not None:
         # skip integrity checks since we just want to compute the
         # new sha1 with all our changes accounted for
         newState.addDigitalSignature(cfg.signatureKey,

@@ -43,6 +43,10 @@ def signTroves(cfg, specStrList, callback = 0):
     import urllib
     from lib.openpgpfile import KeyNotFound
 
+    if cfg.signatureKey is None:
+        print "No signature key is set in configuration"
+        return
+
     troves = ""
     repos = NetworkRepositoryClient(cfg.repositoryMap)
     if not callback:
@@ -66,6 +70,7 @@ def signTroves(cfg, specStrList, callback = 0):
     if cfg.quiet:
         answer = "Y"
     else:
+        # FIXME: make this a callback
         print troves
         print "Are you sure you want to digitally sign these troves [y/N]?"
         answer = sys.stdin.readline()
