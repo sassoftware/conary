@@ -727,11 +727,9 @@ class ConaryClient:
                                                 (oldVersion, oldFlavor),
                                                 (newVersion, newFlavor))
                     elif newVersion is None:
-                        job = (name, (oldVersion, oldFlavor),
-                                     (None, None), False)
-                        newJob.add(job)
                         # add this job to the keeplist to do erase recursion
-                        keepList.append(job)
+                        keepList.append((name, (oldVersion, oldFlavor),
+                                               (None, None), False))
                     else:
                         if oldVersion is None and job[1][0] is None:
                             # this is absolute if the original job for the
