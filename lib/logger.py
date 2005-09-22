@@ -54,10 +54,12 @@ class Logger:
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         pid = os.fork()
         if pid:
-            # make parent process slave -- this allows us to 
-            # restore the logged process and have the child logging process.
-            # this would be difficult if the parent process were doing
-            # the logging as would be done with pty.fork()
+            # make parent process the pty slave - the opposite of 
+            # pty.fork().  In this setup, the parent process continues
+            # to act normally, while the child process performs the 
+            # logging.  This makes it simple to kill the logging process
+            # when we are done with it and restore the parent process to 
+            # normal, unlogged operation.
             os.close(directRd)
             os.close(masterFd)
             self._becomeLogSlave(slaveFd, pid, directWr)
