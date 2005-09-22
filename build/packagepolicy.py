@@ -2071,8 +2071,10 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         # nested iterators to avoid matching regexp twice
         foundPaths = set(path for path in 
            (self.foundPath(line) for line in file(fullpath)) if path)
+
         # now remove false positives using the greylist
-        for foundPath in foundPaths:
+        # copy() for copy because modified
+        for foundPath in foundPaths.copy():
             if foundPath in self.greydict:
                 cam = fullpath.replace('config.log', 'configure.am')
                 if os.path.exists(cam):
@@ -2085,13 +2087,13 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
                 else:
                     cin = []
                 reCam, reCin = self.greydict[foundPath]
-                if not ((line for line in cam if reCam.match(line)) or
-                        (line for line in cin if reCin.match(line))):
+                if not ([line for line in cam if reCam.match(line)] or
+                        [line for line in cin if reCin.match(line)]):
                     # greylist entry has no match, so this is a false
                     # positive and needs to be removed from the set
-                    foundPaths -= set(path)
+                    foundPaths.remove(foundPath)
             if foundPath in self.blacklist:
-                foundPaths -= set(path)
+                foundPaths.remove(foundPath)
         self.foundPaths.update(foundPaths)
 
     def postProcess(self):
