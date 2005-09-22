@@ -1874,12 +1874,14 @@ class Flavor(_BuildPackagePolicy):
             '|/%(lib)s'
             '|%(x11prefix)s/%(lib)s'
             '|%(krbprefix)s/%(lib)s)(/|$)' %recipe.macros)
+	self.libReException = re.compile('^/usr/(lib|%(lib)s)/python.*$')
+
         self.baseIsnset = use.Arch.getCurrentArch()._name
         self.troveMarked = False
 	policy.Policy.doProcess(self, recipe)
 
     def hasLib(self, path):
-        return self.libRe.match(path)
+        return self.libRe.match(path) and not self.libReException.match(path)
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap

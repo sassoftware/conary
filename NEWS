@@ -11,6 +11,10 @@ Changes in 0.62.8:
     the buildRequires list, and gettext:runtime requires perl, then the
     requirement is satisfied.)  This policy currently produces many false
     positives; it needs improvement.
+  * files in /usr/%(lib)s/python/.* are no longer automatically given an 
+    architecture flavor - if there are architecture-specific files in those 
+    dirs, they should result in an arch-specific flavor through normal
+    means.
 
 Changes in 0.62.7:
   * Some unneeded parts of the sql query in _getTroveList have been removed,
