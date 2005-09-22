@@ -18,6 +18,9 @@ Changes in 0.62.8:
     architecture flavor - if there are architecture-specific files in those 
     dirs, they should result in an arch-specific flavor through normal
     means.
+  * By default, no OpenPGP signatures will be added to troves when
+    doing commits unless a fingerprint is explicitly set in conaryrc.
+    Previously, if a keyring existed, the first key found would be used.
 
 Changes in 0.62.7:
   * Some unneeded parts of the sql query in _getTroveList have been removed,
