@@ -839,7 +839,6 @@ class _AbstractPackageRecipe(Recipe):
             except repository.TroveNotFound:
                 missingReqs.append(buildReq)
                 continue
-                break
 
             versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
                 
