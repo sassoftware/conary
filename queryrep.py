@@ -189,6 +189,9 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
             else:
                 size = "(unknown)"
 
+            installBucket = [ x for x in trove.getInstallBucket().iteritems()]
+            installBucket = ', '.join('='.join(x) for x in installBucket)
+
 	    print "%-30s %s" % \
 		(("Name      : %s" % trove.getName(),
 		 ("Build time: %s" % buildTime)))
@@ -205,8 +208,15 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		     ("Label     : %s" % 
                                 troveVersion.branch().label().asString()))
 
-            print "Size      : %s" % size
+            print "%-30s" % ("Size      : %s" % size),
+            if installBucket:
+                print "Bucket    : %s" % installBucket
+            else:
+                print
+
             print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
+
+
 
             metadata.showDetails(repos, cfg, trove.getName(),
                                  troveVersion.branch(),
