@@ -8,6 +8,9 @@ Changes in 0.62.9:
     requirement is satisfied.)  This policy currently produces some false
     positives; the "greylist" that tries to remove false positives needs
     to be expanded.
+  * The repository server now uses a repository instance specific key
+    cache.  This fixes KeyNotFound errors seen when running multiple
+    repositories on one server.
 
 Changes in 0.62.8:
   * The bug, introduced in 0.62.7, that caused Conary to stop short of

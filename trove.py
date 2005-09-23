@@ -461,7 +461,7 @@ class Trove(streams.LargeStreamSet):
     # missingKeys is a list of missing fingerprints. pass a (blank?) list if you care to collect them...
     #raise an exception if there were any bad signatures
     #raise an exception if the trust level is beneath threshold
-    def verifyDigitalSignatures(self, threshold = 0):
+    def verifyDigitalSignatures(self, threshold = 0, keyCache = None):
         missingKeys = []
         badFingerprints = []
         maxTrust = 0
@@ -470,7 +470,9 @@ class Trove(streams.LargeStreamSet):
         if sha1_orig:
             assert(sha1_orig == sha1_new)
 
-        keyCache = getKeyCache()
+        if keyCache is None:
+            keyCache = getKeyCache()
+
         for signature in self.troveInfo.sigs.digitalSigs.iter():
             try:
                 key = keyCache.getPublicKey(signature[0])

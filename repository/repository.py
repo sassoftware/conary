@@ -371,8 +371,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
-    def checkTroveSignatures(self, trv):
-        keyCache = openpgpkey.getKeyCache()
+    def checkTroveSignatures(self, trv, keyCache = None):
+        if keyCache is None:
+            keyCache = openpgpkey.getKeyCache()
         for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
             pubKey = keyCache.getPublicKey(fingerprint)
             if pubKey.isRevoked():
@@ -388,7 +389,7 @@ class ChangeSetJob:
                                           'key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
-                 resetTimestamps = False):
+                 resetTimestamps = False, keyCache = None):
 	self.repos = repos
 	self.cs = cs
 
@@ -444,7 +445,7 @@ class ChangeSetJob:
                                         troveFlavor, csTrove.getChangeLog())
 
 	    newFileMap = newTrove.applyChangeSet(csTrove)
-            self.checkTroveSignatures(newTrove)
+            self.checkTroveSignatures(newTrove, keyCache=keyCache)
 
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove)

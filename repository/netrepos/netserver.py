@@ -1268,7 +1268,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         sig = signature.get()
         # ensure repo knows this key
-        keyCache = getKeyCache()
+        keyCache = self.repos.troveStore.keyTable.keyCache
         pubKey = keyCache.getPublicKey(sig[0])
 
         if pubKey.isRevoked():
@@ -1291,8 +1291,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         trv.addPrecomputedDigitalSignature(sig)
 
-        #verify the new signature is actually good
-        trv.verifyDigitalSignatures()
+        # verify the new signature is actually good
+        trv.verifyDigitalSignatures(keyCache=keyCache)
 
         # start a transaction now, this ensures that queries and updates
         # are happening in a consistent way.

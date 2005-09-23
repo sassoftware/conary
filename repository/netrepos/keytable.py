@@ -37,9 +37,8 @@ class OpenPGPKeyTable:
                                              PRIMARY KEY(fingerprint))""")
         db.commit()
 
-        # set the global key cache to refer to the keys in the database
-        keyCache = OpenPGPKeyDBCache(self)
-        openpgpkey.setKeyCache(keyCache)
+        # create a keyCache for this keyTable.
+        self.keyCache = OpenPGPKeyDBCache(self)
 
     def getFingerprint(self, keyId):
         cu = self.db.cursor()
