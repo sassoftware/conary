@@ -383,7 +383,7 @@ class ChangeSetJob:
             if expirationTime and expirationTime < timestamp:
                 raise openpgpfile.IncompatibleKey('Key %s is expired'
                                                   %pubKey.getFingerprint())
-        res = trv.verifyDigitalSignatures()
+        res = trv.verifyDigitalSignatures(keyCache=keyCache)
         if len(res[1]):
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
