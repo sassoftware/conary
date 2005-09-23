@@ -72,8 +72,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	fileObj = self.repos.getFileVersion(pathId, fileId, None)
 	self.oldFile(pathId, fileId, fileObj)
 
-    def checkTroveSignatures(self, trv):
-        trv.verifyDigitalSignatures()
+    def checkTroveSignatures(self, trv, keyCache=None):
+        trv.verifyDigitalSignatures(keyCache=keyCache)
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
