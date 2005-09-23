@@ -1073,7 +1073,7 @@ class Version(VersionSequence):
             trailingRevisions.append(v.trailingRevision())
         for trailingRevision in trailingRevisions:
             assert(trailingRevision.buildCount is None)
-            trailingRevision.buildCount = 0
+            trailingRevision.buildCount = SerialNumber('0')
         return newV
 
 class Branch(VersionSequence):
