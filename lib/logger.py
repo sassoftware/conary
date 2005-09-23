@@ -126,7 +126,7 @@ class Logger:
             # that can be controlled
             if sys.stdin.isatty():
                 os.tcsetpgrp(0, os.getpgrp())
-        except AttributError:
+        except AttributeError:
             # stdin might not even have an isatty method
             pass
         # wait for child logging process to die
@@ -149,7 +149,7 @@ class _ChildLogger:
             # that can be controlled
             if sys.stdin.isatty():
                 os.tcsetpgrp(0, os.getpgrp())
-        except AttributError:
+        except AttributeError:
            # stdin might not even have an isatty method
             pass
 
