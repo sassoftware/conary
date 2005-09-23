@@ -2033,7 +2033,7 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
     build requirements.
     """
     rootdir = '%(builddir)s'
-    invariantinclusions = [ '.*/config.log', ]
+    invariantinclusions = [ ('.*/config.log', 0400), ]
     # list of regular expressions (using macros) that cause an
     # entry to be ignored unless a related strings is found in
     # another named file (empty tuple is unconditional blacklist)
@@ -2070,10 +2070,6 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
 
     def doFile(self, path):
         fullpath = self.macros.builddir + path
-        if not os.access(fullpath, os.R_OK):
-            self.warn('%s is not readable, unable to check for missing '
-                      'build requirement', fullpath)
-            return
         # iterator to avoid reading in the whole file at once;
         # nested iterators to avoid matching regexp twice
         foundPaths = set(path for path in 
