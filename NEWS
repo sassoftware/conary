@@ -3,12 +3,11 @@ Changes in 0.62.9:
     all config.log files anywhere under the build directory for programs
     that configure has found, and ensures that the transitive closure
     of the build requirements contains each file listed.  (That is, if
-    the file /usr/bin/perl has been found, and gettext:runtime is in
-    the buildRequires list, and gettext:runtime requires perl, then the
-    requirement is satisfied.)  This policy currently produces many false
+    the file /usr/bin/perl has been found, and intltool:runtime is in
+    the buildRequires list, and intltool:runtime requires perl, then the
+    requirement is satisfied.)  This policy currently produces some false
     positives; the "greylist" that tries to remove false positives needs
-    to be expanded.  This new policy will be enabled by default once it is
-    better tested.
+    to be expanded.
 
 Changes in 0.62.8:
   * The bug, introduced in 0.62.7, that caused Conary to stop short of

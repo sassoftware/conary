@@ -723,9 +723,17 @@ class Database(SqlDbRepository):
         closureTupSet = set()
         def recurseOne(depSetList):
             d = self.getTrovesWithProvides(depSetList)
-            # look only at new depSets from this iteration
-            s = set(depSet for depSet in d if depSet not in closureDepDict)
-            closureDepDict.update(d)
+            # look only at depSets with new info in this iteration
+            s = set(depSet for depSet in d
+                    if depSet not in closureDepDict or
+                       d[depSet] != closureDepDict[depSet])
+
+            # update closureDepDict with all possible trove tuples
+            for depSet in d:
+                if depSet in closureDepDict:
+                    closureDepDict[depSet].extend(d[depSet])
+                else:
+                    closureDepDict[depSet] = d[depSet]
 
             # flatten list of all new troveTups for fastest lookup
             troveTupSet = set()

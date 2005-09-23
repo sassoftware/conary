@@ -860,6 +860,7 @@ class _AbstractPackageRecipe(Recipe):
                           "%s" % '\n'.join(sorted(missingReqs)))
                 raise cook.CookError, 'unresolved build dependencies'
         self.buildReqMap = reqMap
+        self.ignoreDeps = ignoreDeps
 
     def extraSource(self, action):
 	"""

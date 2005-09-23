@@ -2034,29 +2034,32 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
     """
     rootdir = '%(builddir)s'
     invariantinclusions = [ '.*/config.log', ]
-    # list of regular expressions (using macros) that unconditionally
-    # cause an entry to be ignored
-    blacklist = [
-    ]
     # list of regular expressions (using macros) that cause an
-    # entry to be ignored unless it is found elsewhere
+    # entry to be ignored unless a related strings is found in
+    # another named file (empty tuple is unconditional blacklist)
     greylist = [
-        # config.log string, configure.am re, configure.in re
-        # FIXME: need to test these regular expressions for false negatives
-        ('%(prefix)s/X11R6/bin/makedepend', '.*makedepend', '.*makedepend'),
-        ('%(bindir)s/g77', '.*g77', '.*g77'),
+        # config.log string, ((filename, regexp), ...)
+        ('%(prefix)s/X11R6/bin/makedepend', ()),
+        ('%(bindir)s/g77',
+            (('configure.ac', r'\s*AC_PROG_F77'),
+             ('configure.in', r'\s*AC_PROG_F77'))),
+        ('%(bindir)s/bison',
+            (('configure.ac', r'\s*AC_PROC_YACC'),
+             ('configure.in', r'\s*(AC_PROG_YACC|YACC=)'))),
     ]
 
     # FIXME: handle exceptions
 
+    def test(self):
+        return not self.recipe.ignoreDeps
+
     def preProcess(self):
         self.foundRe = re.compile('^[^ ]+: found (/([^ ]+)?bin/[^ ]+)\n$')
-        self.blacklist = set(x % self.macros for x in self.blacklist)
         self.greydict = {}
+        # turn list into dictionary, interpolate macros, and compile regexps
         for greyTup in self.greylist:
             self.greydict[greyTup[0] % self.macros] = (
-                re.compile(greyTup[1] % self.macros),
-                re.compile(greyTup[2] % self.macros))
+                (x, re.compile(y % self.macros)) for x, y in greyTup[1])
         self.foundPaths = set()
 
     def foundPath(self, line):
@@ -2076,24 +2079,17 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         # copy() for copy because modified
         for foundPath in foundPaths.copy():
             if foundPath in self.greydict:
-                cam = fullpath.replace('config.log', 'configure.am')
-                if os.path.exists(cam):
-                    cam = file(cam)
-                else:
-                    cam = []
-                cin = fullpath.replace('config.log', 'configure.in')
-                if os.path.exists(cin):
-                    cin = file(cin)
-                else:
-                    cin = []
-                reCam, reCin = self.greydict[foundPath]
-                if not ([line for line in cam if reCam.match(line)] or
-                        [line for line in cin if reCin.match(line)]):
+                foundMatch = False
+                for otherFile, testRe in self.greydict[foundPath]:
+                    otherFile = fullpath.replace('config.log', otherFile)
+                    if not foundMatch and os.path.exists(otherFile):
+                        otherFile = file(otherFile)
+                        if [line for line in otherFile if testRe.match(line)]:
+                            foundMatch = True
+                if not foundMatch:
                     # greylist entry has no match, so this is a false
                     # positive and needs to be removed from the set
                     foundPaths.remove(foundPath)
-            if foundPath in self.blacklist:
-                foundPaths.remove(foundPath)
         self.foundPaths.update(foundPaths)
 
     def postProcess(self):
@@ -2102,11 +2098,9 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
         transitiveBuildRequires = set(
             self.recipe.buildReqMap[spec].getName()
-            for spec in self.recipe.buildRequires
-            if spec in self.recipe.buildReqMap)
+            for spec in self.recipe.buildRequires)
         depSetList = [ self.recipe.buildReqMap[spec].getRequires()
-                       for spec in self.recipe.buildRequires
-                       if spec in self.recipe.buildReqMap ]
+                       for spec in self.recipe.buildRequires ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
             transitiveBuildRequires.update(set(tup[0] for tup in d[depSet]))
@@ -2206,8 +2200,7 @@ def DefaultPolicy(recipe):
 	Provides(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
-# FIXME: enable this one it has been tested
-#        EnforceConfigLogBuildRequirements(recipe),
+        EnforceConfigLogBuildRequirements(recipe),
 	reportErrors(recipe),
     ]
 
