@@ -2070,6 +2070,10 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
 
     def doFile(self, path):
         fullpath = self.macros.builddir + path
+        if not os.access(fullpath, os.R_OK):
+            self.warn('%s is not readable, unable to check for missing '
+                      'build requirement', fullpath)
+            return
         # iterator to avoid reading in the whole file at once;
         # nested iterators to avoid matching regexp twice
         foundPaths = set(path for path in 
