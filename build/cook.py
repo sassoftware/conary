@@ -1161,7 +1161,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    os.unlink(changeSetFile)
         raise CookError(str(e))
 
-    if emerge:
+    if emerge and troves:
         client = conaryclient.ConaryClient(cfg)
         try:
             changeSet = changeset.ChangeSetFromFile(changeSetFile)
