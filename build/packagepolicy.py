@@ -2064,19 +2064,29 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
              ('configure.in', r'\s*(AC_PROG_YACC|YACC=)'))),
     ]
 
-    # FIXME: handle exceptions
-
     def test(self):
         return not self.recipe.ignoreDeps
 
     def preProcess(self):
         self.foundRe = re.compile('^[^ ]+: found (/([^ ]+)?bin/[^ ]+)\n$')
+        self.foundPaths = set()
         self.greydict = {}
         # turn list into dictionary, interpolate macros, and compile regexps
         for greyTup in self.greylist:
             self.greydict[greyTup[0] % self.macros] = (
                 (x, re.compile(y % self.macros)) for x, y in greyTup[1])
-        self.foundPaths = set()
+        # process exceptions differently; user can specify either the
+        # source (found path) or destination (found component) to ignore
+        self.pathExceptions = set()
+        self.compExceptions = set()
+        if self.exceptions:
+            for exception in self.exceptions:
+                exception = exception % self.recipe.macros
+                if '/' in exception:
+                    self.pathExceptions.add(exception)
+                else:
+                    self.compExceptions.add(exception)
+        self.exceptions = None
 
     def foundPath(self, line):
         match = self.foundRe.match(line)
@@ -2089,7 +2099,8 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         # iterator to avoid reading in the whole file at once;
         # nested iterators to avoid matching regexp twice
         foundPaths = set(path for path in 
-           (self.foundPath(line) for line in file(fullpath)) if path)
+           (self.foundPath(line) for line in file(fullpath))
+           if path and path not in self.pathExceptions)
 
         # now remove false positives using the greylist
         # copy() for copy because modified
@@ -2127,6 +2138,7 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         for path in sorted(self.foundPaths):
             thisFileReqs = set(trove.getName()
                                for trove in db.iterTrovesByPath(path))
+            thisFileReqs -= self.compExceptions
             missingReqs = thisFileReqs - transitiveBuildRequires
             if missingReqs:
                 self.info('path %s suggests buildRequires: %s',

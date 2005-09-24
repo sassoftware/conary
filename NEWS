@@ -1,6 +1,9 @@
 Changes in 0.62.10:
   * EnforceSonameBuildRequirements enhanced to handle correctly cases
     where more than one trove can resolve a single soname dependency.
+  * EnforceConfigLogBuildRequirements now can take exceptions, which
+    can be specified either as a filename (such as /usr/bin/bison or
+    %(bindir)s/bison) or as a required trove (such as bison:runtime).
 
 Changes in 0.62.9:
   * EnforceConfigLogBuildRequirements policy added.  It looks through
