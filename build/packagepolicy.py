@@ -1931,12 +1931,15 @@ class EnforceSonameBuildRequirements(policy.Policy):
     # or possibly two variants, one for str(dep) and one for trove
     # names
     def do(self):
-        missingBuildRequires = []
+        missingBuildRequires = set()
+        missingBuildRequiresChoices = []
         # right now we do not enforce branches.  This could be
         # done with more work.  There is no way I know of to
         # enforce flavors, so we just remove them from the spec.
-        truncatedBuildRequires = [ x.split('=')[0].split('[')[0] for
-            x in self.recipe.buildRequires]
+        truncatedBuildRequires = set(
+            self.recipe.buildReqMap[spec].getName()
+            for spec in self.recipe.buildRequires
+            if spec in self.recipe.buildReqMap)
 
 	components = self.recipe.autopkg.components
         pathMap = self.recipe.autopkg.pathMap
@@ -1978,19 +1981,27 @@ class EnforceSonameBuildRequirements(policy.Policy):
             provideNameList = [x[0] for x in localProvides[dep]]
             # normally, there is only one name in provideNameList
 
-            foundCandidates = []
+            foundCandidates = set()
             for name in provideNameList:
                 for candidate in providesNames(name):
                     if db.hasTroveByName(candidate):
-                        foundCandidates.append(candidate)
+                        foundCandidates.add(candidate)
                         break
 
-            if [ x for x in foundCandidates if x not in truncatedBuildRequires ]: 
-                # We have at least one file that uses this library that
-                # is not reflected in the buildRequires list.  Add all
-                # the candidates to the summary message that will be
-                # printed last (it's normally all you need)
-                missingBuildRequires.extend(foundCandidates)
+            missingCandidates = foundCandidates - truncatedBuildRequires
+            if missingCandidates == foundCandidates:
+                # None of the troves that provides this requirement is
+                # reflected in the buildRequires list.  Add candidates
+                # to proper list to print at the end:
+                if len(foundCandidates) > 1:
+                    found = False
+                    for candidateSet in missingBuildRequiresChoices:
+                        if candidateSet == foundCandidates:
+                            found = True
+                    if found == False:
+                        missingBuildRequiresChoices.append(foundCandidates)
+                else:
+                    missingBuildRequires.update(foundCandidates)
 
                 # Now give lots of specific information to help the packager
                 # in case things do not look so obvious...
@@ -2003,26 +2014,31 @@ class EnforceSonameBuildRequirements(policy.Policy):
                         l.append(dep)
                 if pathList:
                     self.warn('buildRequires %s needed to satisfy "%s"'
-                              ' for files: %s'
-                              %(str(foundCandidates), str(dep),
-                                ', '.join(sorted(pathList))))
+                              ' for files: %s',
+                              str(sorted(list(foundCandidates))),
+                              str(dep),
+                              ', '.join(sorted(pathList)))
 
         if pathReqMap:
             for path in pathReqMap:
-                self.warn('file %s has unsatisfied build requirements "%s"'
-                          %(path, '", "'.join([
-                             str(x) for x in sorted(
-                                list(set(pathReqMap[path])))])))
+                self.warn('file %s has unsatisfied build requirements "%s"',
+                          path, '", "'.join([
+                             str(x) for x in
+                               sorted(list(set(pathReqMap[path])))]))
 
         if missingBuildRequires:
             # XXX this needs to be self.error, but we need to do a
             # bootstrap pass first to clean up buildRequires so that
             # compiles do not instantly grind to a halt...
-            self.warn('add to buildRequires: %s'
-                       %str(sorted(list(set(missingBuildRequires)))))
+            self.warn('add to buildRequires: %s',
+                       str(sorted(list(set(missingBuildRequires)))))
             # one special case:
             if list(missingBuildRequires) == [ 'glibc:devel' ]:
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
+        if missingBuildRequiresChoices:
+            for candidateSet in missingBuildRequiresChoices:
+                self.warn('add to buildRequires one of: %s',
+                          str(sorted(list(candidateSet))))
 
 
 class EnforceConfigLogBuildRequirements(policy.Policy):
