@@ -725,12 +725,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         and LabelMap.itemId = Items.itemId
         """
         cu.execute(query, [username, labelStr])
-        names = {}
+        names = set()
         for (trove, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):
                 continue
-            names[trove] = 1
-        return names.keys()
+            names.add(trove)
+        return list(names)
 
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
         troveFilter = {}
