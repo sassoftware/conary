@@ -458,9 +458,12 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         #See if we're actually going to do any work:
-        if self.getGroupNameById(userGroupId) != userGroupName:
-            #Check to make sure the group is unique
-            self._uniqueUserGroup(cu, userGroupName)
+        currentGroupName = self.getGroupNameById(userGroupId)
+        if currentGroupName != userGroupName:
+            if currentGroupName.lower() != userGroupName.lower():
+                #Check to make sure the group is unique
+                self._uniqueUserGroup(cu, userGroupName)
+            #else we're just changing case.
 
             try:
                 cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
