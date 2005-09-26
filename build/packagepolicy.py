@@ -2049,7 +2049,7 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
     build requirements.
     """
     rootdir = '%(builddir)s'
-    invariantinclusions = [ ('.*/config.log', 0400), ]
+    invariantinclusions = [ (r'.*/config\.log', 0400, stat.S_IFDIR), ]
     # list of regular expressions (using macros) that cause an
     # entry to be ignored unless a related strings is found in
     # another named file (empty tuple is unconditional blacklist)
