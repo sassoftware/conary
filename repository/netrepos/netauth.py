@@ -413,6 +413,14 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
+    def getGroupNameById(self, userGroupId):
+        cu = self.db.cursor()
+
+        cu.execute("SELECT userGroup from UserGroups WHERE userGroupId=?",
+            userGroupId)
+
+        return cu.next()[0]
+
     def getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
 
@@ -449,18 +457,20 @@ class NetworkAuthorization:
     def renameGroup(self, userGroupId, userGroupName):
         cu = self.db.cursor()
 
-        #Check to make sure the group is unique
-        self._uniqueUserGroup(cu, userGroupName)
+        #See if we're actually going to do any work:
+        if self.getGroupNameById(userGroupId) != userGroupName:
+            #Check to make sure the group is unique
+            self._uniqueUserGroup(cu, userGroupName)
 
-        try:
-            cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
-        except sqlite3.ProgrammingError, e:
-            self.db.rollback()
-            if str(e) == 'column userGroup is not unique':
-                raise GroupAlreadyExists, "group: %s" % userGroupName
-            raise
+            try:
+                cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
+            except sqlite3.ProgrammingError, e:
+                self.db.rollback()
+                if str(e) == 'column userGroup is not unique':
+                    raise GroupAlreadyExists, "group: %s" % userGroupName
+                raise
 
-        self.db.commit()
+            self.db.commit()
 
     def updateGroupMembers(self, userGroupId, members):
         #Do this in a transaction
