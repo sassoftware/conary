@@ -1384,6 +1384,8 @@ class Trove(streams.LargeStreamSet):
         return self.troveInfo.installBucket
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
+        if name.count(':') > 1:
+            raise TroveError, 'More than one ":" is not allowed in a trove name"
         streams.LargeStreamSet.__init__(self)
         assert(flavor is not None)
 	self.name.set(name)

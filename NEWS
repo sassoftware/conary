@@ -4,6 +4,8 @@ Changes in 0.62.10:
   * EnforceConfigLogBuildRequirements now can take exceptions, which
     can be specified either as a filename (such as /usr/bin/bison or
     %(bindir)s/bison) or as a required trove (such as bison:runtime).
+  * The trove.Trove initializer no longer allows for a trove to be created
+    with a name that has more than one ":" character in it.
 
 Changes in 0.62.9:
   * EnforceConfigLogBuildRequirements policy added.  It looks through
