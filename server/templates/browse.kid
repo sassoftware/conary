@@ -25,7 +25,7 @@ from urllib import quote
 
             <span py:for="l in string.uppercase">
                 <a py:if="l != char and totals[l]" href="browse?char=${l}">${l}</a>
-                <span py:if="l == char or not totals[l]">${l}</span> | 
+                <span py:if="l != char and totals[l]" py:strip="True"> | </span>
             </span>
             <?python
                 total = 0
