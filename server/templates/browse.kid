@@ -23,8 +23,8 @@ from urllib import quote
         <div id="inner">
             <h2>Repository Browser</h2>
 
-            <span py:for="l in string.uppercase">
-                <span py:if="totals[l]" py:strip="True"><a href="browse?char=${l}">${l}</a> |
+            <span py:for="l in string.uppercase" py:strip="True">
+                <span py:if="totals[l]"><a href="browse?char=${l}" title="${totals[l]} trove(s)">${l}</a> |
                 </span>
             </span>
             <?python
@@ -33,8 +33,7 @@ from urllib import quote
                     total += totals[x]
             ?>
             <span py:if="total">
-                <a py:if="l not in string.digits and total" href="browse?char=0" >0-9</a>
-                <span py:if="l in string.digits or not total">0-9</span>
+                <a py:if="l not in string.digits and total" href="browse?char=0" title="${total} trove(s)">0-9</a>
             </span>
 
             <?python
