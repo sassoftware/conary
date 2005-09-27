@@ -1924,12 +1924,17 @@ class Flavor(_BuildPackagePolicy):
 class EnforceSonameBuildRequirements(policy.Policy):
     """
     Test to make sure that each requires dependency in the package
-    is matched by a suitable element in the C{buildRequires} list.
+    is matched by a suitable element in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforceSonameBuildRequirements(exceptions='I{pkg}:I{comp}')}.
     """
-    # FIXME implement exceptions before turning this from a warning
-    # to an error; they should be regexps that are compared to str(dep)
-    # or possibly two variants, one for str(dep) and one for trove
-    # names
+    def preProcess(self):
+        self.compExceptions = set()
+        if self.exceptions:
+            for exception in self.exceptions:
+                self.compExceptions.add(exception % self.recipe.macros)
+        self.exceptions = None
+
     def do(self):
         missingBuildRequires = set()
         missingBuildRequiresChoices = []
@@ -1987,6 +1992,7 @@ class EnforceSonameBuildRequirements(policy.Policy):
                     if db.hasTroveByName(candidate):
                         foundCandidates.add(candidate)
                         break
+            foundCandidates -= self.compExceptions
 
             missingCandidates = foundCandidates - truncatedBuildRequires
             if missingCandidates == foundCandidates:
@@ -2027,18 +2033,15 @@ class EnforceSonameBuildRequirements(policy.Policy):
                                sorted(list(set(pathReqMap[path])))]))
 
         if missingBuildRequires:
-            # XXX this needs to be self.error, but we need to do a
-            # bootstrap pass first to clean up buildRequires so that
-            # compiles do not instantly grind to a halt...
-            self.warn('add to buildRequires: %s',
+            self.error('add to buildRequires: %s',
                        str(sorted(list(set(missingBuildRequires)))))
             # one special case:
             if list(missingBuildRequires) == [ 'glibc:devel' ]:
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
         if missingBuildRequiresChoices:
             for candidateSet in missingBuildRequiresChoices:
-                self.warn('add to buildRequires one of: %s',
-                          str(sorted(list(candidateSet))))
+                self.error('add to buildRequires one of: %s',
+                           str(sorted(list(candidateSet))))
 
 
 class EnforceConfigLogBuildRequirements(policy.Policy):
@@ -2046,7 +2049,10 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
     This class looks through the builddir for config.log files, and looks
     in them for mention of files that configure found on the system, and
     makes sure that the components that contain them are listed as
-    build requirements.
+    build requirements; pass exceptions in with
+    C{r.EnforceConfigLogBuildRequirements(exceptions='I{/path/to/file/found}'}
+    or with
+    C{r.EnforceConfigLogBuildRequirements(exceptions='I{pkg}:I{comp}')}.
     """
     rootdir = '%(builddir)s'
     invariantinclusions = [ (r'.*/config\.log', 0400, stat.S_IFDIR), ]
@@ -2141,7 +2147,7 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
             thisFileReqs -= self.compExceptions
             missingReqs = thisFileReqs - transitiveBuildRequires
             if missingReqs:
-                self.info('path %s suggests buildRequires: %s',
+                self.warn('path %s suggests buildRequires: %s',
                           path, ', '.join((sorted(list(missingReqs)))))
             fileReqs.update(thisFileReqs)
 
@@ -2149,7 +2155,7 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
         # into the recipe if all the individual messages make sense
         missingReqs = fileReqs - transitiveBuildRequires
         if missingReqs:
-            self.info('Possibly add to buildRequires: %s',
+            self.warn('Probably add to buildRequires: %s',
                       str(sorted(list(missingReqs))))
 
 

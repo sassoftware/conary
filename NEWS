@@ -6,6 +6,13 @@ Changes in 0.62.10:
     %(bindir)s/bison) or as a required trove (such as bison:runtime).
   * The trove.Trove initializer no longer allows for a trove to be created
     with a name that has more than one ":" character in it.
+  * EnforceSonameBuildRequirements now can take exceptions, which are
+    specified as a required trove (such as libfoo:devel) to avoid adding
+    to the list of requirements.
+  * EnforceSonameBuildRequirements now produces errors for missing build
+    requirements, and EnforceConfigLogBuildRequirements now demonstrates
+    very few false positives, and so has been updated to warning instead
+    of info.
 
 Changes in 0.62.9:
   * EnforceConfigLogBuildRequirements policy added.  It looks through
