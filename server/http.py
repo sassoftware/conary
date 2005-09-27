@@ -139,23 +139,39 @@ class HttpHandler(WebHandler):
         self._write("main_page")
         return apache.OK
 
-    @strFields(char = 'A')
+    @strFields(char = '')
     @checkAuth(write=False)
     def browse(self, auth, char):
+        defaultPage = False
+        if not char:
+            char = 'A'
+            defaultPage = True
         troves = self.repos.getAllTroveLeaves(self.serverName, {None: [None]})
         # keep a running total of each letter we see so that the display
         # code can skip letters that have no troves
         totals = dict.fromkeys(list(string.digits) + list(string.uppercase), 0)
+        packages = []
+        components = {}
+
+        # In order to jump to the first letter with troves if no char is specified
+        # We have to iterate through troves twice.  Since we have hundreds of troves,
+        # not thousands, this isn't too big of a deal.  In any case this will be
+        # removed soon when we move to a paginated browser
+        for trove in troves:
+            totals[trove[0].upper()] += 1
+        if defaultPage:
+            for x in string.uppercase:
+                if totals[x]:
+                    char = x
+                    break
+
         if char in string.digits:
             char = '0'
             filter = lambda x: x[0] in string.digits
         else:
             filter = lambda x, char=char: x[0].upper() == char
 
-        packages = []
-        components = {}
         for trove in troves:
-            totals[trove[0].upper()] += 1
             if not filter(trove):
                 continue
             if ":" not in trove:

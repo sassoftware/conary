@@ -24,8 +24,8 @@ from urllib import quote
             <h2>Repository Browser</h2>
 
             <span py:for="l in string.uppercase">
-                <a py:if="l != char and totals[l]" href="browse?char=${l}">${l}</a>
-                <span py:if="l != char and totals[l]" py:strip="True"> | </span>
+                <span py:if="totals[l]" py:strip="True"><a href="browse?char=${l}">${l}</a> |
+                </span>
             </span>
             <?python
                 total = 0
