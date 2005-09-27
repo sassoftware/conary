@@ -18,6 +18,9 @@ Changes in 0.62.10:
     overrides this check)
   * Redirects can now redirect to nothing, which allows components to 
     disappear gracefully on a redirection
+  * A soname dependency is now provided only if the library is in a
+    default library directory, or in a directory explicitly added with a
+    SharedLibrary(subtrees='/path/to/dir/') call.
 
 Changes in 0.62.9:
   * EnforceConfigLogBuildRequirements policy added.  It looks through

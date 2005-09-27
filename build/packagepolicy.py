@@ -678,11 +678,16 @@ class SharedLibrary(policy.Policy):
     ]
     recursive = False
 
-    # needs to share with ExecutableLibraries and CheckSonames
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-	self.recipe.ExecutableLibraries(*args, **keywords)
-	self.recipe.CheckSonames(*args, **keywords)
+        if 'subtrees' in keywords:
+            # share with other policies that need to know about shlibs
+            d = {'subtrees': keywords['subtrees']}
+            self.recipe.ExecutableLibraries(**d)
+            self.recipe.CheckSonames(**d)
+            # Provides needs a different limitation...
+            d = {'sonameSubtrees': keywords['subtrees']}
+            self.recipe.Provides(**d)
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
@@ -1739,6 +1744,7 @@ class Provides(_BuildPackagePolicy):
 
     def __init__(self, *args, **keywords):
 	self.provisions = []
+        self.sonameSubtrees = set(destdirpolicy.librarydirs)
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -1746,21 +1752,40 @@ class Provides(_BuildPackagePolicy):
 	    for filespec in args[1:]:
 		self.provisions.append((filespec, args[0]))
         else:
+            sonameSubtrees = keywords.pop('sonameSubtrees')
+            if type(sonameSubtrees) in (list, tuple):
+                self.sonameSubtrees.update(set(sonameSubtrees))
+            else:
+                self.sonameSubtrees.add(sonameSubtrees)
             policy.Policy.updateArgs(self, **keywords)
 
-    def doProcess(self, recipe):
-	self.rootdir = self.rootdir % recipe.macros
+    def preProcess(self):
+	self.rootdir = self.rootdir % self.macros
 	self.fileFilters = []
 	for (filespec, provision) in self.provisions:
 	    self.fileFilters.append(
-		(filter.Filter(filespec, recipe.macros), provision))
+		(filter.Filter(filespec, self.macros), provision))
 	del self.provisions
-	policy.Policy.doProcess(self, recipe)
+
+        # interpolate macros
+        sonameSubtrees = set(x % self.macros
+                                  for x in self.sonameSubtrees)
+        # canonicalize not to have trailing /
+        self.sonameSubtrees = set()
+        for directory in sonameSubtrees:
+            if directory.endswith('/'):
+                directory = directory[:-1]
+            self.sonameSubtrees.add(directory)
 
     def _ELFNonProvide(self, path, m, pkg, mode):
-        if path in pkg.providesMap and m and m.name == 'ELF' and \
-           'soname' in m.contents and not mode & 0111 and \
-           not path.endswith('.so'):
+        basedir = os.path.dirname(path)
+        if path in pkg.providesMap and (
+            (basedir not in self.sonameSubtrees) or
+            (m and m.name == 'ELF' and
+             'soname' in m.contents and not mode & 0111 and
+             not path.endswith('.so'))):
+            # libraries must be in a library directory for their
+            # soname to be provided
             # libraries must be executable for ldconfig to work --
             # see ExecutableLibraries policy
             del pkg.providesMap[path]
