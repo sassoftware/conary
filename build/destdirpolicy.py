@@ -55,8 +55,6 @@ librarydirs = [
     '%(prefix)s/local/%(lib)s/',
     '%(prefix)s/local/lib/',
 ]
-# now uniq for non-multilib systems
-librarydirs = sorted({}.fromkeys(librarydirs).keys())
 
 class TestSuiteLinks(policy.Policy):
     """
