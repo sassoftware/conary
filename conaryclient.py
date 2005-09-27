@@ -97,6 +97,25 @@ class NeededTrovesFailure(DependencyFailure):
               (x[0], x[1].trailingRevision().asString()) for x in suggList])))
         return '\n'.join(res)
 
+class InstallBucketConflicts(UpdateError):
+
+    def __str__(self):
+        res = []
+        res.append("Troves being installed appear to conflict:")
+        for name, l in sorted(self.conflicts.iteritems()):
+            res.append("   %s -> %s" % (name, 
+                           " ".join([ "%s[%s]->%s[%s]" %
+                                        (x[0][0].asString(),
+                                         deps.formatFlavor(x[0][1]),
+                                         x[1][0].asString(),
+                                         deps.formatFlavor(x[1][1]))
+                                     for x in l ])))
+
+        return '\n'.join(res)
+    
+    def __init__(self, conflicts):
+        self.conflicts = conflicts
+
 class VersionSuppliedError(UpdateError):
     def __str__(self):
         return "version should not be specified when a Conary change set " \
@@ -364,16 +383,33 @@ class ConaryClient:
                 jobSet.remove(job)
 
             targets = []
-            for (subName, subVersion, subFlavor) in trv.iterTroveList():
-                if (":" not in subName and ":" not in name) or \
-                   (":"     in subName and ":"     in name):
-                    l = redirectHack.setdefault((subName, subVersion,
-                                                 subFlavor), [])
-                    l.append(item)
-                    targets.append((subName, subVersion, subFlavor))
-                else:
-                    toDoList.append((subName, (None, None), 
-                                              (subVersion, subFlavor), True))
+            allTargets = trv.iterTroveList()
+            # three possibilities:
+            #   1. no targets -- make sure a simple erase occurs
+            #   2. target is the primary target of this redirect (this is 
+            #       tricky; we use the rule that components only redirect to a
+            #       single component, and that collections redirect to a single
+            #       collection (and other, secondary, collections). the
+            #       primary redirects are added to the target list
+            #   3. secondary targets are added to the toDoList for later
+            #      handling
+            if not allTargets:
+                l = redirectHack.setdefault(None, [])
+                l.append(item)
+            else:
+                for (subName, subVersion, subFlavor) in allTargets:
+                    if (":" not in subName and ":" not in name) or \
+                       (":"     in subName and ":"     in name):
+                        # primary
+                        l = redirectHack.setdefault((subName, subVersion,
+                                                     subFlavor), [])
+                        l.append(item)
+                        targets.append((subName, subVersion, subFlavor))
+                    else:
+                        # secondary
+                        toDoList.append((subName, (None, None), 
+                                                  (subVersion, subFlavor), 
+                                         True))
 
             if isPrimary:
                 for subName, subVersion, subFlavor in targets:
@@ -449,7 +485,10 @@ class ConaryClient:
 
             return dict.fromkeys(r)
 
-        def _lockedList(neededList):
+        def _lockedList(neededList, ignorePin):
+            #if ignorePin:
+            #    return ( False, ) * len(neededList)
+
             l = [ (x[0], x[1], x[3]) for x in neededList if x[1] is not None ]
             l.reverse()
             lockList = self.db.trovesArePinned(l)
@@ -483,9 +522,6 @@ class ConaryClient:
             # Make sure troves which the changeset thinks should be removed
             # get considered for removal. Ones which need to be removed
             # for a new trove to be installed are guaranteed to be removed.
-            #
-	    # Pins for updated troves are handled when the update trvCs
-	    # is checked; no need to check it again here
             oldTroves = [ ((job[0], job[1][0], job[1][1]), True, ERASE) for
                                 job in newJob
                                 if job[1][0] is not None and 
@@ -599,6 +635,7 @@ class ConaryClient:
 
         # def _mergeGroupChanges -- main body begins here
             
+        # keepList is (job, ignorePins)
         keepList = []
         erasePrimaryList = []
         toOutdate = set()
@@ -612,12 +649,12 @@ class ConaryClient:
                     # try and outdate absolute change sets
                     assert(not job[1][0])
                     toOutdate.add(item)
-                keepList.append(job)
+                keepList.append((job, True))
             else:
                 item = (job[0], job[1][0], job[1][1])
 
                 erasePrimaryList.append(item)
-                keepList.append(job)
+                keepList.append((job, True))
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -626,12 +663,12 @@ class ConaryClient:
 
         outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
                                                      ineligible)
-        for i, job in enumerate(keepList):
+        for i, (job, ignorePin) in enumerate(keepList):
             item = (job[0], job[2][0], job[2][1])
 
             if item in outdated:
                 job = (job[0], outdated[item][1:], job[2], False)
-                keepList[i] = job
+                keepList[i] = (job, ignorePin)
 
         for info in redirects:
             newJob.add((info[0], (info[1], info[2]), (None, None), False))
@@ -641,7 +678,7 @@ class ConaryClient:
         referencedTroves = set()
 
         while keepList:
-            job = keepList.pop()
+            job, ignorePin = keepList.pop()
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
             
@@ -667,8 +704,9 @@ class ConaryClient:
                                           pristine = False)
                 referencedTroves.update(x for x in trv.iterTroveList())
                 for name, version, flavor in trv.iterTroveList():
-                    keepList.append((name, (version, flavor),
-                                           (version, flavor), False))
+                    keepList.append(((name, (version, flavor),
+                                           (version, flavor), False),
+                                     ignorePin))
 
                 del trv
                 continue
@@ -716,7 +754,7 @@ class ConaryClient:
             referencedTroves.update(x for x in newTrv.iterTroveList())
 
             alreadyInstalled = _alreadyInstalled(newTrv)
-            locked = _lockedList(neededTroveList)
+            locked = _lockedList(neededTroveList, ignorePin)
 
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
                     oldIsPinned in itertools.izip(neededTroveList, locked):
@@ -728,8 +766,9 @@ class ConaryClient:
                                                 (newVersion, newFlavor))
                     elif newVersion is None:
                         # add this job to the keeplist to do erase recursion
-                        keepList.append((name, (oldVersion, oldFlavor),
-                                               (None, None), False))
+                        keepList.append(((name, (oldVersion, oldFlavor),
+                                               (None, None), False),
+                                         False))
                     else:
                         if oldVersion is None and job[1][0] is None:
                             # this is absolute if the original job for the
@@ -743,15 +782,16 @@ class ConaryClient:
                                 makeAbs = absJob in primaryJobList
                         else:
                             makeAbs = False
-
-                        keepList.append((name, (oldVersion, oldFlavor),
+                                
+                        keepList.append(((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), 
-                                         makeAbs))
+                                         makeAbs), ignorePin))
                 else:
                     # recurse through this trove's collection even though
                     # it doesn't need to be installed
-                    keepList.append((name, (newVersion, newFlavor),
-                                           (newVersion, newFlavor), False))
+                    keepList.append(((name, (newVersion, newFlavor),
+                                           (newVersion, newFlavor), False),
+                                     ignorePin))
 
         _removeDuplicateErasures(newJob)
 
@@ -1050,7 +1090,8 @@ class ConaryClient:
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
-                        split = False, sync = False, fromChangesets = []):
+                        split = False, sync = False, fromChangesets = [],
+                        checkBucketConflicts = True):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1131,6 +1172,33 @@ class ConaryClient:
             raise NeededTrovesFailure(suggMap)
         elif cannotResolve:
             raise EraseDepFailure(cannotResolve)
+
+        # look for troves which look like they'll conflict (same name/branch
+        # and incompatible install buckets)
+        if not sync and checkBucketConflicts:
+            d = {}
+            conflicts = {}
+            for job in jobSet:
+                if not job[2][0]: continue
+                name, branch = job[0], job[2][0].branch()
+                l = d.setdefault((name, branch), [])
+                l.append(job)
+
+            for jobList in d.values():
+                if len(jobList) < 2: continue
+                trvs = uJob.getTroveSource().getTroves(
+                        [ (x[0], x[2][0], x[2][1]) for x in jobList ],
+                        withFiles = False)
+                buckets = [ x.getInstallBucket() for x in trvs ]
+                
+                for i, job in enumerate(jobList):
+                    for j in range(i):
+                        if not buckets[i].compatibleWith(buckets[j]):
+                            l = conflicts.setdefault(job[0], [])
+                            l.append((job[2], jobList[j][2]))
+
+            if conflicts:
+                raise InstallBucketConflicts(conflicts)
 
         if split:
             startNew = True

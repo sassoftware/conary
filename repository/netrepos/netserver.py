@@ -1225,6 +1225,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                    self.fromFileId(fileId))
         return ids
 
+    def getCollectionMembers(self, authToken, clientVersion, troveName, 
+                                branch):
+	if not self.auth.check(authToken, write = False, 
+                               trove = troveName,
+			       label = self.toBranch(branch).label()):
+	    raise InsufficientPermission
+
+        cu = self.db.cursor()
+
+        cu.execute("""
+            SELECT DISTINCT IncludedItems.item FROM
+                Items, Nodes, Branches, Instances, TroveTroves,
+                Instances AS IncludedInstances,
+                Items AS IncludedItems
+            WHERE
+                Items.item = ? AND
+                Items.itemId = Nodes.itemId AND
+                Nodes.branchId = Branches.branchId AND
+                Branches.branch = ? AND
+                Instances.itemId = Nodes.itemId AND
+                Instances.versionId = Nodes.versionId AND
+                TroveTroves.instanceId = Instances.instanceId AND
+                IncludedInstances.instanceId = TroveTroves.includedId AND
+                IncludedItems.itemId = IncludedInstances.itemId
+            """, troveName, branch)
+
+        return [ x[0] for x in cu ]
+
     def getTrovesBySource(self, authToken, clientVersion, sourceName, 
                           sourceVersion):
 	if not self.auth.check(authToken, write = False, trove = sourceName,

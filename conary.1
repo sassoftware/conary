@@ -156,12 +156,15 @@ Display a summary of what troves will be affected by the update.
 The update is performed on the database, but the filesystem is not
 changed.
 .TP
-.B \-\-no-deps
-Skip dependency resolution and errors.
-.TP
 .B \-\-resolve
 Attempt to automatically resolve all dependencies.
 Can be made the default option by setting the autoResolve flag in conaryrc.
+.TP
+.B \-\-no-conflict-check
+Skip check for troves being installed multiple times from a single branch.
+.TP
+.B \-\-no-deps
+Skip dependency resolution and errors.
 .TP
 .B \-\-no-recurse
 Install only the troves specified, skipping any troves they reference.

@@ -340,8 +340,8 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
-                            cfg.flavor, macros)
+    recipeObj = recipeClass(repos, cfg, sourceVersion.branch(), cfg.flavor, 
+                            macros)
 
     try:
         use.track(True)

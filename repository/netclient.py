@@ -1075,6 +1075,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
                         for x in ids.iteritems())
 
+    def getCollectionMembers(self, troveName, branch):
+        """
+        Returns all members of any collection named troveName on branch.
+        Matches are for all versions and flavors of troveName (though
+        each member trove name is returned only once.
+        """
+        return self.c[branch].getCollectionMembers(troveName, 
+                                                   self.fromBranch(branch))
+
     def getTrovesBySource(self, sourceName, sourceVersion):
         """
         Returns (troveName, version, flavor) lists of all of the troves on the

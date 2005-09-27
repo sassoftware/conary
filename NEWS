@@ -13,6 +13,11 @@ Changes in 0.62.10:
     requirements, and EnforceConfigLogBuildRequirements now demonstrates
     very few false positives, and so has been updated to warning instead
     of info.
+  * Added a check to warn when a trove is installed multiple times from
+    the same branch with incompatible install buckets (--no-conflict-check
+    overrides this check)
+  * Redirects can now redirect to nothing, which allows components to 
+    disappear gracefully on a redirection
 
 Changes in 0.62.9:
   * EnforceConfigLogBuildRequirements policy added.  It looks through

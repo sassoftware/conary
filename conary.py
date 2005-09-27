@@ -126,6 +126,7 @@ def usage(rc = 1):
     print "                 --info"
     print "                 --just-db"
     print "                 --keep-existing"
+    print "                 --no-conflict-check"
     print "                 --no-deps"
     print "                 --no-recurse"
     print "                 --no-resolve"
@@ -185,6 +186,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["no-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
+    argDef["no-conflict-check"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
     argDef["ls"] = NO_PARAM
@@ -476,6 +478,8 @@ def realMain(cfg, argv=sys.argv):
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
+        kwargs['checkBucketConflicts'] = \
+                                not argSet.pop('no-conflict-check', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)

@@ -250,7 +250,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   test = False, justDatabase = False, 
                                   recurse = True, info = False, 
                                   updateByDefault = True, callback = None, 
-                                  split = True, sync = False, fromFiles = []):
+                                  split = True, sync = False, fromFiles = [],
+                                  checkBucketConflicts = True):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -308,7 +309,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       recurse = recurse, info = info, 
                       updateByDefault = updateByDefault, callback = callback, 
                       split = split, sync = sync,
-                      fromChangesets = fromChangesets)
+                      fromChangesets = fromChangesets,
+                      checkBucketConflicts = checkBucketConflicts)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -329,7 +331,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   recurse = True, info = False, 
                                   updateByDefault = True, callback = None, 
                                   split=True, sync = False, 
-                                  fromChangesets = []):
+                                  fromChangesets = [],
+                                  checkBucketConflicts = True):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -343,7 +346,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                test = test, recurse = recurse,
                                updateByDefault = updateByDefault,
                                callback = callback, split = split,
-                               sync = sync, fromChangesets = fromChangesets)
+                               sync = sync, fromChangesets = fromChangesets,
+                               checkBucketConflicts = checkBucketConflicts)
     except:
         callback.done()
         raise

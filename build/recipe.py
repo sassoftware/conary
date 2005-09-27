@@ -1960,7 +1960,7 @@ class RedirectRecipe(Recipe):
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
-                pkgList = self.repos.findTrove(self.label, 
+                pkgList = self.repos.findTrove(self.branch.label(), 
                                                (name, versionStr, desFlavor))
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
@@ -1970,7 +1970,6 @@ class RedirectRecipe(Recipe):
             troveList.append(pkgList[0])
 
         troves = self.repos.getTroves(troveList, withFiles = False)
-        redirections = {}
         for topLevelTrove in troves:
             topName = topLevelTrove.getName()
             topVersion = topLevelTrove.getVersion()
@@ -1996,22 +1995,24 @@ class RedirectRecipe(Recipe):
                     d2 = self.redirections.setdefault(compName, set())
                     d2.add((name, version, flavor))
 
-        for name,d  in redirections:
-            self.redirections[name] = [ (x[0], x[1], x[2]) for x in d ]
+        allComps = self.repos.getCollectionMembers(self.name, self.branch)
+        for compName in allComps:
+            if compName in self.redirections: continue
+            self.redirections[compName] = set()
+            self.redirections[self.name].add((compName, None, None))
 
     def getRedirections(self):
 	return self.redirections
 
-    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
+    def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
         self.redirections = {}
-	self.label = label
+	self.branch = branch
 	self.flavor = flavor
         self.addTroveList = []
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
-
 
 class FilesetRecipe(Recipe):
     # XXX need to work on adding files from different flavors of troves
