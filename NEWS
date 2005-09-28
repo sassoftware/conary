@@ -11,6 +11,9 @@ Changes in 0.62.11:
     dependencies still need to be there so that inter-component
     requirements are honored, but they must not perturb the rest
     of the system.  
+  * Switch group recipe syntax to use r.add() instead of r.addTrove, 
+    r.remove() instead of r.removeTrove(), and add a
+    r.setDefaultGroup() command to set the default group.
 
 Changes in 0.62.10:
   * EnforceSonameBuildRequirements enhanced to handle correctly cases

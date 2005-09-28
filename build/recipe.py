@@ -1341,15 +1341,17 @@ _addRecipeToCopy(AutoPackageRecipe)
 
 class SingleGroup:
 
-    def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = None, ref = None):
+    def add(self, name, versionStr = None, flavor = None, source = None,
+            byDefault = None, ref = None):
         self.addTroveList.append((name, versionStr, flavor, source, 
 				  byDefault, ref)) 
-
-    def removeTrove(self, name, versionStr = None, flavor = None):
+    # maintain addTrove for backwards compat.
+    addTrove = add
+    
+    def remove(self, name, versionStr = None, flavor = None):
         self.removeTroveList.append((name, versionStr, flavor))
 
-    def addAllTroves(self, reference, byDefault = None):
+    def addAll(self, reference, byDefault = None):
         self.addReferenceList.append((reference, byDefault))
 
     def addNewGroup(self, name, byDefault = None):
@@ -1412,7 +1414,7 @@ class SingleGroup:
             for (troveTup, size, isRedirect) in troveList:
                 self._foundTrove(troveTup, size, byDefault, isRedirect)
 
-        # these are references which were used in addAllTroves() commands
+        # these are references which were used in addAll() commands
         for refSource, byDefault in self.addReferenceList:
             troveList = refSource.getSourceTroves()
             troveTups = [ x for x in chain(
@@ -1621,14 +1623,14 @@ class GroupRecipe(Recipe):
 
     def _parseGroupNames(self, groupName):
         if groupName is None:
-            return [self.name]
+            return [self.defaultGroup]
         elif not isinstance(groupName, (list, tuple)):
             return [groupName]
         else:
             return groupName
 
-    def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = None, groupName = None, ref=None):
+    def add(self, name, versionStr = None, flavor = None, source = None,
+            byDefault = None, groupName = None, ref=None):
         groupNames = self._parseGroupNames(groupName)
         flavor = self._parseFlavor(flavor)
         # track this trove in the GroupRecipe so that it can be found
@@ -1638,11 +1640,13 @@ class GroupRecipe(Recipe):
             self.sources.add(ref)
 
         for groupName in groupNames:
-            self.groups[groupName].addTrove(name, versionStr = versionStr,
+            self.groups[groupName].add(name, versionStr = versionStr,
                                                 flavor = flavor,
                                                 source = source,
                                                 byDefault = byDefault, 
                                                 ref = ref)
+    # maintain addTrove for backwards compatability
+    addTrove = add
 
     def setByDefault(self, byDefault=True, groupName=None):
         """ Set whether troves added to this group are installed by default 
@@ -1651,11 +1655,11 @@ class GroupRecipe(Recipe):
             byDefault value for the main group, you set it for any 
             future groups created.
         """
-        groupNames = self._parseGroupNames()
+        groupNames = self._parseGroupNames(groupName)
         for groupName in groupNames:
             self.groups[groupName].setByDefault(byDefault)
 
-    def addAllTroves(self, reference, groupName=None):
+    def addAll(self, reference, groupName=None):
         """ Add all of the troves directly contained in the given 
             reference to groupName.  For example, if the cooked group-foo 
             contains references to the troves 
@@ -1663,7 +1667,7 @@ class GroupRecipe(Recipe):
             the lines 
             ref = r.addReference('group-foo')
             followed by
-            r.addAllTroves(ref)
+            r.addAll(ref)
             would be equivalent to you having added the addTrove lines
             r.addTrove('foo1', <version>) 
             r.addTrove('foo2', <version>) 
@@ -1673,30 +1677,34 @@ class GroupRecipe(Recipe):
 
         groupNames = self._parseGroupNames(groupName)
         for groupName in groupNames:
-            self.groups[groupName].addAllTroves(reference)
+            self.groups[groupName].addAll(reference)
 
-    def removeTrove(self, name, versionStr=None, flavor=None, 
+    def remove(self, name, versionStr=None, flavor=None, 
                     groupName=None):
-        """ Remove a trove added to this group, either by an addAllTroves
+        """ Remove a trove added to this group, either by an addAll
             line or by an addTrove line. 
         """
         groupNames = self._parseGroupNames(groupName)
         flavor = self._parseFlavor(flavor)
         for groupName in groupNames:
-            self.groups[groupName].removeTrove(name, versionStr, flavor)
+            self.groups[groupName].remove(name, versionStr, flavor)
+
+    def setDefaultGroup(self, groupName=None):
+        if groupName is None:
+            self.defaultGroup = self.name
+        self.defaultGroup = groupName
 
     def addReference(self, name, versionStr=None, flavor=None, ref=None):
         flavor = self._parseFlavor(flavor)
         return _GroupReference(((name, versionStr, flavor),), ref)
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
-	if groupName is None:
-	    groupName = self.name
-
+        groupNames = self._parseGroupNames(groupName)
 	if not self.groups.has_key(name):
 	    raise RecipeFileError, 'group %s has not been created' % name
 
-	self.groups[groupName].addNewGroup(name, byDefault)
+        for groupName in groupNames:
+            self.groups[groupName].addNewGroup(name, byDefault)
 
     def getRequires(self, groupName = None):
         if groupName is None: groupName = self.name
@@ -1927,6 +1935,7 @@ class GroupRecipe(Recipe):
         self.troveSpecMap = {}
         self.foundTroves = {}
         self.sources = set()
+        self.defaultGroup = self.name
 
         self.groups = {}
         self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve,   
