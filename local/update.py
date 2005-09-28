@@ -1430,7 +1430,7 @@ def shlibAction(root, shlibList, tagScript = None):
 	    log.error("ldconfig failed")
 
 
-def _checkHandler(root, tag):
+def _checkHandler(tag, root):
     # the tag description and handler are installed together, but
     # the handler (at least in rpath linux) is multitag
     return os.access('/'.join((root, '/etc/conary/tags', tag)), os.R_OK)
@@ -1457,12 +1457,12 @@ class _InfoFile(dict):
             f.close()
         except:
             self._modified = True
-        for line in self._lines:
-            self[line[keyfield]] = line
-            self._idmap[line[idfield]] = line
         if not self._lines:
             self._lines.append(defaultList)
             self._modified = True
+        for line in self._lines:
+            self[line[keyfield]] = line
+            self._idmap[line[idfield]] = line
 
     def addLine(self, lineItems):
         self._lines.append(lineItems)

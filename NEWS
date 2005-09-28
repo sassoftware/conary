@@ -1,3 +1,9 @@
+Changes in 0.62.12:
+  * Conary will no longer create a "rootroot" group while installing
+    users whose primary group is "root".  It will now call the
+    appropriate tag handler for user/group modifications if the tag
+    handler is installed.
+
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
   * The --resume option now works correctly when conary has
