@@ -158,8 +158,6 @@ class HttpHandler(WebHandler):
         # not thousands, this isn't too big of a deal.  In any case this will be
         # removed soon when we move to a paginated browser
         for trove in troves:
-            if ":" in trove:
-                continue
             totals[trove[0].upper()] += 1
         if defaultPage:
             for x in string.uppercase:
