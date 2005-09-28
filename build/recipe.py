@@ -726,6 +726,9 @@ class _AbstractPackageRecipe(Recipe):
 	    self.theMainDir = new % self.macros
 	    self.macros.maindir = self.theMainDir
             self.explicitMainDir |= explicit
+            if explicit:
+                if self.buildinfo:
+                    self.buildinfo.maindir = self.theMainDir
 	return self.theMainDir
 
     def nameVer(self):
@@ -1109,6 +1112,7 @@ class _AbstractPackageRecipe(Recipe):
         Recipe.__init__(self)
 	self._sources = []
 	self._build = []
+        self.buildinfo = False
 
         self._includeSuperClassBuildReqs()
         self.destdirPolicy = destdirpolicy.DefaultPolicy(self)

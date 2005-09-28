@@ -656,6 +656,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
 
+    destdir = ''
+    maindir = ''
     if not resume:
         destdir = ''
 	if os.path.exists(builddir):
@@ -665,6 +667,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             bldInfo.read()
             if 'destdir' in bldInfo:
                 destdir = bldInfo.destdir
+            if 'maindir' in bldInfo:
+                maindir = bldInfo.maindir
         except:
             pass
 
@@ -701,6 +705,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     try:
         bldInfo.begin()
         bldInfo.destdir = destdir
+        if maindir:
+            recipeObj.mainDir(maindir)
         if resume is True:
             resume = bldInfo.lastline
         recipeObj.unpackSources(builddir, destdir, resume)
