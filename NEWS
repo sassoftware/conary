@@ -10,20 +10,7 @@ Changes in 0.62.11:
     an application packages private versions of libraries -- the
     dependencies still need to be there so that inter-component
     requirements are honored, but they must not perturb the rest
-    of the system.  This will prevent (for example) the file
-    /usr/lib/ooo-1.1/program/libstdc++.so from being considered
-    as a resolution for a need for libstdc++.so for programs other
-    than OpenOffice.og; similarly, /usr/lib/firefox/libnss3.so
-    will not be considered as a resolution for libnss3.so for
-    programs other than firefox.  In this example, the file
-    /usr/lib/libnss3.so will provide something like
-    ELF32/libnss3.so(SysV x86), whereas /usr/lib/firefox/libnss3.so
-    will provide something like
-    ELF32/usr/lib/firefox/libnss3.so(SysV x86) instead.
-    Having no path specified in the provided dependency
-    means that the shared library will be found through
-    /etc/ld.so.conf; having a path specified means that
-    other means will be taken.
+    of the system.  
 
 Changes in 0.62.10:
   * EnforceSonameBuildRequirements enhanced to handle correctly cases
