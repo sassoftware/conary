@@ -486,8 +486,8 @@ class ConaryClient:
             return dict.fromkeys(r)
 
         def _lockedList(neededList, ignorePin):
-            #if ignorePin:
-            #    return ( False, ) * len(neededList)
+            if ignorePin:
+                return ( False, ) * len(neededList)
 
             l = [ (x[0], x[1], x[3]) for x in neededList if x[1] is not None ]
             l.reverse()
@@ -754,10 +754,18 @@ class ConaryClient:
             referencedTroves.update(x for x in newTrv.iterTroveList())
 
             alreadyInstalled = _alreadyInstalled(newTrv)
-            locked = _lockedList(neededTroveList, ignorePin)
+
+            if ignorePin and oldVersion:
+                # recursively ignore the pin only if this item is pinned
+                ignorePin = self.db.trovesArePinned(
+                                [ (trvName, oldVersion, oldFlavor ) ] )[0]
+            else:
+                ignorePin = False
+
+            pinned = _lockedList(neededTroveList, ignorePin)
 
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
-                    oldIsPinned in itertools.izip(neededTroveList, locked):
+                    oldIsPinned in itertools.izip(neededTroveList, pinned):
                 if (name, newVersion, newFlavor) not in alreadyInstalled:
                     if oldIsPinned:
                         if newVersion is not None:
