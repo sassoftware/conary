@@ -1636,10 +1636,10 @@ class Provides(_BuildPackagePolicy):
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-	if args or 'exceptions' in keywords:
+	if args:
 	    for filespec in args[1:]:
 		self.provisions.append((filespec, args[0]))
-        else:
+        if 'sonameSubtrees' in keywords:
             sonameSubtrees = keywords.pop('sonameSubtrees')
             if type(sonameSubtrees) in (list, tuple):
                 self.sonameSubtrees.update(set(sonameSubtrees))
