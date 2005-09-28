@@ -635,8 +635,8 @@ class ConaryClient:
 
         # def _mergeGroupChanges -- main body begins here
             
-        # keepList is (job, ignorePins)
-        keepList = []
+        # jobQueue is (job, ignorePins)
+        jobQueue = []
         erasePrimaryList = []
         toOutdate = set()
         newJob = set()
@@ -649,12 +649,12 @@ class ConaryClient:
                     # try and outdate absolute change sets
                     assert(not job[1][0])
                     toOutdate.add(item)
-                keepList.append((job, True))
+                jobQueue.append((job, True))
             else:
                 item = (job[0], job[1][0], job[1][1])
 
                 erasePrimaryList.append(item)
-                keepList.append((job, True))
+                jobQueue.append((job, True))
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -663,12 +663,12 @@ class ConaryClient:
 
         outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
                                                      ineligible)
-        for i, (job, ignorePin) in enumerate(keepList):
+        for i, (job, ignorePin) in enumerate(jobQueue):
             item = (job[0], job[2][0], job[2][1])
 
             if item in outdated:
                 job = (job[0], outdated[item][1:], job[2], False)
-                keepList[i] = (job, ignorePin)
+                jobQueue[i] = (job, ignorePin)
 
         for info in redirects:
             newJob.add((info[0], (info[1], info[2]), (None, None), False))
@@ -677,8 +677,8 @@ class ConaryClient:
 
         referencedTroves = set()
 
-        while keepList:
-            job, ignorePin = keepList.pop()
+        while jobQueue:
+            job, ignorePin = jobQueue.pop()
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
             
@@ -704,7 +704,7 @@ class ConaryClient:
                                           pristine = False)
                 referencedTroves.update(x for x in trv.iterTroveList())
                 for name, version, flavor in trv.iterTroveList():
-                    keepList.append(((name, (version, flavor),
+                    jobQueue.append(((name, (version, flavor),
                                            (version, flavor), False),
                                      ignorePin))
 
@@ -774,7 +774,7 @@ class ConaryClient:
                                                 (newVersion, newFlavor))
                     elif newVersion is None:
                         # add this job to the keeplist to do erase recursion
-                        keepList.append(((name, (oldVersion, oldFlavor),
+                        jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (None, None), False),
                                          False))
                     else:
@@ -791,13 +791,13 @@ class ConaryClient:
                         else:
                             makeAbs = False
                                 
-                        keepList.append(((name, (oldVersion, oldFlavor),
+                        jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), 
                                          makeAbs), ignorePin))
                 else:
                     # recurse through this trove's collection even though
                     # it doesn't need to be installed
-                    keepList.append(((name, (newVersion, newFlavor),
+                    jobQueue.append(((name, (newVersion, newFlavor),
                                            (newVersion, newFlavor), False),
                                      ignorePin))
 
