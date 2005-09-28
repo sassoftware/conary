@@ -550,7 +550,7 @@ class SonameDependencies(DependencyClass):
     tagName = "soname"
     justOne = False
     depClass = Dependency
-    depFormat = 'IDENT/WORD'
+    depFormat = 'IDENT(?:/WORD)*/WORD'
     flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(SonameDependencies)
 
@@ -641,6 +641,11 @@ class DependencySet(object):
 	tag = depClass.tag
         c = self.members.setdefault(tag, depClass())
         c.addDep(dep)
+
+    def iterDeps(self):
+        for depClass in self.members.itervalues():
+            for dep in depClass.members.itervalues():
+                yield depClass.__class__, dep
 
     def addEmptyDepClass(self, depClass):
         """ adds an empty dependency class, which for flavors has 

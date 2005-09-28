@@ -36,6 +36,8 @@ class ELF(Magic):
             # ar doesn't deal with hasDebug
             self.contents['hasDebug'] = elf.hasDebug(fullpath)
 	requires, provides = elf.inspect(fullpath)
+        self.contents['requires'] = requires
+        self.contents['provides'] = provides
         for req in requires:
             if req[0] == 'abi':
                 self.contents['abi'] = req[1:]

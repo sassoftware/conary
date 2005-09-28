@@ -1610,6 +1610,202 @@ def _getmonodis(macros, recipe, path):
     return None
 
 
+class Provides(_BuildPackagePolicy):
+    """
+    Drives provides mechanism: to avoid marking a file as providing things,
+    such as for package-private plugin modules installed in system library
+    directories:
+    C{r.Provides(exceptions=I{filterexp})} or
+    C{r.Provides(I{provision}, I{filterexp}...)}
+    A C{I{provision}} may be a file, soname or an ABI; a C{I{provision}} that
+    starts with 'file' is a file, one that starts with 'soname:' is a
+    soname, and one that starts with 'abi:' is an ABI.  Other prefixes are
+    reserved.  Note: use C{ComponentProvides} to add capability flags to
+    components.
+    """
+    # must come before Requires because Requires depends on _ELFPathProvide
+    # having been run
+    invariantexceptions = (
+	'%(docdir)s/',
+    )
+    monodisPath = None
+
+    def __init__(self, *args, **keywords):
+	self.provisions = []
+        self.sonameSubtrees = set(destdirpolicy.librarydirs)
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	if args:
+	    for filespec in args[1:]:
+		self.provisions.append((filespec, args[0]))
+        else:
+            sonameSubtrees = keywords.pop('sonameSubtrees')
+            if type(sonameSubtrees) in (list, tuple):
+                self.sonameSubtrees.update(set(sonameSubtrees))
+            else:
+                self.sonameSubtrees.add(sonameSubtrees)
+            policy.Policy.updateArgs(self, **keywords)
+
+    def preProcess(self):
+	self.rootdir = self.rootdir % self.macros
+	self.fileFilters = []
+	for filespec, provision in self.provisions:
+	    self.fileFilters.append(
+		(filter.Filter(filespec, self.macros), provision % self.macros))
+	del self.provisions
+        self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
+
+        # interpolate macros
+        sonameSubtrees = set(x % self.macros for x in self.sonameSubtrees)
+        # canonicalize not to have trailing /
+        self.sonameSubtrees = set()
+        for directory in sonameSubtrees:
+            if directory.endswith('/'):
+                directory = directory[:-1]
+            self.sonameSubtrees.add(directory)
+
+    def _ELFNonProvide(self, path, m, pkg, mode):
+        if (path in pkg.providesMap and
+            'soname' in m.contents and not mode & 0111 and
+            not path.endswith('.so')):
+            # libraries must be in a library directory for their
+            # soname to be provided
+            # libraries must be executable for ldconfig to work --
+            # see ExecutableLibraries policy
+            del pkg.providesMap[path]
+
+    def _ELFPathProvide(self, path, m, pkg):
+        basedir = os.path.dirname(path)
+        # thanks to _ELFNonProvide, we know that this is a reasonable library
+        if basedir not in self.sonameSubtrees:
+            # path needs to be in the dependency, since the
+            # provides is too broad otherwise, so add it.
+            # We can only add characters from the path that are legal
+            # in a dependency name
+            basedir = ''.join(x for x in basedir if self.legalCharsRE.match(x))
+            depSet = deps.DependencySet()
+            for depClass, dep in pkg.providesMap[path].iterDeps():
+                if depClass is deps.SonameDependencies:
+                    elfclass, soname = dep.getName()[0].split('/')
+                    name = '%s%s/%s' % (elfclass, basedir, soname)
+                    newdep = deps.Dependency(name, dep.flags)
+                    # tell Requires about this change
+                    self.recipe.Requires(_privateDepMap=(dep, newdep))
+                    dep = newdep
+                depSet.addDep(depClass, dep)
+            pkg.providesMap[path] = depSet
+
+    def _AddCILDeps(self, path, m, pkg, macros):
+        if not m or m.name != 'CIL':
+            return
+        fullpath = macros.destdir + path
+        if not self.monodisPath:
+            self.monodisPath = _getmonodis(macros, self, path)
+            if not self.monodisPath:
+                return
+        p = util.popen('%s --assembly %s' %(
+                       self.monodisPath, fullpath))
+        name = None
+        ver = None
+        for line in [ x.strip() for x in p.readlines() ]:
+            if 'Name:' in line:
+                name = line.split()[1]
+            elif 'Version:' in line:
+                ver = line.split()[1]
+        p.close()
+        # monodis did not give us any info
+        if not name or not ver:
+            return
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        pkg.providesMap[path].addDep(deps.CILDependencies,
+                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+
+    def doFile(self, path):
+	componentMap = self.recipe.autopkg.componentMap
+	if path not in componentMap:
+	    return
+	pkg = componentMap[path]
+	f = pkg.getFile(path)
+        macros = self.recipe.macros
+        m = None
+
+        fullpath = macros.destdir + path
+        if os.path.exists(fullpath):
+            m = self.recipe.magic[path]
+            mode = os.lstat(fullpath)[stat.ST_MODE]
+            if m and m.name == 'ELF':
+                self._ELFNonProvide(path, m, pkg, mode)
+                self._ELFPathProvide(path, m, pkg)
+            if m and m.name == 'CIL':
+                self._AddCILDeps(path, m, pkg, macros)
+
+        for (filter, provision) in self.fileFilters:
+            if filter.match(path):
+                self._markProvides(path, provision, pkg, m, f)
+
+        if path not in pkg.providesMap:
+            return
+        f.provides.set(pkg.providesMap[path])
+        pkg.provides.union(f.provides())
+
+        # Because paths can change, individual files do not provide their
+        # paths.  However, within a trove, a file does provide its name.
+        # Furthermore, non-regular files can be path dependency targets 
+        # Therefore, we have to handle this case a bit differently.
+        if f.flags.isPathDependencyTarget():
+            pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
+
+    def _markProvides(self, path, provision, pkg, m, f):
+        if path not in pkg.providesMap:
+            # BuildPackage only fills in providesMap for ELF files; we may
+            # need to create a few more DependencySets.
+            pkg.providesMap[path] = deps.DependencySet()
+
+        if provision.startswith("file"):
+            # can't actually specify what to provide, just that it provides...
+            f.flags.isPathDependencyTarget(True)
+            return
+
+        if provision.startswith("abi:"):
+            abistring = provision[4:].strip()
+            op = abistring.index('(')
+            abi = abistring[:op]
+            flags = abistring[op+1:-1].split()
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+            pkg.providesMap[path].addDep(deps.AbiDependency,
+                deps.Dependency(abi, flags))
+            return
+
+        if provision.startswith("soname:"):
+            if m and m.name == 'ELF':
+                # Only ELF files can provide sonames.
+                # This is for libraries that don't really include a soname,
+                # but programs linked against them require a soname
+                main = provision[7:].strip()
+                main = ''.join(x for x in main if self.legalCharsRE.match(x))
+                soflags = []
+                if '(' in main:
+                    # get list of arbitrary flags
+                    main, rest = main.split('(')
+                    soflags.extend(rest[:-1].split())
+                abi = m.contents['abi']
+                soflags.extend(abi[1])
+                flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in soflags ]
+                # normpath removes extra / characters
+                dep = deps.Dependency(
+                    os.path.normpath('/'.join((abi[0], main))), flags)
+                pkg.providesMap[path].addDep(deps.SonameDependencies, dep)
+                if '/' in main:
+                    # basename removes path, so that we can map
+                    # requirements in Requires
+                    plaindep = deps.Dependency(
+                        '/'.join((abi[0], os.path.basename(main))), flags)
+                    self.recipe.Requires(_privateDepMap=(plaindep, dep))
+            return
+
+
 class Requires(_addInfo, _BuildPackagePolicy):
     # _addInfo must come first to use its updateArgs() member
     # _BuildPackagePolicy provides package-walking do() member
@@ -1626,6 +1822,34 @@ class Requires(_addInfo, _BuildPackagePolicy):
 	'%(docdir)s/',
     )
     monodisPath = None
+    _privateDepMap = {}
+
+    def updateArgs(self, *args, **keywords):
+        # _privateDepMap is used only for Provides to talk to Requires
+        privateDepMap = keywords.pop('_privateDepMap', None)
+        if privateDepMap:
+            self._privateDepMap.update([privateDepMap])
+        _addInfo.updateArgs(self, *args, **keywords)
+
+    def _ELFPathFixup(self, path, m, pkg):
+        """
+        Change requirements to have path in soname if appropriate
+        """
+        # common case is no modification, so make that fastest
+        found = False
+        for depClass, dep in pkg.requiresMap[path].iterDeps():
+            if dep in self._privateDepMap:
+                found = True
+        if not found:
+            return
+
+        # found a replacement, make it
+        depSet = deps.DependencySet()
+        for depClass, dep in pkg.requiresMap[path].iterDeps():
+            if dep in self._privateDepMap:
+                dep = self._privateDepMap[dep]
+            depSet.addDep(depClass, dep)
+        pkg.requiresMap[path] = depSet
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -1634,6 +1858,12 @@ class Requires(_addInfo, _BuildPackagePolicy):
 	pkg = componentMap[path]
 	f = pkg.getFile(path)
         macros = self.recipe.macros
+        m = self.recipe.magic[path]
+
+        # we may have some dependencies that need converting
+        if (self._privateDepMap and m and m.name == 'ELF'
+            and path in pkg.requiresMap):
+            self._ELFPathFixup(path, m, pkg)
 
         # now go through explicit requirements
 	for info in self.included:
@@ -1642,25 +1872,22 @@ class Requires(_addInfo, _BuildPackagePolicy):
                     self._markManualRequirement(info, path, pkg)
 
         # now check for automatic dependencies besides ELF
-        m = self.recipe.magic[path]
-
-        if f.inode.perms() & 0111:
-            if m and m.name == 'script':
-                interp = m.contents['interpreter']
-                if len(interp.strip()) and self._checkInclusion(interp, path):
-                    # no interpreter string warning is in BadInterpreterPaths
-                    if not (os.path.exists(interp) or
-                            os.path.exists(macros.destdir+interp)):
-                        # this interpreter not on system, warn
-                        # cannot be an error to prevent buildReq loops
-                        self.warn('interpreter "%s" (referenced in %s) missing',
-                            interp, path)
-                        # N.B. no special handling for /{,usr/}bin/env here;
-                        # if there has been an exception to
-                        # NormalizeInterpreterPaths, then it is a
-                        # real dependency on the env binary
-                    self._addRequirement(path, interp, [], pkg,
-                                         deps.FileDependencies)
+        if f.inode.perms() & 0111 and m and m.name == 'script':
+            interp = m.contents['interpreter']
+            if len(interp.strip()) and self._checkInclusion(interp, path):
+                # no interpreter string warning is in BadInterpreterPaths
+                if not (os.path.exists(interp) or
+                        os.path.exists(macros.destdir+interp)):
+                    # this interpreter not on system, warn
+                    # cannot be an error to prevent buildReq loops
+                    self.warn('interpreter "%s" (referenced in %s) missing',
+                        interp, path)
+                    # N.B. no special handling for /{,usr/}bin/env here;
+                    # if there has been an exception to
+                    # NormalizeInterpreterPaths, then it is a
+                    # real dependency on the env binary
+                self._addRequirement(path, interp, [], pkg,
+                                     deps.FileDependencies)
 
         if m and m.name == 'CIL':
             fullpath = macros.destdir + path
@@ -1727,170 +1954,6 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if flags:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
-
-
-class Provides(_BuildPackagePolicy):
-    """
-    Drives provides mechanism: to avoid marking a file as providing things,
-    such as for package-private plugin modules installed in system library
-    directories:
-    C{r.Provides(exceptions=I{filterexp})} or
-    C{r.Provides(I{provision}, I{filterexp}...)}
-    A C{I{provision}} may be a file, soname or an ABI; a C{I{provision}} that
-    starts with 'file' is a file, one that starts with 'soname:' is a
-    soname, and one that starts with 'abi:' is an ABI.  Other prefixes are
-    reserved.  Note: use C{ComponentProvides} to add capability flags to
-    components.
-    """
-    invariantexceptions = (
-	'%(docdir)s/',
-    )
-    monodisPath = None
-
-    def __init__(self, *args, **keywords):
-	self.provisions = []
-        self.sonameSubtrees = set(destdirpolicy.librarydirs)
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def updateArgs(self, *args, **keywords):
-	if args:
-	    for filespec in args[1:]:
-		self.provisions.append((filespec, args[0]))
-        else:
-            sonameSubtrees = keywords.pop('sonameSubtrees')
-            if type(sonameSubtrees) in (list, tuple):
-                self.sonameSubtrees.update(set(sonameSubtrees))
-            else:
-                self.sonameSubtrees.add(sonameSubtrees)
-            policy.Policy.updateArgs(self, **keywords)
-
-    def preProcess(self):
-	self.rootdir = self.rootdir % self.macros
-	self.fileFilters = []
-	for (filespec, provision) in self.provisions:
-	    self.fileFilters.append(
-		(filter.Filter(filespec, self.macros), provision))
-	del self.provisions
-
-        # interpolate macros
-        sonameSubtrees = set(x % self.macros
-                                  for x in self.sonameSubtrees)
-        # canonicalize not to have trailing /
-        self.sonameSubtrees = set()
-        for directory in sonameSubtrees:
-            if directory.endswith('/'):
-                directory = directory[:-1]
-            self.sonameSubtrees.add(directory)
-
-    def _ELFNonProvide(self, path, m, pkg, mode):
-        basedir = os.path.dirname(path)
-        if path in pkg.providesMap and (
-            (basedir not in self.sonameSubtrees) or
-            (m and m.name == 'ELF' and
-             'soname' in m.contents and not mode & 0111 and
-             not path.endswith('.so'))):
-            # libraries must be in a library directory for their
-            # soname to be provided
-            # libraries must be executable for ldconfig to work --
-            # see ExecutableLibraries policy
-            del pkg.providesMap[path]
-
-    def _AddCILDeps(self, path, m, pkg, macros):
-        if not m or m.name != 'CIL':
-            return
-        fullpath = macros.destdir + path
-        if not self.monodisPath:
-            self.monodisPath = _getmonodis(macros, self, path)
-            if not self.monodisPath:
-                return
-        p = util.popen('%s --assembly %s' %(
-                       self.monodisPath, fullpath))
-        name = None
-        ver = None
-        for line in [ x.strip() for x in p.readlines() ]:
-            if 'Name:' in line:
-                name = line.split()[1]
-            elif 'Version:' in line:
-                ver = line.split()[1]
-        p.close()
-        # monodis did not give us any info
-        if not name or not ver:
-            return
-        if path not in pkg.providesMap:
-            pkg.providesMap[path] = deps.DependencySet()
-        pkg.providesMap[path].addDep(deps.CILDependencies,
-                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
-
-    def doFile(self, path):
-	componentMap = self.recipe.autopkg.componentMap
-	if path not in componentMap:
-	    return
-	pkg = componentMap[path]
-	f = pkg.getFile(path)
-        macros = self.recipe.macros
-        m = None
-
-        fullpath = macros.destdir + path
-        if os.path.exists(fullpath):
-            m = self.recipe.magic[path]
-            mode = os.lstat(fullpath)[stat.ST_MODE]
-            self._ELFNonProvide(path, m, pkg, mode)
-            self._AddCILDeps(path, m, pkg, macros)
-
-        for (filter, provision) in self.fileFilters:
-            if filter.match(path):
-                self._markProvides(path, provision, pkg, m, f)
-
-        if path not in pkg.providesMap:
-            return
-        f.provides.set(pkg.providesMap[path])
-        pkg.provides.union(f.provides())
-
-        # Because paths can change, individual files do not provide their
-        # paths.  However, within a trove, a file does provide its name.
-        # Furthermore, non-regular files can be path dependency targets 
-        # Therefore, we have to handle this case a bit differently.
-        if f.flags.isPathDependencyTarget():
-            pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
-
-    def _markProvides(self, path, provision, pkg, m, f):
-        if path not in pkg.providesMap:
-            # BuildPackage only fills in providesMap for ELF files; we may
-            # need to create a few more DependencySets.
-            pkg.providesMap[path] = deps.DependencySet()
-
-        if provision.startswith("file"):
-            # can't actually specify what to provide, just that it provides...
-            f.flags.isPathDependencyTarget(True)
-            return
-
-        if provision.startswith("abi:"):
-            abistring = provision[4:].strip()
-            op = abistring.index('(')
-            abi = abistring[:op]
-            flags = abistring[op+1:-1].split()
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
-            pkg.providesMap[path].addDep(deps.AbiDependency,
-                deps.Dependency(abi, flags))
-            return
-
-        if provision.startswith("soname:"):
-            if m and m.name == 'ELF':
-                # Only ELF files can provide sonames.
-                # This is for libraries that don't really include a soname,
-                # but programs linked against them require a soname
-                main = provision[7:].strip()
-                soflags = []
-                if '(' in main:
-                    # get list of arbitrary flags
-                    main, rest = main.split('(')
-                    soflags.extend(rest[:-1].split())
-                abi = m.contents['abi']
-                soflags.extend(abi[1])
-                flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in soflags ]
-                pkg.providesMap[path].addDep(deps.SonameDependencies,
-                    deps.Dependency('/'.join((abi[0], main)), flags))
-            return
 
 
 class Flavor(_BuildPackagePolicy):
@@ -2260,8 +2323,8 @@ def DefaultPolicy(recipe):
         UtilizeGroup(recipe),
 	ComponentRequires(recipe),
         ComponentProvides(recipe),
-	Requires(recipe),
 	Provides(recipe),
+	Requires(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
         EnforceConfigLogBuildRequirements(recipe),
