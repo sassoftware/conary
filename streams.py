@@ -392,7 +392,7 @@ class StreamCollection(InfoStream):
     def freeze(self, skipSet = {}):
         l = []
         for typeId, itemDict in sorted(self._items.iteritems()):
-            for item in itemDict:
+            for item in sorted(itemDict):
                 s = item.freeze()
                 l.append(struct.pack("!BH", typeId, len(s)))
                 l.append(s)
