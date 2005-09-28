@@ -1,3 +1,6 @@
+Changes in 0.62.11:
+  * InstallBucket policy now allows using macros in component names.
+
 Changes in 0.62.10:
   * EnforceSonameBuildRequirements enhanced to handle correctly cases
     where more than one trove can resolve a single soname dependency.
