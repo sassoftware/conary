@@ -1636,7 +1636,7 @@ class Provides(_BuildPackagePolicy):
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-	if args:
+	if args or 'exceptions' in keywords:
 	    for filespec in args[1:]:
 		self.provisions.append((filespec, args[0]))
         else:
@@ -1645,7 +1645,7 @@ class Provides(_BuildPackagePolicy):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
-            policy.Policy.updateArgs(self, **keywords)
+        policy.Policy.updateArgs(self, **keywords)
 
     def preProcess(self):
 	self.rootdir = self.rootdir % self.macros
