@@ -649,12 +649,12 @@ class ConaryClient:
                     # try and outdate absolute change sets
                     assert(not job[1][0])
                     toOutdate.add(item)
-                jobQueue.append((job, True))
+                jobQueue.append(job)
             else:
                 item = (job[0], job[1][0], job[1][1])
 
                 erasePrimaryList.append(item)
-                jobQueue.append((job, True))
+                jobQueue.append(job)
 
         # Find out what the primaries outdate (we need to know that to
         # find the collection deltas). While we're at it, remove anything
@@ -663,22 +663,46 @@ class ConaryClient:
 
         outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
                                                      ineligible)
-        for i, (job, ignorePin) in enumerate(jobQueue):
+        for i, job in enumerate(jobQueue):
             item = (job[0], job[2][0], job[2][1])
 
             if item in outdated:
                 job = (job[0], outdated[item][1:], job[2], False)
-                jobQueue[i] = (job, ignorePin)
+                jobQueue[i] = job
 
         for info in redirects:
             newJob.add((info[0], (info[1], info[2]), (None, None), False))
 
         del toOutdate
 
+        # look up pin status for troves being removed
+        removedList = [ (x[0], x[1][0], x[1][1]) for x in jobQueue if
+                            x[1][0] is not None ]
+        pins = self.db.trovesArePinned(removedList)
+        pins.reverse()
+        for i, job in enumerate(jobQueue):
+            if job[1][0] is None: 
+                # it doesn't matter what we put here since it's an install
+                jobQueue[i] = (job, True, False)
+            else:
+                pin = pins.pop()
+                jobQueue[i] = (job, True, pin)
+        del removedList, pins
+
         referencedTroves = set()
 
         while jobQueue:
-            job, ignorePin = jobQueue.pop()
+            job, ignorePin, isPinned = jobQueue.pop()
+
+            if isPinned and not ignorePin:
+                # the outdated item is pinned and we can't ignore the
+                # pin; just keep going
+                if newVersion is not None:
+                    uJob.addPinMapping(name, 
+                                        (oldVersion, oldFlavor),
+                                        (newVersion, newFlavor))
+                continue
+
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
             
@@ -706,7 +730,7 @@ class ConaryClient:
                 for name, version, flavor in trv.iterTroveList():
                     jobQueue.append(((name, (version, flavor),
                                            (version, flavor), False),
-                                     ignorePin))
+                                     ignorePin, False))
 
                 del trv
                 continue
@@ -767,16 +791,11 @@ class ConaryClient:
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
                     oldIsPinned in itertools.izip(neededTroveList, pinned):
                 if (name, newVersion, newFlavor) not in alreadyInstalled:
-                    if oldIsPinned:
-                        if newVersion is not None:
-                            uJob.addPinMapping(name, 
-                                                (oldVersion, oldFlavor),
-                                                (newVersion, newFlavor))
-                    elif newVersion is None:
+                    if newVersion is None:
                         # add this job to the keeplist to do erase recursion
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (None, None), False),
-                                         False))
+                                          ignorePin and isPinned, oldIsPinned))
                     else:
                         if oldVersion is None and job[1][0] is None:
                             # this is absolute if the original job for the
@@ -793,13 +812,14 @@ class ConaryClient:
                                 
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), 
-                                         makeAbs), ignorePin))
+                                         makeAbs), ignorePin and isPinned, 
+                                         oldIsPinned))
                 else:
                     # recurse through this trove's collection even though
                     # it doesn't need to be installed
                     jobQueue.append(((name, (newVersion, newFlavor),
                                            (newVersion, newFlavor), False),
-                                     ignorePin))
+                                     ignorePin, False))
 
         _removeDuplicateErasures(newJob)
 
