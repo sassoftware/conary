@@ -1784,12 +1784,12 @@ class Provides(_BuildPackagePolicy):
                 # This is for libraries that don't really include a soname,
                 # but programs linked against them require a soname
                 main = provision[7:].strip()
-                main = ''.join(x for x in main if self.legalCharsRE.match(x))
                 soflags = []
                 if '(' in main:
                     # get list of arbitrary flags
                     main, rest = main.split('(')
                     soflags.extend(rest[:-1].split())
+                main = ''.join(x for x in main if self.legalCharsRE.match(x))
                 abi = m.contents['abi']
                 soflags.extend(abi[1])
                 flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in soflags ]
