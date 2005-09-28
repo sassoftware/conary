@@ -1687,11 +1687,12 @@ class Provides(_BuildPackagePolicy):
             depSet = deps.DependencySet()
             for depClass, dep in pkg.providesMap[path].iterDeps():
                 if depClass is deps.SonameDependencies:
-                    elfclass, soname = dep.getName()[0].split('/')
+                    oldname = dep.getName()[0]
+                    elfclass, soname = oldname.split('/')
                     name = '%s%s/%s' % (elfclass, basedir, soname)
                     newdep = deps.Dependency(name, dep.flags)
                     # tell Requires about this change
-                    self.recipe.Requires(_privateDepMap=(dep, newdep))
+                    self.recipe.Requires(_privateDepMap=(oldname, newdep))
                     dep = newdep
                 depSet.addDep(depClass, dep)
             pkg.providesMap[path] = depSet
@@ -1800,9 +1801,8 @@ class Provides(_BuildPackagePolicy):
                 if '/' in main:
                     # basename removes path, so that we can map
                     # requirements in Requires
-                    plaindep = deps.Dependency(
-                        '/'.join((abi[0], os.path.basename(main))), flags)
-                    self.recipe.Requires(_privateDepMap=(plaindep, dep))
+                    plainname = '/'.join((abi[0], os.path.basename(main)))
+                    self.recipe.Requires(_privateDepMap=(plainname, dep))
             return
 
 
@@ -1835,19 +1835,23 @@ class Requires(_addInfo, _BuildPackagePolicy):
         """
         Change requirements to have path in soname if appropriate
         """
-        # common case is no modification, so make that fastest
+        # common case is no likely modification, so make that fastest
         found = False
         for depClass, dep in pkg.requiresMap[path].iterDeps():
-            if dep in self._privateDepMap:
+            if dep.getName()[0] in self._privateDepMap:
                 found = True
         if not found:
             return
 
-        # found a replacement, make it
+        # found at least one potential replacement, do the real work
         depSet = deps.DependencySet()
         for depClass, dep in pkg.requiresMap[path].iterDeps():
-            if dep in self._privateDepMap:
-                dep = self._privateDepMap[dep]
+            oldName = dep.getName()[0]
+            if oldName in self._privateDepMap:
+                newprov = self._privateDepMap[oldName]
+                if set(dep.flags.keys()).issubset(set(newprov.flags.keys())):
+                    # we need the new name, but we need to keep the old flags
+                    dep = deps.Dependency(newprov.getName()[0], dep.flags)
             depSet.addDep(depClass, dep)
         pkg.requiresMap[path] = depSet
 
