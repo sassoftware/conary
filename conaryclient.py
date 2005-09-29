@@ -706,18 +706,14 @@ class ConaryClient:
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
             
-            if oldVersion != newVersion or oldFlavor != newFlavor:
-                newJob.add(job)
-
-            if not recurse:
-                continue
-
             # XXX it's crazy that we have to use the name of the trove to
             # figure out if it's a collection or not, but these changesets
             # are sans files (for performance), so that's what we're left
             # with
             if trvName.startswith('fileset-') or trvName.find(":") != -1:
-                continue
+                isCollection = False
+            else:
+                isCollection = True
 
             if oldVersion == newVersion and oldFlavor == newFlavor:
                 # We need to install something which is already installed.
@@ -735,6 +731,8 @@ class ConaryClient:
                 del trv
                 continue
 
+            newJob.add(job)
+            
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
             if newVersion is not None:
@@ -749,7 +747,11 @@ class ConaryClient:
                 newTrv = trove.Trove(trvName, versions.NewVersion(), oldFlavor,
                                      None)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
-                del finalTrvCs
+                del finalTrvCs, oldTrv, fileList
+            elif not isCollection:
+                newTrv = newPristine
+                neededTroveList = []
+                del newPristine
             elif oldVersion is None:
                 # Read the comments at the top of _newBase if you hope
                 # to understand any of this.
@@ -758,7 +760,7 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
-                del finalTrvCs, localTrv
+                del finalTrvCs, localTrv, oldTrv, fileList, newPristine
             else:
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                        pristine = True)
@@ -768,12 +770,10 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
-                del finalTrvCs, localTrv
+                del finalTrvCs, localTrv, oldTrv, fileList, newPristine
 
-            assert(not oldTrv.hasFiles())
-            del oldTrv
-            assert(not fileList)
-            del fileList
+            if not recurse:
+                continue
 
             referencedTroves.update(x for x in newTrv.iterTroveList())
 
