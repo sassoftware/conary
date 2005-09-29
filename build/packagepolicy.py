@@ -2189,6 +2189,8 @@ class EnforceConfigLogBuildRequirements(policy.Policy):
                     self.pathExceptions.add(exception)
                 else:
                     self.compExceptions.add(exception)
+        # never suggest a recursive buildRequires
+        self.compExceptions.update(set(self.recipe.autopkg.components.keys()))
         self.exceptions = None
 
     def foundPath(self, line):
