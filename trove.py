@@ -706,8 +706,6 @@ class Trove(streams.LargeStreamSet):
         # be inferred, but having to do so is dumb. This operation really
         # ought to work on two trove changesets. It works on the two other
         # troves (and calculates the rest) becaues of this flaw.
-        #import lib
-        #lib.epdb.st()
 
         primaryJob = diffJob(primaryDeriv)
         secondaryJob = diffJob(secondaryDeriv)
@@ -891,9 +889,6 @@ class Trove(streams.LargeStreamSet):
         errors
         @type redundantOkay: boolean
         """
-
-        #import lib
-        #lib.epdb.st('f')
 
         for (name, list) in changeList:
             for (oper, version, flavor, byDefault) in list:
