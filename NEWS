@@ -14,6 +14,8 @@ Changes in 0.62.12:
     sources or binaries are shadowed. 
   * Branch and shadow commands now take an unlimited number of troves
     to branch/shadow.
+  * Files sharing versions but with different contents (thanks to flavors)
+    got lost when switching from one flavor of a trove to another
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
