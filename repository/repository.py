@@ -461,11 +461,10 @@ class ChangeSetJob:
                 if fileHostFilter and \
                  newVersion.branch().label().getHost() not in fileHostFilter:
                     fileObj = None
-		elif tuple is None or oldVersion == newVersion:
+		elif tuple is None or (oldVersion == newVersion and
+                                       oldFileId == fileId):
 		    # the file didn't change between versions; we can just
 		    # ignore it
-		    fileObj = None
-		elif oldVersion == newVersion:
 		    fileObj = None
 		else:
 		    diff = cs.getFileChange(oldFileId, fileId)
