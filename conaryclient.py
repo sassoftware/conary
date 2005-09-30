@@ -795,8 +795,6 @@ class ConaryClient:
                     oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                            pristine = True)
 
-                import lib
-                lib.epdb.st('f')
                 oldBucket = _getBucket(uJob.getTroveSource(), self.db, oldTrv, 
                                        isCollection, inDb = True)
                 newBucket = _getBucket(uJob.getTroveSource(), self.db, newTrv, 
@@ -903,9 +901,28 @@ class ConaryClient:
 
             for (newInfo, oldInfo), oldIsPinned in zip(replacedTroves,
                                                        replacedArePinned):
-                if not oldIsPinned:
+                if oldIsPinned:
+                    oldTrv = self.db.getTrove(withFiles = False, *oldInfo)
+                    newTrv = uJob.getTroveSource().getTrove(withFiles = False,
+                                                            *newInfo)
+
+                    if newInfo[0].startswith('fileset-') or \
+                                        newInfo[0].find(":") != -1:
+                        isCollection = False
+                    else:
+                        isCollection = True
+
+                    oldBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                                           oldTrv, isCollection, inDb = True)
+                    newBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                                           newTrv, isCollection)
+                    if oldBucket.compatibleWith(newBucket):
+                        newJob.add((newInfo[0], (None, None),
+                                    (newInfo[1], newInfo[2]), False))
+                else:
+                    # the old one isn't pinned
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
-                                (newInfo[1], newInfo[2]), 0))
+                                (newInfo[1], newInfo[2]), False))
 
         # _findErasures picks what gets erased; nothing else gets to vote
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
