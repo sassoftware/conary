@@ -6,6 +6,8 @@ Changes in 0.62.12:
   * EnforceConfigLogBuildRequirements no longer suggests recursive
     build requirements for packages in which the configure script
     checks to see if the package is already installed.
+  * Installing new version of pinned troves leaves the pinned trove in
+    place if the two troves have compatible install buckets
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
