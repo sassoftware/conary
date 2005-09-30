@@ -144,6 +144,19 @@ class InstallBucket(streams.StreamCollection):
 
         return True
 
+    def intersect(self, other):
+        new = InstallBucket()
+        otherDict = dict(other)
+
+        for key, value in self.iteritems():
+            if otherDict.get(key, value) == value:
+                new.add(key, value)
+
+        return new
+
+    def __str__(self):
+        return ', '.join('='.join(x) for x in self.iteritems())
+
 _DIGSIG_FINGERPRINT   = 0
 _DIGSIG_SIGNATURE     = 1
 _DIGSIG_TIMESTAMP     = 2
