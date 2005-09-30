@@ -1,3 +1,11 @@
+Changes in 0.62.13:
+  * By default, when you shadow a binary trove, its source is shadowed with it.
+  * Instead of a --sources option, cvc shadow and cvc branch now take
+    --source-only and --binary-only options that allow you to control whether
+    sources or binaries are shadowed. 
+  * Branch and shadow commands now take an unlimited number of troves
+    to branch/shadow.
+
 Changes in 0.62.12:
   * Conary will no longer create a "rootroot" group while installing
     users whose primary group is "root".  It will now call the

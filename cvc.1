@@ -126,9 +126,10 @@ Show the version, date, and author of each of the lines in \fI<file>.
 .B branch \fInewbranch [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Creates a new branch (identified by the label \fInewbranch\fP) in the
 repository, relative to the branch specified in \fIversion\fP.
-The \fBtrovename\fR, and any troves it references 
-are recursively branched. If \fB-\-sources\fR is specified, the source
+By default, if a binary trove is given, the binary and its source are
+branched.  If \fB-\-source-only\fR is specified, the source
 trove for each binary trove is branched, instead of the binary trove.
+If \fB-\-binary-only\fR is specified, no source troves are branched.
 .TP
 .B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
 Check the \fI<trove>\fB:source\fR component out of the repository
@@ -181,10 +182,11 @@ and marks it to be removed from the repository at the next
 .TP
 .B shadow \fInewshadow [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Creates a new shadow (identified by the label \fInewshadow\fP) in the
-repository, relative to the branch specified in \fIversion\fP.
-The \fBtrovename\fR, and any troves it references 
-are recursively shadowed. If \fB-\-sources\fR is specified, the source
+repository, relative to the shadow specified in \fIversion\fP.
+By default, if a binary trove is given, the binary and its source are
+shadowed.  If \fB-\-source-only\fR is specified, the source
 trove for each binary trove is shadowed, instead of the binary trove.
+If \fB-\-binary-only\fR is specified, no source troves are shadowed.
 The shadow command works just like the branch command, except that
 it creates a shadow instead of a branch.
 .TP

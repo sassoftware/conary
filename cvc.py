@@ -74,7 +74,8 @@ def usage(rc = 1):
     print "                <trove2>[=version2][[flavor2]]..."
     print "       cvc update <version>"
     print 
-    print "branch flags:  --sources"
+    print "branch flags:  --just-source"
+    print "               --just-binary"
     print
     print 'common flags:  --build-label <label>'
     print '               --config-file <path>'
@@ -101,7 +102,8 @@ def usage(rc = 1):
     print ""
     print "commit flags:  --message <msg>"
     print ""
-    print "shadow flags:  --sources"
+    print "shadow flags:  --source-only"
+    print "               --binary-only"
     return rc
 
 def realMain(cfg, argv=sys.argv):
@@ -115,6 +117,7 @@ def realMain(cfg, argv=sys.argv):
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
+    argDef["binary-only"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
@@ -133,6 +136,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["sources"] = NO_PARAM
+    argDef["source-only"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["unknown-flags"] = NO_PARAM
@@ -194,19 +198,20 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	args = [repos, cfg, dir, args[1], callback]
 	checkin.checkout(*args)
     elif (args[0] == "branch" or args[0] == "shadow"):
-        extraArgs = { 'makeShadow' : (args[0] == "shadow") }
-
-        extraArgs['sourceTroves'] = argSet.has_key('sources')
-        if extraArgs['sourceTroves']:
-            del argSet['sources']
+        makeShadow =  (args[0] == "shadow")
+        sourceOnly = argSet.pop('source-only', False)
+        binaryOnly = argSet.pop('binary-only', False)
 
         if argSet: return usage()
-        if len(args) != 3: return usage()
+        if len(args) < 3: return usage()
 
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
+        target = args[1]
+        troveSpecs = args[2:]
 
-        args = [repos, cfg, ] + args[1:] 
-        branch.branch(*args, **extraArgs)
+        branch.branch(repos, cfg, target, troveSpecs, makeShadow=makeShadow, 
+                      sourceOnly=sourceOnly, binaryOnly=binaryOnly)
+
     elif (args[0] == "commit") or (args[0] == "ci"): # mimic cvs's shortcuts
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)

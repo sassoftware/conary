@@ -15,28 +15,39 @@
 """
 Implements branch and shadow command line functionality.
 """
+import itertools
 
 import conaryclient
 import versions
 from lib import log
 import updatecmd
 
-def branch(repos, cfg, newLabel, troveSpec, makeShadow = False,
-           sourceTroves = False):
+def _getBranchType(binaryOnly, sourceOnly):
+    if binaryOnly and sourceOnly:
+        raise OptionsError, ('Can only specify one of --binary-only and'
+                             ' --source-only')
+    if binaryOnly:
+        return conaryclient.BRANCH_BINARY_ONLY
+    elif sourceOnly:
+        return conaryclient.BRANCH_SOURCE_ONLY
+    else:
+        return conaryclient.BRANCH_ALL
+
+def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
+           sourceOnly = False, binaryOnly = False):
+    branchType = _getBranchType(binaryOnly, sourceOnly)
+
     client = conaryclient.ConaryClient(cfg)
 
-    (troveName, versionSpec, flavor) = updatecmd.parseTroveSpec(troveSpec)
+    troveSpecs = [ updatecmd.parseTroveSpec(x) for x in troveSpecs ]
 
-    troveList = repos.findTrove(cfg.buildLabel, 
-                                (troveName, versionSpec, flavor), 
-                                cfg.buildFlavor)
+    result = repos.findTroves(cfg.buildLabel, troveSpecs, cfg.buildFlavor)
+    troveList = [ x for x in itertools.chain(*result.itervalues())]
 
     if makeShadow:
-        dups = client.createShadow(newLabel, troveList,
-                                   sourceTroves = sourceTroves)
+        dups = client.createShadow(newLabel, troveList, branchType=branchType)
     else:
-        dups = client.createBranch(newLabel, troveList,
-                                   sourceTroves = sourceTroves)
+        dups = client.createBranch(newLabel, troveList, branchType=branchType)
 
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())

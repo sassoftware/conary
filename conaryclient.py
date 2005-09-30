@@ -32,6 +32,10 @@ from repository import changeset
 from repository import trovesource
 from repository.netclient import NetworkRepositoryClient
 
+BRANCH_ALL         = 0
+BRANCH_SOURCE_ONLY = 1
+BRANCH_BINARY_ONLY = 2
+
 class ClientError(Exception):
     """Base class for client errors"""
 
@@ -1477,16 +1481,16 @@ class ConaryClient:
 
         return md
 
-    def createBranch(self, newLabel, troveList = [], sourceTroves = True):
+    def createBranch(self, newLabel, troveList = [], branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
-                                     sourceTroves = sourceTroves)
+                                          branchType = branchType)
 
-    def createShadow(self, newLabel, troveList = [], sourceTroves = True):
+    def createShadow(self, newLabel, troveList = [], branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
-                                     sourceTroves = sourceTroves)
+                                          branchType = branchType)
 
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
-                              sourceTroves):
+                              branchType=BRANCH_ALL):
         cs = changeset.ChangeSet()
 
         seen = set(troveList)
@@ -1503,31 +1507,44 @@ class ConaryClient:
             branchedTroves = {}
 
 	    for trove in troves:
-
                 # add contained troves to the todo-list
                 newTroves = [ x for x in trove.iterTroveList() if x not in seen ]
                 troveList.update(newTroves)
                 seen.update(newTroves)
 
-                if sourceTroves and not trove.getName().endswith(':source'):
+                troveName = trove.getName()
+
+                if troveName.endswith(':source'):
+                    if branchType == BRANCH_BINARY_ONLY:
+                        continue
+
+                elif branchType != BRANCH_BINARY_ONLY:
+                    # name doesn't end in :source - if we want 
+                    # to shadow the listed troves' sources, do so now
+
                     # XXX this can go away once we don't care about
                     # pre-troveInfo troves
                     if not trove.getSourceName():
-                        log.warning('%s has no source information' % 
-                                    trove.getName())
-                    key  = (trove.getSourceName(),
+                        log.warning('%s has no source information' % troveName)
+                        sourceName = troveName
+                    else:
+                        sourceName = trove.getSourceName()
+
+                    key  = (sourceName, 
                             trove.getVersion().getSourceVersion(),
                             deps.DependencySet())
                     if key not in seen:
                         troveList.add(key)
                         seen.add(key)
-                    continue
+
+                    if branchType == BRANCH_SOURCE_ONLY:
+                        continue
 
                 if shadow:
                     branchedVersion = trove.getVersion().createShadow(newLabel)
                 else:
                     branchedVersion = trove.getVersion().createBranch(newLabel,
-                                                                    withVerRel = 1)
+                                                               withVerRel = 1)
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
