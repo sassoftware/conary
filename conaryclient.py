@@ -633,6 +633,22 @@ class ConaryClient:
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
 
+        def _getBucket(trvSrc, db, trv, isCollection, inDb = False):
+            if not isCollection: return trv.getInstallBucket()
+
+            b = None
+            for info in trv.iterTroveList():
+                if inDb:
+                    otherTrv = db.getTrove(withFiles = False, *info)
+                else:
+                    otherTrv = trvSrc.getTrove(withFiles = False, *info)
+                if b is None:
+                    b = otherTrv.getInstallBucket()
+                else:
+                    b = b.intersect(otherTrv.getInstallBucket())
+
+            return b
+
         # def _mergeGroupChanges -- main body begins here
             
         # jobQueue is (job, ignorePins)
@@ -694,15 +710,6 @@ class ConaryClient:
         while jobQueue:
             job, ignorePin, isPinned = jobQueue.pop()
 
-            if isPinned and not ignorePin:
-                # the outdated item is pinned and we can't ignore the
-                # pin; just keep going
-                if newVersion is not None:
-                    uJob.addPinMapping(name, 
-                                        (oldVersion, oldFlavor),
-                                        (newVersion, newFlavor))
-                continue
-
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
             
@@ -731,8 +738,6 @@ class ConaryClient:
                 del trv
                 continue
 
-            newJob.add(job)
-            
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
             if newVersion is not None:
@@ -747,10 +752,11 @@ class ConaryClient:
                 newTrv = trove.Trove(trvName, versions.NewVersion(), oldFlavor,
                                      None)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
-                del finalTrvCs, oldTrv, fileList
+                del finalTrvCs, fileList
             elif not isCollection:
                 newTrv = newPristine
                 neededTroveList = []
+                oldTrv = None
                 del newPristine
             elif oldVersion is None:
                 # Read the comments at the top of _newBase if you hope
@@ -760,7 +766,7 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
-                del finalTrvCs, localTrv, oldTrv, fileList, newPristine
+                del finalTrvCs, localTrv, fileList, newPristine
             else:
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                        pristine = True)
@@ -770,7 +776,54 @@ class ConaryClient:
                 newTrv.mergeCollections(localTrv, newPristine, 
                                         self.cfg.excludeTroves)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
-                del finalTrvCs, localTrv, oldTrv, fileList, newPristine
+                del finalTrvCs, localTrv, fileList, newPristine
+
+            if isPinned and not newVersion:
+                # trying to erase something which is pinned
+                if not ignorePin:
+                    continue
+                newJob.add(job)
+            elif isPinned:
+                # trying to install something whose old version is pinned
+                assert(oldVersion is not None)
+
+                # see if we can simply install it next to the item which
+                # is currently installed
+                if oldTrv is None:
+                    # we may have oldTrv already thanks to the colleciton 
+                    # merging logic
+                    oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                           pristine = True)
+
+                import lib
+                lib.epdb.st('f')
+                oldBucket = _getBucket(uJob.getTroveSource(), self.db, oldTrv, 
+                                       isCollection, inDb = True)
+                newBucket = _getBucket(uJob.getTroveSource(), self.db, newTrv, 
+                                       isCollection)
+
+                if oldBucket.compatibleWith(newBucket):
+                    # make this job a fresh install since the buckets
+                    # are compatible
+                    newJob.add((trvName, (None, None), (newVersion, newFlavor),
+                                False))
+                    # regenerate this
+                    finalTrvCs, fileList, neededTroveList = newTrv.diff(None)
+                    del finalTrvCs, fileList
+                elif not ignorePin:
+                    # this is incompatible with the pinned trove being
+                    # replaced; we need to leave the old one here
+                    if newVersion is not None:
+                        uJob.addPinMapping(name, 
+                                            (oldVersion, oldFlavor),
+                                            (newVersion, newFlavor))
+                    continue
+                else:
+                    newJob.add(job)
+            else:
+                newJob.add(job)
+
+            del oldTrv
 
             if not recurse:
                 continue
