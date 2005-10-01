@@ -78,6 +78,27 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
     if 'from' in argSet:
         fromaddr = argSet['from']
 
+    pid = os.fork()
+    if not pid:
+        #child 1
+        pid2 = os.fork()
+        if not pid2:
+            #child 2
+            doWork(repos, cfg, commitList, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet)
+            sys.exit(0)
+        else:
+            #parent 2
+            pid2, status = os.waitpid(pid2, 0)
+            if status:
+                sys.stderr.write("changemail failed with code %d" % status)
+            else:
+                #Only for debugging.  In apache context, this goes to /dev/null
+                sys.stdout.write("changemail completed successfully")
+            sys.exit(0)
+    return 0
+
+
+def doWork(repos, cfg, commitList, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet):
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
     tmpfile = os.fdopen(tmpfd)
