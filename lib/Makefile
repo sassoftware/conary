@@ -25,6 +25,7 @@ python_files=	    __init__.py		\
 		    patch.py		\
 		    sha1helper.py	\
 		    stackutil.py	\
+		    tracelog.py		\
 		    util.py
 
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
