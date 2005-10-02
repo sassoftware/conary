@@ -49,6 +49,8 @@ from conarycfg import STRINGDICT
 from lib import options
 from lib import util
 
+from lib.tracelog import initLog, logMe
+
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
 class HttpRequests(SimpleHTTPRequestHandler):
@@ -202,16 +204,21 @@ class HttpRequests(SimpleHTTPRequestHandler):
       
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
-	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
 
+        # start the logging
+        initLog(level=3, trace=1)
+        (params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
+        logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
+        
 	try:
 	    result = netRepos.callWrapper(None, None, method, authToken, params)
 	except netserver.InsufficientPermission:
-
 	    self.send_error(403)
 	    return None
+        logMe(3, "returned from", method)
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
+        logMe(3, "encoded xml-rpc response to %d bytes" % (len(resp),))
 
 	self.send_response(200)
         encoding = self.headers.get('Accept-encoding', '')
@@ -222,7 +229,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_header("Content-length", str(len(resp)))
 	self.end_headers()
 	self.wfile.write(resp)
-
+        logMe(3, "sent response to client", len(resp), "bytes")
 	return resp
 
     def do_PUT(self):
