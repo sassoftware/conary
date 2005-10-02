@@ -803,7 +803,7 @@ class Version(VersionSequence):
             while not isinstance(item, AbstractRevision):
                 item = iter.next()
         except StopIteration:
-            if (not trailing.sourceCount.shadowCount()
+            if (trailing.sourceCount.shadowCount() < self.shadowLength()
                 and not trailing.buildCount.shadowCount()):
                 # this is a direct shadow of a binary trove -- it hasn't
                 # been touched on the shadow
