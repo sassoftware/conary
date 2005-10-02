@@ -41,7 +41,7 @@ from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from trove import DigitalSignature, DigitalSignatureVerificationError
 from lib.openpgpkey import getKeyCache
 import base64
-
+from lib.tracelog import logMe
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
@@ -92,6 +92,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except AttributeError:
             return (True, ("MethodNotSupported", methodname, ""))
 
+        logMe(2, "calling", methodname)
         try:
             # the first argument is a version number
             r = method(authToken, *args)
@@ -305,11 +306,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return metadata
     
     def _setupFlavorFilter(self, cu, flavorSet):
-        cu.execute("""CREATE TEMPORARY TABLE ffFlavor(flavorId INTEGER,
-                                                    base STRING,
-                                                    sense INTEGER, 
-                                                    flag STRING)""",
-                   start_transaction = False)
+        logMe(2, flavorSet)
+        cu.execute("""
+        CREATE TEMPORARY TABLE ffFlavor(
+        flavorId INTEGER,
+        base STRING,
+        sense INTEGER, 
+        flag STRING)
+        """, start_transaction = False)
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
@@ -322,7 +326,38 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
                                    flavorId, dep.name, sense, flag, 
                                    start_transaction = False)
+        logMe(3, "created temporary table ffFlavor")       
 
+    def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
+        logMe(2)
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtvlTbl(
+        item STRING,
+        versionSpec STRING,
+        flavorId INT)
+        """, start_transaction = False)
+        for troveName, versionDict in troveSpecs.iteritems():
+            if type(versionDict) is list:
+                versionDict = dict.fromkeys(versionDict, [ None ])
+
+            for versionSpec, flavorList in versionDict.iteritems():
+                if flavorList is None:
+                    cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, NULL)", 
+                               troveName, versionSpec, 
+                               start_transaction = False)
+                else:
+                    for flavorSpec in flavorList:
+                        if flavorSpec:
+                            flavorId = flavorIndices[flavorSpec]
+                        else:
+                            flavorId = None
+                        cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)", 
+                                   troveName, versionSpec, flavorId, 
+                                   start_transaction = False)
+        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", 
+                   start_transaction = False)
+        logMe(3, "created temporary table gtvlTbl")
+        
     _GTL_VERSION_TYPE_NONE = 0
     _GTL_VERSION_TYPE_LABEL = 1
     _GTL_VERSION_TYPE_VERSION = 2
@@ -334,6 +369,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       flavorFilter = _GET_TROVE_ALL_FLAVORS,
                       withVersions = True, 
                       withFlavors = False):
+        logMe(2, versionType, latestFilter, flavorFilter)
         cu = self.db.cursor()
         singleVersionSpec = None
         dropTroveTable = False
@@ -374,37 +410,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
-            cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
-                                                       versionSpec STRING,
-                                                       flavorId INT)""",
-                       start_transaction = False)
-            for troveName, versionDict in troveSpecs.iteritems():
-                if type(versionDict) is list:
-                    versionDict = dict.fromkeys(versionDict, [ None ])
-
-                for versionSpec, flavorList in versionDict.iteritems():
-                    if flavorList is None:
-                        cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, NULL)", 
-                                   troveName, versionSpec, 
-                                   start_transaction = False)
-                    else:
-                        for flavorSpec in flavorList:
-                            if flavorSpec:
-                                flavorId = flavorIndices[flavorSpec]
-                            else:
-                                flavorId = None
-
-                            cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)", 
-                                       troveName, versionSpec, flavorId, 
-                                       start_transaction = False)
-
-            cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", 
-                       start_transaction = False)
-            troveNameClause = """gtvlTbl 
-                    INNER JOIN Items ON
-                        gtvlTbl.item = Items.item
-            """
-
+            self._setupTroveFilter(cu, troveSpecs, flavorIndices)
+            troveNameClause = "gtvlTbl JOIN Items using (item)\n"
+        
         getList = [ 'Items.item', 'permittedTrove', 'salt', 'password' ]
         if dropTroveTable:
             getList.append('gtvlTbl.flavorId')
@@ -415,13 +423,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if withVersions:
             getList += [ 'Versions.version', 'timeStamps', 'Nodes.branchId',
                          'finalTimestamp' ]
-            versionClause = """INNER JOIN versions ON
-                        Nodes.versionId = versions.versionId
+            versionClause = """JOIN versions ON
+            Nodes.versionId = versions.versionId
             """
         else:
             getList += [ "NULL", "NULL", "NULL", "NULL" ]
             versionClause = ""
 
+        # FIXME: the '%s' in the next lines are wreaking havoc through
+        # cached execution plans        
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
                 labelClause = """INNER JOIN Labels ON
@@ -441,6 +451,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             Branches.branchId = NodeLabelMap.branchId AND
                             Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
+            # FIXME: most likely we already have an inner join of versions;
+            # it's no use in creating yet another join
             if singleVersionSpec:
                 labelClause = """INNER JOIN Versions AS VrsnFilter ON
                             VrsnFilter.versionId = Instances.versionId AND
@@ -558,7 +570,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # this is a lot like the query for troveNames()... there is probably
         # a way to unify this through some views
         cu.execute(fullQuery, argList)
-        
+        logMe(3, "execute query", fullQuery, argList)
         pwChecked = False
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
@@ -651,6 +663,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     l.append(flavor)
             else:
                 troveNames.append(troveName)
+        logMe(3, "extracted query results")
 
         if dropTroveTable:
             cu.execute("DROP TABLE gtvlTbl", start_transaction = False)
@@ -678,7 +691,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         if withFlavors:
                             if flavor == None:
                                 flavor = "none"
-
                             flist = l.setdefault(version, [])
                             flist.append(flavor)
                         else:
@@ -688,6 +700,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 troveVersions = newTroveVersions
 
+            logMe(3, "processed troveVersions")
             return troveVersions
         else:
             return troveNames
@@ -695,12 +708,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert(0)
 
     def troveNames(self, authToken, clientVersion, labelStr):
+        logMe(1, labelStr)
         if labelStr is None:    
             return {}
         # authenticate this user first
         if not self.auth.check(authToken):
             return {}
-        username = authToken[0]
+        username = authToken[0]        
         cu = self.db.cursor()
         # now get them troves
         query = """
@@ -717,14 +731,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	            Users.user = ?
 	        and Users.userId = UserGroupMembers.userId
 	        and UserGroupMembers.userGroupId = Permissions.userGroupId
-	    ) as UP join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId ),
-	    Labels, Items
+	    ) as UP
+            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+            join Labels using (labelId), Items
         where
 	    Labels.label = ?
-        and Labels.labelId = LabelMap.labelId
         and LabelMap.itemId = Items.itemId
         """
         cu.execute(query, [username, labelStr])
+        logMe(3, "query", query, [username, labelStr])
         names = set()
         for (trove, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):
@@ -733,6 +748,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return list(names)
 
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
+        logMe(1)
         troveFilter = {}
 
         for name, flavors in troveSpecs.iteritems():
@@ -749,14 +765,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
+        logMe(1)
         return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs, 
                               bestFlavor, self._GTL_VERSION_TYPE_VERSION, 
                               latestFilter = self._GET_TROVE_ALL_VERSIONS)
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
                           flavorFilter = 0):
+        logMe(1, troveSpecs)
         troveFilter = {}
-
         for name, flavors in troveSpecs.iteritems():
             if len(name) == 0:
                 name = None
@@ -764,7 +781,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 troveFilter[name] = { None : flavors }
             else:
                 troveFilter[name] = { None : None }
-        # dispatch the more complex version to the old getTroveList
+        logMe(3, troveFilter)
+        # dispatch the more complex version to the old getTroveList        
         if not troveSpecs == { '' : True }:
             return self._getTroveList(authToken, clientVersion, troveFilter,
                                       withVersions = True, 
@@ -805,6 +823,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             """
         cu = self.db.cursor()
         cu.execute(query, [username,])
+        logMe(3, "executing query", query, [username])
         ret = {}
         for (trove, version, flavor, timeStamps, pattern) in cu:      
             if not self.auth.checkTrove(pattern, trove):
@@ -823,12 +842,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             retname = ret.setdefault(trove, {})
             flist = retname.setdefault(version, [])
             flist.append(flavor)
+        logMe(3, "finished processing results")
         return ret
         
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs, 
                               bestFlavor, versionType, latestFilter):
+        logMe(2)
         hasFlavors = False
-
         d = {}
         for (name, labels) in troveSpecs.iteritems():
             if not name:
@@ -846,7 +866,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorFilter = self._GET_TROVE_BEST_FLAVOR
         else:
             flavorFilter = self._GET_TROVE_ALL_FLAVORS
-
         return self._getTroveList(authToken, clientVersion, d, 
                                   withVersions = True, 
                                   flavorFilter = flavorFilter,
@@ -856,6 +875,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
                                  bestFlavor):
+        logMe(1)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH, 
@@ -863,6 +883,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
+        logMe(1)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH, 
@@ -870,6 +891,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
                               labelStr, flavorFilter = None):
+        logMe(1, labelStr)
         troveSpecs = troveNameList
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
@@ -879,6 +901,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
                               labelStr, flavorFilter = None):
+        logMe(1, labelStr)
         troveSpecs = troveNameList
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
@@ -887,6 +910,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           self._GET_TROVE_ALL_VERSIONS)
 
     def getFileContents(self, authToken, clientVersion, fileList):
+        logMe(1)
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                           suffix = '.cf-out')
@@ -922,6 +946,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName, 
                               branchStr):
+        logMe(1)
         r = self.getTroveLeavesByBranch(authToken, clientVersion, 
                                 { pkgName : { branchStr : None } },
                                 True)
@@ -935,6 +960,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles, withFileContents, excludeAutoSource):
 
+        logMe(1)
         def _cvtTroveList(l):
             new = []
             for (name, (oldV, oldF), (newV, newF), absolute) in l:
@@ -1060,6 +1086,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return url, sizes, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
+        logMe(1)
+        
 	if not self.auth.check(authToken, write = False, 
 			       label = self.toLabel(label)):
 	    raise InsufficientPermission
@@ -1079,6 +1107,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return result
 
     def prepareChangeSet(self, authToken, clientVersion):
+        logMe(1)
 	# make sure they have a valid account and permission to commit to
 	# *something*
 	if not self.auth.check(authToken, write = True):
@@ -1092,6 +1121,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def commitChangeSet(self, authToken, clientVersion, url):
 	assert(url.startswith(self.urlBase()))
+        logMe(1, url)
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
@@ -1131,6 +1161,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return True
 
     def getFileVersions(self, authToken, clientVersion, fileList):
+        logMe(1)
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
@@ -1144,6 +1175,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId, 
                        withContents = 0):
+        logMe(1)
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
@@ -1152,17 +1184,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.fromFile(f)
 
     def _getPackageBranchPathIdsV32(self, sourceName, branch):
+        logMe(1, sourceName, branch)
         cu = self.db.cursor()
-
-        cu.execute("""
+        query = """
             SELECT DISTINCT pathId, path FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
+                TroveInfo JOIN Instances using (instanceId)
+                INNER JOIN Nodes using (itemId, versionId)
+                INNER JOIN Branches using(branchId)
                 INNER JOIN TroveFiles ON
                     Instances.instanceId = TroveFiles.instanceId
                 WHERE
@@ -1171,8 +1199,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     Branches.branch = ?
                 ORDER BY 
                     Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
-
+        """
+        args = [trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch]
+        cu.execute(query, args)       
+        logMe(3, "executing query", query, args)
+        
         ids = {}
         for (pathId, path) in cu:
             encodedPath = self.fromPath(path)
@@ -1183,6 +1214,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
                                 branch):
+        logMe(1, sourceName, branch)
 	if not self.auth.check(authToken, write = False, 
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
@@ -1193,19 +1225,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         cu = self.db.cursor()
 
-        cu.execute("""
+        query = """
             SELECT DISTINCT pathId, path, version, fileId FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
+                TroveInfo JOIN Instances using (instanceId)
+                INNER JOIN Nodes using (itemId, versionId)
+                INNER JOIN Branches using (branchId)
                 INNER JOIN TroveFiles ON
                     Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions ON
-                    TroveFiles.versionId = Versions.versionId
+                INNER JOIN Versions using (versionId)
                 INNER JOIN FileStreams ON
                     TroveFiles.streamId = FileStreams.streamId
                 WHERE
@@ -1214,7 +1241,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     Branches.branch = ?
                 ORDER BY 
                     Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
+        """
+        args = [trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch]
+        cu.execute(query, args)
+        logMe(3, "execute query", query, args)
 
         ids = {}
         for (pathId, path, version, fileId) in cu:
@@ -1227,14 +1257,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getCollectionMembers(self, authToken, clientVersion, troveName, 
                                 branch):
+        logMe(1, troveName, branch)
 	if not self.auth.check(authToken, write = False, 
                                trove = troveName,
 			       label = self.toBranch(branch).label()):
 	    raise InsufficientPermission
 
         cu = self.db.cursor()
-
-        cu.execute("""
+        query = """
             SELECT DISTINCT IncludedItems.item FROM
                 Items, Nodes, Branches, Instances, TroveTroves,
                 Instances AS IncludedInstances,
@@ -1249,12 +1279,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 TroveTroves.instanceId = Instances.instanceId AND
                 IncludedInstances.instanceId = TroveTroves.includedId AND
                 IncludedItems.itemId = IncludedInstances.itemId
-            """, troveName, branch)
-
-        return [ x[0] for x in cu ]
+            """
+        args = [troveName, branch]
+        cu.execute(query, args)
+        logMe(3, "execute query", query, args)
+        ret = [ x[0] for x in cu ]
+        return ret
 
     def getTrovesBySource(self, authToken, clientVersion, sourceName, 
                           sourceVersion):
+        logMe(1, sourceName, sourceVersion)       
 	if not self.auth.check(authToken, write = False, trove = sourceName,
                    label = self.toVersion(sourceVersion).branch().label()):
 	    raise InsufficientPermission
@@ -1262,27 +1296,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         versionMatch = sourceVersion + '-%'
 
         cu = self.db.cursor()
-        cu.execute("""SELECT item, version, flavor FROM 
-                        TroveInfo JOIN Instances ON
-                            TroveInfo.instanceId = Instances.instanceId
-                        JOIN Items ON
-                            Instances.itemId = Items.itemId
-                        JOIN Versions ON
-                            Instances.versionId = Versions.versionId
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        WHERE
-                            TroveInfo.infoType = 1 AND
-                            TroveInfo.data = ? AND
-                            Versions.version LIKE ?
-                    """, sourceName, versionMatch)
-
+        query = """
+        SELECT item, version, flavor FROM 
+            TroveInfo JOIN Instances using (instanceId)
+            JOIN Items using (itemId)
+            JOIN Versions ON
+                Instances.versionId = Versions.versionId
+            JOIN Flavors ON
+                Instances.flavorId = Flavors.flavorId
+            WHERE
+                TroveInfo.infoType = 1 AND
+                TroveInfo.data = ? AND
+                Versions.version LIKE ?
+                """
+        args = [sourceName, versionMatch]
+        cu.execute(query, args)
+        logMe(3, "execute query", query, args)
         matches = [ tuple(x) for x in cu ]
-
         return matches
 
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
+        logMe(1, name, version, flavor)
         version = self.toVersion(version)
         flavor = self.toFlavor(flavor)
 	if not self.auth.check(authToken, write = True, trove = name,
@@ -1331,6 +1366,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # get the instanceId that corresponds to this trove.
         # FIXME: get instanceId in a better fashion.
+        # XXX: I'm fairly positive this many LEFT JOINS should be considered harmful
         query = """SELECT instanceId FROM Instances
                        LEFT JOIN Items ON Items.itemId=Instances.itemId
                        LEFT JOIN Versions
@@ -1405,6 +1441,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return isinstance(self.cache, CacheSet)
 
     def versionCheck(self):
+        logMe(3)
         cu = self.db.cursor()
         count = cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
                            "name='DatabaseVersion'").next()[0]
@@ -1462,6 +1499,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def open(self):
+        logMe(1)
 	if self.troveStore is not None:
 	    self.close()
 
@@ -1479,6 +1517,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.auth = NetworkAuthorization(self.db, self.name)
 
     def reopen(self):
+        logMe(1)
 	sb = os.stat(self.sqlDbPath)
 
 	sqlDeviceInode = (sb.st_dev, sb.st_ino)
@@ -1518,6 +1557,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.troveStore = None
         self.logFile = logFile
 
+        logMe(1, path, basicUrl, name)
 	try:
 	    util.mkdirChain(self.repPath)
 	except OSError, e:
