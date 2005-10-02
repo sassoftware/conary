@@ -18,9 +18,11 @@ import sqlite3
 import sys
 
 from repository.netclient import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, UserNotFound
+from lib.tracelog import logMe
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
+        logMe(2, authToken[0], write, admin, label, trove)
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
@@ -28,29 +30,30 @@ class NetworkAuthorization:
             return False
 
         stmt = """
-            SELECT item, salt, password FROM
-               (SELECT * FROM Users WHERE user=?) AS Users
-            INNER JOIN UserGroupMembers ON
-                UserGroupMembers.userId = Users.userId
-            INNER JOIN Permissions ON 
-                UserGroupMembers.userGroupId = Permissions.userGroupId
-            LEFT OUTER JOIN Items ON 
-                Permissions.itemId = Items.itemId
+        select Items.item, Users.salt, Users.password
+        from Users
+             join UserGroupMembers using (userId)
+             join Permissions using (userGroupId)
+             join Items using (itemId)
         """
-
         params = [ authToken[0] ]
 
-        where = []
+        where = ["Users.user = ?"]
         if label:
-            where.append(" labelId=(SELECT labelId FROM Labels WHERE " \
-                            "label=?) OR labelId=0")
+            where.append("""
+            (
+            Permissions.labelId = 0 OR
+            Permissions.labelId in
+                ( select labelId from Labels where Labels.label = ? )
+            )
+            """)
             params.append(label.asString())
 
         if write:
-            where.append("write=1")
+            where.append("Permissions.write=1")
 
         if admin:
-            where.append("admin=1")
+            where.append("Permissions.admin=1")
 
         if where:
             stmt += "WHERE " + " AND ".join(where)
@@ -98,6 +101,7 @@ class NetworkAuthorization:
         return m.hexdigest() == password
 
     def checkUserPass(self, authToken, label = None):
+        logMe(2, authToken[0], label)
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
@@ -256,11 +260,12 @@ class NetworkAuthorization:
         self._uniqueUser(cu, user)
 
         try:
+            # XXX: ahhh, how we miss real sequences...
             cu.execute("""INSERT INTO UserGroups 
-    SELECT MAX(
-        (SELECT IFNULL(MAX(userId),0) FROM Users),
-        (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
-    )+1, ? """, user)
+            SELECT MAX(
+            (SELECT IFNULL(MAX(userId),0) FROM Users),
+            (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
+            )+1, ? """, user)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column userGroup is not unique':
                 raise GroupAlreadyExists, 'group: %s' % user
@@ -579,23 +584,21 @@ class NetworkAuthorization:
             commit = True
 
         if "UserPermissions" not in tables:
-            cu.execute("""CREATE VIEW UserPermissions AS
-                  SELECT Users.user AS user,
-                         Users.salt AS salt,
-                         Users.password as password,
-                         PerItems.item AS permittedTrove,
-                         Permissions.labelId AS permittedLabelId,
-                         Labels.label AS permittedLabel,
-                         Permissions.admin AS admin,
-                         Permissions.write AS write,
-                         Permissions._ROWID_ as aclId
-                      FROM Users JOIN UserGroupMembers ON
-                          Users.userId = UserGroupMembers.userId
-                      INNER JOIN Permissions ON
-                          UserGroupMembers.userGroupId = Permissions.userGroupId
-                      LEFT OUTER JOIN Items AS PerItems ON
-                          PerItems.itemId = Permissions.itemId
-                      LEFT OUTER JOIN Labels ON
+            cu.execute("""
+            CREATE VIEW UserPermissions AS
+                SELECT Users.user AS user,
+                       Users.salt AS salt,
+                       Users.password as password,
+                       Items.item AS permittedTrove,
+                       Permissions.labelId AS permittedLabelId,
+                       Labels.label AS permittedLabel,
+                       Permissions.admin AS admin,
+                       Permissions.write AS write,
+                       Permissions._ROWID_ as aclId
+                 FROM Users JOIN UserGroupMembers using (userId)
+                      JOIN Permissions using (userGroupId)
+                      JOIN Items using (itemId)
+                      JOIN Labels ON 
                           Permissions.labelId = Labels.labelId
             """)
             commit = True
