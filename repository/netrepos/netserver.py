@@ -308,11 +308,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _setupFlavorFilter(self, cu, flavorSet):
         logMe(2, flavorSet)
         cu.execute("""
-        CREATE TEMPORARY TABLE ffFlavor(
-        flavorId INTEGER,
-        base STRING,
-        sense INTEGER, 
-        flag STRING)
+        CREATE TEMPORARY TABLE
+        ffFlavor(
+            flavorId INTEGER,
+            base STRING,
+            sense INTEGER, 
+            flag STRING)
         """, start_transaction = False)
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
@@ -331,10 +332,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
         logMe(2)
         cu.execute("""
-        CREATE TEMPORARY TABLE gtvlTbl(
-        item STRING,
-        versionSpec STRING,
-        flavorId INT)
+        CREATE TEMPORARY TABLE
+        gtvlTbl(
+            item STRING,
+            versionSpec STRING,
+            flavorId INT)
         """, start_transaction = False)
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
@@ -363,6 +365,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GTL_VERSION_TYPE_VERSION = 2
     _GTL_VERSION_TYPE_BRANCH = 3
 
+    # FIXME: this function gets always called withVersions = true. The code
+    # would simplify alot if we just assumed that instead of casing it
     def _getTroveList(self, authToken, clientVersion, troveSpecs,
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS, 
@@ -379,6 +383,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                versionType == self._GTL_VERSION_TYPE_VERSION or
                versionType == self._GTL_VERSION_TYPE_LABEL)
 
+        # permission check first
+        if not self.auth.check(authToken):
+            return {}
+        
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
             # need. a flavor of 0 (numeric) means "None"
@@ -400,20 +408,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  len(troveSpecs[None]) == 1 and
                                  troveSpecs[None].has_key(None)):
             # no trove names, and/or no version spec
-            troveNameClause = "Items\n"
+            troveNameClause = "Items"
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
         elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
             # no trove names, and a single version spec (multiple ones
             # are disallowed)
             assert(len(troveSpecs[None]) == 1)
-            troveNameClause = "Items\n"
+            troveNameClause = "Items"
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-            troveNameClause = "gtvlTbl JOIN Items using (item)\n"
+            troveNameClause = "gtvlTbl JOIN Items using (item)"
         
-        getList = [ 'Items.item', 'permittedTrove', 'salt', 'password' ]
+        getList = [ 'Items.item', 'permittedTrove']
         if dropTroveTable:
             getList.append('gtvlTbl.flavorId')
         else:
@@ -421,11 +429,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         argList = [ authToken[0] ]
 
         if withVersions:
-            getList += [ 'Versions.version', 'timeStamps', 'Nodes.branchId',
-                         'finalTimestamp' ]
-            versionClause = """JOIN versions ON
-            Nodes.versionId = versions.versionId
-            """
+            getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
+                         'Nodes.finalTimestamp' ]
+            versionClause = "join Versions ON Nodes.versionId = Versions.versionId"
         else:
             getList += [ "NULL", "NULL", "NULL", "NULL" ]
             versionClause = ""
@@ -434,59 +440,52 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # cached execution plans        
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
-                labelClause = """INNER JOIN Labels ON
-                            Labels.labelId = NodeLabelMap.labelId AND
-                            Labels.label = '%s'""" % singleVersionSpec
+                labelClause = """ JOIN Labels ON
+                    Labels.labelId = LabelMap.labelId AND
+                    Labels.label = '%s'""" % singleVersionSpec
             else:
-                labelClause = """INNER JOIN Labels ON
-                            Labels.labelId = NodeLabelMap.labelId AND
-                            Labels.label = gtvlTbl.versionSpec"""
+                labelClause = """JOIN Labels ON
+                    Labels.labelId = LabelMap.labelId AND
+                    Labels.label = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
-                labelClause = """INNER JOIN Branches ON
-                            Branches.branchId = NodeLabelMap.branchId AND
-                            Branches.branch = '%s'""" % singleVersionSpec
+                labelClause = """JOIN Branches ON
+                    Branches.branchId = LabelMap.branchId AND
+                    Branches.branch = '%s'""" % singleVersionSpec
             else:
-                labelClause = """INNER JOIN Branches ON
-                            Branches.branchId = NodeLabelMap.branchId AND
-                            Branches.branch = gtvlTbl.versionSpec"""
+                labelClause = """JOIN Branches ON
+                    Branches.branchId = LabelMap.branchId AND
+                    Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
-            # FIXME: most likely we already have an inner join of versions;
-            # it's no use in creating yet another join
+            # FIXME: will we ever walk through here without wanting to
+            # extract the versions? By augmenting the previous
+            # versionClause setting we save another join
+            assert(withVersions)
+            labelClause = ""
             if singleVersionSpec:
-                labelClause = """INNER JOIN Versions AS VrsnFilter ON
-                            VrsnFilter.versionId = Instances.versionId AND
-                            VrsnFilter.version = '%s'""" % singleVersionSpec
+                vc = "Versions.version = '%s'" % singleVersionSpec
             else:
-                labelClause = """INNER JOIN Versions AS VrsnFilter ON
-                            VrsnFilter.versionId = Instances.versionId AND
-                            VrsnFilter.version = gtvlTbl.versionSpec"""
+                vc = "Versions.version = gtvlTbl.versionSpec"
+            versionClause = """%s AND
+            %s""" % (versionClause, vc)
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             labelClause = ""
 
-        # this forces us to go through the instances table, even though
-        # the nodes table is often sufficient; perhaps we should optimize
-        # that a bit?
+        # we establish the execution domain out into the Nodes table
+        # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
             assert(withVersions)
-            instanceClause = """INNER JOIN Latest ON
-                        Latest.itemId = Items.itemId
-                    INNER JOIN Instances ON
-                        Instances.itemId = Items.itemId 
-                      AND
-                        Instances.versionId = Latest.versionId
-                      AND
-                        Instances.flavorId = Latest.flavorId"""
+            instanceClause = """join Latest as Domain using (itemId)
+            join Nodes using (itemId, branchId, versionId)"""
         else:
-            instanceClause = """INNER JOIN Instances ON 
-                        Instances.itemId = Items.itemId"""
+            instanceClause = """join Instances as Domain using (itemId)
+            join Nodes using (itemId, versionid)"""
 
         if withFlavors:
             assert(withVersions)
-            getList.append("InstFlavor.flavor")
-            flavorClause = """INNER JOIN Flavors AS InstFlavor ON
-                        InstFlavor.flavorId = Instances.flavorId"""
+            getList.append("Flavors.flavor")
+            flavorClause = "join Flavors ON Flavors.flavorId = Domain.flavorId"
         else:
             getList.append("NULL")
             flavorClause = ""
@@ -502,31 +501,32 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             else:
                 extraJoin = ""
 
-            flavorScoringClause = """LEFT OUTER JOIN FlavorMap ON
-                        FlavorMap.flavorId = InstFlavor.flavorId
-                    LEFT OUTER JOIN ffFlavor ON
-                        %s
-                        ffFlavor.base = FlavorMap.base AND
-                        (ffFlavor.flag = FlavorMap.flag OR
-                            (ffFlavor.flag is NULL AND
-                             FlavorMap.flag is NULL))
-                    LEFT OUTER JOIN FlavorScores ON
-                        FlavorScores.present = FlavorMap.sense AND
-                        (FlavorScores.request = ffFlavor.sense OR
-                         (ffFlavor.sense is NULL AND
-                          FlavorScores.request = 0
-                         )
-                        )
+            flavorScoringClause = """
+            LEFT OUTER JOIN FlavorMap ON
+                FlavorMap.flavorId = Flavors.flavorId
+            LEFT OUTER JOIN ffFlavor ON
+                %s
+                ffFlavor.base = FlavorMap.base AND
+                (  ffFlavor.flag = FlavorMap.flag OR
+                   ( ffFlavor.flag is NULL AND
+                     FlavorMap.flag is NULL )
+                )
+            LEFT OUTER JOIN FlavorScores ON
+                FlavorScores.present = FlavorMap.sense AND
+                (    FlavorScores.request = ffFlavor.sense OR
+                     ( ffFlavor.sense is NULL AND
+                       FlavorScores.request = 0 )
+                )
             """ % extraJoin
                         #(FlavorScores.request = ffFlavor.sense OR
                         #    (ffFlavor.sense is NULL AND
                         #     FlavorScores.request = 0)
                         #)
 
+            grouping = """GROUP BY
+            Domain.itemId, Domain.versionId, Domain.flavorId, aclId"""
             if dropTroveTable:
-                grouping = "GROUP BY instanceId, aclId, gtvlTbl.flavorId"
-            else:
-                grouping = "GROUP BY instanceId, aclId"
+                grouping = grouping + ", gtvlTbl.flavorId"
 
             # according to some SQL standard, the SUM in the case where all 
             # values are NULL is NULL. So we use coalesce to change NULL to 0
@@ -541,37 +541,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorScoreCheck = ""
 
         fullQuery = """
-                SELECT 
-                      %s
-                    FROM
-                    %s
-                    %s
-                    INNER JOIN Nodes ON
-                        Nodes.itemId = Instances.itemId AND
-                        Nodes.versionId = Instances.versionId
-                    INNER JOIN LabelMap AS NodeLabelMap ON
-                        NodeLabelMap.branchId = Nodes.branchId AND
-                        NodeLabelMap.itemId = Nodes.itemId
-                    LEFT OUTER JOIN UserPermissions ON
-                        UserPermissions.permittedLabelId = NodeLabelMap.labelId 
-                      OR
-                        UserPermissions.permittedLabelId=0
-                    %s
-                    %s
-                    %s
-                    %s
-                    WHERE
-                        user = ?
-                    %s
-                    %s
+        SELECT 
+            %s
+        FROM
+            %s
+            %s
+            join LabelMap using (itemid, branchId)
+            join (
+               select 
+                   Permissions.labelId as labelId, 
+                   PerItems.item as permittedTrove,
+                   Permissions._ROWID_ as aclId
+               from
+                   Users
+                   join UserGroupMembers using (userId)
+                   join Permissions using (userGroupId)
+                   join Items as PerItems using (itemId)
+               where
+                   Users.user = ?
+               ) as UP on 
+                   ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+            %s
+            %s
+            %s
+            %s
+        %s
+        %s
+        ORDER BY Items.item, Nodes.finalTimestamp
         """ % (", ".join(getList), troveNameClause, instanceClause, 
                versionClause, labelClause, flavorClause, flavorScoringClause,
                grouping, flavorScoreCheck)
-        # this is a lot like the query for troveNames()... there is probably
-        # a way to unify this through some views
         cu.execute(fullQuery, argList)
         logMe(3, "execute query", fullQuery, argList)
-        pwChecked = False
+
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
         allowed = {}
@@ -579,12 +581,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         troveNames = []
         troveVersions = {}
 
-        for (troveName, troveNamePattern, salt, password, 
-             localFlavorId, versionStr, 
+        # FIXME: Remove the ORDER BY in the sql statement above and watch it
+        # CRASH and BURN. Put a "DESC" in there to return some really wrong data
+        #
+        # That is because the loop below is dependent on the order in
+        # which this data is provided, even though it is the same
+        # dataset with and without "ORDER BY" -- gafton
+        for (troveName, troveNamePattern, localFlavorId, versionStr, 
              timeStamps, branchId, finalTimestamp, flavor, flavorScore) in cu:
             if flavorScore is None:
                 flavorScore = 0
-
+                
+            #logMe(3, troveName, versionStr, flavor, flavorScore)
             #os.system("echo %s %s %d > /dev/tty" % (troveName, flavor, flavorScore))
             if allowed.has_key((troveName, versionStr, flavor)):
                 continue
@@ -592,13 +600,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
 
-            if not pwChecked:
-                if not self.auth.checkPassword(salt, password, authToken[1]):
-                    continue
-                pwChecked = True
-
             allowed[(troveName, versionStr, flavor)] = True
 
+            # FIXME: since troveNames is no longer traveling through
+            # here, this withVersions check has become superfluous.
+            # Now we're always dealing with versions -- gafton
             if withVersions:
                 if latestFilter == self._GET_TROVE_VERY_LATEST:
                     d = troveVersions.get(troveName, None)
@@ -725,18 +731,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	        Permissions.labelId as labelId, 
 	        PerItems.item as pattern
 	      from
-	        Users, UserGroupMembers, Permissions
-	        left outer join Items as PerItems on Permissions.itemId = PerItems.itemId 
+	             Users
+                join UserGroupMembers using (userId)
+                join Permissions using (userGroupId)
+                join Items as PerItems using (itemId)
 	      where
 	            Users.user = ?
-	        and Users.userId = UserGroupMembers.userId
-	        and UserGroupMembers.userGroupId = Permissions.userGroupId
 	    ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Labels using (labelId), Items
+            join Labels using (labelId)
+            join Items on LabelMap.itemId = Items.itemId
         where
 	    Labels.label = ?
-        and LabelMap.itemId = Items.itemId
         """
         cu.execute(query, [username, labelStr])
         logMe(3, "query", query, [username, labelStr])
