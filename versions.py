@@ -129,6 +129,9 @@ class SerialNumber(object):
         self.numList += [ 0 ] * ((listLen + 1) - len(self.numList))
         self.numList[-1] += 1
 
+    def iterCounts(self):
+        return iter(self.numList)
+
     def __deepcopy__(self, mem):
 	return SerialNumber(str(self))
 
@@ -258,6 +261,18 @@ class Revision(AbstractRevision):
             return self.buildCount.shadowCount()
 
         return 0
+
+    def shadowChangedUpstreamVersion(self):
+        """ returns True if this revision is a) on a shadow 
+            and b) the parent branch's source count is 0, 
+            implying that the upstream version # has been changed
+        """
+        if (self.sourceCount.shadowCount() and
+            [ x for x in self.sourceCount.iterCounts()][-2] == 0):
+            # 0 means there's no corresponding parent
+            # source with this version number
+            return True
+        return False
 
     def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
@@ -791,7 +806,10 @@ class Version(VersionSequence):
 
         trailing = self.versions[-1]
         if trailing.buildCount is None:
-            return True
+            if trailing.shadowChangedUpstreamVersion():
+                return False
+            else:
+                return True
 
         # find the previous Revision object. If the shadow counts are
         # the same, this is a direct child
