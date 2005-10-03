@@ -19,7 +19,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import gzip
-from lib import log
+from lib import log, magic
 import lookaside
 import os
 import rpmhelper
@@ -192,11 +192,14 @@ class Archive(_Source):
 	    _extractFilesFromRPM(f, directory=destDir)
 
 	else:
+            m = magic.magic(f)
             if f.endswith(".tar"):
                 tarflags = "-xf"
-            elif f.endswith(".bz2") or f.endswith(".tbz2"):
+            elif (isinstance(m, magic.bzip) or f.endswith(".bz2")
+                  or f.endswith(".tbz2")):
                 tarflags = "-jxf"
-            elif f.endswith(".gz") or f.endswith(".tgz") or f.endswith(".Z"):
+            elif (isinstance(m, magic.gzip) or f.endswith(".gz")
+                  or f.endswith(".tgz") or f.endswith(".Z")):
                 tarflags = "-zxf"
             else:
                 raise SourceError, "unknown archive compression"
