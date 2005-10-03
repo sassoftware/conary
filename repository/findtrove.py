@@ -552,7 +552,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
         matching = {}
         matchingLabels = set()
 
-        versionStr = self.map[name][1]
+        versionStr = self.map[name][1].split('/')[-1]
         try:
             verRel = versions.Revision(versionStr)
         except versions.ParseError:
@@ -579,7 +579,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
 
     def missingMsg(self, name):
         labelPath = set(x.keys()[0] for x in self.query[name] if x.keys())
-        versionStr = self.map[name][1]
+        versionStr = self.map[name][1].split('/')[-1]
         if labelPath:
             return "revision %s of %s was not found on label(s) %s" \
                     % (versionStr, name, 
@@ -690,24 +690,32 @@ class TroveFinder:
                 return VERSION_STR_BRANCH
             else:
                 return VERSION_STR_FULL_VERSION
-        elif versionStr.find('/') != -1:
+
+        slashCount = versionStr.count('/')
+
+        if slashCount > 1:
             # if we've got a version string, and it doesn't start with a
-            # /, no / is allowed
+            # /, only one / is allowed
             raise repository.TroveNotFound, \
                     "incomplete version string %s not allowed" % versionStr
         elif firstChar == '@':
             return VERSION_STR_BRANCHNAME
         elif firstChar == ':':
             return VERSION_STR_TAG
-        elif lastChar == '@':
+        elif versionStr.split('/')[0][-1] == '@':
             return VERSION_STR_HOST
         elif versionStr.count('@'):
             return VERSION_STR_LABEL
         else:
+            if slashCount:
+                # if you've specified a prefix, it must have some identifying
+                # mark and not just be foo/1.2
+                raise repository.TroveNotFound, ('Illegal version prefix %s'
+                                                 ' for %s' % (versionStr, name))
             for char in ' ,':
                 if char in versionStr:
                     raise RuntimeError, \
-                        ('%s reqests illegal version/revision %s' 
+                        ('%s requests illegal version/revision %s' 
                                                 % (name, versionStr))
             if '-' in versionStr:
                 try:
@@ -770,9 +778,11 @@ class TroveFinder:
             flavorList = self.mergeFlavors(flavor)
             self.query[QUERY_BY_VERSION].addQuery(troveTup, version, flavorList)
 
+
+
     def sortLabel(self, troveTup, affinityTroves):
         try:
-            label = versions.Label(troveTup[1])
+            label = versions.Label(troveTup[1].split('/', 1)[0])
             newLabelPath = [ label ]
         except versions.ParseError:
             raise repository.TroveNotFound, \
@@ -784,7 +794,7 @@ class TroveFinder:
         labelPath = self._getLabelPath(troveTup)
 
         repositories = [ x.getHost() for x in labelPath ]
-        versionStr = troveTup[1]
+        versionStr = troveTup[1].split('/', 1)[0]
         newLabelPath = []
         for serverName in repositories:
             newLabelPath.append(versions.Label("%s%s" %
@@ -796,7 +806,7 @@ class TroveFinder:
         repositories = [(x.getHost(), x.getNamespace()) \
                          for x in labelPath ]
         newLabelPath = []
-        versionStr = troveTup[1]
+        versionStr = troveTup[1].split('/', 1)[0]
         for serverName, namespace in repositories:
             newLabelPath.append(versions.Label("%s@%s%s" %
                                (serverName, namespace, versionStr)))
@@ -807,24 +817,29 @@ class TroveFinder:
         repositories = [(x.getNamespace(), x.getLabel()) \
                          for x in labelPath ]
         newLabelPath = []
-        serverName = troveTup[1]
+        serverName = troveTup[1].split('/', 1)[0]
         for nameSpace, branchName in repositories:
             newLabelPath.append(versions.Label("%s%s:%s" %
                                (serverName, nameSpace, branchName)))
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def _sortLabel(self, labelPath, troveTup, affinityTroves):
-        if self.query[QUERY_BY_LABEL_PATH].hasName(troveTup[0]): 
+        name, verStr, flavor = troveTup
+        revision = verStr.count('/') != 0 
+        if revision:
+            queryType = QUERY_REVISION_BY_LABEL
+        else:
+            queryType = QUERY_BY_LABEL_PATH
+
+        if self.query[queryType].hasName(troveTup[0]): 
             self.remaining.append(troveTup)
             return
-        flavor = troveTup[2]
         if flavor is None and affinityTroves:
-            self.query[QUERY_BY_LABEL_PATH].addQueryWithAffinity(troveTup, 
-                                                    labelPath, affinityTroves)
+            self.query[queryType].addQueryWithAffinity(troveTup, labelPath, 
+                                                       affinityTroves)
         else:
             flavorList = self.mergeFlavors(flavor)
-            self.query[QUERY_BY_LABEL_PATH].addQuery(troveTup, labelPath, 
-                                                     flavorList)
+            self.query[queryType].addQuery(troveTup, labelPath, flavorList)
 
     def sortTroveVersion(self, troveTup, affinityTroves):
         name = troveTup[0]
