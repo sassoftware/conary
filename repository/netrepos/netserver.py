@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 3
+    schemaVersion = 4
 
     # lets the following exceptions pass:
     #
@@ -1537,6 +1537,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                        "instanceId=? and infoType=?", 
                                        instanceId, trove._TROVEINFO_TAG_SIGS)
 
+                cu.execute("UPDATE DatabaseVersion SET version=4")
                 self.db.commit()
                 version = 4
             if version != self.schemaVersion:
