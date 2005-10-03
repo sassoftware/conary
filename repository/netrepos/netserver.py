@@ -1511,7 +1511,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=3")
                 self.db.commit()
                 version = 3
-                
+            elif version == 3
+                # deterministic sort order for troveCollections was added;
+                # this 
+                for klass, infoType in [
+                              (trove.BuildDependencies, 
+                               trove._TROVEINFO_TAG_BUILDDEPS),
+                              (trove.LoadedTroves, 
+                               trove._TROVEINFO_TAG_LOADEDTROVES),
+                              (trove.InstallBucket, 
+                               trove._TROVEINFO_TAG_INSTALLBUCKET) ]
+                    for instanceId, data in \
+                            [ x for x in cu.execute(
+                                "select instanceId, data from TroveInfo WHERE "
+                                "infoType=?", infoType) ]:
+                        obj = klass(data)
+                        f = obj.freeze()
+                        if f != data:
+                            count += 1
+                            badInstances.add(instanceId)
+                            cu.execute("update troveinfo set data=? where "
+                                       "instanceId=? and infoType=?", f,
+                                       instanceId, infoType)
+                            cu.execute("delete from troveinfo where "
+                                       "instanceId=? and infoType=?", 
+                                       instanceId, trove._TROVEINFO_TAG_SIGS)
+
+                self.db.commit()
+                version = 4
             if version != self.schemaVersion:
                 return False
 
