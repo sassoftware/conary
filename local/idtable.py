@@ -46,6 +46,26 @@ class IdTable:
                    %(self.tableName, ), (item,))
         return cu.lastrowid
 
+    def getOrAddIds(self, items):
+        cu = self.db.cursor()
+        cu.execute('CREATE TEMPORARY TABLE neededIds (num INT, %s STR)' % self.strName)
+        stmt = cu.compile('INSERT INTO neededIds VALUES (?, ?)')
+        for num, item in enumerate(items):
+            cu.execstmt(stmt, num, item)
+
+        cu.execute('''INSERT INTO %(tableName)s 
+                      SELECT DISTINCT 
+                         NULL, neededIds.%(strName)s FROM neededIds 
+                         LEFT JOIN %(tableName)s AS existing USING(%(strName)s)
+                         WHERE existing.%(keyName)s IS NULL
+                   ''' % self.__dict__)
+        ids = [ x[0] for x in 
+                cu.execute("""SELECT %s FROM neededIds JOIN %s USING(%s)
+                              ORDER BY NUM"""
+                           %(self.keyName, self.tableName, self.strName))]
+        cu.execute('DROP TABLE neededIds')
+        return ids
+           
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
