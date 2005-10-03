@@ -19,6 +19,9 @@ Changes in 0.62.12:
   * troves can now be specified for rq, q, and update as <labelpart>/<version>,
     e.g., foo=:rpl1/1.0, or foo=contrib.rpath.com@/2.3-1-2
   * version.hasParent() handles more cases of shadows of shadows correctly.
+  * cooking troves into the repository with --flavor <newflavor> now modifies 
+    the flavor before the recipe is even loaded, not when the recipe's setup
+    function is called.
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.

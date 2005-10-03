@@ -1135,6 +1135,12 @@ def cookItem(repos, cfg, item, prep=0, macros={},
             labelPath = None
 
         try:
+	    use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+	except AttributeError, msg:
+	    log.error('Error setting build flag values: %s' % msg)
+	    sys.exit(1)
+
+        try:
             (loader, sourceVersion) = recipe.recipeLoaderFromSourceComponent(
                                         name, cfg, repos,
                                         versionStr=versionStr,
