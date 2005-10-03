@@ -135,11 +135,14 @@ class OpenPGPKeyTable:
 
     def getPGPKeyData(self, keyId):
         cu = self.db.cursor()
-        cu.execute("""SELECT pgpKey FROM PGPKeys
-                           LEFT JOIN PGPFingerprints ON
-                             PGPKeys.keyId=PGPFingerprints.keyId
-                        WHERE PGPFingerprints.fingerprint like "%%%s%%"
-                        """ %keyId)
+        cu.execute("""select
+                          pgpKey
+                      from
+                          PGPKeys, PGPFingerprints
+                      where
+                              PGPFingerprints.fingerprint like "%%%s%%"
+                          and PGPKeys.keyId=PGPFingerprints.keyId
+                       """ %keyId)
         keys = cu.fetchall()
         if (len(keys) != 1):
             raise openpgpkey.KeyNotFound(keyId)
