@@ -619,16 +619,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     # thrown out incompatible troves, so whatever is left
                     # is at least compatible; within compatible, newer
                     # wins (even if it isn't as "good" as something older)
-
-                    # FIXME: this OR-based serialization sucks.
-                    # if the following pairs of (score, timestamp) come in the
-                    # order showed, we end up picking different results.
-                    #  (assume GET_TROVE_BEST_FLAVOR here)
-                    # (3, 100), (5, 82), (4, 81)  -> (5, 82)  [WRONG]
-                    # (4, 81) , (5, 82), (3, 100) -> (3, 100) [RIGHT]
-                    #
-                    # XXX: this is why the row order of the SQL result matters.
-                    #      We ain't doing the right thing here.
                     if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and
                         flavorScore > lastFlavorScore) or \
                         finalTimestamp > lastTimestamp:
