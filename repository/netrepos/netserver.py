@@ -593,7 +593,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 flavorScore = 0
                 
             #logMe(3, troveName, versionStr, flavor, flavorScore)
-            #os.system("echo %s %s %d > /dev/tty" % (troveName, flavor, flavorScore))
             if allowed.has_key((troveName, versionStr, flavor)):
                 continue
 
@@ -607,10 +606,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # Now we're always dealing with versions -- gafton
             if withVersions:
                 if latestFilter == self._GET_TROVE_VERY_LATEST:
-                    d = troveVersions.get(troveName, None)
-                    if d is None:
-                        d = {}
-                        troveVersions[troveName] = d
+                    d = troveVersions.setdefault(troveName, {})
 
                     if flavorFilter == self._GET_TROVE_BEST_FLAVOR:
                         flavorIdentifier = localFlavorId
@@ -623,9 +619,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     # thrown out incompatible troves, so whatever is left
                     # is at least compatible; within compatible, newer
                     # wins (even if it isn't as "good" as something older)
-                    if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and 
-                                flavorScore > lastFlavorScore) or \
-                                finalTimestamp > lastTimestamp:
+
+                    # FIXME: this OR-based serialization sucks.
+                    # if the following pairs of (score, timestamp) come in the
+                    # order showed, we end up picking different results.
+                    #  (assume GET_TROVE_BEST_FLAVOR here)
+                    # (3, 100), (5, 82), (4, 81)  -> (5, 82)  [WRONG]
+                    # (4, 81) , (5, 82), (3, 100) -> (3, 100) [RIGHT]
+                    #
+                    # XXX: this is why the row order of the SQL result matters.
+                    #      We ain't doing the right thing here.
+                    if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and
+                        flavorScore > lastFlavorScore) or \
+                        finalTimestamp > lastTimestamp:
                         d[(branchId, flavorIdentifier)] = \
                             (finalTimestamp, flavorScore, versionStr, 
                              timeStamps, flavor)
@@ -868,6 +874,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 else:
                     d[name][label] = None
 
+        # FIXME: Usually when we want the very latest we don't want to be
+        # constrained by the "best flavor". But just testing for
+        # 'latestFilter!=self._GET_TROVE_VERY_LATEST' to avoid asking for
+        # BEST_FLAVOR doesn't work because there are other things being keyed
+        # on this in the _getTroveList function
+        #
+        # some MAJOR logic rework needed here...        
         if bestFlavor and hasFlavors:
             flavorFilter = self._GET_TROVE_BEST_FLAVOR
         else:
