@@ -44,7 +44,7 @@ import base64
 from lib.tracelog import logMe
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 32, 33 ]
+SERVER_VERSIONS = [ 32, 33, 34 ]
 CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -723,7 +723,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
-        if labelStr is None:    
+        if clientVersion < 34 and not labelStr:
             return {}
         # authenticate this user first
         if not self.auth.check(authToken):
@@ -731,6 +731,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         username = authToken[0]        
         cu = self.db.cursor()
         # now get them troves
+        args = [ username ]
         query = """
         select distinct
             Items.Item as trove, UP.pattern as pattern
@@ -747,13 +748,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	            Users.user = ?
 	    ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Labels using (labelId)
-            join Items on LabelMap.itemId = Items.itemId
-        where
-	    Labels.label = ?
+            join Items using (itemId)
         """
-        cu.execute(query, [username, labelStr])
-        logMe(3, "query", query, [username, labelStr])
+        if labelStr:
+            query = query + """
+            join Labels on LabelMap.labelId = Labels.labelId
+        where    
+	    Labels.label = ?
+            """
+            args.append(labelStr)       
+        cu.execute(query, args)
+        logMe(3, "query", query, args)
         names = set()
         for (trove, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):

@@ -42,7 +42,7 @@ from lib import openpgpfile
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 32, 33 ]
+CLIENT_VERSIONS = [ 32, 33, 34 ]
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
@@ -342,6 +342,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
 
+    def troveNamesOnServer(self, server):
+        return self.c[server].troveNames("")
+    
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
         # XXX this code should most likely go away, and anything that
