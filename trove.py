@@ -50,14 +50,9 @@ class TroveTuple(streams.StreamSet):
 
         if first == second:
             first = self.freeze()
-            other = other.freeze()
+            second = other.freeze()
 
-        if first < second:
-            return -1
-        elif first == second:
-            return 0
-
-        return 1
+        return cmp(first, second)
 
     def __hash__(self):
         return hash((self.name(), self.version(), self.flavor()))
