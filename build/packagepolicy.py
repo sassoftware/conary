@@ -1669,8 +1669,6 @@ class Provides(_BuildPackagePolicy):
         if (path in pkg.providesMap and
             'soname' in m.contents and not mode & 0111 and
             not path.endswith('.so')):
-            # libraries must be in a library directory for their
-            # soname to be provided
             # libraries must be executable for ldconfig to work --
             # see ExecutableLibraries policy
             del pkg.providesMap[path]
