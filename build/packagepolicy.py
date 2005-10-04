@@ -339,6 +339,16 @@ class CheckDestDir(policy.Policy):
                 self.error('Symlink %s contains destdir %s in contents %s',
                            file, d, contents)
 
+        badRPATHS = (d, '/tmp', '/var/tmp')
+        m = self.recipe.magic[file]
+        if m and m.name == "ELF":
+            rpaths = m.contents['RPATH'] or ''
+            for rpath in rpaths.split(':'):
+                for badRPATH in badRPATHS:
+                    if rpath.startswith(badRPATH):
+                        self.error('file %s has illegal RPATH %s',
+                                    file, rpath)
+                        break
 
 # now the packaging classes
 

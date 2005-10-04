@@ -33,8 +33,9 @@ class ELF(Magic):
         fullpath = basedir+path
 	self.contents['stripped'] = elf.stripped(fullpath)
         if self.__class__ is ELF:
-            # ar doesn't deal with hasDebug
+            # ar doesn't deal with hasDebug or RPATH
             self.contents['hasDebug'] = elf.hasDebug(fullpath)
+            self.contents['RPATH'] = elf.getRPATH(fullpath)
 	requires, provides = elf.inspect(fullpath)
         self.contents['requires'] = requires
         self.contents['provides'] = provides
@@ -44,7 +45,6 @@ class ELF(Magic):
         for prov in provides:
             if prov[0] == 'soname':
                 self.contents['soname'] = prov[1]
-
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):

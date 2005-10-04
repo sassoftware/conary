@@ -22,6 +22,8 @@ Changes in 0.62.12:
   * cooking troves into the repository with --flavor <newflavor> now modifies 
     the flavor before the recipe is even loaded, not when the recipe's setup
     function is called.
+  * add a check to ensure RPATHs in cooked packages do not have %(destdir)s 
+    or /tmp or /var/tmp in them.
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
