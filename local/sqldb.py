@@ -650,6 +650,28 @@ class Database:
                                        "fileId=?, stream=? WHERE fileId=?",
                                        newFileId, newStream, fileId)
 
+                for klass, infoType in [
+                              (trove.BuildDependencies,
+                               trove._TROVEINFO_TAG_BUILDDEPS),
+                              (trove.LoadedTroves,
+                               trove._TROVEINFO_TAG_LOADEDTROVES),
+                              (trove.InstallBucket,
+                               trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
+                    for instanceId, data in \
+                            [ x for x in cu.execute(
+                                "select instanceId, data from TroveInfo WHERE "
+                                "infoType=?", infoType) ]:
+                        obj = klass(data)
+                        f = obj.freeze()
+                        if f != data:
+                            count += 1
+                            cu.execute("update troveinfo set data=? where "
+                                       "instanceId=? and infoType=?", f,
+                                       instanceId, infoType)
+                            cu.execute("delete from troveinfo where "
+                                       "instanceId=? and infoType=?",
+                                       instanceId, trove._TROVEINFO_TAG_SIGS)
+
                 cu.execute("UPDATE DatabaseVersion SET version=9")
                 self.db.commit()
                 print "\r%s\r" %(' ' * len(msg)),
