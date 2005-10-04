@@ -2138,14 +2138,14 @@ class EnforceSonameBuildRequirements(policy.Policy):
                                sorted(list(set(pathReqMap[path])))]))
 
         if missingBuildRequires:
-            self.error('add to buildRequires: %s',
+            self.warn('add to buildRequires: %s',
                        str(sorted(list(set(missingBuildRequires)))))
             # one special case:
             if list(missingBuildRequires) == [ 'glibc:devel' ]:
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
         if missingBuildRequiresChoices:
             for candidateSet in missingBuildRequiresChoices:
-                self.error('add to buildRequires one of: %s',
+                self.warn('add to buildRequires one of: %s',
                            str(sorted(list(candidateSet))))
 
 

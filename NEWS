@@ -24,6 +24,8 @@ Changes in 0.62.12:
     function is called.
   * add a check to ensure RPATHs in cooked packages do not have %(destdir)s 
     or /tmp or /var/tmp in them.
+  * EnforceSonameBuildRequirements has been temporarily changed to produce
+    warnings instead of errors.
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
