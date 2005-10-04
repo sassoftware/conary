@@ -325,6 +325,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
+        if not oldTrovePattern:
+            oldTrovePattern = "ALL"
+
         self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
                                    trovePattern, label, write, capped, admin)
 
