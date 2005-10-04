@@ -257,7 +257,7 @@ EOF
 
 
 
-    def reportAssignments(self, bugzillaProduct):
+    def reportAssignments(self, bugzillaProduct, userList):
         cu = self.db.cursor()
         cu.execute("""SELECT COUNT(components.name) AS count, profiles.login_name
                       FROM components, profiles
@@ -271,7 +271,7 @@ EOF
             print '%5s %s' %(count, login)
 
         print '\n\nComplete Bug Assignment List by User for %s:' %bugzillaProduct
-        for user in ('dbc', 'bugsforerik', 'jmforbes', 'johnsonm', 'msw', 'tgerla'):
+        for user in userList:
             cu.execute("""SELECT components.name
                           FROM components, profiles
                           WHERE components.initialowner=profiles.userid
