@@ -26,6 +26,7 @@ Changes in 0.62.12:
     or /tmp or /var/tmp in them.
   * EnforceSonameBuildRequirements has been temporarily changed to produce
     warnings instead of errors.
+  * Dependncies and flavors didn't order things properly in their frozen forms
 
 Changes in 0.62.11:
   * InstallBucket policy now allows using macros in component names.
