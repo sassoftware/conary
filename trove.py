@@ -45,25 +45,6 @@ class TroveTuple(streams.StreamSet):
     _streamDict = streams.StreamSetDef(streamDict)
 
     def __cmp__(self, other):
-        if self.name() < other.name():
-            return -1
-        elif self.name() > other.name():
-            return 1
-
-        rc = self.version().__cmp__(other.version()
-        if rc: return rc
-
-        first = self.flavor().freeze()
-        second = self.flavor().freeze()
-
-        if first < second:
-            return -1
-        elif first > second:
-            return 1
-
-        return 0
-
-    def __cmp__(self, other):
         first = self.name()
         second = other.name()
 
