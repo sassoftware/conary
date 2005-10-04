@@ -1678,7 +1678,7 @@ class Provides(_BuildPackagePolicy):
     def _ELFPathProvide(self, path, m, pkg):
         basedir = os.path.dirname(path)
         # thanks to _ELFNonProvide, we know that this is a reasonable library
-        if basedir not in self.sonameSubtrees:
+        if basedir not in self.sonameSubtrees and path in pkg.providesMap:
             # path needs to be in the dependency, since the
             # provides is too broad otherwise, so add it.
             # We can only add characters from the path that are legal
