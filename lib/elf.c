@@ -547,15 +547,16 @@ static PyObject *doGetRPATH(Elf * elf) {
 	    return NULL;
 	}
 
-	if (shdr.sh_type == SHT_NOBITS) {
-	    /* this section has no data, skip it */
+	/* skip any section that isn't DYNAMIC */
+	if (shdr.sh_type != SHT_DYNAMIC) {
 	    continue;
 	}
 
 	elf_getshstrndx(elf, &shstrndx);
 	name = elf_strptr(elf, shstrndx, shdr.sh_name);
 
-	/* skip any section name that isn't .dynamic */
+	/* strange. a DYNAMIC section that isn't named .dynamic.
+	   better skip it */
 	if (strcmp(name, ".dynamic"))
 	    continue;
 
