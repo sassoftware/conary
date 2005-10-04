@@ -592,7 +592,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if flavorScore is None:
                 flavorScore = 0
                 
-            #logMe(3, troveName, versionStr, flavor, flavorScore)
+            #logMe(3, troveName, versionStr, flavor, flavorScore, finalTimestamp)
             if allowed.has_key((troveName, versionStr, flavor)):
                 continue
 
@@ -624,8 +624,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     # if the following pairs of (score, timestamp) come in the
                     # order showed, we end up picking different results.
                     #  (assume GET_TROVE_BEST_FLAVOR here)
-                    # (3, 100), (5, 82), (4, 81)  -> (5, 82)  [WRONG]
-                    # (4, 81) , (5, 82), (3, 100) -> (3, 100) [RIGHT]
+                    # (1, 3), (3, 2), (2, 1)  -> (3, 2)  [WRONG]
+                    # (2, 1) , (3, 2), (1, 3) -> (1, 3)  [RIGHT]
                     #
                     # XXX: this is why the row order of the SQL result matters.
                     #      We ain't doing the right thing here.
@@ -635,6 +635,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d[(branchId, flavorIdentifier)] = \
                             (finalTimestamp, flavorScore, versionStr, 
                              timeStamps, flavor)
+                        #logMe(3, lastTimestamp, lastFlavorScore, d)
                 elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
                     assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                     assert(withFlavors)
@@ -1511,7 +1512,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=3")
                 self.db.commit()
                 version = 3
-            elif version == 3
+            elif version == 3:
                 # deterministic sort order for troveCollections was added;
                 # this 
                 for klass, infoType in [
