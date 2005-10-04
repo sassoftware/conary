@@ -536,23 +536,21 @@ static PyObject *doGetRPATH(Elf * elf) {
     char * buf;
     int entries, i;
 
-    if (-1 == elf_getshstrndx (elf, &shstrndx)) {
-	PyErr_SetString(ElfError, "error getting string table index!");
+    if (-1 == elf_getshstrndx(elf, &shstrndx)) {
+	PyErr_SetString(ElfError, "error getting string table index");
 	return NULL;
     }
 
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
-	    PyErr_SetString(ElfError, "error getting section header!");
+	    PyErr_SetString(ElfError, "error getting section header");
 	    return NULL;
 	}
 
-	elf_getshstrndx (elf, &shstrndx);
-	name = elf_strptr (elf, shstrndx, shdr.sh_name);
+	elf_getshstrndx(elf, &shstrndx);
+	name = elf_strptr(elf, shstrndx, shdr.sh_name);
 
-	if (shdr.sh_type == SHT_PROGBITS)
-	    continue;
-
+	/* skip any section name that isn't .dynamic */
 	if (strcmp(name, ".dynamic"))
 	    continue;
 
@@ -560,18 +558,20 @@ static PyObject *doGetRPATH(Elf * elf) {
 	entries = shdr.sh_size / shdr.sh_entsize;
 	for (i = 0; i < entries; i++) {
 	    gelf_getdyn(data, i, &sym);
+	    /* skip any tag that isn't RPATH or RUNPATH */
 	    if (sym.d_tag != DT_RPATH && sym.d_tag != DT_RUNPATH)
 		continue;
 
 	    buf = elf_strptr(elf, shdr.sh_link, sym.d_un.d_val);
-	    if (runpath != NULL && strcmp(runpath, buf)) {
-		PyErr_SetString(ElfError, "conflicting RPATH/RUNPATH entries!");
+	    if (NULL != runpath && strcmp(runpath, buf)) {
+		/* this should never happen */
+		PyErr_SetString(ElfError, "RPATH/RUNPATH entries conflict");
 		return NULL;
 	    }
 	    runpath = buf;
 	}
     }
-    if (runpath != NULL)
+    if (NULL != runpath)
 	return PyString_FromString(runpath);
     else {
 	Py_INCREF(Py_None);
