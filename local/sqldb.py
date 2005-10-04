@@ -583,7 +583,8 @@ class Database:
                 version = 8
                 self.db.commit()
                 print "\r%s\r" %(' ' * len(msg)),
-            elif version == 8:
+
+            if version == 8:
                 import sys
                 msg = "Converting broken fileids..."
                 print msg,
