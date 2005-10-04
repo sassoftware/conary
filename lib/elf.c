@@ -27,6 +27,11 @@
 
 static PyObject * ElfError;
 
+/* debugging aid */
+#if defined(__i386__) || defined(__x86_64__)
+# define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
+#endif
+
 static int doInspect(int fd, Elf * elf, PyObject * reqList,
 		     PyObject * provList) {
     Elf_Scn * sect = NULL;
@@ -174,7 +179,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 			PyDict_SetItem(reqList, val, Py_None);
 		    else
 			PyDict_SetItem(provList, val, Py_None);
-		}
+		} 
 
 	    }
 	} else if (!strcmp(name, ".gnu.version_r")) {
@@ -520,6 +525,91 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
     return rc;
 }
 
+static PyObject *doGetRPATH(Elf * elf) {
+    Elf_Scn * sect = NULL;
+    Elf_Data * data;
+    GElf_Dyn sym;
+    GElf_Shdr shdr;
+    size_t shstrndx;
+    char * name;
+    char * runpath = NULL;
+    char * buf;
+    int entries, i;
+
+    if (-1 == elf_getshstrndx (elf, &shstrndx)) {
+	PyErr_SetString(ElfError, "error getting string table index!");
+	return NULL;
+    }
+
+    while ((sect = elf_nextscn(elf, sect))) {
+	if (!gelf_getshdr(sect, &shdr)) {
+	    PyErr_SetString(ElfError, "error getting section header!");
+	    return NULL;
+	}
+
+	elf_getshstrndx (elf, &shstrndx);
+	name = elf_strptr (elf, shstrndx, shdr.sh_name);
+
+	if (shdr.sh_type == SHT_PROGBITS)
+	    continue;
+
+	if (strcmp(name, ".dynamic"))
+	    continue;
+
+	data = elf_getdata(sect, NULL);
+	entries = shdr.sh_size / shdr.sh_entsize;
+	for (i = 0; i < entries; i++) {
+	    gelf_getdyn(data, i, &sym);
+	    if (sym.d_tag != DT_RPATH && sym.d_tag != DT_RUNPATH)
+		continue;
+
+	    buf = elf_strptr(elf, shdr.sh_link, sym.d_un.d_val);
+	    if (runpath != NULL && strcmp(runpath, buf)) {
+		PyErr_SetString(ElfError, "conflicting RPATH/RUNPATH entries!");
+		return NULL;
+	    }
+	    runpath = buf;
+	}
+    }
+    if (runpath != NULL)
+	return PyString_FromString(runpath);
+    else {
+	Py_INCREF(Py_None);
+	return Py_None;
+    }
+}
+
+static PyObject * getRPATH(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    PyObject *rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    rc = doGetRPATH(elf);
+    elf_end(elf);
+    close(fd);
+
+    return rc;
+}
+
+
 static PyMethodDef ElfMethods[] = {
     { "inspect", inspect, METH_VARARGS, 
 	"inspect an ELF file for dependency information" },
@@ -529,6 +619,8 @@ static PyMethodDef ElfMethods[] = {
 	"returns whether or not an ELF file has debugging info" },
     { "hasUnresolvedSymbols", hasUnresolvedSymbols, METH_VARARGS,
 	"returns whether or not an ELF file has unresolved symbols" },
+    { "getRPATH", getRPATH, METH_VARARGS,
+        "returns the RPATH or RUNPATH set in an ELF file (if any)" },
     { NULL, NULL, 0, NULL }
 };
 
