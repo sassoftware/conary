@@ -768,7 +768,7 @@ class DependencySet(object):
 
     def freeze(self):
         rc = []
-        for tag, depclass in self.getDepClasses().items():
+        for tag, depclass in sorted(self.getDepClasses().items()):
             for dep in depclass.getDeps():
                 rc.append('%d#%s' %(tag, dep.freeze()))
         return '|'.join(rc)
