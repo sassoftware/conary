@@ -536,11 +536,6 @@ static PyObject *doGetRPATH(Elf * elf) {
     char * buf;
     int entries, i;
 
-    if (-1 == elf_getshstrndx(elf, &shstrndx)) {
-	PyErr_SetString(ElfError, "error getting string table index");
-	return NULL;
-    }
-
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
 	    PyErr_SetString(ElfError, "error getting section header");
@@ -552,8 +547,16 @@ static PyObject *doGetRPATH(Elf * elf) {
 	    continue;
 	}
 
-	elf_getshstrndx(elf, &shstrndx);
+	if (-1 == elf_getshstrndx(elf, &shstrndx)) {
+	    PyErr_SetString(ElfError, "error getting string table index");
+	    return NULL;
+	}
+
 	name = elf_strptr(elf, shstrndx, shdr.sh_name);
+	if (NULL == name) {
+	    PyErr_SetString(ElfError, "error getting section name");
+	    return NULL;
+	}
 
 	/* strange. a DYNAMIC section that isn't named .dynamic.
 	   better skip it */
