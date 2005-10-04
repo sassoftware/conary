@@ -567,7 +567,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             %s
         %s
         %s
-        ORDER BY Items.item, Nodes.finalTimestamp
+        -- ORDER BY Items.item, Nodes.finalTimestamp
         """ % (", ".join(getList), troveNameClause, instanceClause, 
                versionClause, labelClause, flavorClause, flavorScoringClause,
                grouping, flavorScoreCheck)
@@ -592,7 +592,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if flavorScore is None:
                 flavorScore = 0
                 
-            #logMe(3, troveName, versionStr, flavor, flavorScore, finalTimestamp)
+            logMe(3, troveName, versionStr, flavor, flavorScore, finalTimestamp)
             if allowed.has_key((troveName, versionStr, flavor)):
                 continue
 
@@ -635,7 +635,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d[(branchId, flavorIdentifier)] = \
                             (finalTimestamp, flavorScore, versionStr, 
                              timeStamps, flavor)
-                        #logMe(3, lastTimestamp, lastFlavorScore, d)
+                        logMe(3, lastTimestamp, lastFlavorScore, d)
+                        if troveName == 'test2:test':
+                            from lib import epdb
+                            epdb.st()
+                            
                 elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
                     assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                     assert(withFlavors)
@@ -1530,7 +1534,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         f = obj.freeze()
                         if f != data:
                             count += 1
-                            badInstances.add(instanceId)
+                            #badInstances.add(instanceId)
                             cu.execute("update troveinfo set data=? where "
                                        "instanceId=? and infoType=?", f,
                                        instanceId, infoType)
