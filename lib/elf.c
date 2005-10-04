@@ -547,6 +547,11 @@ static PyObject *doGetRPATH(Elf * elf) {
 	    return NULL;
 	}
 
+	if (shdr.sh_type == SHT_NOBITS) {
+	    /* this section has no data, skip it */
+	    continue;
+	}
+
 	elf_getshstrndx(elf, &shstrndx);
 	name = elf_strptr(elf, shstrndx, shdr.sh_name);
 
