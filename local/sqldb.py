@@ -391,7 +391,7 @@ def _doAnalyze(db):
 
 class Database:
 
-    schemaVersion = 8
+    schemaVersion = 9
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -583,6 +583,77 @@ class Database:
                 version = 8
                 self.db.commit()
                 print "\r%s\r" %(' ' * len(msg)),
+            elif version == 8:
+                import sys
+                msg = "Converting broken fileids..."
+                print msg,
+                sys.stdout.flush()
+
+                for name in  [ "mono-tools:lib", "mailman:runtime",
+			       "bugzilla:runtime", "cacti:runtime",
+			       "info-cacti:user", "info-adm:user",
+			       "info-amanda:user", "info-apache:user",
+			       "info-bin:user", "info-canna:user",
+			       "info-cyrus:user", "info-daemon:user",
+			       "info-dbus:user", "info-dovecot:user",
+			       "info-exim:user", "info-fax:user",
+			       "info-fcron:user", "info-ftp:user",
+			       "info-games:user", "info-gdm:user",
+			       "info-gopher:user", "info-halt:user",
+			       "info-htt:user", "info-ident:user",
+			       "info-ldap:user", "info-lp:user",
+			       "info-mail:user", "info-mailman:user",
+			       "info-mailnull:user", "info-mysql:user",
+			       "info-named:user", "info-netdump:user",
+			       "info-news:user", "info-nfsnobody:user",
+			       "info-nobody:user", "info-nscd:user",
+			       "info-ntp:user", "info-nut:user",
+			       "info-operator:user", "info-pcap:user",
+			       "info-postfix:user", "info-postgres:user",
+			       "info-privoxy:user", "info-quagga:user",
+			       "info-radiusd:user", "info-radvd:user",
+			       "info-root:user", "info-rpc:user",
+			       "info-rpcuser:user", "info-shutdown:user",
+			       "info-smmsp:user", "info-squid:user",
+			       "info-sshd:user", "info-sync:user",
+			       "info-tomcat:user", "info-uucp:user",
+			       "info-vcsa:user", "info-webalizer:user",
+			       "info-wnn:user", "info-xfs:user",
+			       "info-haldaemon:user", "utempter:runtime" 
+			       "postfix:runtime", "mysql:runtime",
+			       "slocate:runtime", "mysql-server:lib",
+			       "sendmail:runtime", "openldap-servers:runtime",
+			       "arpwatch:runtime", "at:runtime",
+			       "bind:runtime", "cups:runtime",
+			       "httpd:runtime", "httpd:lib",
+			       "php:lib", "squirrelmail:runtime",
+			       "squirrelmail:lib", "inn:runtime",
+			       "inn:lib", "lockdev:lib",
+			       "minicom:runtime", "nfs-utils:lib",
+			       "ntp:lib", "postgresql:lib",
+			       "postgresql:runtime", "procmail:runtime",
+			       "quagga:runtime", "sysvinit:runtime" ]:
+                    cu.execute("""
+                            SELECT fileId, stream, path FROM 
+                                Instances, DBTroveFiles 
+                            WHERE
+                                troveName =? AND
+                                Instances.instanceId = DBTroveFiles.instanceId
+                        """, name)
+                    for (fileId, stream, path) in [ x for x in cu ]:
+                        f = files.ThawFile(stream, fileId)
+                        frz = f.freeze()
+                        if frz != stream:
+                            newFileId = f.fileId()
+                            newStream = f.freeze()
+                            cu.execute("UPDATE DBTroveFiles SET "
+                                       "fileId=?, stream=? WHERE fileId=?",
+                                       newFileId, newStream, fileId)
+
+                cu.execute("UPDATE DatabaseVersion SET version=9")
+                self.db.commit()
+                print "\r%s\r" %(' ' * len(msg)),
+                version = 9
 
             if version != self.schemaVersion:
                 return False
