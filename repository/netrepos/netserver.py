@@ -1521,7 +1521,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                               (trove.LoadedTroves, 
                                trove._TROVEINFO_TAG_LOADEDTROVES),
                               (trove.InstallBucket, 
-                               trove._TROVEINFO_TAG_INSTALLBUCKET) ]
+                               trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
                     for instanceId, data in \
                             [ x for x in cu.execute(
                                 "select instanceId, data from TroveInfo WHERE "
