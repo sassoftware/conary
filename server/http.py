@@ -146,7 +146,7 @@ class HttpHandler(WebHandler):
         if not char:
             char = 'A'
             defaultPage = True
-        troves = self.repos.getAllTroveLeaves(self.serverName, {None: [None]})
+        troves = self.repos.troveNamesOnServer(self.serverName)
         # keep a running total of each letter we see so that the display
         # code can skip letters that have no troves
         totals = dict.fromkeys(list(string.digits) + list(string.uppercase), 0)
