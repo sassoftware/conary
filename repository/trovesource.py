@@ -367,6 +367,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                     trvCs.getNewFlavor())
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
+                    # FIXME: there is no such exception in this context
                     raise DuplicateTrove
                 self.troveCsMap[info] = cs
                 self.jobMap[(info[0], (None, None), info[1:], 
@@ -379,9 +380,11 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
                                        x[0].getOldFlavor()) for x in relative ])
         for (trvCs, info), isPresent in itertools.izip(relative, present):
             if not isPresent:
+                # FIXME: there is no such exception in this context
                 raise MissingTrove
             
             if info in self.troveCsMap:
+                # FIXME: there is no such exception in this context
                 raise DuplicateTrove
             self.troveCsMap[info] = cs
             self.jobMap[(info[0], (trvCs.getOldVersion(), 
