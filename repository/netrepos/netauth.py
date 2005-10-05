@@ -635,10 +635,10 @@ class NetworkAuthorization:
             """)
             commit = True
 
-        if "UserView" not in tables:
+        if "UsersView" not in tables:
             cu.execute("""
             CREATE VIEW
-                UserView AS
+                UsersView AS
             SELECT
                 Users.user as user,
                 Items.item as item,
