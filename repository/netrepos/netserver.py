@@ -371,7 +371,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS, 
                       flavorFilter = _GET_TROVE_ALL_FLAVORS,
-                      withVersions = True, 
                       withFlavors = False):
         logMe(2, versionType, latestFilter, flavorFilter)
         cu = self.db.cursor()
@@ -428,13 +427,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             getList.append('0')
         argList = [ authToken[0] ]
 
-        if withVersions:
-            getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
-                         'Nodes.finalTimestamp' ]
-            versionClause = "join Versions ON Nodes.versionId = Versions.versionId"
-        else:
-            getList += [ "NULL", "NULL", "NULL", "NULL" ]
-            versionClause = ""
+        getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
+                     'Nodes.finalTimestamp' ]
+        versionClause = "join Versions ON Nodes.versionId = Versions.versionId"
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans        
@@ -457,10 +452,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     Branches.branchId = LabelMap.branchId AND
                     Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
-            # FIXME: will we ever walk through here without wanting to
-            # extract the versions? By augmenting the previous
-            # versionClause setting we save another join
-            assert(withVersions)
             labelClause = ""
             if singleVersionSpec:
                 vc = "Versions.version = '%s'" % singleVersionSpec
@@ -475,7 +466,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            assert(withVersions)
             instanceClause = """join Latest as Domain using (itemId)
             join Nodes using (itemId, branchId, versionId)"""
         else:
@@ -483,7 +473,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Nodes using (itemId, versionid)"""
 
         if withFlavors:
-            assert(withVersions)
             getList.append("Flavors.flavor")
             flavorClause = "join Flavors ON Flavors.flavorId = Domain.flavorId"
         else:
@@ -604,79 +593,76 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # FIXME: since troveNames is no longer traveling through
             # here, this withVersions check has become superfluous.
             # Now we're always dealing with versions -- gafton
-            if withVersions:
-                if latestFilter == self._GET_TROVE_VERY_LATEST:
-                    d = troveVersions.setdefault(troveName, {})
+            if latestFilter == self._GET_TROVE_VERY_LATEST:
+                d = troveVersions.setdefault(troveName, {})
 
-                    if flavorFilter == self._GET_TROVE_BEST_FLAVOR:
-                        flavorIdentifier = localFlavorId
-                    else:
-                        flavorIdentifier = flavor
-
-                    lastTimestamp, lastFlavorScore = d.get(
-                            (branchId, flavorIdentifier), (0, -500000))[0:2]
-                    # this rule implements "later is better"; we've already
-                    # thrown out incompatible troves, so whatever is left
-                    # is at least compatible; within compatible, newer
-                    # wins (even if it isn't as "good" as something older)
-
-                    # FIXME: this OR-based serialization sucks.
-                    # if the following pairs of (score, timestamp) come in the
-                    # order showed, we end up picking different results.
-                    #  (assume GET_TROVE_BEST_FLAVOR here)
-                    # (1, 3), (3, 2), (2, 1)  -> (3, 2)  [WRONG]
-                    # (2, 1) , (3, 2), (1, 3) -> (1, 3)  [RIGHT]
-                    #
-                    # XXX: this is why the row order of the SQL result matters.
-                    #      We ain't doing the right thing here.
-                    if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and
-                        flavorScore > lastFlavorScore) or \
-                        finalTimestamp > lastTimestamp:
-                        d[(branchId, flavorIdentifier)] = \
-                            (finalTimestamp, flavorScore, versionStr, 
-                             timeStamps, flavor)
-                        #logMe(3, lastTimestamp, lastFlavorScore, d)
-                            
-                elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
-                    assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
-                    assert(withFlavors)
-
-                    d = troveVersions.get(troveName, None)
-                    if d is None:
-                        d = {}
-                        troveVersions[troveName] = d
-
-                    lastTimestamp, lastFlavorScore = d.get(
-                            (versionStr, localFlavorId), (0, -500000))[0:2]
-
-                    if (flavorScore > lastFlavorScore):
-                        d[(versionStr, localFlavorId)] = \
-                            (finalTimestamp, flavorScore, versionStr, 
-                             timeStamps, flavor)
+                if flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+                    flavorIdentifier = localFlavorId
                 else:
-                    # if _GET_TROVE_ALL_VERSIONS is used, withFlavors must
-                    # be specified (or the various latest versions can't
-                    # be differentiated)
-                    assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
-                    assert(withFlavors)
+                    flavorIdentifier = flavor
 
-                    version = versions.VersionFromString(versionStr)
-                    version.setTimeStamps([float(x) for x in 
-                                                timeStamps.split(":")])
+                lastTimestamp, lastFlavorScore = d.get(
+                        (branchId, flavorIdentifier), (0, -500000))[0:2]
+                # this rule implements "later is better"; we've already
+                # thrown out incompatible troves, so whatever is left
+                # is at least compatible; within compatible, newer
+                # wins (even if it isn't as "good" as something older)
 
-                    d = troveVersions.get(troveName, None)
-                    if d is None:
-                        d = {}
-                        troveVersions[troveName] = d
+                # FIXME: this OR-based serialization sucks.
+                # if the following pairs of (score, timestamp) come in the
+                # order showed, we end up picking different results.
+                #  (assume GET_TROVE_BEST_FLAVOR here)
+                # (1, 3), (3, 2), (2, 1)  -> (3, 2)  [WRONG]
+                # (2, 1) , (3, 2), (1, 3) -> (1, 3)  [RIGHT]
+                #
+                # XXX: this is why the row order of the SQL result matters.
+                #      We ain't doing the right thing here.
+                if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and
+                    flavorScore > lastFlavorScore) or \
+                    finalTimestamp > lastTimestamp:
+                    d[(branchId, flavorIdentifier)] = \
+                        (finalTimestamp, flavorScore, versionStr, 
+                         timeStamps, flavor)
+                    #logMe(3, lastTimestamp, lastFlavorScore, d)
 
-                    version = version.freeze()
-                    l = d.get(version, None)
-                    if l is None:
-                        l = []
-                        d[version] = l
-                    l.append(flavor)
+            elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+                assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
+                assert(withFlavors)
+
+                d = troveVersions.get(troveName, None)
+                if d is None:
+                    d = {}
+                    troveVersions[troveName] = d
+
+                lastTimestamp, lastFlavorScore = d.get(
+                        (versionStr, localFlavorId), (0, -500000))[0:2]
+
+                if (flavorScore > lastFlavorScore):
+                    d[(versionStr, localFlavorId)] = \
+                        (finalTimestamp, flavorScore, versionStr, 
+                         timeStamps, flavor)
             else:
-                troveNames.append(troveName)
+                # if _GET_TROVE_ALL_VERSIONS is used, withFlavors must
+                # be specified (or the various latest versions can't
+                # be differentiated)
+                assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
+                assert(withFlavors)
+
+                version = versions.VersionFromString(versionStr)
+                version.setTimeStamps([float(x) for x in 
+                                            timeStamps.split(":")])
+
+                d = troveVersions.get(troveName, None)
+                if d is None:
+                    d = {}
+                    troveVersions[troveName] = d
+
+                version = version.freeze()
+                l = d.get(version, None)
+                if l is None:
+                    l = []
+                    d[version] = l
+                l.append(flavor)
         logMe(3, "extracted query results")
 
         if dropTroveTable:
@@ -685,41 +671,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if flavorIndices:
             cu.execute("DROP TABLE ffFlavor", start_transaction = False)
 
-        if withVersions:
-            if latestFilter == self._GET_TROVE_VERY_LATEST or \
-                        flavorFilter == self._GET_TROVE_BEST_FLAVOR:
-                newTroveVersions = {}
-                for troveName, versionDict in troveVersions.iteritems():
+        if latestFilter == self._GET_TROVE_VERY_LATEST or \
+                    flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+            newTroveVersions = {}
+            for troveName, versionDict in troveVersions.iteritems():
+                if withFlavors:
+                    l = {}
+                else:
+                    l = []
+
+                for (finalTimestamp, flavorScore, versionStr, timeStamps, 
+                     flavor) in versionDict.itervalues():
+                    version = versions.VersionFromString(versionStr)
+                    version.setTimeStamps([float(x) for x in 
+                                                timeStamps.split(":")])
+                    version = self.freezeVersion(version)
+
                     if withFlavors:
-                        l = {}
+                        if flavor == None:
+                            flavor = "none"
+                        flist = l.setdefault(version, [])
+                        flist.append(flavor)
                     else:
-                        l = []
+                        l.append(version)
 
-                    for (finalTimestamp, flavorScore, versionStr, timeStamps, 
-                         flavor) in versionDict.itervalues():
-                        version = versions.VersionFromString(versionStr)
-                        version.setTimeStamps([float(x) for x in 
-                                                    timeStamps.split(":")])
-                        version = self.freezeVersion(version)
+                newTroveVersions[troveName] = l
 
-                        if withFlavors:
-                            if flavor == None:
-                                flavor = "none"
-                            flist = l.setdefault(version, [])
-                            flist.append(flavor)
-                        else:
-                            l.append(version)
+            troveVersions = newTroveVersions
 
-                    newTroveVersions[troveName] = l
-
-                troveVersions = newTroveVersions
-
-            logMe(3, "processed troveVersions")
-            return troveVersions
-        else:
-            return troveNames
-
-        assert(0)
+        logMe(3, "processed troveVersions")
+        return troveVersions
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
@@ -780,7 +761,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 troveFilter[name] = { None : None }
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withVersions = True, withFlavors = True)
+                                  withFlavors = True)
 
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
@@ -804,7 +785,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # dispatch the more complex version to the old getTroveList        
         if not troveSpecs == { '' : True }:
             return self._getTroveList(authToken, clientVersion, troveFilter,
-                                      withVersions = True, 
                                       latestFilter = self._GET_TROVE_VERY_LATEST,
                                       withFlavors = True)
         # faster version for the "get-all" case
@@ -893,7 +873,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             flavorFilter = self._GET_TROVE_ALL_FLAVORS
         return self._getTroveList(authToken, clientVersion, d, 
-                                  withVersions = True, 
                                   flavorFilter = flavorFilter,
                                   versionType = versionType,
                                   latestFilter = latestFilter,
