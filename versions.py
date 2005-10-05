@@ -71,17 +71,11 @@ class SerialNumber(object):
 
         i = 0
         for i in range(min(len(self.numList), len(other.numList))):
-            if self.numList[i] < other.numList[i]:
-                return -1
-            elif self.numList[i] > other.numList[i]:
-                return 1
+            cmpVal = cmp(self.numList[i], other.numList[i])
+            if cmpVal != 0:
+                return cmpVal
 
-        if len(self.numList) < len(other.numList):
-            return -1
-        elif len(self.numList) > len(other.numList):
-            return 1
-
-        return 0
+        return cmp(len(self.numList), len(other.numList))
 
     def __eq__(self, other):
         if self.__class__ != other.__class__:
