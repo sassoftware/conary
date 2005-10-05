@@ -1,3 +1,13 @@
+  * The Schema creation SQL statements have been rewritten in a more
+    standardized form. Some indexes have been redifined and a number
+    of views have made their way into the default repository server
+    schema
+  * The new call troveNamesOnServer can be used now by the netclient
+    code for a much faster retrieval of all trive names available on all
+    lables on a given server. Server and client protocol numbers have changed.
+  * getTroveList server side function got a rework that should result
+    in about a 50% exceution time speedup on most queries.
+
 Changes in 0.62.12:
   * Conary will no longer create a "rootroot" group while installing
     users whose primary group is "root".  It will now call the
