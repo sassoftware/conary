@@ -21,7 +21,12 @@ class InstructionSets:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if 'InstructionSets' not in tables:
-            cu.execute("CREATE TABLE InstructionSets(isnSetId integer primary key, base str, flags str)")
+            cu.execute("""
+            CREATE TABLE InstructionSets(
+                isnSetId        INTEGER PRIMARY KEY,
+                base            STRING,
+                flags           STRING
+            )""")
 
     def _freezeIsd(self, isd):
         frozen = isd.freeze()

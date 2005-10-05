@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 4
+    schemaVersion = 5
 
     # lets the following exceptions pass:
     #
@@ -1497,9 +1497,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=3")
                 self.db.commit()
                 version = 3
-            elif version == 3:
-                print "Conversion to version 4 requires script available "
-                print "from http://wiki.rpath.com/ConaryConversion"
+            # migration to schma version 4
+            if version == 3:
+                from lib.tracelog import printErr
+                msg = """
+                Conversion to version 4 requires script available
+                from http://wiki.rpath.com/ConaryConversion
+                """
+                printErr(msg)
+                print msg
+                return False
+            # schema version 5 adds a few views and various cleanups
+            if version == 4:
+                # FlavorScoresIdx was not unique
+                cu.execute("DROP INDEX FlavorScoresIdx")
+                cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx "
+                           "    on FlavorScores(request, present)")
+                # remove redundancy/rename                
+                cu.execute("DROP INDEX NodesIdx")
+                cu.execute("DROP INDEX NodesIdx2")
+                cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
+                                  ON Nodes(itemId, branchId, versionId)""")
+                cu.execute("""CREATE INDEX NodesItemVersionIdx
+                                  ON Nodes(itemId, versionId)""")
+                # the views are added by the __init__ methods of their
+                # respective classes
+                cu.execute("UPDATE DatabaseVersion SET version=5")
+                self.db.commit()
+                version = 5
+                
             if version != self.schemaVersion:
                 return False
 
@@ -1721,10 +1747,11 @@ class CacheSet:
         # start a transaction to retain a consistent state
         self.db._begin()
         cu.execute("""
-            SELECT row, returnValue, size FROM CacheContents WHERE
-                troveName=? AND newFlavorId=? AND newVersionId=?
-            """, (name, flavorId, versionId))
-
+        SELECT row, returnValue, size
+        FROM CacheContents
+        WHERE troveName=? AND newFlavorId=? AND newVersionId=?
+        """, (name, flavorId, versionId))
+        
         # delete all matching entries from the db and the file system
         for (row, returnVal, size) in cu.fetchall():
             cu.execute("DELETE FROM CacheContents WHERE row=?", row)
@@ -1770,27 +1797,26 @@ class CacheSet:
 
         if "CacheContents" not in tables:
             cu.execute("""
-                CREATE TABLE CacheContents(
-                    row INTEGER PRIMARY KEY,
-                    troveName STRING,
-                    oldFlavorId INTEGER,
-                    oldVersionId INTEGER,
-                    newFlavorId INTEGER,
-                    newVersionId INTEGER,
-                    absolute BOOLEAN,
-                    recurse BOOLEAN,
-                    withFiles BOOLEAN,
-                    withFileContents BOOLEAN,
-                    excludeAutoSource BOOLEAN,
-                    returnValue BINARY,
-                    size INTEGER)
-            """)
+            CREATE TABLE CacheContents(
+               row              INTEGER PRIMARY KEY,
+               troveName        STRING,
+               oldFlavorId      INTEGER,
+               oldVersionId     INTEGER,
+               newFlavorId      INTEGER,
+               newVersionId     INTEGER,
+               absolute         BOOLEAN,
+               recurse          BOOLEAN,
+               withFiles        BOOLEAN,
+               withFileContents BOOLEAN,
+               excludeAutoSource BOOLEAN,
+               returnValue      BINARY,
+               size             INTEGER
+            )""")
             cu.execute("""
-                CREATE INDEX CacheContentsIdx ON 
-                        CacheContents(troveName, oldFlavorId, oldVersionId, 
-                                      newFlavorId, newVersionId)
+            CREATE INDEX CacheContentsIdx ON 
+                CacheContents(troveName, oldFlavorId, oldVersionId, 
+                              newFlavorId, newVersionId)
             """)
-
             cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
             cu.execute("INSERT INTO CacheVersion VALUES(?)", schemaVersion)
         self.db.commit()

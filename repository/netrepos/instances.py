@@ -22,18 +22,47 @@ class InstanceTable:
         self.db = db
         
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        cu.execute("""SELECT tbl_name FROM sqlite_master
+                      WHERE type='table' or type='view' """)
         tables = [ x[0] for x in cu ]
         if "Instances" not in tables:
-            cu.execute("""CREATE TABLE Instances(
-				instanceId INTEGER PRIMARY KEY, 
-				itemId INT, 
-				versionId INT, 
-				flavorId INT,
-				isRedirect INT,
-				isPresent INT)""")
+            cu.execute("""
+            CREATE TABLE Instances(
+                instanceId      INTEGER PRIMARY KEY, 
+                itemId          INTEGER, 
+                versionId       INTEGER, 
+                flavorId        INTEGER,
+                isRedirect      INTEGER,
+                isPresent       INTEGER,
+                CONSTRAINT Instances_itemId_fk
+                    FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT Instances_versionId_fk
+                    FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT Instances_flavorId_fk
+                    FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                    ON DELETE RESTRICT ON UPDATE CASCADE,
+                CONSTRAINT Instances_item_version_flavor_uq
+                    UNIQUE (itemId, versionId, flavorId)                          
+            )""")
             cu.execute("""CREATE UNIQUE INDEX InstancesIdx ON 
 		               Instances(itemId, versionId, flavorId)""")
+        if "InstancesView" not in tables:
+            cu.execute("""
+            CREATE VIEW
+                InstancesView AS
+            SELECT
+                Instances.instanceId as instanceId,
+                Items.item as item,
+                Versions.version as version,
+                Flavors.flavor as flavor
+            FROM
+                Instances
+            JOIN Items on Instances.itemId = Items.itemId
+            JOIN Versions on Instances.versionId = Versions.versionId
+            JOIN Flavors on Instances.flavorId = Flavors.flavorId
+            """)
 
     def addId(self, itemId, versionId, flavorId, isRedirect, isPresent = True):
 	if isPresent:
@@ -107,10 +136,12 @@ class FileStreams:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if 'FileStreams' not in tables:
-            cu.execute("""CREATE TABLE FileStreams(streamId INTEGER PRIMARY KEY,
-                                                   fileId BINARY,
-                                                   stream BINARY)""")
+            cu.execute("""
+            CREATE TABLE FileStreams(
+                streamId INTEGER PRIMARY KEY,
+                fileId BINARY,
+                stream BINARY
+            )""")
 	    # in sqlite 2.8.15, a unique here seems to cause problems
 	    # (as the versionId isn't unique, apparently)
-	    cu.execute("""CREATE INDEX FileStreamsIdx ON
-			  FileStreams(fileId)""")
+	    cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")

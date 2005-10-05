@@ -67,15 +67,26 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
                    "name='TroveTroves'")
         if cu.next()[0] == 0:
-            cu.execute("""CREATE TABLE TroveTroves(instanceId INTEGER, 
-					           includedId INTEGER,
-                                                   byDefault BOOLEAN)""")
-	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
-			    "TroveTroves(instanceId)")
+            cu.execute("""
+            CREATE TABLE TroveTroves(
+                instanceId      INTEGER, 
+                includedId      INTEGER,
+                byDefault       BOOLEAN,
+                CONSTRAINT TroveTroves_instanceId_fk
+                    FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                    ON DELETE RESTRICT ON UPDATE CASCADE,
+                CONSTRAINT TroveTroves_includedId_fk
+                    FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
+                    ON DELETE RESTRICT ON UPDATE CASCADE,
+                CONSTRAINT TroveTroves_instance_included_uq
+                    UNIQUE(instanceId, includedId)
+            )""")
+            # ideally we would attempt to create a unique index on (instance, included)
+            # for sqlite as well for integrity checking, but sqlite's performance will hurt            
+	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
 	    # this index is so we can quickly tell what troves are needed
 	    # by another trove
-	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
-			    "TroveTroves(includedId)")
+	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
 
     def __init__(self, db):
 	self.db = db
@@ -85,16 +96,23 @@ class TroveStore:
 				 
         self.begin()
 	self._createSchema(cu)
+
+        # Order matters!
+        # Create the simple (leaf) tables first, and then the ones
+        # that have foreign keys
 	trovefiles.TroveFiles(self.db)
 	instances.FileStreams(self.db)
+
 	self.items = items.Items(self.db)
-	self.instances = instances.InstanceTable(self.db)
-	self.versionTable = LocalRepVersionTable(self.db)
+	self.flavors = flavors.Flavors(self.db)
         self.branchTable = versionops.BranchTable(self.db)
         self.changeLogs = cltable.ChangeLogTable(self.db)
+
+	self.versionTable = LocalRepVersionTable(self.db)
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
-	self.flavors = flavors.Flavors(self.db)
+	self.instances = instances.InstanceTable(self.db)
+
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         flavors.FlavorScores(self.db)
         self.depTables = deptable.DependencyTables(self.db)

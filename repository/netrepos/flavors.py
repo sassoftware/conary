@@ -15,9 +15,7 @@
 from deps import deps
 
 class Flavors:
-
     # manages the Flavors and FlavorMap tables
-
     def __init__(self, db):
         self.db = db
         
@@ -25,12 +23,23 @@ class Flavors:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "Flavors" not in tables:
-	    cu.execute("""CREATE TABLE Flavors(flavorId INTEGER PRIMARY KEY,
-					       flavor STR UNIQUE)""")
-            cu.execute("""CREATE TABLE FlavorMap(flavorId INT,
-						 base STR,
-						 sense INT,
-						 flag STR)""")
+	    cu.execute("""
+            CREATE TABLE Flavors(
+                flavorId        INTEGER PRIMARY KEY,
+                flavor          STRING,
+                CONSTRAINT Flavors_flavor_uq
+                    UNIQUE(flavor)
+            )""")
+            cu.execute("""
+            CREATE TABLE FlavorMap(
+                flavorId        INTEGER,
+                base            STRING,
+                sense           INTEGER,
+                flag            STRING,
+                CONSTRAINT FlavorMap_flavorId_fk
+                    FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                    ON DELETE CASCADE ON UPDATE CASCADE
+            )""")
             cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
             cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
 
@@ -86,11 +95,24 @@ class FlavorScores:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "FlavorScores" not in tables:
-            cu.execute("""CREATE TABLE FlavorScores(request INT,
-                                                    present INT,
-                                                    value INT)""")
-            cu.execute("""CREATE INDEX FlavorScoresIdx ON 
-                                    FlavorScores(request, present)""")
+            cu.execute("""
+            CREATE TABLE FlavorScores(
+                request         INTEGER,
+                present         INTEGER,
+                value           INTEGER,
+                CONSTRAINT FlavorScores_request_fk
+                        FOREIGN KEY (request) REFERENCES Flavors(flavorId)
+                        ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT FlavorScores_present_fk
+                        FOREIGN KEY (request) REFERENCES Flavors(flavorId)
+                        ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT FlavorScores_request_present_uq
+                        UNIQUE(request, present)                        
+            )""")
+            # a real database would already have an index based on the
+            # unique constraint above
+            cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
+                              FlavorScores(request, present)""")
 
             for (request, present), value in deps.flavorScores.iteritems():
                 if value is None:

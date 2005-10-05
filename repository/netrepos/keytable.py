@@ -12,8 +12,6 @@
 # full details.
 #
 
-import StringIO
-
 import sqlite3
 from lib import openpgpfile, openpgpkey
 import StringIO
@@ -25,16 +23,27 @@ class OpenPGPKeyTable:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "PGPKeys" not in tables:
-            cu.execute("""CREATE TABLE PGPKeys(keyId INTEGER,
-                                               userId INTEGER,
-                                               fingerprint STRING(40) UNIQUE,
-                                               pgpKey BINARY,
-                                               PRIMARY KEY(keyId))""")
+            cu.execute("""
+            CREATE TABLE PGPKeys(
+                keyId           INTEGER PRIMARY KEY,
+                userId          INTEGER,
+                fingerprint     STRING(40),
+                pgpKey          BINARY,
+                CONSTRAINT PGPKeys_userId_fk
+                    FOREIGN KEY (userId) REFERENCES Users(userId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT PGPKeys_fingerprint_uq
+                    UNIQUE(fingerprint)
+            )""")
         if "PGPFingerprints" not in tables:
-            cu.execute("""CREATE TABLE PGPFingerprints(
-                                             keyId INTEGER,
-                                             fingerprint STRING(40),
-                                             PRIMARY KEY(fingerprint))""")
+            cu.execute("""
+            CREATE TABLE PGPFingerprints(
+                keyId           INTEGER,
+                fingerprint     STRING(40) PRIMARY KEY,
+                CONSTRAINT PGPFingerprints_keyId_fk
+                    FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
+                    ON DELETE CASCADE ON UPDATE CASCADE
+            )""")
         db.commit()
 
         # create a keyCache for this keyTable.

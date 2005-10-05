@@ -544,22 +544,39 @@ class NetworkAuthorization:
         commit = False
         
         if "Users" not in tables:
-            cu.execute("""CREATE TABLE Users (userId INTEGER PRIMARY KEY,
-                                              user STRING UNIQUE,
-                                              salt BINARY,
-                                              password STRING)""")
+            cu.execute("""
+            CREATE TABLE Users (
+                userId          INTEGER PRIMARY KEY,
+                user            STRING,
+                salt            BINARY,
+                password        STRING,
+                CONSTRAINT Users_userId_uq
+                    UNIQUE(user)
+            )""")
             commit = True
 
         if "UserGroups" not in tables:
-            cu.execute("""CREATE TABLE UserGroups (
-                                           userGroupId INTEGER PRIMARY KEY,
-                                           userGroup STRING UNIQUE)""")
+            cu.execute("""
+            CREATE TABLE UserGroups (
+                userGroupId     INTEGER PRIMARY KEY,
+                userGroup       STRING,
+                CONSTRAINT UserGroups_userGroup_uq
+                    UNIQUE(userGroup)
+            )""")
             commit = True
 
         if "UserGroupMembers" not in tables:
-            cu.execute("""CREATE TABLE UserGroupMembers (
-                                            userGroupId INTEGER,
-                                            userId INTEGER)""")
+            cu.execute("""
+            CREATE TABLE UserGroupMembers (
+                userGroupId     INTEGER,
+                userId          INTEGER,
+                CONSTRAINT UserGroupMembers_userGroupId_fk
+                    FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                    ON DELETE RESTRICT ON UPDATE CASCADE,
+                CONSTRAINT UserGroupMembers_userId_fk
+                    FOREIGN KEY (userId) REFERENCES Users(userId)
+                    ON DELETE CASCADE ON UPDATE CASCADE
+            )""")
             cu.execute("""CREATE INDEX UserGroupMembersIdx ON
                                             UserGroupMembers(userGroupId)""")
             cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
@@ -567,12 +584,26 @@ class NetworkAuthorization:
             commit = True
 
         if "Permissions" not in tables:
-            cu.execute("""CREATE TABLE Permissions (userGroupId INTEGER,
-                                                    labelId INTEGER NOT NULL,
-                                                    itemId INTEGER NOT NULL,
-                                                    write INTEGER,
-                                                    capped INTEGER,
-                                                    admin INTEGER)""")
+            cu.execute("""
+            CREATE TABLE Permissions (
+                userGroupId     INTEGER,
+                labelId         INTEGER NOT NULL,
+                itemId          INTEGER NOT NULL,
+                write           INTEGER,
+                capped          INTEGER,
+                admin           INTEGER,
+                CONSTRAINT Permissions_userGroupId_fk
+                    FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT Permissions_labelId_fk
+                    FOREIGN KEY (labelId) REFERENCES Labels(labelId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT Permissions_itemId_fk
+                    FOREIGN KEY (itemid) REFERENCES Items(itemId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT Permissions_ug_l_i_uq
+                    UNIQUE(userGroupId, labelId, itemId)
+            )""")
             cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                           ON Permissions(userGroupId, labelId, itemId)""")
 
@@ -595,7 +626,8 @@ class NetworkAuthorization:
                        Permissions.admin AS admin,
                        Permissions.write AS write,
                        Permissions._ROWID_ as aclId
-                 FROM Users JOIN UserGroupMembers using (userId)
+                 FROM Users
+                      JOIN UserGroupMembers using (userId)
                       JOIN Permissions using (userGroupId)
                       JOIN Items using (itemId)
                       JOIN Labels ON 
@@ -603,6 +635,26 @@ class NetworkAuthorization:
             """)
             commit = True
 
+        if "UserView" not in tables:
+            cu.execute("""
+            CREATE VIEW
+                UserView AS
+            SELECT
+                Users.user as user,
+                Items.item as item,
+                Labels.label as label,
+                Permissions.write as W,
+                Permissions.admin as A,
+                Permissions.capped as C
+            FROM
+                Users
+            JOIN UserGroupMembers using (userId)
+            JOIN Permissions using (userGroupId)
+            JOIN Items using (itemId)
+            JOIN Labels on Permissions.labelId = Labels.labelId
+            """)
+            commit = True
+            
         if commit:
             self.db.commit()
 

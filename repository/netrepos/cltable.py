@@ -25,12 +25,15 @@ class ChangeLogTable:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "ChangeLogs" not in tables:
-            cu.execute("""CREATE TABLE ChangeLogs(
-				nodeId INTEGER UNIQUE,
-				name STR, 
-				contact STR, 
-				message STR)
-			""")
+            cu.execute("""
+            CREATE TABLE ChangeLogs(
+                nodeId          INTEGER,
+                name            STRING, 
+                contact         STRING, 
+                message         STRING,
+                CONSTRAINT ChangeLogs_nodeId_uq
+                    UNIQUE(nodeId)
+            )""")
 	    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
 
     def add(self, nodeId, cl):
