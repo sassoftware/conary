@@ -557,12 +557,9 @@ class VersionSequence(AbstractVersion):
         self.strRep = None
 
     def __cmp__(self, other):
-        if self.isAfter(other):
-            return 1
-        elif self == other:
-            return 0
-
-        return -1
+        assert(self.__class__ == other.__class__)
+	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
+	return cmp(self.versions[-1].timeStamp, other.versions[-1].timeStamp)
 
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
@@ -988,9 +985,7 @@ class Version(VersionSequence):
 	@type other: Version
 	@rtype: boolean
 	"""
-        assert(self.__class__ == other.__class__)
-	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
-	return self.versions[-1].timeStamp  >  other.versions[-1].timeStamp
+	return self > other
 
     def __deepcopy__(self, mem):
 	return Version(copy.deepcopy(self.versions[:]))
