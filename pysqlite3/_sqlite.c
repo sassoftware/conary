@@ -1360,10 +1360,13 @@ Bind arguments to a SQL statement.";
 static PyObject*
 _stmt_bind(pysqlstmt *self, PyObject *args)
 {
-	int idx, rc;
 	PyObject *obj;
-
-	if (!PyArg_ParseTuple(args, "iO", &idx, &obj)) {
+	PyObject *idobj;
+	int idx, rc;
+	char *bName = NULL;
+	int bLen = 0;
+	
+	if (!PyArg_ParseTuple(args, "OO", &idobj, &obj)) {
 		return NULL;
 	}
 
@@ -1372,7 +1375,34 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 				"Statement has already been finalized.");
 		return NULL;
 	}
-
+	/* if we're using named bind arguments, extract the idx */
+	if (PyString_Check(idobj)) {
+		PyString_AsStringAndSize(idobj, &bName, &bLen);
+		/* XXX: some implementations are more permissive when asked to
+		   bind parameters that are not present in the query */
+		if (sqlite3_bind_parameter_count(self->p_stmt) == 0) {
+			PyErr_SetString(_sqlite_ProgrammingError,
+					"Statement does not use named bind parameters.");
+			return NULL;
+		}
+		idx = sqlite3_bind_parameter_index(self->p_stmt, bName);
+		/* FIXME: this detects errors faster - but normally we
+		   should be ok with looking at a hash and only
+		   picking the stuff we need in the query */
+		if (idx == 0) {
+			PyErr_SetString(_sqlite_ProgrammingError,
+					"Bind parameter name unknown to the query");
+			return NULL;
+		}
+	}
+	else if (PyInt_Check(idobj))
+		idx = (int) PyInt_AsLong(idobj);
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"First bind argument must be int or string");
+		return NULL;
+	}		
+	
 	rc = -1;
 	/* bools are derived from int, no need to handle it explicitly */
 	if (PyInt_Check(obj)) {

@@ -13,7 +13,7 @@ if sys.version_info[:2] >= (2,2):
     MyStopIteration = StopIteration
 else:
     MyStopIteration = IndexError
-
+    
 class DBAPITypeObject:
     def __init__(self,*values):
         self.values = values
@@ -137,11 +137,13 @@ class Cursor:
 	self.current_row = stmt.step()
 
     def execute(self, SQL, *parms, **kwargs):
+        # kwargs we won't attempt to bind to the query
+        _nobind = ['start_transaction']
         start_transaction = kwargs.get('start_transaction', True)
         SQL = SQL.strip()
         self._checkNotClosed("execute")
         startingTransaction = False
-        
+
         if self.con.autocommit:
             pass
         elif start_transaction:
@@ -152,13 +154,31 @@ class Cursor:
                       not in ("SELECT", "VACUUM", "DETACH")):
                     self.con._begin()
 
-        if len(parms) == 1 and (isinstance(parms[0], tuple) or
-                                isinstance(parms[0], list)):
-            parms = parms[0]
-
+        # prepare the statement
         self.stmt = self.con.db.prepare(SQL)
-        for i, parm in enumerate(parms):
-            self.stmt.bind(i + 1, parm)
+        # first dereference the list/tuple if it is encapsulated
+        if len(parms) == 1:
+            if isinstance(parms[0], tuple) or \
+                   isinstance(parms[0], list) or \
+                   isinstance(parms[0], dict):
+                parms = parms[0]
+        # now bind the arguments. lists/tuples are positions, hashes are named parameters
+        if isinstance(parms, tuple) or isinstance(parms, list):
+            for i, parm in enumerate(parms):
+                self.stmt.bind(i + 1, parm)
+        elif isinstance(parms, dict):
+            for pkey, pval in parms.iteritems():
+                if pkey[0] is not ":":
+                    pkey = ":" + pkey
+                self.stmt.bind(pkey, pval)
+        else:
+            raise _sqlite.ProgrammingError, \
+                  "Don't know how to bind these parameters"
+        # the sqlite C bindings require us to reference these bind parameters as :name
+        for pkey, pval in kwargs.items():
+            # some arguments are not meant for the query
+            if pkey in _nobind: continue
+            self.stmt.bind(":" + pkey, pval)        
         self.current_row = self.stmt.step()
         if startingTransaction:
             self.con.inTransaction = True
