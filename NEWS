@@ -6,6 +6,10 @@
     labels on a given server. Server and client protocol numbers have changed.
   * getTroveList server side function got a rework that should result
     in about a 50% execution time speedup on most queries.
+  * many changes to cloning, including sideways cloning, better cloning
+    with multiple flavors, separate cloning of source and binaries, resilience
+    against duplicate troves, proper fileIds used during clones, simultanous
+    cloning of multiple troves, and better clonedFrom tracking
 
 Changes in 0.62.12:
   * Conary will no longer create a "rootroot" group while installing
