@@ -258,8 +258,12 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             trv.delTrove(name, version, flavor, False)
             trv.addTrove(name, newVersion, flavor, byDefault = byDefault)
 
+        uphillCache = {}
         for (pathId, path, fileId, version) in trv.iterFileList():
-            changeVersion = _isUphill(version, newVersion)
+            changeVersion = uphillCache.get(version, None)
+            if changeVersion is None:
+                changeVersion = _isUphill(version, newVersion)
+                uphillCache[version] = changeVersion
 
             if changeVersion:
                 trv.updateFile(pathId, path, newVersion, fileId)
