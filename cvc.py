@@ -51,7 +51,7 @@ def usage(rc = 1):
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] [--trust-threshold <int>]"
     print "                    <trove>[=<version>]"
-    print "       cvc clone <target-branch> <trove>[=<version>]"
+    print "       cvc clone <target-branch> <trove>[=<version>]+"
     print "       cvc commit [--message <message>]"
     print '                  [--signature-key "<fingerprint>"]'
     print "       cvc config"
@@ -234,11 +234,11 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	    cfg.display()
     elif (args[0] == "clone"):
         if argSet: return usage()
-        if len(args) != 3:
+        if len(args) < 3:
             return usage()
 
         import clone
-        clone.CloneTrove(cfg, args[1], args[2])
+        clone.CloneTrove(cfg, args[1], args[2:])
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

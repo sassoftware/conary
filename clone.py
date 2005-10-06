@@ -22,7 +22,7 @@ from lib import log
 import versions
 import sys
 
-def CloneTrove(cfg, targetBranch, troveSpec):
+def CloneTrove(cfg, targetBranch, troveSpecList):
 
     def _createSourceVersion(targetBranchVersionList, sourceVersion):
         assert(targetBranchVersionList)
@@ -60,111 +60,200 @@ def CloneTrove(cfg, targetBranch, troveSpec):
         
         return False 
 
-    def _createBinaryVersion(repos, srcVersion, names, flavors):
-        # XXX this assumes that anything with this srcVersion was cloned from
-        # the troves we're now cloning. double checking that might be good,
-        # since if it's not mess confusion could result
+    def _createBinaryVersions(versionMap, repos, srcVersion, infoList ):
+        # this works on a single flavor at a time
+        singleFlavor = list(set(x[2] for x in infoList))
+        assert(len(singleFlavor) == 1)
+        singleFlavor = singleFlavor[0]
 
-        # this works by finding the suggested version for each flavor
-        # we need of each trove, and picking the largest
-        bestBuildCount = 0
-        import lib
-        lib.epdb.st()
-        for flavor in flavors:
-            nextVer = cook.nextVersion(repos, names, srcVersion, flavor)
-            if nextVer.trailingRevision().getBuildCount() > bestBuildCount:
-                bestBuildCount = nextVer.trailingRevision().getBuildCount()
-                bestBuildVersion = nextVer
+        srcBranch = srcVersion.branch()
 
-        return bestBuildVersion
+        q = {}
+        for name, cloneSourceVersion, flavor in infoList:
+            q[name] = { srcBranch : [ flavor ] }
 
-    parts = troveSpec.split('=', 1) 
-    troveName = parts[0]
-    if len(parts) == 1:
-        versionSpec = None
-    else:
-        versionSpec = parts[1]
+        currentVersions = repos.getTroveLeavesByBranch(q, bestFlavor = True)
+        dupCheck = {}
 
-    if troveName.startswith("fileset"):
-        print "File sets cannot be cloned."
-        sys.exit(1)
-    elif troveName.startswith("group"):
-        print "Groups cannot be cloned."
-        sys.exit(1)
-    elif not troveName.endswith(":source"):
-        print "Source components are required for cloning."
-        sys.exit(1)
+        for name, versionDict in currentVersions.iteritems():
+            lastVersion = versionDict.keys()[0]
+            assert(len(versionDict[lastVersion]) == 1)
+            assert(versionDict[lastVersion][0] == singleFlavor)
+            if lastVersion.getSourceVersion() == srcVersion:
+                dupCheck[name] = lastVersion
+
+        trvs = repos.getTroves([ (name, version, singleFlavor) for
+                                    name, version in dupCheck.iteritems() ],
+                               withFiles = False)
+
+        for trv in trvs:
+            assert(trv.getFlavor() == singleFlavor)
+            name = trv.getName()
+            info = (name, trv.troveInfo.clonedFrom(), trv.getFlavor())
+            if info in infoList:
+                # no need to reclone this one
+                infoList.remove(info)
+                versionMap[info] = trv.getVersion()
+
+        if not infoList:
+            return ([], None)
+
+        buildVersion = cook.nextVersion(repos, 
+                            [ x[0] for x in infoList ], srcVersion, flavor)
+        return infoList, buildVersion
 
     targetBranch = versions.VersionFromString(targetBranch)
-
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
 
-    srcTroveList = repos.findTrove(cfg.installLabelPath, 
-                                (troveName, versionSpec, None))
-    # findTrove shouldn't return more than one thing when there is a single
-    # flavor (in this case, None)
-    assert(len(srcTroveList) == 1)
-    srcTroveName, srcTroveVersion = srcTroveList[0][:2]
+    cloneSources = []
 
-    try:
-        currentVersionList = repos.getTroveVersionsByBranch(
-            { srcTroveName : { targetBranch : None } } )[srcTroveName].keys()
-    except KeyError:
-        print "No versions of %s exist on branch %s." \
-                    % (srcTroveName, targetBranch.asString()) 
+    for troveSpec in troveSpecList:
+        parts = troveSpec.split('=', 1) 
+        troveName = parts[0]
+
+        if troveName.startswith("fileset"):
+            print "File sets cannot be cloned."
+            sys.exit(1)
+        elif troveName.startswith("group"):
+            print "Groups cannot be cloned."
+            sys.exit(1)
+
+
+        spec = updatecmd.parseTroveSpec(troveSpec)
+        cloneSources += repos.findTrove(cfg.installLabelPath, spec)
+
+    # get the transitive closure
+    allTroveInfo = set()
+    allTroves = dict()
+    while cloneSources:
+        needed = []
+
+        for info in cloneSources:
+            if info not in allTroveInfo:
+                needed.append(info)
+                allTroveInfo.add(info)
+
+        troves = repos.getTroves(needed, withFiles = False)
+        allTroves.update(x for x in itertools.izip(needed, troves))
+        cloneSources = [ x for x in itertools.chain(
+                            *(t.iterTroveList() for t in troves)) ]
+
+    # split out the binary and sources
+    sourceTroveInfo = [ x for x in allTroveInfo 
+                                if x[0].endswith(':source') ]
+    binaryTroveInfo = [ x for x in allTroveInfo 
+                                if not x[0].endswith(':source') ]
+
+    del allTroveInfo
+    versionMap = {}
+    cloneJob = []
+
+    # start off by finding new version numbers for the sources
+    for info in sourceTroveInfo:
+        name, version = info[:2]
+
+        try:
+            currentVersionList = repos.getTroveVersionsByBranch(
+                { name : { targetBranch : None } } )[name].keys()
+        except KeyError:
+            print "No versions of %s exist on branch %s." \
+                        % (name, targetBranch.asString()) 
+            return 1
+
+        currentVersionList.sort()
+
+        # if the latest version of the source trove was cloned from the version
+        # being cloned, we don't need to reclone the source
+        trv = repos.getTrove(name, currentVersionList[-1],
+                             deps.DependencySet(), withFiles = False)
+        if trv.troveInfo.clonedFrom() == version:
+            versionMap[info] = trv.getVersion()
+        else:
+            versionMap[info] = _createSourceVersion(currentVersionList, version)
+            cloneJob.append((info, versionMap[info]))
+
+    # now go through the binaries; sort them into buckets based on the
+    # source trove each came from. we can't clone troves which came
+    # from multiple versions of the same source
+    trovesBySource = {}
+    for info in binaryTroveInfo:
+        trv = allTroves[info]
+        source = trv.getSourceName()
+        # old troves don't have source info
+        assert(source is not None)
+
+        l = trovesBySource.setdefault(trv.getSourceName(), 
+                               (trv.getVersion().getSourceVersion(), []))
+        if l[0] != trv.getVersion().getSourceVersion():
+            log.error("Clone operation needs multiple vesrions of %s"
+                        % trv.getSourceName())
+        l[1].append(info)
+        
+    # this could be parallelized -- may not be worth the effort though
+    for srcTroveName, (sourceVersion, infoList) in trovesBySource.iteritems():
+        newSourceVersion = versionMap.get(
+                (srcTroveName, sourceVersion, deps.DependencySet()), None)
+        if newSourceVersion is None:
+            # we're not cloning the source at the same time; try and fine
+            # the source version which was used when the source was cloned
+            try:
+                currentVersionList = repos.getTroveVersionsByBranch(
+                  { srcTroveName : { targetBranch : None } } ) \
+                            [srcTroveName].keys()
+            except KeyError:
+                print "No versions of %s exist on branch %s." \
+                            % (srcTroveName, targetBranch.asString()) 
+                return 1
+
+            trv = repos.getTrove(srcTroveName, currentVersionList[-1],
+                                 deps.DependencySet(), withFiles = False)
+            if trv.troveInfo.clonedFrom() == sourceVersion:
+                newSourceVersion = trv.getVersion()
+            else:
+                log.error("Cannot find cloned source for %s=%s" %
+                            (srcTroveName, sourceVersion.asString()))
+                return 1
+
+        # we know newSourceVersion is right at this point. now find the new
+        # binary version for each flavor
+        byFlavor = dict()
+        for info in infoList:
+            byFlavor.setdefault(info[2], []).append(info)
+
+        for flavor, infoList in byFlavor.iteritems():
+            cloneList, newBinaryVersion = \
+                        _createBinaryVersions(versionMap, repos, 
+                                              newSourceVersion, infoList)
+            versionMap.update(
+                dict((x, newBinaryVersion) for x in cloneList))
+            cloneJob += [ (x, newBinaryVersion) for x in cloneList ]
+            
+    # check versions
+    for info, newVersion in cloneJob:
+        if not _isUphill(info[1], newVersion):
+            log.error("clone only supports cloning troves to parent branches")
+            return 1
+
+    if not cloneJob:
+        log.warning("Nothing to clone!")
         return 1
 
-    currentVersionList.sort()
-
-    # if the latest version of the source trove was cloned from the version
-    # being cloned, we don't need to reclone the source
-    trove = repos.getTrove(srcTroveName, currentVersionList[-1],
-                           deps.DependencySet(), withFiles = False)
-    if trove.troveInfo.clonedFrom() == srcTroveVersion.asString():
-        newSourceVersion = currentVersionList[-1]
-        cloneSource = False
-    else:
-        newSourceVersion = _createSourceVersion(currentVersionList, 
-                                                srcTroveVersion)
-        cloneSource = True
-
-    allTroveInfo = repos.getTrovesBySource(srcTroveName, srcTroveVersion)
-
-    flavors = set(x[2] for x in allTroveInfo)
-    names = set(x[0] for x in allTroveInfo)
-
-    newBinaryVersion = _createBinaryVersion(repos, newSourceVersion, names, 
-                                            flavors)
-
-    if cloneSource:
-        allTroveInfo.append((srcTroveName, srcTroveVersion, 
-                             deps.DependencySet()))
-    allTroves = repos.getTroves(allTroveInfo)
-
-    if not _isUphill(srcTroveVersion, newSourceVersion):
-        log.error("clone only supports cloning troves to parent branches")
-        return 1
-    
-    # This works because it's a package. That means that all of the troves we
-    # enounter, even referenced ones, will have the same version
+    allTroves = repos.getTroves([ x[0] for x in cloneJob ])
 
     cs = changeset.ChangeSet()
     uphillCache = {}
 
-    newVersionHost = newSourceVersion.branch().label().getHost()
     allFilesNeeded = list()
 
-    for trv in allTroves:
+    for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
+        newVersionHost = newVersion.branch().label().getHost()
+
         trv.troveInfo.clonedFrom.set(trv.getVersion())
 
         oldVersion = trv.getVersion()
-        if oldVersion == srcTroveVersion:
-            newVersion = newSourceVersion
-        else:
-            newVersion = newBinaryVersion
-            
         trv.changeVersion(newVersion)
 
+        # this loop only works for packages!
         for (name, version, flavor) in trv.iterTroveList():
             byDefault = trv.includeTroveByDefault(name, version, flavor)
             trv.delTrove(name, version, flavor, False)

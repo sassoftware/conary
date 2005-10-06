@@ -1492,7 +1492,7 @@ class ConaryClient:
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
                               branchType=BRANCH_ALL):
         cs = changeset.ChangeSet()
-
+        
         seen = set(troveList)
         dupList = []
         needsCommit = False
