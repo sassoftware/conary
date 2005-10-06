@@ -60,13 +60,30 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
         
         return False 
 
-    def _createBinaryVersions(versionMap, repos, srcVersion, infoList ):
+    def _isSibling(ver, possibleSibling):
+        verBranch = ver.branch()
+        sibBranch = possibleSibling.branch()
+
+        verHasParent = verBranch.hasParentBranch()
+        sibHasParent = sibBranch.hasParentBranch()
+
+        if verHasParent and sibHasParent:
+            return verBranch.parentBranch() == sibBranch.parentBranch()
+        elif not verHasParent and not sibHasParent:
+            # top level versions are always siblings
+            return True
+
+        return False
+
+    def _createBinaryVersions(versionMap, leafMap, repos, srcVersion, infoList):
         # this works on a single flavor at a time
         singleFlavor = list(set(x[2] for x in infoList))
         assert(len(singleFlavor) == 1)
         singleFlavor = singleFlavor[0]
 
         srcBranch = srcVersion.branch()
+
+        infoVersionMap = dict(((x[0], x[2]), x[1]) for x in infoList)
 
         q = {}
         for name, cloneSourceVersion, flavor in infoList:
@@ -79,6 +96,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             lastVersion = versionDict.keys()[0]
             assert(len(versionDict[lastVersion]) == 1)
             assert(versionDict[lastVersion][0] == singleFlavor)
+            leafMap[(name, infoVersionMap[name, singleFlavor], singleFlavor)] \
+                    = (name, lastVersion, singleFlavor)
             if lastVersion.getSourceVersion() == srcVersion:
                 dupCheck[name] = lastVersion
 
@@ -118,7 +137,6 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             print "Groups cannot be cloned."
             sys.exit(1)
 
-
         spec = updatecmd.parseTroveSpec(troveSpec)
         cloneSources += repos.findTrove(cfg.installLabelPath, spec)
 
@@ -145,8 +163,12 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
                                 if not x[0].endswith(':source') ]
 
     del allTroveInfo
-    versionMap = {}
-    cloneJob = []
+    versionMap = {}         # maps existing info to the version which is
+                            # being cloned by this job, or where that version
+                            # has already been cloned to
+    leafMap = {}            # maps existing info to the info for the latest
+                            # version of that trove on the target branch
+    cloneJob = []           # (info, newVersion) tuples
 
     # start off by finding new version numbers for the sources
     for info in sourceTroveInfo:
@@ -156,21 +178,28 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             currentVersionList = repos.getTroveVersionsByBranch(
                 { name : { targetBranch : None } } )[name].keys()
         except KeyError:
-            print "No versions of %s exist on branch %s." \
-                        % (name, targetBranch.asString()) 
-            return 1
+            currentVersionList = []
 
-        currentVersionList.sort()
+        if currentVersionList:
+            currentVersionList.sort()
+            leafMap[info] = (info[0], currentVersionList[-1], info[2])
 
-        # if the latest version of the source trove was cloned from the version
-        # being cloned, we don't need to reclone the source
-        trv = repos.getTrove(name, currentVersionList[-1],
-                             deps.DependencySet(), withFiles = False)
-        if trv.troveInfo.clonedFrom() == version:
-            versionMap[info] = trv.getVersion()
+            # if the latest version of the source trove was cloned from the
+            # version being cloned, we don't need to reclone the source
+            trv = repos.getTrove(name, currentVersionList[-1],
+                                 deps.DependencySet(), withFiles = False)
+            if trv.troveInfo.clonedFrom() == version:
+                versionMap[info] = trv.getVersion()
+            else:
+                versionMap[info] = _createSourceVersion(currentVersionList, 
+                                                        version)
+                cloneJob.append((info, versionMap[info]))
         else:
-            versionMap[info] = _createSourceVersion(currentVersionList, version)
-            cloneJob.append((info, versionMap[info]))
+            newVersion = targetBranch.createVersion(
+                versions.Revision(
+                    "%s-1" % version.trailingRevision().getVersion()))
+            versionMap[info] = newVersion
+            cloneJob.append((info, newVersion))
 
     # now go through the binaries; sort them into buckets based on the
     # source trove each came from. we can't clone troves which came
@@ -185,7 +214,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
         l = trovesBySource.setdefault(trv.getSourceName(), 
                                (trv.getVersion().getSourceVersion(), []))
         if l[0] != trv.getVersion().getSourceVersion():
-            log.error("Clone operation needs multiple vesrions of %s"
+            log.error("Clone operation needs multiple versions of %s"
                         % trv.getSourceName())
         l[1].append(info)
         
@@ -222,7 +251,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
 
         for flavor, infoList in byFlavor.iteritems():
             cloneList, newBinaryVersion = \
-                        _createBinaryVersions(versionMap, repos, 
+                        _createBinaryVersions(versionMap, leafMap, repos, 
                                               newSourceVersion, infoList)
             versionMap.update(
                 dict((x, newBinaryVersion) for x in cloneList))
@@ -230,8 +259,10 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             
     # check versions
     for info, newVersion in cloneJob:
-        if not _isUphill(info[1], newVersion):
-            log.error("clone only supports cloning troves to parent branches")
+        if not _isUphill(info[1], newVersion) and \
+                    not _isSibling(info[1], newVersion):
+            log.error("clone only supports cloning troves to parent "
+                      "and sibling branches")
             return 1
 
     if not cloneJob:
@@ -247,7 +278,10 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
     for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
         newVersionHost = newVersion.branch().label().getHost()
 
-        trv.troveInfo.clonedFrom.set(trv.getVersion())
+        # if this is a clone of a clone, use the original clonedFrom value
+        # so that all clones refer back to the source-of-all-clones trove
+        if trv.troveInfo.clonedFrom() is None:
+            trv.troveInfo.clonedFrom.set(trv.getVersion())
 
         oldVersion = trv.getVersion()
         trv.changeVersion(newVersion)
@@ -259,17 +293,37 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
             trv.addTrove(name, newVersion, flavor, byDefault = byDefault)
 
         uphillCache = {}
+        needsNewVersions = []
+        # discover which files need their versions changed (since we
+        # don't want the cloned trove referring to files on the branch
+        # which was the source of the clone)
         for (pathId, path, fileId, version) in trv.iterFileList():
-            changeVersion = uphillCache.get(version, None)
-            if changeVersion is None:
-                changeVersion = _isUphill(version, newVersion)
-                uphillCache[version] = changeVersion
+            changeVersion = _isSibling(version, newVersion)
+            if not changeVersion:
+                changeVersion = uphillCache.get(version, None)
+                if changeVersion is None:
+                    changeVersion = _isUphill(version, newVersion)
+                    uphillCache[version] = changeVersion
 
             if changeVersion:
-                trv.updateFile(pathId, path, newVersion, fileId)
+                needsNewVersions.append((pathId, path, fileId))
 
             if version.branch().label().getHost() != newVersionHost:
                 allFilesNeeded.append((pathId, fileId, version))
+
+        # try and find the version on the target branch for files which
+        # need to be reversioned
+        if needsNewVersions:
+            if info in leafMap:
+                oldTrv = repos.getTrove(withFiles = True, *leafMap[info])
+                map = dict(((x[0], x[2]), x[3]) for x in
+                                        oldTrv.iterFileList())
+            else:
+                map = {}
+
+            for (pathId, path, fileId) in needsNewVersions:
+                ver = map.get((pathId, fileId), newVersion)
+                trv.updateFile(pathId, path, ver, fileId)
 
         # reset the signatures, because all the versions have now
         # changed, thus invalidating the old sha1 hash
