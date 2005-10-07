@@ -23,6 +23,7 @@ python_files = __init__.py	\
 	fixedglob.py		\
 	lookaside.py		\
 	macros.py		\
+	nextversion.py		\
 	packagepolicy.py	\
 	policy.py		\
 	recipe.py		\
