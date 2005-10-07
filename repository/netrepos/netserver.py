@@ -44,7 +44,7 @@ import base64
 from lib.tracelog import logMe
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 32, 33, 34 ]
+SERVER_VERSIONS = [ 32, 33, 34, 35 ]
 CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):

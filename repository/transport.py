@@ -22,6 +22,13 @@ import zlib
 from StringIO import StringIO
         
 class XMLOpener(urllib.FancyURLopener):
+    def __init__(self, *args, **kw):
+        self.compress = False
+        urllib.FancyURLopener.__init__(self, *args, **kw)
+
+    def setCompress(self, compress):
+        self.compress = compress
+
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
     
@@ -74,14 +81,20 @@ class XMLOpener(urllib.FancyURLopener):
         fullUrl = '%s:%s' %(protocol, url)
         if data is not None:
             h.putrequest('POST', fullUrl)
+            if self.compress:
+                h.putheader('Content-encoding', 'deflate')
+                data = zlib.compress(data, 9)
             h.putheader('Content-type', 'text/xml')
             h.putheader('Content-length', '%d' % len(data))
             h.putheader('Accept-encoding', 'deflate')
         else:
             h.putrequest('GET', fullUrl)
-        if auth: h.putheader('Authorization', 'Basic %s' % auth)
-        if realhost: h.putheader('Host', realhost)
-        for args in self.addheaders: h.putheader(*args)
+        if auth:
+            h.putheader('Authorization', 'Basic %s' % auth)
+        if realhost:
+            h.putheader('Host', realhost)
+        for args in self.addheaders:
+            h.putheader(*args)
         h.endheaders()
         if data is not None:
             h.send(data)
@@ -114,6 +127,10 @@ class Transport(xmlrpclib.Transport):
 
     def __init__(self, https=False):
         self.https = https
+        self.compress = False
+
+    def setCompress(self, compress):
+        self.compress = compress
 
     def _protocol(self):
         if self.https:
@@ -129,6 +146,7 @@ class Transport(xmlrpclib.Transport):
 	    opener = XMLOpener({})
 	else:
 	    opener = XMLOpener()
+        opener.setCompress(self.compress)
 
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
@@ -140,6 +158,7 @@ class Transport(xmlrpclib.Transport):
 		opener.addheader(key,value)
 	opener.addheader('User-agent', self.user_agent)
 	response = opener.open(''.join([self._protocol(), '://', host, handler]), request_body)
+        
 	return self.parse_response(response)
 
     

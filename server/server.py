@@ -204,10 +204,15 @@ class HttpRequests(SimpleHTTPRequestHandler):
       
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
+        data = self.rfile.read(contentLength)
+
+        encoding = self.headers.get('Content-Encoding', None)
+        if encoding == 'deflate':
+            data = zlib.decompress(data)
 
         # start the logging
         initLog(level=3, trace=1)
-        (params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
+        (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
         
 	try:

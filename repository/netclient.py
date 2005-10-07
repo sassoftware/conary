@@ -42,7 +42,7 @@ from lib import openpgpfile
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 32, 33, 34 ]
+CLIENT_VERSIONS = [ 32, 33, 34, 35 ]
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
@@ -184,6 +184,10 @@ class ServerCache:
                      ",".join([str(x) for x in CLIENT_VERSIONS]))
 
             server.serverVersion = max(intersection)
+            # server protocol version 35 or greater can accept
+            # a compressed request from the client
+            if server.serverVersion >= 35:
+                transporter.setCompress(True)
 
 	return server
 		

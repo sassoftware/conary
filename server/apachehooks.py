@@ -68,8 +68,13 @@ def post(port, isSecure, repos, req):
     else:
         protocol = "http"
 
+    encoding = req.headers_in.get('Content-Encoding', None)
+    data = req.read()
+    if encoding == 'deflate':
+        data = zlib.decompress(data)
+
     if req.headers_in['Content-Type'] == "text/xml":
-        (params, method) = xmlrpclib.loads(req.read())
+        (params, method) = xmlrpclib.loads(data)
 
         try:
             result = repos.callWrapper(protocol, port, method, authToken, 
