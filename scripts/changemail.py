@@ -96,7 +96,6 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         else:
             #parent 2
             pid2, status = os.waitpid(pid2, 0)
-            status=256
             if status:
                 fail(status, srcMap, pkgMap, grpMap, argv)
             sys.exit(0)
