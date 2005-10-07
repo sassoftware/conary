@@ -581,7 +581,7 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except repository.repository.TroveNotFound, e:
 	print >> sys.stderr, str(e)
-    except updatecmd.TroveSpecError, e:
+    except conaryclient.cmdline.TroveSpecError, e:
 	print >> sys.stderr, str(e)
     except repository.netclient.InvalidServerVersion, e:
 	print >> sys.stderr, str(e)

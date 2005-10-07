@@ -11,7 +11,6 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from build import cook
 import itertools
 import os
 import pickle
@@ -23,6 +22,7 @@ import deps
 import versions
 import trove
 import metadata
+from build import cook
 from deps import deps
 from lib import log
 from lib import util

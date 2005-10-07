@@ -42,7 +42,7 @@ from repository import filecontents
 from repository import repository
 from repository.netclient import NetworkRepositoryClient
 import trove
-from updatecmd import parseTroveSpec
+from conaryclient.cmdline import parseTroveSpec
 import versions
 
 # -------------------- private below this line -------------------------

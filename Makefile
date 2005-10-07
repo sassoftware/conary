@@ -24,7 +24,8 @@ export mandir = $(prefix)/share/man
 export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
 export conarylibdir = $(libdir)/conary
 
-SUBDIRS=build local repository server lib pysqlite3 deps scripts config web
+SUBDIRS=build local repository server lib pysqlite3 deps scripts config web \
+        conaryclient
 
 python_files = __init__.py	\
 	branch.py		\
@@ -35,7 +36,6 @@ python_files = __init__.py	\
 	commit.py		\
 	conary.py		\
 	conarycfg.py		\
-	conaryclient.py		\
 	constants.py		\
 	cvc.py			\
         cvcdesc.py              \
