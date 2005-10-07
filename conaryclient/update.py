@@ -525,6 +525,10 @@ class ClientUpdate:
                 else:
                     b = b.intersect(otherTrv.getInstallBucket())
 
+            if b is None:
+                # this gives us an empty bucket
+                b = trv.getInstallBucket()
+
             return b
 
         # def _mergeGroupChanges -- main body begins here
@@ -667,16 +671,13 @@ class ClientUpdate:
 
                 # see if we can simply install it next to the item which
                 # is currently installed
-                if oldTrv is None:
-                    # we may have oldTrv already thanks to the colleciton 
-                    # merging logic
-                    oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
-                                           pristine = True)
+                localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                            pristine = False)
 
-                oldBucket = _getBucket(uJob.getTroveSource(), self.db, oldTrv, 
-                                       isCollection, inDb = True)
-                newBucket = _getBucket(uJob.getTroveSource(), self.db, newTrv, 
-                                       isCollection)
+                oldBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                                       localTrv, isCollection, inDb = True)
+                newBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                                       newTrv, isCollection)
 
                 if oldBucket.compatibleWith(newBucket):
                     # make this job a fresh install since the buckets

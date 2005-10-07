@@ -17,6 +17,8 @@ Changes in 0.62.13:
     must be running Conary 0.62.13 or later.  If the server is running
     an older version, the client will fall back to sending uncompressed
     requests.
+  * Install bucket handling didn't work well for collection which weren't
+    fully installed
 
 Changes in 0.62.12:
   * Conary will no longer create a "rootroot" group while installing
