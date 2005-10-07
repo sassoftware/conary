@@ -34,6 +34,13 @@ def usage(exitcode=1):
     )))
     return exitcode
 
+def fail(code, srcMap, pkgMap, grpMap, argv):
+    print >>sys.stderr, "An error occurred while processing changemail.  Code: %d" % code
+    print >>sys.stderr, "    srcMap=%s" % srcMap.items()
+    print >>sys.stderr, "    pkgMap=%s" % pkgMap.items()
+    print >>sys.stderr, "    grpMap=%s" % grpMap.items()
+    print >>sys.stderr, "    argv=%s" % argv
+    sys.stderr.flush()
 
 def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
     if not len(argv) and not len(otherArgs):
@@ -84,21 +91,19 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         pid2 = os.fork()
         if not pid2:
             #child 2
-            doWork(repos, cfg, commitList, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet)
+            doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet)
             sys.exit(0)
         else:
             #parent 2
             pid2, status = os.waitpid(pid2, 0)
+            status=256
             if status:
-                sys.stderr.write("changemail failed with code %d" % status)
-            else:
-                #Only for debugging.  In apache context, this goes to /dev/null
-                sys.stdout.write("changemail completed successfully")
+                fail(status, srcMap, pkgMap, grpMap, argv)
             sys.exit(0)
     return 0
 
 
-def doWork(repos, cfg, commitList, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet):
+def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, argSet):
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
     tmpfile = os.fdopen(tmpfd)
