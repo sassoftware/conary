@@ -1990,7 +1990,7 @@ class RedirectRecipe(Recipe):
                 pkgList = self.repos.findTrove(self.branch.label(), 
                                                (name, versionStr, desFlavor))
             except repository.TroveNotFound, e:
-                raise RecipeFileError, str(e)
+                raise RecipeFileError, "Couldn't find redirect trove: " + str(e)
 
             assert(len(pkgList) == 1)
             packageSet[pkgList[0]] = fromName
