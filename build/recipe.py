@@ -361,20 +361,10 @@ class RecipeLoader:
             pass
 
 def _scoreLoadRecipeChoice(labelPath, version):
-    """ These labels all match the given labelPath.
-        We score them based on the number of matching labels in 
-        the label path, and return the one that's "best".
-
-        The following rules should apply:
-        * if the labelPath is [bar, foo] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
-          is that any other shadow/branch in the path may be from a 
-          maintenance branch.
-        * if the labelPath is [bar] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.
-    """
     # FIXME I'm quite sure this heuristic will get replaced with
     # something smarter/more sane as time progresses
+    if not labelPath:
+        return 0
     score = 0
     labelPath = [ x for x in reversed(labelPath)]
     branch = version.branch()
@@ -391,11 +381,32 @@ def _scoreLoadRecipeChoice(labelPath, version):
     return score
 
 def getBestLoadRecipeChoices(labelPath, troveTups):
+    """ These labels all match the given labelPath.
+        We score them based on the number of matching labels in 
+        the label path, and return the one that's "best".
+
+        The following rules should apply:
+        * if the labelPath is [bar, foo] and you are choosing between
+          /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
+          is that any other shadow/branch in the path may be from a 
+          maintenance branch.
+        * if the labelPath is [bar] and you are choosing between
+          /foo/bar/ and /foo/blah/bar, choose /foo/bar.
+        * if two troves are on the same branch, prefer the later trove.
+    """
     scores = [ (_scoreLoadRecipeChoice(labelPath, x[1]), x) for x in troveTups ]
     maxScore = max(scores)[0]
-    return [x[1] for x in scores if x[0] == maxScore ]
+    troveTups = [x[1] for x in scores if x[0] == maxScore ]
 
-
+    if len(troveTups) <= 1:
+        return troveTups
+    else:
+        byBranch = {}
+        for troveTup in troveTups:
+            branch = troveTup[1].branch()
+            if branch in byBranch:
+                byBranch[branch] = max(byBranch[branch], troveTup)
+        return byBranch.values()
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
@@ -522,9 +533,11 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         try:
             troves = db.findTrove(labelPath, (name, versionStr, flavor))
             if len(troves) > 1:
-                raise RuntimeError, (
-                                'Multiple troves could match loadInstalled' 
-                                ' request %s' % troveSpec)
+                troves = getBestLoadRecipeChoices(labelPath, troves)
+                if len(troves) > 1:
+                    raise RecipeFileError(
+                                    'Multiple troves could match loadInstalled'
+                                    ' request %s: %s' %(troveSpec, troves))
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
         except repository.TroveNotFound:
@@ -533,6 +546,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             return None
         try:
             troves = db.findTrove(None, (name, versionStr, flavor))
+            troves = getBestLoadRecipeChoices(None, troves)
             if len(troves) > 1:
                 raise RuntimeError, (
                                 'Multiple troves could match loadRecipe' 
