@@ -27,11 +27,11 @@ def _getBranchType(binaryOnly, sourceOnly):
         raise OptionsError, ('Can only specify one of --binary-only and'
                              ' --source-only')
     if binaryOnly:
-        return conaryclient.BRANCH_BINARY_ONLY
+        return conaryclient.ConaryClient.BRANCH_BINARY_ONLY
     elif sourceOnly:
-        return conaryclient.BRANCH_SOURCE_ONLY
+        return conaryclient.ConaryClient.BRANCH_SOURCE_ONLY
     else:
-        return conaryclient.BRANCH_ALL
+        return conaryclient.ConaryClient.BRANCH_ALL
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
            sourceOnly = False, binaryOnly = False):

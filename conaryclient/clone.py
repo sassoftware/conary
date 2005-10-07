@@ -11,7 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from build import cook
+import build
+from build.nextversion import nextVersion
 from deps import deps
 import itertools
 from lib import log
@@ -116,7 +117,7 @@ class ClientClone:
             if not infoList:
                 return ([], None)
 
-            buildVersion = cook.nextVersion(repos, 
+            buildVersion = nextVersion(repos, 
                                 [ x[0] for x in infoList ], srcVersion, flavor)
             return infoList, buildVersion
 
@@ -359,3 +360,6 @@ class ClientClone:
 
         self.repos.commitChangeSet(cs)
 
+class CloneError(Exception):
+
+    pass

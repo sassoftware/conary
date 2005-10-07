@@ -589,6 +589,8 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except conaryclient.UpdateError, e:
        print >> sys.stderr, str(e)
+    except conaryclient.CloneError, e:
+       print >> sys.stderr, str(e)
     except repository.repository.RepositoryLocked, e:
        print >> sys.stderr, str(e)
     except:

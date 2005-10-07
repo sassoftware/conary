@@ -13,7 +13,9 @@
 #
 
 python_files =	__init__.py	\
-		cmdline.py
+		branch.py       \
+		cmdline.py      \
+		clone.py
 
 extra_dist = Makefile
 
