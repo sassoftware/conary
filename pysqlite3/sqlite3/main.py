@@ -162,10 +162,11 @@ class Cursor:
                    isinstance(parms[0], list) or \
                    isinstance(parms[0], dict):
                 parms = parms[0]
-        # now bind the arguments. lists/tuples are positions, hashes are named parameters
+        # now bind the arguments. lists/tuples are positionals
         if isinstance(parms, tuple) or isinstance(parms, list):
             for i, parm in enumerate(parms):
                 self.stmt.bind(i + 1, parm)
+        # hashes are named parameters
         elif isinstance(parms, dict):
             for pkey, pval in parms.iteritems():
                 if pkey[0] is not ":":
