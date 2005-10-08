@@ -145,11 +145,17 @@ class MetadataTable:
 
     def getLatestVersion(self, itemId, branchId):
         cu = self.db.cursor()
-        cu.execute("""SELECT Versions.version FROM Versions, Metadata, Branches
-                      WHERE Metadata.versionId=Versions.versionId
+        cu.execute("""SELECT
+                          Versions.version
+                      FROM
+                          Metadata, Branches, Versions
+                      WHERE
+                              Metadata.itemId=? AND Metadata.branchId=?
                           AND Metadata.branchId=Branches.branchId
-                          AND Metadata.itemId=? AND Metadata.branchId=?
-                      ORDER BY Metadata.timeStamp DESC LIMIT 1""", itemId, branchId)
+                          AND Metadata.versionId=Versions.versionId
+                      ORDER BY
+                          Metadata.timeStamp DESC LIMIT 1""",
+                   (itemId, branchId))
 
         item = cu.fetchone()
         if item:
