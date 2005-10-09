@@ -11,12 +11,15 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import itertools
+import time
+
 from callbacks import UpdateCallback
 import conarycfg
 from deps import deps
-import itertools
 from lib import log
 from local import database
+import os
 from repository import changeset
 from repository import trovesource
 from repository.netclient import NetworkRepositoryClient
@@ -1246,7 +1249,7 @@ class ClientUpdate:
 
             return rb
 
-        def _createAllCs(q, allJobs, uJob, cfg):
+        def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
 	    db = database.Database(cfg.root, cfg.dbPath)
@@ -1254,12 +1257,16 @@ class ClientUpdate:
 					    localRepository = db)
 
             for i, job in enumerate(allJobs):
+                if stopSelf.isSet():
+                    return
+
                 callback.setChangesetHunk(i + 1, len(allJobs))
                 newCs = _createCs(repos, job, uJob)
                 q.put(newCs)
 
             q.put(None)
-            thread.exit()
+
+            # returning terminates the thread
 
         # def applyUpdate -- body begins here
 
@@ -1285,20 +1292,35 @@ class ClientUpdate:
                     _applyCs(newCs, uJob, removeHints = removeHints)
             else:
                 from Queue import Queue
-                import thread
+                from threading import Event, Thread
 
                 csQueue = Queue(5)
-                thread.start_new_thread(_createAllCs,
-                                        (csQueue, allJobs, uJob, self.cfg))
+                stopDownloadEvent = Event()
 
-                newCs = csQueue.get()
-                i = 1
-                while newCs is not None:
-                    callback.setUpdateHunk(i, len(allJobs))
-                    i += 1
-                    _applyCs(newCs, uJob, removeHints = removeHints)
-                    callback.updateDone()
+                downloadThread = Thread(None, _createAllCs, args = 
+                            (csQueue, allJobs, uJob, self.cfg, 
+                             stopDownloadEvent))
+                downloadThread.start()
+
+                try:
                     newCs = csQueue.get()
+                    i = 1
+                    while newCs is not None:
+                        callback.setUpdateHunk(i, len(allJobs))
+                        i += 1
+                        _applyCs(newCs, uJob, removeHints = removeHints)
+                        callback.updateDone()
+                        newCs = csQueue.get()
+                finally:
+                    stopDownloadEvent.set()
+                    downloadThread.join(120)
+
+                    if downloadThread.isAlive():
+                        log.warning('timeout waiting for download thread to '
+                                    'terminate -- closing database and exiting')
+                        self.db.close()
+                        os.kill(os.getpid(), 15)
+
 
 class ClientError(Exception):
     """Base class for client errors"""
