@@ -654,6 +654,8 @@ class Database:
                                       instanceId=? and infoType=?""",
                                (instanceId, trove._TROVEINFO_TAG_SIGS))
                 print "\r%s\r" %(' ' * len(msg)),
+                cu.execute("UPDATE DatabaseVersion SET version=10")
+                self.db.commit()
                 version = 10
 
             if version != self.schemaVersion:
