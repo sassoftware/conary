@@ -435,13 +435,13 @@ class Database(SqlDbRepository):
                                   flags & update.MISSINGFILESOKAY))
 
         for (name, version, flavor) in cs.getOldTroveList():
-            localVersion = version.createBranch(versions.LocalLabel(), 
+            rollbackVersion = version.createBranch(versions.RollbackLabel(), 
                                                 withVerRel = 1)
             trove = self.getTrove(name, version, flavor, pristine = False)
             origTrove = self.getTrove(name, version, flavor, 
                                       pristine = True)
             assert(trove)
-            troveList.append((trove, origTrove, localVersion, 
+            troveList.append((trove, origTrove, rollbackVersion, 
                               update.MISSINGFILESOKAY))
 
         callback.creatingRollback()

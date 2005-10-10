@@ -28,6 +28,7 @@ Changes in 0.62.13:
     * A bug where database was left locked on exception during install
       when the download thread was still executing has been fixed.
     * The conaryclient code has been split into pieces.
+    * Switched rollbacks to local@local:ROLLBACK
 
   o Building/Branching changes
     * Many changes have been made to cloning, including sideways
