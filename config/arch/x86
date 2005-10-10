@@ -5,7 +5,7 @@ archProp bits32 True
 archProp bits64 False
 targetArch i386
 unameArch i386
-optflags -O2 -march=i386 -mcpu=i686
+optflags -O2 -march=i386
 
 [i486]
 targetArch i386
