@@ -11,7 +11,7 @@ Changes in 0.62.13:
     with multiple flavors, separate cloning of source and binaries, resilience
     against duplicate troves, proper fileIds used during clones, simultanous
     cloning of multiple troves, and better clonedFrom tracking
-  * split conaryclient into pieces
+  * The conaryclient code has been split into pieces.
   * Conary now compresses XML-RPC requests before sending them to the
     repository server.  In order to use compression, the remote server
     must be running Conary 0.62.13 or later.  If the server is running
