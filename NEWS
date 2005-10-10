@@ -29,7 +29,8 @@ Changes in 0.62.13:
       when the download thread was still executing has been fixed.
     * The conaryclient code has been split into pieces.
     * Switched rollbacks to local@local:ROLLBACK
-    * The download thread failing caused the main thread to block forever
+    * The main thread no longer blocks forever when the download
+      thread fails.
 
   o Building/Branching changes
     * Many changes have been made to cloning, including sideways
