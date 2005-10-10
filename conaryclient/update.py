@@ -1291,10 +1291,10 @@ class ClientUpdate:
                     callback.setUpdateHunk(i + 1, len(allJobs))
                     _applyCs(newCs, uJob, removeHints = removeHints)
             else:
-                from Queue import Queue
+                import Queue
                 from threading import Event, Thread
 
-                csQueue = Queue(5)
+                csQueue = Queue.Queue(5)
                 stopDownloadEvent = Event()
 
                 downloadThread = Thread(None, _createAllCs, args = 
@@ -1303,14 +1303,21 @@ class ClientUpdate:
                 downloadThread.start()
 
                 try:
-                    newCs = csQueue.get()
-                    i = 1
-                    while newCs is not None:
-                        callback.setUpdateHunk(i, len(allJobs))
+                    i = 0
+                    while True:
+                        try:
+                            newCs = csQueue.get(True, 10)
+                        except Queue.Empty:
+                            if downloadThread.isAlive():
+                                continue
+                            log.warning('download thread terminated '
+                                        'unexpectedly')
+                            break
+                            
                         i += 1
+                        callback.setUpdateHunk(i, len(allJobs))
                         _applyCs(newCs, uJob, removeHints = removeHints)
                         callback.updateDone()
-                        newCs = csQueue.get()
                 finally:
                     stopDownloadEvent.set()
                     downloadThread.join(120)
