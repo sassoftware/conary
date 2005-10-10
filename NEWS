@@ -24,6 +24,9 @@ Changes in 0.62.13:
     with many versions much faster.
   * Fixed bug where database was left locked on exception during install
     when the download thread was still executing
+  * The database conversion in 0.62.12 did not correct all out-of-order
+    file streams.  A new conversion funtion is in 0.62.13 that will examine
+    every file stream and ensure that it is stored correctly in the database.
 
 Changes in 0.62.12:
   * Conary will no longer create a "rootroot" group while installing
