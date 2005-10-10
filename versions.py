@@ -509,6 +509,14 @@ class LocalLabel(StaticLabel):
 
     name = "local@local:LOCAL"
 
+class RollbackLabel(StaticLabel):
+
+    """
+    Class defining the local branch.
+    """
+
+    name = "local@local:ROLLBACK"
+
 class EmergeLabel(StaticLabel):
 
     """
@@ -718,6 +726,9 @@ class NewVersion(AbstractVersion):
 	return False
 
     def onLocalCookLabel(self):
+	return False
+
+    def onRollbackLabel(self):
 	return False
 
     def __hash__(self):
@@ -934,6 +945,15 @@ class Version(VersionSequence):
 	"""
 	return isinstance(self.versions[-2], LocalLabel)
 
+    def onRollbackLabel(self):
+    	"""
+	Tests whether this is the rollback branch, or is a version on
+	the rollback branch
+
+	@rtype: boolean
+	"""
+	return isinstance(self.versions[-2], RollbackLabel)
+
     def onEmergeLabel(self):
     	"""
 	Tests whether this is the emerge branch, or is a version on
@@ -961,7 +981,7 @@ class Version(VersionSequence):
 	@rtype: boolean
 	"""
 	return (self.onLocalCookLabel() or self.onEmergeLabel()
-                or self.onLocalLabel())
+                or self.onLocalLabel() or self.onRollbackLabel())
 
     def branch(self):
 	"""
