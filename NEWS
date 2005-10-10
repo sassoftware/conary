@@ -7,7 +7,7 @@ Changes in 0.62.13:
       code for a much faster retrieval of all trove names available on
       all labels on a given server. Server and client protocol numbers
       have changed.
-    * getTroveList server side function got a rework that should
+    * The getTroveList() server side function got a rework that should
       result in about a 50% execution time speedup on most queries.
     * The Metadata SQL query has been reworked to join tables in a
       much better order, speeding up the getMetadata call on a
@@ -39,7 +39,7 @@ Changes in 0.62.13:
       of source and binaries, resilience against duplicate troves,
       proper use of existing fileIds during clones, simultaneous
       cloning of multiple troves, and better clonedFrom tracking.
-    * Default optflags for x86 changed to remove -mcpu as it is 
+    * The default optflags for x86 changed to remove -mcpu, as it is
       deprecated in gcc.
 
 Changes in 0.62.12:
