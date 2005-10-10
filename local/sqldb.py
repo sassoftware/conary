@@ -617,6 +617,7 @@ class Database:
                 print "\r%s\r" %(' ' * len(msg)),
                 version = 9
             if version == 9:
+                import sys
                 cu.execute("""SELECT
                                   instanceId, fileId, stream, path
                               FROM DBTroveFiles""")
