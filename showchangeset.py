@@ -170,6 +170,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                         (cType, pathId, path, 
                              fileId, version, change) = fileList[pathId]
                         fileObj = files.ThawFile(change, pathId)
+                    assert(fileId == fileObj.fileId())
                     if tags and not ls and not fileObj.tags:
                         continue
                     prefix = indent + ' ' + cType + '  '
