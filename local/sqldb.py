@@ -618,13 +618,17 @@ class Database:
                 version = 9
             if version == 9:
                 import sys
+
+                cu.execute("SELECT COUNT(*) FROM DBTroveFiles")
+                total = cu.fetchone()[0]
+
                 cu.execute("""SELECT
-                                  instanceId, fileId, stream, path
-                              FROM DBTroveFiles""")
-                rows = [ x for x in cu ]
-                total = len(rows)
-                changed = set()
-                for i, (instanceId, fileId, stream, path) in enumerate(rows):
+                                  instanceId, fileId, stream
+                              FROM
+                                  DBTroveFiles""")
+                changes = []
+                changedTroves = set()
+                for i, (instanceId, fileId, stream) in enumerate(cu):
                     i += 1
                     if i % 1000 == 0 or (i == total):
                         msg = ("\rReordering streams and recalculating "
@@ -641,18 +645,23 @@ class Database:
                         # if the stream didn't change, skip
                         continue
                     newFileId = f.fileId()
+                    changes.append((newFileId, newStream, fileId))
+                    changedTroves.add(instanceId)
+
+                # make the changes
+                for newFileId, newStream, fileId in changes:
                     cu.execute("UPDATE DBTroveFiles SET "
                                "fileId=?, stream=? WHERE fileId=?",
                                (newFileId, newStream, fileId))
-                    changed.add(instanceId)
 
                 # delete signatures for the instances we changed
-                for instanceId in changed:
+                for instanceId in changedTroves:
                     cu.execute("""DELETE FROM
                                       troveinfo
                                   WHERE
-                                      instanceId=? and infoType=?""",
+                                      instanceId=? AND infoType=?""",
                                (instanceId, trove._TROVEINFO_TAG_SIGS))
+
                 print "\r%s\r" %(' ' * len(msg)),
                 cu.execute("UPDATE DatabaseVersion SET version=10")
                 self.db.commit()
