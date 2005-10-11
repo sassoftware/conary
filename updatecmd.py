@@ -153,6 +153,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateHunk = (num, total)
 
     def __init__(self):
+        callbacks.UpdateCallback.__init__(self)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
         self.csHunk = None
