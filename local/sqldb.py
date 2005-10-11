@@ -391,7 +391,7 @@ def _doAnalyze(db):
 
 class Database:
 
-    schemaVersion = 10
+    schemaVersion = 11
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -666,6 +666,51 @@ class Database:
                 cu.execute("UPDATE DatabaseVersion SET version=10")
                 self.db.commit()
                 version = 10
+            if version == 10:
+                # convert contrib.rpath.com -> contrib.rpath.org
+                import sys
+                msg = ''
+
+                cu.execute('select count(*) from versions')
+                total = cu.fetchone()[0]
+
+                updates = []
+                cu.execute("select versionid, version from versions")
+                for i, (versionId, version) in enumerate(cu):
+                    i += 1
+                    msg = ('\rrenaming contrib.rpath.com to '
+                           'contrib.rpath.org.  %d/%d' %(i, total))
+                    print msg,
+                    sys.stdout.flush()
+
+                    if not versionId:
+                        continue
+                    new = version.replace('contrib.rpath.com',
+                                          'contrib.rpath.org')
+                    if version != new:
+                        updates.append((versionId, new))
+
+                for versionId, version in updates:
+                    cu.execute("""update versions
+                                      set version=?
+                                  where versionid=?""", (version, versionId))
+                    # erase signature troveinfo since the version changed
+                    cu.execute("""delete from
+                                      TroveInfo
+                                  where
+                                          infotype = 9
+                                      and instanceid in
+                                      (select
+                                           instanceid
+                                       from
+                                           versions, instances
+                                       where
+                                           versions.versionid=?)""",
+                               (versionId,))
+                print "\r%s\r" %(' ' * len(msg)),
+                cu.execute("UPDATE DatabaseVersion SET version=11")
+                self.db.commit()
+                version = 11
 
             if version != self.schemaVersion:
                 return False

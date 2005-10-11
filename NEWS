@@ -23,6 +23,8 @@ Changes in 0.62.13:
       out-of-order file streams.  A new conversion function is in
       0.62.13 that will examine every file stream and ensure that it
       is stored correctly in the database.
+    * Versions from the contrib.rpath.com repository are automatically
+      rewritten to point to contrib.rpath.org.
     * Install bucket handling now works for collections which were not
       fully installed.
     * A bug where database was left locked on exception during install
@@ -31,6 +33,8 @@ Changes in 0.62.13:
     * Switched rollbacks to local@local:ROLLBACK
     * The main thread no longer blocks forever when the download
       thread fails.
+    * Matching referenced troves in collections is no longer dependent
+      on sort order of internal dictionaries.
 
   o Common Repository and Client changes
     * When a changeset is applied to the local system or committed to
@@ -38,8 +42,6 @@ Changes in 0.62.13:
       objects and verified.  This prevents corrupted or miscomputed
       changesets from being committed to the repository or applied to
       the local system.
-    * Matching referenced troves in collections is no longer dependent
-      on sort order of internal dicts
 
   o Building/Branching changes
     * Many changes have been made to cloning, including sideways
