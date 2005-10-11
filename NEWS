@@ -24,7 +24,10 @@ Changes in 0.62.13:
       0.62.13 that will examine every file stream and ensure that it
       is stored correctly in the database.
     * Versions from the contrib.rpath.com repository are automatically
-      rewritten to point to contrib.rpath.org.
+      rewritten to point to contrib.rpath.org.  NOTE: if you have a
+      label from the contrib.rpath.com repository in your
+      InstallLabelPath (such as contrib.rpath.com@rpl:devel), you will
+      need to modify it to point to contrib.rpath.org.
     * Install bucket handling now works for collections which were not
       fully installed.
     * A bug where database was left locked on exception during install
