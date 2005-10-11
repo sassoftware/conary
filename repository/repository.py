@@ -500,6 +500,9 @@ class ChangeSetJob:
                             fileObj = files.ThawFile(diff, pathId)
                             oldfile = None
 
+                if fileObj and fileObj.fileId() != fileId:
+                    raise trove.TroveIntegrityError, \
+                          "fileObj.fileId() != fileId in changeset"
                 self.repos.addFileVersion(troveInfo, pathId, fileObj, path, 
                                           fileId, newVersion)
 

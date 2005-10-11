@@ -32,6 +32,13 @@ Changes in 0.62.13:
     * The main thread no longer blocks forever when the download
       thread fails.
 
+  o Common Repository and Client changes
+    * When a changeset is applied to the local system or committed to
+      a networked repository, the fileIds are recomputed from the file
+      objects and verified.  This prevents corrupted or miscomputed
+      changesets from being committed to the repository or applied to
+      the local system.
+
   o Building/Branching changes
     * Many changes have been made to cloning, including sideways
       cloning (creating a clone at the same branch depth as the clone
