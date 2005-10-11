@@ -1,3 +1,9 @@
+Changes in 0.62.14:
+  * The threading changes in .13 caused some error information to be lost.
+    Tracebacks have now been fixed, and the download thread checks much more
+    often to see if it needs to exit.
+  * Catch InstallBucketConflicts exception
+
 Changes in 0.62.13:
   o Repository Server changes
     * The Schema creation SQL statements have been rewritten in a more
