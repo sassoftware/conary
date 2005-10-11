@@ -131,7 +131,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             condRollback()
             return (True, ("TroveIntegrityError", str(e) +
                            # add a helpful error message for now
-                        ' (you may need to update to conary 0.62.0 or later)'))
+                        ' (you may need to update to conary 0.62.12 or later)'))
         except FileContentsNotFound, e:
             condRollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
