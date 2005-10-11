@@ -1262,6 +1262,7 @@ class ClientUpdate:
 	    db = database.Database(cfg.root, cfg.dbPath)
 	    repos = NetworkRepositoryClient(cfg.repositoryMap,
 					    localRepository = db)
+            callback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):
                 if stopSelf.isSet():
@@ -1270,6 +1271,8 @@ class ClientUpdate:
                 callback.setChangesetHunk(i + 1, len(allJobs))
                 newCs = _createCs(repos, job, uJob)
                 q.put(newCs)
+
+            callback.setAbortEvent(None)
 
             q.put(None)
 

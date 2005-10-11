@@ -33,6 +33,7 @@ import findtrove
 from lib import log, util
 import metadata
 import repository
+import sys
 import transport
 import trove
 import versions
@@ -722,15 +723,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     callback.downloadingChangeSet(0, sum(sizes))
                     copyCallback = \
                         lambda x: callback.downloadingChangeSet(x, sum(sizes))
+                    abortCheck = callback.checkAbort
                 else:
                     copyCallback = None
+                    abortCheck = None
 
                 try:
                     # seek to the end of the file
                     outFile.seek(0, 2)
                     start = outFile.tell()
                     totalSize = util.copyfileobj(inF, outFile,
-                                                 callback = copyCallback )
+                                                 callback = copyCallback,
+                                                 abortCheck = abortCheck)
+                    if totalSize == None:
+                        sys.exit(0)
                     #assert(totalSize == sum(sizes))
                     inF.close()
                 except:

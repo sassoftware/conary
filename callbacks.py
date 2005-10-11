@@ -87,6 +87,12 @@ class UpdateCallback(ChangesetCallback):
     def done(self):
         pass
 
+    def checkAbort(self):
+        return (self.abortEvent and self.abortEvent.isSet())
+
+    def setAbortEvent(self, event = None):
+        self.abortEvent = event
+
     def __init__(self):
         pass
 

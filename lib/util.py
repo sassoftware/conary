@@ -248,7 +248,8 @@ def copyfile(sources, dest, verbose=True):
 	    log.debug('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
-def copyfileobj(source, dest, callback = None, digest = None):
+def copyfileobj(source, dest, callback = None, digest = None, 
+                abortCheck = None):
     total = 0
     buf = source.read(128 * 1024)
     while buf:
@@ -256,6 +257,9 @@ def copyfileobj(source, dest, callback = None, digest = None):
 	dest.write(buf)
 	if digest: digest.update(buf)
         if callback: callback(total)
+        if abortCheck:
+            if abortCheck():
+                return None
 	buf = source.read(128 * 1024)
 
     return total
