@@ -615,6 +615,7 @@ class ClientUpdate:
                 trv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                           pristine = False)
                 referencedTroves.update(x for x in trv.iterTroveList())
+
                 for name, version, flavor in trv.iterTroveList():
                     jobQueue.append(((name, (version, flavor),
                                            (version, flavor), False),
@@ -750,6 +751,12 @@ class ClientUpdate:
                 else:
                     # recurse through this trove's collection even though
                     # it doesn't need to be installed
+                    if oldVersion is not None:
+                        jobQueue.append(((name, (oldVersion, oldFlavor),
+                                                (None, None), False),
+                                          ignorePin and isPinned, 
+                                          oldIsPinned))
+
                     jobQueue.append(((name, (newVersion, newFlavor),
                                            (newVersion, newFlavor), False),
                                      ignorePin, False))
