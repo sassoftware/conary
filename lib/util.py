@@ -19,6 +19,7 @@ import epdb
 import errno
 import log
 import os
+import select
 import shutil
 import stackutil
 import stat
@@ -252,15 +253,32 @@ def copyfileobj(source, dest, callback = None, digest = None,
                 abortCheck = None):
     total = 0
     buf = source.read(128 * 1024)
-    while buf:
+
+    if abortCheck:
+        sourceFd = source.fileno()
+    else:
+        sourceFd = None
+
+    while True:
+        if not buf:
+            break
+
 	total += len(buf)
 	dest.write(buf)
 	if digest: digest.update(buf)
         if callback: callback(total)
+
         if abortCheck:
-            if abortCheck():
-                return None
-	buf = source.read(128 * 1024)
+            # if we need to abortCheck, make sure we check it every time
+            # read returns, and every five seconds
+            l1 = []
+            while not l1:
+                if abortCheck and abortCheck():
+                    return None
+                l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
+
+        buf = source.read(128 * 1024)
+
 
     return total
 
