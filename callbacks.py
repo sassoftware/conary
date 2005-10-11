@@ -94,7 +94,7 @@ class UpdateCallback(ChangesetCallback):
         self.abortEvent = event
 
     def __init__(self):
-        pass
+        self.abortEvent = None
 
 class SignatureCallback:
 
