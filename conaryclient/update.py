@@ -1313,7 +1313,8 @@ class ClientUpdate:
                             log.warning('download thread terminated '
                                         'unexpectedly')
                             break
-                            
+                        if newCs is None:
+                            break
                         i += 1
                         callback.setUpdateHunk(i, len(allJobs))
                         _applyCs(newCs, uJob, removeHints = removeHints)
