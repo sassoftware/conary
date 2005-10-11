@@ -113,6 +113,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise openpgpfile.IncompatibleKey(exceptionArgs)
         elif exceptionName == 'RepositoryLocked':
             raise repository.RepositoryLocked
+        elif exceptionName == 'TroveIntegrityError':
+            raise trove.TroveIntegrityError(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
