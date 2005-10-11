@@ -38,6 +38,8 @@ Changes in 0.62.13:
       objects and verified.  This prevents corrupted or miscomputed
       changesets from being committed to the repository or applied to
       the local system.
+    * Matching referenced troves in collections is no longer dependent
+      on sort order of internal dicts
 
   o Building/Branching changes
     * Many changes have been made to cloning, including sideways

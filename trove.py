@@ -1245,17 +1245,18 @@ class Trove(streams.LargeStreamSet):
 	    # trove is being obsoleted, use that for the diff. if we
 	    # can't do that either, throw up our hands in a fit of pique
 
-	    for version in newVersionList:
+            if len(oldVersionList) == 1 and len(newVersionList) == 1:
+                trvList.append((name, oldVersionList[0], newVersionList[0], 
+                                oldFlavor, newFlavor))
+                del oldVersionList[0]
+                continue
 
+	    for version in newVersionList[:]:
 
 		if not oldVersionList:
 		    # no nice match, that's too bad
 		    trvList.append((name, None, version, None, newFlavor))
-                    continue
-		elif len(oldVersionList) == 1:
-		    trvList.append((name, oldVersionList[0], version, 
-				    oldFlavor, newFlavor))
-		    del oldVersionList[0]
+                    newVersionList.remove(version)
                     continue
 
 		branch = version.branch()
@@ -1269,8 +1270,6 @@ class Trove(streams.LargeStreamSet):
                     parentVersion = version.parentVersion()
 		else:
 		    parentVersion = None
-
-
 
                 sameBranches = []
                 parentBranches = []
@@ -1303,15 +1302,22 @@ class Trove(streams.LargeStreamSet):
                 if match and len(match) == 1:
                     match = match[0]
                     oldVersionList.remove(match)
+                    newVersionList.remove(version)
                     trvList.append((name, match, version, 
                                     oldFlavor, newFlavor))
-                else:
-                    # Here's the fit of pique. This shouldn't happen
-                    # except for the most ill-formed of groups.
-                    raise TroveDiffError, "Cannot determine what trove is " \
-                        "being replaced for %s=%s[%s]" %  \
-                            (name, version.asString(), 
-                             deps.formatFlavor(newFlavor))
+            
+            if newVersionList and not oldVersionList:
+                for version in newVersionList:
+                    trvList.append((name, None, version, 
+                                    None, newFlavor))
+            elif newVersionList:
+                version = newVersionList[0]
+                # Here's the fit of pique. This shouldn't happen
+                # except for the most ill-formed of groups.
+                raise TroveDiffError, "Cannot determine what trove is " \
+                    "being replaced for %s=%s[%s]" %  \
+                        (name, version.asString(), 
+                         deps.formatFlavor(newFlavor))
 
 	    # remove old versions which didn't get matches
 	    for oldVersion in oldVersionList:
