@@ -12,14 +12,16 @@
 # full details.
 
 import itertools
+import os
 import time
+import traceback
+import sys
 
 from callbacks import UpdateCallback
 import conarycfg
 from deps import deps
 from lib import log
 from local import database
-import os
 from repository import changeset
 from repository import trovesource
 from repository.netclient import NetworkRepositoryClient
@@ -1331,13 +1333,25 @@ class ClientUpdate:
                         callback.updateDone()
                 finally:
                     stopDownloadEvent.set()
-                    downloadThread.join(120)
+                    # the download thread _should_ respond to the stopDownloadEvent
+                    # in ~5 seconds.
+                    downloadThread.join(20)
 
                     if downloadThread.isAlive():
                         log.warning('timeout waiting for download thread to '
                                     'terminate -- closing database and exiting')
+                        log.warning('the following traceback _may_ be related')
                         self.db.close()
+                        tb = sys.exc_info()[2]
+                        if tb:
+                            print >>sys.stderr, ''.join(tb)
+                        # this will kill the download thread as well
                         os.kill(os.getpid(), 15)
+                    else:
+                        # DEBUGGING NOTE: if you need to debug update code not
+                        # related to threading, the easiest thing is to add 
+                        # 'threaded False' to your conary config.
+                        pass
 
 
 class ClientError(Exception):
