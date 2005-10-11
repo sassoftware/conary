@@ -1,3 +1,6 @@
+Changes in 0.62.15:
+  * The MakeDevices() policy now accepts mode= as a named argument.
+
 Changes in 0.62.14:
   * The threading changes in .13 caused some error information to be lost.
     Tracebacks have now been fixed, and the download thread checks much more
