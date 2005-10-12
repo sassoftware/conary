@@ -960,11 +960,11 @@ class ClientUpdate:
 
             if isinstance(newVersionStr, versions.Version):
                 assert(isinstance(newFlavorStr, deps.DependencySet))
-                newJob.add((troveName, oldTrove,
-                            (newVersionStr, newFlavorStr), isAbsolute))
-                # FIXME: find a way to keep people from committing broken
-                # code.  sets are not subscriptable.
-                # log.debug("set up job %s", newJob[-1])
+                jobToAdd = (troveName, oldTrove,
+                            (newVersionStr, newFlavorStr), isAbsolute)
+                newJob.add(jobToAdd)
+                log.debug("set up job %s", jobToAdd)
+                del jobToAdd
             elif isinstance(newVersionStr, versions.Branch):
                 toFind[(troveName, newVersionStr.asString(),
                         newFlavorStr)] = oldTrove, isAbsolute
