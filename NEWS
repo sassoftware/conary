@@ -9,6 +9,9 @@ Changes in 0.62.15:
   * Cloning groups is now supported
   * Fix update case where a group update should cause conary to search the 
     system for an older version of a trove to replace.
+  * If you update a trove foo locally to a new version on the same branch, and 
+    then update the containing group to a new version on a different branch,
+    conary will now update foo to the new branch as well. 
 
 Changes in 0.62.14:
   * The threading changes in .13 caused some error information to be lost.

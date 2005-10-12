@@ -782,7 +782,9 @@ class Trove(streams.LargeStreamSet):
                 #      to be removed
                 #   3. If the new troves are on the same branch, take the
                 #      newer one.
-                #   4. Otherwise, take the trove from the primary (it's
+                #   4. If the primary change is a version change but the 
+                #      secondary change is a branch change, use the secondary
+                #   5. Otherwise, take the trove from the primary (it's
                 #      not clear this case is possible given how linkages
                 #      are maintained)
                 assert(newOverlap is None)
@@ -795,6 +797,12 @@ class Trove(streams.LargeStreamSet):
                         keepSecondary = False
                     else:
                         keepPrimary = False
+                elif job[1][0].branch() == job[2][0].branch():
+                    # Primary change was a version change on the same
+                    # branch.  The secondary change is a branch change
+                    # (otherwise the case before this one would have been
+                    # triggered)
+                    keepPrimary = False
                 else:
                     keepSecondary = False
 
