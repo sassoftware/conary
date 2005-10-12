@@ -39,6 +39,8 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
     for arg in cfgMap.keys():
 	argDef[arg] = 1
+    argDef['debug'] = NO_PARAM
+    argDef['debugger'] = NO_PARAM
 
     i = 1
     while i < len(argv):
@@ -132,16 +134,16 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 	    cfg.configLine("%s %s" % (name, argSet[arg]))
 	    del argSet[arg]
 
-    if argSet.has_key('debug'):
-	del argSet['debug']
+    if argSet.has_key('debugger'):
+	del argSet['debugger']
 	from lib import epdb
 	epdb.set_trace()
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError, 
                                             debugCtrlC=True)
 
 
-    if '-v' in otherArgs:
-	otherArgs.remove('-v')
+    if 'debug' in argSet:
+	del argSet['debug']
 	log.setVerbosity(log.DEBUG)
     else:
 	log.setVerbosity(log.WARNING)

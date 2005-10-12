@@ -120,7 +120,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["binary-only"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
-    argDef["debug"] = NO_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
     argDef["flavor"] = ONE_PARAM
