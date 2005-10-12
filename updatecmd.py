@@ -422,6 +422,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
+    client.checkWriteableRoot()
     troveList = [] 
     for item in troveStrList:
         name, ver, flv = parseTroveSpec(item)
