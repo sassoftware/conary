@@ -67,8 +67,11 @@ class TroveTupleList(streams.StreamCollection):
         dep.flavor.set(flavor)
         self.addStream(1, dep)
 
+    def remove(self, tup):
+        self.delStream(1, tup)
+
     def iter(self):
-        return self.iterAll()
+        return ( x[1] for x in self.iterAll() )
 
 class BuildDependencies(TroveTupleList):
     pass
