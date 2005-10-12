@@ -41,9 +41,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.lock.acquire()
         t = ""
 
-        if self.csText:
-            t = self.csText + ' '
-
         if self.updateText:
 	    if self.updateHunk is not None and self.updateHunk[1] != 1:
 		if self.csText is None:
@@ -58,7 +55,11 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
             t += self.updateText
 
+        if self.csText:
+            t = self.csText + ' '
+
 	if t and len(t) < 76:
+            t = t[:76]
 	    t += '...'
 
         self._message(t)
@@ -73,20 +74,23 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.update()
 
     def preparingChangeSet(self):
-        self.updateMsg("Preparing changeset")
+        self.updateMsg("Preparing changeset request")
 
     def resolvingDependencies(self):
         self.updateMsg("Resolving dependencies")
 
     def updateDone(self):
+        self.lock.acquire()
+        self._message('Done.')
+        self._message('\n')
         self.updateText = None
+        self.lock.release()
 
     def _downloading(self, msg, got, need):
         if got == need:
             self.csText = None
         elif need != 0:
-            if self.csHunk is None or self.csHunk[1] == 1 or \
-		    not self.updateText:
+            if self.csHunk[1] < 2 or not self.updateText:
                 self.csMsg("%s (%d%% of %dk)"
                            % (msg, (got * 100) / need, need / 1024))
             else:
@@ -102,13 +106,13 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._downloading('Downloading', got, need)
 
     def requestingFileContents(self):
-        if self.csHunk is None:
+        if self.csHunk[1] < 2:
             self.csMsg("Requesting file contents")
         else:
             self.csMsg("Requesting file contents for changeset %d of %d" % self.csHunk)
 
     def requestingChangeSet(self):
-        if self.csHunk is None:
+        if self.csHunk[1] < 2:
             self.csMsg("Requesting changeset")
         else:
             self.csMsg("Requesting changeset %d of %d" % self.csHunk)
@@ -137,7 +141,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 		      (troveNum, troveCount))
 
     def runningPreTagHandlers(self):
-        self.updateMsg("Running tag pre-scripts")
+        self.updateMsg("Running tag prescripts")
 
     def runningPostTagHandlers(self):
         self.updateMsg("Running tag post-scripts")
@@ -152,18 +156,31 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.restored = 0
         self.updateHunk = (num, total)
 
+    def setUpdateJob(self, job):
+        self.lock.acquire()
+        if self.updateHunk[1] < 2:
+            lines = [ 'Applying update job:' ]
+        else:
+            lines = [ 'Applying update job %d of %d:' %self.updateHunk ]
+        indent = '    '
+        lines.extend(formatUpdateJobInfo(job, indent = indent))
+        for line in lines:
+            self._message(line)
+            self._message('\n')
+        self.lock.release()
+
     def __init__(self):
         callbacks.UpdateCallback.__init__(self)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
-        self.csHunk = None
-        self.updateHunk = None
+        self.csHunk = (0, 0)
+        self.updateHunk = (0, 0)
         self.csText = None
         self.updateText = None
         self.lock = thread.allocate_lock()
 
-def displayUpdateJobInfo(jobList, verbose=False):
-    indent = '    '
+
+def formatUpdateJobInfo(jobList, verbose=False, indent=''):
     new = []
     for name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute \
                                                         in jobList:
@@ -188,24 +205,28 @@ def displayUpdateJobInfo(jobList, verbose=False):
 
         if not oldVersion:
             # if there is no oldVersion, this is a new trove
-            new.append(("%s (%s)" % (name, newInfo), 'N'))
+            new.append(("%s=%s" % (name, newInfo), 'Install'))
             continue
         elif not newVersion:
             # if there is no newVersion, this is a new trove
-            new.append(("%s (%s deleted)" % (name, oldVersion.asString()), 'D'))
+            new.append(("%s=%s" % (name, oldInfo), 'Erase  '))
             continue
 
         if oldVersion.branch() != newVersion.branch():
-            kind = 'Br'
+            # kind = 'Br'
+            kind = 'Update '
             oldInfo = oldVersion.asString()
             newInfo = newVersion.asString()
         elif oldTVersion.getVersion() != newTVersion.getVersion():
-            kind = 'V'
-        elif oldTVersion.getSourceCount() != \
-                                    newTVersion.getSourceCount():
-            kind = 'S'
+            # kind = 'V'
+            kind = 'Update '
+        elif (oldTVersion.getSourceCount() !=
+              newTVersion.getSourceCount()):
+            # kind = 'S'
+            kind = 'Update '
         else:
-            kind = 'B'
+            # kind = 'B'
+            kind = 'Update '
         if oldFlavor != newFlavor:
             flavors = deps.flavorDifferences([oldFlavor, newFlavor])
             oldFlavor = flavors[oldFlavor]
@@ -218,27 +239,15 @@ def displayUpdateJobInfo(jobList, verbose=False):
         new.append(("%s (%s -> %s)" % (name, oldInfo, newInfo), kind))
 
     new.sort()
-    new = [ "%s %s" % (x[1], x[0]) for x in new ]
-    #if verbose:
-    #    formatter = lambda x: '%s[%s]' % (x[1].asString(),
-    #                                      deps.formatFlavor(x[2]))
-    #else:
-    #    formatter = lambda x: x[1].trailingRevision().asString()
+    new = ("%s%s %s" % (indent, x[1], x[0]) for x in new)
 
-    #old = []
-    #old += [ "D %s (%s deleted)" % (x[0], formatter(x)) 
-    #                                 for x in cs.getOldTroveList() ]
-    #old.sort()
+    return new
 
-    if not new and not old:
-        print indent + "Nothing is affected by this update."
-
+def displayUpdateJobInfo(jobList, verbose=False):
+    indent = '    '
+    new = formatUpdateJobInfo(jobList, verbose=verbose, indent=indent)
     if new:
-        print indent + ("\n%s" %indent).join(new)
-
-    #if old:
-    #    print indent + ("\n%s" %indent).join(old)
-
+        print '\n'.join(new)
 
 def displayUpdateInfo(updJob, verbose=False):
     totalJobs = len(updJob.getJobs())

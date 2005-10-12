@@ -1,3 +1,9 @@
+Changes in 0.62.16:
+  * "conary update" and "conary erase" now displays the actions it is
+    taking as runs (similar to --info output).
+  * The --info output for "conary erase" and "conary update" has been
+    reworked to be more user friendly.
+
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
   * Added (undocumented) --debug (prints debugging output), 

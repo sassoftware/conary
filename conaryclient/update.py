@@ -1169,7 +1169,6 @@ class ClientUpdate:
                                         restrictToTroveSource = 
                                             (len(fromChangesets) > 0),
                                         asPrimary = True)
-
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
@@ -1255,8 +1254,6 @@ class ClientUpdate:
         else:
             uJob.addJob(jobSet)
 
-        callback.updateDone()
-
         return (uJob, suggMap)
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
@@ -1323,7 +1320,9 @@ class ClientUpdate:
             callback.setChangesetHunk(0, 0)
             newCs = _createCs(self.repos, allJobs[0], uJob, standalone = True)
             callback.setUpdateHunk(0, 0)
+            callback.setUpdateJob(allJobs[0])
             _applyCs(newCs, uJob)
+            callback.updateDone()
         else:
             # build a set of everything which is being removed
             removeHints = set()
@@ -1336,7 +1335,9 @@ class ClientUpdate:
                     callback.setChangesetHunk(i + 1, len(allJobs))
                     newCs = _createCs(self.repos, job, uJob)
                     callback.setUpdateHunk(i + 1, len(allJobs))
+                    callback.setUpdateJob(job)
                     _applyCs(newCs, uJob, removeHints = removeHints)
+                    callback.updateDone()
             else:
                 import Queue
                 from threading import Event, Thread
@@ -1364,6 +1365,7 @@ class ClientUpdate:
                             break
                         i += 1
                         callback.setUpdateHunk(i, len(allJobs))
+                        callback.setUpdateJob(allJobs[i - 1])
                         _applyCs(newCs, uJob, removeHints = removeHints)
                         callback.updateDone()
                 finally:

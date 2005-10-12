@@ -84,6 +84,9 @@ class UpdateCallback(ChangesetCallback):
     def setUpdateHunk(self, hunk, hunkCount):
         pass
 
+    def setUpdateJob(self, job):
+        pass
+
     def done(self):
         pass
 
@@ -113,7 +116,6 @@ class SignatureCallback:
 
 
 class LineOutput:
-
     def _message(self, msg):
         self.out.write("\r")
         self.out.write(msg)
