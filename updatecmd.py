@@ -287,6 +287,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                           (pkgStr, msg))
                 sys.exit(1)
             applyList.append(cs)
+            log.debug("found changeset file %s" % pkgStr)
         else:
             troveSpec = parseTroveSpec(pkgStr)
             if troveSpec[0][0] == '-':
@@ -301,6 +302,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             else:
                 applyList.append((troveSpec[0], troveSpec[1:],
                                   (None, None), False))
+            log.debug("will look for %s", applyList[-1])
 
     # dedup
     applyList = set(applyList)

@@ -544,6 +544,7 @@ class ClientUpdate:
         toOutdate = set()
         newJob = set()
 
+        log.debug("looking up troves to outdate for primary troves")
         for job in primaryJobList:
             if job[2][0] is not None:
                 item = (job[0], job[2][0], job[2][1])
@@ -566,6 +567,7 @@ class ClientUpdate:
 
         outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
                                                      ineligible)
+        log.debug("assembling initial job list")
         for i, job in enumerate(jobQueue):
             item = (job[0], job[2][0], job[2][1])
 
@@ -595,6 +597,7 @@ class ClientUpdate:
         referencedTroves = set()
 
         while jobQueue:
+            log.debug("examing job %s", jobQueue[-1])
             job, ignorePin, isPinned = jobQueue.pop()
 
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
@@ -614,6 +617,8 @@ class ClientUpdate:
                 # Needless to say, that's a bit silly. We don't need to
                 # go through all of that, but we do need to recursively
                 # update the referncedTroves set.
+                log.debug("trove already installed -- recursing through "
+                          "referenced troves")
                 trv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                           pristine = False)
                 referencedTroves.update(x for x in trv.iterTroveList())
@@ -633,6 +638,7 @@ class ClientUpdate:
                                                     newVersion, newFlavor,
                                                     withFiles = False)
 
+            log.debug("merging trove into current diff")
             if newVersion is None:
                 # handle erase recursion
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
@@ -667,11 +673,14 @@ class ClientUpdate:
                 del finalTrvCs, localTrv, fileList, newPristine
 
             if isPinned and not newVersion:
-                # trying to erase something which is pinned
                 if not ignorePin:
+                    # trying to erase something which is pinned
+                    log.debug("skipping of pinned trove")
                     continue
+                log.debug("erasing pinned trove")
                 newJob.add(job)
             elif isPinned:
+                log.debug("old version of trove is pinned")
                 # trying to install something whose old version is pinned
                 assert(oldVersion is not None)
 
@@ -688,6 +697,7 @@ class ClientUpdate:
                 if oldBucket.compatibleWith(newBucket):
                     # make this job a fresh install since the buckets
                     # are compatible
+                    log.debug("install new trove as buckets are compatible")
                     newJob.add((trvName, (None, None), (newVersion, newFlavor),
                                 False))
                     # regenerate this
@@ -696,14 +706,17 @@ class ClientUpdate:
                 elif not ignorePin:
                     # this is incompatible with the pinned trove being
                     # replaced; we need to leave the old one here
+                    log.debug("skipping install job due to pin")
                     if newVersion is not None:
                         uJob.addPinMapping(name, 
                                             (oldVersion, oldFlavor),
                                             (newVersion, newFlavor))
                     continue
                 else:
+                    log.debug("ignoring pin")
                     newJob.add(job)
             else:
+                log.debug("adding job")
                 newJob.add(job)
 
             del oldTrv
@@ -724,11 +737,13 @@ class ClientUpdate:
 
             pinned = _lockedList(neededTroveList, ignorePin)
 
+            log.debug("iterating through referenced troves (if any)")
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
                     oldIsPinned in itertools.izip(neededTroveList, pinned):
                 if (name, newVersion, newFlavor) not in alreadyInstalled:
                     if newVersion is None:
                         # add this job to the keeplist to do erase recursion
+                        log.debug("considering referenced trove for removal")
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (None, None), False),
                                           ignorePin and isPinned, oldIsPinned))
@@ -746,14 +761,18 @@ class ClientUpdate:
                         else:
                             makeAbs = False
                                 
+                        log.debug("considering installation of referenced "
+                                  "trove")
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), 
                                          makeAbs), ignorePin and isPinned, 
                                          oldIsPinned))
                 else:
+                    log.debug("referenced trove already installed")
                     # recurse through this trove's collection even though
                     # it doesn't need to be installed
                     if oldVersion is not None:
+                        log.debug("removing old versoin of referenced trove")
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                 (None, None), False),
                                           ignorePin and isPinned, 
@@ -869,9 +888,15 @@ class ClientUpdate:
                     # as relative to preserve proper keepExisting behavior.
                     newList = []
                     for troveCs in item.iterNewTroveList():
+                        log.debug("found %s=%s[%s]" %
+                                  (troveCs.getName(), 
+                                   troveCs.getNewVersion().asString(),
+                                   str(troveCs.getNewFlavor())))
                         if troveCs.isAbsolute():
                             # XXX we could just flip the absolute bit instead
                             # of going through all of this...
+                            log.debug("(switching to relative install to "
+                                      "force prevent rooting)")
                             newTrove = trove.Trove(troveCs.getName(), 
                                             troveCs.getNewVersion(), 
                                             troveCs.getNewFlavor(), 
@@ -883,6 +908,7 @@ class ClientUpdate:
                     for troveCs in newList:
                         # new replaces old
                         item.newTrove(troveCs)
+
 
                 splittable = False
                 uJob.getTroveSource().addChangeSet(item, 
@@ -917,6 +943,7 @@ class ClientUpdate:
                 assert(not newFlavorStr)
                 assert(not isAbsolute)
                 for troveInfo in oldTroves:
+                    log.debug("set up removal of %s", troveInfo)
                     removeJob.add((troveInfo[0], (troveInfo[1], troveInfo[2]),
                                    (None, None), False))
                 # skip ahead to the next itemList
@@ -935,6 +962,7 @@ class ClientUpdate:
                 assert(isinstance(newFlavorStr, deps.DependencySet))
                 newJob.add((troveName, oldTrove,
                             (newVersionStr, newFlavorStr), isAbsolute))
+                log.debug("set up job %s", newJob[-1])
             elif isinstance(newVersionStr, versions.Branch):
                 toFind[(troveName, newVersionStr.asString(),
                         newFlavorStr)] = oldTrove, isAbsolute
@@ -962,11 +990,13 @@ class ClientUpdate:
             results.update(source.findTroves(None, toFind))
         else:
             if toFind:
+                log.debug("looking up troves w/ database affinity")
                 results.update(self.repos.findTroves(
                                         self.cfg.installLabelPath, toFind, 
                                         self.cfg.flavor,
                                         affinityDatabase=self.db))
             if toFindNoDb:
+                log.debug("looking up troves w/o database affinity")
                 results.update(self.repos.findTroves(
                                            self.cfg.installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
@@ -979,8 +1009,10 @@ class ClientUpdate:
                 raise UpdateError, "Relative update of %s specifies multiple " \
                             "troves for install" % troveName
 
-            newJob.update([ (x[0], oldTroveInfo, x[1:], isAbsolute) for x in 
-                                    resultList ])
+            newJobList = [ (x[0], oldTroveInfo, x[1:], isAbsolute) for x in 
+                                    resultList ]
+            newJob.update(newJobList)
+            log.debug("adding jobs %s", newJobList)
 
         # Items which are already installed shouldn't be installed again. We
         # want to track them though to ensure they aren't removed by some
@@ -997,6 +1029,7 @@ class ClientUpdate:
                         item[0], item[1].asString())
 
         oldItems.update(oldItems2)
+        log.debug("items already installed: %s", oldItems)
 
         changeSetList.update(removeJob)
         del newJob, removeJob, oldItems2, jobsFromChangeSetFiles
