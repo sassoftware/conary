@@ -30,6 +30,7 @@ from clone import ClientClone
 from update import ClientUpdate
 
 CloneError = clone.CloneError
+CloneIncomplete = clone.CloneIncomplete
 UpdateError = update.UpdateError
 NoNewTrovesError = update.NoNewTrovesError
 DependencyFailure = update.DependencyFailure
