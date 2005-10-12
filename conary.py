@@ -200,6 +200,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
     argDef["test"] = NO_PARAM
+    argDef["verbose"] = NO_PARAM
     argDef["version"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
 
@@ -227,7 +228,6 @@ def realMain(cfg, argv=sys.argv):
     if cfg.installLabelPath:
         cfg.installLabel = cfg.installLabelPath[0]
     
-
     cfg.initializeFlavors()
 
     profile = False
@@ -237,6 +237,10 @@ def realMain(cfg, argv=sys.argv):
 	prof.start()
 	profile = True
 	del argSet['profile']
+
+    if argSet.has_key('verbose'):
+	log.setVerbosity(log.DEBUG)
+        del argSet['verbose']
 
     if (len(otherArgs) < 2):
 	return usage()
