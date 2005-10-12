@@ -628,6 +628,7 @@ class Database:
                                   DBTroveFiles""")
                 changes = []
                 changedTroves = set()
+                msg = ''
                 for i, (instanceId, fileId, stream) in enumerate(cu):
                     i += 1
                     if i % 1000 == 0 or (i == total):
