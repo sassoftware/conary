@@ -1,5 +1,12 @@
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
+  * Added (undocumented) --verbose
+  * Added debug messages to conaryclient/update.py
+  * Cloning to the the same branch works (providing a good way of
+    reverting changes)
+  * Cloning now updates buildRequirements and loadedTroves in troveInfo
+    and enforces their consistency on the target branch
+  * Cloning groups is now supported
 
 Changes in 0.62.14:
   * The threading changes in .13 caused some error information to be lost.
