@@ -1474,9 +1474,14 @@ class SingleGroup:
         # build a list of the troves that we're checking so far
         troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
 
+        # set verbosity to WARNING to avoid the conflicting meaning of the 
+        # DEBUG flag in update code vs. cook code
+        log.setVerbosity(log.WARNING)
         updJob, suggMap = client.updateChangeSet(troves, recurse = True,
                                                  resolveDeps = True,
                                                  test = True)
+        log.setVerbosity(log.DEBUG)
+
         # restore config
         cfg.setValue('dbPath', oldDbPath)
         cfg.setValue('root', oldRoot)
