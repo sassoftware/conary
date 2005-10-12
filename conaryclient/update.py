@@ -962,7 +962,9 @@ class ClientUpdate:
                 assert(isinstance(newFlavorStr, deps.DependencySet))
                 newJob.add((troveName, oldTrove,
                             (newVersionStr, newFlavorStr), isAbsolute))
-                log.debug("set up job %s", newJob[-1])
+                # FIXME: find a way to keep people from committing broken
+                # code.  sets are not subscriptable.
+                # log.debug("set up job %s", newJob[-1])
             elif isinstance(newVersionStr, versions.Branch):
                 toFind[(troveName, newVersionStr.asString(),
                         newFlavorStr)] = oldTrove, isAbsolute
