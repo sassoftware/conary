@@ -14,6 +14,7 @@ Changes in 0.62.15:
   * If you update a trove foo locally to a new version on the same branch, and 
     then update the containing group to a new version on a different branch,
     conary will now update foo to the new branch as well. 
+  * fix error message when you try to pin as non-root
 
 Changes in 0.62.14:
   * The threading changes in .13 caused some error information to be lost.
