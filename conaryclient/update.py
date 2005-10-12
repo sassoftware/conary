@@ -733,7 +733,7 @@ class ClientUpdate:
                                                (None, None), False),
                                           ignorePin and isPinned, oldIsPinned))
                     else:
-                        if oldVersion is None and job[1][0] is None:
+                        if oldVersion is None:
                             # this is absolute if the original job for the
                             # parents was absolute. primaries will have
                             # been rooted by now though, so look in the 
@@ -741,7 +741,7 @@ class ClientUpdate:
                             if isAbsolute:
                                 makeAbs = True
                             else:
-                                absJob = (job[0], job[1], job[2], True)
+                                absJob = (job[0], (None, None), job[2], True)
                                 makeAbs = absJob in primaryJobList
                         else:
                             makeAbs = False
