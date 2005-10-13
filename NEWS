@@ -4,9 +4,7 @@ Changes in 0.62.16:
   * The --info output for "conary erase" and "conary update" has been
     reworked to be more user friendly.
   * Added new conaryrc option signatureKeyMap to choose which signature
-    to use when signing based on the buildLabel.  Later signatureKeyMap
-    entries override earlier ones, so (for example) ~/.conaryrc entries
-    will override entries in /etc/conaryrc.
+    to use when signing based on the label.
   * Fixed a bug where conary would only sign the last trove listed,
     instead of signing all troves listed.
 
