@@ -191,10 +191,9 @@ class ConfigFile:
                 self.__dict__[key] = []
             label = val.split()[0]
             fingerprint = ''.join(val.split()[1:])
-            if fingerprint == '':
+            if fingerprint in ('', 'None'):
                 fingerprint = None
-            # insert at the beginning of the list so that later keys override
-            self.__dict__[key].insert(0, (label, fingerprint))
+            self.__dict__[key].append((label, fingerprint))
 
     def displayKey(self, key, value, type, out):
         if type in (INT,STRING):
