@@ -40,6 +40,7 @@ import trove
 import updatecmd
 from lib import util
 import versions
+from conarycfg import selectSignatureKey
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
@@ -530,10 +531,11 @@ def commit(repos, cfg, message, callback=None):
 	return
 
     newState.changeChangeLog(cl)
-    if cfg.signatureKey is not None:
+    signatureKey = selectSignatureKey(cfg, newState.getBranch().label().asString())
+    if signatureKey is not None:
         # skip integrity checks since we just want to compute the
         # new sha1 with all our changes accounted for
-        newState.addDigitalSignature(cfg.signatureKey,
+        newState.addDigitalSignature(signatureKey,
                                      skipIntegrityChecks=True)
 
     if not srcPkg:

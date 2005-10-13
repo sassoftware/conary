@@ -890,7 +890,7 @@ def _createPackageChangeSet(repos, cfg, bldList, recipeObj, sourceVersion,
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
 
-    signatureKey = selectSignatureKey(cfg, targetVersion.branch().label())
+    signatureKey = selectSignatureKey(cfg, targetVersion.branch().label().asString())
     if signatureKey:
         signAbsoluteChangeset(changeSet, signatureKey)
 
