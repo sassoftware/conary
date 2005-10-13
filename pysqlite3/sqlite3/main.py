@@ -169,8 +169,8 @@ class Cursor:
         # hashes are named parameters
         elif isinstance(parms, dict):
             for pkey, pval in parms.iteritems():
-                if pkey[0] is not ":":
-                    pkey = ":" + pkey
+                if pkey in _nobind: continue
+                if pkey[0] is not ":": pkey = ":" + pkey
                 self.stmt.bind(pkey, pval)
         else:
             raise _sqlite.ProgrammingError, \
