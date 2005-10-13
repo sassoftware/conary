@@ -3,6 +3,10 @@ Changes in 0.62.16:
     taking as runs (similar to --info output).
   * The --info output for "conary erase" and "conary update" has been
     reworked to be more user friendly.
+  * Added new conaryrc option signatureKeyMap to choose which signature
+    to use when signing based on the buildLabel.
+  * Fixed a bug where conary would only sign the last trove listed,
+    instead of signing all troves listed.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
