@@ -45,6 +45,7 @@ import trove
 from conaryclient.cmdline import parseTroveSpec
 import versions
 from nextversion import nextVersion
+from conarycfg import selectSignatureKey
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -619,11 +620,10 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     (bldList, recipeObj, builddir, destdir) = result
     
     # 2. convert the package into a changeset ready for committal
-    changeSet, built = _createPackageChangeSet(repos, bldList, recipeObj,
-                                               sourceVersion, 
-                                               targetLabel=targetLabel, 
-                                               alwaysBumpCount=alwaysBumpCount,
-                                               signatureKey=cfg.signatureKey)
+    changeSet, built = _createPackageChangeSet(repos, cfg, bldList, recipeObj,
+                           sourceVersion,
+                           targetLabel=targetLabel,
+                           alwaysBumpCount=alwaysBumpCount)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
@@ -767,9 +767,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
     return bldList, recipeObj, builddir, destdir
 
-def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
-                            targetLabel=None, alwaysBumpCount=False,
-                            signatureKey=None):
+def _createPackageChangeSet(repos, cfg, bldList, recipeObj, sourceVersion,
+                            targetLabel=None, alwaysBumpCount=False):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
         components created by cooking a package recipe.  RecipeObj is
@@ -891,6 +890,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
 
+    signatureKey = selectSignatureKey(cfg, targetVersion.branch().label())
     if signatureKey:
         signAbsoluteChangeset(changeSet, signatureKey)
 

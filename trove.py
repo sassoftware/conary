@@ -511,7 +511,7 @@ class Trove(streams.LargeStreamSet):
             maxTrust = max(lev,maxTrust)
 
         if len(badFingerprints):
-            raise DigitalSignatureVerificationError("The following keys have bad digital signatures: %s" % (' '.join(badFingerprints)))
+            raise DigitalSignatureVerificationError("Trove signatures made by the following keys are bad: %s" % (' '.join(badFingerprints)))
 
         if maxTrust < threshold:
             raise DigitalSignatureVerificationError("This trove does not meet minimum trust level")

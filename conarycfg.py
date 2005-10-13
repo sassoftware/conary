@@ -29,21 +29,22 @@ from lib import log,util
 import versions
 
 
-(STRING, 
-    BOOL, 
-    LABEL, 
+(STRING,
+    BOOL,
+    LABEL,
     LABELLIST,
-    STRINGDICT, 
-    STRINGLIST, 
-    CALLBACK, 
-    EXEC, 
-    STRINGPATH, 
+    STRINGDICT,
+    STRINGLIST,
+    CALLBACK,
+    EXEC,
+    STRINGPATH,
     FLAVOR,
     INT,
     REGEXPLIST,
-    FLAVORLIST, 
-    FINGERPRINT, 
-) = range(14)
+    FLAVORLIST,
+    FINGERPRINT,
+    FINGERPRINT_MAP,
+) = range(15)
 
 BOOLEAN=BOOL
 
@@ -180,7 +181,20 @@ class ConfigFile:
         elif type == FLAVORLIST:
             self.__dict__[key].append(deps.deps.parseFlavor(val))
         elif type == FINGERPRINT:
-            self.__dict__[key] = val.replace(' ', '')
+            self.__dict__['signatureKeyMap'] = None
+            if val in ('', 'None'):
+                self.__dict__[key] = None
+            else:
+                self.__dict__[key] = val.replace(' ', '')
+        elif type == FINGERPRINT_MAP:
+            if self.__dict__[key] is None:
+                self.__dict__[key] = []
+            label =val.split()[0]
+            fingerprint = ''.join(val.split()[1:])
+            if fingerprint in ('', 'None'):
+                self.__dict__[key].append((label, None))
+            else:
+                self.__dict__[key].append((label, fingerprint))
 
     def displayKey(self, key, value, type, out):
         if type in (INT,STRING):
@@ -225,6 +239,12 @@ class ConfigFile:
             out.write("%-25s %s\n" % (key, bool(value)))
         elif type == FINGERPRINT:
             out.write("%-25s %s\n" % (key, value))
+        elif type == FINGERPRINT_MAP:
+            if value:
+                for label, fingerprint in value:
+                    out.write("%-25s %-25s %s\n" % (key, label, fingerprint))
+            else:
+                out.write("%-25s None\n" %key)
         else:
             out.write("%-25s (unknown type)\n" % (key))
 
@@ -338,6 +358,7 @@ class ConaryConfiguration(ConfigFile):
         'quiet'                 : [ BOOL, False ],
         'signatureKey'          : [ FINGERPRINT, None],
         'trustThreshold'        : [ INT, 0],
+        'signatureKeyMap'       : [ FINGERPRINT_MAP, None],
     }
 
     def __init__(self, readConfigFiles=True):
@@ -423,3 +444,12 @@ class ParseError(ConaryCfgError):
 
     def __init__(self, str):
 	self.str = str
+
+def selectSignatureKey(cfg, label):
+    if not cfg.signatureKeyMap:
+        return cfg.signatureKey
+    for sigLabel, fingerprint in cfg.signatureKeyMap:
+        if re.match(sigLabel, label):
+            return fingerprint
+    return cfg.signatureKey
+
