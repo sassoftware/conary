@@ -189,12 +189,12 @@ class ConfigFile:
         elif type == FINGERPRINT_MAP:
             if self.__dict__[key] is None:
                 self.__dict__[key] = []
-            label =val.split()[0]
+            label = val.split()[0]
             fingerprint = ''.join(val.split()[1:])
-            if fingerprint in ('', 'None'):
-                self.__dict__[key].append((label, None))
-            else:
-                self.__dict__[key].append((label, fingerprint))
+            if fingerprint == '':
+                fingerprint = None
+            # insert at the beginning of the list so that later keys override
+            self.__dict__[key].insert(0, (label, fingerprint))
 
     def displayKey(self, key, value, type, out):
         if type in (INT,STRING):
