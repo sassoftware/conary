@@ -459,6 +459,32 @@ Multiple maps can be given for a single label. (If no mapping is found,
 The path to install files into, normally \fI/\fR.
 Can be overridden by the \fB\-\-root \fI<root>\fR command-line option.
 .TP
+.B signatureKey
+Specifies the OpenPGP Key from a local keyring to be used when generating trove
+signatures. \fBNOTE:\fR When this option is processed, it clears all entries in
+signatureKeyMap. This has to happen for multiple reasons. This is the only way
+that specifying \fB\-\-signature\-key\fR on the command line can work correctly.
+It's also a convenient workaround for the fact that successive signatureKeyMap
+entries are cumulative, which means that if signatureKey didn't clear the
+signatureKeyMap, there would be no mechanism to override signatureKeyMap
+entries specified in previously processed config files. This also means that if
+both signatureKey and signatureKeyMap are used in the same config file
+signatureKey should be specified \fBbefore\fR any signatureKeyMap lines. You
+can think of signatureKey as a default signatureKeyMap to be used if no
+signatureKeyMap regexes match. (see below) This setting defaults to None.
+.TP
+.B signatureKeyMap
+Provides a mechanism to map an OpenPGP Key from a local keyring to a
+repository. the arguments that follow are a pair of regex and fingerprint.
+Multiple signatureKeyMap lines can be present and will be processed in order.
+When a trove signature is to be generated, the signatureKeyMap is checked, the
+\fBFIRST\fR regex that matches will determine which OpenPGP Key will be used.
+If no regexes match, signatureKey will be used (though it might have it's
+default setting of None). It is a GOOD idea to specify a signatureKey line
+before specifying any signatureKeyMap lines if you use them--unless you really
+meant to NOT override signatureKeyMap lines specified in a previously processed
+config file!
+.TP
 .B updateThreshold
 Defines the upper limit on the number of unrelated troves that will be
 downloaded at one time from the repository.  Setting updateThreshold to a 

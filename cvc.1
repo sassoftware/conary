@@ -1,5 +1,5 @@
 .\" Copyright (c) 2004-2005 rPath, Inc.
-.TH CVC 1 "21 February 2005" "rPath, Inc."
+.TH CVC 1 "12 October 2005" "rPath, Inc."
 .SH NAME
 cvc \- Conary source management
 .SH SYNOPSIS
@@ -25,10 +25,10 @@ source directory are created with the \fBcvc newpkg\fP subcommand.
 Then the contents of the source directory are modified with other
 subcommands, and the changes to the source component are then
 committed to the repository with the \fBcvc commit\fP subcommand.
-Only the \fBcvc commit\fP command modifies the repository; the
-rest of the commands either query the repository for information
-about a source package or schedule a change to be applied to the
-repository by the next \fBcvc commit\fP command.
+Only the \fBcvc commit\fP and \fBcvc sign\fP commands modify the repository; 
+the rest of the commands either query the repository for information about a 
+source package or schedule a change to be applied to the repository by the next 
+\fBcvc commit\fP command.
 .PP
 The default branch on which each of these commands operates
 is specified by the \fBbuildLabel\fP configuration entry
@@ -53,6 +53,9 @@ modify, and cook source components:
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-no-deps] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-signature-key <fingerprint>|None] \e
 .PD 0
 .TP
 .B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>[=<version>]...
@@ -107,7 +110,14 @@ This can be useful for rerunning policy for a complete build using
 The \-\-no-deps option prevents conary from raising an error 
 if a component or package listed as a build requirement for the package
 is not installed on the build system.
-.IP 
+.IP
+If \-\-signature\-key is specified, the OpenPGP key in the local keyring with 
+that fingerprint will be used to create trove signatures for all troves created 
+during the cook. The repository must recognize the OpenPGP key that made the 
+trove signature or the respective troves will be rejected. If 
+\-\-signature\-key None is specified, generation of trove signatures will be 
+disabled.
+.IP
 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
@@ -190,9 +200,48 @@ If \fB-\-binary-only\fR is specified, no source troves are shadowed.
 The shadow command works just like the branch command, except that
 it creates a shadow instead of a branch.
 .TP
+.B sign [\fR\-\-signature\-key <fingerprint>\fB] 
+[\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Signs the specified troves in their respective repositories. If 
+\fB-\-signature\-key\fR is specified, it will override all signatureKey and 
+signatureKeyMap settings specified in config files. The repositories affected 
+must recognize the OpenPGP key(s) that made the trove signature(s) or the 
+respective signatures will be rejected.
+.TP
 .B update [\fI<version>\fP]
 Updates the current source directory to the latest version, or to
 \fI<version>\fP if specified.  Merges changes when possible.
+.RE
+.\"
+.\"
+.\"
+.SH TROVE SIGNATURES
+.TP 4
+.B Discussion
+.br
+cvc is able to generate trove signatures. in all cases <fingerprint> refers to 
+the fingerprint of an OpenPGP key from the local keyring. (generally ~/.gnupg). 
+When a signature is generated and submitted to a repository, the repository 
+verifies the signature. If the signature is bad, or the repository doesn't know 
+about the OpenPGP Key that made that signature, the repository will remain 
+unachaged. Aka, a signature failure on cook will result in the trove not being 
+uploaded to the repository, whereas a failure on sign will not affect the trove 
+on the repository, whether or not that trove already had signatures associated 
+with it. The OpenPGP key that will be used can be specified on the command line 
+or in a config file. see conary(1) for a discussion on the appropriate settings.
+.TP 4
+.B Fingerprints
+.br
+Fingerprints can have spaces in them. Valid OpenPGP key ids can also be used in
+place of the full fingerprint. For example:
+.br
+\ \ \ \ AAFF BBCC DDEE 1122
+.br
+\ \ \ \ 1234 5678 9ABC DEF0 1212 3344 AAFF BBCC DDEE 1122
+.br
+\ \ \ \ 123456789ABCDEF012123344AAFFBBCCDDEE1122
+.br
+All refer to the exact same OpenPGP Key
 .RE
 .\"
 .\"
