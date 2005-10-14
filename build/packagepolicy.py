@@ -1517,7 +1517,7 @@ class ComponentRequires(policy.Policy):
     def __init__(self, *args, **keywords):
         self.depMap = {
             # component: components that require it if they both exist
-            'data': frozenset(('lib', 'runtime')),
+            'data': frozenset(('lib', 'runtime', 'devellib')),
             'devellib': frozenset(('devel',)),
             'lib': frozenset(('devel', 'devellib', 'runtime')),
             # while config is not an automatic component, its meaning

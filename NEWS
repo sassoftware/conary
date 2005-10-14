@@ -7,6 +7,8 @@ Changes in 0.62.16:
     to use when signing based on the label.
   * Fixed a bug where conary would only sign the last trove listed,
     instead of signing all troves listed.
+  * The ComponentRequires policy now makes :devellib components require
+    :data components if they exist.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
