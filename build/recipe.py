@@ -1479,7 +1479,8 @@ class SingleGroup:
         log.setVerbosity(log.WARNING)
         updJob, suggMap = client.updateChangeSet(troves, recurse = True,
                                                  resolveDeps = True,
-                                                 test = True)
+                                                 test = True,
+                                                 checkBucketConflicts=False)
         log.setVerbosity(log.DEBUG)
 
         # restore config
