@@ -27,11 +27,13 @@ class ProfileStat(gobject.GObject):
     tt = 0.0
     ct = 0.0
     callers = None
+    callees = None
 gobject.type_register(ProfileStat)
 
 class Caller(gobject.GObject):
     func = None
     nc = 0
+    tt = 0
 gobject.type_register(Caller)
 
 def compare(a, b):
@@ -146,6 +148,7 @@ class StatWindow(gtk.Window):
 
         self.funcselection = self.funcview.get_selection()
         self.funcselection.connect("changed", self.display_callers)
+        self.funcview.connect("key_press_event", self.button_press)
 
         cols = (('Num calls', set_num_calls, sort_num_calls),
                 ('Total Time', set_t_time, sort_t_time),
@@ -164,25 +167,33 @@ class StatWindow(gtk.Window):
         pane.pack1(sw, True, False)
 
         self.callerstore = gtk.ListStore(Caller)
-        callerview = gtk.TreeView(self.callerstore)
+        self.callerview = gtk.TreeView(self.callerstore)
 
-        selection = callerview.get_selection()
+        selection = self.callerview.get_selection()
         selection.connect("changed", self.display_function)
 
         cols = (('Num calls', set_num_caller_calls, sort_num_calls),
-                ('Function', set_func, sort_func))
-        setup_tree_view(callerview, self.callerstore, cols)
+                ('Total time', set_t_time, sort_t_time),
+                ('Parent function', set_func, sort_func))
+        setup_tree_view(self.callerview, self.callerstore, cols)
         # set to number of calls, decending
         self.callerstore.set_sort_column_id(0, gtk.SORT_DESCENDING)
         
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(-1, 150)
-        sw.add(callerview)
+        sw.add(self.callerview)
         pane.pack2(sw, False, True)
         
         self.add(pane)
 
+    def button_press(self, obj, event):
+        selection = obj.get_selection()
+        if event.keyval == ord('c'):
+           self.display_children(selection)
+        elif event.keyval == ord('p'):
+           self.display_callers(selection)
+            
     def display_callers(self, selection):
         model, iter = selection.get_selected()
         if not iter:
@@ -193,8 +204,25 @@ class StatWindow(gtk.Window):
             caller = Caller()
             caller.func = func
             caller. nc = nc
+            caller. tt = stats.stats[func][2]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
+            self.callerview.get_column(2).set_title('Parent function')
+
+    def display_children(self, selection):
+        model, iter = selection.get_selected()
+        if not iter:
+            return
+        info = model.get_value(iter, 0)
+        self.callerstore.clear()
+        for func, nc in info.callees.iteritems():
+            caller = Caller()
+            caller.func = func
+            caller. nc = nc
+            caller. tt = stats.stats[func][2]
+            iter = self.callerstore.append()
+            self.callerstore.set(iter, 0, caller)
+            self.callerview.get_column(2).set_title('Child function')
 
     def display_function(self, selection):
         model, iter = selection.get_selected()
@@ -215,6 +243,13 @@ class StatWindow(gtk.Window):
             iter = self.funcstore.iter_next(iter)
         
     def populate(self, stats):
+        callees = {}
+        for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
+            callees.setdefault(func, {})
+            for caller, num in callers.iteritems():
+                d = callees.setdefault(caller, {})
+                d[func] = num
+
         for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
             stat = ProfileStat()
             stat.func = func
@@ -223,6 +258,7 @@ class StatWindow(gtk.Window):
             stat.tt = tt
             stat.ct = ct
             stat.callers = callers
+            stat.callees = callees[func]
             iter = self.funcstore.append()
             self.funcstore.set(iter, 0, stat)
 
