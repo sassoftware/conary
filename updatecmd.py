@@ -81,8 +81,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     def updateDone(self):
         self.lock.acquire()
-        self._message('Done.')
-        self._message('\n')
+        self._message('')
         self.updateText = None
         self.lock.release()
 
