@@ -9,9 +9,13 @@ Changes in 0.62.16:
     instead of signing all troves listed.
   * The ComponentRequires policy now makes :devellib components require
     :data components if they exist.
-  * Don't check for bucket conflicts when resolving - if we want to 
-    check for bucket conflicts in groups, it will be readded in a more 
+  * Don't check for bucket conflicts when resolving during group cooks - if we
+    want to check for bucket conflicts in groups, it will be readded in a more
     general way.
+  * Removed extra freezes and thaws of files for a 8% improvement in install
+    time for absolute change sets (at the cost of some memory, but thanks
+    to splitting transactions this should be a good trade off)
+  * Added removeIfExist call to miscmodule for some peformance improvement
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.

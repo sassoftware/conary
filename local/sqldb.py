@@ -1084,15 +1084,19 @@ order by
                 """ % flavorStr, instanceId, byDefault, name,
                         newVersion.asString())
 
-    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
+    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
+                fileStream = None):
 	(cu, troveInstanceId, addFileStmt) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
 	if fileObj:
+            if fileStream is None:
+                fileStream = fileObj.freeze()
+
 	    self.troveFiles.addItem(cu, fileObj.pathId(), 
                                     versionId, path, 
                                     fileId, troveInstanceId, 
-                                    fileObj.freeze(), fileObj.tags,
+                                    fileStream, fileObj.tags,
                                     addItemStmt = addFileStmt)
 	else:
 	    cu.execute("""

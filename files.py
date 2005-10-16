@@ -375,8 +375,7 @@ class SymbolicLink(File):
 	return "%8d" % len(self.target())
 
     def restore(self, fileContents, root, target, journal=None):
-	if os.path.exists(target) or os.path.islink(target):
-	    os.unlink(target)
+        util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.target(), target)
         # utime() follows symlinks and Linux currently does not implement
@@ -390,8 +389,7 @@ class Socket(File):
     _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
-	if os.path.exists(target) or os.path.islink(target):
-	    os.unlink(target)
+        util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
@@ -405,8 +403,7 @@ class NamedPipe(File):
     _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
-	if os.path.exists(target) or os.path.islink(target):
-	    os.unlink(target)
+        util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
 	File.restore(self, root, target, journal=journal)
@@ -437,8 +434,7 @@ class DeviceFile(File):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
     def restore(self, fileContents, root, target, journal=None):
-	if os.path.exists(target) or os.path.islink(target):
-	    os.unlink(target)
+        util.removeIfExists(target)
 
         if not journal and os.getuid(): return
 

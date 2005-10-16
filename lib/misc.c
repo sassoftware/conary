@@ -16,13 +16,23 @@
 
 #include <Python.h>
 
+#include <errno.h>
 #include <malloc.h>
+#include <sys/stat.h>
 
+static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
+static PyObject * removeIfExists(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
+    { "exists", exists, METH_VARARGS,
+        "returns a boolean reflecting whether a file (even a broken symlink) "
+        "exists in the filesystem" },
     { "malloced", malloced, METH_VARARGS, 
-	"amount of memory currently allocated through malloc()" }
+	"amount of memory currently allocated through malloc()" },
+    { "removeIfExists", removeIfExists, METH_VARARGS, 
+	"unlinks a file if it exists; silently fails if it does not exist. "
+	"returns a boolean indicating whether or not a file was removed" }
 };
 
 static PyObject * malloced(PyObject *self, PyObject *args) {
@@ -32,6 +42,47 @@ static PyObject * malloced(PyObject *self, PyObject *args) {
 
     /* worked */
     return Py_BuildValue("i", ma.uordblks);
+}
+
+static PyObject * exists(PyObject *self, PyObject *args) {
+    char * fn;
+    struct stat sb;
+
+    if (!PyArg_ParseTuple(args, "s", &fn))
+        return NULL;
+
+    if (lstat(fn, &sb)) {
+        if (errno == ENOENT) {
+            Py_INCREF(Py_False);
+            return Py_False;
+        }
+
+        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
+        return NULL;
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
+}
+
+static PyObject * removeIfExists(PyObject *self, PyObject *args) {
+    char * fn;
+
+    if (!PyArg_ParseTuple(args, "s", &fn))
+        return NULL;
+
+    if (unlink(fn)) {
+        if (errno == ENOENT) {
+            Py_INCREF(Py_False);
+            return Py_False;
+        }
+
+        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
+        return NULL;
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
 }
 
 PyMODINIT_FUNC

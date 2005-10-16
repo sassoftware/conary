@@ -83,10 +83,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return file
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
-	# don't add duplicates to this repository
-	#if not self.troveStore.hasFile(fileObj.pathId(), fileVersion):
-	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId, fileVersion)
+    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId, 
+                       fileVersion, fileStream = None):
+	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId, 
+                                fileVersion, fileStream = None)
 
     ###
 

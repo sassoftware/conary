@@ -685,14 +685,16 @@ class TroveStore:
 	    else:
 		yield (pathId, path, fileId, version)
 
-    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
+    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
+                fileStream = None):
 	cu = troveInfo[0]
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
 	if fileObj:
-	    stream = fileObj.freeze()
+            if fileStream is None:
+                fileStream = fileObj.freeze()
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)", 
-		       (pathId, versionId, fileId, stream, path))
+		       (pathId, versionId, fileId, fileStream, path))
 	else:
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)", 
 		       (pathId, versionId, fileId, path))

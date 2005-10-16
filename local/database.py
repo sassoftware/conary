@@ -272,8 +272,10 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
     def iterFilesWithTag(self, tag):
 	return self.db.iterFilesWithTag(tag)
 
-    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
-	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
+    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version,
+                       fileStream = None):
+	self.db.addFile(troveId, pathId, fileObj, path, fileId, version,
+                        fileStream = fileStream)
 
     def addTrove(self, trove, pin = False):
 	return self.db.addTrove(trove, pin = pin)

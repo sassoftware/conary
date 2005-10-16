@@ -18,6 +18,7 @@ import bz2
 import epdb
 import errno
 import log
+import misc
 import os
 import select
 import shutil
@@ -523,3 +524,6 @@ class BZ2File:
                 return rc
             # read some more data and try to get enough uncompressed
             # data to return
+
+exists = misc.exists
+removeIfExists = misc.removeIfExists

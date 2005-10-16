@@ -63,9 +63,9 @@ class FilesystemJob:
         self.linkGroups[linkGroup] = target
 
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
-	self.restores.append((fileObj.pathId(), fileObj.freeze(), target, 
+	self.restores.append((fileObj.pathId(), fileObj, target, 
                               contentsOverride, msg))
-        if fileObj and fileObj.hasContents:
+        if fileObj.hasContents:
             self.restoreSize += fileObj.contents.size()
 
 	for tag in fileObj.tags:
@@ -261,8 +261,6 @@ class FilesystemJob:
 	    # contents from the change set or from the database". If we 
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
-	    fileObj = files.ThawFile(fileObj, pathId)
-
             if fileObj.hasContents:
                 callback.restoreFiles(fileObj.contents.size(), 
                                       self.restoreSize)

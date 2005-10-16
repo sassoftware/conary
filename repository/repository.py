@@ -461,11 +461,13 @@ class ChangeSetJob:
                 if fileHostFilter and \
                  newVersion.branch().label().getHost() not in fileHostFilter:
                     fileObj = None
+                    fileStream = None
 		elif tuple is None or (oldVersion == newVersion and
                                        oldFileId == fileId):
 		    # the file didn't change between versions; we can just
 		    # ignore it
 		    fileObj = None
+                    fileStream = None
 		else:
 		    diff = cs.getFileChange(oldFileId, fileId)
                     if diff is None:
@@ -475,6 +477,7 @@ class ChangeSetJob:
                         # is empty though, keeping this skip from occuring
                         # on databases
                         fileObj = None
+                        fileStream = None
                         if not fileHostFilter:
                             raise KeyError
                     else:
@@ -483,13 +486,14 @@ class ChangeSetJob:
                             oldfile = repos.getFileVersion(pathId, oldFileId,
                                                            oldVersion)
                             if diff[0] == "\x01":
-                                # stored as a diff (so the file type didn't
-                                # change)
+                                # stored as a diff (the file type is the same)
                                 fileObj = oldfile.copy()
                                 fileObj.twm(diff, oldfile)
                                 assert(fileObj.pathId() == pathId)
+                                fileStream = fileObj.freeze()
                             else:
                                 fileObj = files.ThawFile(diff, pathId)
+                                fileStream = diff
 
                             if fileObj.hasContents and oldfile.hasContents and \
                                fileObj.contents.sha1() == oldfile.contents.sha1() and \
@@ -498,13 +502,15 @@ class ChangeSetJob:
                                 restoreContents = 0
                         else:
                             fileObj = files.ThawFile(diff, pathId)
+                            fileStream = diff
                             oldfile = None
 
                 if fileObj and fileObj.fileId() != fileId:
                     raise trove.TroveIntegrityError, \
                           "fileObj.fileId() != fileId in changeset"
                 self.repos.addFileVersion(troveInfo, pathId, fileObj, path, 
-                                          fileId, newVersion)
+                                          fileId, newVersion, 
+                                          fileStream = fileStream)
 
 		# files with contents need to be tracked so we can stick
 		# there contents in the archive "soon"; config files need
