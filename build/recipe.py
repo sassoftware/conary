@@ -1310,6 +1310,8 @@ class CPackageRecipe(BuildPackageRecipe):
         'glibc:lib',
         'glibc:devellib',
         'glibc:devel',
+        'libgcc:lib',
+        'libgcc:devellib',
         'debugedit:runtime',
         'elfutils:runtime',
     ]
