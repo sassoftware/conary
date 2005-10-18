@@ -24,6 +24,9 @@ Changes in 0.62.16:
   * The LinkCount policy now enforces the requirement that hardlink groups
     contain only files in the same directory as each other; no hardlinks
     between files in different directories are allowed.
+  * When updating a group across branches, if a subtrove within the update has 
+    already been manually moved to the new branch by the user, conary will 
+    recognize this and sync that trove with the group
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.

@@ -732,6 +732,12 @@ class Trove(streams.LargeStreamSet):
 
         # build an index to the secondary job set
         secondaryIndex = {}
+
+        # track secondary jobs that switch branches -- we may want to find
+        # a match on the local system that is not linked into the
+        # containing trove on the local system (because the local trove
+        # switched branches too)
+        unusedBranchJobs = set()
         for job in secondaryJob:
             (name, oldInfo, newInfo, byDefault) = job
             assert((name, (oldInfo[0], oldInfo[1])) not in secondaryIndex)
@@ -740,6 +746,9 @@ class Trove(streams.LargeStreamSet):
                 secondaryIndex[(name, oldInfo)] = job
             if newInfo[0]:
                 secondaryIndex[(name, newInfo)] = job
+                if oldInfo[0] and oldInfo[0].branch() != newInfo[0].branch():
+                    unusedBranchJobs.add((name, newInfo[0], newInfo[1]))
+
 
         primaryRemoveList = []
         for job in primaryJob:
@@ -810,6 +819,7 @@ class Trove(streams.LargeStreamSet):
 
             if not keepPrimary:
                 primaryRemoveList.append(job)
+                unusedBranchJobs.discard((job[0], job[2][0], job[2][1]))
 
             if not keepSecondary:
                 if oldOverlap is not None:
@@ -825,9 +835,16 @@ class Trove(streams.LargeStreamSet):
         for job in primaryRemoveList:
             primaryJob.remove(job)
 
+
         applyJob(primaryJob)
         applyJob(secondaryJob, skipNotByDefault = True,
                  excludeTroves = excludeTroveList)
+
+        for name, oldInfo, newInfo, byDefault in secondaryJob:
+            if byDefault:
+                unusedBranchJobs.discard((job[0], job[2][0], job[2][1]))
+
+        return unusedBranchJobs
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False):

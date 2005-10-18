@@ -596,6 +596,7 @@ class ClientUpdate:
 
         referencedTroves = set()
 
+        orphanedBranchJobs = set()
         while jobQueue:
             log.debug("examing job %s", jobQueue[-1])
             job, ignorePin, isPinned = jobQueue.pop()
@@ -639,6 +640,7 @@ class ClientUpdate:
                                                     withFiles = False)
 
             log.debug("merging trove into current diff")
+
             if newVersion is None:
                 # handle erase recursion
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
@@ -657,8 +659,10 @@ class ClientUpdate:
                 # to understand any of this.
                 (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
                 newTrv = pristineTrv.copy()
-                newTrv.mergeCollections(localTrv, newPristine, 
-                                        self.cfg.excludeTroves)
+                orphaned = newTrv.mergeCollections(localTrv, 
+                                                   newPristine, 
+                                                   self.cfg.excludeTroves)
+                orphanedBranchJobs.update(obj)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
                 del finalTrvCs, localTrv, fileList, newPristine
             else:
@@ -667,8 +671,10 @@ class ClientUpdate:
                 localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                             pristine = False)
                 newTrv = oldTrv.copy()
-                newTrv.mergeCollections(localTrv, newPristine, 
-                                        self.cfg.excludeTroves)
+                orphaned = newTrv.mergeCollections(localTrv, 
+                                                   newPristine, 
+                                                   self.cfg.excludeTroves)
+                orphanedBranchJobs.update(orphaned)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
                 del finalTrvCs, localTrv, fileList, newPristine
 
@@ -785,6 +791,7 @@ class ClientUpdate:
         _removeDuplicateErasures(newJob)
 
         absJob = [ x for x in newJob if x[3] is True ]
+        absJob.extend((x[0], (None, None), x[1:]) for x in orphanedBranchJobs)
         if absJob:
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
@@ -795,9 +802,23 @@ class ClientUpdate:
                 [ (x[0], x[2][0], x[2][1]) for x in absJob ],
                 ineligible = removeSet | ineligible | referencedTroves | 
                              redirects)
-            newJob = newJob - set(absJob)
 
             newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
+
+            # an orphaned branch job is an update of a trove referenced in
+            # a collection that traversed across branches and was dropped 
+            # because it looked like the local system erased the trove It's
+            # possible that the trove might have just switched branches instead 
+            # of being deleted, so we check to see if it switched to the target
+            # branch, in which case we use that as the old trove to update.
+
+            # orphaned branch jobs are only valid if you find a 
+            # local trove on the target branch that can be matched to it -
+            # not as a fresh install
+            newTroves = [x for x in newTroves if x not in orphanedBranchJobs] 
+
+            newJob = newJob - set(absJob)
+
             replacedTroves = [ (x[0], x[1]) for x in outdated.iteritems()
                                if x[1][1] is not None ]
 
