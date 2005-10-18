@@ -662,7 +662,7 @@ class ClientUpdate:
                 orphaned = newTrv.mergeCollections(localTrv, 
                                                    newPristine, 
                                                    self.cfg.excludeTroves)
-                orphanedBranchJobs.update(obj)
+                orphanedBranchJobs.update(orphaned)
                 finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
                 del finalTrvCs, localTrv, fileList, newPristine
             else:
