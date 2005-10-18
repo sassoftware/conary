@@ -700,9 +700,10 @@ class SharedLibrary(policy.Policy):
             d = {'subtrees': keywords['subtrees']}
             self.recipe.ExecutableLibraries(**d)
             self.recipe.CheckSonames(**d)
-            # Provides needs a different limitation...
+            # Provides and Requires need a different limitation...
             d = {'sonameSubtrees': keywords['subtrees']}
             self.recipe.Provides(**d)
+            self.recipe.Requires(**d)
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
@@ -1651,8 +1652,8 @@ class Provides(_BuildPackagePolicy):
 	if args:
 	    for filespec in args[1:]:
 		self.provisions.append((filespec, args[0]))
-        if 'sonameSubtrees' in keywords:
-            sonameSubtrees = keywords.pop('sonameSubtrees')
+        sonameSubtrees = keywords.pop('sonameSubtrees', None)
+        if sonameSubtrees:
             if type(sonameSubtrees) in (list, tuple):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
@@ -1834,11 +1835,21 @@ class Requires(_addInfo, _BuildPackagePolicy):
     monodisPath = None
     _privateDepMap = {}
 
+    def __init__(self, *args, **keywords):
+        self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        policy.Policy.__init__(self, *args, **keywords)
+
     def updateArgs(self, *args, **keywords):
         # _privateDepMap is used only for Provides to talk to Requires
         privateDepMap = keywords.pop('_privateDepMap', None)
         if privateDepMap:
             self._privateDepMap.update([privateDepMap])
+        sonameSubtrees = keywords.pop('sonameSubtrees', None)
+        if sonameSubtrees:
+            if type(sonameSubtrees) in (list, tuple):
+                self.sonameSubtrees.update(set(sonameSubtrees))
+            else:
+                self.sonameSubtrees.add(sonameSubtrees)
         _addInfo.updateArgs(self, *args, **keywords)
 
     def _ELFPathFixup(self, path, m, pkg):
@@ -1847,21 +1858,52 @@ class Requires(_addInfo, _BuildPackagePolicy):
         """
         # common case is no likely modification, so make that fastest
         found = False
+        rpath = False
         for depClass, dep in pkg.requiresMap[path].iterDeps():
             if dep.getName()[0] in self._privateDepMap:
                 found = True
+        if m and 'RPATH' in m.contents and m.contents['RPATH']:
+            rpath = m.contents['RPATH']
+            found = True
+
         if not found:
             return
+
+        # check for system paths in RPATH, prune them out
+        rpathList = []
+        if rpath:
+            rpathList = [ x for x in rpath.split(':')
+                          if x not in self.sonameSubtrees ]
+
+        def _findSonameInRpath(soname):
+            for path in rpathList:
+                destpath = '/'.join((self.macros.destdir, path, soname))
+                if util.exists(destpath):
+                    return path
+                destpath = '/'.join((path, soname))
+                if util.exists(destpath):
+                    return path
+            # didn't find anything
+            return None
 
         # found at least one potential replacement, do the real work
         depSet = deps.DependencySet()
         for depClass, dep in pkg.requiresMap[path].iterDeps():
             oldName = dep.getName()[0]
             if oldName in self._privateDepMap:
-                newprov = self._privateDepMap[oldName]
-                if set(dep.flags.keys()).issubset(set(newprov.flags.keys())):
+                # we assume that if it is both provided and required,
+                # we fix up the requirement to match the provision
+                provided = self._privateDepMap[oldName]
+                if set(dep.flags.keys()).issubset(set(provided.flags.keys())):
                     # we need the new name, but we need to keep the old flags
-                    dep = deps.Dependency(newprov.getName()[0], dep.flags)
+                    dep = deps.Dependency(provided.getName()[0], dep.flags)
+            elif '/' in oldName:
+                elfClass, soname = oldName.split('/', 1)
+                rpath = _findSonameInRpath(soname)
+                if rpath:
+                    # change the name to follow the rpath
+                    newName = '/'.join((elfClass, rpath, soname))
+                    dep = deps.Dependency(newName, dep.flags)
             depSet.addDep(depClass, dep)
         pkg.requiresMap[path] = depSet
 

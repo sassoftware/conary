@@ -16,6 +16,11 @@ Changes in 0.62.16:
     time for absolute change sets (at the cost of some memory, but thanks
     to splitting transactions this should be a good trade off)
   * Added removeIfExist call to miscmodule for some peformance improvement
+  * ELF files that find non-system libraries via an RPATH now have the path
+    to the library encoded in their dependency requirement, matching the 
+    path encoded in the dependency provision.  Before this, the RPATH
+    was ignored and the path encoding was only guessed within one source
+    package.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
