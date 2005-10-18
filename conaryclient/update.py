@@ -1381,6 +1381,7 @@ class ClientUpdate:
                         self.db.close()
                         tb = sys.exc_info()[2]
                         if tb:
+                            tb = traceback.format_tb(tb)
                             print >>sys.stderr, ''.join(tb)
                         # this will kill the download thread as well
                         os.kill(os.getpid(), 15)
