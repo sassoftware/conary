@@ -1,8 +1,8 @@
 Changes in 0.62.16:
-  * "conary update" and "conary erase" now displays the actions it is
-    taking as runs (similar to --info output).
+  * The "conary update" and "conary erase" commands now display the actions
+    they take as they run (similar to --info output).
   * The --info output for "conary erase" and "conary update" has been
-    reworked to be more user friendly.
+    reworked to be more user-friendly.
   * Added new conaryrc option signatureKeyMap to choose which signature
     to use when signing based on the label.
   * Fixed a bug where conary would only sign the last trove listed,
@@ -14,8 +14,8 @@ Changes in 0.62.16:
     general way.
   * Removed extra freezes and thaws of files for a 8% improvement in install
     time for absolute change sets (at the cost of some memory, but thanks
-    to splitting transactions this should be a good trade off)
-  * Added removeIfExist call to miscmodule for some peformance improvement
+    to splitting transactions this should be a good trade off).
+  * Added removeIfExist call to miscmodule for some peformance improvement.
   * ELF files that find non-system libraries via an RPATH now have the path
     to the library encoded in their dependency requirement, matching the 
     path encoded in the dependency provision.  Before this, the RPATH
