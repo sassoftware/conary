@@ -1482,7 +1482,7 @@ class SingleGroup:
         updJob, suggMap = client.updateChangeSet(troves, recurse = True,
                                                  resolveDeps = True,
                                                  test = True,
-                                                 checkBucketConflicts=False)
+                                                 checkPathConflicts=False)
         log.setVerbosity(log.DEBUG)
 
         # restore config

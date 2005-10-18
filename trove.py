@@ -18,6 +18,7 @@ Implements troves (packages, components, etc.) for the repository
 import changelog
 import copy
 import files
+import itertools
 from lib import sha1helper
 from lib.openpgpkey import getKeyCache
 from lib.openpgpfile import KeyNotFound
@@ -79,96 +80,58 @@ class BuildDependencies(TroveTupleList):
 class LoadedTroves(TroveTupleList):
     pass
 
-class InstallBucketItem(streams.StreamSet):
-    _INSTALL_BIN_KEY  = 0
-    _INSTALL_BIN_VALUE = 1
+class PathHashes(set, streams.InfoStream):
 
-    ignoreUnknown = True
-    streamDict = {
-        _INSTALL_BIN_KEY    : (streams.StringStream,        'key'    ),
-        _INSTALL_BIN_VALUE  : (streams.StringStream,        'value'  ),
-    }
-    _streamDict = streams.StreamSetDef(streamDict)
+    """
+    A set of 8 bytes hashes from the first 8 bytes of the md5 of each path.
+    """
 
+    def __eq__(self, other, skipSet = None):
+        return set.__eq__(self, other)
 
-class InstallBucket(streams.StreamCollection):
-    streamDict = { 1 : InstallBucketItem }
+    def __ne__(self, other, skipSet = None):
+        return set.__ne__(self, other)
 
-    # XXX these aren't particularly efficient; they imitate a dict with a list
+    def freeze(self, skipSet = None):
+        return struct.pack("8s" * len(self), *self)
 
-    def add(self, key, value):
-        item = InstallBucketItem()
-        item.key.set(key)
-        item.value.set(value)
-        self.addStream(1, item)
+    def thaw(self, s):
+        self.clear()
+        items = struct.unpack("8s" * (len(s) / 8), s)
+        for item in items:
+            self.add(item)
 
-    def keys(self):
-        return [ x for x in self.iterkeys() ]
+    def diff(self, them):
+        additions = self - them
+        removals = them - self
+        s = struct.pack("!I" + "8s" * (len(additions) + len(removals)),
+                        *itertools.chain((len(additions),), additions, 
+                                         removals))
+        return s
 
-    def __iter__(self):
-        return self.iterkeys()
+    def twm(self, diff, base):
+        assert(self == base)
+        items = struct.unpack("!I" + "8s" * ((len(diff) - 4) / 8), diff)
+        additions = items[1:items[0] + 1]
+        removals = items[items[0] + 1:]
 
-    def iterkeys(self):
-        for bucket in self.getStreams(1):
-            yield bucket.key()
+        self.difference_update(removals)
+        self.update(additions)
 
-    def values(self):
-        return [ x for x in self.itervalues() ]
+    def add(self, item):
+        assert(len(item) == 8)
+        set.add(self, item)
 
-    def itervalues(self):
-        for bucket in self.getStreams(1):
-            yield bucket.value()
-
-    def items(self):
-        return [ x for x in self.iteritems() ]
-
-    def iteritems(self):
-        for bucket in self.getStreams(1):
-            yield bucket.key(), bucket.value()
-
-    def __getitem__(self, key):
-        for bucket in self.getStreams(1):
-            if bucket.key() == key:
-                return bucket.value()
-
-        raise KeyError
-
-    def __setitem__(self, key, value):
-        for bucket in self.getStreams(1):
-            if bucket.key() == key:
-                bucket.value.set(value)
-                return
-
-        self.add(key, value)
+    def addPath(self, path):
+        self.add(sha1helper.md5String(path)[0:8])
 
     def compatibleWith(self, other):
-        if not other.keys() or not self.keys():
-            return False
+        return not(self & other)
 
-        otherDict = dict(other)
-
-        for key, value in self.iteritems():
-            if otherDict.get(key, value) == value:
-                return False
-            del otherDict[key]
-
-        if otherDict:
-            return False
-
-        return True
-
-    def intersect(self, other):
-        new = InstallBucket()
-        otherDict = dict(other)
-
-        for key, value in self.iteritems():
-            if otherDict.get(key, value) == value:
-                new.add(key, value)
-
-        return new
-
-    def __str__(self):
-        return ', '.join('='.join(x) for x in self.iteritems())
+    def __init__(self, val = None):
+        set.__init__(self)
+        if val is not None:
+            self.thaw(val)
 
 _DIGSIG_FINGERPRINT   = 0
 _DIGSIG_SIGNATURE     = 1
@@ -273,16 +236,17 @@ class TroveSignatures(streams.StreamSet):
 
         return streams.StreamSet.freeze(self, skipSet = skipSet)
 
-_TROVEINFO_TAG_SIZE           = 0
-_TROVEINFO_TAG_SOURCENAME     = 1
-_TROVEINFO_TAG_BUILDTIME      = 2
-_TROVEINFO_TAG_CONARYVER      = 3
-_TROVEINFO_TAG_BUILDDEPS      = 4
-_TROVEINFO_TAG_LOADEDTROVES   = 5
-_TROVEINFO_TAG_INSTALLBUCKET  = 6
-_TROVEINFO_TAG_ISCOLLECTION   = 7
-_TROVEINFO_TAG_CLONEDFROM     = 8
-_TROVEINFO_TAG_SIGS           = 9
+_TROVEINFO_TAG_SIZE           =  0
+_TROVEINFO_TAG_SOURCENAME     =  1
+_TROVEINFO_TAG_BUILDTIME      =  2
+_TROVEINFO_TAG_CONARYVER      =  3
+_TROVEINFO_TAG_BUILDDEPS      =  4
+_TROVEINFO_TAG_LOADEDTROVES   =  5
+_TROVEINFO_TAG_INSTALLBUCKET  =  6          # unused as of 0.62.16
+_TROVEINFO_TAG_ISCOLLECTION   =  7
+_TROVEINFO_TAG_CLONEDFROM     =  8
+_TROVEINFO_TAG_SIGS           =  9
+_TROVEINFO_TAG_PATH_HASHES    = 10 
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -293,14 +257,13 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CONARYVER     : ( streams.StringStream, 'conaryVersion'),
         _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
         _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
-        _TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,        'installBucket'),
+        #_TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,       'installBucket'),
         _TROVEINFO_TAG_ISCOLLECTION  : ( streams.ShortStream,  'isCollection' ),
         _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom'   ),
         _TROVEINFO_TAG_SIGS          : ( TroveSignatures,      'sigs'         ),
+        _TROVEINFO_TAG_PATH_HASHES   : ( PathHashes,           'pathHashes'   ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
-
-
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -397,17 +360,17 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
 
         return new
 
-_STREAM_TRV_NAME      = 0
-_STREAM_TRV_VERSION   = 1
-_STREAM_TRV_FLAVOR    = 2
-_STREAM_TRV_CHANGELOG = 3
-_STREAM_TRV_TROVEINFO = 4
-_STREAM_TRV_PROVIDES  = 5
-_STREAM_TRV_REQUIRES  = 6
-_STREAM_TRV_TROVES    = 7
-_STREAM_TRV_FILES     = 8
-_STREAM_TRV_REDIRECT  = 9
-_STREAM_TRV_SIGS      = 10
+_STREAM_TRV_NAME       = 0
+_STREAM_TRV_VERSION    = 1
+_STREAM_TRV_FLAVOR     = 2
+_STREAM_TRV_CHANGELOG  = 3
+_STREAM_TRV_TROVEINFO  = 4
+_STREAM_TRV_PROVIDES   = 5
+_STREAM_TRV_REQUIRES   = 6
+_STREAM_TRV_TROVES     = 7
+_STREAM_TRV_FILES      = 8
+_STREAM_TRV_REDIRECT   = 9
+_STREAM_TRV_SIGS       = 10
 
 class Trove(streams.LargeStreamSet):
     """
@@ -424,16 +387,16 @@ class Trove(streams.LargeStreamSet):
     Conary often directly manipulates TroveChangeSet objects))
     """
     streamDict = { 
-        _STREAM_TRV_NAME      : (streams.StringStream,        "name"      ),
-        _STREAM_TRV_VERSION   : (streams.FrozenVersionStream, "version"   ), 
-        _STREAM_TRV_FLAVOR    : (streams.DependenciesStream,  "flavor"    ), 
-        _STREAM_TRV_PROVIDES  : (streams.DependenciesStream,  "provides"  ), 
-        _STREAM_TRV_REQUIRES  : (streams.DependenciesStream,  "requires"  ), 
-        _STREAM_TRV_CHANGELOG : (changelog.ChangeLog,         "changeLog" ), 
-        _STREAM_TRV_TROVEINFO : (TroveInfo,                   "troveInfo" ), 
-        _STREAM_TRV_TROVES    : (TroveRefsTrovesStream,       "troves"    ), 
-        _STREAM_TRV_FILES     : (TroveRefsFilesStream,        "idMap"     ), 
-        _STREAM_TRV_REDIRECT  : (ByteStream,                  "redirect"  ),
+        _STREAM_TRV_NAME       : (streams.StringStream,        "name"       ),
+        _STREAM_TRV_VERSION    : (streams.FrozenVersionStream, "version"    ), 
+        _STREAM_TRV_FLAVOR     : (streams.DependenciesStream,  "flavor"     ), 
+        _STREAM_TRV_PROVIDES   : (streams.DependenciesStream,  "provides"   ), 
+        _STREAM_TRV_REQUIRES   : (streams.DependenciesStream,  "requires"   ), 
+        _STREAM_TRV_CHANGELOG  : (changelog.ChangeLog,         "changeLog"  ), 
+        _STREAM_TRV_TROVEINFO  : (TroveInfo,                   "troveInfo"  ), 
+        _STREAM_TRV_TROVES     : (TroveRefsTrovesStream,       "troves"     ), 
+        _STREAM_TRV_FILES      : (TroveRefsFilesStream,        "idMap"      ), 
+        _STREAM_TRV_REDIRECT   : (ByteStream,                  "redirect"   ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
     ignoreUnknown = False
@@ -451,7 +414,8 @@ class Trove(streams.LargeStreamSet):
     def _sigString(self):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
-                                                      'versionStrings' : True })
+                                                      'versionStrings' : True,
+                                                      'pathHashes' : True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         if skipIntegrityChecks:
             self.computeSignatures()
@@ -580,6 +544,10 @@ class Trove(streams.LargeStreamSet):
         assert(not self.redirect())
 	self.idMap[pathId] = (path, fileId, version)
 
+    def computePathHashes(self):
+        for path, fileId, version in self.idMap.itervalues():
+            self.troveInfo.pathHashes.addPath(path)
+
     # pathId is the only thing that must be here; the other fields could
     # be None
     def updateFile(self, pathId, path, version, fileId):
@@ -671,6 +639,10 @@ class Trove(streams.LargeStreamSet):
 
     def includeTroveByDefault(self, name, version, flavor):
         return self.troves[(name, version, flavor)]
+
+    def compatibleWith(self, other):
+        return self.troveInfo.pathHashes.compatibleWith(
+                                            other.troveInfo.pathHashes)
 
     def hasTrove(self, name, version, flavor):
 	return self.troves.has_key((name, version, flavor))
@@ -1428,12 +1400,8 @@ class Trove(streams.LargeStreamSet):
         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
                  for x in self.troveInfo.loadedTroves.iterAll() ]
 
-    def setInstallBucket(self, installBucket):
-        for (key, value) in sorted(installBucket.iteritems()):
-            self.troveInfo.installBucket.add(key, value)
-
-    def getInstallBucket(self):
-        return self.troveInfo.installBucket
+    def getPathHashes(self):
+        return self.troveInfo.pathHashes
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         if name.count(':') > 1:

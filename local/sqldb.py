@@ -391,7 +391,7 @@ def _doAnalyze(db):
 
 class Database:
 
-    schemaVersion = 11
+    schemaVersion = 12
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -594,9 +594,7 @@ class Database:
                               (trove.BuildDependencies,
                                trove._TROVEINFO_TAG_BUILDDEPS),
                               (trove.LoadedTroves,
-                               trove._TROVEINFO_TAG_LOADEDTROVES),
-                              (trove.InstallBucket,
-                               trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
+                               trove._TROVEINFO_TAG_LOADEDTROVES) ]:
                     for instanceId, data in \
                             [ x for x in cu.execute(
                                 "select instanceId, data from TroveInfo WHERE "
@@ -712,6 +710,12 @@ class Database:
                 cu.execute("UPDATE DatabaseVersion SET version=11")
                 self.db.commit()
                 version = 11
+
+            if version == 11:
+                assert(0)
+                cu.execute('select count(*) from versions')
+                trove._TROVEINFO_TAG_INSTALLBUCKET
+                version = 12
 
             if version != self.schemaVersion:
                 return False

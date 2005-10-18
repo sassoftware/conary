@@ -476,7 +476,7 @@ def realMain(cfg, argv=sys.argv):
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
-        kwargs['checkBucketConflicts'] = \
+        kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
@@ -589,7 +589,7 @@ def main(argv=sys.argv):
        print >> sys.stderr, str(e)
     except conaryclient.CloneError, e:
        print >> sys.stderr, str(e)
-    except conaryclient.InstallBucketConflicts, e:
+    except conaryclient.InstallPathConflicts, e:
        print >> sys.stderr, str(e)
     except repository.repository.RepositoryLocked, e:
        print >> sys.stderr, str(e)

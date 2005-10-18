@@ -37,7 +37,7 @@ DependencyFailure = update.DependencyFailure
 DepResolutionFailure = update.DepResolutionFailure
 EraseDepFailure = update.EraseDepFailure
 NeededTrovesFailure = update.NeededTrovesFailure
-InstallBucketConflicts = update.InstallBucketConflicts
+InstallPathConflicts = update.InstallPathConflicts
 
 class TroveNotFound(Exception):
     def __init__(self, troveName):

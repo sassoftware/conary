@@ -510,64 +510,15 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
-
 class InstallBucket(policy.Policy):
     """
-        Set key/value pairs that determine whether conary assumes that two 
-        versions of a component can be installed side-by-side:
-        C{r.InstallBucket('foo:runtime', key1='value1', key2='value2')}
-
-        If two versions of a component share the same install keys, but
-        differ on a value for some key, the two troves are assumed to be
-        installable side by side.
+    Stub for older recipes
     """
-
-    defaultCompKeys = { 
-                        'devellib' : {'lib': '%(lib)s'},
-                        'lib'      : {'lib': '%(lib)s'},
-                        'test'     : {'version': '%(version)s'},
-                      }
-
-    def __init__(self, *args, **keywords):
-        policy.Policy.__init__(self, *args, **keywords)
-        self.installBucketSpecs = {}
-
     def updateArgs(self, *args, **keywords):
-        # keep a list of packages filtered for in PackageSpec in the recipe
-        if args:
-            if len(args) > 1:
-                raise RuntimeError, ('Cannot specify multiple components'
-                                     ' for InstallBucket, got '
-                                     ' %s' % ', '.join(args) )
-            name = args[0]
-            if ':' not in name:
-                raise RuntimeError, ('Packages can not have an install bin -'
-                                     ' they must be component specific')
-            self.installBucketSpecs[args[0]] = keywords
+        self.warn('Install buckets are deprecated')
 
-
-    def do(self):
-        def _expandBinKeys(binKeys):
-            return dict((x[0], x[1] % self.recipe.macros) \
-                                            for x in binKeys.iteritems())
-
-        # interpolate self.installBucketSpecs
-        self.installBucketSpecs = dict(
-            (x[0] % self.recipe.macros, x[1])
-            for x in self.installBucketSpecs.iteritems())
-
-        # install the default keys for components
-        for compName, binKeys in self.defaultCompKeys.iteritems():
-            for component in self.recipe.autopkg.getComponents():
-                if component.name.split(':')[1] == compName:
-                    component.setInstallBucket(_expandBinKeys(binKeys))
-
-        # override or fill in binKeys from user specified bin keys
-        for component in self.recipe.autopkg.getComponents():
-            binKeys = self.installBucketSpecs.get(component.name, {})
-            if not component.getInstallBucket():
-                component.setInstallBucket(_expandBinKeys(binKeys))
-
+    def test(self):
+        return False
 
 def _markConfig(policy, filename, fullpath):
     policy.dbg('config: %s', filename)

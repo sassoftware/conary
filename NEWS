@@ -32,6 +32,8 @@ Changes in 0.62.16:
     will always raise a "RepositoryClosed" exception when a client
     attempts to access it.  The configuration variable is a string.
     The string will also be returned to the client.
+  * Removed install buckets and replaced with comparisons of hashed path
+    values to determine trove compatibility.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.

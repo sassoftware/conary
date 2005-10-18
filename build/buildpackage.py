@@ -188,16 +188,6 @@ class BuildComponent(dict):
         """
         return self.recipe.suppmap
 
-    def getInstallBucket(self):
-        """
-        Dict description of the properties that describe whether two versions 
-        of this trove can be installed side-by-side
-        """
-        return self.installBucket
-
-    def setInstallBucket(self, installBucket):
-        self.installBucket = installBucket
-
     def __init__(self, name, recipe):
 	self.name = name
         self.requires = deps.DependencySet()
@@ -210,7 +200,6 @@ class BuildComponent(dict):
         self.isnsetMap = {}
         self.hardlinks = []
         self.badhardlinks = []
-        self.installBucket = {}
         self.recipe = recipe
 	dict.__init__(self)
 

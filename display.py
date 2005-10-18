@@ -319,12 +319,6 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
         print "%-30s" % \
             ("Flavor    : %s" % deps.formatFlavor(trove.getFlavor())),
 
-        installBucket = [ x for x in trove.getInstallBucket().iteritems()]
-        installBucket = ', '.join('='.join(x) for x in installBucket)
-        if installBucket:
-            print "Bucket    : %s" % installBucket
-        else:
-            print
         print "Requires  : %s" % trove.getRequires()
     elif showBuildReqs:
         for (n,v,f) in sorted(trove.getBuildRequirements()):

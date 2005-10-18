@@ -143,9 +143,7 @@ class ClientUpdate:
                         newTrv = trvSrc.getTrove(job[0], job[2][0], job[2][1],
                                                  withFiles = False)
                             
-                        if oldTrv.getInstallBucket().compatibleWith(
-                                    newTrv.getInstallBucket()):
-
+                        if oldTrv.compatibleWith(newTrv):
                             restoreSet.add(job)
                             break
 
@@ -516,25 +514,26 @@ class ClientUpdate:
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
 
-        def _getBucket(trvSrc, db, trv, isCollection, inDb = False):
-            if not isCollection: return trv.getInstallBucket()
+        def _getPathHashes(trvSrc, db, trv, isCollection, inDb = False):
+            if not isCollection: return trv.getPathHashes()
 
-            b = None
+            ph = None
             for info in trv.iterTroveList():
                 if inDb:
                     otherTrv = db.getTrove(withFiles = False, *info)
                 else:
                     otherTrv = trvSrc.getTrove(withFiles = False, *info)
-                if b is None:
-                    b = otherTrv.getInstallBucket()
+
+                if ph is None:
+                    ph = otherTrv.getPathHashes()
                 else:
-                    b = b.intersect(otherTrv.getInstallBucket())
+                    ph.update(otherTrv.getPathHashes())
 
-            if b is None:
-                # this gives us an empty bucket
-                b = trv.getInstallBucket()
+            if ph is None:
+                # this gives us an empty set
+                ph = trv.getPathHashes()
 
-            return b
+            return ph
 
         # def _mergeGroupChanges -- main body begins here
             
@@ -595,8 +594,8 @@ class ClientUpdate:
         del removedList, pins
 
         referencedTroves = set()
-
         orphanedBranchJobs = set()
+
         while jobQueue:
             log.debug("examing job %s", jobQueue[-1])
             job, ignorePin, isPinned = jobQueue.pop()
@@ -695,15 +694,15 @@ class ClientUpdate:
                 localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                             pristine = False)
 
-                oldBucket = _getBucket(uJob.getTroveSource(), self.db, 
-                                       localTrv, isCollection, inDb = True)
-                newBucket = _getBucket(uJob.getTroveSource(), self.db, 
-                                       newTrv, isCollection)
+                oldPaths = _getPathHashes(uJob.getTroveSource(), self.db, 
+                                          localTrv, isCollection, inDb = True)
+                newPaths = _getPathHashes(uJob.getTroveSource(), self.db, 
+                                          newTrv, isCollection)
 
-                if oldBucket.compatibleWith(newBucket):
-                    # make this job a fresh install since the buckets
+                if oldPaths.compatibleWith(newPaths):
+                    # make this job a fresh install since the paths
                     # are compatible
-                    log.debug("install new trove as buckets are compatible")
+                    log.debug("install new trove as paths do not overlap")
                     newJob.add((trvName, (None, None), (newVersion, newFlavor),
                                 False))
                     # regenerate this
@@ -843,11 +842,11 @@ class ClientUpdate:
                     else:
                         isCollection = True
 
-                    oldBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                    oldPaths = _getPathHashes(uJob.getTroveSource(), self.db, 
                                            oldTrv, isCollection, inDb = True)
-                    newBucket = _getBucket(uJob.getTroveSource(), self.db, 
+                    newPaths = _getPathHashes(uJob.getTroveSource(), self.db, 
                                            newTrv, isCollection)
-                    if oldBucket.compatibleWith(newBucket):
+                    if oldPaths.compatibleWith(newPaths):
                         newJob.add((newInfo[0], (None, None),
                                     (newInfo[1], newInfo[2]), False))
                 else:
@@ -1136,7 +1135,7 @@ class ClientUpdate:
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
-                        checkBucketConflicts = True):
+                        checkPathConflicts = True):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1218,8 +1217,8 @@ class ClientUpdate:
             raise EraseDepFailure(cannotResolve)
 
         # look for troves which look like they'll conflict (same name/branch
-        # and incompatible install buckets)
-        if not sync and checkBucketConflicts:
+        # and incompatible install paths)
+        if not sync and checkPathConflicts:
             d = {}
             conflicts = {}
             for job in jobSet:
@@ -1233,16 +1232,16 @@ class ClientUpdate:
                 trvs = uJob.getTroveSource().getTroves(
                         [ (x[0], x[2][0], x[2][1]) for x in jobList ],
                         withFiles = False)
-                buckets = [ x.getInstallBucket() for x in trvs ]
+                paths = [ x.getPathHashes() for x in trvs ]
                 
                 for i, job in enumerate(jobList):
                     for j in range(i):
-                        if not buckets[i].compatibleWith(buckets[j]):
+                        if not paths[i].compatibleWith(paths[j]):
                             l = conflicts.setdefault(job[0], [])
                             l.append((job[2], jobList[j][2]))
 
             if conflicts:
-                raise InstallBucketConflicts(conflicts)
+                raise InstallPathConflicts(conflicts)
 
         if split:
             startNew = True
@@ -1475,7 +1474,7 @@ class NeededTrovesFailure(DependencyFailure):
               (x[0], x[1].trailingRevision().asString()) for x in suggList])))
         return '\n'.join(res)
 
-class InstallBucketConflicts(UpdateError):
+class InstallPathConflicts(UpdateError):
 
     def __str__(self):
         res = []

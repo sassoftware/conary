@@ -94,6 +94,7 @@ def _createComponent(repos, bldPkg, newVersion, ident):
             size += f.contents.size()
 
     p.setSize(size)
+    p.computePathHashes()
 
     return (p, fileMap)
 
@@ -569,6 +570,8 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
     fileset.setIsCollection(False)
+    fileset.setIsCollection(False)
+    fileset.computePathHashes()
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
@@ -873,7 +876,6 @@ def _createPackageChangeSet(repos, cfg, bldList, recipeObj, sourceVersion,
         p.setSourceName(sourceName)
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
-        p.setInstallBucket(buildPkg.getInstallBucket())
         p.setIsCollection(False)
 	
 	byDefault = recipeObj.byDefault(compName)
