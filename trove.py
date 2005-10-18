@@ -126,6 +126,7 @@ class PathHashes(set, streams.InfoStream):
         self.add(sha1helper.md5String(path)[0:8])
 
     def compatibleWith(self, other):
+        if not self or not other: return False
         return not(self & other)
 
     def __init__(self, val = None):
