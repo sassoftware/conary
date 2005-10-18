@@ -27,6 +27,11 @@ Changes in 0.62.16:
   * When updating a group across branches, if a subtrove within the update has 
     already been manually moved to the new branch by the user, conary will 
     recognize this and sync that trove with the group
+  * A new "closed" configuration variable has been added to the
+    apache-based networked repository server.  When set, the server
+    will always raise a "RepositoryClosed" exception when a client
+    attempts to access it.  The configuration variable is a string.
+    The string will also be returned to the client.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.

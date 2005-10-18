@@ -1829,6 +1829,13 @@ class CacheSet:
         self.versions = versiontable.VersionTable(self.db)
         self.db.commit()
 
+class ClosedRepositoryServer(xmlshims.NetworkConvertors):
+    def callWrapper(self, *args):
+        return (True, ("RepositoryClosed", self.closedMessage))
+
+    def __init__(self, closedMessage):
+        self.closedMessage = closedMessage
+
 class InvalidClientVersion(Exception):
     pass
 

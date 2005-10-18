@@ -40,6 +40,7 @@ class ServerConfig(conarycfg.ConfigFile):
         'tmpDir'            :  "/var/tmp",
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
         'staticPath'        :  "/conary-static",
+        'closed'            :  None,
     }
 
 def checkAuth(req, repos):
@@ -230,18 +231,21 @@ def handler(req):
             print "error: serverName is required in %s" % req.filename
             return
 
-	repositories[repName] = netserver.NetworkRepositoryServer(
-                                cfg.repositoryDir,
-                                cfg.tmpDir,
-				urlBase, 
-                                cfg.serverName,
-                                cfg.repositoryMap,
-				commitAction = cfg.commitAction,
-                                cacheChangeSets = cfg.cacheChangeSets,
-                                logFile = cfg.logFile)
+        if cfg.closed:
+            repositories[repName] = netserver.ClosedRepositoryServer(cfg.closed)
+        else:
+            repositories[repName] = netserver.NetworkRepositoryServer(
+                                    cfg.repositoryDir,
+                                    cfg.tmpDir,
+                                    urlBase, 
+                                    cfg.serverName,
+                                    cfg.repositoryMap,
+                                    commitAction = cfg.commitAction,
+                                    cacheChangeSets = cfg.cacheChangeSets,
+                                    logFile = cfg.logFile)
 
-	repositories[repName].forceSecure = cfg.forceSSL
-        repositories[repName].cfg = cfg
+            repositories[repName].forceSecure = cfg.forceSSL
+            repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
     secure =  (port == 443)
