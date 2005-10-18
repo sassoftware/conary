@@ -21,6 +21,9 @@ Changes in 0.62.16:
     path encoded in the dependency provision.  Before this, the RPATH
     was ignored and the path encoding was only guessed within one source
     package.
+  * The LinkCount policy now enforces the requirement that hardlink groups
+    contain only files in the same directory as each other; no hardlinks
+    between files in different directories are allowed.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
