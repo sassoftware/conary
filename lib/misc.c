@@ -32,7 +32,8 @@ static PyMethodDef MiscMethods[] = {
 	"amount of memory currently allocated through malloc()" },
     { "removeIfExists", removeIfExists, METH_VARARGS, 
 	"unlinks a file if it exists; silently fails if it does not exist. "
-	"returns a boolean indicating whether or not a file was removed" }
+	"returns a boolean indicating whether or not a file was removed" },
+    {NULL}  /* Sentinel */
 };
 
 static PyObject * malloced(PyObject *self, PyObject *args) {
