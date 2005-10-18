@@ -614,6 +614,7 @@ class Database:
                 self.db.commit()
                 print "\r%s\r" %(' ' * len(msg)),
                 version = 9
+
             if version == 9:
                 import sys
 
@@ -665,6 +666,7 @@ class Database:
                 cu.execute("UPDATE DatabaseVersion SET version=10")
                 self.db.commit()
                 version = 10
+
             if version == 10:
                 # convert contrib.rpath.com -> contrib.rpath.org
                 import sys
@@ -712,9 +714,44 @@ class Database:
                 version = 11
 
             if version == 11:
-                assert(0)
-                cu.execute('select count(*) from versions')
-                trove._TROVEINFO_TAG_INSTALLBUCKET
+                import sys
+                # remove installbuckets and the signatures for troves which
+                # used them
+                for instanceId in \
+                        [ x[0] for x in cu.execute(
+                            "select distinct instanceId from TroveInfo "
+                            " WHERE infoType=?", 
+                                    trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
+                    cu.execute("delete from TroveInfo WHERE infoType=? "
+                               "AND instanceId=?",
+                                    trove._TROVEINFO_TAG_INSTALLBUCKET,
+                                    instanceId)
+                    cu.execute("delete from TroveInfo WHERE infoType=? "
+                               "AND instanceId=?",
+                                    trove._TROVEINFO_TAG_SIGS,
+                                    instanceId)
+
+                # calculate path hashes for every trove
+                instanceIds = [ x[0] for x in cu.execute(
+                        "select instanceId from instances") ]
+                for i, instanceId in enumerate(instanceIds):
+                    if i % 20 == 0:
+                        print "Updating trove %d of %d\r" %  \
+                                    (i, len(instanceIds)),
+                        sys.stdout.flush()
+                    ph = trove.PathHashes()
+                    for path, in cu.execute(
+                            "select path from dbtrovefiles where instanceid=?",
+                            instanceId):
+                        ph.addPath(path)
+                    cu.execute("""
+                        insert into troveinfo(instanceId, infoType, data)
+                            values(?, ?, ?)""", instanceId,
+                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
+
+                print " " * 40 + "\r",
+                cu.execute("UPDATE DatabaseVersion SET version=12")
+                self.db.commit()
                 version = 12
 
             if version != self.schemaVersion:
