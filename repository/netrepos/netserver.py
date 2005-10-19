@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 5
+    schemaVersion = 6
 
     # lets the following exceptions pass:
     #
@@ -1525,6 +1525,41 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=5")
                 self.db.commit()
                 version = 5
+
+            if version == 5:
+                # remove installbuckets and the signatures for troves which
+                # used them
+                for instanceId in \
+                        [ x[0] for x in cu.execute(
+                            "select distinct instanceId from TroveInfo "
+                            " WHERE infoType=?", 
+                                    trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
+                    cu.execute("delete from TroveInfo WHERE infoType=? "
+                               "AND instanceId=?",
+                                    trove._TROVEINFO_TAG_INSTALLBUCKET,
+                                    instanceId)
+                    cu.execute("delete from TroveInfo WHERE infoType=? "
+                               "AND instanceId=?",
+                                    trove._TROVEINFO_TAG_SIGS,
+                                    instanceId)
+
+                # calculate path hashes for every trove
+                instanceIds = [ x[0] for x in cu.execute(
+                        "select instanceId from instances") ]
+                for i, instanceId in enumerate(instanceIds):
+                    ph = trove.PathHashes()
+                    for path, in cu.execute(
+                            "select path from trovefiles where instanceid=?",
+                            instanceId):
+                        ph.addPath(path)
+                    cu.execute("""
+                        insert into troveinfo(instanceId, infoType, data)
+                            values(?, ?, ?)""", instanceId,
+                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
+
+                cu.execute("UPDATE DatabaseVersion SET version=6")
+                self.db.commit()
+                version = 6
                 
             if version != self.schemaVersion:
                 return False
