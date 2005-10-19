@@ -12,7 +12,9 @@
 # full details.
 #
 
-from base_drv import DBStoreError
+from base_drv import DBStoreError, DBStoreCursorError
+from base_drv import BaseDatabase as Database
+from base_drv import BaseCursor as Cursor
 
 # default driver we want to use
 __DRIVER = "sqlite"
@@ -62,8 +64,14 @@ def __get_driver(driver = __DRIVER):
         driver)
     
 # create a database connection and return an instance
+# all drivers parse a db string in the form:
+#   [[user[:password]@]host/]database
 def connect(db, driver=None, *args):
     driver = __get_driver(driver)
     dbh = driver(db)
     assert(dbh.connect(*args))
     return dbh
+
+
+__all__ = [ "connect",
+            "DBStoreError", "DBStoreCursorError", "DBInvalidBackend" ]
