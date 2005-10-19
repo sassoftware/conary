@@ -44,12 +44,12 @@ import base64
 from lib.tracelog import logMe
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 32, 33, 34, 35 ]
-CACHE_SCHEMA_VERSION = 16
+SERVER_VERSIONS = [ 36 ]
+CACHE_SCHEMA_VERSION = 17
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 6
+    schemaVersion = 7
 
     # lets the following exceptions pass:
     #
@@ -1576,6 +1576,45 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=6")                
                 self.db.commit()
                 version = 6
+                logMe(3, "finished migrating the schema to version", version)
+
+            if version != 6:
+                logMe(3, "migrating schema from version", version)
+
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_TAG_SIGS)
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_TAG_FLAGS)
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_INSTALLBUCKET)
+
+                flags = trove.TroveFlagStream()
+                flags.isCollection(set = True)
+                collectionStream = flags.freeze()
+                flags.isCollection(set = False)
+                notCollectionStream = flags.freeze()
+
+                cu.execute("""
+                    INSERT INTO TroveInfo
+                        SELECT instanceId, ?, ?
+                            FROM Items, Instances WHERE
+                                NOT (item LIKE '%:%' OR item LIKE 'fileset-')
+                               AND
+                                Items.instanceId = Instances.instanceId
+                    """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
+
+                cu.execute("""
+                    INSERT INTO TroveInfo
+                        SELECT instanceId, ?, ?
+                            FROM Items, Instances WHERE
+                                (item LIKE '%:%' OR item LIKE 'fileset-')
+                            WHERE
+                                Items.instanceId = Instances.instanceId
+                    """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
+
+                cu.execute("UPDATE DatabaseVersion SET version=7")                
+                self.db.commit()
+                version = 7
                 logMe(3, "finished migrating the schema to version", version)
                 
             if version != self.schemaVersion:

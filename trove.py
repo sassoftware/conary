@@ -237,6 +237,27 @@ class TroveSignatures(streams.StreamSet):
 
         return streams.StreamSet.freeze(self, skipSet = skipSet)
 
+_TROVE_FLAG_ISCOLLECTION = 0
+
+class TroveFlagsStream(streams.NumericStream):
+
+    __slots__ = "val"
+    format = "B"
+
+    def isCollection(self, set = None):
+	return self._isFlag(_FILE_FLAG_ISCOLLECTION, set)
+
+    def _isFlag(self, flag, set):
+	if set != None:
+            if self.val is None:
+                self.val = 0x0
+	    if set:
+		self.val |= flag
+	    else:
+		self.val &= ~(flag)
+
+	return (self.val and self.val & flag)
+
 _TROVEINFO_TAG_SIZE           =  0
 _TROVEINFO_TAG_SOURCENAME     =  1
 _TROVEINFO_TAG_BUILDTIME      =  2
@@ -244,12 +265,12 @@ _TROVEINFO_TAG_CONARYVER      =  3
 _TROVEINFO_TAG_BUILDDEPS      =  4
 _TROVEINFO_TAG_LOADEDTROVES   =  5
 _TROVEINFO_TAG_INSTALLBUCKET  =  6          # unused as of 0.62.16
-_TROVEINFO_TAG_ISCOLLECTION   =  7
+_TROVEINFO_TAG_FLAGS          =  7
 _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10 
 
-class TroveInfo(streams.StreamSet):
+class TroveInfo(streams.LargeStreamSet):
     ignoreUnknown = True
     streamDict = {
         _TROVEINFO_TAG_SIZE          : ( streams.LongLongStream,'size'        ),
@@ -259,7 +280,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
         _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
         #_TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,       'installBucket'),
-        _TROVEINFO_TAG_ISCOLLECTION  : ( streams.ShortStream,  'isCollection' ),
+        _TROVEINFO_TAG_FLAGS         : ( streams.ShortStream,  'flags'        ),
         _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom'   ),
         _TROVEINFO_TAG_SIGS          : ( TroveSignatures,      'sigs'         ),
         _TROVEINFO_TAG_PATH_HASHES   : ( PathHashes,           'pathHashes'   ),
@@ -1378,12 +1399,12 @@ class Trove(streams.LargeStreamSet):
 
     def setIsCollection(self, b):
         if b:
-            return self.troveInfo.isCollection.set(1)
+            return self.troveInfo.flags.isCollection(set = True)
         else:
-            return self.troveInfo.isCollection.set(0)
+            return self.troveInfo.flags.isCollection(set = False)
 
     def isCollection(self):
-        return self.troveInfo.isCollection()
+        return self.troveInfo.flags.isCollection()
 
     def setBuildRequirements(self, itemList):
         for (name, ver, release) in itemList:

@@ -391,7 +391,7 @@ def _doAnalyze(db):
 
 class Database:
 
-    schemaVersion = 12
+    schemaVersion = 13
 
     def _createSchema(self, cu):
         cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
@@ -753,6 +753,42 @@ class Database:
                 cu.execute("UPDATE DatabaseVersion SET version=12")
                 self.db.commit()
                 version = 12
+
+            if version == 12:
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_TAG_SIGS)
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_TAG_FLAGS)
+                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
+                           trove._TROVEINFO_INSTALLBUCKET)
+
+                flags = trove.TroveFlagStream()
+                flags.isCollection(set = True)
+                collectionStream = flags.freeze()
+                flags.isCollection(set = False)
+                notCollectionStream = flags.freeze()
+
+                cu.execute("""
+                    INSERT INTO TroveInfo
+                        SELECT instanceId, ?, ?
+                            FROM Items, Instances WHERE
+                                NOT (item LIKE '%:%' OR item LIKE 'fileset-')
+                               AND
+                                Items.instanceId = Instances.instanceId
+                    """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
+
+                cu.execute("""
+                    INSERT INTO TroveInfo
+                        SELECT instanceId, ?, ?
+                            FROM Items, Instances WHERE
+                                (item LIKE '%:%' OR item LIKE 'fileset-')
+                            WHERE
+                                Items.instanceId = Instances.instanceId
+                    """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
+
+                cu.execute("UPDATE DatabaseVersion SET version=13")
+                self.db.commit()
+                version = 13
 
             if version != self.schemaVersion:
                 return False

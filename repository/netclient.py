@@ -43,7 +43,7 @@ from lib import openpgpfile
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 32, 33, 34, 35 ]
+CLIENT_VERSIONS = [ 36 ]
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
