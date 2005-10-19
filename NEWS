@@ -1,3 +1,7 @@
+Changes in 0.70:
+  * Conary does the right thing if the same trove is listed twice in an update
+    due to recursion (it checks for duplicate installs of the same trove)
+
 Changes in 0.62.16:
   * The "conary update" and "conary erase" commands now display the actions
     they take as they run (similar to --info output).

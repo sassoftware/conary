@@ -514,6 +514,39 @@ class ClientUpdate:
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
 
+        def _removeDuplicateAdditions(jobSet):
+            # the same trove could be added both as part of a cmd line update
+            # and as part of a recursive update (or as part of two recursive
+            # updates).  Prefer the update that already has a remove 
+            # tied to it (if any).
+            additions = {}
+
+            for job in jobSet:
+                if job[2][0] is not None:
+                    l = additions.setdefault((job[0], job[2][0], job[2][1]), [])
+                    l.append(job)
+            
+            toRemove = []
+            for addition, l in additions.iteritems():
+                if len(l) > 1:
+                    empty = [ x for x in l if x[1][0] is None] 
+                    # there should be only one of these, since we've already
+                    # converted absolute updates to relative ones.
+                    assert(len(empty) <= 1)
+
+                    l = set(l)
+                    l.difference_update(empty)
+
+                    if len(l) > 1:
+                        # it's not obvious what to do with this case, leave
+                        # it as an error until we see whether it occurs irl
+                        raise RuntimeError, ('Multiple relative updates '
+                                             ' in same trove: ' % l)
+                    toRemove.extend(empty)
+
+            jobSet.difference_update(toRemove)
+
+
         def _getPathHashes(trvSrc, db, trv, isCollection, inDb = False):
             if not isCollection: return trv.getPathHashes()
 
@@ -794,23 +827,18 @@ class ClientUpdate:
                                                 for x in orphanedBranchJobs)
 
         if absJob:
-            absJob = set(absJob)
-
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
             removeSet = set(((x[0], x[1][0], x[1][1])
                              for x in newJob if x[1][0] is not None))
 
-            # we ignore update requests that match a relative update - we 
-            # already know what system trove this update should match to
-            duplicates = set((x[0], (None, None), x[2], True) \
-                                            for x in newJob if x[3] is False)
-            
             outdated, eraseList = self.db.outdatedTroves(
-                [ (x[0], x[2][0], x[2][1]) for x in absJob - duplicates],
+                [ (x[0], x[2][0], x[2][1]) for x in absJob],
                 ineligible = removeSet | ineligible | referencedTroves | 
                              redirects)
 
+            # we'll add these back in as relative updates/installs
+            newJob.difference_update(absJob)
 
             newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
             # an orphaned branch job is an update of a trove referenced in
@@ -825,15 +853,13 @@ class ClientUpdate:
             # not as a fresh install
             newTroves = (x for x in newTroves if x not in orphanedBranchJobs) 
 
-            newJob = newJob - absJob
+            # these are considered relative now; they're being newly
+            # installed
+            newJob.update((x[0], (None, None), (x[1], x[2]), 0) 
+                          for x in newTroves)
 
             replacedTroves = [ (x[0], x[1]) for x in outdated.iteritems()
                                if x[1][1] is not None ]
-
-            for info in newTroves:
-                # these are considered relative now; they're being newly
-                # installed
-                newJob.add((info[0], (None, None), (info[1], info[2]), 0))
 
             replacedArePinned = self.db.trovesArePinned((x[1] for x
                                                          in replacedTroves))
@@ -863,10 +889,11 @@ class ClientUpdate:
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
                                 (newInfo[1], newInfo[2]), False))
 
+        _removeDuplicateAdditions(newJob)
         # _findErasures picks what gets erased; nothing else gets to vote
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
 				 recurse)
-        newJob -= set([ x for x in newJob if x[2][0] is None ])
+        newJob.difference_update([x for x in newJob if x[2][0] is None])
         newJob.update(eraseSet)
 
         return newJob
