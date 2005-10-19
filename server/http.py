@@ -195,6 +195,8 @@ class HttpHandler(WebHandler):
     @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
         leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
+        if t not in leaves:
+            return apache.HTTP_NOT_FOUND
         versionList = sorted(leaves[t].keys(), reverse = True)
 
         if not v:
