@@ -1,6 +1,14 @@
-Changes in 0.70:
-  * Conary does the right thing if the same trove is listed twice in an update
-    due to recursion (it checks for duplicate installs of the same trove)
+Changes in 0.70.0:
+  * Adding path hash data to TroveInfo overflowed the amount of
+    storage space available in a StreamSet when a trove contained
+    several thousand files.  TroveInfo is now stored as a
+    LargeStreamSet, which changes the on-disk changeset
+    representation.  Therefore 0.70.0 changes the filecontainer
+    version number.  We have changed the network protocol version
+    number.
+  * Conary now does the right thing if the same trove is listed twice
+    in an update due to recursion (it checks for duplicate installs of
+    the same trove)
 
 Changes in 0.62.16:
   * The "conary update" and "conary erase" commands now display the actions
