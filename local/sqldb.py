@@ -16,12 +16,12 @@ import deps.arch
 import deps.deps
 import deptable
 import files
-import idtable
 import sqlite3
 import trove
 import troveinfo
 import versions
 import versiontable
+from dbstore import idtable
 
 class Tags(idtable.CachedIdTable):
 

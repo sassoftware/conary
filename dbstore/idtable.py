@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 rPath, Inc.
+# Copyright (c) 2004-2005 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+# FIXME: convert to use the dbstore modules
 
 class IdTable:
     """
@@ -26,8 +28,10 @@ class IdTable:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if tableName not in tables:
-            cu.execute("CREATE TABLE %s(%s integer primary key, %s str unique)"
-                       %(self.tableName, self.keyName, self.strName))
+            cu.execute("CREATE TABLE %s (%s integer primary key, %s string)" %(
+                self.tableName, self.keyName, self.strName))
+            cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
+                self.tableName, self.tableName, self.strName))               
 	    self.initTable()
 
     def initTable(self):
@@ -40,10 +44,11 @@ class IdTable:
 
         return id
 
+    # XXX: use dbstore sequences
     def addId(self, item):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (NULL, ?)"
-                   %(self.tableName, ), (item,))
+        cu.execute("INSERT INTO %s (%s, %s) VALUES (NULL, ?)" %(
+            self.tableName, self.keyName, self.strName), (item,))
         return cu.lastrowid
 
     def getOrAddIds(self, items):
@@ -53,7 +58,7 @@ class IdTable:
         for num, item in enumerate(items):
             cu.execstmt(stmt, num, item)
 
-        cu.execute('''INSERT INTO %(tableName)s 
+        cu.execute('''INSERT INTO %(tableName)s (%(keyName)s, %(strName)s)
                       SELECT DISTINCT 
                          NULL, neededIds.%(strName)s FROM neededIds 
                          LEFT JOIN %(tableName)s AS existing USING(%(strName)s)
@@ -217,8 +222,7 @@ class IdPairMapping:
 
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s VALUES (?, ?, ?)"
-		   % (self.tableName),
-                   (first, second, val))
+		   % (self.tableName,), (first, second, val))
 
     def __getitem__(self, key):
 	(first, second) = key

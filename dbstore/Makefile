@@ -14,7 +14,8 @@
 
 TOPDIR	= ..
 
-python_files = __init__.py
+python_files	= __init__.py \
+		  idtable.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)

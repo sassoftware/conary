@@ -19,8 +19,7 @@ python_files = database.py	\
 		sqldb.py	\
 		troveinfo.py	\
 		update.py	\
-		versiontable.py \
-		idtable.py
+		versiontable.py
 
 extra_dist = Makefile
 

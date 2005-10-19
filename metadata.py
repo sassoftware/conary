@@ -19,7 +19,7 @@ import xml.dom.minidom
 import xml.parsers.expat
 
 from lib import log
-from local import idtable
+from dbstore import idtable
 from fmtroves import TroveCategories, LicenseCategories
 from httplib import HTTPConnection
 from urllib2 import urlopen

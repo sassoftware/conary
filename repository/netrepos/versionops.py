@@ -12,7 +12,7 @@
 # full details.
 # 
 
-from local import idtable
+from dbstore import idtable
 import versions
 from repository.repository import DuplicateBranch
 
