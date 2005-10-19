@@ -210,8 +210,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         if encoding == 'deflate':
             data = zlib.decompress(data)
 
-        # start the logging
-        initLog(level=3, trace=1)
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
         
@@ -375,6 +373,9 @@ if __name__ == '__main__':
         prof.start()
 
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
+
+    # start the logging
+    initLog(level=3, trace=1)
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], cfg.repositoryMap,
