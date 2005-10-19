@@ -12,11 +12,22 @@
 # full details.
 # 
 
-from local import idtable
+from dbstore import idtable
 
-class Items(idtable.IdTable):
+class Items(idtable.IdTable):    
+    # we create the table as a "traditional" IdTable and then personalize it
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')
+        idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')       
+    def initTable(self):
+        cu = self.db.cursor()
+        cu.execute(" ALTER TABLE Items ADD COLUMN "
+                   " hasTrove INTEGER NOT NULL DEFAULT 0")
+        
+    def setTroveFlag(self, itemId, val):
+        cu = self.db.cursor()
+        if val: val = 1
+        else:   val = 0
+	cu.execute("UPDATE Items SET hasTrove=? WHERE itemId=?", (val, itemId))
 
     def iterkeys(self):
         cu = self.db.cursor()

@@ -33,6 +33,8 @@ from local import troveinfo
 from local import versiontable
 from local import sqldb
 
+from lib.tracelog import logMe
+
 class LocalRepVersionTable(versiontable.VersionTable):
 
     def getId(self, theId, itemId):
@@ -140,15 +142,15 @@ class TroveStore:
 
     def getInstanceId(self, itemId, versionId, flavorId, isRedirect,
                       isPresent = True):
-	theId = self.instances.get((itemId, versionId, flavorId), None)
+ 	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
 					 isRedirect, isPresent = isPresent)
-	elif isPresent:
-	    # XXX we shouldn't have to do this unconditionally
+        # XXX we shouldn't have to do this unconditionally
+        if isPresent:
 	    self.instances.setPresent(theId, 1)
-
-	return theId
+            self.items.setTroveFlag(itemId, 1)
+ 	return theId
 
     def getVersionId(self, version, cache):
 	theId = cache.get(version, None)
@@ -258,8 +260,9 @@ class TroveStore:
 
     def iterTroveNames(self):
         cu = self.db.cursor()
-        cu.execute("SELECT DISTINCT item FROM Instances NATURAL JOIN "
-                   "Items WHERE isPresent=1 ORDER BY item");
+        cu.execute("SELECT DISTINCT Items.item as item "
+                   " FROM Instances JOIN Items USING(itemId) "
+                   " WHERE Instances.isPresent=1 ORDER BY item");
 
         for (item,) in cu:
             yield item
@@ -283,6 +286,8 @@ class TroveStore:
 	versionCache = {}
 	(cu, trove) = troveInfo
 
+        logMe(3, trove)
+        
 	troveVersion = trove.getVersion()
 	troveItemId = self.getItemId(trove.getName())
 
@@ -361,7 +366,7 @@ class TroveStore:
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
-					     troveFlavorId, 
+					     troveFlavorId,
                                              trove.isRedirect(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
@@ -453,7 +458,7 @@ class TroveStore:
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
-					    isPresent = False)
+                                            isPresent = False)
             cu.execute("INSERT INTO TroveTroves VALUES(?, ?, ?)",
 	               troveInstanceId, instanceId,
                        trove.includeTroveByDefault(name, version, flavor))
@@ -529,6 +534,8 @@ class TroveStore:
         return metadata.Metadata(md)
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
+        logMe(3, troveName, troveVersion, troveFlavor)
+        
 	if not troveVersion:
 	    return self.items.has_key(troveName)
 	
@@ -609,7 +616,7 @@ class TroveStore:
                    "instanceId=?", troveInstanceId)
         for (instanceId, byDefault) in cu:
 	    (itemId, versionId, flavorId, isPresent) = \
-		    self.instances.getId(instanceId)
+                     self.instances.getId(instanceId)
 	    name = self.items.getId(itemId)
 	    flavor = self.flavors.getId(flavorId)
 	    version = self.versionTable.getId(versionId, itemId)

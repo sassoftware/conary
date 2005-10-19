@@ -30,7 +30,7 @@ import trove
 from lib import util
 from repository import xmlshims
 from repository import repository
-from local import idtable
+from dbstore import idtable
 from local import sqldb
 from local import versiontable
 from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists, GroupAlreadyExists, UserNotFound
@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 6
+    schemaVersion = 7
 
     # lets the following exceptions pass:
     #
@@ -729,15 +729,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	            Users.user = ?
 	    ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Items using (itemId)
-        """
+            join Items using (itemId) """
+        where = [ "Items.hasTrove = 1" ]
         if labelStr:
             query = query + """
-            join Labels on LabelMap.labelId = Labels.labelId
-        where    
-	    Labels.label = ?
-            """
+            join Labels on LabelMap.labelId = Labels.labelId """
+            where.append("Labels.label = ?")
             args.append(labelStr)       
+        query = """%s
+        where %s
+        """ % (query, " AND ".join(where))
         cu.execute(query, args)
         logMe(3, "query", query, args)
         names = set()
@@ -1497,7 +1498,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=3")
                 self.db.commit()
                 version = 3
-            # migration to schma version 4
+
+            # migration to schema version 4
             if version == 3:
                 from lib.tracelog import printErr
                 msg = """
@@ -1507,8 +1509,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 printErr(msg)
                 print msg
                 return False
+
             # schema version 5 adds a few views and various cleanups
             if version == 4:
+                logMe(3, "migrating schema from version", version)
                 # FlavorScoresIdx was not unique
                 cu.execute("DROP INDEX FlavorScoresIdx")
                 cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx "
@@ -1527,6 +1531,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = 5
 
             if version == 5:
+                logMe(3, "migrating schema from version", version)
                 # remove installbuckets and the signatures for troves which
                 # used them
                 for instanceId in \
@@ -1560,6 +1565,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=6")
                 self.db.commit()
                 version = 6
+                
+            # add a hasTrove flag to the Items table for various optimizations
+            if version == 6:
+                logMe(3, "migrating schema from version", version)
+                # update the Items table                
+                cu.execute(" ALTER TABLE Items ADD COLUMN "
+                           " hasTrove INTEGER NOT NULL DEFAULT 0 ")
+                cu.execute("""
+                UPDATE Items SET hasTrove = 1
+                WHERE Items.itemId IN (
+                    SELECT Instances.itemId FROM Instances
+                    WHERE Instances.isPresent = 1 ) """)
+
+                cu.execute("UPDATE DatabaseVersion SET version=7")
+                self.db.commit()
+                version = 7
                 
             if version != self.schemaVersion:
                 return False

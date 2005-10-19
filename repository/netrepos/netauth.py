@@ -143,7 +143,8 @@ class NetworkAuthorization:
             if itemId:
                 itemId = itemId[0]
             else:
-                cu.execute("INSERT INTO Items VALUES(NULL, ?)", trovePattern)
+                cu.execute("INSERT INTO Items (itemId, item) VALUES(NULL, ?)",
+                           trovePattern)
                 itemId = cu.lastrowid
         else:
             itemId = 0
@@ -608,9 +609,9 @@ class NetworkAuthorization:
                           ON Permissions(userGroupId, labelId, itemId)""")
 
             if "Items" in tables:
-                cu.execute("""INSERT INTO Items VALUES(0, 'ALL')""")
+                cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
             if "Labels" in tables:
-                cu.execute("""INSERT INTO Labels VALUES (0, 'ALL')""")
+                cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
 
             commit = True
 
