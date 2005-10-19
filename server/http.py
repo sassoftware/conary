@@ -17,6 +17,7 @@ import os
 import string
 import sys
 import traceback
+from urllib import unquote
 
 import kid
 import templates
@@ -194,6 +195,7 @@ class HttpHandler(WebHandler):
     @strFields(t = None, v = "")
     @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
+        t = unquote(t)
         leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
         if t not in leaves:
             return apache.HTTP_NOT_FOUND
