@@ -790,20 +790,29 @@ class ClientUpdate:
         _removeDuplicateErasures(newJob)
 
         absJob = [ x for x in newJob if x[3] is True ]
-        absJob.extend((x[0], (None, None), x[1:]) for x in orphanedBranchJobs)
+        absJob.extend((x[0], (None, None), x[1:], True) \
+                                                for x in orphanedBranchJobs)
+
         if absJob:
+            absJob = set(absJob)
+
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
             removeSet = set(((x[0], x[1][0], x[1][1])
                              for x in newJob if x[1][0] is not None))
 
+            # we ignore update requests that match a relative update - we 
+            # already know what system trove this update should match to
+            duplicates = set((x[0], (None, None), x[2], True) \
+                                            for x in newJob if x[3] is False)
+            
             outdated, eraseList = self.db.outdatedTroves(
-                [ (x[0], x[2][0], x[2][1]) for x in absJob ],
+                [ (x[0], x[2][0], x[2][1]) for x in absJob - duplicates],
                 ineligible = removeSet | ineligible | referencedTroves | 
                              redirects)
 
-            newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
 
+            newTroves = (x[0] for x in outdated.iteritems() if x[1][1] is None)
             # an orphaned branch job is an update of a trove referenced in
             # a collection that traversed across branches and was dropped 
             # because it looked like the local system erased the trove It's
@@ -814,9 +823,9 @@ class ClientUpdate:
             # orphaned branch jobs are only valid if you find a 
             # local trove on the target branch that can be matched to it -
             # not as a fresh install
-            newTroves = [x for x in newTroves if x not in orphanedBranchJobs] 
+            newTroves = (x for x in newTroves if x not in orphanedBranchJobs) 
 
-            newJob = newJob - set(absJob)
+            newJob = newJob - absJob
 
             replacedTroves = [ (x[0], x[1]) for x in outdated.iteritems()
                                if x[1][1] is not None ]

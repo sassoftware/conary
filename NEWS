@@ -34,6 +34,8 @@ Changes in 0.62.16:
     The string will also be returned to the client.
   * Removed install buckets and replaced with comparisons of hashed path
     values to determine trove compatibility.
+  * If a trove is included in an update twice, once directly, and once 
+    implicitly through recursion, ignore the recursive update.
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
