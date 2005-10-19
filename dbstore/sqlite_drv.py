@@ -44,7 +44,10 @@ class Database(BaseDatabase):
             return self.version
         for (type, name, tbl_name) in slist:
             if type == "table":
-                self.tables.setdefault(name, [])
+                if name.endswith("_sequence"):
+                    self.sequences.append(name[:-len("_sequence")])
+                else:
+                    self.tables.setdefault(name, [])
             elif type == "view":
                 self.views.append(name)
             elif type == "index":
