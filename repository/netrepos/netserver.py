@@ -1564,7 +1564,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 # add a hasTrove flag to the Items table for various 
                 # optimizations
-                logMe(3, "migrating schema from version", version)
                 # update the Items table                
                 cu.execute(" ALTER TABLE Items ADD COLUMN "
                            " hasTrove INTEGER NOT NULL DEFAULT 0 ")
@@ -1574,8 +1573,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     SELECT Instances.itemId FROM Instances
                     WHERE Instances.isPresent = 1 ) """)
 
-                cu.execute("UPDATE DatabaseVersion SET version=6")
+                cu.execute("UPDATE DatabaseVersion SET version=6")                
                 self.db.commit()
+                version = 6
+                logMe(3, "finished migrating the schema to version", version)
                 
             if version != self.schemaVersion:
                 return False
