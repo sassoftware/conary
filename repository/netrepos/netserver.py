@@ -1578,7 +1578,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = 6
                 logMe(3, "finished migrating the schema to version", version)
 
-            if version != 6:
+            if version == 6:
                 logMe(3, "migrating schema from version", version)
 
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
