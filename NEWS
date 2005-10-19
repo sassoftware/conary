@@ -36,6 +36,8 @@ Changes in 0.62.16:
     values to determine trove compatibility.
   * If a trove is included in an update twice, once directly, and once 
     implicitly through recursion, ignore the recursive update.
+  * More constraints added to the repository schema
+  * Added hasTrove to Items table for faster trove names check
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
