@@ -25,7 +25,7 @@ export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
 export conarylibdir = $(libdir)/conary
 
 SUBDIRS=build local repository server lib pysqlite3 deps scripts config web \
-        conaryclient
+        conaryclient dbstore
 
 python_files = __init__.py	\
 	branch.py		\
