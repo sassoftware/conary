@@ -32,8 +32,8 @@ class InstanceTable:
                 itemId          INTEGER, 
                 versionId       INTEGER, 
                 flavorId        INTEGER,
-                isRedirect      INTEGER,
-                isPresent       INTEGER,
+                isRedirect      INTEGER NOT NULL DEFAULT 0,
+                isPresent       INTEGER NOT NULL DEFAULT 0,
                 CONSTRAINT Instances_itemId_fk
                     FOREIGN KEY (itemId) REFERENCES Items(itemId)
                     ON DELETE CASCADE ON UPDATE CASCADE,
@@ -42,12 +42,10 @@ class InstanceTable:
                     ON DELETE CASCADE ON UPDATE CASCADE,
                 CONSTRAINT Instances_flavorId_fk
                     FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Instances_item_version_flavor_uq
-                    UNIQUE (itemId, versionId, flavorId)                          
+                    ON DELETE RESTRICT ON UPDATE CASCADE
             )""")
-            cu.execute("""CREATE UNIQUE INDEX InstancesIdx ON 
-		               Instances(itemId, versionId, flavorId)""")
+            cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
+                       " Instances(itemId, versionId, flavorId) ")
         if "InstancesView" not in tables:
             cu.execute("""
             CREATE VIEW
@@ -78,12 +76,13 @@ class InstanceTable:
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?, ?)",
                    (itemId, versionId, flavorId, isRedirect, isPresent))
+        # XXX: sqlite-ism
 	return cu.lastrowid
 
     def getId(self, theId):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId, versionId, flavorId, isPresent "
-		   "FROM Instances WHERE instanceId=?", theId)
+        cu.execute(" SELECT itemId, versionId, flavorId, isPresent "
+		   " FROM Instances WHERE instanceId=? ", theId)
 	try:
 	    return cu.next()
 	except StopIteration:
@@ -91,13 +90,11 @@ class InstanceTable:
 
     def isPresent(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT isPresent FROM Instances WHERE "
-			"itemId=? AND versionId=? AND flavorId=?", item)
-
+        cu.execute(" SELECT isPresent FROM Instances WHERE "
+                   " itemId=? AND versionId=? AND flavorId=?", item)
 	val = cu.fetchone()
 	if not val:
 	    return 0
-
 	return val[0]
 
     def setPresent(self, theId, val):
