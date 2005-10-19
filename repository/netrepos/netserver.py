@@ -49,7 +49,7 @@ CACHE_SCHEMA_VERSION = 16
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 7
+    schemaVersion = 6
 
     # lets the following exceptions pass:
     #
@@ -1562,12 +1562,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             values(?, ?, ?)""", instanceId,
                             trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
 
-                cu.execute("UPDATE DatabaseVersion SET version=6")
-                self.db.commit()
-                version = 6
-                
-            # add a hasTrove flag to the Items table for various optimizations
-            if version == 6:
+                # add a hasTrove flag to the Items table for various 
+                # optimizations
                 logMe(3, "migrating schema from version", version)
                 # update the Items table                
                 cu.execute(" ALTER TABLE Items ADD COLUMN "
@@ -1578,9 +1574,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     SELECT Instances.itemId FROM Instances
                     WHERE Instances.isPresent = 1 ) """)
 
-                cu.execute("UPDATE DatabaseVersion SET version=7")
+                cu.execute("UPDATE DatabaseVersion SET version=6")
                 self.db.commit()
-                version = 7
                 
             if version != self.schemaVersion:
                 return False
