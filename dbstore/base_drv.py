@@ -48,7 +48,7 @@ class BaseCursor:
             return self._cursor.execute(sql, *args)
         if len(args) == 1 and isinstance(args[0], dict):
             kw.update(args[0])
-        return self._cursor.execute(sql, kw)
+        return self._cursor.execute(sql, **kw)
         
     # return the column names of the current select
     def __rowDict(self, row):
@@ -147,14 +147,15 @@ class BaseDatabase:
         self.alive_check = "select 1 where 1 = 1"
         self.cursorClass = BaseCursor
         
-    # the string syntax for databse connection is user:password@host/database
+    # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
         assert(self.database)
-        # regexes are k00l and I am 1337 h@x0r
+        assert(len(tuple(names)) == 4)
+        # regexes are k001 and I am 1337 h@x0r
         regex = re.compile(
             "^(((?P<%s>[^:]+)(:(?P<%s>[^@]+))?@)?(?P<%s>[^/]+)/)?(?P<%s>.+)$" % tuple(names)
             )
-        m = regex.match(self.database)
+        m = regex.match(self.database.strip())
         assert(m)
         return m.groupdict()
         
