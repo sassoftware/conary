@@ -210,10 +210,11 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 	final = alloca(len);
     } else
 	final = malloc(len);
-    
+
     if (final == NULL)
+	/* FIXME: memory leak.  DECREF vals here */
 	return PyErr_NoMemory();
-    
+
     chptr = final;
     for (i = 0; i < ssd->tagCount; i++) {
 	if (vals[i] != Py_None)  {
