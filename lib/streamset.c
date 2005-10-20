@@ -164,21 +164,27 @@ static int StreamSet_Cmp(PyObject * self, PyObject * other) {
 #define EXCLUDE_EMPTY 0
 #define INCLUDE_EMPTY 1
 
-static inline void addSmallTag(char** buf, int tag, int valLen) {
+static inline int addSmallTag(char** buf, int tag, int valLen) {
     char *chptr = *buf;
     *chptr++ = tag;
-    *((short *) chptr) = htons(valLen);
-    chptr += sizeof(short);
+    if (valLen > USHRT_MAX) {
+        PyErr_SetString(PyExc_TypeError, "unsigned short overflow");
+	return -1;
+    }
+    *((unsigned short *) chptr) = htons(valLen);
+    chptr += sizeof(unsigned short);
     *buf = chptr;
+    return 0;
 }
 
-static inline void addLargeTag(char** buf, int tag, int valLen) {
+static inline int addLargeTag(char** buf, int tag, int valLen) {
     char *chptr = *buf;
     *((short *) chptr) = htons(tag);
     chptr += sizeof(short);
-    *((int *) chptr) = htonl(valLen);
+    *((unsigned int *) chptr) = htonl(valLen);
     chptr += sizeof(int);
     *buf = chptr;
+    return 0;
 }
 
 static PyObject *concatStrings(StreamSetDefObject *ssd,
@@ -189,7 +195,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     char *final, *chptr;
     int i, valLen, useAlloca = 0;
     PyObject * result;
-    void (*addTag)(char**,int,int);
+    int (*addTag)(char**,int,int);
 
     assert(size == SIZE_SMALL || size == SIZE_LARGE);
     assert(includeEmpty == INCLUDE_EMPTY || includeEmpty == EXCLUDE_EMPTY);
@@ -216,7 +222,8 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 	    if (valLen > 0 || includeEmpty) {
 		/* either we have data or including empty data was
 		   requested */
-		addTag(&chptr, ssd->tags[i].tag, valLen);
+		if (addTag(&chptr, ssd->tags[i].tag, valLen))
+		    goto error;
 		memcpy(chptr, PyString_AS_STRING(vals[i]), valLen);
 		chptr += valLen;
 	    } else {
@@ -234,6 +241,18 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     if (!useAlloca)
 	free(final);
     return result;
+
+ error:
+    {
+	int j;
+	for (j = i; j < ssd->tagCount; j++) {
+	    Py_DECREF(vals[j]);
+	}
+
+	if (!useAlloca)
+	    free(final);
+	return NULL;
+    }
 }
 
 static PyObject * StreamSet_DeepCopy(PyObject * self, PyObject * args) {
@@ -371,19 +390,21 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	Py_DECREF(attr);
 
 	if (!vals[i]) {
+	    /* an error occurred when calling the freeze method for the
+	       object.  Free memory and return NULL */
 	    int j;
 
-	    for (j = 0; j < i; j++) 
+	    for (j = 0; j < i; j++)
 		Py_DECREF(vals[j]);
 	    if (!useAlloca)
 		free(vals);
-
 	    return NULL;
 	}
 
         if (vals[i] != Py_None)
             len += PyString_GET_SIZE(vals[i]) + ssd->size;
     }
+
     /* do not include zero length frozen data */
     rc = concatStrings(ssd, vals, len, EXCLUDE_EMPTY, ssd->size);
     if (!useAlloca)
@@ -507,7 +528,7 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	getTag = getSmallTag;
     else
 	getTag = getLargeTag;
-	   
+
     end = data + dataLen;
     chptr = data + offset;
     while (chptr < end) {
