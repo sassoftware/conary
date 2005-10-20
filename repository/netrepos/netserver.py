@@ -1532,22 +1532,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             if version == 5:
                 logMe(3, "migrating schema from version", version)
-                # remove installbuckets and the signatures for troves which
-                # used them
-                for instanceId in \
-                        [ x[0] for x in cu.execute(
-                            "select distinct instanceId from TroveInfo "
-                            " WHERE infoType=?", 
-                                    trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
-                    cu.execute("delete from TroveInfo WHERE infoType=? "
-                               "AND instanceId=?",
-                                    trove._TROVEINFO_TAG_INSTALLBUCKET,
-                                    instanceId)
-                    cu.execute("delete from TroveInfo WHERE infoType=? "
-                               "AND instanceId=?",
-                                    trove._TROVEINFO_TAG_SIGS,
-                                    instanceId)
-
                 # calculate path hashes for every trove
                 instanceIds = [ x[0] for x in cu.execute(
                         "select instanceId from instances") ]
@@ -1587,9 +1571,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
                            trove._TROVEINFO_TAG_FLAGS)
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_INSTALLBUCKET)
+                           trove._TROVEINFO_TAG_INSTALLBUCKET)
 
-                flags = trove.TroveFlagStream()
+                flags = trove.TroveFlagsStream()
                 flags.isCollection(set = True)
                 collectionStream = flags.freeze()
                 flags.isCollection(set = False)
@@ -1614,11 +1598,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                 Items.instanceId = Instances.instanceId
                     """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
 
-                cu.execute("UPDATE DatabaseVersion SET version=7")                
+                cu.execute("UPDATE DatabaseVersion SET version=7")
                 self.db.commit()
                 version = 7
                 logMe(3, "finished migrating schema to version", version)
-                
+
             if version != self.schemaVersion:
                 return False
 

@@ -245,7 +245,7 @@ class TroveFlagsStream(streams.NumericStream):
     format = "B"
 
     def isCollection(self, set = None):
-	return self._isFlag(_FILE_FLAG_ISCOLLECTION, set)
+	return self._isFlag(_TROVE_FLAG_ISCOLLECTION, set)
 
     def _isFlag(self, flag, set):
 	if set != None:
@@ -280,7 +280,7 @@ class TroveInfo(streams.LargeStreamSet):
         _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
         _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
         #_TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,       'installBucket'),
-        _TROVEINFO_TAG_FLAGS         : ( streams.ShortStream,  'flags'        ),
+        _TROVEINFO_TAG_FLAGS         : ( TroveFlagsStream,     'flags'        ),
         _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom'   ),
         _TROVEINFO_TAG_SIGS          : ( TroveSignatures,      'sigs'         ),
         _TROVEINFO_TAG_PATH_HASHES   : ( PathHashes,           'pathHashes'   ),

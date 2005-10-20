@@ -715,22 +715,6 @@ class Database:
 
             if version == 11:
                 import sys
-                # remove installbuckets and the signatures for troves which
-                # used them
-                for instanceId in \
-                        [ x[0] for x in cu.execute(
-                            "select distinct instanceId from TroveInfo "
-                            " WHERE infoType=?", 
-                                    trove._TROVEINFO_TAG_INSTALLBUCKET) ]:
-                    cu.execute("delete from TroveInfo WHERE infoType=? "
-                               "AND instanceId=?",
-                                    trove._TROVEINFO_TAG_INSTALLBUCKET,
-                                    instanceId)
-                    cu.execute("delete from TroveInfo WHERE infoType=? "
-                               "AND instanceId=?",
-                                    trove._TROVEINFO_TAG_SIGS,
-                                    instanceId)
-
                 # calculate path hashes for every trove
                 instanceIds = [ x[0] for x in cu.execute(
                         "select instanceId from instances") ]
@@ -760,9 +744,9 @@ class Database:
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
                            trove._TROVEINFO_TAG_FLAGS)
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_INSTALLBUCKET)
+                           trove._TROVEINFO_TAG_INSTALLBUCKET)
 
-                flags = trove.TroveFlagStream()
+                flags = trove.TroveFlagsStream()
                 flags.isCollection(set = True)
                 collectionStream = flags.freeze()
                 flags.isCollection(set = False)
