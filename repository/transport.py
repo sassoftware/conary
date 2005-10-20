@@ -102,9 +102,7 @@ class XMLOpener(urllib.FancyURLopener):
         if errcode == 200:
             fp = h.getfile()
             encoding = headers.get('Content-encoding', None)
-            if encoding == 'zlib':
-                fp = StringIO(zlib.decompress(fp.read()))
-            elif encoding == 'deflate':
+            if encoding == 'deflate':
                 fp = StringIO(zlib.decompress(fp.read()))
             return urllib.addinfourl(fp, headers, fullUrl)
         else:
