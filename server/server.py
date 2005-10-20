@@ -225,9 +225,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	self.send_response(200)
         encoding = self.headers.get('Accept-encoding', '')
-        if len(resp) > 200 and 'zlib' in encoding:
+        if len(resp) > 200 and 'deflate' in encoding:
             resp = zlib.compress(resp, 5)
-            self.send_header('Content-encoding', 'zlib')
+            self.send_header('Content-encoding', 'deflate')
 	self.send_header("Content-type", "text/xml")
 	self.send_header("Content-length", str(len(resp)))
 	self.end_headers()
