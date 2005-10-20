@@ -30,8 +30,6 @@ import versions
 
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 
-    _streamDict = changeset.ReadOnlyChangeSet._streamDict
-
     def merge(self, cs, src = None):
         changeset.ReadOnlyChangeSet.merge(self, cs)
         if isinstance(cs, UpdateChangeSet):

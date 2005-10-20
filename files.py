@@ -62,11 +62,13 @@ INODE_STREAM_MTIME = 2
 INODE_STREAM_OWNER = 3
 INODE_STREAM_GROUP = 4
 
+SMALL = streams.SMALL
+LARGE = streams.LARGE
+
 class DeviceStream(streams.StreamSet):
 
-    streamDict = { DEVICE_STREAM_MAJOR : (streams.IntStream,  "major"),
-                   DEVICE_STREAM_MINOR : (streams.IntStream,  "minor") }
-    _streamDict = streams.StreamSetDef(streamDict)
+    streamDict = { DEVICE_STREAM_MAJOR : (SMALL, streams.IntStream,  "major"),
+                   DEVICE_STREAM_MINOR : (SMALL, streams.IntStream,  "minor") }
     __slots__ = [ "major", "minor" ]
 
 class LinkGroupStream(streams.StringStream):
@@ -118,9 +120,8 @@ REGULAR_FILE_SHA1 = 2
 
 class RegularFileStream(streams.StreamSet):
 
-    streamDict = { REGULAR_FILE_SIZE : (streams.LongLongStream, "size"),
-                   REGULAR_FILE_SHA1 : (streams.Sha1Stream,     "sha1") }
-    _streamDict = streams.StreamSetDef(streamDict)
+    streamDict = { REGULAR_FILE_SIZE : (SMALL, streams.LongLongStream, "size"),
+                   REGULAR_FILE_SHA1 : (SMALL, streams.Sha1Stream,     "sha1") }
     __slots__ = [ "size", "sha1" ]
 
 class InodeStream(streams.StreamSet):
@@ -129,11 +130,10 @@ class InodeStream(streams.StreamSet):
     Stores basic inode information on a file: perms, owner, group.
     """
 
-    streamDict = { INODE_STREAM_PERMS : (streams.ShortStream,  "perms"),
-                   INODE_STREAM_MTIME : (streams.MtimeStream,  "mtime"),
-                   INODE_STREAM_OWNER : (streams.StringStream, "owner"),
-                   INODE_STREAM_GROUP : (streams.StringStream, "group") }
-    _streamDict = streams.StreamSetDef(streamDict)
+    streamDict = { INODE_STREAM_PERMS : (SMALL, streams.ShortStream,  "perms"),
+                   INODE_STREAM_MTIME : (SMALL, streams.MtimeStream,  "mtime"),
+                   INODE_STREAM_OWNER : (SMALL, streams.StringStream, "owner"),
+                   INODE_STREAM_GROUP : (SMALL, streams.StringStream, "group") }
     __slots__ = [ "perms", "mtime", "owner", "group" ]
 
     def triplet(self, code, setbit = 0):
@@ -248,16 +248,14 @@ class File(streams.StreamSet):
     lsTag = None
     hasContents = False
     skipChmod = False
-    streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
-                   FILE_STREAM_FLAGS : (FlagsStream, "flags"),
-                   FILE_STREAM_PROVIDES :
-                       (streams.DependenciesStream, 'provides'  ),
-                   FILE_STREAM_REQUIRES :
-                       (streams.DependenciesStream, 'requires'  ),
-                   FILE_STREAM_FLAVOR   :
-                       (streams.DependenciesStream, 'flavor'    ),
-		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
-    _streamDict = streams.StreamSetDef(streamDict)
+    streamDict = {
+        FILE_STREAM_INODE    : (SMALL, InodeStream, "inode"),
+        FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),
+        FILE_STREAM_PROVIDES : (SMALL, streams.DependenciesStream, 'provides'),
+        FILE_STREAM_REQUIRES : (SMALL, streams.DependenciesStream, 'requires'),
+        FILE_STREAM_FLAVOR   : (SMALL, streams.DependenciesStream, 'flavor'),
+        FILE_STREAM_TAGS     : (SMALL, streams.StringsStream, "tags")
+        }
     __slots__ = [ "thePathId", "inode", "flags", "tags",
                   'provides', 'requires', 'flavor' ]
 
@@ -363,10 +361,9 @@ class SymbolicLink(File):
 
     lsTag = "l"
     streamDict = {
-        FILE_STREAM_TARGET :   (streams.StringStream, "target"),
+        FILE_STREAM_TARGET :   (SMALL, streams.StringStream, "target"),
     }
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     # chmod() on a symlink follows the symlink
     skipChmod = True
     __slots__ = [ "target", ]
@@ -386,7 +383,6 @@ class Socket(File):
 
     lsTag = "s"
     __slots__ = []
-    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
         util.removeIfExists(target)
@@ -400,7 +396,6 @@ class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
-    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
         util.removeIfExists(target)
@@ -412,7 +407,6 @@ class Directory(File):
 
     lsTag = "d"
     __slots__ = []
-    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
 	if not os.path.isdir(target):
@@ -425,9 +419,8 @@ class Directory(File):
 
 class DeviceFile(File):
 
-    streamDict = { FILE_STREAM_DEVICE : (DeviceStream, "devt") }
+    streamDict = { FILE_STREAM_DEVICE : (SMALL, DeviceStream, "devt") }
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -451,30 +444,27 @@ class DeviceFile(File):
                 flags = stat.S_IFBLK
             os.mknod(target, flags, os.makedev(self.devt.major(), 
                                                self.devt.minor()))
-            
+
             File.restore(self, root, target, journal=journal)
 
 class BlockDevice(DeviceFile):
 
     lsTag = "b"
     __slots__ = []
-    _streamDict = DeviceFile._streamDict
 
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
     __slots__ = []
-    _streamDict = DeviceFile._streamDict
-    
+
 class RegularFile(File):
 
     streamDict = { 
-	FILE_STREAM_CONTENTS : (RegularFileStream,          'contents'  ),
-        FILE_STREAM_LINKGROUP: (LinkGroupStream,            'linkGroup' ),
+	FILE_STREAM_CONTENTS : (SMALL, RegularFileStream,      'contents'  ),
+        FILE_STREAM_LINKGROUP: (SMALL, LinkGroupStream,        'linkGroup' ),
     }
 
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = ('contents', 'linkGroup')
 
     lsTag = "-"
@@ -508,7 +498,7 @@ class RegularFile(File):
                 # clean up instead of leaving temp files around
                 os.unlink(tmpname)
                 raise
-            
+
             File.restore(self, root, target, journal=journal)
 	else:
 	    File.restore(self, root, target, journal=journal)

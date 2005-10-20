@@ -28,7 +28,7 @@ class TroveInfoTable:
                                                                   data)""")
 
     def addInfo(self, cu, trove, idNum):
-        for (tag, (streamType, name)) in trove.troveInfo.streamDict.iteritems():
+        for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
             if frz:
                 cu.execute("INSERT INTO TroveInfo VALUES (?, ?, ?)",
@@ -38,5 +38,5 @@ class TroveInfoTable:
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?", 
                    idNum)
         for (tag, frz) in cu:
-            name = trove.troveInfo.streamDict[tag][1]
+            name = trove.troveInfo.streamDict[tag][2]
             trove.troveInfo.__getattribute__(name).thaw(frz)

@@ -1528,15 +1528,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = 6
                 logMe(3, "finished migrating schema to version", version)
 
-            # switch TroveInfo to be a LargeStreamSet to accomodate
-            # lots of PathHashes
             if version == 6:
                 logMe(3, "migrating schema from version", version)
 
+                # erase signatures due to troveInfo storage changes
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
                            trove._TROVEINFO_TAG_SIGS)
+                # erase what used to be isCollection, to be replaced
+                # with flags stream
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
                            trove._TROVEINFO_TAG_FLAGS)
+                # get rid of install buckets
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
                            trove._TROVEINFO_TAG_INSTALLBUCKET)
 

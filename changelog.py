@@ -24,13 +24,17 @@ _CHANGELOG_NAME    = 1
 _CHANGELOG_CONTACT = 2
 _CHANGELOG_MESSAGE = 3
 
+SMALL = streams.SMALL
+LARGE = streams.LARGE
+
 class ChangeLog(streams.StreamSet):
 
-    streamDict = { _CHANGELOG_NAME    : (streams.StringStream, "name"    ),
-                   _CHANGELOG_CONTACT : (streams.StringStream, "contact" ),
-                   _CHANGELOG_MESSAGE : (streams.StringStream, "message" ) }
+    streamDict = {
+        _CHANGELOG_NAME    : (SMALL, streams.StringStream, "name"    ),
+        _CHANGELOG_CONTACT : (SMALL, streams.StringStream, "contact" ),
+        _CHANGELOG_MESSAGE : (SMALL, streams.StringStream, "message" )
+        }
 
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'name', 'contact', 'message' ]
 
     def getName(self):
@@ -66,7 +70,7 @@ class ChangeLog(streams.StreamSet):
 
 	if newMsg == msg:
 	    return False
-	
+
 	if newMsg[-len(msg):]:
 	    newMsg = newMsg[:-len(msg)]
 

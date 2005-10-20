@@ -31,6 +31,7 @@ from streams import FrozenVersionStream
 from streams import StringVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
+from streams import SMALL, LARGE
 
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
@@ -39,11 +40,10 @@ class TroveTuple(streams.StreamSet):
 
     ignoreUnknown = True
     streamDict = {
-        _SINGLE_TROVE_TUP_NAME    : (streams.StringStream,        'name'    ),
-        _SINGLE_TROVE_TUP_VERSION : (streams.StringVersionStream, 'version' ),
-        _SINGLE_TROVE_TUP_FLAVOR  : (streams.DependenciesStream,  'flavor'  )
+        _SINGLE_TROVE_TUP_NAME    : (SMALL, streams.StringStream,        'name'    ),
+        _SINGLE_TROVE_TUP_VERSION : (SMALL, streams.StringVersionStream, 'version' ),
+        _SINGLE_TROVE_TUP_FLAVOR  : (SMALL, streams.DependenciesStream,  'flavor'  )
     }
-    _streamDict = streams.StreamSetDef(streamDict)
 
     def __cmp__(self, other):
         first = self.name()
@@ -140,11 +140,10 @@ _DIGSIG_TIMESTAMP     = 2
 
 class DigitalSignature(streams.StreamSet):
     streamDict = {
-        _DIGSIG_FINGERPRINT     : ( streams.StringStream,    'fingerprint' ),
-        _DIGSIG_SIGNATURE       : ( streams.StringStream,    'signature'   ),
-        _DIGSIG_TIMESTAMP       : ( streams.IntStream,       'timestamp'   ),
+        _DIGSIG_FINGERPRINT     : (SMALL, streams.StringStream,    'fingerprint' ),
+        _DIGSIG_SIGNATURE       : (SMALL, streams.StringStream,    'signature'   ),
+        _DIGSIG_TIMESTAMP       : (SMALL, streams.IntStream,       'timestamp'   ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
 
     def _mpiToLong(self, data):
         length = ((ord(data[0]) << 8) + ord(data[1]) + 7) / 8
@@ -219,10 +218,9 @@ _TROVESIG_DIGSIG = 1
 class TroveSignatures(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVESIG_SHA1            : ( streams.Sha1Stream,    'sha1'        ),
-        _TROVESIG_DIGSIG          : ( DigitalSignatures,     'digitalSigs' ),
+        _TROVESIG_SHA1            : ( SMALL, streams.Sha1Stream,    'sha1'        ),
+        _TROVESIG_DIGSIG          : ( LARGE, DigitalSignatures,     'digitalSigs' ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
 
     # this code needs to be called any time we're making a derived
     # trove esp. shadows. since some info in the trove gets changed
@@ -270,22 +268,21 @@ _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10 
 
-class TroveInfo(streams.LargeStreamSet):
+class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVEINFO_TAG_SIZE          : ( streams.LongLongStream,'size'        ),
-        _TROVEINFO_TAG_SOURCENAME    : ( streams.StringStream,  'sourceName'  ),
-        _TROVEINFO_TAG_BUILDTIME     : ( streams.LongLongStream,'buildTime'   ),
-        _TROVEINFO_TAG_CONARYVER     : ( streams.StringStream, 'conaryVersion'),
-        _TROVEINFO_TAG_BUILDDEPS     : ( BuildDependencies,    'buildReqs'    ),
-        _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
+        _TROVEINFO_TAG_SIZE          : (SMALL, streams.LongLongStream,'size'        ),
+        _TROVEINFO_TAG_SOURCENAME    : (SMALL, streams.StringStream,  'sourceName'  ),
+        _TROVEINFO_TAG_BUILDTIME     : (SMALL, streams.LongLongStream,'buildTime'   ),
+        _TROVEINFO_TAG_CONARYVER     : (SMALL, streams.StringStream, 'conaryVersion'),
+        _TROVEINFO_TAG_BUILDDEPS     : (LARGE, BuildDependencies,    'buildReqs'    ),
+        _TROVEINFO_TAG_LOADEDTROVES  : (LARGE, LoadedTroves,         'loadedTroves' ),
         #_TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,       'installBucket'),
-        _TROVEINFO_TAG_FLAGS         : ( TroveFlagsStream,     'flags'        ),
-        _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom'   ),
-        _TROVEINFO_TAG_SIGS          : ( TroveSignatures,      'sigs'         ),
-        _TROVEINFO_TAG_PATH_HASHES   : ( PathHashes,           'pathHashes'   ),
+        _TROVEINFO_TAG_FLAGS         : (SMALL, TroveFlagsStream,     'flags'        ),
+        _TROVEINFO_TAG_CLONEDFROM    : (SMALL, StringVersionStream,  'clonedFrom'   ),
+        _TROVEINFO_TAG_SIGS          : (LARGE, TroveSignatures,      'sigs'         ),
+        _TROVEINFO_TAG_PATH_HASHES   : (LARGE, PathHashes,           'pathHashes'   ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -394,7 +391,7 @@ _STREAM_TRV_FILES      = 8
 _STREAM_TRV_REDIRECT   = 9
 _STREAM_TRV_SIGS       = 10
 
-class Trove(streams.LargeStreamSet):
+class Trove(streams.StreamSet):
     """
     Troves are groups of files and other troves, which are included by
     reference. By convention, "component" often refers to a trove with
@@ -409,18 +406,17 @@ class Trove(streams.LargeStreamSet):
     Conary often directly manipulates TroveChangeSet objects))
     """
     streamDict = { 
-        _STREAM_TRV_NAME       : (streams.StringStream,        "name"       ),
-        _STREAM_TRV_VERSION    : (streams.FrozenVersionStream, "version"    ), 
-        _STREAM_TRV_FLAVOR     : (streams.DependenciesStream,  "flavor"     ), 
-        _STREAM_TRV_PROVIDES   : (streams.DependenciesStream,  "provides"   ), 
-        _STREAM_TRV_REQUIRES   : (streams.DependenciesStream,  "requires"   ), 
-        _STREAM_TRV_CHANGELOG  : (changelog.ChangeLog,         "changeLog"  ), 
-        _STREAM_TRV_TROVEINFO  : (TroveInfo,                   "troveInfo"  ), 
-        _STREAM_TRV_TROVES     : (TroveRefsTrovesStream,       "troves"     ), 
-        _STREAM_TRV_FILES      : (TroveRefsFilesStream,        "idMap"      ), 
-        _STREAM_TRV_REDIRECT   : (ByteStream,                  "redirect"   ),
+        _STREAM_TRV_NAME       : (SMALL, streams.StringStream,        "name"       ),
+        _STREAM_TRV_VERSION    : (SMALL, streams.FrozenVersionStream, "version"    ), 
+        _STREAM_TRV_FLAVOR     : (LARGE, streams.DependenciesStream,  "flavor"     ), 
+        _STREAM_TRV_PROVIDES   : (LARGE, streams.DependenciesStream,  "provides"   ), 
+        _STREAM_TRV_REQUIRES   : (LARGE, streams.DependenciesStream,  "requires"   ), 
+        _STREAM_TRV_CHANGELOG  : (LARGE, changelog.ChangeLog,         "changeLog"  ), 
+        _STREAM_TRV_TROVEINFO  : (LARGE, TroveInfo,                   "troveInfo"  ), 
+        _STREAM_TRV_TROVES     : (LARGE, TroveRefsTrovesStream,       "troves"     ), 
+        _STREAM_TRV_FILES      : (LARGE, TroveRefsFilesStream,        "idMap"      ), 
+        _STREAM_TRV_REDIRECT   : (SMALL, ByteStream,                  "redirect"   ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
     ignoreUnknown = False
 
     # the memory savings from slots isn't all that interesting here, but it
@@ -434,10 +430,10 @@ class Trove(streams.LargeStreamSet):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
 
     def _sigString(self):
-        return streams.LargeStreamSet.freeze(self, 
-                                             skipSet = { 'sigs' : True,
-                                                      'versionStrings' : True,
-                                                      'pathHashes' : True })
+        return streams.StreamSet.freeze(self,
+                                        skipSet = { 'sigs' : True,
+                                                    'versionStrings' : True,
+                                                    'pathHashes' : True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         if skipIntegrityChecks:
             self.computeSignatures()
@@ -1428,7 +1424,7 @@ class Trove(streams.LargeStreamSet):
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         if name.count(':') > 1:
             raise TroveError, 'More than one ":" is not allowed in a trove name'
-        streams.LargeStreamSet.__init__(self)
+        streams.StreamSet.__init__(self)
         assert(flavor is not None)
 	self.name.set(name)
 	self.version.set(version)
@@ -1614,28 +1610,27 @@ _STREAM_TCS_NEW_SIGS        = 16
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
 
-class AbstractTroveChangeSet(streams.LargeStreamSet):
+class AbstractTroveChangeSet(streams.StreamSet):
 
     streamDict = { 
-	_STREAM_TCS_NAME	: (streams.StringStream, "name"          ),
-        _STREAM_TCS_OLD_VERSION : (FrozenVersionStream,  "oldVersion"    ),
-        _STREAM_TCS_NEW_VERSION : (FrozenVersionStream,  "newVersion"    ),
-        _STREAM_TCS_REQUIRES    : (DependenciesStream,   "requires"      ),
-        _STREAM_TCS_PROVIDES    : (DependenciesStream,   "provides"      ),
-        _STREAM_TCS_CHANGE_LOG  : (ChangeLog,            "changeLog"     ),
-        _STREAM_TCS_OLD_FILES   : (OldFileStream,	 "oldFiles"      ),
-        _STREAM_TCS_TYPE        : (streams.IntStream,    "tcsType"       ),
-        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,   "troves"        ),
-        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,   "newFiles"      ),
-        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,   "changedFiles"  ),
-        _STREAM_TCS_OLD_FLAVOR  : (DependenciesStream,   "oldFlavor"     ),
-        _STREAM_TCS_NEW_FLAVOR  : (DependenciesStream,   "newFlavor"     ),
-        _STREAM_TCS_IS_REDIRECT : (ByteStream,           "isRedirect"    ),
-        _STREAM_TCS_TROVEINFO   : (streams.StringStream, "troveInfoDiff" ),
-        _STREAM_TCS_OLD_SIGS    : (TroveSignatures,      "oldSigs"       ),
-        _STREAM_TCS_NEW_SIGS    : (TroveSignatures,      "newSigs"       ),
+	_STREAM_TCS_NAME	: (SMALL, streams.StringStream, "name"       ),
+        _STREAM_TCS_OLD_VERSION : (SMALL, FrozenVersionStream,  "oldVersion" ),
+        _STREAM_TCS_NEW_VERSION : (SMALL, FrozenVersionStream,  "newVersion" ),
+        _STREAM_TCS_REQUIRES    : (LARGE, DependenciesStream,   "requires"   ),
+        _STREAM_TCS_PROVIDES    : (LARGE, DependenciesStream,   "provides"   ),
+        _STREAM_TCS_CHANGE_LOG  : (LARGE, ChangeLog,            "changeLog"  ),
+        _STREAM_TCS_OLD_FILES   : (LARGE, OldFileStream,        "oldFiles"   ),
+        _STREAM_TCS_TYPE        : (SMALL, streams.IntStream,    "tcsType"    ),
+        _STREAM_TCS_TROVE_CHANGES:(LARGE, ReferencedTroveSet,   "troves"     ),
+        _STREAM_TCS_NEW_FILES   : (LARGE, ReferencedFileList,   "newFiles"   ),
+        _STREAM_TCS_CHG_FILES   : (LARGE, ReferencedFileList,   "changedFiles"),
+        _STREAM_TCS_OLD_FLAVOR  : (SMALL, DependenciesStream,   "oldFlavor"  ),
+        _STREAM_TCS_NEW_FLAVOR  : (SMALL, DependenciesStream,   "newFlavor"  ),
+        _STREAM_TCS_IS_REDIRECT : (SMALL, ByteStream,           "isRedirect" ),
+        _STREAM_TCS_TROVEINFO   : (LARGE, streams.StringStream, "troveInfoDiff"),
+        _STREAM_TCS_OLD_SIGS    : (LARGE, TroveSignatures,      "oldSigs"    ),
+        _STREAM_TCS_NEW_SIGS    : (LARGE, TroveSignatures,      "newSigs"    ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
 
     ignoreUnknown = True
 
@@ -1874,8 +1869,6 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
-    _streamDict = AbstractTroveChangeSet._streamDict
-
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, oldSigs, newSigs,
                  absolute = 0, isRedirect = False,
@@ -1904,8 +1897,6 @@ class TroveChangeSet(AbstractTroveChangeSet):
         self.newSigs.thaw(newSigs.freeze())
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
-
-    _streamDict = AbstractTroveChangeSet._streamDict
 
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)

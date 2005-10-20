@@ -51,12 +51,16 @@ _FILEINFO_OLDFILEID = 1
 _FILEINFO_NEWFILEID = 2
 _FILEINFO_CSINFO    = 3
 
+SMALL = streams.SMALL
+LARGE = streams.LARGE
+
 class FileInfo(streams.StreamSet):
 
-    streamDict = { _FILEINFO_OLDFILEID : (streams.StringStream, "oldFileId"),
-                   _FILEINFO_NEWFILEID : (streams.StringStream, "newFileId"),
-                   _FILEINFO_CSINFO    : (streams.StringStream, "csInfo"   ) }
-    _streamDict = streams.StreamSetDef(streamDict)
+    streamDict = {
+        _FILEINFO_OLDFILEID : (SMALL, streams.StringStream, "oldFileId"),
+        _FILEINFO_NEWFILEID : (SMALL, streams.StringStream, "newFileId"),
+        _FILEINFO_CSINFO    : (LARGE, streams.StringStream, "csInfo"   )
+        }
     __slots__ = [ "oldFileId", "newFileId", "csInfo" ]
 
     def __init__(self, first, newFileId = None, csInfo = None):
@@ -76,7 +80,7 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 	    s = trv.freeze()
 	    l.append(struct.pack("!I", len(s)))
 	    l.append(s)
-	
+
 	return "".join(l)
 
     def thaw(self, data):
@@ -87,14 +91,14 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 	    s = data[i: i + size]
 	    i += size
 	    trvCs = trove.ThawTroveChangeSet(s)
-	    
+
 	    self[(trvCs.getName(), trvCs.getNewVersion(),
 					  trvCs.getNewFlavor())] = trvCs
 
     def __init__(self, data = None):
 	if data:
 	    self.thaw(data)
-	    
+
 class ChangeSetFileDict(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
@@ -115,7 +119,7 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 	    i += 4
 	    info = FileInfo(data[i:i+size])
 	    i += size
-	    
+
             oldFileId = info.oldFileId()
             if oldFileId == "":
                 oldFileId = None
@@ -127,16 +131,18 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 	if data:
 	    self.thaw(data)
 
-class ChangeSet(streams.LargeStreamSet):
+class ChangeSet(streams.StreamSet):
 
-    streamDict = { 
-     _STREAM_CS_PRIMARY   :(streams.ReferencedTroveList, "primaryTroveList"),
-     _STREAM_CS_TROVES    :(ChangeSetNewTroveList,       "newTroves"       ),
-     _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"       ),
-     _STREAM_CS_FILES     :(ChangeSetFileDict,		 "files"           ),
+    streamDict = {
+        _STREAM_CS_PRIMARY:
+        (LARGE, streams.ReferencedTroveList, "primaryTroveList"),
+        _STREAM_CS_TROVES:
+        (LARGE, ChangeSetNewTroveList,       "newTroves"       ),
+        _STREAM_CS_OLD_TROVES:
+        (LARGE, streams.ReferencedTroveList, "oldTroves"       ),
+        _STREAM_CS_FILES:
+           (LARGE, ChangeSetFileDict,        "files"           ),
     }
-    _streamDict = streams.StreamSetDef(streamDict)
-
     ignoreUnknown = True
 
     def _resetTroveLists(self):
@@ -675,7 +681,7 @@ class ChangeSet(streams.LargeStreamSet):
         return jobSet
             
     def __init__(self, data = None):
-	streams.LargeStreamSet.__init__(self, data)
+	streams.StreamSet.__init__(self, data)
 	self.configCache = {}
 	self.fileContents = {}
 	self.absolute = False
@@ -683,7 +689,7 @@ class ChangeSet(streams.LargeStreamSet):
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
-    _streamDict = ChangeSet._streamDict
+    #streamDict = ChangeSet.streamDict
 
     def __init__(self, absCS):
 	self.absCS = absCS
@@ -725,8 +731,6 @@ class PathIdsConflictError(Exception):
                                                  path2, trove2.getName(), v2))
 
 class ReadOnlyChangeSet(ChangeSet):
-
-    _streamDict = ChangeSet._streamDict
 
     def fileQueueCmp(a, b):
         if a[1][0] == "1" and b[1][0] == "0":
@@ -1083,8 +1087,6 @@ class ReadOnlyChangeSet(ChangeSet):
         self.fileQueue = []
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
-
-    _streamDict = ReadOnlyChangeSet._streamDict
 
     def __init__(self, fileName, skipValidate = 1):
         if type(fileName) is str:

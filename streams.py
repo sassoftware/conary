@@ -27,8 +27,9 @@ IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
 StreamSet = cstreams.StreamSet
-LargeStreamSet = cstreams.LargeStreamSet
 StreamSetDef = cstreams.StreamSetDef
+SMALL = cstreams.SMALL
+LARGE = cstreams.LARGE
 
 class InfoStream(object):
 
