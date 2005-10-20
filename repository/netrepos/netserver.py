@@ -704,8 +704,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
-        if clientVersion < 34 and not labelStr:
-            return {}
         # authenticate this user first
         if not self.auth.check(authToken):
             return {}
@@ -1189,35 +1187,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     self.toFileId(fileId))
 	return self.fromFile(f)
 
-    def _getPackageBranchPathIdsV32(self, sourceName, branch):
-        logMe(1, sourceName, branch)
-        cu = self.db.cursor()
-        query = """
-            SELECT DISTINCT pathId, path FROM
-                TroveInfo JOIN Instances using (instanceId)
-                INNER JOIN Nodes using (itemId, versionId)
-                INNER JOIN Branches using(branchId)
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY 
-                    Nodes.finalTimestamp DESC
-        """
-        args = [trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch]
-        cu.execute(query, args)       
-        logMe(3, "executing query", query, args)
-        
-        ids = {}
-        for (pathId, path) in cu:
-            encodedPath = self.fromPath(path)
-            if encodedPath not in ids:
-                ids[encodedPath] = self.fromPathId(pathId)
-
-        return ids
-
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
                                 branch):
         logMe(1, sourceName, branch)
@@ -1225,9 +1194,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
 	    raise InsufficientPermission
-
-        if clientVersion < 33:
-            return self._getPackageBranchPathIdsV32(sourceName, branch)
 
         cu = self.db.cursor()
 
