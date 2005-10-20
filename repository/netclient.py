@@ -1078,9 +1078,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param branch: branch to restrict the source to
         @type branch: versions.Branch
         """
-        ids = self.c[branch].getPackageBranchPathIds(sourceName, 
-                                                     self.fromVersion(branch))
-        return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
+        return dict((self.toPath(x[0]), (self.toPathId(x[1][0]),
+                                         self.toVersion(x[1][1]),
+                                         self.toFileId(x[1][2])))
                     for x in ids.iteritems())
 
     def getCollectionMembers(self, troveName, branch):
