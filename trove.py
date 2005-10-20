@@ -237,7 +237,7 @@ class TroveSignatures(streams.StreamSet):
 
         return streams.StreamSet.freeze(self, skipSet = skipSet)
 
-_TROVE_FLAG_ISCOLLECTION = 0
+_TROVE_FLAG_ISCOLLECTION = 1 << 0
 
 class TroveFlagsStream(streams.NumericStream):
 
