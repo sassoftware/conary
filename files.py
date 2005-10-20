@@ -619,7 +619,7 @@ def contentsChanged(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
 	
-	if RegularFile.streamDict[streamId][1] == "contents":
+	if RegularFile.streamDict[streamId][2] == "contents":
             if tupleChanged(RegularFileStream, diff[i:i+size]):
                 return True
 	i += size
@@ -656,7 +656,7 @@ def fieldsChanged(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
 
-	name = cl.streamDict[streamId][1]
+	name = cl.streamDict[streamId][2]
 	
 	if name == "inode":
 	    l = tupleChanged(InodeStream, diff[i:i+size])
@@ -682,7 +682,7 @@ def tupleChanged(cl, diff):
     rc = []
     while i < len(diff):
         streamId, size = struct.unpack("!BH", diff[i:i+3])
-        name = cl.streamDict[streamId][1]
+        name = cl.streamDict[streamId][2]
         rc.append(name)
         i += size + 3
 
