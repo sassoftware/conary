@@ -499,17 +499,17 @@ static inline void getSmallTag(char** buf, int *tag, int *size) {
     char *chptr = *buf;
     *tag = *chptr;
     chptr++;
-    *size = ntohs(*((short *) chptr));
-    chptr += sizeof(short);
+    *size = ntohs(*((unsigned short *) chptr));
+    chptr += sizeof(unsigned short);
     *buf = chptr;
 }
 
 static inline void getLargeTag(char** buf, int *tag, int *size) {
     char *chptr = *buf;
-    *tag = ntohs(*((short *) chptr));
-    chptr += sizeof(short);
-    *size = ntohl(*((int *) chptr));
-    chptr += sizeof(int);
+    *tag = ntohs(*((unsigned short *) chptr));
+    chptr += sizeof(unsigned short);
+    *size = ntohl(*((unsigned int *) chptr));
+    chptr += sizeof(unsigned int);
     *buf = chptr;
 }
 
@@ -592,6 +592,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     int size; 
     int streamId;
     PyObject * attr, * baseAttr, * ro;
+    void (*getTag)(char**,int*,int*);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "z#O!|O", kwlist, 
 				     &diff, &diffLen, self->ob_type,
@@ -610,12 +611,15 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 
     ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
 
+    if (ssd->size == SIZE_SMALL)
+	getTag = getSmallTag;
+    else
+	getTag = getLargeTag;
+
     end = diff + diffLen;
     chptr = diff;
     while (chptr < end) {
-	streamId = *chptr++;
-	size = ntohs(*((short *) chptr));
-	chptr += sizeof(short);
+	getTag(&chptr, &streamId, &size);
 	streamData = chptr;
 	chptr += size;
 
@@ -784,8 +788,12 @@ PyTypeObject StreamSetType = {
 };
 
 static PyMethodDef LargeStreamSetMethods[] = {
+    { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS         },
+    { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS                 },
+    { "__eq__", (PyCFunction) StreamSet_Eq,     METH_VARARGS | METH_KEYWORDS },
     { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
     { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
+    { "twm",    (PyCFunction) StreamSet_Twm,    METH_VARARGS | METH_KEYWORDS },
     {NULL}  /* Sentinel */
 };
 
