@@ -1576,9 +1576,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=6")                
                 self.db.commit()
                 version = 6
-                logMe(3, "finished migrating the schema to version", version)
+                logMe(3, "finished migrating schema to version", version)
 
-            if version == 6:
+            # switch TroveInfo to be a LargeStreamSet to accomodate lots of PathHashes
+            if 0 and version == 6:
                 logMe(3, "migrating schema from version", version)
 
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
@@ -1594,6 +1595,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 flags.isCollection(set = False)
                 notCollectionStream = flags.freeze()
 
+                # XXX: Items does not have instanceId...
                 cu.execute("""
                     INSERT INTO TroveInfo
                         SELECT instanceId, ?, ?
@@ -1615,7 +1617,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("UPDATE DatabaseVersion SET version=7")                
                 self.db.commit()
                 version = 7
-                logMe(3, "finished migrating the schema to version", version)
+                logMe(3, "finished migrating schema to version", version)
                 
             if version != self.schemaVersion:
                 return False
