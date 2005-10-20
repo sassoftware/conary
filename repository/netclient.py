@@ -186,11 +186,7 @@ class ServerCache:
                     (",".join([str(x) for x in serverVersions]),
                      ",".join([str(x) for x in CLIENT_VERSIONS]))
 
-            server.serverVersion = max(intersection)
-            # server protocol version 35 or greater can accept
-            # a compressed request from the client
-            if server.serverVersion >= 35:
-                transporter.setCompress(True)
+            transporter.setCompress(True)
 
 	return server
 		
@@ -1084,14 +1080,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         """
         ids = self.c[branch].getPackageBranchPathIds(sourceName, 
                                                      self.fromVersion(branch))
-        if self.c[branch].serverVersion >= 33:
-            return dict((self.toPath(x[0]), (self.toPathId(x[1][0]),
-                                             self.toVersion(x[1][1]),
-                                             self.toFileId(x[1][2])))
-                        for x in ids.iteritems())
-        else:
-            return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
-                        for x in ids.iteritems())
+        return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
+                    for x in ids.iteritems())
 
     def getCollectionMembers(self, troveName, branch):
         """
