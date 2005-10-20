@@ -724,7 +724,7 @@ class FilesystemJob:
                 headFile = files.ThawFile(headChanges, pathId)
                 
             if baseFile.flags.isAutoSource():
-                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+                fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
                 continue
             
             # FIXME we should be able to inspect headChanges directly

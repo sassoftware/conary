@@ -9,6 +9,8 @@ Changes in 0.70.0:
   * Conary now does the right thing if the same trove is listed twice
     in an update due to recursion (it checks for duplicate installs of
     the same trove)
+  * Fix bug where None would show up in CONARY files when an autosource
+    file changed contents but did not change names
 
 Changes in 0.62.16:
   * The "conary update" and "conary erase" commands now display the actions
