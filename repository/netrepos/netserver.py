@@ -1557,13 +1557,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     SELECT Instances.itemId FROM Instances
                     WHERE Instances.isPresent = 1 ) """)
 
-                cu.execute("UPDATE DatabaseVersion SET version=6")                
+                cu.execute("UPDATE DatabaseVersion SET version=6")
                 self.db.commit()
                 version = 6
                 logMe(3, "finished migrating schema to version", version)
 
-            # switch TroveInfo to be a LargeStreamSet to accomodate lots of PathHashes
-            if 0 and version == 6:
+            # switch TroveInfo to be a LargeStreamSet to accomodate
+            # lots of PathHashes
+            if version == 6:
                 logMe(3, "migrating schema from version", version)
 
                 cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
@@ -1579,24 +1580,27 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 flags.isCollection(set = False)
                 notCollectionStream = flags.freeze()
 
-                # XXX: Items does not have instanceId...
                 cu.execute("""
                     INSERT INTO TroveInfo
-                        SELECT instanceId, ?, ?
-                            FROM Items, Instances WHERE
-                                NOT (item LIKE '%:%' OR item LIKE 'fileset-')
-                               AND
-                                Items.instanceId = Instances.instanceId
-                    """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
+                    SELECT
+                        instanceId, ?, ?
+                    FROM
+                        Items, Instances
+                    WHERE
+                            NOT (item LIKE '%:%' OR item LIKE 'fileset-%')
+                        AND Items.itemId = Instances.itemId
+                    """, (trove._TROVEINFO_TAG_FLAGS, collectionStream))
 
                 cu.execute("""
                     INSERT INTO TroveInfo
-                        SELECT instanceId, ?, ?
-                            FROM Items, Instances WHERE
-                                (item LIKE '%:%' OR item LIKE 'fileset-')
-                            WHERE
-                                Items.instanceId = Instances.instanceId
-                    """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
+                    SELECT
+                        instanceId, ?, ?
+                    FROM
+                        Items, Instances
+                    WHERE
+                            (item LIKE '%:%' OR item LIKE 'fileset-%')
+                        AND Items.itemId = Instances.itemId
+                    """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
 
                 cu.execute("UPDATE DatabaseVersion SET version=7")
                 self.db.commit()
