@@ -1,16 +1,30 @@
 Changes in 0.70.0:
-  * Adding path hash data to TroveInfo overflowed the amount of
-    storage space available in a StreamSet when a trove contained
-    several thousand files.  TroveInfo is now stored as a
-    LargeStreamSet, which changes the on-disk changeset
-    representation.  Therefore 0.70.0 changes the filecontainer
-    version number.  We have changed the network protocol version
-    number.
-  * Conary now does the right thing if the same trove is listed twice
-    in an update due to recursion (it checks for duplicate installs of
-    the same trove)
-  * Fix bug where None would show up in CONARY files when an autosource
-    file changed contents but did not change names
+  o The client and server protocol versions have been changed and
+    the filecontainer version number updated.
+    * Upgrading from previous versions of Conary to 0.70.0 will
+      require downloading a old-format changeset file from
+      ftp://download.rpath.com/pub/conary/
+    * Adding path hash data to TroveInfo overflowed the amount of
+      storage space available in a StreamSet when a trove contained
+      several thousand files.  In order to accommodate larger data
+      stored in StreamSets, we have changed the way data sizes are
+      handled.
+    * With the changes to StreamSet, LargeStreamSet is obsolete.
+      Changeset files used to used LargeStreamSet to represent data.
+      Since we now just use a StreamSet, the changeset file format
+      changed.
+    * Since this version of Conary is incompatible with previous
+      versions, we took this opportunity to do database and repository
+      migrations that will allow us to make significant code cleanups
+      in the near future.
+
+ o Other smaller changes
+    * Conary now does the right thing if the same trove is listed
+      twice in an update due to recursion (it checks for duplicate
+      installs of the same trove).
+    * A bug where None would show up in CONARY files when an
+      autosource file changed contents but did not change names has
+      been fixed.
 
 Changes in 0.62.16:
   * The "conary update" and "conary erase" commands now display the actions
