@@ -35,6 +35,7 @@ staticforward PyTypeObject StreamSetDefType;
 
 struct tagInfo {
     int tag;
+    int size;
     PyObject * name;
     PyObject * type;
 };
@@ -43,7 +44,6 @@ typedef struct {
     PyObject_HEAD
     struct tagInfo * tags;
     int tagCount;
-    int size;
 } StreamSetDefObject;
 
 typedef struct {
@@ -51,7 +51,7 @@ typedef struct {
 } StreamSetObject;
 
 static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
-		    char * data, int dataLen, int offset, int streamSize);
+		    char * data, int dataLen, int offset);
 
 /* ------------------------------------- */
 /* StreamSetDef Implementation           */
@@ -88,14 +88,16 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
     for (i = 0; i < items->ob_size; i++) {
 	int tag;
 	PyObject * streamType;
+	int size;
 	char * name;
 
-	if (!PyArg_ParseTuple(items->ob_item[i], "i(Os)",
-			 &tag, &streamType, &name)) {
+	if (!PyArg_ParseTuple(items->ob_item[i], "i(iOs)",
+			      &tag, &size, &streamType, &name)) {
 	    return -1;
 	}
 
 	ssd->tags[i].tag = tag;
+	ssd->tags[i].size = size;
 	ssd->tags[i].name = PyString_FromString(name);
 	ssd->tags[i].type = streamType;
 	Py_INCREF(streamType);
@@ -126,8 +128,10 @@ static int _StreamSet_doCmp(PyObject * self, PyObject * other,
     PyObject * attr, * otherAttr, * rc;
 
     if (self->ob_type != other->ob_type) return 1;
-    
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+
+    ssd = (void *) PyObject_GetAttrString((PyObject *)self->ob_type,
+					  "_streamDict");
+
     for (i = 0; i < ssd->tagCount; i++) {
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) 
 	    continue;
@@ -145,7 +149,7 @@ static int _StreamSet_doCmp(PyObject * self, PyObject * other,
 	    Py_DECREF(rc);
 	    return 1;
 	}
-	
+
 	Py_DECREF(rc);
     }
 
@@ -156,54 +160,91 @@ static int StreamSet_Cmp(PyObject * self, PyObject * other) {
     return _StreamSet_doCmp(self, other, Py_None);
 }
 
-/* constants for size argument */
 #define SIZE_SMALL sizeof(char) + sizeof(short)
-#define SIZE_LARGE sizeof(short) + sizeof(int)
+#define SIZE_LARGE sizeof(char) + sizeof(long)
 
 /* constants for includeEmpty argument */
 #define EXCLUDE_EMPTY 0
 #define INCLUDE_EMPTY 1
 
-static inline int addSmallTag(char** buf, int tag, int valLen) {
+static inline int addTag(char** buf, int tag, int valSize, int valLen) {
     char *chptr = *buf;
+    int len;
+
+    /* first char is the tag */
     *chptr++ = tag;
-    if (valLen > USHRT_MAX) {
-        PyErr_SetString(PyExc_TypeError, "unsigned short overflow");
-	return -1;
+
+    /* next is the size.  if a small value is specified, use 15
+       bits for the size.  if a large value is specified, use 31
+       bits for the size and set the high bit to 1 */
+    if (valSize == SMALL) {
+	if (valLen > SHRT_MAX) {
+	    PyErr_SetString(PyExc_TypeError, "short int overflow");
+	    return -1;
+	}
+	*((int16_t *) chptr) = htons(valLen);
+	chptr += sizeof(int16_t);
+    } else if (valSize == LARGE) {
+	if (valLen > LONG_MAX) {
+	    PyErr_SetString(PyExc_TypeError, "long int overflow");
+	    return -1;
+	}
+	/* set the high bit to 1, which signifies that we're
+	   using 31 bits for the size */
+	*((uint32_t *) chptr) = htonl(valLen | (1 << 31));
+	chptr += sizeof(uint32_t);
+    } else {
+	/* unreachable */
+	assert(0);
     }
-    *((unsigned short *) chptr) = htons(valLen);
-    chptr += sizeof(unsigned short);
+
+    /* figure out how much space we used */
+    len = chptr - *buf;
+
+    /* move the buffer pointer to the current posititon */
     *buf = chptr;
-    return 0;
+
+    /* return the amount of space consumed */
+    return len;
 }
 
-static inline int addLargeTag(char** buf, int tag, int valLen) {
+static inline void getTag(char** buf, int *tag, int *size) {
     char *chptr = *buf;
-    *((short *) chptr) = htons(tag);
-    chptr += sizeof(short);
-    *((unsigned int *) chptr) = htonl(valLen);
-    chptr += sizeof(int);
+    char b;
+
+    *tag = *chptr;
+    chptr++;
+    /* read the next byte */
+    b = *chptr;
+    if (b & (1 << 7)) {
+	/* if the high bit is set, this is a 31 bit size */
+	*size = ntohl(*((uint32_t *) chptr)) & ~(1 << 31);
+	chptr += sizeof(uint32_t);
+    } else {
+	/* otherwise it's a 15 bit size.  mask out the high bit */
+	*size = ntohs(*((int16_t *) chptr));
+	chptr += sizeof(int16_t);
+    }
     *buf = chptr;
-    return 0;
 }
 
 static PyObject *concatStrings(StreamSetDefObject *ssd,
 			       PyObject ** vals,
-			       int len,
-			       int includeEmpty,
-			       int size) {
+			       int includeEmpty) {
     char *final, *chptr;
-    int i, valLen, useAlloca = 0;
+    int i, len, valLen, rc, useAlloca = 0;
     PyObject * result;
-    int (*addTag)(char**,int,int);
 
-    assert(size == SIZE_SMALL || size == SIZE_LARGE);
     assert(includeEmpty == INCLUDE_EMPTY || includeEmpty == EXCLUDE_EMPTY);
 
-    if (size == SIZE_SMALL)
-	addTag = addSmallTag;
-    else
-	addTag = addLargeTag;
+    /* first calculate the amount of space needed (worst case) */
+    len = 0;
+    for (i = 0; i < ssd->tagCount; i++) {
+	if (vals[i] != Py_None)  {
+	    valLen = PyString_GET_SIZE(vals[i]);
+	    len += valLen + SIZE_LARGE;
+	}
+    }
 
     if (len < ALLOCA_CUTOFF) {
 	useAlloca = 1;
@@ -215,22 +256,23 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 	/* FIXME: memory leak.  DECREF vals here */
 	return PyErr_NoMemory();
 
+    len = 0;
     chptr = final;
     for (i = 0; i < ssd->tagCount; i++) {
 	if (vals[i] != Py_None)  {
 	    valLen = PyString_GET_SIZE(vals[i]);
+	    len += valLen;
 	    /* do not include zero length frozen data if requested */
 	    if (valLen > 0 || includeEmpty) {
 		/* either we have data or including empty data was
 		   requested */
-		if (addTag(&chptr, ssd->tags[i].tag, valLen))
+		rc = addTag(&chptr, ssd->tags[i].tag, ssd->tags[i].size,
+			    valLen);
+		if (-1 == rc)
 		    goto error;
+		len += rc;
 		memcpy(chptr, PyString_AS_STRING(vals[i]), valLen);
 		chptr += valLen;
-	    } else {
-		/* otherwise we need to reduce the total size because
-		   we are excluding tags */
-		len -= size;
 	    }
 	}
 
@@ -283,14 +325,15 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
     if (!PyArg_ParseTuple(args, "O!", self->ob_type, &other))
         return NULL;
 
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
+					  "_streamDict");
+
     len = sizeof(PyObject *) * ssd->tagCount;
     if (len < ALLOCA_CUTOFF) {
 	useAlloca = 1;
 	vals = alloca(len);
     } else
 	vals = malloc(len);
-    len = 0;
 
     for (i = 0; i < ssd->tagCount; i++) {
 	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
@@ -309,14 +352,13 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
 	    if (!useAlloca)
 		free(vals);
 	    return NULL;
-	} else if (vals[i] != Py_None)
-	    len += ssd->size + PyString_GET_SIZE(vals[i]);
+	}
     }
 
     /* note that, unlike freeze(), diff() includes diffs that
        are zero length.  they have special meaning in some
        stream types (usually that the stored value is None) */
-    rc = concatStrings(ssd, vals, len, INCLUDE_EMPTY, ssd->size);
+    rc = concatStrings(ssd, vals, INCLUDE_EMPTY);
 
     if (!useAlloca)
 	free(vals);
@@ -370,14 +412,15 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	return NULL;
     }
 
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
+					  "_streamDict");
+
     len = sizeof(PyObject *) * ssd->tagCount;
     if (len < ALLOCA_CUTOFF) {
 	useAlloca = 1;
 	vals = alloca(len);
     } else
 	vals = malloc(len);
-    len = 0;
 
     for (i = 0; i < ssd->tagCount; i++) {
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) {
@@ -401,20 +444,17 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 		free(vals);
 	    return NULL;
 	}
-
-        if (vals[i] != Py_None)
-            len += PyString_GET_SIZE(vals[i]) + ssd->size;
     }
 
     /* do not include zero length frozen data */
-    rc = concatStrings(ssd, vals, len, EXCLUDE_EMPTY, ssd->size);
+    rc = concatStrings(ssd, vals, EXCLUDE_EMPTY);
     if (!useAlloca)
 	free(vals);
     return rc;
 }
 
-static int StreamSet_Init_Common(PyObject * o, PyObject * args,
-				 PyObject * kwargs, int size) {
+static int StreamSet_Init(PyObject * o, PyObject * args,
+			  PyObject * kwargs) {
     static char * kwlist[] = { "data", "offset", NULL };
     StreamSetObject *self = (StreamSetObject *) o;
     StreamSetDefObject * ssd;
@@ -428,26 +468,49 @@ static int StreamSet_Init_Common(PyObject * o, PyObject * args,
         return -1;
     }
 
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    ssd = (void *) PyObject_GetAttrString((PyObject *) o->ob_type,
+					  "_streamDict");
+
     if (!ssd) {
-	char *buf;
-	int len = 50 + strlen(self->ob_type->tp_name);
-	buf = malloc(len);
-	if (buf == NULL) {
-	    PyErr_NoMemory();
+	PyObject *sd;
+	int rc;
+	PyObject *arg;
+
+	/* clear the old error */
+	PyErr_Clear();
+	sd = PyObject_GetAttrString((PyObject *) o->ob_type, "streamDict");
+	if (!sd) {
+	    char *buf;
+	    int len = 50 + strlen(self->ob_type->tp_name);
+	    buf = malloc(len);
+	    if (buf == NULL) {
+		PyErr_NoMemory();
+		return -1;
+	    }
+	    len = snprintf(buf, len,
+			   "%s class is missing the streamDict class variable",
+			   o->ob_type->tp_name);
+	    PyErr_SetString(PyExc_ValueError, buf);
+	    free(buf);
 	    return -1;
 	}
-	len = snprintf(buf, len, "%s class is missing the _streamDict class attribute", self->ob_type->tp_name);
-        PyErr_SetString(PyExc_ValueError, buf);
-	free(buf);
-	return -1;
+
+	ssd = (void *) PyObject_New(StreamSetDefObject, &StreamSetDefType);
+	if (NULL == ssd)
+	    return -1;
+	arg = PyTuple_New(1);
+	PyTuple_SetItem(arg, 0, sd);
+	rc = StreamSetDef_Init((PyObject *) ssd, arg, NULL);
+	Py_DECREF(arg);
+	if (-1 == rc)
+	    return -1;
+	PyObject_SetAttrString((PyObject *) o->ob_type, "_streamDict",
+			       (PyObject *) ssd);
     } else if (ssd->ob_type != &StreamSetDefType) {
         PyErr_SetString(PyExc_TypeError, 
 			"_streamDict attribute must be a cstreams.StreamSetDef");
 	return -1;
     }
-
-    ssd->size = size;
 
     for (i = 0; i < ssd->tagCount; i++) {
 	PyObject * obj;
@@ -466,69 +529,37 @@ static int StreamSet_Init_Common(PyObject * o, PyObject * args,
     if (!data)
 	return 0;
 
-    if (Thaw_raw(o, ssd, data, dataLen, offset, ssd->size))
+    if (Thaw_raw(o, ssd, data, dataLen, offset))
 	return -1;
 
     return 0;
-}
-
-static int StreamSet_Init(PyObject * self, PyObject * args,
-			  PyObject * kwargs) {
-    return StreamSet_Init_Common(self, args, kwargs, SIZE_SMALL);
 }
 
 static PyObject * StreamSet_Thaw(PyObject * o, PyObject * args) {
     char * data = NULL;
     int dataLen;
     StreamSetDefObject * ssd;
-    StreamSetObject *self = (StreamSetObject *) o;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen))
         return NULL;
 
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    ssd = (void *) PyObject_GetAttrString((PyObject *) o->ob_type,
+					  "_streamDict");
 
-    if (Thaw_raw(o, ssd, data, dataLen, 0, ssd->size))
+    if (Thaw_raw(o, ssd, data, dataLen, 0))
 	return NULL;
 
     Py_INCREF(Py_None);
     return Py_None;
 }
 
-static inline void getSmallTag(char** buf, int *tag, int *size) {
-    char *chptr = *buf;
-    *tag = *chptr;
-    chptr++;
-    *size = ntohs(*((unsigned short *) chptr));
-    chptr += sizeof(unsigned short);
-    *buf = chptr;
-}
-
-static inline void getLargeTag(char** buf, int *tag, int *size) {
-    char *chptr = *buf;
-    *tag = ntohs(*((unsigned short *) chptr));
-    chptr += sizeof(unsigned short);
-    *size = ntohl(*((unsigned int *) chptr));
-    chptr += sizeof(unsigned int);
-    *buf = chptr;
-}
-
 static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
-		    char * data, int dataLen, int offset,
-		    int streamSize) {
+		    char * data, int dataLen, int offset) {
     char * streamData, * chptr, * end;
     int size, i;
     PyObject * attr, * ro;
     int ignoreUnknown = -1;
     int streamId;
-    void (*getTag)(char**,int*,int*);
-
-    assert(streamSize == SIZE_SMALL || streamSize == SIZE_LARGE);
-
-    if (streamSize == SIZE_SMALL)
-	getTag = getSmallTag;
-    else
-	getTag = getLargeTag;
 
     end = data + dataLen;
     chptr = data + offset;
@@ -546,8 +577,7 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	    if (ignoreUnknown == 1)
 		continue;
 	    if (ignoreUnknown == -1) {
-		obj = PyDict_GetItemString(self->ob_type->tp_dict, 
-					   "ignoreUnknown");
+		obj = PyObject_GetAttrString(self, "ignoreUnknown");
 		if (obj != NULL) {
 		    ignoreUnknown = PyInt_AsLong(obj);
 		}
@@ -589,10 +619,9 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     StreamSetDefObject * ssd;
     char * end, * chptr, * streamData;
     int i;
-    int size; 
+    int size;
     int streamId;
     PyObject * attr, * baseAttr, * ro;
-    void (*getTag)(char**,int*,int*);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "z#O!|O", kwlist, 
 				     &diff, &diffLen, self->ob_type,
@@ -609,13 +638,8 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
         return Py_False;
     }
 
-    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
-
-    if (ssd->size == SIZE_SMALL)
-	getTag = getSmallTag;
-    else
-	getTag = getLargeTag;
-
+    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
+					  "_streamDict");
     end = diff + diffLen;
     chptr = diff;
     while (chptr < end) {
@@ -630,10 +654,9 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 	    PyObject * obj;
 	    int ignoreUnknown = 0;
 
-	    obj = PyDict_GetItemString(self->ob_type->tp_dict, 
-				       "ignoreUnknown");
+	    obj = PyObject_GetAttrString((PyObject *)self, "ignoreUnknown");
 
-	    if (obj != NULL) 
+	    if (obj != NULL)
 		ignoreUnknown = PyInt_AsLong(obj);
 
 	    if (ignoreUnknown == 1)
@@ -656,7 +679,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 
 	if (!ro)
 	    return NULL;
-	
+
 	Py_DECREF(ro);
 
     }
@@ -680,14 +703,6 @@ static long StreamSet_Hash(PyObject * self) {
     Py_DECREF(kwargs);
     Py_DECREF(frozen);
     return rc;
-}
-
-/* ------------------------------------- */
-/* LargeStreamSet Implementation         */
-
-static int LStreamSet_Init(PyObject * self, PyObject * args,
-			   PyObject * kwargs) {
-    return StreamSet_Init_Common(self, args, kwargs, SIZE_LARGE);
 }
 
 /* ------------------------------------- */
@@ -787,56 +802,6 @@ PyTypeObject StreamSetType = {
     StreamSet_Init,                 /* tp_init */
 };
 
-static PyMethodDef LargeStreamSetMethods[] = {
-    { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS         },
-    { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS                 },
-    { "__eq__", (PyCFunction) StreamSet_Eq,     METH_VARARGS | METH_KEYWORDS },
-    { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
-    { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
-    { "twm",    (PyCFunction) StreamSet_Twm,    METH_VARARGS | METH_KEYWORDS },
-    {NULL}  /* Sentinel */
-};
-
-PyTypeObject LargeStreamSetType = {
-    PyObject_HEAD_INIT(&PyType_Type)
-    0,                              /*ob_size*/
-    "cstreams.LargeStreamSet",      /*tp_name*/
-    sizeof(StreamSetObject),        /*tp_basicsize*/
-    0,                              /*tp_itemsize*/
-    0,                              /*tp_dealloc*/
-    0,                              /*tp_print*/
-    0,                              /*tp_getattr*/
-    0,                              /*tp_setattr*/
-    StreamSet_Cmp,		    /*tp_compare*/
-    0,                              /*tp_repr*/
-    0,                              /*tp_as_number*/
-    0,                              /*tp_as_sequence*/
-    0,                              /*tp_as_mapping*/
-    StreamSet_Hash,                 /*tp_hash */
-    0,				    /*tp_call*/
-    0,                              /*tp_str*/
-    0,                              /*tp_getattro*/
-    0,                              /*tp_setattro*/
-    0,                              /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
-    NULL,                           /* tp_doc */
-    0,                              /* tp_traverse */
-    0,                              /* tp_clear */
-    0,                              /* tp_richcompare */
-    0,                              /* tp_weaklistoffset */
-    0,                              /* tp_iter */
-    0,                              /* tp_iternext */
-    LargeStreamSetMethods,          /* tp_methods */
-    0,                              /* tp_members */
-    0,                              /* tp_getset */
-    0,                              /* tp_base */
-    0,                              /* tp_dict */
-    0,                              /* tp_descr_get */
-    0,                              /* tp_descr_set */
-    0,                              /* tp_dictoffset */
-    LStreamSet_Init,                /* tp_init */
-};
-
 #define REGISTER_TYPE(name) \
     if (PyType_Ready(&name ## Type) < 0) \
         return; \
@@ -847,5 +812,4 @@ void streamsetinit(PyObject * m) {
     StreamSetDefType.tp_new = PyType_GenericNew;
     REGISTER_TYPE(StreamSetDef);
     allStreams[STREAM_SET].pyType = StreamSetType;
-    allStreams[LARGE_STREAM_SET].pyType = LargeStreamSetType;
 }

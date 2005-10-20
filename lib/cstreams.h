@@ -30,13 +30,14 @@ extern PyTypeObject StreamSetType;
 #define INT_STREAM	    2
 #define SHORT_STREAM	    3
 #define STREAM_SET	    4
-#define LARGE_STREAM_SET    5
 
 struct singleStream {
     PyTypeObject pyType;
 };
 
-extern struct singleStream allStreams[6];
+extern struct singleStream allStreams[5];
 
 #define STREAM_CHECK(x, t) x->ob_type == (PyTypeObject *) &allStreams[t]
 
+#define SMALL 0
+#define LARGE 1

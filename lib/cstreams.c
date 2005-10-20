@@ -49,11 +49,13 @@ initcstreams(void)
     for (i = 0; i < (sizeof(allStreams) / sizeof(*allStreams)); i++) {
         char * name;
 
-        allStreams[i].pyType.tp_new = PyType_GenericNew;
+	allStreams[i].pyType.tp_new = PyType_GenericNew;
         if (PyType_Ready(&allStreams[i].pyType) < 0)
             return;
         Py_INCREF(&allStreams[i].pyType);
         name = strrchr(allStreams[i].pyType.tp_name, '.') + 1;
         PyModule_AddObject(m, name, (PyObject *) &allStreams[i].pyType);
     }
+    PyModule_AddObject(m, "SMALL", (PyObject *) PyInt_FromLong(SMALL));
+    PyModule_AddObject(m, "LARGE", (PyObject *) PyInt_FromLong(LARGE));
 }
