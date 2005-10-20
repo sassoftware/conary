@@ -755,19 +755,17 @@ class Database:
                 cu.execute("""
                     INSERT INTO TroveInfo
                         SELECT instanceId, ?, ?
-                            FROM Items, Instances WHERE
-                                NOT (item LIKE '%:%' OR item LIKE 'fileset-')
-                               AND
-                                Items.instanceId = Instances.instanceId
+                            FROM Instances WHERE
+                                NOT (   trovename LIKE '%:%'
+                                     OR trovename LIKE 'fileset-%')
                     """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
 
                 cu.execute("""
                     INSERT INTO TroveInfo
                         SELECT instanceId, ?, ?
-                            FROM Items, Instances WHERE
-                                (item LIKE '%:%' OR item LIKE 'fileset-')
-                            WHERE
-                                Items.instanceId = Instances.instanceId
+                            FROM Instances WHERE
+                                (   trovename LIKE '%:%'
+                                 OR trovename LIKE 'fileset-%')
                     """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
 
                 cu.execute("UPDATE DatabaseVersion SET version=13")
