@@ -445,7 +445,10 @@ class Label(AbstractLabel):
 	return i
 
     def __repr__(self):
-        return "versions.Label('%s')" % self.asString()
+        return "Label('%s')" % self.asString()
+
+    def __str__(self):
+        return self.asString()
 
     def __init__(self, value, template = None):
 	"""
@@ -637,6 +640,9 @@ class VersionSequence(AbstractVersion):
 
     def __repr__(self):
         return "VFS('%s')" % self.asString()
+
+    def __str__(self):
+        return self.asString()
 
     def freeze(self):
 	"""

@@ -762,9 +762,12 @@ class DependencySet(object):
 	return not(not(self.members))
 
     def __str__(self):
-	memberList = self.members.items()
-	memberList.sort()
-	return "\n".join([ str(x[1]) for x in memberList])
+        if self.isFlavor():
+            return formatFlavor(self)
+        else:
+            memberList = self.members.items()
+            memberList.sort()
+            return "\n".join([ str(x[1]) for x in memberList])
 
     def freeze(self):
         rc = []
