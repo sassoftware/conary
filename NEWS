@@ -3,6 +3,9 @@ Changes in 0.70.1:
     a component on the local system was updated to a new version of a
     trove, and updating that package also tries to update to that version
     but using a different path
+  * Redirects are allowed in group cooking as long as the target of the 
+    redirect is also specified in the group (this allows cleaner handling
+    when trying to clean up after label multiplicity)
 
 Changes in 0.70.0:
   o The client and server protocol versions have been changed and

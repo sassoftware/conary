@@ -1388,7 +1388,7 @@ class SingleGroup:
     def findTroves(self, troveMap, repos):
         self._findTroves(troveMap)
         self._removeTroves(repos)
-        self._checkForRedirects()
+        self._checkForRedirects(repos)
 
     def autoResolveDeps(self, cfg, repos, labelPath, includedTroves):
         if self.autoResolve:
@@ -1541,13 +1541,46 @@ class SingleGroup:
             del self.troves[troveTup]
             self.redirects.discard(troveTup)
 
-    def _checkForRedirects(self):
+    def _checkForRedirects(self, repos):
         if self.redirects:
-            redirects = [('%s=%s[%s]' % (n,v.asString(),deps.formatFlavor(f))) \
-                                        for (n,v,f) in sorted(self.redirects)]
-            raise RecipeFileError, \
-                "found redirects, which are not allowed in groups: \n%s" \
-                    % '\n'.join(redirects)
+            redirects = repos.getTroves(self.redirects)
+            missingTargets = {}
+            for trv in redirects:
+                targets = []
+                name = trv.getName()
+                # see processRedirectHack
+                # we ignore non-primaries
+                for (subName, subVersion, subFlavor) in trv.iterTroveList():
+                    if (":" not in subName and ":" not in name) or \
+                       (":"     in subName and ":"     in name):
+                       targets.append((subName, subVersion, subFlavor))
+                missing = [ x for x in targets if x not in self.troves ]
+                if missing:
+                    l = missingTargets.setdefault(trv, [])
+                    l += missing
+
+
+            errmsg = []
+            if not missingTargets:
+                for troveTup in self.redirects:
+                    del self.troves[troveTup]
+                return
+
+            for trv in sorted(missingTargets):
+                (n,v,f) = (trv.getName(),trv.getVersion(),trv.getFlavor())
+                errmsg.append('\n%s=%s[%s]:' % (n, v.asString(),
+                                                deps.formatFlavor(f)))
+                errmsg.extend([(' -> %s=%s[%s]' % (n, v.asString(),
+                                                   deps.formatFlavor(f))) 
+                                    for (n,v,f) in sorted(missingTargets[trv])])
+            raise RecipeFileError, ("""\
+If you include a redirect in this group, you must also include the
+target of the redirect.
+
+The following troves are missing targets:
+%s
+""" % '\n'.join(errmsg))
+
 
     def getRequires(self):
         return self.requires
