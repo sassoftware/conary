@@ -1,3 +1,9 @@
+Changes in 0.70.1:
+  * Collection merging didn't handle (admittedly obscure) cases where 
+    a component on the local system was updated to a new version of a
+    trove, and updating that package also tries to update to that version
+    but using a different path
+
 Changes in 0.70.0:
   o The client and server protocol versions have been changed and
     the filecontainer version number updated.

@@ -700,8 +700,9 @@ class Trove(streams.StreamSet):
                 if newVersion is not None and \
                         (oldVersion or not skipNotByDefault or byDef):
                     if not excludeTroves or not excludeTroves.match(name):
+                        # there can be duplicate trove additions
                         self.addTrove(name, newVersion, newFlavor, 
-                                      byDefault = byDef)
+                                      byDefault = byDef, presentOkay = True)
 
         # Trove changesets suck. They don't store the A->B for a trove
         # inclusion, they store -A and +B. The A->B relationship can
@@ -738,7 +739,6 @@ class Trove(streams.StreamSet):
                 if oldInfo[0] and oldInfo[0].branch() != newInfo[0].branch():
                     unusedBranchJobs.add((name, newInfo[0], newInfo[1]))
 
-
         primaryRemoveList = []
         for job in primaryJob:
             (name, oldInfo, newInfo, byDefault) = job
@@ -771,6 +771,14 @@ class Trove(streams.StreamSet):
                 # place. This can't happen since both diffs are from the
                 # same trove (self).
                 assert(0)
+            elif newOverlap:
+                # Both troves started from the same place, and diverged to
+                # different troves, and the trove the secondary is going
+                # to is already in the primary. Keep the primary way
+                # we got here. This results in two different paths for
+                # adding the new trove, but applyJob() sorts that out for
+                # us.
+                keepSecondary = False
             else:
                 # Both troves started from the same place, and diverged to
                 # different troves. Here are the rules:
@@ -823,7 +831,6 @@ class Trove(streams.StreamSet):
 
         for job in primaryRemoveList:
             primaryJob.remove(job)
-
 
         applyJob(primaryJob)
         applyJob(secondaryJob, skipNotByDefault = True,
