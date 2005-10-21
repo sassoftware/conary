@@ -781,9 +781,9 @@ class DependencySet(object):
 
     def __repr__(self):
         if self.isFlavor():
-            return "deps.parseFlavor('%s')" % formatFlavor(self)
+            return "Flavor('%s')" % formatFlavor(self)
         else:
-            return "deps.ThawDependencySet('%s')" % self.freeze()
+            return "ThawDep('%s')" % self.freeze()
 
     def __init__(self):
 	self.members = {}

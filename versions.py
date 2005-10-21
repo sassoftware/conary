@@ -636,7 +636,7 @@ class VersionSequence(AbstractVersion):
 	return "/".join(strL)
 
     def __repr__(self):
-        return "versions.VersionFromString('%s')" % self.asString()
+        return "VFS('%s')" % self.asString()
 
     def freeze(self):
 	"""
