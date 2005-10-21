@@ -31,7 +31,7 @@ class Database(BaseDatabase):
         assert(cdb["database"])
         # FIXME: we should channel exceptions into generic exception
         # classes common to all backends
-        self.dbh = sqlite3.connect(cdb["database"], timeout)
+        self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
         self._getSchema()
         return True
     
