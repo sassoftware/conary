@@ -385,15 +385,12 @@ class Database(SqlDbRepository):
         trvChgs = newGroup.diff(instGroup)[2]
 
         resultDict = {}
-        eraseList = []
         for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChgs:
-            if not newVersion:
-                eraseList.append((name, oldVersion, oldFlavor))
-            else:
+            if newVersion:
                 resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
                                                              oldFlavor)
 
-        return resultDict, eraseList
+        return resultDict
 
     def depCheck(self, jobSet, troveSource, findOrdering = False):
         return self.db.depCheck(jobSet, troveSource, 

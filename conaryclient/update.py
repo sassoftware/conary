@@ -296,7 +296,7 @@ class ClientUpdate:
                                 True))
 
         for l in redirectHack.itervalues():
-	    outdated, eraseList = self.db.outdatedTroves(l)
+	    outdated = self.db.outdatedTroves(l)
             del l[:]
             for (name, newVersion, newFlavor), \
                   (oldName, oldVersion, oldFlavor) in outdated.iteritems():
@@ -507,7 +507,7 @@ class ClientUpdate:
 
             # Everything left in outdated conflicts with itself. we'll
             # let outdated sort things out.
-            outdated, eraseList = self.db.outdatedTroves(newItems, inelligible)
+            outdated = self.db.outdatedTroves(newItems, inelligible)
             needed = []
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
@@ -595,8 +595,7 @@ class ClientUpdate:
         # which is the target of a redirect
         redirects = set(itertools.chain(*redirectHack.values()))
 
-        outdated, eraseList = self.db.outdatedTroves(toOutdate | redirects, 
-                                                     ineligible)
+        outdated = self.db.outdatedTroves(toOutdate | redirects, ineligible)
         log.debug("assembling initial job list")
         for i, job in enumerate(jobQueue):
             item = (job[0], job[2][0], job[2][1])
@@ -830,7 +829,7 @@ class ClientUpdate:
             removeSet = set(((x[0], x[1][0], x[1][1])
                              for x in newJob if x[1][0] is not None))
 
-            outdated, eraseList = self.db.outdatedTroves(
+            outdated = self.db.outdatedTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in absJob],
                 ineligible = removeSet | ineligible | referencedTroves | 
                              redirects)
