@@ -1631,14 +1631,9 @@ class Provides(_BuildPackagePolicy):
 	del self.provisions
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
 
-        # interpolate macros
-        sonameSubtrees = set(x % self.macros for x in self.sonameSubtrees)
-        # canonicalize not to have trailing /
-        self.sonameSubtrees = set()
-        for directory in sonameSubtrees:
-            if directory.endswith('/'):
-                directory = directory[:-1]
-            self.sonameSubtrees.add(directory)
+        # interpolate macros, using canonical path form with no trailing /
+        self.sonameSubtrees = set(os.path.normpath(x % self.macros)
+                                  for x in self.sonameSubtrees)
 
     def _ELFNonProvide(self, path, m, pkg, mode):
         if (path in pkg.providesMap and
