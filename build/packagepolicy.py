@@ -1861,6 +1861,9 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 elfClass, soname = oldName.split('/', 1)
                 rpath = _findSonameInRpath(soname)
                 if rpath:
+                    if rpath.startswith('/'):
+                        # we need it without the leading /
+                        rpath = rpath[1:]
                     # change the name to follow the rpath
                     newName = '/'.join((elfClass, rpath, soname))
                     dep = deps.Dependency(newName, dep.flags)
