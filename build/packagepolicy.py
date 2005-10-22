@@ -1877,7 +1877,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
         m = self.recipe.magic[path]
 
         # we may have some dependencies that need converting
-        if (self._privateDepMap and m and m.name == 'ELF'
+        if (m and m.name == 'ELF'
             and path in pkg.requiresMap):
             self._ELFPathFixup(path, m, pkg)
 
