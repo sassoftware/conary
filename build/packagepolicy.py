@@ -1814,37 +1814,38 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 self.sonameSubtrees.add(sonameSubtrees)
         _addInfo.updateArgs(self, *args, **keywords)
 
+    def preProcess(self):
+        self.sonameSubtrees = set(os.path.normpath(x % self.macros)
+                                  for x in self.sonameSubtrees)
+
     def _ELFPathFixup(self, path, m, pkg):
         """
         Change requirements to have path in soname if appropriate
         """
         # common case is no likely modification, so make that fastest
         found = False
-        rpath = False
+        rpathList = []
         for depClass, dep in pkg.requiresMap[path].iterDeps():
             if dep.getName()[0] in self._privateDepMap:
                 found = True
         if m and 'RPATH' in m.contents and m.contents['RPATH']:
             rpath = m.contents['RPATH']
-            found = True
+            # normalize all elements of RPATH
+            rpathList = [ os.path.normpath(x) for x in rpath.split(':') ]
+            # prune system paths from RPATH
+            rpathList = [ x for x in rpathList if x not in self.sonameSubtrees ]
 
-        if not found:
+        if not found and not rpathList:
             return
 
-        # check for system paths in RPATH, prune them out
-        rpathList = []
-        if rpath:
-            rpathList = [ x for x in rpath.split(':')
-                          if x not in self.sonameSubtrees ]
-
         def _findSonameInRpath(soname):
-            for path in rpathList:
-                destpath = '/'.join((self.macros.destdir, path, soname))
+            for rpath in rpathList:
+                destpath = '/'.join((self.macros.destdir, rpath, soname))
                 if util.exists(destpath):
-                    return path
-                destpath = '/'.join((path, soname))
+                    return rpath
+                destpath = '/'.join((rpath, soname))
                 if util.exists(destpath):
-                    return path
+                    return rpath
             # didn't find anything
             return None
 

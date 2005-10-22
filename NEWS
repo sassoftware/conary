@@ -11,7 +11,8 @@ Changes in 0.70.1:
   * ELF files finding non-system libraries via an RPATH did not always
     have the path to the library encoded in their dependency requirement,
     depending on whether the package also included some other (unrelated)
-    non-system library.
+    non-system library.  Futhermore, system paths encoded in an RPATH were
+    incorrectly honored.  Both of these bugs have been fixed.
   * Ownership policy now uses macros in the user and group definitions.
 
 Changes in 0.70.0:
