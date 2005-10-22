@@ -934,14 +934,14 @@ class MakeDevices(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	"""
-	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
+	MakeDevices(path, devtype, major, minor, owner, group, mode=0400)
 	"""
 	if args:
             args = list(args)
             if 'mode' in keywords:
                 args.append(keywords.pop('mode'))
 	    l = len(args)
-	    # perms is optional, all other arguments must be there
+	    # mode is optional, all other arguments must be there
 	    assert((l > 5) and (l < 8))
 	    if l == 6:
 		args.append(0400)
