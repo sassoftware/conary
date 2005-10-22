@@ -1371,7 +1371,9 @@ class Ownership(_BuildPackagePolicy, _UserGroup):
 	self.fileFilters = []
 	for (filespec, user, group) in self.filespecs:
 	    self.fileFilters.append(
-		(filter.Filter(filespec, recipe.macros), user, group))
+		(filter.Filter(filespec, recipe.macros),
+                 user %recipe.macros,
+                 group %recipe.macros))
 	del self.filespecs
 	policy.Policy.doProcess(self, recipe)
 
