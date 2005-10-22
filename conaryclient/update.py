@@ -864,7 +864,8 @@ class ClientUpdate:
             for (newInfo, oldInfo), oldIsPinned in zip(replacedTroves,
                                                        replacedArePinned):
                 if oldIsPinned:
-                    oldTrv = self.db.getTrove(withFiles = False, *oldInfo)
+                    oldTrv = self.db.getTrove(withFiles = False, 
+                                              pristine = False, *oldInfo)
                     newTrv = uJob.getTroveSource().getTrove(withFiles = False,
                                                             *newInfo)
 
