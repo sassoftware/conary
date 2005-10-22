@@ -1810,8 +1810,12 @@ class Requires(_addInfo, _BuildPackagePolicy):
         _addInfo.updateArgs(self, *args, **keywords)
 
     def preProcess(self):
-        self.sonameSubtrees = set(os.path.normpath(x % self.macros)
+        self.systemLibPaths = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
+        # anything that any buildreqs have caused to go into ld.so.conf
+        # is a system library by definition
+        self.systemLibPaths |= set(os.path.normpath(x[:-1])
+                                   for x in file('/etc/ld.so.conf').readlines())
 
     def _ELFPathFixup(self, path, m, pkg):
         """
@@ -1828,7 +1832,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
             # normalize all elements of RPATH
             rpathList = [ os.path.normpath(x) for x in rpath.split(':') ]
             # prune system paths from RPATH
-            rpathList = [ x for x in rpathList if x not in self.sonameSubtrees ]
+            rpathList = [ x for x in rpathList if x not in self.systemLibPaths ]
 
         if not found and not rpathList:
             return
