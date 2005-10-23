@@ -180,7 +180,8 @@ class ServerCache:
             intersection = set(serverVersions) & set(CLIENT_VERSIONS)
             if not intersection:
                 raise InvalidServerVersion, \
-                   ("Invalid server version.  Server accepts client "
+                   ("While talking to repository " + url + ":\n"
+                    "Invalid server version.  Server accepts client "
                     "versions %s, but this client only supports versions %s"
                     " - download a valid client from wiki.conary.com") % \
                     (",".join([str(x) for x in serverVersions]),
