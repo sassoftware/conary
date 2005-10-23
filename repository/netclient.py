@@ -142,6 +142,11 @@ class ServerCache:
              ' "local" -- this host is reserved for troves compiled/created'
              ' locally, and cannot be queried.')
 
+        def _cleanseUrl(protocol, url):
+            if url.find('@') != -1:
+                return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
+            return url
+
 	server = self.cache.get(serverName, None)
 	if server is None:
 	    url = self.map.get(serverName, None)
@@ -172,13 +177,13 @@ class ServerCache:
                         errmsg = errmsg[1]
                 else:
                     errmsg = str(e)
-                if url.find('@') != -1:
-                    url = protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
+                url = _cleanseUrl(protocol, url)
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, errmsg))
 
             intersection = set(serverVersions) & set(CLIENT_VERSIONS)
             if not intersection:
+                url = _cleanseUrl(protocol, url)
                 raise InvalidServerVersion, \
                    ("While talking to repository " + url + ":\n"
                     "Invalid server version.  Server accepts client "
