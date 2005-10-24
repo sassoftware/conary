@@ -1635,14 +1635,6 @@ class Provides(_BuildPackagePolicy):
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
 
-    def _ELFNonProvide(self, path, m, pkg, mode):
-        if (path in pkg.providesMap and
-            'soname' in m.contents and not mode & 0111 and
-            not path.endswith('.so')):
-            # libraries must be executable for ldconfig to work --
-            # see ExecutableLibraries policy
-            del pkg.providesMap[path]
-
     def _ELFPathProvide(self, path, m, pkg):
         basedir = os.path.dirname(path)
         # thanks to _ELFNonProvide, we know that this is a reasonable library
@@ -1656,12 +1648,14 @@ class Provides(_BuildPackagePolicy):
             for depClass, dep in pkg.providesMap[path].iterDeps():
                 if depClass is deps.SonameDependencies:
                     oldname = dep.getName()[0]
-                    elfclass, soname = oldname.split('/')
-                    name = '%s%s/%s' % (elfclass, basedir, soname)
-                    newdep = deps.Dependency(name, dep.flags)
-                    # tell Requires about this change
-                    self.recipe.Requires(_privateDepMap=(oldname, newdep))
-                    dep = newdep
+                    elfclass, soname = oldname.split('/', 1)
+                    if '/' not in soname:
+                        # add it
+                        name = '%s%s/%s' % (elfclass, basedir, soname)
+                        newdep = deps.Dependency(name, dep.flags)
+                        # tell Requires about this change
+                        self.recipe.Requires(_privateDepMap=(oldname, newdep))
+                        dep = newdep
                 depSet.addDep(depClass, dep)
             pkg.providesMap[path] = depSet
 
@@ -1701,18 +1695,22 @@ class Provides(_BuildPackagePolicy):
         m = None
 
         fullpath = macros.destdir + path
+
         if os.path.exists(fullpath):
             m = self.recipe.magic[path]
             mode = os.lstat(fullpath)[stat.ST_MODE]
+
+        # Now add in the manual provisions, which may include sonames
+        # that might need to have paths added
+        for (filter, provision) in self.fileFilters:
+            if filter.match(path):
+                m = self._markProvides(path, fullpath, provision, pkg, m, f)
+
+        if os.path.exists(fullpath):
             if m and m.name == 'ELF':
-                self._ELFNonProvide(path, m, pkg, mode)
                 self._ELFPathProvide(path, m, pkg)
             if m and m.name == 'CIL':
                 self._AddCILDeps(path, m, pkg, macros)
-
-        for (filter, provision) in self.fileFilters:
-            if filter.match(path):
-                self._markProvides(path, provision, pkg, m, f)
 
         if path not in pkg.providesMap:
             return
@@ -1726,7 +1724,7 @@ class Provides(_BuildPackagePolicy):
         if f.flags.isPathDependencyTarget():
             pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
 
-    def _markProvides(self, path, provision, pkg, m, f):
+    def _markProvides(self, path, fullpath, provision, pkg, m, f):
         if path not in pkg.providesMap:
             # BuildPackage only fills in providesMap for ELF files; we may
             # need to create a few more DependencySets.
@@ -1735,7 +1733,7 @@ class Provides(_BuildPackagePolicy):
         if provision.startswith("file"):
             # can't actually specify what to provide, just that it provides...
             f.flags.isPathDependencyTarget(True)
-            return
+            return m
 
         if provision.startswith("abi:"):
             abistring = provision[4:].strip()
@@ -1745,9 +1743,21 @@ class Provides(_BuildPackagePolicy):
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
             pkg.providesMap[path].addDep(deps.AbiDependency,
                 deps.Dependency(abi, flags))
-            return
+            return m
 
         if provision.startswith("soname:"):
+            if os.path.islink(fullpath):
+                # allow symlinks to provide sonames if necessary and if
+                # they point to real files; paths encoded in sonames might
+                # require the symlink path
+                # FIXME: this requires changes elsewhere to allow
+                # symlinks to carry deps
+                contents = os.readlink(fullpath)
+                if contents.startswith('/'):
+                    m = self.recipe.magic[os.path.normpath(contents)]
+                else:
+                    m = self.recipe.magic[os.path.normpath(
+                                          os.path.dirname(path)+'/'+contents)]
             if m and m.name == 'ELF':
                 # Only ELF files can provide sonames.
                 # This is for libraries that don't really include a soname,
@@ -1771,7 +1781,7 @@ class Provides(_BuildPackagePolicy):
                     # requirements in Requires
                     plainname = '/'.join((abi[0], os.path.basename(main)))
                     self.recipe.Requires(_privateDepMap=(plainname, dep))
-            return
+            return m
 
 
 class Requires(_addInfo, _BuildPackagePolicy):

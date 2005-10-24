@@ -14,6 +14,12 @@ Changes in 0.70.1:
     non-system library.  Futhermore, system paths encoded in an RPATH were
     incorrectly honored.  Both of these bugs have been fixed.
   * Ownership policy now uses macros in the user and group definitions.
+  * Symbolic links to shared libraries can now provide path-encoded
+    soname dependencies (only manually, never automatically).
+  * Removed outdated code with convoluted code for preventing providing
+    soname dependencies in some cases; that code has been functionally
+    replaced by limiting automatic soname dependencies to system library
+    directories.
 
 Changes in 0.70.0:
   o The client and server protocol versions have been changed and
