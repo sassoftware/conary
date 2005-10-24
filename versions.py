@@ -668,8 +668,6 @@ class VersionSequence(AbstractVersion):
                  if isinstance(x, AbstractRevision)]
 
     def setTimeStamps(self, timeStamps, clearCache=True):
-        strStr = self.asString()
-
         if clearCache:
             if max(self.timeStamps()) != 0:
                 # we're changing the timeStamps, invalidate the cache
@@ -1099,7 +1097,6 @@ class Version(VersionSequence):
         """
         newV = self.copy()
         v = newV
-        hasParentVersion = v.hasParentVersion()
         trailingRevisions = []
         while v.hasParentVersion():
             v = v.parentVersion()
