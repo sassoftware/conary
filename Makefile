@@ -14,7 +14,7 @@
 
 all: subdirs conary-wrapper constants.py
 
-export VERSION = 0.70.0
+export VERSION = 0.70.1
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
