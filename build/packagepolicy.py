@@ -1197,7 +1197,6 @@ class IgnoredSetuid(policy.Policy):
 class LinkCount(policy.Policy):
     """
     Only regular, non-config files may have hardlinks; no exceptions.
-    No cross-directory hardlinks allowed
     """
     def do(self):
         for component in self.recipe.autopkg.getComponents():
@@ -1206,14 +1205,6 @@ class LinkCount(policy.Policy):
                     self.error("Config file %s has illegal hard links", path)
             for path in component.badhardlinks:
                 self.error("Special file %s has illegal hard links", path)
-            for inode in component.linkGroups:
-                # ensure all in same directory
-                dirSet = set(x.rsplit('/', 1)[0] + '/'
-                             for x in component.linkGroups[inode])
-                if len(dirSet) > 1:
-                    self.error('files %s are hard links across directories %s',
-                               ', '.join(sorted(component.linkGroups[inode])),
-                               ', '.join(sorted(list(dirSet))))
 
 
 class User(policy.Policy):
