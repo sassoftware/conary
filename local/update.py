@@ -470,8 +470,6 @@ class FilesystemJob:
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
-	cwd = os.getcwd()
-
         fileList = [ ((pathId,) + baseTrove.getFile(pathId)[1:])
                         for pathId in troveCs.getOldFileList() ]
         fileObjs = repos.getFileVersions(fileList)
@@ -482,7 +480,7 @@ class FilesystemJob:
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
 		continue
-                
+
 	    (path, fileId, version) = baseTrove.getFile(pathId)
 
 	    if not fsTrove.hasFile(pathId):
@@ -492,6 +490,7 @@ class FilesystemJob:
 	    if path[0] == '/':
 		realPath = root + path
 	    else:
+                cwd = os.getcwd()
 		realPath = cwd + "/" + path
 
 	    if flags & MERGE:
@@ -546,7 +545,6 @@ class FilesystemJob:
 	"""
 	if baseTrove:
 	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
-	cwd = os.getcwd()
 
         # fully updated tracks whether any errors have occured; if no
         # errors occur, fsTrove gets updated to the new version of the trove
@@ -567,6 +565,7 @@ class FilesystemJob:
 	    if headPath[0] == '/':
                 headRealPath = root + headPath
 	    else:
+                cwd = os.getcwd()
 		headRealPath = cwd + "/" + headPath
 
 	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
@@ -652,6 +651,7 @@ class FilesystemJob:
 	    if fsPath[0] == "/":
 		rootFixup = root
 	    else:
+                cwd = os.getcwd()
 		rootFixup = cwd + "/"
 
 	    pathOkay = True             # do we have a valid, merged path?

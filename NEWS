@@ -1,3 +1,9 @@
+Changes in 0.70.2:
+  * Running "conary update" in a directory that does not exist no
+    longer fails with an error (bugzilla #212).  Note that "cvc
+    update" still requires that the current working directory exists
+    of course.
+
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 
     a component on the local system was updated to a new version of a
