@@ -1098,7 +1098,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 	(name, tagInfo, control) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
 
-	start = gzip.GzipFile('', 'r', fileobj = control).read()
+	start = gzip.GzipFile(None, 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 
 	self.absolute = True
@@ -1134,7 +1134,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             if tag != ChangedFileTypes.diff and not(self.absolute and isConfig):
                 break
 
-            cont = filecontents.FromFile(gzip.GzipFile(None, "r", fileobj = f))
+            cont = filecontents.FromFile(gzip.GzipFile(None, 'r', fileobj = f))
             s = cont.get().read()
             self.configCache[name] = (tag, s, False)
             cont = filecontents.FromString(s)
@@ -1226,7 +1226,7 @@ class dictAsCsf:
         f = contObj.get()
         (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
         #os.unlink(path)
-        gzf = gzip.GzipFile(path, "wb", fileobj = os.fdopen(os.dup(fd), "w"))
+        gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
         util.copyfileobj(f, gzf)
         del f
         del gzf
