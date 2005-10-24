@@ -16,7 +16,6 @@ Implements troves (packages, components, etc.) for the repository
 """
 
 import changelog
-import copy
 import files
 import itertools
 from lib import sha1helper
