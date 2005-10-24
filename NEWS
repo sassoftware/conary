@@ -22,6 +22,7 @@ Changes in 0.70.1:
     directories.
   * Instead of complaining about hardlinks spanning directories, Conary
     simply creates one link group per directory per hardlinked file.
+  * Fixed bug which made source commits fail on cloned source troves
 
 Changes in 0.70.0:
   o The client and server protocol versions have been changed and

@@ -218,7 +218,7 @@ class FrozenVersionStream(InfoStream):
 
     def diff(self, them):
 	if self.v != them.v:
-	    return self.v.freeze()
+	    return self.freeze()
 
 	return None
 
