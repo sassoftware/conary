@@ -1,4 +1,7 @@
 Changes in 0.70.2:
+  * GnuPG compatible trust metrics for OpenPGP Keys now exists. This
+    makes it possible for conary clients to refuse troves that aren't
+    properly trusted. The metrics currently in place mimic gpg behavior.
   * Running "conary update" in a directory that does not exist no
     longer fails with an error (bugzilla #212).  Note that "cvc
     update" still requires that the current working directory exists

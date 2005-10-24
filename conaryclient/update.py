@@ -1313,7 +1313,7 @@ class ClientUpdate:
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback(),
-                    autoPinList = conarycfg.RegularExpressionList()):
+                    autoPinList = conarycfg.RegularExpressionList(), threshold = 0):
 
         def _createCs(repos, job, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
@@ -1338,7 +1338,8 @@ class ClientUpdate:
                                     journal = journal, callback = callback,
                                     localRollbacks = localRollbacks,
                                     removeHints = removeHints,
-                                    autoPinList = autoPinList)
+                                    autoPinList = autoPinList,
+                                    threshold = threshold,)
             except database.CommitError, e:
                 raise UpdateError, "changeset cannot be applied"
 
