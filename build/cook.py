@@ -575,6 +575,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
+    changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 
                                                 fileset.getFlavor()) ]
