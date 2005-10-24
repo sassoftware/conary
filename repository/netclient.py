@@ -1253,7 +1253,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 break
 	r = c.getresponse()
-	assert(r.status == 200)
+        # give a slightly more helpful message for 403
+        if r.status == 403:
+            raise repository.CommitError('Permission denied. Check username, '
+                                         'password, and https settings.')
+        # and a generic message for a non-OK status
+        if r.status != 200:
+            raise repository.CommitError('Error uploading to repository: '
+                                         '%s (%s)' %(r.status, r.reason))
 
     def __init__(self, repMap, localRepository = None):
         # the local repository is used as a quick place to check for

@@ -3,6 +3,8 @@ Changes in 0.70.2:
     longer fails with an error (bugzilla #212).  Note that "cvc
     update" still requires that the current working directory exists
     of course.
+  * HTTP error conditions are handled more gracefully when commiting a
+    change set. (bugzilla #334)
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 
