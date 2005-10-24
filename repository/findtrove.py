@@ -586,8 +586,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
                        ', '.join(x.asString() for x in labelPath))
         else:
             return "revision %s of %s was not found" \
-                    % (versionStr, name, 
-                       ', '.join(x.asString() for x in labelPath))
+                    % (versionStr, name)
 
 ##############################################
 # 
