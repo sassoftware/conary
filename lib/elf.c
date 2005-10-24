@@ -603,8 +603,6 @@ static PyObject * getRPATH(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    lseek(fd, 0, 0);
-
     elf = elf_begin(fd, ELF_C_READ, NULL);
     if (!elf) {
 	PyErr_SetString(ElfError, "error initializing elf file");
@@ -612,6 +610,41 @@ static PyObject * getRPATH(PyObject *self, PyObject *args) {
     }
 
     rc = doGetRPATH(elf);
+    elf_end(elf);
+    close(fd);
+
+    return rc;
+}
+
+static PyObject * getType(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    GElf_Ehdr ehdr;
+    PyObject *rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    if (!gelf_getehdr(elf, &ehdr)) {
+	PyErr_SetString(ElfError, "failed to get ELF header");
+	return NULL;
+    }
+
+    rc = PyLong_FromLong(ehdr.e_type);
+
     elf_end(elf);
     close(fd);
 
@@ -630,15 +663,30 @@ static PyMethodDef ElfMethods[] = {
 	"returns whether or not an ELF file has unresolved symbols" },
     { "getRPATH", getRPATH, METH_VARARGS,
         "returns the RPATH or RUNPATH set in an ELF file (if any)" },
+    { "getType", getType, METH_VARARGS,
+        "returns the ELF type of the file (elf.ET_EXEC, elf.ET_DYN, etc)" },
     { NULL, NULL, 0, NULL }
 };
+
+
+#define ADD_CONST(name) \
+PyModule_AddObject(m, #name, PyLong_FromLong(name));
 
 PyMODINIT_FUNC
 initelf(void)
 {
+    PyObject* m;
+
     ElfError = PyErr_NewException("elf.error", NULL, NULL);
-    Py_InitModule3("elf", ElfMethods, 
-		   "provides access to elf shared library dependencies");
+    m = Py_InitModule3("elf", ElfMethods, 
+                       "provides access to elf shared library dependencies");
+
+    ADD_CONST(ET_NONE);
+    ADD_CONST(ET_REL);
+    ADD_CONST(ET_EXEC);
+    ADD_CONST(ET_DYN);
+    ADD_CONST(ET_CORE);
+
     elf_version(EV_CURRENT);
 
 }
