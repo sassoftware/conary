@@ -1098,7 +1098,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 	(name, tagInfo, control) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
 
-	start = gzip.GzipFile(None, "r", fileobj = control).read()
+	start = gzip.GzipFile('', 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 
 	self.absolute = True
