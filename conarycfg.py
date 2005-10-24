@@ -355,9 +355,9 @@ class ConaryConfiguration(ConfigFile):
                                                   '/etc/conary/distro/arch',
                                                   '~/.conary/arch')],
         'quiet'                 : [ BOOL, False ],
-        'signatureKey'          : [ FINGERPRINT, None],
-        'trustThreshold'        : [ INT, 0],
-        'signatureKeyMap'       : [ FINGERPRINT_MAP, None],
+        'signatureKey'          : [ FINGERPRINT, None ],
+        'trustThreshold'        : [ INT, 0 ],
+        'signatureKeyMap'       : [ FINGERPRINT_MAP, None ],
     }
 
     def __init__(self, readConfigFiles=True):

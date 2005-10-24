@@ -207,6 +207,7 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         revoked, timestamp = openpgpfile.getKeyEndOfLifeFromString(keyId, keyData)
 
         # populate the cache
-        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
+        # note keys in the repository are always considered fully trusted
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp, openpgpfile.TRUST_FULL)
         return self.publicDict[keyId]
 

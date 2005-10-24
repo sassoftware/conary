@@ -371,7 +371,7 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
-    def checkTroveSignatures(self, trv, keyCache = None):
+    def checkTroveSignatures(self, trv, threshold, keyCache = None):
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
         for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
@@ -383,13 +383,13 @@ class ChangeSetJob:
             if expirationTime and expirationTime < timestamp:
                 raise openpgpfile.IncompatibleKey('Key %s is expired'
                                                   %pubKey.getFingerprint())
-        res = trv.verifyDigitalSignatures(keyCache=keyCache)
+        res = trv.verifyDigitalSignatures(threshold, keyCache)
         if len(res[1]):
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
-                 resetTimestamps = False, keyCache = None):
+                 resetTimestamps = False, keyCache = None, threshold = 0):
 	self.repos = repos
 	self.cs = cs
 
@@ -445,7 +445,7 @@ class ChangeSetJob:
                                         troveFlavor, csTrove.getChangeLog())
 
 	    newFileMap = newTrove.applyChangeSet(csTrove)
-            self.checkTroveSignatures(newTrove, keyCache=keyCache)
+            self.checkTroveSignatures(newTrove, threshold, keyCache=keyCache)
 
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove)

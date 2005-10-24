@@ -23,6 +23,7 @@ from Crypto.Cipher import Blowfish
 from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
+from Crypto.Hash import RIPEMD
 from string import upper
 
 # key types defined in RFC 2440 page 49
@@ -130,6 +131,19 @@ ENCRYPTION_TYPE_SHA1_CHECK = 0xfe
 OLD_PKT_LEN_ONE_OCTET  = 0
 OLD_PKT_LEN_TWO_OCTET  = 1
 OLD_PKT_LEN_FOUR_OCTET = 2
+
+# trust levels
+TRUST_UNTRUSTED = 0
+TRUST_MARGINAL  = 4
+TRUST_FULL      = 5
+TRUST_ULTIMATE  = 6
+
+#trust packet headers
+TRP_VERSION     = chr(1)
+TRP_KEY         = chr(12)
+TRP_USERID      = chr(13)
+
+TRUST_PACKET_LENGTH = 40
 
 SEEK_SET = 0
 SEEK_CUR = 1
@@ -1334,3 +1348,76 @@ def readKeyData(keyRing, fingerprint):
     keyRing.seek(start)
     keyData = keyRing.read(end - start)
     return keyData
+
+# this code is GnuPG specific. RFC 2440 indicates the existence of trust
+# packets inside a keyring. GnuPG ignores this convention and keeps trust
+# in a separate file generally called trustdb.gpg
+# records are always 40 bytes long
+# tags we care about are:
+# 1: version stuff. always the first data packet
+# 2 thru 11: we don't care
+# 12: key trust packet
+# 13: userid trust packet
+# the formats of packets tagged 12 and 13 (by reverse engineering)
+# offset 0: packet tag
+# offset 1: reserved
+# offsets 2-21: fingerprint of key/hash of userId 20 bytes either way
+# offset 22: trust/validity value.
+# offsets 23-39 don't matter for our purposes
+# the trust is in the key packet. that will be what's returned once
+# we establish the validity of the key (found in the userid packets)
+def getKeyTrust(trustFile, fingerprint):
+    # give nothing, get nothing
+    if not fingerprint:
+        return TRUST_UNTRUSTED
+    try:
+        trustDb = open(trustFile, 'r')
+    except IOError:
+        return TRUST_UNTRUSTED
+    except:
+        trustDb.close()
+        raise
+    # FIXME: verify trustdb version is 3
+    found = 0
+    done = 0
+    # alter fingerprint to be the form found in the trustDB
+    data = int (fingerprint, 16)
+    keyId = ''
+    while data:
+        keyId = chr(data%256) + keyId
+        data //= 256
+    # seek for the right key record in the trust db
+    while not done:
+        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
+        if len(dataChunk) == TRUST_PACKET_LENGTH:
+            if (dataChunk[0] == TRP_KEY) and (dataChunk[2:22] == keyId):
+                done = 1
+                found = 1
+        else:
+            done = 1
+    if not found:
+        trustDb.close()
+        return TRUST_UNTRUSTED
+    trust = ord(dataChunk[22])
+    # gnupg assigns lineal order to such things as expired and invalid
+    # in a less than logical fashion. for our purposes, we'll simply
+    # treat them all as untrusted
+    if trust < TRUST_MARGINAL:
+        trust = TRUST_UNTRUSTED
+    # before returning this value, establish the validity of the key
+    # the overall validity of a key is equal to the greatest validity
+    # of any one userId that key has
+    done = 0
+    maxValidity = TRUST_UNTRUSTED
+    while not done:
+        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
+        if (len(dataChunk) == TRUST_PACKET_LENGTH) and (dataChunk[0] == TRP_USERID):
+            maxValidity = max(maxValidity, ord(dataChunk[22]))
+        else:
+            done = 1
+    trustDb.close()
+    # if the key isn't fully valid, by convention, it can't propogate any
+    # imbued trust to the signatures made by that key
+    if maxValidity >= TRUST_FULL:
+        return trust
+    return TRUST_UNTRUSTED

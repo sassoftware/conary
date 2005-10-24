@@ -24,6 +24,7 @@ from openpgpfile import getPublicKey
 from openpgpfile import getPublicKeyFromString
 from openpgpfile import getFingerprint
 from openpgpfile import getKeyEndOfLife
+from openpgpfile import getKeyTrust
 from openpgpfile import seekNextKey
 from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
@@ -158,10 +159,15 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         else:
             self.publicPaths = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
                                  '/etc/conary/pubring.gpg' ]
+            self.trustDbPaths = [ os.environ['HOME'] + '/.gnupg/trustdb.gpg',
+                                 '/etc/conary/trustdb.gpg' ]
             self.privatePath = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
         self.publicPaths = [ path ]
+
+    def setTrustDbPath(self, path):
+        self.trustDbPaths = [ path ]
 
     def addPublicPath(self, path):
         self.publicPaths.append(path)
@@ -175,13 +181,16 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             return self.publicDict[keyId]
 
         # otherwise search for it
-        for publicPath in self.publicPaths:
+        for i in range(len(self.publicPaths)):
             try:
+                publicPath = self.publicPaths[i]
+                trustDbPath = self.trustDbPaths[i]
                 # translate the keyId to a full fingerprint for consistency
                 fingerprint = getFingerprint(keyId, publicPath)
                 revoked, timestamp = getKeyEndOfLife(keyId, publicPath)
                 cryptoKey = getPublicKey(keyId, publicPath)
-                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
+                trustLevel = getKeyTrust(trustDbPath, fingerprint)
+                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp, trustLevel)
                 return self.publicDict[keyId]
             except KeyNotFound:
                 pass

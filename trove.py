@@ -20,7 +20,7 @@ import files
 import itertools
 from lib import sha1helper
 from lib.openpgpkey import getKeyCache
-from lib.openpgpfile import KeyNotFound
+from lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 import streams
 import struct
 import versions
@@ -470,7 +470,7 @@ class Trove(streams.StreamSet):
     def verifyDigitalSignatures(self, threshold = 0, keyCache = None):
         missingKeys = []
         badFingerprints = []
-        maxTrust = 0
+        maxTrust = TRUST_UNTRUSTED
         sha1_orig = self.troveInfo.sigs.sha1()
         sha1_new = self.computeSignatures(store=False)
         if sha1_orig:
@@ -492,9 +492,8 @@ class Trove(streams.StreamSet):
 
         if len(badFingerprints):
             raise DigitalSignatureVerificationError("Trove signatures made by the following keys are bad: %s" % (' '.join(badFingerprints)))
-
         if maxTrust < threshold:
-            raise DigitalSignatureVerificationError("This trove does not meet minimum trust level")
+            raise DigitalSignatureVerificationError("Trove does not meet minimum trust level: %s" %self.getName())
         return maxTrust, missingKeys
 
     def computeSignatures(self, store = True):

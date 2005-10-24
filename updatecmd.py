@@ -390,7 +390,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves)
+                       callback = callback, autoPinList = cfg.pinTroves, threshold = cfg.trustThreshold)
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,

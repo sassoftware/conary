@@ -38,6 +38,7 @@ import trovestore
 import versions
 from datastore import IntegrityError
 from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
+from lib.openpgpfile import TRUST_FULL
 from trove import DigitalSignature, DigitalSignatureVerificationError
 from lib.openpgpkey import getKeyCache
 import base64
@@ -1327,7 +1328,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         trv.addPrecomputedDigitalSignature(sig)
 
         # verify the new signature is actually good
-        trv.verifyDigitalSignatures(keyCache=keyCache)
+        # FIXME: if we want to lock down the server to REQUIRE digital
+        # signatures swap out lines below.
+        # blindly doing this will result in massive test suite failure.
+        # consider setting up a config entry to turn this on
+        #trv.verifyDigitalSignatures(TRUST_FULL, keyCache)
+        trv.verifyDigitalSignatures(keyCache = keyCache)
 
         # start a transaction now, this ensures that queries and updates
         # are happening in a consistent way.

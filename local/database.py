@@ -405,7 +405,7 @@ class Database(SqlDbRepository):
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
                         removeHints = {}, 
-                        autoPinList = RegularExpressionList()):
+                        autoPinList = RegularExpressionList(), threshold = 0):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -525,7 +525,7 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             localrep.LocalRepositoryChangeSetJob(self, cs, callback,
-                                                 autoPinList)
+                                                 autoPinList, threshold = threshold)
             self.db.mapPinnedTroves(uJob.getPinMaps())
 
         errList = fsJob.getErrorList()

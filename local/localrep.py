@@ -19,6 +19,7 @@ from repository import repository
 from StringIO import StringIO
 import sha
 import zlib
+from lib import openpgpfile
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -72,14 +73,14 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	fileObj = self.repos.getFileVersion(pathId, fileId, None)
 	self.oldFile(pathId, fileId, fileObj)
 
-    def checkTroveSignatures(self, trv, keyCache=None):
-        trv.verifyDigitalSignatures(keyCache=keyCache)
+    def checkTroveSignatures(self, trv, threshold, keyCache=None):
+        trv.verifyDigitalSignatures(threshold, keyCache)
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, callback, autoPinList):
+    def __init__(self, repos, cs, callback, autoPinList, threshold = 0):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -121,8 +122,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                     continue
 		(oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
-
-	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback)
+	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback, threshold = threshold)
 
         for trove in self.oldTroveList():
             self.repos.eraseTrove(trove.getName(), trove.getVersion(),
