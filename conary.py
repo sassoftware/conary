@@ -49,6 +49,7 @@ import showchangeset
 import updatecmd
 import verify
 import versions
+from trove import DigitalSignatureVerificationError
 
 sys.excepthook = util.genExcepthook()
 
@@ -591,6 +592,8 @@ def main(argv=sys.argv):
     except conaryclient.InstallPathConflicts, e:
         print >> sys.stderr, str(e)
     except repository.repository.RepositoryLocked, e:
+        print >> sys.stderr, str(e)
+    except DigitalSignatureVerificationError, e:
         print >> sys.stderr, str(e)
     except:
         raise
