@@ -615,12 +615,18 @@ class ClientUpdate:
         pins = self.db.trovesArePinned(removedList)
         pins.reverse()
         for i, job in enumerate(jobQueue):
+            # was this job originally absolute? 
+            absoluteAncestry = (job[0], (None, None), job[2], True) \
+                                    in primaryJobList
+
+            # add ignorePin, isPinned, absoluteAncestry flags
             if job[1][0] is None: 
-                # it doesn't matter what we put here since it's an install
-                jobQueue[i] = (job, True, False)
+                # it doesn't matter what we put here since we don't have it
+                # already
+                jobQueue[i] = (job, True, False, absoluteAncestry)
             else:
                 pin = pins.pop()
-                jobQueue[i] = (job, True, pin)
+                jobQueue[i] = (job, True, pin, absoluteAncestry)
         del removedList, pins
 
         referencedTroves = set()
@@ -628,7 +634,7 @@ class ClientUpdate:
 
         while jobQueue:
             log.debug("examing job %s", jobQueue[-1])
-            job, ignorePin, isPinned = jobQueue.pop()
+            job, ignorePin, isPinned, absoluteAncestry = jobQueue.pop()
 
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), 
                     isAbsolute) = job
@@ -656,7 +662,7 @@ class ClientUpdate:
                 for name, version, flavor in trv.iterTroveList():
                     jobQueue.append(((name, (version, flavor),
                                            (version, flavor), False),
-                                     ignorePin, False))
+                                     ignorePin, False, absoluteAncestry))
 
                 del trv
                 continue
@@ -781,18 +787,15 @@ class ClientUpdate:
                         log.debug("considering referenced trove for removal")
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (None, None), False),
-                                          ignorePin and isPinned, oldIsPinned))
+                                          ignorePin and isPinned, oldIsPinned,
+                                          absoluteAncestry))
                     else:
                         if oldVersion is None:
                             # this is absolute if the original job for the
                             # parents was absolute. primaries will have
                             # been rooted by now though, so look in the 
                             # original job as well
-                            if isAbsolute:
-                                makeAbs = True
-                            else:
-                                absJob = (job[0], (None, None), job[2], True)
-                                makeAbs = absJob in primaryJobList
+                            makeAbs = absoluteAncestry
                         else:
                             makeAbs = False
                                 
@@ -801,7 +804,7 @@ class ClientUpdate:
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), 
                                          makeAbs), ignorePin and isPinned, 
-                                         oldIsPinned))
+                                         oldIsPinned, absoluteAncestry))
                 else:
                     log.debug("referenced trove already installed")
                     # recurse through this trove's collection even though
@@ -811,11 +814,11 @@ class ClientUpdate:
                         jobQueue.append(((name, (oldVersion, oldFlavor),
                                                 (None, None), False),
                                           ignorePin and isPinned, 
-                                          oldIsPinned))
+                                          oldIsPinned, absoluteAncestry))
 
                     jobQueue.append(((name, (newVersion, newFlavor),
                                            (newVersion, newFlavor), False),
-                                     ignorePin, False))
+                                     ignorePin, False, absoluteAncestry))
 
         _removeDuplicateErasures(newJob)
 
