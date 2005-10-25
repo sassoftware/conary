@@ -179,6 +179,9 @@ class Revision(AbstractRevision):
     def __repr__(self):
         return "versions.Revision('%s')" % self.asString()
 
+    def __str__(self):
+        return self.asString()
+
     def freeze(self):
 	return self.asString(frozen = True)
 
