@@ -39,7 +39,7 @@ from lib import sha1helper
 from lib import util
 from repository import changeset
 from repository import filecontents
-from repository import repository
+from repository import errors
 from repository.netclient import NetworkRepositoryClient
 import trove
 from conaryclient.cmdline import parseTroveSpec
@@ -264,7 +264,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         trove = repos.getTrove(srcName, sourceVersion, 
                                deps.DependencySet(), withFiles = False)
         sourceVersion = trove.getVersion()
-    except repository.TroveMissing:
+    except errors.TroveMissing:
         if not allowMissingSource and targetLabel != versions.CookLabel():
             raise RuntimeError, ('Cooking with non-existant source'
                                  ' version %s' % sourceVersion.asString())
@@ -1097,7 +1097,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                             logBuild=logBuild, callback=callback)
         if troves:
             built = (tuple(troves), changeSetFile)
-    except repository.RepositoryError, e:
+    except errors.RepositoryError, e:
 	if emerge:
 	    os.unlink(changeSetFile)
         raise CookError(str(e))

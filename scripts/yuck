@@ -26,8 +26,8 @@ import conarycfg
 from deps import deps
 from local import database
 from lib import util
+from repository import errors
 from repository import netclient
-from repository import repository
 import versions
 import updatecmd
 
@@ -148,7 +148,7 @@ def main(argv):
     for host in query:
         try:
             versionList = repos.getTroveLeavesByBranch(query[host])
-        except repository.OpenError, e:
+        except errors.OpenError, e:
             print >>sys.stderr, "Warning: could not access %s: %s" % (host, e)
             print >>sys.stderr, "Skipping packages %s" % query[host].keys()
             continue

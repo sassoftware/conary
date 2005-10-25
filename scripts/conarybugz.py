@@ -71,7 +71,6 @@ from deps import deps
 from local import database
 from lib import util
 from repository import netclient
-from repository import repository
 import versions
 import updatecmd
 

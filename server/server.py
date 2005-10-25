@@ -42,6 +42,7 @@ sys.path.append(mainPath)
 from repository.netrepos import netserver
 from repository.netrepos import netauth
 from repository import changeset
+from repository import errors
 from repository.netrepos.netserver import NetworkRepositoryServer
 from repository.filecontainer import FileContainer
 from conarycfg import ConfigFile
@@ -218,7 +219,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         
 	try:
 	    result = netRepos.callWrapper(None, None, method, authToken, params)
-	except netserver.InsufficientPermission:
+	except errors.InsufficientPermission:
 	    self.send_error(403)
 	    return None
         logMe(3, "returned from", method)

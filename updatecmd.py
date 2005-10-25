@@ -19,7 +19,7 @@ from lib import log
 from lib import util
 from local import database
 from repository import changeset
-from repository import repository
+from repository import errors
 from repository.filecontainer import BadContainer
 import conaryclient
 import os
@@ -98,7 +98,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                            % ((msg,) + self.csHunk + (((got * 100) / need),)))
         else: # no idea how much we need, just keep on counting...
             self.csMsg("%s (got %dk so far)" % (msg, got / 1024))
-            
+
         self.update()
 
     def downloadingFileContents(self, got, need):
@@ -332,11 +332,11 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         # prefers it
         callback.done()
         print e
-    except repository.TroveNotFound, e:
+    except errors.TroveNotFound, e:
         log.error(e)
     except conaryclient.UpdateError, e:
         log.error(e)
-    except repository.CommitError, e:
+    except errors.CommitError, e:
         log.error(e)
     except changeset.PathIdsConflictError, e:
         log.error(e)
@@ -471,7 +471,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
                 print "%s=%s" % (name, version.asString())
             else:
                 print name
-            
+
         return
 
     try:
@@ -483,7 +483,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
         log.error(e)
     except conaryclient.UpdateError, e:
         log.error(e)
-    except repository.CommitError, e:
+    except errors.CommitError, e:
         log.error(e)
     except changeset.PathIdsConflictError, e:
         log.error(e)

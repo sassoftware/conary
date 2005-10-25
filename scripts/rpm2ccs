@@ -25,11 +25,11 @@ import conary
 import checkin
 import conarycfg
 import rpmhelper
-import repository
 
 from build import cook
 from lib import util
 from repository.netclient import NetworkRepositoryClient
+from repository import errors
 
 
 chkconfigRe = re.compile(r'([ \t]*)(/sbin/)?chkconfig.*')
@@ -591,7 +591,7 @@ def main(argv):
         repos.findTrove(cfg.buildLabel, recipe.packagename+':source',
                         None, None)
         checkin.checkout(repos, cfg, packagedir, recipe.packagename)
-    except repository.repository.TroveNotFound:
+    except errors.TroveNotFound:
         checkin.newPackage(repos, cfg, recipe.packagename)
 
     os.chdir(packagedir)

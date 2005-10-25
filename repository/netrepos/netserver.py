@@ -17,6 +17,8 @@ import cPickle
 from deps import deps
 from repository import changeset
 from repository import repository
+from repository import errors
+from netauth import NetworkAuthorization
 import fsrepos
 from lib import log
 import files
@@ -33,13 +35,12 @@ from repository import repository
 from dbstore import idtable
 from local import sqldb
 from local import versiontable
-from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists, GroupAlreadyExists, UserNotFound
 import trovestore
 import versions
 from datastore import IntegrityError
 from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from lib.openpgpfile import TRUST_FULL
-from trove import DigitalSignature, DigitalSignatureVerificationError
+from trove import DigitalSignature
 from lib.openpgpkey import getKeyCache
 import base64
 from lib.tracelog import logMe
@@ -100,7 +101,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # the first argument is a version number
             r = method(authToken, *args)
             return (False, r)
-	except repository.TroveMissing, e:
+	except errors.TroveMissing, e:
             condRollback()
 	    if not e.troveName:
 		return (True, ("TroveMissing", "", ""))
@@ -109,16 +110,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
+        except IntegrityError, e:
+            condRollback()
+            return (True, ('IntegrityError', str(e)))
 	except trove.TroveIntegrityError, e:
             condRollback()
             return (True, ("TroveIntegrityError", str(e) +
                            # add a helpful error message for now
                         ' (you may need to update to conary 0.62.12 or later)'))
-        except FileContentsNotFound, e:
+        except errors.FileContentsNotFound, e:
             condRollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
-        except FileStreamNotFound, e:
+        except errors.FileStreamNotFound, e:
             condRollback()
             return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
@@ -129,7 +133,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise
 	except Exception, e:
             condRollback()
-            for klass, marshall in simpleExceptions:
+            for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
                     return (True, (marshall, str(e)))
             raise
@@ -153,7 +157,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # adds a new user, with no acls. for now it requires full admin
         # rights
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         self.auth.addUser(user, newPassword)
 
@@ -163,7 +167,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # adds a new user, with no acls. for now it requires full admin
         # rights
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         #Base64 decode salt
         self.auth.addUserByMD5(user, base64.decodestring(salt), newPassword)
@@ -171,14 +175,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def deleteUserByName(self, authToken, clientVersion, user):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         self.auth.deleteUserByName(user)
         return True
 
     def deleteUserById(self, authToken, clientVersion, userId):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         error = self.auth.deleteUserById(userId)
         if error:
@@ -191,7 +195,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         if trovePattern == "":
             trovePattern = None
@@ -207,7 +211,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
                 oldLabel, trovePattern, label, write, capped, admin):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
 
         if trovePattern == "":
             trovePattern = "ALL"
@@ -226,19 +230,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             write, capped, admin)
 
         return True
-    
+
     def changePassword(self, authToken, clientVersion, user, newPassword):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]) and\
-            user != authToken[0]:
-            raise InsufficientPermission
+        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+            and user != authToken[0]):
+            raise errors.InsufficientPermission
 
         self.auth.changePassword(user, newPassword)
-        
+
         return True
 
     def getUserGroups(self, authToken, clientVersion):
         r = self.auth.getUserGroups(authToken[0])
-        return r 
+        return r
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
@@ -247,10 +251,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.check(authToken, write = True,
                                label = branch.label(),
                                trove = troveName):
-            raise InsufficientPermission
-                                                                                            
-        retval = self.troveStore.updateMetadata(troveName, branch, shortDesc, longDesc,
-                                                urls, categories, licenses, source, language)
+            raise errors.InsufficientPermission
+
+        retval = self.troveStore.updateMetadata(troveName, branch,
+                                                shortDesc, longDesc,
+                                                urls, categories,
+                                                licenses, source,
+                                                language)
         self.troveStore.commit()
         return retval
 
@@ -264,7 +271,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.check(authToken, write = False,
                                    label = branch.label(),
                                    trove = troveName):
-                raise InsufficientPermission
+                raise errors.InsufficientPermission
             if version:
                 version = self.toVersion(version)
             else:
@@ -886,7 +893,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFileContents(self, authToken, clientVersion, fileList):
         logMe(1)
         try:
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+            (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
 
             sizeList = []
@@ -896,20 +903,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 fileLabel = fileVersion.branch().label()
                 fileId = self.toFileId(fileId)
 
-                if not self.auth.check(authToken, write = False, 
+                if not self.auth.check(authToken, write = False,
                                        label = fileLabel):
-                    raise InsufficientPermission
+                    raise errors.InsufficientPermission
 
                 fileObj = self.troveStore.findFileVersion(fileId)
                 if fileObj is None:
-                    raise FileStreamNotFound((fileId, fileVersion))
+                    raise errors.FileStreamNotFound((fileId, fileVersion))
 
                 filePath = self.repos.contentsStore.hashToPath(
                     sha1helper.sha1ToString(fileObj.contents.sha1()))
                 try:
                     size = os.stat(filePath).st_size
                 except OSError, e:
-                    raise FileContentsNotFound((fileId, fileVersion))
+                    raise errors.FileContentsNotFound((fileId, fileVersion))
                 sizeList.append(size)
                 os.write(fd, "%s %d\n" % (filePath, size))
             url = os.path.join(self.urlBase(), 
@@ -997,7 +1004,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	    if not self.auth.check(authToken, write = False, trove = name,
 				   label = newVer.branch().label()):
-		raise InsufficientPermission
+		raise errors.InsufficientPermission
 
 	    if old == 0:
 		l = (name, (None, None),
@@ -1064,7 +1071,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         
 	if not self.auth.check(authToken, write = False, 
 			       label = self.toLabel(label)):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
 	requires = {}
 	for dep in requiresList:
@@ -1085,7 +1092,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# make sure they have a valid account and permission to commit to
 	# *something*
 	if not self.auth.check(authToken, write = True):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
 	os.close(fd)
@@ -1113,7 +1120,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    if not self.auth.check(authToken, write = True, 
 		       label = troveCs.getNewVersion().branch().label(),
 		       trove = troveCs.getName()):
-		raise InsufficientPermission
+		raise errors.InsufficientPermission
 
 	self.repos.commitChangeSet(cs, self.name)
 
@@ -1161,7 +1168,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False, 
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
 
@@ -1201,7 +1208,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False, 
                                trove = troveName,
 			       label = self.toBranch(branch).label()):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
         query = """
@@ -1231,7 +1238,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         logMe(1, sourceName, sourceVersion)       
 	if not self.auth.check(authToken, write = False, trove = sourceName,
                    label = self.toVersion(sourceVersion).branch().label()):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
         versionMatch = sourceVersion + '-%'
 
@@ -1262,7 +1269,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         flavor = self.toFlavor(flavor)
 	if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
         trv = self.repos.getTrove(name, version, flavor)
 
@@ -1275,11 +1282,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pubKey = keyCache.getPublicKey(sig[0])
 
         if pubKey.isRevoked():
-            raise IncompatibleKey('Key %s has been revoked. '
+            raise errors.IncompatibleKey('Key %s has been revoked. '
                                   'Signature rejected' %sig[0])
 
         if (pubKey.getTimestamp()):
-            raise IncompatibleKey('Key %s has expired. '
+            raise errors.IncompatibleKey('Key %s has expired. '
                                   'Signature rejected' %sig[0])
 
         #need to verify this key hasn't signed this trove already
@@ -1290,7 +1297,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             foundSig = 0
 
         if foundSig:
-            raise AlreadySignedError("Trove already signed by key")
+            raise errors.AlreadySignedError("Trove already signed by key")
 
         trv.addPrecomputedDigitalSignature(sig)
 
@@ -1344,7 +1351,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
         uid = self.auth.getUserIdByName(user)
         self.repos.troveStore.keyTable.addNewAsciiKey(uid, keyData)
         return True
@@ -1353,7 +1360,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         import base64
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
         uid = self.auth.getUserIdByName(user)
         keyData = base64.b64decode(encKeyData)
         self.repos.troveStore.keyTable.addNewKey(uid, keyData)
@@ -1361,7 +1368,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def changePGPKeyOwner(self, authToken, label, user, key):
         if (not self.auth.checkIsFullAdmin(*authToken)):
-            raise InsufficientPermission
+            raise errors.InsufficientPermission
         if user:
             uid = self.auth.getUserIdByName(user)
         else:
@@ -1405,14 +1412,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
-	    raise InsufficientPermission
+	    raise errors.InsufficientPermission
 
         # cut off older clients entirely, no negotiation
         if clientVersion < SERVER_VERSIONS[0]:
-            raise InvalidClientVersion, \
-               ("Invalid client version %s.  Server accepts client versions %s"
-                " - read http://wiki.conary.com/ConaryConversion" % \
-                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
+            raise errors.InvalidClientVersion(
+               'Invalid client version %s.  Server accepts client versions %s '
+               '- read http://wiki.conary.com/ConaryConversion' % 
+               (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
         return SERVER_VERSIONS
 
@@ -1652,7 +1659,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	try:
 	    util.mkdirChain(self.repPath)
 	except OSError, e:
-	    raise repository.OpenError(str(e))
+	    raise errors.OpenError(str(e))
 
         if cacheChangeSets:
             self.cache = CacheSet(path + "/cache.sql", tmpPath, 
@@ -1894,46 +1901,5 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, closedMessage):
         self.closedMessage = closedMessage
 
-class InvalidClientVersion(Exception):
-    pass
-
 class SchemaVersion(Exception):
     pass
-
-class GetFileContentsError(Exception):
-    def __init__(self, val):
-        Exception.__init__(self)
-        self.val = val
-
-class AlreadySignedError(Exception):
-    def __str__(self):
-        return self.error
-    def __init__(self, error = "Already signed"):
-        self.error=error
-
-class FileContentsNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
-
-class FileStreamNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
-
-# This is a list of simple exception classes and the text string
-# that should be used to marshall an exception instance of that
-# class back to the client.  The str() value of the exception will
-# be returned as the exception argument.
-simpleExceptions = (
-    (AlreadySignedError,         'AlreadySignedError'),
-    (BadSelfSignature,           'BadSelfSignature'),
-    (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
-    (GroupAlreadyExists,         'GroupAlreadyExists'),
-    (IncompatibleKey,            'IncompatibleKey'),
-    (IntegrityError,             'IntegrityError'),
-    (InvalidClientVersion,       'InvalidClientVersion'),
-    (KeyNotFound,                'KeyNotFound'),
-    (UserAlreadyExists,          'UserAlreadyExists'),
-    (UserNotFound,               'UserNotFound'),
-    (repository.CommitError,     'CommitError'),
-    (repository.DuplicateBranch, 'DuplicateBranch'),
-    )

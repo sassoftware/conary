@@ -16,7 +16,7 @@ Provides the output for the "conary repquery" command
 """
 
 from deps import deps
-from repository import repository
+from repository import errors
 import display
 import files
 from lib import log
@@ -148,7 +148,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                                     cfg.flavor, 
                                     acrossLabels = True,
                                     acrossFlavors = True)
-    except repository.TroveNotFound, e:
+    except errors.TroveNotFound, e:
 	log.error(str(e))
 	return
 
@@ -161,7 +161,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                 sourceTrove = repos.getTrove(sourceName, 
                         troveVersion.getSourceVersion(), deps.DependencySet(),
                         withFiles = False)
-            except repository.TroveMissing:
+            except errors.TroveMissing:
                 sourceTrove = None
         elif troveName.endswith(':source'):
             sourceTrove = trove

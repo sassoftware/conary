@@ -61,7 +61,7 @@ def signTroves(cfg, specStrList, callback = 0):
             #        trvList = repos.findTroves(cfg.buildLabel, name)
             trvList = repos.findTrove([ cfg.buildLabel ],
                                       (name, versionStr, flavor), cfg.flavor)
-        except repository.repository.TroveNotFound, e:
+        except errors.TroveNotFound, e:
             log.error(str(e))
             return
 

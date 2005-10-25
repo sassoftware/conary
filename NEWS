@@ -27,6 +27,11 @@ Changes in 0.70.2:
   * The NormalizeCompression policy no longer causes an error if you have
     two files in the filesystem that differ only by the .gz or .bz2
     extension.
+  * Exception handling has been re-worked.  All exception classes that
+    are marshaled back to the client are now in the repository.errors
+    module.  Some of the most commonly used exception classes have
+    been included in their previous modules for compatibility until
+    code can be modified to use the new repository.errors module.
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 

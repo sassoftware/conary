@@ -23,7 +23,7 @@ import copy
 import difflib
 from build import recipe, lookaside
 from local import update
-from repository import changeset
+from repository import changeset, errors
 import changelog
 from build import cook
 import deps
@@ -31,7 +31,6 @@ import files
 from lib import log
 from lib import magic
 import os
-import repository
 from lib import sha1helper
 from lib import openpgpfile
 import sys
@@ -293,7 +292,7 @@ def checkout(repos, cfg, workDir, name, callback=None):
     name += ":source"
     try:
         trvList = repos.findTrove(cfg.buildLabel, (name, versionStr, None))
-    except repository.repository.TroveNotFound, e:
+    except errors.TroveNotFound, e:
         log.error(str(e))
         return
     if len(trvList) > 1:
@@ -387,7 +386,7 @@ def commit(repos, cfg, message, callback=None):
                 log.error("contents of working directory are not all "
                           "from the head of the branch; use update")
                 return
-        except repository.repository.TroveMissing:
+        except errors.TroveMissing:
             # the version in the CONARY file doesn't exist in the repository.
             # The only time this should happen is after a fresh merge, when
             # the new version is in the CONARY file before the commit happens.
@@ -846,7 +845,7 @@ def diff(repos, versionStr = None):
 
         try:
             pkgList = repos.findTrove(None, (state.getName(), versionStr, None))
-        except repository.repository.TroveNotFound, e:
+        except errors.TroveNotFound, e:
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
             return
@@ -957,7 +956,7 @@ def updateSrc(repos, versionStr = None, callback = None):
 
         try:
             pkgList = repos.findTrove(None, (pkgName, versionStr, None))
-        except repository.repository.TroveNotFound:
+        except errors.TroveNotFound:
 	    log.error("Unable to find source component %s with version %s"
                       % (pkgName, versionStr))
 	    return

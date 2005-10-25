@@ -17,14 +17,18 @@ import re
 import sqlite3
 import sys
 
-from repository.netclient import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, UserNotFound
+from repository import errors
 from lib.tracelog import logMe
+
+# FIXME: remove these compatibilty error classes later
+UserAlreadyExists = errors.UserAlreadyExists
+GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
         logMe(2, authToken[0], write, admin, label, trove)
         if label and label.getHost() != self.name:
-            raise RepositoryMismatch
+            raise errors.RepositoryMismatch
 
         if not authToken[0]:
             return False
@@ -103,7 +107,7 @@ class NetworkAuthorization:
     def checkUserPass(self, authToken, label = None):
         logMe(2, authToken[0], label)
         if label and label.getHost() != self.name:
-            raise RepositoryMismatch
+            raise errors.RepositoryMismatch
 
         cu = self.db.cursor()
 
@@ -170,7 +174,7 @@ class NetworkAuthorization:
         except sqlite3.ProgrammingError, e:
             if str(e) == 'columns userGroupId, labelId, itemId are not unique':
                 self.db.rollback()
-                raise PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
+                raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
             raise
 
         self.db.commit()
@@ -196,7 +200,7 @@ class NetworkAuthorization:
         except sqlite3.ProgrammingError, e:
             if str(e) == 'columns userGroupId, labelId, itemId are not unique':
                 self.db.rollback()
-                raise PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
+                raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
             raise
 
         self.db.commit()
@@ -222,7 +226,7 @@ class NetworkAuthorization:
             FROM Users WHERE LOWER(User)=LOWER(?)
         """, user)
         if cu.next()[0]:
-            raise UserAlreadyExists, 'user: %s' % user
+            raise errors.UserAlreadyExists, 'user: %s' % user
         return True
 
     def _uniqueUserGroup(self, cu, usergroup):
@@ -235,7 +239,7 @@ class NetworkAuthorization:
             FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
         """, usergroup)
         if cu.next()[0]:
-            raise GroupAlreadyExists, 'usergroup: %s' % usergroup
+            raise errors.GroupAlreadyExists, 'usergroup: %s' % usergroup
         return True
 
     def addUser(self, user, password):
@@ -269,7 +273,7 @@ class NetworkAuthorization:
             )+1, ? """, user)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column userGroup is not unique':
-                raise GroupAlreadyExists, 'group: %s' % user
+                raise errors.GroupAlreadyExists, 'group: %s' % user
             raise
 
         userGroupId = cu.lastrowid
@@ -279,7 +283,7 @@ class NetworkAuthorization:
                        (userGroupId, user, salt, password))
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column user is not unique':
-                raise UserAlreadyExists, 'user: %s' % user
+                raise errors.UserAlreadyExists, 'user: %s' % user
             raise
 
         userId = cu.lastrowid
@@ -297,8 +301,8 @@ class NetworkAuthorization:
         try:
             userId = cu.next()[0]
         except StopIteration:
-            raise UserNotFound(user)
-        
+            raise errors.UserNotFound(user)
+
         return self.deleteUser(userId, user, commit)
 
     def deleteUserById(self, userId, commit = True):
@@ -309,8 +313,8 @@ class NetworkAuthorization:
         try:
             user = cu.next()[0]
         except StopIteration:
-            raise UserNotFound(user)
-        
+            raise errors.UserNotFound(user)
+
         return self.deleteUser(userId, user, commit)
 
     def deleteUser(self, userId, user, commit = True):
@@ -343,7 +347,7 @@ class NetworkAuthorization:
         except Exception, e:
             if commit:
                 self.db.rollback()
-            
+
             raise e
         return True
 
@@ -454,7 +458,7 @@ class NetworkAuthorization:
         except sqlite3.ProgrammingError, e:
             self.db.rollback()
             if str(e) == 'column userGroup is not unique':
-                raise GroupAlreadyExists, "group: %s" % userGroupName
+                raise errors.GroupAlreadyExists, "group: %s" % userGroupName
             raise
 
         self.db.commit()
@@ -476,7 +480,7 @@ class NetworkAuthorization:
             except sqlite3.ProgrammingError, e:
                 self.db.rollback()
                 if str(e) == 'column userGroup is not unique':
-                    raise GroupAlreadyExists, "group: %s" % userGroupName
+                    raise errors.GroupAlreadyExists, "group: %s" % userGroupName
                 raise
 
             self.db.commit()
@@ -659,8 +663,3 @@ class NetworkAuthorization:
         if commit:
             self.db.commit()
 
-class RepositoryMismatch(Exception):
-    pass
-
-class InsufficientPermission(Exception):
-    pass

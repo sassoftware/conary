@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 rPath, Inc.
+# Copyright (c) 2004-2005 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,7 +12,7 @@
 # full details.
 #
 from repository import changeset
-from repository import repository
+from repository import errors
 from repository import filecontainer
 from lib import log
 import os
@@ -44,16 +44,16 @@ def doCommit(repos, changeSetFile, targetLabel):
         # add commitChangeSet method that takes a fd.
         try:
             repos.commitChangeSetFile(changeSetFile)
-        except repository.CommitError, e:
+        except errors.CommitError, e:
             print e
     finally:
         if targetLabel:
             os.unlink(changeSetFile)
-	
+
 def doLocalCommit(db, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
     if not cs.isLocal():
 	log.error("repository changesets must be applied with update instead")
     db.commitChangeSet(cs, set(), isRollback = True, toStash = False)
-    
+
 

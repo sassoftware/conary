@@ -27,6 +27,7 @@ from lib import log
 from lib import util
 import localrep
 from repository import changeset
+from repository import errors
 from repository import filecontents
 from repository import filecontainer
 from repository import repository
@@ -848,6 +849,6 @@ class MissingDependencies(Exception):
     def __init__(self, depList):
         self.depList = depList
 
-class CommitError(repository.CommitError):
+class CommitError(errors.CommitError):
     pass
 

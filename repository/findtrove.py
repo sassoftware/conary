@@ -13,7 +13,7 @@
 #
 
 from deps import deps
-import repository
+import errors
 import versions
 
 
@@ -632,10 +632,10 @@ class TroveFinder:
             if missing and not allowMissing:
                 if len(missing) > 1:
                     missingMsgs = [ missing[x] for x in troveSpecs if x in missing]
-                    raise repository.TroveNotFound, '%d troves not found:\n%s\n' \
+                    raise errors.TroveNotFound, '%d troves not found:\n%s\n' \
                             % (len(missing), '\n'.join(x for x in missingMsgs))
                 else:
-                    raise repository.TroveNotFound, missing.values()[0]
+                    raise errors.TroveNotFound, missing.values()[0]
 
             troveSpecs = self.remaining
 
@@ -645,7 +645,7 @@ class TroveFinder:
         (name, versionStr, flavor) = troveTup
         if not self.labelPath and (not versionStr or versionStr[0] != "/"):
             if not self.allowNoLabel:
-                raise repository.TroveNotFound, \
+                raise errors.TroveNotFound, \
                     "fully qualified version or label " + \
                     "expected instead of %s" % versionStr
 
@@ -655,7 +655,7 @@ class TroveFinder:
                 affinityTroves = self.affinityDatabase.findTrove(None, 
                                                                  (troveTup[0],
                                                                   None, None))
-            except repository.TroveNotFound:
+            except errors.TroveNotFound:
                 pass
         
         type = self._getVersionType(troveTup)
@@ -684,7 +684,7 @@ class TroveFinder:
             try:
                 version = versions.VersionFromString(versionStr)
             except versions.ParseError, e:
-                raise repository.TroveNotFound, str(e)
+                raise errors.TroveNotFound, str(e)
             if isinstance(version, versions.Branch):
                 return VERSION_STR_BRANCH
             else:
@@ -695,7 +695,7 @@ class TroveFinder:
         if slashCount > 1:
             # if we've got a version string, and it doesn't start with a
             # /, only one / is allowed
-            raise repository.TroveNotFound, \
+            raise errors.TroveNotFound, \
                     "incomplete version string %s not allowed" % versionStr
         elif firstChar == '@':
             return VERSION_STR_BRANCHNAME
@@ -709,7 +709,7 @@ class TroveFinder:
             if slashCount:
                 # if you've specified a prefix, it must have some identifying
                 # mark and not just be foo/1.2
-                raise repository.TroveNotFound, ('Illegal version prefix %s'
+                raise errors.TroveNotFound, ('Illegal version prefix %s'
                                                  ' for %s' % (versionStr, name))
             for char in ' ,':
                 if char in versionStr:
@@ -722,7 +722,7 @@ class TroveFinder:
                     versions.Revision(versionStr)
                     return VERSION_STR_REVISION
                 except versions.ParseError, msg:
-                    raise repository.TroveNotFound, str(msg)
+                    raise errors.TroveNotFound, str(msg)
             return VERSION_STR_TROVE_VER
 
     def _getLabelPath(self, troveTup):
@@ -784,7 +784,7 @@ class TroveFinder:
             label = versions.Label(troveTup[1].split('/', 1)[0])
             newLabelPath = [ label ]
         except versions.ParseError:
-            raise repository.TroveNotFound, \
+            raise errors.TroveNotFound, \
                                 "invalid version %s" % troveTup[1]
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 

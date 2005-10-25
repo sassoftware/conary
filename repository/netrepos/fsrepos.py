@@ -23,10 +23,8 @@ import repository.netclient
 from repository.repository import AbstractRepository
 from repository.repository import ChangeSetJob
 from datastore import DataStoreRepository, DataStore
-from repository.repository import DuplicateBranch
-from repository.repository import RepositoryError
-from repository.repository import TroveMissing
 from repository import changeset
+from repository import errors
 from repository import filecontents
 import sqlite3
 import sys
@@ -53,7 +51,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    return self.troveStore.getTrove(pkgName, version, flavor,
                                             withFiles = withFiles)
 	except KeyError:
-	    raise TroveMissing(pkgName, version)
+	    raise errors.TroveMissing(pkgName, version)
 
     def addTrove(self, pkg):
 	return self.troveStore.addTrove(pkg)
@@ -94,15 +92,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
-	    label = v.branch().label()
-	    if isinstance(label, versions.EmergeLabel):
-		raise repository.repository.CommitError, \
-		    "can not commit items on localhost@local:EMERGE"
-	    
-	    if isinstance(label, versions.CookLabel):
-		raise repository.repository.CommitError, \
-		    "can not commit items on localhost@local:COOK"
-
+            if v.isOnLocalHost():
+                label = v.branch().label()
+		raise errors.CommitError('can not commit items on '
+                                         '%s label' %(label.asString()))
         self.troveStore.begin()
         try:
             # a little odd that creating a class instance has the side

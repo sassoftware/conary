@@ -15,7 +15,7 @@
 import conaryclient
 from lib import log
 from local import update
-from repository import repository
+from repository import errors
 from updatecmd import parseTroveSpec
 from updatecmd import UpdateCallback
 import versions
@@ -91,7 +91,7 @@ def LocalChangeSetCommand(db, cfg, troveName, outFileName):
     try:
 	troveList = db.trovesByName(troveName)
         troveList = db.getTroves(troveList)
-    except repository.TroveNotFound, e:
+    except errors.TroveNotFound, e:
 	log.error(e)
 	return
 

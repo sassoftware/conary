@@ -17,7 +17,6 @@
 The conary main program.
 """
 
-
 import sys
 if sys.version_info < (2, 4):
     print "error: python 2.4 or later is requried"
@@ -41,8 +40,6 @@ from lib import options
 from lib import util
 from local import database
 import queryrep
-import repository
-from repository import netclient
 import conaryclient
 import rollbacks
 import showchangeset
@@ -147,9 +144,10 @@ def usage(rc = 1):
     return rc
 
 def openRepository(repMap):
+    from repository import netclient, errors
     try:
-        return repository.netclient.NetworkRepositoryClient(repMap)
-    except repository.repository.OpenError, e:
+        return netclient.NetworkRepositoryClient(repMap)
+    except errors.OpenError, e:
 	log.error('Unable to open repository %s: %s', path, str(e))
 	sys.exit(1)
 
@@ -411,6 +409,7 @@ def realMain(cfg, argv=sys.argv):
         troves = otherArgs[2:]
         verify.verify(troves, db, cfg, all=all)
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
+        from repository import changeset
         ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
@@ -447,7 +446,7 @@ def realMain(cfg, argv=sys.argv):
         component = None
         if len(otherArgs) > 3:
             component = otherArgs[3:]
-        cs = repository.changeset.ChangeSetFromFile(changeset)
+        cs = changeset.ChangeSetFromFile(changeset)
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
@@ -550,6 +549,7 @@ def realMain(cfg, argv=sys.argv):
 	sys.exit(1)
 
 def main(argv=sys.argv):
+    from repository import errors
     try:
         if '--skip-default-config' in argv:
             argv = argv[:]
@@ -569,23 +569,15 @@ def main(argv=sys.argv):
 		"remote server denied permission for the requested operation"
 	else:
 	    raise
-    except netclient.UnknownException, e:
+    except errors.UnknownException, e:
 	print >> sys.stderr, \
 	    "An unknown exception occured on the repository server:"
 	print >> sys.stderr, "\t%s" % str(e)
-    except repository.repository.TroveMissing, e:
+    except errors.RepositoryError, e:
 	print >> sys.stderr, str(e)
     except database.OpenError, e:
 	print >> sys.stderr, str(e)
-    except repository.repository.OpenError, e:
-	print >> sys.stderr, str(e)
-    except repository.repository.DuplicateBranch, e:
-	print >> sys.stderr, str(e)
-    except repository.repository.TroveNotFound, e:
-	print >> sys.stderr, str(e)
     except conaryclient.cmdline.TroveSpecError, e:
-	print >> sys.stderr, str(e)
-    except repository.netclient.InvalidServerVersion, e:
 	print >> sys.stderr, str(e)
     except database.OldDatabaseSchema, e:
 	print >> sys.stderr, str(e)
@@ -594,8 +586,6 @@ def main(argv=sys.argv):
     except conaryclient.CloneError, e:
         print >> sys.stderr, str(e)
     except conaryclient.InstallPathConflicts, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.RepositoryLocked, e:
         print >> sys.stderr, str(e)
     except DigitalSignatureVerificationError, e:
         print >> sys.stderr, str(e)

@@ -13,7 +13,6 @@
 #
 
 import base64
-import exceptions
 import gzip
 import httplib
 import itertools
@@ -26,7 +25,9 @@ import xmlrpclib
 
 #conary
 import changeset
+import datastore
 from deps import deps
+import errors
 import files
 import filecontents
 import findtrove
@@ -39,7 +40,6 @@ import trove
 import versions
 import xmlshims
 from lib import openpgpfile
-
 
 shims = xmlshims.NetworkConvertors()
 
@@ -75,49 +75,24 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 		version = None
 	    else:
 		version = shims.toVersion(version)
-	    raise repository.TroveMissing(name, version)
-	elif exceptionName == "CommitError":
-	    raise repository.CommitError(exceptionArgs[0])
-	elif exceptionName == "DuplicateBranch":
-	    raise repository.DuplicateBranch(exceptionArgs[0])
+	    raise errors.TroveMissing(name, version)
         elif exceptionName == "MethodNotSupported":
-	    raise repository.MethodNotSupported(exceptionArgs[0])
+	    raise errors.MethodNotSupported(exceptionArgs[0])
         elif exceptionName == "IntegrityError":
-            from datastore import IntegrityError
-            raise IntegrityError
-        elif exceptionName in "InvalidClientVersion":
-            from netrepos import netserver
-	    raise netserver.InvalidClientVersion, exceptionArgs[0]
-        elif exceptionName == "UserAlreadyExists":
-            import netrepos
-	    raise UserAlreadyExists(exceptionArgs[0])
-        elif exceptionName == "GroupAlreadyExists":
-            import netrepos
-	    raise GroupAlreadyExists(exceptionArgs[0])
-        elif exceptionName == "UserNotFound":
-            raise UserNotFound(exceptionArgs[0])
+	    raise datastore.IntegrityError(exceptionArgs[0])
         elif exceptionName == 'FileContentsNotFound':
-            raise FileContentsNotFound((self.toFileId(exceptionArgs[0]),
-                                        self.toVersion(exceptionArgs[1])))
+            raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
+                                               self.toVersion(exceptionArgs[1])))
         elif exceptionName == 'FileStreamNotFound':
-            raise FileStreamNotFound((self.toFileId(exceptionArgs[0]),
-                                      self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'KeyNotFound':
-            raise openpgpfile.KeyNotFound(exceptionArgs[0])
-        elif exceptionName == 'DigitalSignatureVerificationError':
-            raise trove.DigitalSignatureVerificationError(exceptionArgs[0])
-        elif exceptionName == 'AlreadySignedError':
-            raise AlreadySignedError(exceptionArgs[0])
-        elif exceptionName == 'BadSelfSignature':
-            raise openpgpfile.BadSelfSignature(exceptionArgs)
-        elif exceptionName == 'IncompatibleKey':
-            raise openpgpfile.IncompatibleKey(exceptionArgs)
+            raise errors.FileStreamNotFound((self.toFileId(exceptionArgs[0]),
+                                             self.toVersion(exceptionArgs[1])))
         elif exceptionName == 'RepositoryLocked':
-            raise repository.RepositoryLocked
-        elif exceptionName == 'TroveIntegrityError':
-            raise trove.TroveIntegrityError(exceptionArgs[0])
+            raise errors.RepositoryLocked
 	else:
-	    raise UnknownException(exceptionName, exceptionArgs)
+            for klass, marshall in errors.simpleExceptions:
+                if exceptionName == marshall:
+                    raise klass(exceptionArgs[0])
+	    raise errors.UnknownException(exceptionName, exceptionArgs)
 
 class ServerProxy(xmlrpclib.ServerProxy):
 
@@ -137,7 +112,7 @@ class ServerCache:
 	    else:
 		serverName = item.branch().label().getHost()
         if serverName == 'local':
-            raise repository.OpenError(
+            raise errors.OpenError(
              '\nError: Tried to access repository on reserved host name'
              ' "local" -- this host is reserved for troves compiled/created'
              ' locally, and cannot be queried.')
@@ -169,7 +144,7 @@ class ServerCache:
                 if isinstance(e, socket.error):
                     errmsg = e[1]
                 # includes OS and IO errors
-                elif isinstance(e, exceptions.EnvironmentError):
+                elif isinstance(e, EnvironmentError):
                     errmsg = e.strerror
                     # sometimes there is a socket error hiding 
                     # inside an IOError!
@@ -178,24 +153,24 @@ class ServerCache:
                 else:
                     errmsg = str(e)
                 url = _cleanseUrl(protocol, url)
-		raise repository.OpenError('Error occured opening repository '
+		raise errors.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, errmsg))
 
             intersection = set(serverVersions) & set(CLIENT_VERSIONS)
             if not intersection:
                 url = _cleanseUrl(protocol, url)
-                raise InvalidServerVersion, \
-                      ("While talking to repository " + url + ":\n"
-                       "Invalid server version.  Server accepts client "
-                       "versions %s, but this client only supports versions %s"
-                       " - download a valid client from wiki.conary.com") % \
-                       (",".join([str(x) for x in serverVersions]),
-                        ",".join([str(x) for x in CLIENT_VERSIONS]))
+                raise errors.InvalidServerVersion(
+                    "While talking to repository " + url + ":\n"
+                    "Invalid server version.  Server accepts client "
+                    "versions %s, but this client only supports versions %s"
+                    " - download a valid client from wiki.conary.com" %
+                    (",".join([str(x) for x in serverVersions]),
+                     ",".join([str(x) for x in CLIENT_VERSIONS])))
 
             transporter.setCompress(True)
 
 	return server
-		
+
     def __init__(self, repMap):
 	self.cache = {}
 	self.map = repMap
@@ -508,14 +483,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	b = self.fromBranch(branch)
 	v = self.c[branch].getTroveLatestVersion(troveName, b)
         if v == 0:
-            raise repository.TroveMissing(troveName, branch)
+            raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
 	rc = self.getTroves([(troveName, troveVersion, troveFlavor)],
                             withFiles = withFiles)
 	if rc[0] is None:
-	    raise repository.TroveMissing(troveName, version = troveVersion)
+	    raise errors.TroveMissing(troveName, version = troveVersion)
 
 	return rc[0]
 
@@ -523,7 +498,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	chgSetList = []
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))
-	
+
 	cs = self._getChangeSet(chgSetList, recurse = False, 
                                 withFiles = withFiles,
                                 withFileContents = False)
@@ -536,7 +511,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             except KeyError:
                 l.append(None)
                 continue
-            
+
             t = trove.Trove(troveCs.getName(), troveCs.getOldVersion(),
                             troveCs.getNewFlavor(), troveCs.getChangeLog())
             # trove integrity checks don't work when file information is
@@ -1206,7 +1181,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # getConaryUrl call was introduced at proto version 37
         if max(commonVersions) < 37:
             hostInfo = version.branch().label().asString()
-            raise InvalidServerVersion, \
+            raise errors.InvalidServerVersion, \
                   ("While talking to " + hostInfo + " ...\n"
                    "Server protocol version does not have the "
                    "necessary support for the update-conary call")
@@ -1274,12 +1249,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	r = c.getresponse()
         # give a slightly more helpful message for 403
         if r.status == 403:
-            raise repository.CommitError('Permission denied. Check username, '
-                                         'password, and https settings.')
+            raise errors.CommitError('Permission denied. Check username, '
+                                     'password, and https settings.')
         # and a generic message for a non-OK status
         if r.status != 200:
-            raise repository.CommitError('Error uploading to repository: '
-                                         '%s (%s)' %(r.status, r.reason))
+            raise errors.CommitError('Error uploading to repository: '
+                                     '%s (%s)' %(r.status, r.reason))
 
     def __init__(self, repMap, localRepository = None):
         # the local repository is used as a quick place to check for
@@ -1287,50 +1262,3 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # span repositories. it has no effect on any other operation.
 	self.c = ServerCache(repMap)
         self.localRep = localRepository
-
-class UnknownException(repository.RepositoryError):
-
-    def __str__(self):
-	return "UnknownException: %s %s" % (self.eName, self.eArgs)
-
-    def __init__(self, eName, eArgs):
-	self.eName = eName
-	self.eArgs = eArgs
-
-class UserAlreadyExists(Exception):
-    pass
-
-class GroupAlreadyExists(Exception):
-    pass
-
-class PermissionAlreadyExists(Exception):
-    pass
-
-class UserNotFound(Exception):
-    def __init__(self, user = "user"):
-        self.user = user
-
-    def __str__(self):
-        return "UserNotFound: %s" % self.user
-
-class InvalidServerVersion(Exception):
-    pass
-
-class GetFileContentsError(Exception):
-    def __init__(self, val):
-        Exception.__init__(self)
-        self.val = val
-
-class FileContentsNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
-
-class FileStreamNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
-
-class AlreadySignedError(Exception):
-    def __str__(self):
-        return self.error
-    def __init__(self, error = "Already signed"):
-        self.error=error

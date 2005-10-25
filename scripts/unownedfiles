@@ -25,15 +25,13 @@ import conarycfg
 from deps import deps
 from local import database
 from lib import util
-from repository import netclient
-from repository import repository
 import versions
 import updatecmd
 
 def usage():
     print """\
 Usage: unowned [-r] <file>+
-         """                      
+         """
     return 1
 
 sys.excepthook = util.genExcepthook()
@@ -51,11 +49,10 @@ def main(argv):
 
     if not pathList:
         return usage()
-        
 
     expandedPathList = []
     for path in pathList:
-        expandedPathList.extend(util.braceGlob(os.path.abspath(util.normpath(path)))) 
+        expandedPathList.extend(util.braceGlob(os.path.abspath(util.normpath(path))))
 
     cfg = conarycfg.ConaryConfiguration()
     db = database.Database(cfg.root, cfg.dbPath)
@@ -78,7 +75,7 @@ def main(argv):
                         break
                     if not found:
                         unownedFile(filePath)
-            
+
     return 0
 
 def unownedFile(path):

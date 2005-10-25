@@ -20,8 +20,6 @@ import metadata
 from deps import deps
 from lib import util
 from local import database
-from repository import changeset
-from repository import repository
 from repository.netclient import NetworkRepositoryClient
 
 # mixins for ConaryClient

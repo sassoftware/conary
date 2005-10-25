@@ -14,7 +14,7 @@
 
 from dbstore import idtable
 import versions
-from repository.repository import DuplicateBranch
+from repository.errors import DuplicateBranch
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch):

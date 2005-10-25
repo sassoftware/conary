@@ -24,7 +24,7 @@ import gzip
 import itertools
 import os
 from lib import patch
-import repository
+import errors
 from lib import sha1helper
 import streams
 import struct
@@ -475,7 +475,7 @@ class ChangeSet(streams.StreamSet):
                               'and then run the update again by using '
                               '"conary update --replace-files"')
                     continue
-                    
+
                 origFile = db.getFileVersion(pathId, curFileId, curVersion)
 
                 if csInfo[0] == "\x01":
@@ -609,7 +609,7 @@ class ChangeSet(streams.StreamSet):
 	    # it's already in use we won't be able to though
 	    try:
 		repos.getTrove(name, newVer, troveCs.getNewFlavor())
-	    except repository.TroveMissing: 
+	    except errors.TroveMissing: 
 		pass
 	    else:
 		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)

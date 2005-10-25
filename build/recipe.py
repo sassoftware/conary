@@ -44,7 +44,7 @@ from lib import util
 from local import database
 import macros
 import packagepolicy
-from repository import repository,trovesource
+from repository import errors, trovesource
 import source
 import use
 import updatecmd
@@ -420,7 +420,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     try:
 	pkgs = repos.findTrove(labelPath, 
                                (component, versionStr, deps.DependencySet()))
-    except repository.TroveMissing:
+    except errors.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
     if filterVersions:
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
@@ -540,7 +540,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                     ' request %s: %s' %(troveSpec, troves))
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
-        except repository.TroveNotFound:
+        except errors.TroveNotFound:
             pass
         if labelPath is None:
             return None
@@ -553,7 +553,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                 ' request for %s' % name)
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
-        except repository.TroveNotFound:
+        except errors.TroveNotFound:
             pass
         return None
 
@@ -853,7 +853,7 @@ class _AbstractPackageRecipe(Recipe):
             try:
                 troves = db.trovesByName(name)
                 troves = db.getTroves(troves)
-            except repository.TroveNotFound:
+            except errors.TroveNotFound:
                 missingReqs.append(buildReq)
                 continue
 
@@ -1951,7 +1951,7 @@ class GroupRecipe(Recipe):
                 results[troveSource] = source.findTroves(self.labelPath, 
                                                          toFind, 
                                                          cfg.buildFlavor)
-            except repository.TroveNotFound, e:
+            except errors.TroveNotFound, e:
                 raise RecipeFileError, str(e)
             for result in results.itervalues():
                 troveTups.update(chain(*result.itervalues()))
@@ -2030,7 +2030,7 @@ class RedirectRecipe(Recipe):
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
                 pkgList = self.repos.findTrove(self.branch.label(), 
                                                (name, versionStr, desFlavor))
-            except repository.TroveNotFound, e:
+            except errors.TroveNotFound, e:
                 raise RecipeFileError, "Couldn't find redirect trove: " + str(e)
 
             assert(len(pkgList) == 1)
@@ -2172,7 +2172,7 @@ class FilesetRecipe(Recipe):
         try:
             troveSet = self.repos.findTroves(self.label, findList,
                                              defaultFlavor = self.flavor)
-        except repository.TroveNotFound, e:
+        except errors.TroveNotFound, e:
             raise RecipeFileError, str(e)
 
         for (component, versionStr), itemList in \

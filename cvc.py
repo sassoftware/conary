@@ -31,7 +31,6 @@ import checkin
 import conarycfg
 import constants
 import flavorcfg
-import repository
 import updatecmd
 import versions
 import xmlrpclib
@@ -285,7 +284,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	
 	try:
 	    repos = NetworkRepositoryClient(cfg.repositoryMap)
-	except repository.repository.OpenError:
+	except errors.OpenError:
 	    repos = None
 
 	checkin.newTrove(repos, cfg, args[1], dir = dir)
@@ -409,23 +408,13 @@ def main(argv=sys.argv):
         print >> sys.stderr, \
             "An unknown exception occured on the repository server:"
         print >> sys.stderr, "\t%s" % str(e)
-    except repository.repository.TroveNotFound, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.TroveMissing, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.RepositoryLocked, e:
+    except errors.RepositoryError, e:
         print >> sys.stderr, str(e)
     except database.OpenError, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.OpenError, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.DuplicateBranch, e:
         print >> sys.stderr, str(e)
     except checkin.CONARYFileMissing, e:
         print >> sys.stderr, str(e)
     except openpgpfile.KeyNotFound, e:
-        print >> sys.stderr, str(e)
-    except repository.repository.CommitError, e:
         print >> sys.stderr, str(e)
     except KeyboardInterrupt, e:
         pass

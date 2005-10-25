@@ -20,7 +20,7 @@ import display
 import files
 from lib import log
 import time
-from repository import repository
+from repository import errors
 import sys
 import showchangeset
 import versions
@@ -50,7 +50,7 @@ def verify(troveNameList, db, cfg, all=False):
             troves = db.getTroves(troves)
             for trove in troves:
                 verifyTrove(trove, db, cfg)
-        except repository.TroveNotFound:
+        except errors.TroveNotFound:
             if versionStr:
                 if flavor:
                     flavorStr = deps.formatFlavor(flavor)

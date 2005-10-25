@@ -24,7 +24,7 @@ import time
 
 from deps import deps
 from lib.sha1helper import sha1ToString, md5ToString
-from repository import repository
+from repository import errors
 import updatecmd
 
 _troveFormat  = "%-39s %s"
@@ -247,7 +247,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                 _displayTroveInfo(db, trv, localTrv, ls, ids, sha1s, 
 				  fullVersions, tags, info, deps, 
                                   showBuildReqs, showFlavors, showDiff)
-        except repository.TroveNotFound:
+        except errors.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
                           versionStr, troveName)
