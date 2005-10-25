@@ -107,27 +107,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
-	except repository.CommitError, e:
-            condRollback()
-	    return (True, ("CommitError", str(e)))
-	except InvalidClientVersion, e:
-            condRollback()
-	    return (True, ("InvalidClientVersion", str(e)))
-	except repository.DuplicateBranch, e:
-            condRollback()
-	    return (True, ("DuplicateBranch", str(e)))
-	except GroupAlreadyExists, e:
-            condRollback()
-	    return (True, ("GroupAlreadyExists", str(e)))
-	except UserAlreadyExists, e:
-            condRollback()
-	    return (True, ("UserAlreadyExists", str(e)))
-        except UserNotFound, e:
-            condRollback()
-            return (True, ("UserNotFound", str(e)))
-	except IntegrityError, e:
-            condRollback()
-	    return (True, ("IntegrityError", str(e)))
 	except trove.TroveIntegrityError, e:
             condRollback()
             return (True, ("TroveIntegrityError", str(e) +
@@ -141,29 +120,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             condRollback()
             return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
-        except KeyNotFound, e:
-            condRollback()
-            return (True, ('KeyNotFound', str(e)))
-        except DigitalSignatureVerificationError, e:
-            condRollback()
-            return (True, ('DigitalSignatureVerificationError', str(e)))
-        except AlreadySignedError, e:
-            condRollback()
-            return (True, ('AlreadySignedError', str(e)))
-        except BadSelfSignature, e:
-            condRollback()
-            return (True, ('BadSelfSignature', str(e)))
-        except IncompatibleKey, e:
-            condRollback()
-            return (True, ('IncompatibleKey', str(e)))
         except sqlite3.InternalError, e:
             condRollback()
             if str(e) == 'database is locked':
-                return (True, ('RepositoryLocked', ))
+                return (True, ('RepositoryLocked'))
             raise
 	except Exception, e:
             condRollback()
-            raise 
+            for klass, marshall in simpleExceptions:
+                if isinstance(e, klass):
+                    return (True, (marshall, str(e)))
+            raise
 	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:
 	#    import traceback, sys, string
@@ -1407,7 +1374,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise InsufficientPermission
 
         # cut off older clients entirely, no negotiation
-        if clientVersion < 32:
+        if clientVersion < 36:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"
                 " - read http://wiki.conary.com/ConaryConversion" % \
@@ -1915,3 +1882,22 @@ class FileContentsNotFound(GetFileContentsError):
 class FileStreamNotFound(GetFileContentsError):
     def __init__(self, val):
         GetFileContentsError.__init__(self, val)
+
+# This is a list of simple exception classes and the text string
+# that should be used to marshall an exception instance of that
+# class back to the client.  The str() value of the exception will
+# be returned as the exception argument.
+simpleExceptions = (
+    (AlreadySignedError,         'AlreadySignedError'),
+    (BadSelfSignature,           'BadSelfSignature'),
+    (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
+    (GroupAlreadyExists,         'GroupAlreadyExists'),
+    (IncompatibleKey,            'IncompatibleKey'),
+    (IntegrityError,             'IntegrityError'),
+    (InvalidClientVersion,       'InvalidClientVersion'),
+    (KeyNotFound,                'KeyNotFound'),
+    (UserAlreadyExists,          'UserAlreadyExists'),
+    (UserNotFound,               'UserNotFound'),
+    (repository.CommitError,     'CommitError'),
+    (repository.DuplicateBranch, 'DuplicateBranch'),
+    )
