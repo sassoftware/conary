@@ -13,6 +13,8 @@ Changes in 0.70.2:
   * When performing an update of a group that adds a trove foo,
     search the system for a older version of foo to replace if the original 
     update command found a replacement by searching the system.
+  * Building groups w/ autoResolve displays the revision of the troves which
+    are being included
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 

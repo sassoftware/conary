@@ -1493,7 +1493,7 @@ class SingleGroup:
         for trove, needs in suggMap.iteritems():
             print "trove:%s" % trove[0]
             for item in needs:
-                print "\t", item[0]
+                print "\t", item[0], item[1].trailingRevision()
 
         neededTups = set(chain(*suggMap.itervalues()))
         troves = repos.getTroves(neededTups, withFiles=False)
