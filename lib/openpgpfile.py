@@ -16,6 +16,7 @@ import base64
 import os
 import sha
 import md5
+from Crypto.Hash import RIPEMD
 import StringIO
 from Crypto.Cipher import AES
 from Crypto.Cipher import DES3
@@ -23,7 +24,6 @@ from Crypto.Cipher import Blowfish
 from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
-from Crypto.Hash import RIPEMD
 from string import upper
 
 # key types defined in RFC 2440 page 49
@@ -1125,7 +1125,7 @@ def verifySHAChecksum(data):
     return m.digest() == data[-20:]
 
 def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
-    hashes = ('Unknown', md5, sha, 'RIPE-MD/160', 'Double Width SHA',
+    hashes = ('Unknown', md5, sha, RIPEMD, 'Double Width SHA',
               'MD2', 'Tiger/192', 'HAVAL-5-160')
     ciphers = ('Unknown', 'IDEA', DES3, CAST, Blowfish, 'SAFER-SK128',
                'DES/SK', AES, AES, AES)
@@ -1150,7 +1150,7 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
         cipherAlg = ciphers[algType]
         s2kType = readBlockType(keyRing)
         hashType = readBlockType(keyRing)
-        if hashType in (1, 2):
+        if hashType in (1, 2, 3):
             hashAlg = hashes[hashType]
         else:
             if hashType > len(hashes) - 1:
