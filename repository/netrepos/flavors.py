@@ -105,7 +105,7 @@ class FlavorScores:
                         ON DELETE CASCADE ON UPDATE CASCADE,
                 CONSTRAINT FlavorScores_present_fk
                         FOREIGN KEY (request) REFERENCES Flavors(flavorId)
-                        ON DELETE CASCADE ON UPDATE CASCADE,
+                        ON DELETE CASCADE ON UPDATE CASCADE
             )""")
             cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
                               FlavorScores(request, present)""")
