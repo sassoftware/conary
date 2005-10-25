@@ -36,6 +36,7 @@ class ELF(Magic):
             # ar doesn't deal with hasDebug or RPATH
             self.contents['hasDebug'] = elf.hasDebug(fullpath)
             self.contents['RPATH'] = elf.getRPATH(fullpath)
+            self.contents['Type'] = elf.getType(fullpath)
 	requires, provides = elf.inspect(fullpath)
         self.contents['requires'] = requires
         self.contents['provides'] = provides
