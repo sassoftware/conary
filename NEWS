@@ -18,6 +18,12 @@ Changes in 0.70.2:
   * New option, "conary update-conary" has been added in an attempt to
     provide a workaround for future drastic protocol revisions such as
     what happened for 0.70
+  * The change to automatically split up hardlink groups into per-directory
+    hardlink groups has been reverted.  Instead, Conary enforces that
+    link groups do not cross directories, but provides an exception
+    mechanism for the rare cases where it is appropriate to do so.
+    The old LinkCount policy was renamed LinkType, and the new policy
+    enforcing link group directory counting is now called LinkCount.
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 

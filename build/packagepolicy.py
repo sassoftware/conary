@@ -1194,7 +1194,7 @@ class IgnoredSetuid(policy.Policy):
                       type, file, mode&06777)
 
 
-class LinkCount(policy.Policy):
+class LinkType(policy.Policy):
     """
     Only regular, non-config files may have hardlinks; no exceptions.
     """
@@ -1205,6 +1205,55 @@ class LinkCount(policy.Policy):
                     self.error("Config file %s has illegal hard links", path)
             for path in component.badhardlinks:
                 self.error("Special file %s has illegal hard links", path)
+
+
+class LinkCount(policy.Policy):
+    """
+    It is generally an error to have hardlinks across directories,
+    except when the packager knows that there is no reasonable
+    chance that they will be on separate filesystems; in those
+    cases, pass in a list of regexps specifying directory names
+    that are exceptions to this rule by calling
+    C{r.LinkCount(exceptions=I{regexp}} or
+    C{r.LinkCount(exceptions=[I{regexp}, I{regexp}])}
+    """
+    def __init__(self, *args, **keywords):
+        policy.Policy.__init__(self, *args, **keywords)
+        self.excepts = set()
+
+    def updateArgs(self, *args, **keywords):
+        if 'exceptions' in keywords:
+            exceptions = keywords.pop('exceptions')
+            if type(exceptions) is str:
+                self.excepts.add(exceptions)
+            elif type(exceptions) in (tuple, list):
+                self.excepts.update(set(*exceptions))
+        # FIXME: we may want to have another keyword argument
+        # that passes information down to the buildpackage
+        # that causes link groups to be broken for some
+        # directories but not others.  We need to research
+        # first whether this is useful; it may not be.
+
+    def do(self):
+        filters = [filter.Filter(x, self.macros) for x in self.excepts]
+        for component in self.recipe.autopkg.getComponents():
+            for inode in component.linkGroups:
+                # ensure all in same directory, except for directories
+                # matching regexps that have been passed in
+                dirSet = set(os.path.dirname(x) + '/'
+                             for x in component.linkGroups[inode]
+                             if not [y for y in filters if y.match(x)])
+                if len(dirSet) > 1:
+                    self.error('files %s are hard links across directories %s',
+                               ', '.join(sorted(component.linkGroups[inode])),
+                               ', '.join(sorted(list(dirSet))))
+                    self.error('If these directories cannot reasonably be'
+                               ' on different filesystems, disable this'
+                               ' warning by calling'
+                               " r.LinkCount(exceptions=('%s')) or"
+                               " equivalent"
+                               % "', '".join(sorted(list(dirSet))))
+
 
 
 class User(policy.Policy):
@@ -2336,6 +2385,7 @@ def DefaultPolicy(recipe):
 	FilesForDirectories(recipe),
 	ObsoletePaths(recipe),
 	IgnoredSetuid(recipe),
+	LinkType(recipe),
 	LinkCount(recipe),
         User(recipe),
         SupplementalGroup(recipe),

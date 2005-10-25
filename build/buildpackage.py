@@ -94,9 +94,6 @@ class BuildComponent(dict):
 
         if linkCount > 1:
             if f.hasContents:
-                # hardlink groups cannot span directories, so make them
-                # unique per directory
-                inode = tuple(list(inode) + [os.path.dirname(path)])
                 l = self.linkGroups.get(inode, [])
                 l.append(path)
                 self.linkGroups[inode] = l
