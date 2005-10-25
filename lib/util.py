@@ -251,9 +251,9 @@ def copyfile(sources, dest, verbose=True):
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None, 
-                abortCheck = None):
+                abortCheck = None, bufSize = 128*1024):
     total = 0
-    buf = source.read(128 * 1024)
+    buf = source.read(bufSize)
 
     if abortCheck:
         sourceFd = source.fileno()
@@ -277,9 +277,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
                 if abortCheck and abortCheck():
                     return None
                 l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
-
-        buf = source.read(128 * 1024)
-
+        buf = source.read(bufSize)
 
     return total
 
