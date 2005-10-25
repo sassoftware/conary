@@ -27,7 +27,7 @@ import time
 import traceback
 import types
 
-import buildinfo, buildpackage, lookaside, use, recipe
+import buildinfo, buildpackage, lookaside, policy, use, recipe
 import callbacks
 import conaryclient
 import constants
@@ -753,7 +753,13 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             logFile.write(''.join(traceback.format_exception(*sys.exc_info())))
             logFile.write('\n')
             logFile.close()
-        raise
+
+        if (isinstance(msg, policy.PolicyError) 
+            and not cfg.debugRecipeExceptions):
+            print msg
+            sys.exit(1)
+        else:
+            raise
 
     if logBuild and recipeObj._autoCreatedFileCount:
         logFile.close()
