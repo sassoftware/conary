@@ -395,7 +395,7 @@ def main(argv=sys.argv):
             cfg = conarycfg.ConaryConfiguration()
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
-	realMain(cfg, argv)
+	return realMain(cfg, argv)
     except conarycfg.ConaryCfgError, e:
         log.error(str(e))
         sys.exit(1)
@@ -425,8 +425,11 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except openpgpfile.KeyNotFound, e:
         print >> sys.stderr, str(e)
+    except repository.repository.CommitError, e:
+        print >> sys.stderr, str(e)
     except KeyboardInterrupt, e:
         pass
+    return 1
 
 
 if __name__ == "__main__":

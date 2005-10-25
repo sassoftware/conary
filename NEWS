@@ -8,6 +8,8 @@ Changes in 0.70.2:
     of course.
   * HTTP error conditions are handled more gracefully when commiting a
     change set. (bugzilla #334)
+  * conary and cvc now more reliably set a non-zero exit status when
+    an error occurs. (bugzilla #312)
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 

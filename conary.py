@@ -555,10 +555,9 @@ def main(argv=sys.argv):
 
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
-	realMain(cfg, argv)
+	return realMain(cfg, argv)
     except conarycfg.ConaryCfgError, e:
-       log.error(str(e))
-       sys.exit(1)
+        log.error(str(e))
     except xmlrpclib.ProtocolError, e:
 	if e.errcode == 403:
 	    print >> sys.stderr, \
@@ -595,6 +594,7 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except:
         raise
+    return 1
 
 if __name__ == "__main__":
     sys.exit(main())
