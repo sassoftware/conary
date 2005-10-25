@@ -43,6 +43,10 @@ from lib import openpgpfile
 
 # FIXME: remove these compatibility exception classes later
 AlreadySignedError = errors.AlreadySignedError
+FileStreamNotFound = errors.FileStreamNotFound
+UserNotFound = errors.UserNotFound
+GroupAlreadyExists = errors.GroupAlreadyExists
+PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
