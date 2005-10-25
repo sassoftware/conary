@@ -92,7 +92,7 @@ _GTL_VERSION_TYPE_LABEL   = 1
 _GTL_VERSION_TYPE_VERSION = 2
 _GTL_VERSION_TYPE_BRANCH  = 3
 
-class SimpleTroveSource(AbstractTroveSource):
+class SearchableTroveSource(AbstractTroveSource):
     """ A simple implementation of most of the methods needed 
         for findTrove - all of the methods are implemplemented
         in terms of trovesByName, which is left for subclasses to 
@@ -107,6 +107,7 @@ class SimpleTroveSource(AbstractTroveSource):
     
     def __init__(self):
         self.searchAsDatabase()
+        AbstractTroveSource.__init__(self)
 
     def searchAsRepository(self):
         self._allowNoLabel = False
@@ -269,29 +270,48 @@ class SimpleTroveSource(AbstractTroveSource):
                                      _GET_TROVE_ALL_VERSIONS, 
                                      bestFlavor)
 
+class SimpleTroveSource(SearchableTroveSource):
+
+    def __init__(self, troveTups=[]):
+        SearchableTroveSource.__init__(self)
+        troveTups = list(troveTups)
+        _trovesByName = {}
+        for (n,v,f) in troveTups:
+            _trovesByName.setdefault(n,set()).add((n,v,f))
+        self._trovesByName = _trovesByName
+
+    def trovesByName(self, name):
+        return self._trovesByName.get(name, [])
+
+    def __len__(self):
+        return len(list(self))
+        
+    def __iter__(self):
+        return itertools.chain(*self._trovesByName.itervalues())
+
+    def addTrove(self, n, v, f):
+        self._trovesByName.setdefault(n,set()).add((n,v,f))
+
+
 class TroveListTroveSource(SimpleTroveSource):
     def __init__(self, source, troveTups, withDeps=False):
-        SimpleTroveSource.__init__(self)
-        troveTups = [ x for x in troveTups ]
+        SimpleTroveSource.__init__(self, troveTups)
         self.deps = {}
-        self._trovesByName = {}
         self.source = source
         self.sourceTups = troveTups[:]
-
-        for (n,v,f) in troveTups:
-            self._trovesByName.setdefault(n, []).append((n,v,f))
 
         foundTups = set()
         
         # recurse into the given trove tups to include all child troves
         while troveTups:
-            self._trovesByName.setdefault(n, []).append((n,v,f))
-            newTroves = source.getTroves(troveTups, withFiles=False)
+            for (n,v,f) in troveTups:
+                self._trovesByName.setdefault(n, set()).add((n,v,f))
+                newTroves = source.getTroves(troveTups, withFiles=False)
             foundTups.update(newTroves)
             troveTups = []
             for newTrove in newTroves:
                 for tup in newTrove.iterTroveList():
-                    self._trovesByName.setdefault(tup[0], []).append(tup)
+                    self._trovesByName.setdefault(tup[0], set()).add(tup)
                     if tup not in foundTups:
                         troveTups.append(tup)
 
@@ -301,11 +321,8 @@ class TroveListTroveSource(SimpleTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
-    def trovesByName(self, name):
-        return self._trovesByName.get(name, [])
 
-
-class GroupRecipeSource(SimpleTroveSource):
+class GroupRecipeSource(SearchableTroveSource):
     """ A TroveSource that contains all the troves in a cooking 
         (but not yet committed) recipe.  Useful for modifying a recipe
         in progress using findTrove.
@@ -327,7 +344,7 @@ class GroupRecipeSource(SimpleTroveSource):
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
 
-class ReferencedTrovesSource(SimpleTroveSource):
+class ReferencedTrovesSource(SearchableTroveSource):
     """ A TroveSource that only (n,v,f) pairs for troves that are
         referenced by other, installed troves.
     """
@@ -341,7 +358,7 @@ class ReferencedTrovesSource(SimpleTroveSource):
     def trovesByName(self, name):
         return self.source.findTroveReferences([name])[0]
 
-class ChangesetFilesTroveSource(SimpleTroveSource):
+class ChangesetFilesTroveSource(SearchableTroveSource):
 
     # Provide a trove source based on both absolute and relative change
     # set files. Changesets withFiles=False can be generated from this
@@ -353,7 +370,7 @@ class ChangesetFilesTroveSource(SimpleTroveSource):
     # full tuples
 
     def __init__(self, db):
-        SimpleTroveSource.__init__(self)
+        SearchableTroveSource.__init__(self)
         self.db = db
         self.troveCsMap = {}
         self.jobMap = {}

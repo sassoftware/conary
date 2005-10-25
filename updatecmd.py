@@ -13,14 +13,13 @@
 #
 import callbacks
 from conaryclient.cmdline import parseTroveSpec
-from conaryclient.cmdline import toTroveSpec
+from conaryclient import cmdline
 from deps import deps
 from lib import log
 from lib import util
 from local import database
 from repository import changeset
 from repository import errors
-from repository.filecontainer import BadContainer
 import conaryclient
 import os
 import sys
@@ -269,54 +268,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     if not callback:
         callback = callbacks.UpdateCallback()
 
-    applyList = []
-
-    if type(pkgList) is str:
-        pkgList = ( pkgList, )
-
-    # If keepExisting is true, we want our specifications to be relative
-    # to nothing. If it's false, they should be absolute as updateChangeSet
-    # interperts absolute jobs as ones which should be rooted (if there is
-    # anything available to root them to).
-    areAbsolute = not keepExisting
-
     fromChangesets = []
     
     for path in fromFiles:
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
 
-    for pkgStr in pkgList:
-        if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
-            try:
-                cs = changeset.ChangeSetFromFile(pkgStr)
-            except BadContainer, msg:
-                # ensure that it is obvious that a file is being referenced
-                if pkgStr[0] not in './':
-                    pkgStr = './' + pkgStr
-                log.error("'%s' is not a valid conary changeset: %s" % 
-                          (pkgStr, msg))
-                sys.exit(1)
-            applyList.append(cs)
-            log.debug("found changeset file %s" % pkgStr)
-        else:
-            troveSpec = parseTroveSpec(pkgStr)
-            if troveSpec[0][0] == '-':
-                applyList.append((troveSpec[0], troveSpec[1:],
-                                  (None, None), False))
-            elif troveSpec[0][0] == '+':
-                applyList.append((troveSpec[0], (None, None), 
-                                  troveSpec[1:], areAbsolute))
-            elif updateByDefault:
-                applyList.append((troveSpec[0], (None, None), 
-                                  troveSpec[1:], areAbsolute))
-            else:
-                applyList.append((troveSpec[0], troveSpec[1:],
-                                  (None, None), False))
-            log.debug("will look for %s", applyList[-1])
-
-    # dedup
-    applyList = set(applyList)
+    applyList = cmdline.parseUpdateList(pkgList, keepExisting, updateByDefault)
+    
     try:
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       tagScript = tagScript, 

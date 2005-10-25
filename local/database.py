@@ -119,7 +119,7 @@ class UpdateJob:
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
 
-class SqlDbRepository(trovesource.SimpleTroveSource,
+class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 
@@ -328,7 +328,7 @@ class SqlDbRepository(trovesource.SimpleTroveSource,
         datastore.DataStoreRepository.__init__(self, path,
                            dataStore = localrep.SqlDataStore(self.db.db))
         repository.AbstractRepository.__init__(self)
-        trovesource.SimpleTroveSource.__init__(self)
+        trovesource.SearchableTroveSource.__init__(self)
 
 class Database(SqlDbRepository):
 

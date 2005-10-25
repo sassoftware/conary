@@ -18,7 +18,9 @@ Changes in 0.70.2:
       system.
     * New option, "conary update-conary" has been added in an attempt
       to provide a workaround for future drastic protocol revisions
-      such as what happened for 0.70
+      such as what happened for 0.70 
+    * Methods for parsing command line update request and changeset requests
+      have been added to conaryclient.cmdline
 
   o Build Changes (cvc)
     * cvc more reliably sets a non-zero exit status when an error

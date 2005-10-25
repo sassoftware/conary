@@ -13,75 +13,40 @@
 #
 
 import conaryclient
+from conaryclient import cmdline
 from lib import log
 from local import update
 from repository import errors
-from updatecmd import parseTroveSpec
 from updatecmd import UpdateCallback
 import versions
 
-def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
+def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
                      callback = None):
-    def _findTrove(troveName, versionStr, flavorStr):
-        troveList = repos.findTrove(cfg.installLabelPath, 
-                                    (troveName, versionStr, flavorStr),
-                                    cfg.flavor)
-        if len(troveList) > 1:
-            log.error("trove %s has multiple matches on "
-                      "installLabelPath", troveName)
-
-        return (troveList[0][1], troveList[0][2])
-
     client = conaryclient.ConaryClient(cfg)
+    applyList = cmdline.parseChangeList(troveSpecs, repos, repos)
 
+    toFind = []
+    for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
+        if oldVer is not None:
+            toFind.append((n, oldVer,oldFla))
+        if newVer is not None:
+            toFind.append((n, newVer, newFla))
+
+    results = repos.findTroves(cfg.installLabelPath, toFind, cfg.flavor)
+
+    for troveSpec, trovesFound in results.iteritems():
+        if len(trovesFound) > 1:
+            log.error("trove %s has multiple matches on "
+                      "installLabelPath", troveSpec[0])
+            
     primaryCsList = []
 
-    for item in troveList:
-        l = item.split("--")
-        isAbstract = False
-        add = True
-
-        if len(l) == 1:
-            (troveName, versionStr, flavor) = parseTroveSpec(l[0])
-
-            if troveName[0] == '-':
-                troveName = troveName[1:]
-                oldVersion, oldFlavor = _findTrove(troveName, versionStr,
-                                                   flavor)
-                newVersion, newFlavor = None, None
-            else:
-                isAbstract = True
-                if troveName[0] == '+':
-                    troveName = troveName[1:]
-                oldVersion, oldFlavor = None, None
-                newVersion, newFlavor = _findTrove(troveName, versionStr,
-                                                   flavor)
-        elif len(l) != 2:
-            log.error("one = expected in '%s' argument to changeset", item)
-            return
-        else:
-            (troveName, oldVersionStr, oldFlavor) = parseTroveSpec(l[0])
-
-            if l[1]:
-                if l[0]:
-                    l[1] = troveName + "=" + l[1]
-                (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1])
-                newVersion, newFlavor = _findTrove(troveName, newVersionStr, 
-                                                   newFlavor)
-            else:
-                newVersion, newFlavor = None, None
-
-            if newVersion and not oldVersionStr:
-                # foo=--1.2
-                oldVersion, oldFlavor = None, None
-            else:
-                # foo=1.1--1.2
-                oldVersion, oldFlavor = _findTrove(troveName, oldVersionStr, 
-                                                   oldFlavor)
-
-        primaryCsList.append((troveName, (oldVersion, oldFlavor), 
-                                         (newVersion, newFlavor),
-                              isAbstract))
+    for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
+        if oldVer is not None:
+            oldVer, oldFla = results[n, oldVer, oldFla][0][1:]
+        if newVer is not None:
+            newVer, newFla = results[n, newVer, newFla][0][1:]
+        primaryCsList.append((n, (oldVer, oldFla), (newVer, newFla), isAbs))
 
     client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
                                callback = callback, 
