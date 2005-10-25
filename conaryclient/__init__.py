@@ -67,7 +67,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             cfg = conarycfg.ConaryConfiguration()
             cfg.initializeFlavors()
         
-        cfg.installLabel = cfg.installLabelPath[0]
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
