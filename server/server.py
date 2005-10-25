@@ -104,6 +104,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
         if base == 'changeset':
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
+            if os.path.realpath(localName) != localName:
+                self.send_error(403, "File not found")
+                return None
 
             if localName.endswith(".cf-out"):
                 try:

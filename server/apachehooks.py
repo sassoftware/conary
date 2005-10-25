@@ -120,6 +120,9 @@ def get(port, isSecure, repos, req):
         return apache.HTTP_FORBIDDEN
    
     if cmd == "changeset":
+        if '/' in req.args:
+            return apache.HTTP_FORBIDDEN
+
         localName = repos.tmpPath + "/" + req.args + "-out"
         size = os.stat(localName).st_size
 
