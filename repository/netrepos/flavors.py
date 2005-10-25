@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 rPath, Inc.
+# Copyright (c) 2004-2005 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -99,18 +99,14 @@ class FlavorScores:
             CREATE TABLE FlavorScores(
                 request         INTEGER,
                 present         INTEGER,
-                value           INTEGER,
+                value           INTEGER NOT NULL DEFAULT -1000000,
                 CONSTRAINT FlavorScores_request_fk
                         FOREIGN KEY (request) REFERENCES Flavors(flavorId)
                         ON DELETE CASCADE ON UPDATE CASCADE,
                 CONSTRAINT FlavorScores_present_fk
                         FOREIGN KEY (request) REFERENCES Flavors(flavorId)
                         ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT FlavorScores_request_present_uq
-                        UNIQUE(request, present)                        
             )""")
-            # a real database would already have an index based on the
-            # unique constraint above
             cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
                               FlavorScores(request, present)""")
 
