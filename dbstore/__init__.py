@@ -66,10 +66,10 @@ def __get_driver(driver = __DRIVER):
 # create a database connection and return an instance
 # all drivers parse a db string in the form:
 #   [[user[:password]@]host/]database
-def connect(db, driver=None, *args, **kw):
+def connect(db, driver=None, **kw):
     driver = __get_driver(driver)
     dbh = driver(db)
-    assert(dbh.connect(*args, **kw))
+    assert(dbh.connect(**kw))
     return dbh
 
 
