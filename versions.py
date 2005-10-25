@@ -592,6 +592,36 @@ class VersionSequence(AbstractVersion):
 
 	return self.hash
 
+    def closeness(self, other):
+        """
+        Measures the "closeness" (the inverse of the distance) between two
+        versions of branches. If the two are exactly the same, 
+        ZeroDivision results.
+        """
+
+        def _buildSet(seq):
+            s = set()
+            last = None
+            for item in seq:
+                if isinstance(item, AbstractLabel):
+                    s.add(item)
+                    if last is not None:
+                        s.add((last, item))
+                    last = item
+
+            return s
+
+        # Assemble sets based on the labels of each VersionSequence. The
+        # sets consist of each label, and the transition from label to
+        # label (which labels occur next to each other, modulo version
+        # numbers). 
+        ourSet = _buildSet(self.versions)
+        otherSet = _buildSet(other.versions)
+
+        common = ourSet & otherSet
+        return (len(common) / (len(ourSet) + len(otherSet) - 
+                                (len(common) * 2.0)))
+
     def asString(self, defaultBranch = None, frozen = False):
 	"""
 	Returns a string representation of the version.
