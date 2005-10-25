@@ -23,7 +23,7 @@ import versions
 def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
                      callback = None):
     client = conaryclient.ConaryClient(cfg)
-    applyList = cmdline.parseChangeList(troveSpecs, repos, repos)
+    applyList = cmdline.parseChangeList(troveSpecs)
 
     toFind = []
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
