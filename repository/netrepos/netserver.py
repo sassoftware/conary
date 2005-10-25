@@ -44,8 +44,10 @@ from lib.openpgpkey import getKeyCache
 import base64
 from lib.tracelog import logMe
 
-# a list of the protocols we understand
-SERVER_VERSIONS = [ 36 ]
+# a list of the protocol versions we understand. Make sure the first
+# one in the list is the lowest protocol version we support and th
+# last one is the current server protocol version
+SERVER_VERSIONS = [ 36, 37 ]
 CACHE_SCHEMA_VERSION = 17
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -1097,7 +1099,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
-
 	try:
 	    cs = changeset.ChangeSetFromFile(path)
 	finally:
@@ -1120,8 +1121,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    return True
 
         d = { 'reppath' : self.urlBase(),
-              'user' : authToken[0],
-        }
+              'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
 	for troveCs in cs.iterNewTroveList():
@@ -1368,13 +1368,47 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             uid = None
         self.repos.troveStore.keyTable.updateOwner(uid, key)
 
-
+    def getConaryUrl(self, authtoken, clientVersion, \
+                     revStr, flavorStr):
+        """
+        Returns a url to a downloadable changeset for the conary
+        client that is guaranteed to work with this server's version.
+        """       
+        # adjust accordingly.... all urls returned are relative to this
+        _baseUrl = "ftp://download.rpath.com/conary/"
+        # Note: if this hash is getting too big, we will switch to a
+        # database table. The "default" entry is a last resort.
+        _clientUrls = {
+            # revision { flavor : relative path }
+            ## "default" : { "is: x86"    : "conary.x86.ccs",
+            ##               "is: x86_64" : "conary.x86_64.ccs", }
+            }            
+        logMe(3, revStr, flavorStr)
+        rev = versions.Revision(revStr)
+        revision = rev.getVersion()
+        flavor = self.toFlavor(flavorStr)
+        ret = ""
+        bestMatch = -1000000
+        match = _clientUrls.get("default", {})
+        if _clientUrls.has_key(revision):
+            match = _clientUrls[revision]        
+        for mStr in match.keys():
+            mFlavor = deps.parseFlavor(mStr)
+            score = mFlavor.score(flavor)
+            if score is False:
+                continue
+            if score > bestMatch:
+                ret = match[mStr]
+        if len(ret):
+            return "%s/%s" % (_baseUrl, ret)
+        return ""
+    
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
         # cut off older clients entirely, no negotiation
-        if clientVersion < 36:
+        if clientVersion < SERVER_VERSIONS[0]:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"
                 " - read http://wiki.conary.com/ConaryConversion" % \
@@ -1523,6 +1557,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 cu.execute("""
                     INSERT INTO TroveInfo
+                        (instanceId, infoType, data)
                     SELECT
                         instanceId, ?, ?
                     FROM
@@ -1534,6 +1569,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 cu.execute("""
                     INSERT INTO TroveInfo
+                        (instanceId, infoType, data)
                     SELECT
                         instanceId, ?, ?
                     FROM

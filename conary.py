@@ -20,7 +20,7 @@ The conary main program.
 
 import sys
 if sys.version_info < (2, 4):
-    print "error: python 2.4 or greater is requried"
+    print "error: python 2.4 or later is requried"
     sys.exit(1)
 
 #stdlib
@@ -71,6 +71,7 @@ def usage(rc = 1):
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
+    print "       conary update-conary"
     print "       conary usage"
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
@@ -453,7 +454,10 @@ def realMain(cfg, argv=sys.argv):
                                         tags, fullVersions, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
-    elif (otherArgs[1] == "update" or otherArgs[1] == "erase"):
+    elif otherArgs[1] == "update-conary":
+        cfg.requireInstallLabelPath()
+        updatecmd.updateConary(cfg)
+    elif otherArgs[1] in ["update", "erase"]:
         cfg.requireInstallLabelPath()
 	kwargs = {}
 

@@ -194,6 +194,37 @@ version of a trove you have installed.
 Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
+.B updateall
+.\" FIXME: document
+.RS 4
+.TP 4
+.B \-\-exclude-troves <patterns>
+See \fBupdate \-\-exclude-troves\fP
+.TP
+.B \-\-info
+Displays the list of update tasks that would be performed without
+doing the actual system update
+.TP
+.B \-\-no-deps
+See \fBupdate \-\-no-deps\fP
+.TP
+.B \-\-no-resolve
+See \fBupdate \-\-no-replace\fP
+.TP
+.B \-\-replace-files
+See \fBupdate \-\-replace-files\fP
+.TP
+.B \-\-resolve
+See \fBupdate \-\-resolve\fP
+.RE
+.TP
+.B update-conary
+Downloads a stable version of the \fBconary client\fP and forcibly
+installs it. This could help if the locally installed client is too
+old (or otherwise misbehaves) and cannot perform a regular upgrade
+through a \fBconary update conary\fP invocation.
+.RE
+.TP
 .B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Lists troves in the repository.
 Arguments include

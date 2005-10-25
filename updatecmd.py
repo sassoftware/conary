@@ -25,6 +25,7 @@ import conaryclient
 import os
 import sys
 import thread
+import urllib2
 
 # FIXME client should instantiated once per execution of the command line 
 # conary client
@@ -95,7 +96,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             else:
                 self.csMsg("%s %d of %d (%d%%)"
                            % ((msg,) + self.csHunk + (((got * 100) / need),)))
-
+        else: # no idea how much we need, just keep on counting...
+            self.csMsg("%s (got %dk so far)" % (msg, got / 1024))
+            
         self.update()
 
     def downloadingFileContents(self, got, need):
@@ -393,6 +396,63 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        callback = callback, autoPinList = cfg.pinTroves, threshold = cfg.trustThreshold)
 
 
+# we grab a url from the repo based on our version and flavor,
+# download the changeset it points to and update it
+def updateConary(cfg):
+    def _urlNotFound(url, msg = None):
+        print >> sys.stderr, "While attempting to download from", url.url
+        print >> sys.stderr, "ERROR: Could not download the conary changeset."
+        if msg is not None:
+            print >> sys.stderr, "Server Error Code:", msg.code, msg.msg        
+        url.close()
+        return -1    
+    # first, grab the label of the installed conary client
+    db = database.Database(cfg.root, cfg.dbPath)    
+    troves = db.trovesByName("conary")
+    # FIXME: what should we do if this comes back as having more than
+    # one version of conary installed?
+    assert(len(troves)==1)
+    (name, version, flavor) = troves[0]   
+    client = conaryclient.ConaryClient(cfg)
+    csUrl = client.getConaryUrl(version, flavor)
+    if csUrl == "":
+        print "There is no update available for your conary client version"
+        return
+    try:
+        url = urllib2.urlopen(csUrl)
+    except urllib2.HTTPError, msg:
+        return _urlNotFound(url, msg)
+    csSize = 0
+    if url.info().has_key("content-length"):
+        csSize = int(url.info()["content-length"])
+        
+    # check that we can make updates before bothering with downloading this
+    client.checkWriteableRoot()
+
+    # download the changeset
+    (fd, path) = util.mkstemp()
+    os.unlink(path)
+    dst = os.fdopen(fd, "r+")
+    callback = UpdateCallback()
+    dlSize = util.copyfileobj(
+        url, dst, bufSize = 16*1024,
+        callback = lambda x, m=csSize: callback.downloadingChangeSet(x, m)
+        )
+    if not dlSize:
+        return _urlNotFound(url)
+   
+    url.close()
+    cs = changeset.ChangeSetFromFile(dst)
+    # try to apply this changeset, with as much resemblance to a --force
+    # option as we can flag in the applyUpdate call
+    try:
+        (job, other) = client.updateChangeSet(set([cs]), callback=callback)
+    except:
+        callback.done()
+        raise
+    return client.applyUpdate(job, localRollbacks = cfg.localRollbacks,
+                              callback = callback, replaceFiles = True)
+    
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
               test = False, showItems = False):
     client = conaryclient.ConaryClient(cfg)

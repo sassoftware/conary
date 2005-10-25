@@ -43,7 +43,7 @@ from lib import openpgpfile
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36 ]
+CLIENT_VERSIONS = [ 36, 37 ]
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
@@ -185,12 +185,12 @@ class ServerCache:
             if not intersection:
                 url = _cleanseUrl(protocol, url)
                 raise InvalidServerVersion, \
-                   ("While talking to repository " + url + ":\n"
-                    "Invalid server version.  Server accepts client "
-                    "versions %s, but this client only supports versions %s"
-                    " - download a valid client from wiki.conary.com") % \
-                    (",".join([str(x) for x in serverVersions]),
-                     ",".join([str(x) for x in CLIENT_VERSIONS]))
+                      ("While talking to repository " + url + ":\n"
+                       "Invalid server version.  Server accepts client "
+                       "versions %s, but this client only supports versions %s"
+                       " - download a valid client from wiki.conary.com") % \
+                       (",".join([str(x) for x in serverVersions]),
+                        ",".join([str(x) for x in CLIENT_VERSIONS]))
 
             transporter.setCompress(True)
 
@@ -1195,6 +1195,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
 	    
+    def getConaryUrl(self, version, flavor):
+        # make sure the server supports us.
+        # XXX: when reworking the server cache one can save the extra
+        # checkVersion call below (we already called it in __getitem__)
+        serverVersions = self.c[version].checkVersion()
+        # as a result of the server cache __getitem__ work we know
+        # that this intersection is not empty
+        commonVersions = set(serverVersions) & set(CLIENT_VERSIONS)
+        # getConaryUrl call was introduced at proto version 37
+        if max(commonVersions) < 37:
+            hostInfo = version.branch().label().asString()
+            raise InvalidServerVersion, \
+                  ("While talking to " + hostInfo + " ...\n"
+                   "Server protocol version does not have the "
+                   "necessary support for the update-conary call")
+        ver = version.trailingRevision()
+        return self.c[version].getConaryUrl(self.fromVersion(ver),
+                                            self.fromFlavor(flavor))
+        
     def _commit(self, chgSet, fName, callback = None):
 	serverName = None
 	for trove in chgSet.iterNewTroveList():

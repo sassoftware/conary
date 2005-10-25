@@ -286,3 +286,11 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def pinTroves(self, troveList, pin = True):
         self.db.pinTroves(troveList, pin = pin)
 
+    def getConaryUrl(self, version, flavor):
+        """
+        returns url to a conary changeset for updating the local client to
+        @param version: a conary client version object, L{versions.Version}
+        @param flavor: a conary client flavor object, L{deps.deps.DependencySet}
+        """        
+        return self.repos.getConaryUrl(version, flavor)
+    

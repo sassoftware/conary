@@ -15,6 +15,9 @@ Changes in 0.70.2:
     update command found a replacement by searching the system.
   * Building groups w/ autoResolve displays the revision of the troves which
     are being included
+  * New option, "conary update-conary" has been added in an attempt to
+    provide a workaround for future drastic protocol revisions such as
+    what happened for 0.70
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 
