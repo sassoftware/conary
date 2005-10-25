@@ -32,7 +32,7 @@ from deps import deps
 import destdirpolicy
 import files
 import filter
-from lib import util, log
+from lib import elf, util, log
 import policy
 import use
 import tags
@@ -1739,6 +1739,14 @@ class Provides(_BuildPackagePolicy):
         if os.path.exists(fullpath):
             m = self.recipe.magic[path]
             mode = os.lstat(fullpath)[stat.ST_MODE]
+
+        if os.path.exists(fullpath):
+            if (m and m.name == 'ELF'
+                and m.contents['provides']
+                and m.contents['Type'] == elf.ET_EXEC):
+                # unless specified manually, do not export dependencies
+                # for ELF executables
+                del pkg.providesMap[path]
 
         # Now add in the manual provisions, which may include sonames
         # that might need to have paths added

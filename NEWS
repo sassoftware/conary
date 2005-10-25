@@ -35,6 +35,10 @@ Changes in 0.70.2:
     * The NormalizeCompression policy no longer causes an error if you
       have two files in the filesystem that differ only by the .gz or
       .bz2 extension.
+    * The Provides policy will not longer automatically provide soname
+      dependencies for executable files that provide sonames.  A few
+      executables do provide sonames, and 0.70.1 provided them as
+      harmless extraneous provisions.
 
    o Repository Changes
      * A new getConaryUrl() method has been implemented to support the
