@@ -33,6 +33,7 @@ import os
 import re
 import shutil
 import stat
+import tempfile
 
 #conary imports
 from lib import magic
@@ -744,15 +745,32 @@ class NormalizeCompression(policy.Policy):
 	m = self.recipe.magic[path]
 	if not m:
 	    return
-	p = self.macros.destdir+path
-	# XXX if foo and foo.gz both occur, this is bad -- fix it!
+
+        # Note: uses external gzip/bunzip if they exist because a
+        # pipeline is faster in a multiprocessing environment
+
+        def _mktmp(fullpath):
+            return tempfile.mkstemp('.temp', '', os.path.dirname(fullpath))[1]
+
+        def _move(tmppath, fullpath):
+            os.chmod(tmppath, os.lstat(fullpath).st_mode)
+            os.rename(tmppath, fullpath)
+
+	fullpath = self.macros.destdir+path
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
-	    util.execute('gunzip %s; gzip -f -n -9 %s' %(p, p[:-3]))
+            tmppath = _mktmp(fullpath)
+            util.execute('/bin/gzip -dc %s | /bin/gzip -f -n -9 > %s'
+                         %(fullpath, tmppath))
+            _move(tmppath, fullpath)
             del self.recipe.magic[path]
 	if m.name == 'bzip' and m.contents['compression'] != '9':
-	    util.execute('bunzip2 %s; bzip2 -9 %s' %(p, p[:-4]))
+            tmppath = _mktmp(fullpath)
+            util.execute('/usr/bin/bzip2 -dc %s | /usr/bin/bzip2 -9 > %s'
+                         %(fullpath, tmppath))
+            _move(tmppath, fullpath)
             del self.recipe.magic[path]
+
 
 class NormalizeManPages(policy.Policy):
     """
