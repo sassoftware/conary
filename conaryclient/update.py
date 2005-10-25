@@ -858,8 +858,14 @@ class ClientUpdate:
             newJob.update((x[0], (None, None), (x[1], x[2]), 0) 
                           for x in newTroves)
 
-            replacedTroves = [ (x[0], x[1]) for x in outdated.iteritems()
-                               if x[1][1] is not None ]
+            replacedTroves = ( (x[0], x[1]) for x in outdated.iteritems()
+                               if x[1][1] is not None )
+
+            # only allow orphaned branch jobs if they are updating
+            # something a local trove that is already on the target branch
+            replacedTroves = [x for x in replacedTroves
+                              if x[0] not in orphanedBranchJobs
+                                 or x[0][1].branch() == x[1][1].branch()]
 
             replacedArePinned = self.db.trovesArePinned((x[1] for x
                                                          in replacedTroves))
