@@ -143,6 +143,11 @@ class Revision(AbstractRevision):
 
     __slots__ = ( "version", "sourceCount", "buildCount", "timeStamp" )
 
+    def __cmp__(self, other):
+        assert(isinstance(other, Revision))
+        assert(self.timeStamp > 0 and other.timeStamp > 0)
+        return cmp(self.timeStamp, other.timeStamp)
+
     def __getstate__(self):
         return (self.version, self.sourceCount, self.buildCount,
                 self.timeStamp)
