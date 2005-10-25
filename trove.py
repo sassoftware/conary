@@ -988,6 +988,103 @@ class Trove(streams.StreamSet):
 	@rtype: (TroveChangeSet, fileChangeList, troveChangeList)
 	"""
 
+        def _iterInfo(d, name):
+            for flavor, verList in d[name].iteritems():
+                for ver in verList:
+                    yield (name, ver, flavor)
+        
+        def _infoByBranch(infoSet):
+            byBr = {}
+            for info in infoSet:
+                d = byBr.setdefault(info[1].branch(), {})
+                d.setdefault(info[2], []).append(info[1])
+
+            return byBr
+
+        def _versionMatch(oldInfoSet, newInfoSet):
+            # Match by version; use the closeness measure for items on
+            # different branches and the timestamps for the same branch. If the
+            # same version exists twice here, it means the flavors are
+            # incompatible or tied; in either case the flavor won't help us
+            # much.
+            matches = []
+            byBranch = {}
+            # we need copies we can update
+            oldInfoSet = set(oldInfoSet)
+            newInfoSet = set(newInfoSet)
+
+            for newInfo in newInfoSet:
+                for oldInfo in oldInfoSet:
+                    if newInfo[1].branch() == oldInfo[1].branch():
+                        l = byBranch.setdefault(newInfo, [])
+                        l.append(((oldInfo[1].trailingRevision(), oldInfo)))
+
+            # pass 1, find things on the same branch
+            for newInfo, oldInfoList in sorted(byBranch.items()):
+                # take the newest (by timestamp) item from oldInfoList which
+                # hasn't been matched to anything else 
+                oldInfoList.sort()
+                oldInfoList.reverse()
+                name = newInfo[0]
+
+                for revision, oldInfo in oldInfoList:
+                    if oldInfo not in oldInfoSet: continue
+                    matches.append((oldInfo, newInfo))
+                    oldInfoSet.remove(oldInfo)
+                    newInfoSet.remove(newInfo)
+                    break
+
+            del byBranch
+
+            # pass 2, match across branches -- we know there is nothing left
+            # on the same branch anymore
+            scored = []
+            for newInfo in newInfoSet:
+                for oldInfo in oldInfoSet:
+                    score = newInfo[1].closeness(oldInfo[1])
+                    # score 0 are have nothing in common
+                    if not score: continue
+                    scored.append((score, oldInfo, newInfo))
+
+            # high scores are better
+            scored.sort()
+            scored.reverse()
+            for score, oldInfo, newInfo in scored:
+                if oldInfo not in oldInfoSet: continue
+                if newInfo not in newInfoSet: continue
+
+                matches.append((oldInfo, newInfo))
+                oldInfoSet.remove(oldInfo)
+                newInfoSet.remove(newInfo)
+
+            # the dregs are left. we do straight matching by timestamp here;
+            # newest goes with newest, etc
+            newList = []
+            oldList = []
+            for newInfo in newInfoSet:
+                newList.append((newInfo[1].trailingRevision(), newInfo))
+            newList.sort()
+            newList.reverse()
+                                
+            for oldInfo in oldInfoSet:
+                oldList.append((oldInfo[1].trailingRevision(), oldInfo))
+            oldList.sort()
+            oldList.reverse()
+
+            for ((oldTs, oldInfo), (newTs, newInfo)) in \
+                                            itertools.izip(oldList, newList):
+                matches.append((oldInfo, newInfo))
+
+            for oldTs, oldInfo in oldList[len(newList):]:
+                matches.append((oldInfo, (None, None, None)))
+                
+            for newTs, newInfo in newList[len(oldList):]:
+                matches.append(((None, None, None), newInfo))
+
+            return matches
+
+        # def diff() begins here
+
 	assert(not them or self.name() == them.name())
         assert((not self.idMap) or (not self.troves))
         assert((not them) or (not them.idMap) or (not them.troves))
@@ -1118,12 +1215,19 @@ class Trove(streams.StreamSet):
 			trvList.append((name, None, version, None, newFlavor))
 		del added[name]
 
-	changePair = []
 	# for things that are left, see if we can match flavors 
 	for name in added.keys():
-            if not removed.has_key(name):
-                # nothing to match up against
+            changePair = []
+            newInfoSet = set(_iterInfo(added, name))
+
+            if name not in removed:
+                # this don't have removals to go with them
+                for oldInfo in newInfoSet:
+                    trvList.append((name, None, newInfo[1], 
+                                          None, newInfo[2]))
                 continue
+
+            oldInfoSet = set(_iterInfo(removed, name))
 
             # try to match flavors by branch first - take bad matches
             # that are on the same branch over perfect matches that are
@@ -1132,35 +1236,25 @@ class Trove(streams.StreamSet):
             # To that end, sort flavors by branch.  Search over
             # the flavors on a particular branch first.  If those flavors
             # match, remove from the main added/removed list
-            addedByBranch = {}
-            removedByBranch = {}
-            for flavor, versionList in added[name].iteritems():
-                for version in versionList:
-                    d = addedByBranch.setdefault(version.branch(), {})
-                    d.setdefault(flavor, []).append(version)
+            addedByBranch = _infoByBranch(newInfoSet)
+            removedByBranch = _infoByBranch(oldInfoSet)
 
-            for flavor, versionList in removed[name].iteritems():
-                for version in versionList:
-                    d = removedByBranch.setdefault(version.branch(), {})
-                    d.setdefault(flavor, []).append(version)
-
+            # Search matching branches (order is irrelevant), then all
+            # of the troves regardless of branch
             searchOrder = []
             for branch, addedFlavors in addedByBranch.iteritems():
                 removedFlavors = removedByBranch.get(branch, False)
                 if removedFlavors:
                     searchOrder.append((addedFlavors, removedFlavors))
 
-            # after we've found all the matches we could while staying
-            # with branch affinity, try to match up all added/removed
-            # troves with this name that remain
             searchOrder.append((added[name], removed[name]))
 
             scoreCache = {}
+            usedFlavors = set()
             NEG_INF = -99999
 
-            for addedSource, removedSource in searchOrder:
+            for addedFlavors, removedFlavors in searchOrder:
                 found = True
-                used = set()
 
                 while found:
                     found = False
@@ -1168,19 +1262,24 @@ class Trove(streams.StreamSet):
                     # score every new flavor against every old flavor 
                     # to find the best match.  Doing anything less
                     # may result in incorrect flavor lineups
-                    for newFlavor in addedSource.keys():
-                        if newFlavor in used:
+                    for newFlavor in addedFlavors:
+                        if newFlavor in usedFlavors:
                             continue
+
+                        # empty flavors don't score properly; handle them
+                        # here
                         if not newFlavor:
-                            if newFlavor in removedSource:
-                                # match up empty flavors immediately
+                            if newFlavor in removedFlavors:
                                 maxScore = (9999, newFlavor, newFlavor)
                                 break
                             else:
                                 continue
-                        for oldFlavor in removedSource.keys():
-                            if not oldFlavor or oldFlavor in used:
+
+                        for oldFlavor in removedFlavors:
+                            if not oldFlavor or oldFlavor in usedFlavors:
+                                # again, empty flavors don't score properly
                                 continue
+
                             myMax = scoreCache.get((newFlavor, 
                                                      oldFlavor), None)
                             if myMax is None:
@@ -1193,162 +1292,69 @@ class Trove(streams.StreamSet):
                                 # If we do that, we should consider adding
                                 # heuristic to prefer strongly satisfied
                                 # flavors most of all. 
-                                scores = (newFlavor.score(oldFlavor),
+                                scores = (NEG_INF, newFlavor.score(oldFlavor),
                                           oldFlavor.score(newFlavor))
-                                scores = [x for x in scores if x is not False]
-                                if scores:
-                                    myMax = max(scores)
-                                else:
-                                    myMax = NEG_INF
+                                myMax = max(x for x in scores if x is not False)
+
+                                # scoring (thanks to the transformations above)
+                                # is symmetric
                                 scoreCache[newFlavor, oldFlavor] = myMax
+                                scoreCache[oldFlavor, newFlavor] = myMax
+
                             if not maxScore or myMax > maxScore[0]:
                                 maxScore = (myMax, newFlavor, oldFlavor)
+
                     if maxScore and maxScore[0] > NEG_INF:
                         found = True
                         newFlavor, oldFlavor = maxScore[1:]
-                        used.update((newFlavor, oldFlavor))
+                        usedFlavors.update((newFlavor, oldFlavor))
+
                     if found:
-                        changePair.append((name, addedSource[newFlavor][:], 
+                        changePair.append((addedFlavors[newFlavor][:], 
                                            newFlavor, 
-                                           removedSource[oldFlavor][:],
+                                           removedFlavors[oldFlavor][:],
                                            oldFlavor))
-                        lst = added[name][newFlavor]
-                        # remove these versions from the final "added"
-                        # list.
-                        for version in addedSource[newFlavor][:]:
-                            lst.remove(version)
-                        if not lst:
-                            del added[name][newFlavor]
-
-                        lst = removed[name][oldFlavor]
-                        for version in removedSource[oldFlavor][:]:
-                            lst.remove(version)
-                        if not lst:
-                            del removed[name][oldFlavor]
-
-	    if not added[name]:
-		del added[name]
-	    if not removed[name]:
-		del removed[name]
-	    
-	for name in added.keys():
-	    if len(added[name]) == 1 and removed.has_key(name) and \
-                        len(removed[name]) == 1:
-		# one of each? they *must* be a good match...
-		newFlavor = added[name].keys()[0]
-		oldFlavor = removed[name].keys()[0]
-		changePair.append((name, added[name][newFlavor], newFlavor, 
-				   removed[name][oldFlavor], oldFlavor))
-		del added[name]
-		del removed[name]
-		continue
-
-	for name in added.keys():
-	    for newFlavor in added[name].keys():
-		# no good match. that's too bad
-		changePair.append((name, added[name][newFlavor], newFlavor, 
-				   None, None))
-
-	for (name, newVersionList, newFlavor, oldVersionList, oldFlavor) \
-		    in changePair:
-	    assert(newVersionList)
-
-	    if not oldVersionList:
-		for newVersion in newVersionList:
-		    trvList.append((name, None, newVersion, 
-					  None, newFlavor))
-                continue
-
-	    # for each new version of a trove, try and generate the diff
-	    # between that trove and the version of the trove which was
-	    # removed which was on the same branch. if that's not possible,
-	    # see if the parent of the trove was removed, and use that as
-	    # the diff. if we can't do that and only one version of this
-	    # trove is being obsoleted, use that for the diff. if we
-	    # can't do that either, throw up our hands in a fit of pique
-
-            if len(oldVersionList) == 1 and len(newVersionList) == 1:
-                trvList.append((name, oldVersionList[0], newVersionList[0], 
-                                oldFlavor, newFlavor))
-                del oldVersionList[0]
-                continue
-
-	    for version in newVersionList[:]:
-
-		if not oldVersionList:
-		    # no nice match, that's too bad
-		    trvList.append((name, None, version, None, newFlavor))
-                    newVersionList.remove(version)
-                    continue
-
-		branch = version.branch()
-
-		if branch.hasParentBranch():
-		    parentBranch = branch.parentBranch()
-		else:
-		    parentBranch = None
-
-                if version.hasParentVersion():
-                    parentVersion = version.parentVersion()
-		else:
-		    parentVersion = None
-
-                sameBranches = []
-                parentBranches = []
-                childBranches = []
-                parentNodes = []
-                childNodes = []
-
-                for other in oldVersionList:
-                    if other.branch() == branch:
-                        sameBranches.append(other)
-                    if parentVersion and other == parentVersion:
-                        parentNodes.append(other)
-                    if parentBranch and other.branch() == parentBranch:
-                        parentBranches.append(other)
-                    if other.hasParentVersion():
-                        if other.parentVersion() == version:
-                            childNodes.append(other)
-                    if other.branch().hasParentBranch():
-                        if other.branch().parentBranch() == branch:
-                            childBranches.append(other)
-
-                # none is a sentinel
-                priority = [ sameBranches, parentNodes, childNodes, 
-                             parentBranches, childBranches, None ]
-
-                for match in priority:
-                    if match:
-                        break
-
-                if match and len(match) == 1:
-                    match = match[0]
-                    oldVersionList.remove(match)
-                    newVersionList.remove(version)
-                    trvList.append((name, match, version, 
-                                    oldFlavor, newFlavor))
             
-            if newVersionList and not oldVersionList:
+            # go through changePair and try and match things up by versions
+            for (newVersionList, newFlavor, oldVersionList, oldFlavor) \
+                        in changePair:
+                oldInfoList = []
+                for version in oldVersionList:
+                    info = (name, version, oldFlavor)
+                    if info in oldInfoSet:
+                        oldInfoList.append(info)
+
+                newInfoList = []
                 for version in newVersionList:
-                    trvList.append((name, None, version, 
-                                    None, newFlavor))
-            elif newVersionList:
-                version = newVersionList[0]
-                # Here's the fit of pique. This shouldn't happen
-                # except for the most ill-formed of groups.
-                raise TroveDiffError, "Cannot determine what trove is " \
-                    "being replaced for %s=%s[%s]" %  \
-                        (name, version.asString(), 
-                         deps.formatFlavor(newFlavor))
+                    info = (name, version, newFlavor)
+                    if info in newInfoSet:
+                        newInfoList.append(info)
 
-	    # remove old versions which didn't get matches
-	    for oldVersion in oldVersionList:
-		trvList.append((name, oldVersion, None, oldFlavor, None))
+                versionMatches = _versionMatch(oldInfoList, newInfoList)
 
-        for name, flavorList in removed.iteritems():
-            for flavor, versionList in flavorList.iteritems():
-                for version in versionList:
-                    trvList.append((name, version, None, flavor, None))
+                for oldInfo, newInfo in versionMatches:
+                    if not oldInfo[1] or not newInfo[1]:
+                        # doesn't match anything in this flavor grouping
+                        continue
+
+                    trvList.append((name, oldInfo[1], newInfo[1],
+                                          oldInfo[2], newInfo[2]))
+                    newInfoSet.remove(newInfo)
+                    oldInfoSet.remove(oldInfo)
+
+            # so much for flavor influenced matching. now try to match up 
+            # everything that's left based on versions
+            versionMatches = _versionMatch(oldInfoSet, newInfoSet)
+            for oldInfo, newInfo in versionMatches:
+                trvList.append((name, oldInfo[1], newInfo[1],
+                                      oldInfo[2], newInfo[2]))
+
+            del removed[name]
+
+        for name in removed:
+            # this don't have additions to go with them
+            for oldInfo in set(_iterInfo(removed, name)):
+                trvList.append((name, oldInfo[1], None, oldInfo[2], None))
 
 	return (chgSet, filesNeeded, trvList)
 
@@ -1925,13 +1931,6 @@ class PatchError(TroveError):
 
     """
     Indicates that an error occured parsing a group file.
-    """
-
-    pass
-
-class TroveDiffError(TroveError):
-    """
-    Indicates that an error occurred calculating differences between troves.
     """
 
     pass

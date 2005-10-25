@@ -21,6 +21,10 @@ Changes in 0.70.2:
       such as what happened for 0.70 
     * Methods for parsing command line update request and changeset requests
       have been added to conaryclient.cmdline
+    * A metric for the distance between arbitrary versions on different
+      branches has been added, and the code which matches troves changes
+      between collections uses this code to give well-defined matches
+      for all cases.
 
   o Build Changes (cvc)
     * cvc more reliably sets a non-zero exit status when an error
