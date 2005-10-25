@@ -175,7 +175,7 @@ def get(port, isSecure, repos, req):
         return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
-    if not isSecure and repos.forceSecure:
+    if not isSecure and repos.forceSecure or '/' in req.args:
         return apache.HTTP_FORBIDDEN
 
     path = repos.tmpPath + "/" + req.args + "-in"

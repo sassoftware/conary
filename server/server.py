@@ -237,6 +237,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     def do_PUT(self):
 	path = self.path.split("?")[-1]
+
+        if '/' in path:
+	    self.send_error(403, "Forbidden")
+
 	path = FILE_PATH + '/' + path + "-in"
 
 	size = os.stat(path).st_size
