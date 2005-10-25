@@ -25,7 +25,7 @@ def listRollbacks(db, cfg):
 	    return version.trailingRevision().asString()
 	return version.asString()
 
-    for rollbackName in db.getRollbackList():
+    for rollbackName in reversed(db.getRollbackList()):
 	print "%s:" % rollbackName
 
 	rb = db.getRollback(rollbackName)

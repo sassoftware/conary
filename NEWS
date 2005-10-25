@@ -25,6 +25,7 @@ Changes in 0.70.2:
       branches has been added, and the code which matches troves changes
       between collections uses this code to give well-defined matches
       for all cases.
+    * Rollbacks are now listed with the most recent on top
 
   o Build Changes (cvc)
     * cvc more reliably sets a non-zero exit status when an error
