@@ -1,37 +1,50 @@
 Changes in 0.70.2:
-  * GnuPG compatible trust metrics for OpenPGP Keys now exists. This
-    makes it possible for conary clients to refuse troves that aren't
-    properly trusted. The metrics currently in place mimic gpg behavior.
-  * Running "conary update" in a directory that does not exist no
-    longer fails with an error (bugzilla #212).  Note that "cvc
-    update" still requires that the current working directory exists
-    of course.
-  * HTTP error conditions are handled more gracefully when commiting a
-    change set. (bugzilla #334)
-  * conary and cvc now more reliably set a non-zero exit status when
-    an error occurs. (bugzilla #312)
-  * When performing an update of a group that adds a trove foo,
-    search the system for a older version of foo to replace if the original 
-    update command found a replacement by searching the system.
-  * Building groups w/ autoResolve displays the revision of the troves which
-    are being included
-  * New option, "conary update-conary" has been added in an attempt to
-    provide a workaround for future drastic protocol revisions such as
-    what happened for 0.70
-  * The change to automatically split up hardlink groups into per-directory
-    hardlink groups has been reverted.  Instead, Conary enforces that
-    link groups do not cross directories, but provides an exception
-    mechanism for the rare cases where it is appropriate to do so.
-    The old LinkCount policy was renamed LinkType, and the new policy
-    enforcing link group directory counting is now called LinkCount.
-  * The NormalizeCompression policy no longer causes an error if you have
-    two files in the filesystem that differ only by the .gz or .bz2
-    extension.
-  * Exception handling has been re-worked.  All exception classes that
-    are marshaled back to the client are now in the repository.errors
-    module.  Some of the most commonly used exception classes have
-    been included in their previous modules for compatibility until
-    code can be modified to use the new repository.errors module.
+  o Client Changes (conary)
+    * GnuPG compatible trust metrics for OpenPGP Keys now exists. This
+      makes it possible for conary clients to refuse troves that
+      aren't properly trusted. The metrics currently in place mimic
+      gpg behavior.
+    * Running "conary update" in a directory that does not exist no
+      longer fails with an error (bugzilla #212).  Note that "cvc
+      update" still requires that the current working directory exists
+      of course.
+    * HTTP error conditions are handled more gracefully when commiting
+      a change set. (bugzilla #334)
+    * conary more reliably sets a non-zero exit status when an error
+      occurs. (bugzilla #312)
+    * When performing an update of a group that adds a trove foo,
+      search the system for a older version of foo to replace if the
+      original update command found a replacement by searching the
+      system.
+    * New option, "conary update-conary" has been added in an attempt
+      to provide a workaround for future drastic protocol revisions
+      such as what happened for 0.70
+
+  o Build Changes (cvc)
+    * cvc more reliably sets a non-zero exit status when an error
+      occurs. (bugzilla #312)
+    * Building groups w/ autoResolve displays the revision of the
+      troves which are being included
+    * The change to automatically split up hardlink groups into
+      per-directory hardlink groups has been reverted.  Instead,
+      Conary enforces that link groups do not cross directories, but
+      provides an exception mechanism for the rare cases where it is
+      appropriate to do so.  The old LinkCount policy was renamed
+      LinkType, and the new policy enforcing link group directory
+      counting is now called LinkCount.
+    * The NormalizeCompression policy no longer causes an error if you
+      have two files in the filesystem that differ only by the .gz or
+      .bz2 extension.
+
+   o Repository Changes
+     * A new getConaryUrl() method has been implemented to support the
+       "conary update-conary" feature
+     * Exception handling has been re-worked.  All exception classes
+       that are marshaled back to the client are now in the
+       repository.errors module.  Some of the most commonly used
+       exception classes have been included in their previous modules
+       for compatibility until code can be modified to use the new
+       repository.errors module.
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 
