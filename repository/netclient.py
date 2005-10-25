@@ -41,6 +41,9 @@ import versions
 import xmlshims
 from lib import openpgpfile
 
+# FIXME: remove these compatibility exception classes later
+AlreadySignedError = errors.AlreadySignedError
+
 shims = xmlshims.NetworkConvertors()
 
 CLIENT_VERSIONS = [ 36, 37 ]
