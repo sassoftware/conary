@@ -10,6 +10,9 @@ Changes in 0.70.2:
     change set. (bugzilla #334)
   * conary and cvc now more reliably set a non-zero exit status when
     an error occurs. (bugzilla #312)
+  * When performing an update of a group that adds a trove foo,
+    search the system for a older version of foo to replace if the original 
+    update command found a replacement by searching the system.
 
 Changes in 0.70.1:
   * Collection merging didn't handle (admittedly obscure) cases where 
