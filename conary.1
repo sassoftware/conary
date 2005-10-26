@@ -119,13 +119,15 @@ Arguments include
 See \-\-replace-files description from \fBconary update\fP
 .RE
 .TP
-.B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>* <\fIchangeset-file\fP>*
-Updates the trove \fItrovename\fR from the appropriate repository to 
-match the optional \fIversion\fP (otherwise the most recent version which 
-matches the \fBinstall-label\fP) and applies the changesets contained in any
+.B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP][--[\fIversion\fP][\fIflavor\fP]]>* <\fIchangeset-file\fP>*
+Updates each \fItrovename\fR from the appropriate repository to 
+match the optional \fIversion\fP and \fIflavor\fP given (otherwise the most 
+recent version which matches the \fBinstall-label\fP is used).  Also 
+applies any given changesets. 
 If the \fItrovename\fR is preceded by a minus, the trove is erased as part
-of the operation.
-\fIchange-files\fP given.
+of the operation.  If a -- is used in a troveSpec, the version and flavor
+before the -- (if any) specify the trove to erase from the local system,
+and the version and flavor after the -- (if any) specify the update version.
 .RS 4
 .TP
 .B \-\-exclude-troves \fIregexp-list\fR
