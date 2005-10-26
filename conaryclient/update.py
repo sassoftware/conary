@@ -107,6 +107,9 @@ class ClientUpdate:
                 return scoredList[-1][-1]
 
         def _checkDeps(jobSet, trvSrc, findOrdering):
+            import lib
+            lib.epdb.st('f')
+
             while True:
                 (depList, cannotResolve, changeSetList) = \
                                 self.db.depCheck(jobSet, uJob.getTroveSource(),
@@ -117,7 +120,7 @@ class ClientUpdate:
 
                 oldIdx = {}
                 for job in jobSet:
-                    if job[1][0] is not None and job[2][0] is not None:
+                    if job[1][0] is not None:
                         oldIdx[(job[0], job[1][0], job[1][1])] = job
 
                 restoreSet = set()
@@ -136,6 +139,12 @@ class ClientUpdate:
                                 uJob.getPrimaryJobs():
                             continue
 
+                        if job[2][0] is None:
+                            # this was an erasure implied by package changes;
+                            # leaving it in place won't hurt anything
+                            restoreSet.add(job)
+                            break
+
                         oldTrv = self.db.getTrove(withFiles = False,
                                                   *provInfo)
                         newTrv = trvSrc.getTrove(job[0], job[2][0], job[2][1],
@@ -150,7 +159,10 @@ class ClientUpdate:
 
                 for job in restoreSet:
                     jobSet.remove(job)
-                    jobSet.add((job[0], (None, None), job[2], False))
+                    if job[2][0] is not None:
+                        # if there was an install portion of the job,
+                        # retain it
+                        jobSet.add((job[0], (None, None), job[2], False))
 
         # def _resolveDependencies() begins here
 
