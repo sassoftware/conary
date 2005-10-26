@@ -442,11 +442,11 @@ def realMain(cfg, argv=sys.argv):
         if len(otherArgs) < 3:
             showchangeset.usage()
             return 1
-        changeset = otherArgs[2]
+        cspath = otherArgs[2]
         component = None
         if len(otherArgs) > 3:
             component = otherArgs[3:]
-        cs = changeset.ChangeSetFromFile(changeset)
+        cs = changeset.ChangeSetFromFile(cspath)
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
