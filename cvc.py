@@ -24,7 +24,7 @@ from lib import log
 from local import database
 from build import cook,use,signtrove
 import deps
-from repository import netclient
+from repository import errors, netclient
 from repository.netclient import NetworkRepositoryClient
 import branch
 import checkin
