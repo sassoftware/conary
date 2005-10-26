@@ -30,6 +30,9 @@ Changes in 0.70.2:
       if they satisfy dependencies for other troves
     * updateall command respects pins on top-level troves
     * Dependency resolution no longer blows away pinned troves
+    * conary update now takes a changeSpec, allowing you to specify both
+      the version to remove and the update version, like 
+      'conary update foo=2.0--3.0'
 
   o Build Changes (cvc)
     * cvc more reliably sets a non-zero exit status when an error

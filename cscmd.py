@@ -23,14 +23,24 @@ import versions
 def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
                      callback = None):
     client = conaryclient.ConaryClient(cfg)
-    applyList = cmdline.parseChangeList(troveSpecs)
+    applyList = cmdline.parseChangeList(troveSpecs, allowChangeSets=False)
 
     toFind = []
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
-        if oldVer is not None:
+        if n[0] in ('-', '+'):
+            n = n[1:]
+
+        found = False
+        if oldVer or oldFla:
             toFind.append((n, oldVer,oldFla))
-        if newVer is not None:
+            found = True
+
+        if newVer or newFla:
             toFind.append((n, newVer, newFla))
+            found = True
+
+        if not found:
+            toFind.append((n, None, None))
 
     results = repos.findTroves(cfg.installLabelPath, toFind, cfg.flavor)
 
@@ -42,10 +52,29 @@ def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
     primaryCsList = []
 
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
-        if oldVer is not None:
+        if n[0] == '-':
+            updateByDefault = False
+        else: 
+            updateByDefault = True
+
+        if n[0] in ('-', '+'):
+            n = n[1:]
+            
+        found = False
+        if oldVer or oldFla:
             oldVer, oldFla = results[n, oldVer, oldFla][0][1:]
-        if newVer is not None:
+            found = True
+
+        if newVer or newFla:
             newVer, newFla = results[n, newVer, newFla][0][1:]
+            found = True
+
+        if not found:
+            if updateByDefault:
+                newVer, newFla = results[n, None, None][0][1:]
+            else:
+                oldVer, oldFla = results[n, None, None][0][1:]
+
         primaryCsList.append((n, (oldVer, oldFla), (newVer, newFla), isAbs))
 
     client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 

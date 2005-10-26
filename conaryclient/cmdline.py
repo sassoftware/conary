@@ -40,9 +40,24 @@ def parseTroveSpec(specStr):
         name, versionSpec = l
     else:
         name = specStr
-        versionSpec = ''
+        versionSpec = None
 
     return (name, versionSpec, flavor)
+
+def _getChangeSet(path):
+        try:
+            cs = changeset.ChangeSetFromFile(path)
+        except BadContainer, msg:
+            # ensure that it is obvious that a file is being referenced
+            if path[0] not in './':
+                path = './' + path
+            log.error("'%s' is not a valid conary changeset: %s" % 
+                      (path, msg))
+            # XXX sys.exit is gross
+            import sys
+            sys.exit(1)
+        log.debug("found changeset file %s" % path)
+        return cs
 
 def parseUpdateList(updateList, keepExisting, updateByDefault=True):
     # If keepExisting is true, we want our specifications to be relative
@@ -59,19 +74,8 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
 
     for updateStr in updateList:
         if os.path.exists(updateStr) and os.path.isfile(updateStr):
-            try:
-                cs = changeset.ChangeSetFromFile(updateStr)
-            except BadContainer, msg:
-                # ensure that it is obvious that a file is being referenced
-                if updateStr[0] not in './':
-                    updateStr = './' + updateStr
-                log.error("'%s' is not a valid conary changeset: %s" % 
-                          (updateStr, msg))
-                # XXX sys.exit is gross
-                import sys
-                sys.exit(1)
-            applyList.append(cs)
-            log.debug("found changeset file %s" % updateStr)
+            applyList.append(_getChangeSet(updateStr))
+            continue
         else:
             troveSpec = parseTroveSpec(updateStr)
             if troveSpec[0][0] == '-':
@@ -92,53 +96,65 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
     return set(applyList)
 
 
-def parseChangeList(troveList):
-    """ Takes input specifying changesets, such as foo=1.1--1.2,
+def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
+                    allowChangeSets=True):
+    """ Takes input specifying changeSpecs, such as foo=1.1--1.2,
         and turns it into (name, (oldVersionSpec, oldFlavorSpec),
                                  (newVersionSpec, newFlavorSpec), isAbsolute)
         tuples.
     """
-    if isinstance(troveList, str):
-        troveList = (troveList,)
     applyList = []
-    for item in troveList:
-        l = item.split("--")
+
+    if isinstance(changeSpecList, str):
+        changeSpecList = (changeSpecList,)
+
+
+    for changeSpec in changeSpecList:
+
         isAbsolute = False
-        add = True
+
+        if (allowChangeSets and os.path.exists(changeSpec) 
+            and os.path.isfile(changeSpec)):
+            applyList.append(_getChangeSet(changeSpec))
+            continue
+
+        l = changeSpec.split("--")
 
         if len(l) == 1:
             (troveName, versionStr, flavor) = parseTroveSpec(l[0])
 
             if troveName[0] == '-':
-                troveName = troveName[1:]
-                oldVersion, oldFlavor = versionStr, flavor
-                newVersion, newFlavor = None, None
+                applyList.append((troveName, (versionStr, flavor), 
+                                  (None, None), False))
+            elif troveName[0] == '+' or updateByDefault:
+                applyList.append((troveName, (None, None), 
+                                  (versionStr, flavor), not keepExisting))
             else:
-                isAbsolute = True
-                if troveName[0] == '+':
-                    troveName = troveName[1:]
-                oldVersion, oldFlavor = None, None
-                newVersion, newFlavor = versionStr, flavor
+                applyList.append((troveName, (versionStr, flavor), 
+                                  (None, None), False))
         elif len(l) != 2:
-            log.error("one = expected in '%s' argument to changeset", item)
+            log.error("one = expected in '%s' argument to changeset", 
+                      changeSpec)
             return
         else:
-            (troveName, oldVersion, oldFlavor) = parseTroveSpec(l[0])
+            oldSpec, newSpec = l
+            (troveName, oldVersion, oldFlavor) = parseTroveSpec(oldSpec)
 
-            if l[1]:
-                if l[0]:
-                    l[1] = troveName + "=" + l[1]
-                (troveName, newVersion, newFlavor) = parseTroveSpec(l[1])
+            if newSpec:
+                newSpec = troveName + "=" + newSpec
+                (troveName, newVersion, newFlavor) = parseTroveSpec(newSpec)
             else:
                 newVersion, newFlavor = None, None
 
             if (newVersion or newFlavor) and not (oldVersion or oldFlavor):
                 # foo=--1.2
                 oldVersion, oldFlavor = None, None
-        applyList.append((troveName, (oldVersion, oldFlavor), 
-                                     (newVersion, newFlavor), isAbsolute))
 
-    return applyList
+            applyList.append((troveName, (oldVersion, oldFlavor), 
+                              (newVersion, newFlavor), False))
+
+    # dedup
+    return set(applyList)
 
 def toTroveSpec(name, versionStr, flavor):
     disp = [name]

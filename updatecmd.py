@@ -258,13 +258,13 @@ def displayUpdateInfo(updJob, verbose=False):
         displayUpdateJobInfo(job, verbose)
     return
 
-def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
-                                  keepExisting = False, depCheck = True,
-                                  test = False, justDatabase = False, 
-                                  recurse = True, info = False, 
-                                  updateByDefault = True, callback = None, 
-                                  split = True, sync = False, fromFiles = [],
-                                  checkPathConflicts = True):
+def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None, 
+                               keepExisting = False, depCheck = True,
+                               test = False, justDatabase = False, 
+                               recurse = True, info = False, 
+                               updateByDefault = True, callback = None, 
+                               split = True, sync = False, fromFiles = [],
+                               checkPathConflicts = True):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -274,7 +274,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
 
-    applyList = cmdline.parseUpdateList(pkgList, keepExisting, updateByDefault)
+    applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
+                                        updateByDefault, allowChangeSets=True)
     
     try:
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 

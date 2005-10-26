@@ -107,8 +107,6 @@ class ClientUpdate:
                 return scoredList[-1][-1]
 
         def _checkDeps(jobSet, trvSrc, findOrdering):
-            import lib
-            lib.epdb.st('f')
 
             while True:
                 (depList, cannotResolve, changeSetList) = \
@@ -1006,9 +1004,13 @@ class ClientUpdate:
                 needsOld = oldVersionStr or oldFlavorStr
                 troveName = troveName[1:]
             else:
-                needsOld = not updateMode or oldVersionStr or oldFlavorStr
-                needsNew = updateMode or newVersionStr or newFlavorStr
-
+                needsOld = oldVersionStr or oldFlavorStr
+                needsNew = newVersionStr or newFlavorStr
+                if not (needsOld or needsNew):
+                    if updateMode:
+                        needsNew = True
+                    else:
+                        needsOld = True
 
             if needsOld:
                 oldTroves = self.db.findTrove(None, 
