@@ -404,7 +404,7 @@ def main(argv=sys.argv):
                 "remote server denied permission for the requested operation"
         else:
             raise
-    except netclient.UnknownException, e:
+    except errors.UnknownException, e:
         print >> sys.stderr, \
             "An unknown exception occured on the repository server:"
         print >> sys.stderr, "\t%s" % str(e)
