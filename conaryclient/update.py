@@ -217,7 +217,7 @@ class ClientUpdate:
                 newJob = self._updateChangeSet(troves, uJob,
                                           keepExisting = False,
                                           recurse = False,
-                                          asPrimary = False)[0]
+                                          ignorePrimaryPins = False)[0]
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
@@ -318,7 +318,7 @@ class ClientUpdate:
         return redirectHack
 
     def _mergeGroupChanges(self, uJob, primaryJobList, redirectHack, 
-                           recurse, ineligible):
+                           recurse, ineligible, ignorePrimaryPins):
 
         def _newBase(newTrv):
             """
@@ -635,10 +635,10 @@ class ClientUpdate:
             if job[1][0] is None: 
                 # it doesn't matter what we put here since we don't have it
                 # already
-                jobQueue[i] = (job, True, False, absoluteAncestry)
+                jobQueue[i] = (job, ignorePrimaryPins, False, absoluteAncestry)
             else:
                 pin = pins.pop()
-                jobQueue[i] = (job, True, pin, absoluteAncestry)
+                jobQueue[i] = (job, ignorePrimaryPins, pin, absoluteAncestry)
         del removedList, pins
 
         referencedTroves = set()
@@ -761,7 +761,7 @@ class ClientUpdate:
                     # replaced; we need to leave the old one here
                     log.debug("skipping install job due to pin")
                     if newVersion is not None:
-                        uJob.addPinMapping(name, 
+                        uJob.addPinMapping(trvName, 
                                             (oldVersion, oldFlavor),
                                             (newVersion, newFlavor))
                     continue
@@ -920,7 +920,8 @@ class ClientUpdate:
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
-                         restrictToTroveSource = False, asPrimary = True):
+                         restrictToTroveSource = False, 
+                         ignorePrimaryPins = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1140,7 +1141,7 @@ class ClientUpdate:
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
         newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
-                                         recurse, oldItems)
+                                         recurse, oldItems, ignorePrimaryPins)
         if not newJob:
             raise NoNewTrovesError
 
@@ -1191,7 +1192,7 @@ class ClientUpdate:
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
-                        checkPathConflicts = True):
+                        checkPathConflicts = True, ignorePrimaryPins = True):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1228,6 +1229,8 @@ class ClientUpdate:
         @param fromChangesets: When specified, these changesets are used
         as the source of troves instead of the repository.
         @type fromChangesets: list of changeset.ChangeSetFromFile
+        @param ignorePrimaryPins: If True, pins on primary troves are
+        ignored otherwise they are treated normally.
         @rtype: tuple
         """
         callback.preparingChangeSet()
@@ -1244,7 +1247,7 @@ class ClientUpdate:
                                         sync = sync, 
                                         restrictToTroveSource = 
                                             (len(fromChangesets) > 0),
-                                        asPrimary = True)
+                                        ignorePrimaryPins = ignorePrimaryPins)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 

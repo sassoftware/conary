@@ -28,6 +28,8 @@ Changes in 0.70.2:
     * Rollbacks are now listed with the most recent on top
     * Troves which a group operation tries to remove will be left behind
       if they satisfy dependencies for other troves
+    * updateall command respects pins on top-level troves
+    * Dependency resolution no longer blows away pinned troves
 
   o Build Changes (cvc)
     * cvc more reliably sets a non-zero exit status when an error

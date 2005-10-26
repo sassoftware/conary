@@ -307,7 +307,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   updateByDefault = True, callback = None, 
                                   split=True, sync = False, 
                                   fromChangesets = [],
-                                  checkPathConflicts = True):
+                                  checkPathConflicts = True, 
+                                  ignorePrimaryPins = True):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -322,7 +323,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                updateByDefault = updateByDefault,
                                callback = callback, split = split,
                                sync = sync, fromChangesets = fromChangesets,
-                               checkPathConflicts = checkPathConflicts)
+                               checkPathConflicts = checkPathConflicts,
+                               ignorePrimaryPins = ignorePrimaryPins)
     except:
         callback.done()
         raise
@@ -437,7 +439,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
         callback = UpdateCallback()
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       depCheck = depCheck, test = test, info = info, 
-                      callback = callback)
+                      callback = callback, ignorePrimaryPins = False)
     except conaryclient.DependencyFailure, e:
         log.error(e)
     except conaryclient.UpdateError, e:
