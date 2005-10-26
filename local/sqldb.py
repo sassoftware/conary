@@ -1069,7 +1069,8 @@ order by
 
 
         cu.execute("""
-            SELECT includedId, troveName, version, flavor, isPresent, inPristine
+            SELECT includedId, troveName, version, flavor, isPresent, 
+                   inPristine, timeStamps
                 FROM TroveTroves JOIN Instances ON
                     TroveTroves.includedId = Instances.instanceId
                 JOIN Versions ON
@@ -1086,13 +1087,15 @@ order by
         currentTrv = trove.Trove('foo', versions.NewVersion(),
                                   deps.deps.DependencySet(), None)
         instanceDict = {}
-        for (includedId, name, version, flavor, isPresent, inPristine) in cu:
+        for (includedId, name, version, flavor, isPresent, 
+                                            inPristine, timeStamps) in cu:
             if flavor is None:
                 flavor = deps.deps.DependencySet()
             else:
                 flavor = deps.deps.ThawDependencySet(flavor)
 
             version = versions.VersionFromString(version)
+	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
             instanceDict[(name, version, flavor)] = includedId
             if isPresent:
@@ -1767,7 +1770,7 @@ order by
     def findByNames(self, nameList):
         cu = self.db.cursor()
 
-        cu.execute("""SELECT troveName, version, flavor FROM
+        cu.execute("""SELECT troveName, version, flavor, timeStamps FROM
                             Instances JOIN Versions ON
                                 Instances.versionId = Versions.versionId
                             JOIN Flavors ON
@@ -1777,8 +1780,14 @@ order by
                                 troveName IN (%s)""" %
                     ",".join(["'%s'" % x for x in nameList]))
 
-        return [ (n, versions.VersionFromString(v),
-                  deps.deps.ThawDependencySet(f)) for (n, v, f) in cu ]
+        l = []
+        for (name, version, flavor, timeStamps) in cu:
+            version = versions.VersionFromString(version)
+	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+            flavor = deps.deps.ThawDependencySet(flavor)
+            l.append((name, version, flavor))
+
+        return l
 
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
