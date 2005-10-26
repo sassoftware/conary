@@ -1465,6 +1465,8 @@ class SingleGroup:
         cfg.installLabelPath = labelPath
         oldAutoResolve = cfg.autoResolve
         cfg.autoResolve = True
+        oldFlavor = cfg.flavor
+        cfg.flavor = [ cfg.buildFlavor ]
         # set up a conaryclient to do the dep solving
         client = conaryclient.ConaryClient(cfg)
 
@@ -1490,6 +1492,7 @@ class SingleGroup:
         cfg.setValue('root', oldRoot)
         cfg.installLabelPath = oldInstallLabelPath
         cfg.autoResolve = oldAutoResolve
+        cfg.flavor = oldFlavor
         for trove, needs in suggMap.iteritems():
             print "trove:%s" % trove[0]
             for item in needs:
