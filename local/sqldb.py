@@ -1039,8 +1039,18 @@ order by
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
         
+        # these are collections that _could_ include trove (they have 
+        # an empty slot where this trove might fit)
+        cu.execute('''SELECT TroveTroves.instanceId FROM Instances 
+                      JOIN TroveTroves 
+                        ON (Instances.instanceId = TroveTroves.includedId)
+                      WHERE troveName = ? AND isPresent=0''', trove.getName())
+        collections = cu.fetchall()
+
         cu.execute("select instanceId from trovetroves where includedid=?", troveInstanceId)
-        for x, in cu:
+        collections += cu.fetchall()
+
+        for x, in collections:
             self._sanitizeTroveCollection(cu, x, nameHint = trove.getName())
 
         self._sanitizeTroveCollection(cu, troveInstanceId)
@@ -1057,8 +1067,6 @@ order by
         else:
             nameClause = ""
 
-        #import lib
-        #lib.epdb.st('f')
 
         cu.execute("""
             SELECT includedId, troveName, version, flavor, isPresent, inPristine
