@@ -23,7 +23,7 @@ import kid
 import templates
 
 from repository.netrepos import netserver
-from repository.netclient import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists
+from repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
