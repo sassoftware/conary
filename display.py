@@ -149,7 +149,7 @@ def parseTroveStrings(troveNameList):
     for item in troveNameList:
         (name, version, flavor) = updatecmd.parseTroveSpec(item)
 
-        if version:
+        if version is not None:
             hasVersions = True
         if flavor is not None:
             hasFlavors = True
