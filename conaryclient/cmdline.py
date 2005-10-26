@@ -67,6 +67,8 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
                     updateStr = './' + updateStr
                 log.error("'%s' is not a valid conary changeset: %s" % 
                           (updateStr, msg))
+                # XXX sys.exit is gross
+                import sys
                 sys.exit(1)
             applyList.append(cs)
             log.debug("found changeset file %s" % updateStr)
