@@ -862,7 +862,8 @@ class ClientUpdate:
                                if x[1][1] is not None )
 
             # only allow orphaned branch jobs if they are updating
-            # something a local trove that is already on the target branch
+            # from a local trove that is on the same label as the orphaned
+            # job
             replacedTroves = [x for x in replacedTroves
                               if x[0] not in orphanedBranchJobs
                                  or x[0][1].branch() == x[1][1].branch()]
