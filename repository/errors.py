@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import versions
 
 class RepositoryMismatch(Exception):
     pass
