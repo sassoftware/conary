@@ -114,7 +114,7 @@ dist: $(dist_files)
 	@echo "=== sanity building/testing conary ==="; \
 	cd $(DISTDIR); \
 	make > /dev/null; \
-	./conary > /dev/null || echo "CONARY DOES NOT WORK"; \
+	./conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
 	cd -; \
 	rm -rf $(DISTDIR)
 
