@@ -288,41 +288,6 @@ class ConfigFile:
     def getDisplayOption(self, key):
         return self._displayOptions[key]
 
-    def initializeFlavors(self):
-        import flavorcfg
-        self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
-                                                   self.archDirs)
-        if self.flavor == []:
-            self.flavor = [deps.deps.DependencySet()]
-
-        self.flavor = self.flavorConfig.toDependency(override=self.flavor)
-
-        newFlavors = []
-        hasIns = False
-        
-        # if any flavor has an instruction set, don't merge
-        for flavor in self.flavor:
-            if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
-                hasIns = True
-                break
-
-        if not hasIns:
-            # use all the flavors for the main arch first
-            for depList in deps.arch.currentArch:
-                for flavor in self.flavor:
-                    insSet = deps.deps.DependencySet()
-                    for dep in depList:
-                        insSet.addDep(deps.deps.InstructionSetDependency, dep)
-                    newFlavor = flavor.copy()
-                    newFlavor.union(insSet)
-                    newFlavors.append(newFlavor)
-            self.flavor = newFlavors
-
-        # buildFlavor is installFlavor + overrides
-        self.buildFlavor = deps.deps.overrideFlavor(self.flavor[0], 
-                                                    self.buildFlavor)
-	self.flavorConfig.populateBuildFlags()
-
 
 class ConaryConfiguration(ConfigFile):
 
@@ -422,6 +387,41 @@ class ConaryConfiguration(ConfigFile):
                 value = maskedMap
 
         ConfigFile.displayKey(self, key, value, type, out)
+
+    def initializeFlavors(self):
+        import flavorcfg
+        self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
+                                                   self.archDirs)
+        if self.flavor == []:
+            self.flavor = [deps.deps.DependencySet()]
+
+        self.flavor = self.flavorConfig.toDependency(override=self.flavor)
+
+        newFlavors = []
+        hasIns = False
+        
+        # if any flavor has an instruction set, don't merge
+        for flavor in self.flavor:
+            if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
+                hasIns = True
+                break
+
+        if not hasIns:
+            # use all the flavors for the main arch first
+            for depList in deps.arch.currentArch:
+                for flavor in self.flavor:
+                    insSet = deps.deps.DependencySet()
+                    for dep in depList:
+                        insSet.addDep(deps.deps.InstructionSetDependency, dep)
+                    newFlavor = flavor.copy()
+                    newFlavor.union(insSet)
+                    newFlavors.append(newFlavor)
+            self.flavor = newFlavors
+
+        # buildFlavor is installFlavor + overrides
+        self.buildFlavor = deps.deps.overrideFlavor(self.flavor[0], 
+                                                    self.buildFlavor)
+	self.flavorConfig.populateBuildFlags()
 
 
 class ConaryCfgError(Exception):
