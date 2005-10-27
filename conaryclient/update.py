@@ -519,8 +519,14 @@ class ClientUpdate:
             # let outdated sort things out.
             outdated = self.db.outdatedTroves(newItems, inelligible)
             needed = []
+
             for newInfo, oldInfo in outdated.iteritems():
                 jobSet.add((newInfo[0], oldInfo[1:], newInfo[1:], False))
+
+                # it's possible we have hooked up to something that was 
+                # scheduled for removal anyway - remove the duplicate
+                # erasure
+                jobSet.discard((oldInfo[0], oldInfo[1:], (None, None), False))
 
         def _removeDuplicateAdditions(jobSet):
             # the same trove could be added both as part of a cmd line update
@@ -575,6 +581,26 @@ class ClientUpdate:
                 ph = trv.getPathHashes()
 
             return ph
+
+    def _matchRelativeUpdates(newJob):
+        changes = []
+        noFlavor = deps.DependencySet()
+        oldTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
+        newTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
+
+        # nonUpdate == either a new install or an erasure
+        nonUpdate = [ x for x in newJob if not (x[1][0] and x[2][0])]
+        newJob.difference_update(nonUpdate)
+
+        for (name, oldInfo, newInfo, isAbs) in nonUpdate:
+            if oldInfo[0]:
+                oldTrv.addTrove(name, oldInfo[0], oldInfo[1])
+            else:
+                newTrv.addTrove(name, newInfo[0], newInfo[1])
+
+        finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+        for (name, oldVer, newVer, oldFla, newFla) in neededTroveList:
+            newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
 
         # def _mergeGroupChanges -- main body begins here
             
@@ -908,6 +934,8 @@ class ClientUpdate:
                                 (newInfo[1], newInfo[2]), False))
 
         _removeDuplicateAdditions(newJob)
+        _matchRelativeUpdates(newJob)
+
         # _findErasures picks what gets erased; nothing else gets to vote
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
 				 recurse)
