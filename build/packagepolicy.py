@@ -330,6 +330,8 @@ class CheckDestDir(policy.Policy):
     """
     def doFile(self, file):
 	d = self.macros.destdir
+        b = self.macros.builddir
+
 	if file.find(d) != -1:
             self.error('Path %s contains destdir %s', file, d)
 	fullpath = d+file
@@ -338,8 +340,11 @@ class CheckDestDir(policy.Policy):
 	    if contents.find(d) != -1:
                 self.error('Symlink %s contains destdir %s in contents %s',
                            file, d, contents)
+	    if contents.find(b) != -1:
+                self.error('Symlink %s contains builddir %s in contents %s',
+                           file, b, contents)
 
-        badRPATHS = (d, '/tmp', '/var/tmp')
+        badRPATHS = (d, b, '/tmp', '/var/tmp')
         m = self.recipe.magic[file]
         if m and m.name == "ELF":
             rpaths = m.contents['RPATH'] or ''

@@ -3,6 +3,7 @@ Changes in 0.70.3:
     * a local cook of a trove foo will ensure that the changeset created is 
       installable on your local system (by making sure the version number created
       is unique)
+    * don't allow the builddir to appear in rpath
 
 Changes in 0.70.2:
   o Client Changes (conary)
