@@ -126,7 +126,7 @@ class ClientClone:
             if not infoList:
                 return ([], None)
 
-            buildVersion = nextVersion(repos, 
+            buildVersion = nextVersion(repos, None,
                                 [ x[0] for x in infoList ], srcVersion, flavor)
             return infoList, buildVersion
 
