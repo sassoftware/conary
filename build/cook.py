@@ -1114,7 +1114,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 client.updateChangeSet([changeSet], recurse=True, resolveDeps=False)
             client.applyUpdate(updJob)
 
-        except (conaryclient.UpdateError, repository.CommitError), e:
+        except (conaryclient.UpdateError, errors.CommitError), e:
             log.error(e)
             log.error("Not committing changeset: please apply %s by hand" % changeSetFile)
         else: 
