@@ -12,7 +12,7 @@
 # full details.
 #
 
-def nextVersion(repos, troveNames, sourceVersion, troveFlavor, 
+def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor, 
                 targetLabel=None, alwaysBumpCount=False):
     """
     Calculates the version to use for a newly built trove which is about
@@ -35,24 +35,24 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
         troveNames = [troveNames]
 
     # strip off any components and remove duplicates
-    troveNames = set([x.split(':')[0] for x in troveNames])
+    pkgNames = set([x.split(':')[0] for x in troveNames])
 
     # search for all the packages that are being created by this cook - 
     # we take the max of all of these versions as our latest.
-    query = dict.fromkeys(troveNames, 
+    query = dict.fromkeys(pkgNames, 
                           {sourceVersion.getBinaryVersion().branch() : None })
     
     d = repos.getTroveVersionsByBranch(query)
     latest = None
 
     relVersions = []
-    for troveName in troveNames:
-        if troveName in d:
-            for version in d[troveName]:
+    for pkgName in pkgNames:
+        if pkgName in d:
+            for version in d[pkgName]:
                 if (not version.isBranchedBinary()
                     and version.getSourceVersion() == sourceVersion):
-                    relVersions.append((version, d[troveName][version]))
-    del troveName
+                    relVersions.append((version, d[pkgName][version]))
+    del pkgName
 
     if relVersions:
         # all these versions only differ by build count.
@@ -90,6 +90,37 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
         else:
             latest = sourceVersion
         latest = latest.getBinaryVersion()
+        latest.incrementBuildCount()
+    if latest.isOnLocalHost():
+        return nextLocalVersion(db, troveNames, latest, troveFlavor) 
+    else:
+        return latest
+        
+def nextLocalVersion(db, troveNames, latest, troveFlavor):
+    # if we've branched on to a local label, we check
+    # the database for installed versions to see if we need to
+    # bump the build count on this label
+
+    # search for both pkgs and their components
+    pkgNames = set([x.split(':')[0] for x in troveNames] + troveNames)
+
+    query = dict.fromkeys(troveNames, {latest.branch() : None })
+    results = db.getTroveLeavesByBranch(query)
+
+    relVersions = []
+    for troveName in troveNames:
+        if troveName in results:
+            for version in results[troveName]:
+                if version.getSourceVersion() == latest.getSourceVersion():
+                    relVersions.append((version, 
+                                        results[troveName][version]))
+    if not relVersions:
+        return latest
+
+    relVersions.sort(lambda a, b: cmp(a[0].trailingRevision().buildCount,
+                                      b[0].trailingRevision().buildCount))
+    latest, flavors = relVersions[-1]
+    if troveFlavor in flavors:
         latest.incrementBuildCount()
     return latest
 

@@ -37,6 +37,7 @@ from lib import log
 from lib import logger
 from lib import sha1helper
 from lib import util
+from local import database
 from repository import changeset
 from repository import filecontents
 from repository import errors
@@ -274,23 +275,24 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     macros['buildbranch'] = buildBranch.asString()
     macros['buildlabel'] = buildBranch.label().asString()
 
+    db = database.Database(cfg.root, cfg.dbPath)
     if issubclass(recipeClass, recipe._AbstractPackageRecipe):
-	ret = cookPackageObject(repos, cfg, recipeClass, sourceVersion, 
+	ret = cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, 
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
                                 ignoreDeps = ignoreDeps, logBuild = logBuild)
     elif issubclass(recipeClass, recipe.RedirectRecipe):
-	ret = cookRedirectObject(repos, cfg, recipeClass,  sourceVersion,
+	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
                               alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.GroupRecipe):
-	ret = cookGroupObject(repos, cfg, recipeClass, sourceVersion, 
+	ret = cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, 
 			      macros = macros, targetLabel = targetLabel,
                               alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
-	ret = cookFilesetObject(repos, cfg, recipeClass, sourceVersion, 
+	ret = cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, 
 				macros = macros, targetLabel = targetLabel,
                                 alwaysBumpCount = alwaysBumpCount)
     else:
@@ -313,7 +315,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     return built
 
-def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
+def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 		    targetLabel = None, alwaysBumpCount=False):
     """
     Turns a redirect recipe object into a change set. Returns the absolute
@@ -361,8 +363,9 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
         for (name, version, flavor) in troveList:
             redirectFlavor.union(flavor, mergeType=deps.DEP_MERGE_TYPE_NORMAL)
 
-    targetVersion = nextVersion(repos, fullName, sourceVersion, redirectFlavor,
-                                targetLabel, alwaysBumpCount=alwaysBumpCount)
+    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
+                                redirectFlavor, targetLabel, 
+                                alwaysBumpCount=alwaysBumpCount)
 
     redirSet = {}
     for topName, troveList in redirects.iteritems():
@@ -394,7 +397,7 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     return (changeSet, built, None)
 
-def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
+def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 		    targetLabel = None, alwaysBumpCount=False):
     """
     Turns a group recipe object into a change set. Returns the absolute
@@ -461,8 +464,9 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
                 grpFlavor.union(flavor,
                             mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
-    targetVersion = nextVersion(repos, groupNames, sourceVersion, grpFlavor,
-                                targetLabel, alwaysBumpCount=alwaysBumpCount)
+    targetVersion = nextVersion(repos, db, groupNames, sourceVersion, 
+                                grpFlavor, targetLabel, 
+                                alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
     groups = {}
@@ -500,7 +504,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     return (changeSet, built, None)
 
-def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
+def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 		      targetLabel = None, alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
@@ -554,7 +558,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    targetVersion = nextVersion(repos, fullName, sourceVersion, flavor, 
+    targetVersion = nextVersion(repos, db, fullName, sourceVersion, flavor, 
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
@@ -581,7 +585,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
                                                 fileset.getFlavor()) ]
     return (changeSet, built, None)
 
-def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
+def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
                       ignoreDeps=False, logBuild=False):
@@ -624,7 +628,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     (bldList, recipeObj, builddir, destdir) = result
     
     # 2. convert the package into a changeset ready for committal
-    changeSet, built = _createPackageChangeSet(repos, cfg, bldList, recipeObj,
+    changeSet, built = _createPackageChangeSet(repos, db, cfg, bldList, recipeObj,
                            sourceVersion,
                            targetLabel=targetLabel,
                            alwaysBumpCount=alwaysBumpCount)
@@ -777,7 +781,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
     return bldList, recipeObj, builddir, destdir
 
-def _createPackageChangeSet(repos, cfg, bldList, recipeObj, sourceVersion,
+def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                             targetLabel=None, alwaysBumpCount=False):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
@@ -788,7 +792,7 @@ def _createPackageChangeSet(repos, cfg, bldList, recipeObj, sourceVersion,
     # all components, so just grab the first one.
     flavor = bldList[0].flavor.copy()
     componentNames = [ x.name for x in bldList ]
-    targetVersion = nextVersion(repos, componentNames, sourceVersion, 
+    targetVersion = nextVersion(repos, db, componentNames, sourceVersion, 
                                 flavor, targetLabel, 
                                 alwaysBumpCount=alwaysBumpCount)
 

@@ -1,3 +1,9 @@
+Changes in 0.70.3:
+  o Build Changes (cvc)
+    * a local cook of a trove foo will ensure that the changeset created is 
+      installable on your local system (by making sure the version number created
+      is unique)
+
 Changes in 0.70.2:
   o Client Changes (conary)
     * GnuPG compatible trust metrics for OpenPGP Keys now exists. This
