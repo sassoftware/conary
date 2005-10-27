@@ -582,25 +582,25 @@ class ClientUpdate:
 
             return ph
 
-    def _matchRelativeUpdates(newJob):
-        changes = []
-        noFlavor = deps.DependencySet()
-        oldTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
-        newTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
+        def _matchRelativeUpdates(newJob):
+            changes = []
+            noFlavor = deps.DependencySet()
+            oldTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
+            newTrv = trove.Trove('@trv', versions.NewVersion(), noFlavor, None)
 
-        # nonUpdate == either a new install or an erasure
-        nonUpdate = [ x for x in newJob if not (x[1][0] and x[2][0])]
-        newJob.difference_update(nonUpdate)
+            # nonUpdate == either a new install or an erasure
+            nonUpdate = [ x for x in newJob if not (x[1][0] and x[2][0])]
+            newJob.difference_update(nonUpdate)
 
-        for (name, oldInfo, newInfo, isAbs) in nonUpdate:
-            if oldInfo[0]:
-                oldTrv.addTrove(name, oldInfo[0], oldInfo[1])
-            else:
-                newTrv.addTrove(name, newInfo[0], newInfo[1])
+            for (name, oldInfo, newInfo, isAbs) in nonUpdate:
+                if oldInfo[0]:
+                    oldTrv.addTrove(name, oldInfo[0], oldInfo[1])
+                else:
+                    newTrv.addTrove(name, newInfo[0], newInfo[1])
 
-        finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
-        for (name, oldVer, newVer, oldFla, newFla) in neededTroveList:
-            newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
+            finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+            for (name, oldVer, newVer, oldFla, newFla) in neededTroveList:
+                newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
 
         # def _mergeGroupChanges -- main body begins here
             
