@@ -166,8 +166,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         indent = '    '
         lines.extend(formatUpdateJobInfo(job, indent = indent))
         for line in lines:
-            self._message(line)
-            self._message('\n')
+            # don't use self._message since we are not expecting to erase
+            # this line.
+            self.out.write(line + '\n')
         self.lock.release()
 
     def __init__(self):
