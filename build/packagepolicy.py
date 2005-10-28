@@ -1232,7 +1232,7 @@ class LinkCount(policy.Policy):
             if type(exceptions) is str:
                 self.excepts.add(exceptions)
             elif type(exceptions) in (tuple, list):
-                self.excepts.update(set(*exceptions))
+                self.excepts.update(set(exceptions))
         # FIXME: we may want to have another keyword argument
         # that passes information down to the buildpackage
         # that causes link groups to be broken for some
