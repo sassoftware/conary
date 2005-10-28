@@ -613,20 +613,19 @@ class VersionSequence(AbstractVersion):
         ZeroDivision results.
         """
 
-        def _buildSet(seq):
-            s = set()
-            last = None
-            for label in seq.iterLabels():
-                s.add(label)
-                if last is not None:
-                    s.add((last, label))
-                last = label
+        def _buildSet(ver):
+            s = set(ver.versions)
+            lastLabel = None
+            for label in ver.iterLabels():
+                if lastLabel is not None:
+                    s.add((lastLabel, label))
+                lastLabel = label
 
             return s
 
-        # Assemble sets based on the labels of each VersionSequence. The
-        # sets consist of each label, and the transition from label to
-        # label (which labels occur next to each other, modulo version
+        # Assemble sets based on the labels of each VersionSequence. The sets
+        # consist of each item in the version list and the transition between
+        # labels (which labels occur next to each other, modulo version
         # numbers). 
         ourSet = _buildSet(self)
         otherSet = _buildSet(other)
