@@ -289,7 +289,106 @@ class ConfigFile:
         return self._displayOptions[key]
 
 
-class ConaryConfiguration(ConfigFile):
+# ------------- sectioned config file definition -----------------
+
+class ConfigSection(ConfigFile):
+    
+    """ 
+        Defines a subsection of a config file.  A subsection has a 
+        defaults class variable, like a ConfigFile does, that defines
+        what keys it accepts.  
+    """
+        
+
+    def __init__(self, parent):
+        self._parent = parent
+        ConfigFile.__init__(self)
+
+    def getDisplayOption(self, key):
+        return self._parent._displayOptions[key]
+
+class SectionedConfig(ConfigFile):
+
+    """ 
+        Defines a config file with sections, defined by [<sectionName>]
+        in a config file.  
+
+        All section names are allowed unless you override setSection() in a
+        subclass.  Once a current section is set, all subsequent config lines 
+        are in that section until another section is set or a new config 
+        file is entered.
+    """
+     
+
+    sectionType = None
+    
+    def __init__(self):
+        ConfigFile.__init__(self)
+        self.sections = {}
+        self.sectionName = ''
+        assert(issubclass(self.sectionType, ConfigSection))
+
+    def setSection(self, sectionName):
+        if sectionName not in self.sections:
+            self.sections[sectionName] = self.sectionType(self)
+        self.sectionName = sectionName
+
+    def configLine(self, line, file = "override", lineno = '<No line>'):
+	line = line.strip()
+        if line and line[0] == '[' and line[-1] == ']':
+            self.setSection(line[1:-1])
+            return
+        if self.sectionName:
+            self.sections[self.sectionName].configLine(line, file, lineno)
+        else:
+            ConfigFile.configLine(self, line, file, lineno)
+
+    def display(self, out=None):
+        if out is None:
+            out = sys.stdout
+        ConfigFile.display(self)
+        for sectionName in sorted(self.sections):
+            print ""
+            print ""
+            print "[%s]" % sectionName
+            self.sections[sectionName].display(out)
+
+    def read(self, *args, **kw):
+        oldSection = self.sectionName
+        self.sectionName = None
+        return ConfigFile.read(self, *args, **kw)
+        self.sectionName = oldSection
+
+
+# --------------------- conary config file classes ----------
+
+class ConaryContext(ConfigSection):
+    """ Conary uses context to let the value of particular config parameters
+        be set based on a keyword that can be set at the command line.
+        Configuartion values that are set in a context are overridden 
+        by the values in the context that have been set.  Values that are 
+        unset in the context do not override the default config values.
+    """
+    defaults = { 'buildFlavor'      : [FLAVOR,    None],
+                 'buildLabel'       : [LABEL,     None],
+                 'flavor'           : [ FLAVORLIST, [] ],
+                 'installLabelPath' : [ LABELLIST, None],
+                 'contact'	    : None,
+                 'name'   	    : None,
+                 'excludeTroves'    : [ REGEXPLIST, RegularExpressionList() ],
+                 'repositoryMap'    : [ STRINGDICT, {} ],
+                 'signatureKey'     : [ FINGERPRINT, None ],
+                 'signatureKeyMap'  : [ FINGERPRINT_MAP, None ] 
+               }
+
+    def displayKey(self, key, value, type, out):
+        if not value:
+            return
+        ConfigSection.displayKey(self, key, value, type, out)
+
+class ConaryConfiguration(SectionedConfig):
+    
+    sectionType = ConaryContext
 
     defaults = {
 	'autoResolve'	        : [ BOOL, False ],
@@ -326,7 +425,7 @@ class ConaryConfiguration(ConfigFile):
     }
 
     def __init__(self, readConfigFiles=True):
-	ConfigFile.__init__(self)
+	SectionedConfig.__init__(self)
 
 	self.pkgflags = {}
 	self.useflags = {}
@@ -360,7 +459,7 @@ class ConaryConfiguration(ConfigFile):
 
     def initDisplayOptions(self):
         ConfigFile.initDisplayOptions(self)
-        self.setDisplayOptions(hidePasswords=False)
+        self.setDisplayOptions(hidePasswords=False, showContexts=False)
 
     def requireInstallLabelPath(self):
         if not self.installLabelPath:
@@ -370,10 +469,20 @@ class ConaryConfiguration(ConfigFile):
     def display(self, out=None):
         if out is None:
             out = sys.stdout
-        ConfigFile.display(self, out=out)
+        if out is None:
+            out = sys.stdout
+        ConfigFile.display(self, out)
+        
         for macro in sorted(self.macroflags.keys()):
             key = 'macros.' + macro
             out.write('%-25s %-25s\n' % (key, self[key]))
+
+        if self.getDisplayOption('showContexts'):
+            for sectionName in sorted(self.sections):
+                print ""
+                print ""
+                print "[%s]" % sectionName
+                self.sections[sectionName].display(out)
 
     def displayKey(self, key, value, type, out):
         # mask out username and password in repository map entries
@@ -387,6 +496,24 @@ class ConaryConfiguration(ConfigFile):
                 value = maskedMap
 
         ConfigFile.displayKey(self, key, value, type, out)
+
+    def setContext(self, name):
+        """ Copy the config values from the context named name (if any)
+            into the main config file.  Returns False if not such config
+            file found.
+        """
+        if name not in self.sections:
+            return False
+        context = self.sections[name]
+
+        for key in context.defaults:
+            value = context[key]
+            if value:
+                if isinstance(value, dict):
+                    self.__dict__[key].update(value)
+                else:
+                    self.__dict__[key] = value
+        return True
 
     def initializeFlavors(self):
         import flavorcfg

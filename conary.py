@@ -79,13 +79,14 @@ def usage(rc = 1):
     print ""
     print "commit flags:    --target-branch <branch>"
     print ""
-    print "config flags:    --show-passwords"
+    print "config flags:    --show-passwords --show-contexts"
     print ""
     print 'common flags:    --build-label <label>'
     print '                 --config-file <path>'
     print '                 --config "<item> <value>"'
     print '                 --install-label <label>'
     print "                 --root <root>"
+    print "                 --context <context>"
     print ""
     print "query flags:     --buildreqs"
     print "                 --deps"
@@ -170,6 +171,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["buildreqs"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
+    argDef["context"] = ONE_PARAM
     argDef["deps"] = NO_PARAM
     argDef["diff"] = NO_PARAM
     argDef["from-file"] = MULT_PARAM
@@ -201,6 +203,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["test"] = NO_PARAM
     argDef["version"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
+    argDef["show-contexts"] = NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
@@ -215,6 +218,12 @@ def realMain(cfg, argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+
+    context = argSet.pop('context', None)
+    if 'CONARY_CONTEXT' in os.environ:
+        context = os.environ['CONARY_CONTEXT']
+    if context:
+        cfg.setContext(context)
 
     l = []
     for labelStr in argSet.get('install-label', []):
@@ -272,14 +281,15 @@ def realMain(cfg, argv=sys.argv):
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
-	showPasswords = 'show-passwords' in argSet
-        if showPasswords:
-	    del argSet['show-passwords']
+        
+	showPasswords = argSet.pop('show-passwords', False)
+	showContexts = argSet.pop('show-contexts', False)
         try:
             prettyPrint = sys.stdout.isatty()
         except AttributeError:
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
+                              showContexts=showContexts,
                               prettyPrint=prettyPrint)
 	if argSet: return usage()
 	if (len(otherArgs) > 2):

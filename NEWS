@@ -2,6 +2,14 @@ Changes in 0.70.3:
   o Client Changes (conary)
     * Conary now works harder to avoid having separate erase/installs,
       instead preferring to link those up into one update when possible.
+    * Conary configuration now supports contexts.  Contexts are defined in 
+      sections starting with a [<name>] line, and provide contextual 
+      configurations for certain variables, defined in the man page.  All 
+      configuration options after the [<name>] will be associated with that 
+      context, and will override the default configuration when that context 
+      is active.  The current context can be selected by using the --context 
+      parameter, or by setting the CONARY_CONTEXT environment variable. 
+    * 'conary config --show-contexts' will display the available contexts
   o Build Changes (cvc)
     * A local cook of a trove foo will ensure that the changeset created is 
       installable on your local system, by making sure the version number 

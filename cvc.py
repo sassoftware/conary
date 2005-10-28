@@ -16,6 +16,7 @@
 Provides the output for the "cvc" subcommands
 """
 
+import os
 import sys
 
 from lib import options
@@ -79,6 +80,7 @@ def usage(rc = 1):
     print 'common flags:  --build-label <label>'
     print '               --config-file <path>'
     print '               --config "<item> <value>"'
+    print '               --context <context>'
     print '               --install-label <label>'
     print "               --root <root>"
     print '               --signature-key "<fingerprint>"'
@@ -119,6 +121,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["binary-only"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
+    argDef["context"] = ONE_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
     argDef["flavor"] = ONE_PARAM
@@ -133,6 +136,8 @@ def realMain(cfg, argv=sys.argv):
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
+    argDef["show-passwords"] = NO_PARAM
+    argDef["show-contexts"] = NO_PARAM
     argDef["sources"] = NO_PARAM
     argDef["source-only"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
@@ -152,6 +157,12 @@ def realMain(cfg, argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+
+    context = argSet.pop('context', None)
+    if 'CONARY_CONTEXT' in os.environ:
+        context = os.environ['CONARY_CONTEXT']
+    if context:
+        cfg.setContext(context)
 
     cfg.initializeFlavors()
     # set the build flavor here, just to set architecture information 
@@ -225,8 +236,17 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	checkin.commit(repos, cfg, message, callback=callback)
         log.setVerbosity(level)
     elif (args[0] == "config"):
+	showPasswords = argSet.pop('show-passwords', False)
+	showContexts = argSet.pop('show-contexts', False)
+        try:
+            prettyPrint = sys.stdout.isatty()
+        except AttributeError:
+            prettyPrint = False
+        cfg.setDisplayOptions(hidePasswords=not showPasswords,
+                              showContexts=showContexts,
+                              prettyPrint=prettyPrint)
 	if argSet: return usage()
-	if (len(args) >= 2):
+	if (len(args) > 2):
 	    return usage()
 	else:
 	    cfg.display()
