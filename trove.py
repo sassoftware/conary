@@ -1015,6 +1015,7 @@ class Trove(streams.StreamSet):
 
             for newInfo in newInfoSet:
                 for oldInfo in oldInfoSet:
+                    oldLabels = [ x for x in 
                     if newInfo[1].branch() == oldInfo[1].branch():
                         l = byBranch.setdefault(newInfo, [])
                         l.append(((oldInfo[1].trailingRevision(), oldInfo)))

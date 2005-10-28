@@ -23,6 +23,9 @@ Changes in 0.70.3:
       environment.
     * cvc will allow you to cook a trove locally even when you are unable 
       to access the trove's source repository
+  * Common Changes:
+    * Version closeness was improperly measured for troves on different
+      branches when then label structure was identical
 
 Changes in 0.70.2:
   o Client Changes (conary)
