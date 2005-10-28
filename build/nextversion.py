@@ -42,7 +42,11 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     query = dict.fromkeys(pkgNames, 
                           {sourceVersion.getBinaryVersion().branch() : None })
     
-    d = repos.getTroveVersionsByBranch(query)
+    if repos:
+        d = repos.getTroveVersionsByBranch(query)
+    else:
+        d = {}
+
     latest = None
 
     relVersions = []

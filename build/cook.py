@@ -261,14 +261,26 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     srcName = fullName + ':source'
 
-    try: 
-        trove = repos.getTrove(srcName, sourceVersion, 
-                               deps.DependencySet(), withFiles = False)
-        sourceVersion = trove.getVersion()
-    except errors.TroveMissing:
-        if not allowMissingSource and targetLabel != versions.CookLabel():
-            raise RuntimeError, ('Cooking with non-existant source'
-                                 ' version %s' % sourceVersion.asString())
+    if repos:
+        try: 
+            trove = repos.getTrove(srcName, sourceVersion, 
+                                   deps.DependencySet(), withFiles = False)
+            sourceVersion = trove.getVersion()
+        except errors.TroveMissing:
+            if not allowMissingSource and targetLabel != versions.CookLabel():
+                raise RuntimeError, ('Cooking with non-existant source'
+                                     ' version %s' % sourceVersion.asString())
+        except errors.OpenError:
+            if targetLabel != versions.CookLabel():
+                raise
+            log.warning('Could not open repository -- not attempting to'
+                        ' share pathId information with the'
+                        ' repository.  This cook will not merge config'
+                        ' file information on update.')
+            time.sleep(3)
+            repos = None
+
+
     buildBranch = sourceVersion.branch()
     assert(not buildBranch.timeStamps() or max(buildBranch.timeStamps()) != 0)
 
@@ -828,47 +840,47 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # this keeps cook and emerge branchs from showing up
         searchBranch = searchBranch.parentBranch()
 
-    versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
-    versionDict = repos.getTroveLeavesByBranch(versionDict)
-
-    if not versionDict and searchBranch.hasParentBranch():
-        # there was no match on this branch; look uphill
-        searchBranch = searchBranch.parentBranch()
+    if repos:
         versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
         versionDict = repos.getTroveLeavesByBranch(versionDict)
+        if not versionDict and searchBranch.hasParentBranch():
+            # there was no match on this branch; look uphill
+            searchBranch = searchBranch.parentBranch()
+            versionDict = dict((x, { searchBranch : None } ) for x in grpMap )
+            versionDict = repos.getTroveLeavesByBranch(versionDict)
 
-    log.debug('looking up pathids from repository history')
-    # look up the pathids for every file that has been built by
-    # this source component, following our brach ancestry
-    while True:
-        d = repos.getPackageBranchPathIds(sourceName, searchBranch)
-        ident.merge(d)
+        log.debug('looking up pathids from repository history')
+        # look up the pathids for every file that has been built by
+        # this source component, following our brach ancestry
+        while True:
+            d = repos.getPackageBranchPathIds(sourceName, searchBranch)
+            ident.merge(d)
 
-        if not searchBranch.hasParentBranch():
-            break
-        searchBranch = searchBranch.parentBranch()
+            if not searchBranch.hasParentBranch():
+                break
+            searchBranch = searchBranch.parentBranch()
 
-    # older versions (protocol version 32 and earlier) did not return
-    # version/fileid information from getPackageBranchPathIds().  If
-    # any entry is missing that information, fall back to the older
-    # method using ident.populate() on a trove list
-    missingInfo = False
-    for pathid, version, fileid in ident.map.values():
-        if version is None or fileid is None:
-            missingInfo = True
-            break
+        # older versions (protocol version 32 and earlier) did not return
+        # version/fileid information from getPackageBranchPathIds().  If
+        # any entry is missing that information, fall back to the older
+        # method using ident.populate() on a trove list
+        missingInfo = False
+        for pathid, version, fileid in ident.map.values():
+            if version is None or fileid is None:
+                missingInfo = True
+                break
 
-    if missingInfo:
-        # we're missing version or fileid, try to find them
-        log.debug('version/fileId information missing from pathId '
-                  'lookups, probably using an old server.  Falling '
-                  'back to old method')
-        troveList = []
-        for main in versionDict:
-            for (ver, flavors) in versionDict[main].iteritems():
-                troveList += [ (main, ver, x) for x in flavors ]
+        if missingInfo:
+            # we're missing version or fileid, try to find them
+            log.debug('version/fileId information missing from pathId '
+                      'lookups, probably using an old server.  Falling '
+                      'back to old method')
+            troveList = []
+            for main in versionDict:
+                for (ver, flavors) in versionDict[main].iteritems():
+                    troveList += [ (main, ver, x) for x in flavors ]
 
-        ident.populate(repos, troveList)
+            ident.populate(repos, troveList)
     log.debug('pathId lookup complete')
 
     built = []
@@ -945,8 +957,12 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
-    versionDict = repos.getTroveLeavesByLabel(
-                                { srcName : { buildLabel : None } })
+    if repos:
+        versionDict = repos.getTroveLeavesByLabel(
+                                    { srcName : { buildLabel : None } })
+    else:
+        versionDict = {}
+
     versionList = versionDict.get(srcName, {}).keys()
     if versionList:
         relVersionList  = [ x for x in versionList \
@@ -1008,7 +1024,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param macros: set of macros for the build
     @type macros: dict
     """
-
     buildList = []
     changeSetFile = None
     targetLabel = None
@@ -1046,9 +1061,16 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
 	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
-        sourceVersion = guessSourceVersion(repos, recipeClass.name, 
-                                           recipeClass.version,
-                                           cfg.buildLabel)
+
+        try:
+            sourceVersion = guessSourceVersion(repos, recipeClass.name, 
+                                               recipeClass.version,
+                                               cfg.buildLabel)
+        except errors.OpenError:
+            # pass this error here, we'll warn about the unopenable repository
+            # later.
+            sourceVersion = None
+
         if not sourceVersion:
             # just make up a sourceCount -- there's no version in 
             # the repository to compare against

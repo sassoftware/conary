@@ -21,6 +21,8 @@ Changes in 0.70.3:
       to the destdir.
     * The ManualConfigure action now sets the standard Configure
       environment.
+    * cvc will allow you to cook a trove locally even when you are unable 
+      to access the trove's source repository
 
 Changes in 0.70.2:
   o Client Changes (conary)
