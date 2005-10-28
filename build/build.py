@@ -16,6 +16,12 @@ Module used by recipes to direct the build and installation of
 software packages.  Classes from this module are not used directly;
 instead, they are used through eponymous interfaces in recipe.
 
+Most of the paths that these classes use have a special property;
+if they are relative paths, they are interpreted relative to the
+main build directory (the C{%(builddir)s}); if they are absolute paths,
+they are interpreted relative to the destination root directory
+(the C{%(destdir)s}).
+
 The class descriptions contain usage examples for quick reference.
 
 @var _permmap: A mapping of common integer file modes to their octal
@@ -284,6 +290,9 @@ class ManualConfigure(Configure):
     """
     template = ('cd %%(actionDir)s; '
                 '%%(mkObjdir)s '
+                'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
+                ' CPPFLAGS="%%(cppflags)s"'
+                ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class Make(BuildCommand):
@@ -424,7 +433,10 @@ class MakePathsInstall(Make):
 class CompilePython(BuildCommand):
     """
     Builds compiled and optimized compiled python files:
-    C{r.CompilePython(I{/dir1}, I{/dir2})}
+    C{r.CompilePython('I{/dir1}', 'I{/dir2})}'.  The paths provided
+    must be absolute paths that are interpred relative to
+    C{%(destdir)s} in order for the paths compiled into the
+    python byte code files to be correct.
     """
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
@@ -439,6 +451,7 @@ class CompilePython(BuildCommand):
 	destlen = len(destdir)
 	for arg in self.arglist:
 	    # arg will always have a leading /, so no os.sep needed
+            assert(arg[0] == '/')
 	    for directory in util.braceGlob(destdir+arg %macros):
 		macros['dir'] = directory[destlen:]
 		util.execute(self.command %macros)
@@ -446,7 +459,7 @@ class CompilePython(BuildCommand):
 
 class Ldconfig(BuildCommand):
     """
-    Runs C{ldconfig}: C{r.Ldconfig(I{/dir1})}
+    Runs C{ldconfig} in a directory: C{r.Ldconfig('I{/dir1}')}
 
     Used mainly when a package does not set up all the appropriate
     symlinks for a library.  Conary packages should include all the
@@ -536,9 +549,11 @@ class Desktopfile(BuildCommand, _FileAction):
     """
     Properly installs desktop files in C{/usr/share/applications/},
     including setting category (and vendor, if necessary), if the
-    target has enabled building desktop files: C{r.Desktopfile(I{filename})}
+    target has enabled building desktop files: C{r.Desktopfile('I{filename}')}
 
     It also enforces proper build requirements for desktop files.
+    The C{I{filename}} argument is interpreted only relative to
+    C{%(builddir)s}, never relative to C{%(destdir)s}.
     """
     template = ('cd %%(builddir)s; '
 		'desktop-file-validate %(args)s ; '
@@ -556,7 +571,8 @@ class Desktopfile(BuildCommand, _FileAction):
 	if 'desktop-file-utils:runtime' not in self.recipe.buildRequires:
 	    # Unfortunately, we really cannot do this automagically
             self.recipe.reportErrors(
-                "Must add 'desktop-file-utils:runtime' to buildRequires")
+                "Must add 'desktop-file-utils:runtime' to buildRequires"
+                " for file(s) %s", ', '.join(self.arglist))
 	macros = self.recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category
@@ -674,8 +690,12 @@ class _PutFiles(_FileAction):
 
 class Install(_PutFiles):
     """
-    Installs files from C{%(builddir)s} to C{%(destdir)s}:
-    C{r.Install(I{srcfile}, I{destfile})}
+    Copies a file from one location to another; it is exactly like the
+    C{r.Copy()} function except that it fixes up the mode:
+    C{r.Install(I{srcfile}, I{destfile})}.
+    Most of the time, it is used to install files from the C{%(builddir)s}
+    to the C{%(destdir)s}; C{I{srcfile}} is normally a relative path,
+    and C{I{destfile}} is normally an absolute path.
 
     Note that a trailing C{/} on destfile means to create the directory
     if necessary.  Source files with no execute permission will default
@@ -692,12 +712,13 @@ class Install(_PutFiles):
 
 class Copy(_PutFiles):
     """
-    Copies files within C{%(destdir)s}:
+    Copies files without changing the mode:
     C{r.Copy(I{srcfile}, I{destfile})}
 
     Note that a trailing C{/} on destfile means to create the directory
-    if necessary.  The mode of C{I{srcfile}} used for C{I{destfile}}
-    unless you set C{mode=0I{octalmode}}.
+    if necessary, and use the basename of C{I{srcname}} for the name of
+    the file created in the destination directory.  The mode of
+    C{I{srcfile}} used for C{I{destfile}} unless you set C{mode=0I{octalmode}}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -706,12 +727,13 @@ class Copy(_PutFiles):
 
 class Move(_PutFiles):
     """
-    Moves files within C{%(destdir)s}:
+    Moves files:
     C{r.Move(I{srcname}, I{destname})}
 
     Note that a trailing C{/} on destfile means to create the directory
-    if necessary.  The mode is preserved, unless you explicitly set the
-    new mode with C{mode=0I{octalmode}}.
+    if necessary, and use the basename of C{I{srcname}} for the name of
+    the file created in the destination directory.  The mode is preserved,
+    unless you explicitly set the new mode with C{mode=0I{octalmode}}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -816,10 +838,10 @@ class Link(_FileAction):
     """
     Install a hard link (discouraged): C{r.Link(I{newname(s)}, I{existingname})}
     
-    Much more limited than a symlink, hard links are only permitted
-    within the same directory, you cannot create a hard link into another
+    Much more limited than a symlink, as hard links are permitted only
+    within the same directory.  You cannot create a hard link into another
     directory.  Use symlinks in preference to hard links unless it is
-    ABSOLUTELY necessary to use a hard link!
+    B{absolutely} necessary to use a hard link!
     """
     def do(self, macros):
 	d = macros['destdir']
@@ -855,7 +877,9 @@ class Link(_FileAction):
 
 class Remove(BuildAction):
     """
-    Removes files from within the C{%(destdir)s}: C{r.Remove(I{filename(s)})}
+    Removes files: C{r.Remove('I{filename}'I{[, ...]})} or
+    C{r.Remove('I{dirname}'I{[, ...]}, recursive=True)}
+
     """
     keywords = { 'recursive': False }
 
@@ -1037,7 +1061,7 @@ class Doc(_FileAction):
 
 class Create(_FileAction):
     """
-    Creates a file in C{%(destdir)s}: C{r.Create(I{emptyfile})}
+    Creates a file: C{r.Create(I{emptyfile})}
     
     Without C{contents} specified it is rather like C{touch foo};
     with C{contents} specified it is more like C{cat > foo <<EOF ... EOF}.
@@ -1078,7 +1102,7 @@ class Create(_FileAction):
 
 class MakeDirs(_FileAction):
     """
-    Creates directories in C{%(destdir)s}: C{r.MakeDirs(I{dir(s)})}
+    Creates directories: C{r.MakeDirs(I{dir(s)})}
 
     Set C{component} only if the package should be responsible for
     the directory.
@@ -1535,16 +1559,14 @@ class XInetdService(_FileAction):
 
 
 class XMLCatalogEntry(BuildCommand):
-    """ Adds an entry to the XML catalog file specified in the 
-        action. If the catalog directory(defaults to /etc/xml) is 
-        nonexistant, it is created.  If the catalog is nonexistant,
-        it is created.
+    """
+    Adds an entry to the XML catalog file C{I{catalogFile}}:
+    C{r.AddXMLCatalogEntry(I{catalogFile}, I{type}, I{orig}, I{replace})}
+    If the catalog directory(defaults to /etc/xml) is 
+    nonexistant, it is created.  If the catalog does not exist,
+    it is created.
 
-        C{r.AddXMLCatalogEntry(I{catalogFile}, I{type}, I{orig}, 
-                               I{replace})}
-
-        @keyword catalogDir: the directory where the catalog file 
-                            is located.
+    @keyword catalogDir: the directory where the catalog file is located.
     """
     
     template = (
@@ -1591,15 +1613,14 @@ class XMLCatalogEntry(BuildCommand):
         
 
 class SGMLCatalogEntry(BuildCommand):
-    """ Adds an entry to the SGML catalog file specified in the 
-        action. If the catalog directory(defaults to /etc/sgml) is 
-        nonexistant, it is created.  If the catalog is nonexistant,
-        it is created.
+    """
+    Adds an entry to the SGML catalog file C{I{catalogFile}}:
+    C{r.AddSGMLCatalogEntry(I{catalogFile}, I{catalogReference})}
+    If the catalog directory(defaults to /etc/sgml) is 
+    nonexistant, it is created.  If the catalog does not exist,
+    it is created.
 
-        C{r.AddSGMLCatalogEntry(I{catalogFile}, I{catalogReference})}
-
-        @keyword catalogDir: the directory where the catalog file 
-                            is located.
+    @keyword catalogDir: the directory where the catalog file is located.
     """
 
     template = (
