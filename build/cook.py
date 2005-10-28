@@ -860,27 +860,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                 break
             searchBranch = searchBranch.parentBranch()
 
-        # older versions (protocol version 32 and earlier) did not return
-        # version/fileid information from getPackageBranchPathIds().  If
-        # any entry is missing that information, fall back to the older
-        # method using ident.populate() on a trove list
-        missingInfo = False
-        for pathid, version, fileid in ident.map.values():
-            if version is None or fileid is None:
-                missingInfo = True
-                break
-
-        if missingInfo:
-            # we're missing version or fileid, try to find them
-            log.debug('version/fileId information missing from pathId '
-                      'lookups, probably using an old server.  Falling '
-                      'back to old method')
-            troveList = []
-            for main in versionDict:
-                for (ver, flavors) in versionDict[main].iteritems():
-                    troveList += [ (main, ver, x) for x in flavors ]
-
-            ident.populate(repos, troveList)
     log.debug('pathId lookup complete')
 
     built = []
