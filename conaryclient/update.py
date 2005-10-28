@@ -555,7 +555,7 @@ class ClientUpdate:
                         # it's not obvious what to do with this case, leave
                         # it as an error until we see whether it occurs irl
                         raise RuntimeError, ('Multiple relative updates '
-                                             ' in same trove: ' % l)
+                                             ' in same trove: %s' % l)
                     toRemove.extend(empty)
 
             jobSet.difference_update(toRemove)

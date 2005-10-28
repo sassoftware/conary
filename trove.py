@@ -836,7 +836,7 @@ class Trove(streams.StreamSet):
 
         for name, oldInfo, newInfo, byDefault in secondaryJob:
             if byDefault:
-                unusedBranchJobs.discard((job[0], job[2][0], job[2][1]))
+                unusedBranchJobs.discard((name, newInfo[0], newInfo[1]))
 
         return unusedBranchJobs
 
