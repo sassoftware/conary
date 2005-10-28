@@ -597,6 +597,15 @@ class VersionSequence(AbstractVersion):
 
 	return self.hash
 
+    def iterElements(self):
+        if isinstance(item, AbstractLabel):
+            yield item
+
+    def iterLabels(self):
+        for item in self.versions:
+            if isinstance(item, AbstractLabel):
+                yield item
+
     def closeness(self, other):
         """
         Measures the "closeness" (the inverse of the distance) between two
@@ -607,12 +616,11 @@ class VersionSequence(AbstractVersion):
         def _buildSet(seq):
             s = set()
             last = None
-            for item in seq:
-                if isinstance(item, AbstractLabel):
-                    s.add(item)
-                    if last is not None:
-                        s.add((last, item))
-                    last = item
+            for label in seq.iterLabels():
+                s.add(label)
+                if last is not None:
+                    s.add((last, label))
+                last = label
 
             return s
 
@@ -620,8 +628,8 @@ class VersionSequence(AbstractVersion):
         # sets consist of each label, and the transition from label to
         # label (which labels occur next to each other, modulo version
         # numbers). 
-        ourSet = _buildSet(self.versions)
-        otherSet = _buildSet(other.versions)
+        ourSet = _buildSet(self)
+        otherSet = _buildSet(other)
 
         common = ourSet & otherSet
         return (len(common) / (len(ourSet) + len(otherSet) - 
