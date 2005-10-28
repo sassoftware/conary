@@ -600,10 +600,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         elif branch:
             # if no labelPath was specified, search backwards through the 
             # labels on the current branch.
-            labelPath = [branch.label()]
-            while branch.hasParentBranch():
-                branch = branch.parentBranch()
-                labelPath.append(branch.label())
+            labelPath = list(versions.iterLabels())
+            labelPath.reverse()
         else:
             labelPath = None
         if findInstalled and not alwaysIgnoreInstalled:
