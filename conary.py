@@ -219,9 +219,9 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
-    context = argSet.pop('context', None)
-    if 'CONARY_CONTEXT' in os.environ:
-        context = os.environ['CONARY_CONTEXT']
+    context = os.environ.get('CONARY_CONTEXT', None)
+    context = argSet.pop('context', context)
+
     if context:
         cfg.setContext(context)
 

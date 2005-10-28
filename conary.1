@@ -551,9 +551,10 @@ not specified, the values defined in the main configuration section are used.
 .TP 4
 .B Specifying the context
 The context to be used by conary can be specified in two ways:  first, through
-the config option \fB--context\fR \fI<context>\fR, which is accepted by all
-of conary, and secondly, through the environment variable CONARY_CONTEXT, 
-which, if set, will override \fB--context\fR.
+the environment variable CONARY_CONTEXT, and second, through the command line 
+option \fB--context\fR \fI<context>\fR, which is accepted for all conary 
+commands.  If both the environment variable and the command line option are 
+provided, the command line option is used.
 
 .TP
 .B Viewing available contexts
