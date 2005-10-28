@@ -535,7 +535,32 @@ Can be overridden by the \fB\-\-use-macro \fI"<macro> <value>"\fR command-line o
 .B includeConfigFile
 Immediately reads the listed configuration file.  The file name may include
 shell globs, in which case all files matching the glob will be read in.
-.RE
+.SH
+.PD 0
+.TP
+.B Configuration Contexts
+A Configuration context is a section of a config file delimited by a section
+name in square brackets, like \fI[foo]\fR.  Options that can be specified after
+the brackets are limited to \fBbuildFlavor, buildLabel, flavor,
+installLabelPath, contact, name, excludeTroves, repositoryMap, signatureKey,
+and signatureKeyMap\fR.  When a context is selected, the configuration values
+specified in the context override the default values.   If any values are 
+not specified, the values defined in the main configuration section are used.
+
+.RS 4
+.TP 4
+.B Specifying the context
+The context to be used by conary can be specified in two ways:  first, through
+the config option \fB--context\fR \fI<context>\fR, which is accepted by all
+of conary, and secondly, through the environment variable CONARY_CONTEXT, 
+which, if set, will override \fB--context\fR.
+
+.TP
+.B Viewing available contexts
+Contexts are visible using \fBconary config --show-contexts\fR
+
+.SH
+.PD 0
 .TP 4
 .I /etc/conary
 Contains all local configuration for Conary except for the conaryrc file.
