@@ -465,7 +465,7 @@ def realMain(cfg, argv=sys.argv):
                                         deps=showDeps)
     elif otherArgs[1] == "update-conary":
         cfg.requireInstallLabelPath()
-        updatecmd.updateConary(cfg)
+        updatecmd.updateConary(cfg, constants.version)
     elif otherArgs[1] in ["update", "erase"]:
         cfg.requireInstallLabelPath()
 	kwargs = {}

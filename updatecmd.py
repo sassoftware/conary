@@ -361,7 +361,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
-def updateConary(cfg):
+def updateConary(cfg, conaryVersion):
     def _urlNotFound(url, msg = None):
         print >> sys.stderr, "While attempting to download from", url.url
         print >> sys.stderr, "ERROR: Could not download the conary changeset."
@@ -372,6 +372,12 @@ def updateConary(cfg):
     # first, grab the label of the installed conary client
     db = database.Database(cfg.root, cfg.dbPath)    
     troves = db.trovesByName("conary")
+
+    # filter based on the version of conary this is (after all, we should
+    # try to update ourself; not something else)
+    troves = [ x for x in troves if 
+                   x[1].trailingRevision().getVersion() == conaryVersion ]
+
     # FIXME: what should we do if this comes back as having more than
     # one version of conary installed?
     assert(len(troves)==1)
