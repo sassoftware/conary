@@ -26,6 +26,14 @@ Changes in 0.70.3:
   * Common Changes:
     * Version closeness was improperly measured for troves on different
       branches when then label structure was identical
+  o Repository Changes
+    * Repository now has a config flag called requireSigs. Setting it to
+      True will force all troves to have valid package signatures.  Troves
+      lacking this will be rejected.  Enabling this option prevents the
+      generation of branches, shadows, or clones since these troves are not
+      signed.  It is not recommended that this option be enabled until the
+      infrastructure is in place to provide package signatures for all types
+      of troves.
 
 Changes in 0.70.2:
   o Client Changes (conary)
