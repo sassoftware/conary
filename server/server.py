@@ -46,7 +46,7 @@ from repository import errors
 from repository.netrepos.netserver import NetworkRepositoryServer
 from repository.filecontainer import FileContainer
 from conarycfg import ConfigFile
-from conarycfg import STRINGDICT
+from conarycfg import STRINGDICT, BOOLEAN
 from lib import options
 from lib import util
 
@@ -289,6 +289,7 @@ class ServerConfig(ConfigFile):
 	'port'			:   '8000',
 	'repositoryMap'         : [ STRINGDICT, {} ],
 	'tmpFilePath'           : DEFAULT_FILE_PATH,
+        'requireSigs'           : [ BOOLEAN, False ]
     }
 
     def __init__(self, path="serverrc"):
@@ -339,6 +340,7 @@ if __name__ == '__main__':
 	'map'	        : 'repositoryMap',
 	'port'	        : 'port',
 	'tmp-file-path' : 'tmpFilePath',
+        'require-sigs'  : 'requireSigs'
     }
 
     cfg = ServerConfig()
@@ -387,7 +389,7 @@ if __name__ == '__main__':
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], cfg.repositoryMap,
-                        logFile = cfg.logFile)
+                        logFile = cfg.logFile, requireSigs = cfg.requireSigs)
 
     port = int(cfg.port)
     httpServer = HTTPServer(("", port), HttpRequests)

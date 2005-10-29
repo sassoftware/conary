@@ -42,6 +42,7 @@ class ServerConfig(conarycfg.ConfigFile):
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
         'staticPath'        :  "/conary-static",
         'closed'            :  None,
+        'requireSigs'       :  [ conarycfg.BOOLEAN, False ],
     }
 
 def checkAuth(req, repos):
@@ -241,7 +242,8 @@ def handler(req):
                                     cfg.repositoryMap,
                                     commitAction = cfg.commitAction,
                                     cacheChangeSets = cfg.cacheChangeSets,
-                                    logFile = cfg.logFile)
+                                    logFile = cfg.logFile,
+                                    requireSigs = cfg.requireSigs)
 
             repositories[repName].forceSecure = cfg.forceSSL
             repositories[repName].cfg = cfg

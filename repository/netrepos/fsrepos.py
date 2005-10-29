@@ -30,6 +30,7 @@ import sqlite3
 import sys
 import trovestore
 import versions
+from lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -97,11 +98,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
         self.troveStore.begin()
+        if self.requireSigs:
+            threshold = TRUST_FULL
+        else:
+            threshold = TRUST_UNTRUSTED
         try:
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True,
-                         keyCache = self.troveStore.keyTable.keyCache)
+                         keyCache = self.troveStore.keyTable.keyCache, threshold = threshold)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -355,7 +360,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, path, repositoryMap, logFile = None):
+    def __init__(self, name, troveStore, path, repositoryMap, logFile = None, requireSigs = False):
 	self.top = path
 	self.name = name
 	map = dict(repositoryMap)
@@ -366,8 +371,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	self.sqlDbPath = self.top + "/sqldb"
 
-	fullPath = path + "/contents"
-	util.mkdirChain(fullPath)
+        fullPath = path + "/contents"
+        self.requireSigs = requireSigs
+        util.mkdirChain(fullPath)
         store = DataStore(fullPath, logFile = logFile)
 
 	DataStoreRepository.__init__(self, path, logFile = logFile,

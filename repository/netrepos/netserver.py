@@ -1302,11 +1302,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         trv.addPrecomputedDigitalSignature(sig)
 
         # verify the new signature is actually good
-        # FIXME: if we want to lock down the server to REQUIRE digital
-        # signatures swap out lines below.
-        # blindly doing this will result in massive test suite failure.
-        # consider setting up a config entry to turn this on
-        #trv.verifyDigitalSignatures(TRUST_FULL, keyCache)
         trv.verifyDigitalSignatures(keyCache = keyCache)
 
         # start a transaction now, this ensures that queries and updates
@@ -1611,7 +1606,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.repos = fsrepos.FilesystemRepository(self.name, self.troveStore,
                                                   self.repPath, self.map,
-                                                  logFile = self.logFile)
+                                                  logFile = self.logFile,
+                                                  requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name)
 
     def reopen(self):
@@ -1644,7 +1640,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def __init__(self, path, tmpPath, basicUrl, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False,
-                 logFile = None):
+                 logFile = None, requireSigs = False):
 	self.map = repositoryMap
 	self.repPath = path
 	self.tmpPath = tmpPath
@@ -1654,6 +1650,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.sqlDbPath = self.repPath + '/sqldb'
         self.troveStore = None
         self.logFile = logFile
+        self.requireSigs = requireSigs
 
         logMe(1, path, basicUrl, name)
 	try:
