@@ -128,35 +128,6 @@ class _IdGen:
         idDict.update(self.map)
         self.map = idDict
 
-    def populate(self, repos, troveList):
-	# Find the files and ids which were owned by the last version of
-	# this package on the branch. Only used when talking to servers
-        # older than protocol 33
-        if not troveList:
-            return
-        csList = []
-	for (name, version, flavor) in troveList:
-	    csList.append((name, (None, None), (version, flavor), True))
-            
-        cs = repos.createChangeSet(csList, withFiles=True,
-                                   withFileContents=False)
-	l = []
-        for (name, version, flavor) in troveList:
-            try:
-                troveCs = cs.getNewTroveVersion(name, version, flavor)
-            except KeyError:
-                l.append(None)
-                continue
-            t = trove.Trove(troveCs.getName(), troveCs.getOldVersion(),
-                            troveCs.getNewFlavor(), troveCs.getChangeLog())
-            t.applyChangeSet(troveCs)
-            l.append(t)
-            # recurse over troves contained in the current trove
-            troveList += [ x for x in t.iterTroveList() ]
-            
-        for t in l:
-            self._processTrove(t, cs)
-
 # -------------------- public below this line -------------------------
 
 class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
