@@ -894,10 +894,10 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     srcName = name + ':source'
     sourceVerison = None
     if os.path.exists('CONARY'):
-        # XXX checkin imports cook functions as well, perhaps move
+        # FIXME checkin imports cook functions as well, perhaps move
         # SourceState or some functions here to a third file?
         import checkin
-        state = checkin.SourceStateFromFile('CONARY')
+        state = checkin.ConaryStateFromFile('CONARY').getSourceState()
         if state.getName() == srcName and \
                         state.getVersion() != versions.NewVersion():
             if state.getVersion().trailingRevision().version != versionStr:

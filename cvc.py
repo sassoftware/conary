@@ -68,6 +68,7 @@ def usage(rc = 1):
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
+    print "       cvc context <name> [--ask]"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
     print '       cvc sign [--signature-key "<fingerprint>"]'
     print '                [--quiet] <trove>[=version][[flavor]]'
@@ -118,6 +119,7 @@ def realMain(cfg, argv=sys.argv):
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
+    argDef["ask"] = NO_PARAM
     argDef["binary-only"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
@@ -158,8 +160,15 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
-    context = os.environ.get('CONARY_CONTEXT', None)
+    context = cfg.context
+    if os.path.exists('CONARY'):
+        state = checkin.ConaryStateFromFile('CONARY')
+        if state.hasContext():
+            context = state.getContext()
+
+    context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
+
 
     if context:
         cfg.setContext(context)
@@ -294,11 +303,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             del argSet['quiet']
         signtrove.signTroves(cfg, args[1:])
     elif (args[0] == "newpkg"):
-	if argSet.has_key("dir"):
-	    dir = argSet['dir']
-	    del argSet['dir']
-	else:
-	    dir = None
+        dir = argSet.pop('dir', None)
 
 	if len(args) != 2 or argSet: return usage()
 	
@@ -308,6 +313,20 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	    repos = None
 
 	checkin.newTrove(repos, cfg, args[1], dir = dir)
+    elif (args[0] == "context"):
+        if len(args) > 2:
+            return usage()
+
+        ask = argSet.pop('ask', False)
+        if len(args) > 1:
+            name = args[1]
+        else:
+            name = None
+
+        if not name and not ask:
+            return usage()
+
+	checkin.setContext(cfg, name, ask=ask)
     elif (args[0] == "merge"):
 	if argSet or not args or len(args) > 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
@@ -386,7 +405,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         log.setVerbosity(log.INFO)
         
         xmlSource = args[1]
-        state = checkin.SourceStateFromFile("CONARY")
+        state = checkin.ConaryStateFromFile("CONARY").getSourceState()
         troveName = state.getName()
         troveBranch = state.getVersion().branch()
        

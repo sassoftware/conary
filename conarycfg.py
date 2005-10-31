@@ -332,6 +332,7 @@ class SectionedConfig(ConfigFile):
         if sectionName not in self.sections:
             self.sections[sectionName] = self.sectionType(self)
         self.sectionName = sectionName
+        return self.sections[sectionName]
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
@@ -395,6 +396,7 @@ class ConaryConfiguration(SectionedConfig):
         'buildFlavor'           : [ FLAVOR, deps.deps.DependencySet() ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
 	'buildPath'		: '/var/tmp/conary-builds',
+	'context'		: None,
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
@@ -504,6 +506,7 @@ class ConaryConfiguration(SectionedConfig):
         """
         if name not in self.sections:
             return False
+        self.context = name
         context = self.sections[name]
 
         for key in context.defaults:
@@ -514,6 +517,9 @@ class ConaryConfiguration(SectionedConfig):
                 else:
                     self.__dict__[key] = value
         return True
+
+    def getContext(self, name):
+        return self.sections.get(name, None)
 
     def initializeFlavors(self):
         import flavorcfg

@@ -50,6 +50,47 @@ class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
 # makePathId() returns 16 random bytes, for use as a pathId
 makePathId = lambda: os.urandom(16)
 
+class ConaryState:
+
+    def __init__(self, context=None, source=None):
+        self.context = context
+        self.source = source
+
+    def write(self, filename):
+	f = open(filename, "w")
+        self._write(f)
+        if self.hasSourceState():
+            self.source._write(f)
+            
+    def _write(self, f):
+        if self.getContext():
+            f.write("context %s\n" % self.getContext())
+
+    def hasContext(self):
+        return bool(self.context )
+
+    def getContext(self):
+        return self.context 
+
+    def setContext(self, name):
+        self.context = name
+
+    def getSourceState(self):
+        return self.source
+
+    def setSourceState(self, sourceState):
+        self.source = sourceState
+
+    def hasSourceState(self):
+        return bool(self.source)
+
+    def copy(self):
+        if self.hasSourceState():
+            sourceState = self.getSourceState().copy()
+        else:
+            sourceState = None
+        return ConaryState(self.context, sourceState)
+        
 class SourceState(trove.Trove):
 
     __slots__ = [ "branch", "pathMap", "lastMerged" ]
@@ -65,8 +106,8 @@ class SourceState(trove.Trove):
 
 	return False
 
-    def write(self, filename):
-	"""
+    def _write(self, f):
+        """
 	Returns a string representing file information for this trove
 	trove, which can later be read by the read() method. This is
 	only used to create the Conary control file when dealing with
@@ -83,22 +124,22 @@ class SourceState(trove.Trove):
 	"""
         assert(len(self.troves) == 0)
 
-	f = open(filename, "w")
-	f.write("name %s\n" % self.getName())
+        f.write("name %s\n" % self.getName())
         f.write("version %s\n" % self.getVersion().freeze())
         f.write("branch %s\n" % self.getBranch().freeze())
         if self.getLastMerged() is not None:
             f.write("lastmerged %s\n" % self.getLastMerged().freeze())
 
         rc = []
-	rc.append("%d\n" % (len(self.idMap)))
+        rc.append("%d\n" % (len(self.idMap)))
 
         rc += [ "%s %s %s %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
                                 sha1helper.sha1ToString(x[1][1]),
-				x[1][2].asString())
+                                x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
 	f.write("".join(rc))
+
 
     def changeBranch(self, branch):
 	self.branch = branch
@@ -144,6 +185,7 @@ class SourceState(trove.Trove):
                  lastmerged = None, isRedirect = False):
         assert(not isRedirect)
         assert(not changeLog)
+
 	trove.Trove.__init__(self, name, version, 
                              deps.deps.DependencySet(), None)
         self.branch = branch
@@ -158,7 +200,32 @@ class CONARYFileMissing(Exception):
     def __str__(self):
         return 'CONARY state file does not exist.'
 
-class SourceStateFromFile(SourceState):
+class ConaryStateFromFile(ConaryState):
+
+    def parseFile(self, filename):
+	f = open(filename)
+        lines = f.readlines()
+
+	fields = lines[0][:-1].split()
+        if fields[0] == 'context':
+            self.context = fields[1]
+            lines = lines[1:]
+        else:
+            self.context = None
+
+        if lines:
+            self.source = SourceStateFromLines(lines)
+        else:
+            self.source = None
+
+    def __init__(self, file):
+	if not os.path.isfile(file):
+	    raise CONARYFileMissing
+
+	self.parseFile(file)
+        
+
+class SourceStateFromLines(SourceState):
 
     # name : (isVersion, required)
     fields = { 'name'       : (False, True ),
@@ -181,9 +248,7 @@ class SourceStateFromFile(SourceState):
 	    version = versions.VersionFromString(version)
 	    self.addFile(pathId, path, version, fileId)
 
-    def parseFile(self, filename):
-	f = open(filename)
-        lines = f.readlines()
+    def parseLines(self, lines):
         kwargs = {}
 
         while lines:
@@ -210,11 +275,8 @@ class SourceStateFromFile(SourceState):
 
 	self.readFileList(lines)
 
-    def __init__(self, file):
-	if not os.path.isfile(file):
-	    raise CONARYFileMissing
-
-	self.parseFile(file)
+    def __init__(self, lines):
+        self.parseLines(lines)
 
     def copy(self):
         return SourceState.copy(self, classOverride = SourceState)
@@ -312,7 +374,9 @@ def checkout(repos, cfg, workDir, name, callback=None):
 	    return
 
     branch = fullLabel(cfg.buildLabel, trvInfo[1], versionStr)
-    state =SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
+    sourceState = SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
+    conaryState = ConaryState(cfg.context, sourceState)
+
 
     cs = repos.createChangeSet([(trvInfo[0],
                                 (None, None), 
@@ -331,7 +395,7 @@ def checkout(repos, cfg, workDir, name, callback=None):
     for (pathId, path, fileId, version) in troveCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
-	state.addFile(pathId, path, version, fileId)
+	sourceState.addFile(pathId, path, version, fileId)
 
 	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
         if fileObj.flags.isAutoSource():
@@ -355,7 +419,7 @@ def checkout(repos, cfg, workDir, name, callback=None):
 	contents = cs.getFileContents(pathId)[1]
 	fileObj.restore(*((contents,) + tup))
 
-    state.write(workDir + "/CONARY")
+    conaryState.write(workDir + "/CONARY")
 
 def commit(repos, cfg, message, callback=None):
     if not callback:
@@ -365,7 +429,8 @@ def commit(repos, cfg, message, callback=None):
 	log.error("name and contact information must be set for commits")
 	return
 
-    state = SourceStateFromFile("CONARY")
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
 
     troveName = state.getName()
 
@@ -574,11 +639,12 @@ def commit(repos, cfg, message, callback=None):
     newState.changeVersion(ver)
 
     newState.setLastMerged(None)
-    newState.write("CONARY")
+    conaryState.setSourceState(newState)
+    conaryState.write("CONARY")
     #FIXME: SIGN HERE
 
 def annotate(repos, filename):
-    state = SourceStateFromFile("CONARY")
+    state = ConaryStateFromFile("CONARY").getSourceState()
     curVersion = state.getVersion()
     branch = state.getBranch()
     troveName = state.getName()
@@ -834,7 +900,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
-    state = SourceStateFromFile("CONARY")
+    state = ConaryStateFromFile("CONARY").getSourceState()
 
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
@@ -938,7 +1004,8 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 def updateSrc(repos, versionStr = None, callback = None):
     if not callback:
         callback = CheckinCallback()
-    state = SourceStateFromFile("CONARY")
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
     pkgName = state.getName()
     baseVersion = state.getVersion()
     
@@ -995,13 +1062,15 @@ def updateSrc(repos, versionStr = None, callback = None):
     if newState.getVersion() == troveCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)
 
-    newState.write("CONARY")
+    conaryState.setSourceState(newState)
+    conaryState.write("CONARY")
 
 def merge(repos, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
-        state = SourceStateFromFile("CONARY")
+        conaryState = ConaryStateFromFile("CONARY")
+        state = conaryState.getSourceState()
     except OSError:
         return
 
@@ -1050,11 +1119,13 @@ def merge(repos, callback=None):
         newState.setLastMerged(parentHeadVersion)
         newState.changeVersion(shadowHeadVersion)
 
-    newState.write("CONARY")
+    conaryState.setSourceState(newState)
+    conaryState.write("CONARY")
 
 def addFiles(fileList, ignoreExisting=False):
     try:
-        state = SourceStateFromFile("CONARY")
+        conaryState = ConaryStateFromFile("CONARY")
+        state = conaryState.getSourceState()
     except OSError:
         return
 
@@ -1087,17 +1158,17 @@ def addFiles(fileList, ignoreExisting=False):
 
 	state.addFile(pathId, file, versions.NewVersion(), "0" * 20)
 
-    state.write("CONARY")
+    conaryState.write("CONARY")
 
 def removeFile(file):
-    state = SourceStateFromFile("CONARY")
-    if not state.removeFilePath(file):
+    conaryState = ConaryStateFromFile("CONARY")
+    if not conaryState.getSourceState().removeFilePath(file):
 	log.error("file %s is not under management" % file)
 
     if os.path.exists(file):
 	os.unlink(file)
 
-    state.write("CONARY")
+    conaryState.write("CONARY")
 
 def newTrove(repos, cfg, name, dir = None):
     parts = name.split('=', 1) 
@@ -1116,7 +1187,8 @@ def newTrove(repos, cfg, name, dir = None):
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
     branch = versions.Branch([label])
-    state = SourceState(name, versions.NewVersion(), branch)
+    sourceState = SourceState(name, versions.NewVersion(), branch)
+    conaryState = ConaryState(cfg.context, sourceState)
 
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel(
@@ -1134,10 +1206,12 @@ def newTrove(repos, cfg, name, dir = None):
 	    log.error("cannot create directory %s/%s", os.getcwd(), dir)
 	    return
 
-    state.write(dir + "/" + "CONARY")
+    conaryState.write(dir + "/" + "CONARY")
 
 def renameFile(oldName, newName):
-    state = SourceStateFromFile("CONARY")
+    conaryState = ConaryStateFromFile("CONARY")
+    sourceState = conaryState.getSourceState()
+
     if not os.path.exists(oldName):
 	log.error("%s does not exist or is not a regular file" % oldName)
 	return
@@ -1150,17 +1224,17 @@ def renameFile(oldName, newName):
 	log.error("%s already exists" % newName)
 	return
 
-    for (pathId, path, fileId, version) in state.iterFileList():
+    for (pathId, path, fileId, version) in sourceState.iterFileList():
 	if path == oldName:
 	    os.rename(oldName, newName)
-	    state.addFile(pathId, newName, version, fileId)
-	    state.write("CONARY")
+	    sourceState.addFile(pathId, newName, version, fileId)
+	    conaryState.write("CONARY")
 	    return
     
     log.error("file %s is not under management" % oldName)
 
 def showLog(repos, branch = None):
-    state = SourceStateFromFile("CONARY")
+    state = ConaryStateFromFile("CONARY").getSourceState()
     if not branch:
 	branch = state.getBranch()
     else:
@@ -1256,3 +1330,75 @@ def fullLabel(defaultLabel, version, versionStr):
     else:
 	return version.branch()
 
+def setContext(cfg, contextName=None, ask=False):
+    def _ask(txt, *args):
+        if len(args) == 0:
+            default = defaultText = None
+        elif len(args) == 1:
+            defaultText = default = args[0]
+        else:
+            defaultText, default = args[0:2]
+            
+        while True:
+            if defaultText:
+                msg = "%s [%s]: " % (txt, defaultText)
+            else:
+                msg = "%s: " % txt
+            answer = raw_input(msg)
+            if answer:
+                return answer
+            elif defaultText:
+                return default
+
+    if os.path.exists('CONARY'):
+        state = ConaryStateFromFile('CONARY')
+    else:
+        state = ConaryState()
+
+    assert(contextName or ask)
+
+    if not contextName:
+        default = cfg.context
+        contextName = _ask('Context name', default)
+
+    context = cfg.getContext(contextName)
+
+    if ask:
+        if context:
+            print 'Context %s already exists' % contextName
+        else:
+
+            print '* Creating new context %s' % contextName
+            context = cfg.setSection(contextName)
+            conaryrc = _ask('File to store context definition in', 
+                            os.environ['HOME'] + '/.conaryrc')
+
+            buildLabel = str(cfg.buildLabel)
+
+            buildLabel = _ask('Build Label', buildLabel)
+            context.configLine('buildLabel ' + buildLabel)
+
+            installLabelPath = _ask('installLabelPath', buildLabel)
+            context.configLine('installLabelPath ' + installLabelPath)
+
+            flavor = _ask('installFlavor', 'use default', None)
+            if flavor:
+                context.configLine('flavor ' + flavor)
+
+            name = _ask('contact name', 'use default (%s)' % cfg.name, None)
+            if name:
+                context.configLine('name ' + name)
+
+            contact = _ask('contact info', 'use default (%s)' % cfg.contact,
+                           None)
+
+            if contact:
+                context.configLine('contact ' + contact)
+
+            f = open(conaryrc, 'a')
+            f.write('\n\n[%s]\n' % contextName)
+            f.write('# created by cvc context\n')
+            context.display(f)
+
+    state.setContext(contextName)
+    state.write('CONARY')

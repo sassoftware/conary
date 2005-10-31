@@ -28,6 +28,7 @@ import xmlrpclib
 
 #conary
 import callbacks
+import checkin
 import commit
 import conarycfg
 import constants
@@ -219,7 +220,13 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
-    context = os.environ.get('CONARY_CONTEXT', None)
+    context = cfg.context
+    if os.path.exists('CONARY'):
+        state = checkin.ConaryStateFromFile('CONARY')
+        if state.hasContext():
+            context = state.getContext()
+
+    context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
 
     if context:
