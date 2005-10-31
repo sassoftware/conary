@@ -425,6 +425,10 @@ class Database:
             # conary is being run as a non-root user
             if str(e) != 'attempt to write a readonly database':
                 raise
+            else:
+                readOnly = True
+        else:
+            readOnly = False
 
         if not self.versionCheck():
             raise OldDatabaseSchema
@@ -437,7 +441,8 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        _doAnalyze(self.db)
+        if not readOnly:
+            _doAnalyze(self.db)
 
         if self.db.inTransaction:
             self.db.commit()
