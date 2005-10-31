@@ -55,6 +55,7 @@ def usage(rc = 1):
     print "       cvc commit [--message <message>]"
     print '                  [--signature-key "<fingerprint>"]'
     print "       cvc config"
+    print "       cvc context [<name>] [--ask]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
     print '                [--flavor  "<flavor>"] '
     print '                [--signature-key "<fingerprint>"]'
@@ -68,7 +69,6 @@ def usage(rc = 1):
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
-    print "       cvc context <name> [--ask]"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
     print '       cvc sign [--signature-key "<fingerprint>"]'
     print '                [--quiet] <trove>[=version][[flavor]]'
@@ -323,9 +323,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         else:
             name = None
 
-        if not name and not ask:
-            return usage()
-
 	checkin.setContext(cfg, name, ask=ask)
     elif (args[0] == "merge"):
 	if argSet or not args or len(args) > 1: return usage()
@@ -451,7 +448,7 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except database.OpenError, e:
         print >> sys.stderr, str(e)
-    except checkin.CONARYFileMissing, e:
+    except checkin.ConaryStateError, e:
         print >> sys.stderr, str(e)
     except openpgpfile.KeyNotFound, e:
         print >> sys.stderr, str(e)

@@ -76,6 +76,8 @@ class ConaryState:
         self.context = name
 
     def getSourceState(self):
+        if not self.source:
+            raise ConaryStateError, 'No source state defined in CONARY'
         return self.source
 
     def setSourceState(self, sourceState):
@@ -191,14 +193,6 @@ class SourceState(trove.Trove):
         self.branch = branch
         self.pathMap = {}
         self.lastMerged = lastmerged
-
-class CONARYFileMissing(Exception):
-    """
-    This exception is raised when the CONARY file specified does not
-    exist
-    """
-    def __str__(self):
-        return 'CONARY state file does not exist.'
 
 class ConaryStateFromFile(ConaryState):
 
@@ -1350,12 +1344,14 @@ def setContext(cfg, contextName=None, ask=False):
             elif defaultText:
                 return default
 
+    if not contextName and not ask:
+        cfg.displayContext()
+        return
+
     if os.path.exists('CONARY'):
         state = ConaryStateFromFile('CONARY')
     else:
         state = ConaryState()
-
-    assert(contextName or ask)
 
     if not contextName:
         default = cfg.context
@@ -1363,42 +1359,57 @@ def setContext(cfg, contextName=None, ask=False):
 
     context = cfg.getContext(contextName)
 
-    if ask:
-        if context:
-            print 'Context %s already exists' % contextName
-        else:
+    if not ask:
+        if not context:
+            log.error("context %s does not exist", contextName)
+            return
+    elif context:
+        log.error("context %s already exists", contextName)
+        return
+    else:
+        # ask and not context
+        print '* Creating new context %s' % contextName
+        context = cfg.setSection(contextName)
+        conaryrc = _ask('File to store context definition in', 
+                        os.environ['HOME'] + '/.conaryrc')
 
-            print '* Creating new context %s' % contextName
-            context = cfg.setSection(contextName)
-            conaryrc = _ask('File to store context definition in', 
-                            os.environ['HOME'] + '/.conaryrc')
+        buildLabel = str(cfg.buildLabel)
 
-            buildLabel = str(cfg.buildLabel)
+        buildLabel = _ask('Build Label', buildLabel)
+        context.configLine('buildLabel ' + buildLabel)
 
-            buildLabel = _ask('Build Label', buildLabel)
-            context.configLine('buildLabel ' + buildLabel)
+        installLabelPath = _ask('installLabelPath', buildLabel)
+        context.configLine('installLabelPath ' + installLabelPath)
 
-            installLabelPath = _ask('installLabelPath', buildLabel)
-            context.configLine('installLabelPath ' + installLabelPath)
+        flavor = _ask('installFlavor', 'use default', None)
+        if flavor:
+            context.configLine('flavor ' + flavor)
 
-            flavor = _ask('installFlavor', 'use default', None)
-            if flavor:
-                context.configLine('flavor ' + flavor)
+        name = _ask('contact name', 'use default (%s)' % cfg.name, None)
+        if name:
+            context.configLine('name ' + name)
 
-            name = _ask('contact name', 'use default (%s)' % cfg.name, None)
-            if name:
-                context.configLine('name ' + name)
+        contact = _ask('contact info', 'use default (%s)' % cfg.contact,
+                       None)
 
-            contact = _ask('contact info', 'use default (%s)' % cfg.contact,
-                           None)
+        if contact:
+            context.configLine('contact ' + contact)
 
-            if contact:
-                context.configLine('contact ' + contact)
-
-            f = open(conaryrc, 'a')
-            f.write('\n\n[%s]\n' % contextName)
-            f.write('# created by cvc context\n')
-            context.display(f)
+        f = open(conaryrc, 'a')
+        f.write('\n\n[%s]\n' % contextName)
+        f.write('# created by cvc context\n')
+        context.display(f)
 
     state.setContext(contextName)
     state.write('CONARY')
+
+class ConaryStateError(Exception):
+    pass
+
+class CONARYFileMissing(ConaryStateError):
+    """
+    This exception is raised when the CONARY file specified does not
+    exist
+    """
+    def __str__(self):
+        return 'CONARY state file does not exist.'

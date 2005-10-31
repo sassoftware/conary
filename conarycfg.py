@@ -521,6 +521,21 @@ class ConaryConfiguration(SectionedConfig):
     def getContext(self, name):
         return self.sections.get(name, None)
 
+    def displayContext(self, out=None):
+        if out is None:
+            out = sys.stdout
+	keys = ConaryContext.defaults.keys()
+	keys.sort()
+        out.write('[%s]\n' % self.context)
+
+	for item in keys:
+	    if (type(ConaryContext.defaults[item]) == list):
+		t = ConaryContext.defaults[item][0]
+	    else:
+		t = STRING
+            self.displayKey(item, self[item], t, out)
+
+
     def initializeFlavors(self):
         import flavorcfg
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
