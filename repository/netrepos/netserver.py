@@ -1370,6 +1370,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             uid = None
         self.repos.troveStore.keyTable.updateOwner(uid, key)
 
+    def getAsciiOpenPGPKey(self, authToken, label, keyId):
+        # don't check auth. this is a public function
+        return self.repos.troveStore.keyTable.getAsciiPGPKeyData(keyId)
+
+    def listUsersMainKeys(self, authToken, label, userId = None):
+        # the only reason to lock this fuction down is because it correlates
+        # a valid userId to valid fingerprints. neither of these pieces of
+        # information is sensitive separately.
+        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+            and userId != self.auth.getUserIdByName(authToken[0])):
+            raise errors.InsufficientPermission
+        return self.repos.troveStore.keyTable.getUsersMainKeys(userId)
+
+    def listSubkeys(self, authToken, label, fingerprint):
+        return self.repos.troveStore.keyTable.getSubkeys(fingerprint)
+
+    def getOpenPGPKeyUserIds(self, authToken, label, keyId):
+        return self.repos.troveStore.keyTable.getUserIds(keyId)
+
     def getConaryUrl(self, authtoken, clientVersion, \
                      revStr, flavorStr):
         """

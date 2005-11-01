@@ -15,6 +15,9 @@
 import sqlite3
 from lib import openpgpfile, openpgpkey
 import StringIO
+import base64
+from textwrap import wrap
+from constants import version
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -156,6 +159,11 @@ class OpenPGPKeyTable:
         if (len(keys) != 1):
             raise openpgpkey.KeyNotFound(keyId)
         return keys[0][0]
+
+    def getAsciiPGPKeyData(self, keyId):
+        # don't trap exceptions--that way we can assume we found a key.
+        keyData = self.getPGPKeyData(keyId)
+        return "-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: Conary "+version+"\n\n"+"\n".join(wrap(base64.b64encode(keyData), 72))+"\n-----END PGP PUBLIC KEY BLOCK-----"
 
     def getUsersMainKeys(self, userId):
         cu = self.db.cursor()

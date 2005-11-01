@@ -279,6 +279,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         encKeyData = base64.b64encode(keyData)
         self.c[label].addNewPGPKey(user, encKeyData)
 
+    def getAsciiOpenPGPKey(self, label, keyId):
+        return self.c[label].getAsciiOpenPGPKey(keyId)
+
+    def listUsersMainKeys(self, label, userId):
+        return self.c[label].listUsersMainKeys(userId)
+
+    def listSubkeys(self, label, fingerprint):
+        return self.c[label].listSubkeys(fingerprint)
+
+    def getOpenPGPKeyUserIds(self, label, keyId):
+        return self.c[label].getOpenPGPKeyUserIds(keyId)
+
     def changePGPKeyOwner(self, label, user, key):
         self.c[label].changePGPKeyOwner(user, key)
 

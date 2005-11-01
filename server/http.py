@@ -23,7 +23,7 @@ import kid
 import templates
 
 from repository.netrepos import netserver
-from repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists
+from repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
@@ -51,7 +51,7 @@ def checkAuth(write = False, admin = False):
             # now check for proper permissions
             if write or admin:
                 if not self.repServer.auth.check(self.authToken, write=write, admin=admin):
-                    raise netserver.InsufficientPermission
+                    raise InsufficientPermission
 
             return func(self, **kwargs)
         return wrapper
@@ -110,7 +110,7 @@ class HttpHandler(WebHandler):
 
         try:
             return method(**d)
-        except netserver.InsufficientPermission:
+        except InsufficientPermission:
             if auth[0] == "anonymous":
                 # if an anonymous user raises InsufficientPermission,
                 # ask for a real login.
@@ -536,7 +536,7 @@ class HttpHandler(WebHandler):
         
         if username != self.authToken[0]:
             if not admin:
-                raise netserver.InsufficientPermission
+                raise InsufficientPermission
         
         if self.authToken[1] != oldPassword and self.authToken[0] == username and not admin:
             self._write("error", error = "Error: old password is incorrect")
