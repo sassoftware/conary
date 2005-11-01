@@ -163,7 +163,11 @@ class OpenPGPKeyTable:
     def getAsciiPGPKeyData(self, keyId):
         # don't trap exceptions--that way we can assume we found a key.
         keyData = self.getPGPKeyData(keyId)
-        return "-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: Conary "+version+"\n\n"+"\n".join(wrap(base64.b64encode(keyData), 72))+"\n-----END PGP PUBLIC KEY BLOCK-----"
+        keyData = "\n".join(wrap(base64.b64encode(keyData), 72))
+        # pad the data if base64.encode didn't
+        if keyData[-1] != '=':
+            keyData += '='
+        return "-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: Conary "+version+"\n\n%s\n-----END PGP PUBLIC KEY BLOCK-----" % keyData
 
     def getUsersMainKeys(self, userId):
         cu = self.db.cursor()

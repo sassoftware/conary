@@ -588,3 +588,22 @@ class HttpHandler(WebHandler):
         #not a problem yet since admins can only touch their own keys atm
         self.repServer.addNewAsciiPGPKey(self.authToken, 0, self.authToken[0], keyData)
         return self._redirect('pgpAdminForm')
+
+    @strFields(search = '')
+    @checkAuth(write = False)
+    def getOpenPGPKey(self, auth, search, **kwargs):
+        from lib.openpgpfile import KeyNotFound
+        # This function mimics limited key server behavior. The keyserver line
+        # for a gpg command must be formed manually--because gpg doesn't
+        # automatically know how to talk to limited key servers.
+        # A correctly formed gpg command looks like:
+        # 'gpg --keyserver=REPO_MAP/getOpenPGPKey?search=KEY_ID --recv-key KEY_ID'
+        # example: 'gpg --keyserver=http://admin:111111@localhost/conary/getOpenPGPKey?search=F7440D78FE813C882212C2BF8AC2828190B1E477 --recv-key F7440D78FE813C882212C2BF8AC2828190B1E477'
+        # repositories that allow anonymous users do not require userId/passwd
+        try:
+            keyData = self.repServer.getAsciiOpenPGPKey(self.authToken, 0, search)
+        except KeyNotFound:
+            self._write("error", shortError = "Key Not Found", error = "OpenPGP Key %s is not in this repository" %search)
+            return apache.OK
+        self._write("pgp_get_key", keyId = search, keyData = keyData)
+        return apache.OK

@@ -2,6 +2,14 @@ Changes in 0.70.4:
   o Build Changes (cvc)
     * CompilePython has been fixed to accept macros in its arguments.
       This bug cropped up in 0.70.3
+  o Repository Changes
+    * Repository now serves up OpenPGP Keys it has stored, in the same
+      manner as "Limited Keyservers". Limited meaning users can only
+      retrieve keys. No search or browse capability is implied. The page
+      is available under /getOpenPGPKey?search=KEY_ID. This page is not
+      really intended for end user browsing so much as evenutally imbuing
+      conary with the ability to automatically retrieve OpenPGP Keys used
+      to make package signatures.
 
 Changes in 0.70.3:
   o Client Changes (conary)
