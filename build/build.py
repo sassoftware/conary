@@ -451,8 +451,12 @@ class CompilePython(BuildCommand):
 	destlen = len(destdir)
 	for arg in self.arglist:
 	    # arg will always have a leading /, so no os.sep needed
+            # Expand macros in the arg string.
+            arg = arg % macros
+            # XXX Replace this with an exception since it can be reached by
+            # user error
             assert(arg[0] == '/')
-	    for directory in util.braceGlob(destdir+arg %macros):
+	    for directory in util.braceGlob(destdir+arg):
 		macros['dir'] = directory[destlen:]
 		util.execute(self.command %macros)
 
