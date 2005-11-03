@@ -153,6 +153,15 @@ commits all the changes in the source directory to the repository.
 It will ask for a changelog message unless one is passed on the
 command line with \fB\-\-message\fP.  
 .TP
+.B context [name]\fP
+When not passed a name, displays information about the current context.  
+See \fIman conary\fP for more information on contexts.
+.IP
+When passed a name, sets the context to <name> for the current directory.
+That context will then be used for all conary
+operations in the directory.  The commands \fBcvc checkout\fP and 
+\fBcvc newpkg\fP will transfer the current context into their newly 
+created directories.
 .B describe \fI<xml file>\fP
 Update the metadata of the source trove in the current source directory
 based on the contents of \fI<xml file>\fP.
