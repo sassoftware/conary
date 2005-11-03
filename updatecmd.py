@@ -406,6 +406,14 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
         keepExisting = False
 
+    if cfg.interactive:
+        print 'The following updates will be performed:'
+        displayUpdateInfo(updJob)
+        okay = cmdline.askYn('continue with update? [Y/n]', default=True)
+
+        if not okay:
+            return
+
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,

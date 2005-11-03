@@ -18,6 +18,7 @@ Implements branch and shadow command line functionality.
 import itertools
 
 import conaryclient
+from conaryclient import cmdline
 import versions
 from lib import log
 import updatecmd
@@ -33,6 +34,23 @@ def _getBranchType(binaryOnly, sourceOnly):
     else:
         return conaryclient.ConaryClient.BRANCH_ALL
 
+def displayBranchJob(cs, shadow=False):
+    if shadow:
+        branchOp = 'Shadow'
+    else:
+        branchOp = 'Branch'
+
+    indent = '   '
+    for csTrove in cs.iterNewTroveList():
+        newInfo = str(csTrove.getNewVersion())
+        flavor = csTrove.getNewFlavor()
+        if flavor:
+            newInfo += '[%s]' % flavor
+
+        print "%s%s  %-20s (%s)" % (indent, branchOp, csTrove.getName(),
+                                        newInfo)
+                                       
+
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
            sourceOnly = False, binaryOnly = False):
     branchType = _getBranchType(binaryOnly, sourceOnly)
@@ -45,9 +63,27 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     troveList = [ x for x in itertools.chain(*result.itervalues())]
 
     if makeShadow:
-        dups = client.createShadow(newLabel, troveList, branchType=branchType)
+        dups, cs = client.createShadowJob(newLabel, troveList, 
+                                          branchType=branchType)
     else:
-        dups = client.createBranch(newLabel, troveList, branchType=branchType)
+        dups, cs = client.createBranchJob(newLabel, troveList, 
+                                          branchType=branchType)
 
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())
+
+    if cfg.interactive:
+        if makeShadow:
+            branchOps = 'shadows'
+        else:
+            branchOps = 'branches'
+
+        print 'The following %s will be created:' % branchOps
+        displayBranchJob(cs, shadow=makeShadow)
+        print
+        okay = cmdline.askYn('continue with %s? [y/N]' % branchOp.lower(), 
+                             default=False)
+        if not okay: 
+            return
+
+    client.repos.commitChangeSet(cs)

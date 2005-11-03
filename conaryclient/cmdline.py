@@ -164,6 +164,18 @@ def toTroveSpec(name, versionStr, flavor):
         disp.extend(('[', deps.formatFlavor(flavor), ']'))
     return ''.join(disp)
 
+def askYn(prompt, default=None):
+    while True:
+        resp = raw_input(prompt + ' ')
+        if resp.lower() in ('y', 'yes'):
+            return True
+        elif resp in ('n', 'no'):
+            return False
+        elif not resp:
+            return default
+        else:
+            print "Unknown response '%s'." % resp
+
 class TroveSpecError(Exception):
 
     pass

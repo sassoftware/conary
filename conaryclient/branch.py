@@ -20,11 +20,11 @@ class ClientBranch:
     BRANCH_SOURCE_ONLY = 1
     BRANCH_BINARY_ONLY = 2
 
-    def createBranch(self, newLabel, troveList = [], branchType=BRANCH_ALL):
+    def createBranchJob(self, newLabel, troveList = [], branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
                                           branchType = branchType)
 
-    def createShadow(self, newLabel, troveList = [], branchType=BRANCH_ALL):
+    def createShadowJob(self, newLabel, troveList = [], branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
                                           branchType = branchType)
 
@@ -128,8 +128,8 @@ class ClientBranch:
                     cs.addPrimaryTrove(name, version, flavor)
                     needsCommit = True
 
-        if needsCommit:
-            self.repos.commitChangeSet(cs)
+        if not needsCommit:
+            cs = None 
 
-	return dupList
+	return dupList, cs
 
