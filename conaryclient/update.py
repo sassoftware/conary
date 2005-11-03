@@ -1542,9 +1542,9 @@ class EraseDepFailure(DepResolutionFailure):
         res = []
         res.append("Troves being removed create unresolved dependencies:")
         for (reqBy, depSet, providedBy) in self.failures:
-            res.append("    %s:\n\t%s" %  \
-                        (reqBy[0], "\n\t".join(str(depSet).split("\n"))
-                        ))
+            res.append("    %s requires %s:\n\t%s" %
+                       (reqBy[0], ' or '.join(x[0] for x in providedBy),
+                        "\n\t".join(str(depSet).split("\n"))))
         return '\n'.join(res)
 
 class NeededTrovesFailure(DependencyFailure):

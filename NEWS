@@ -1,4 +1,8 @@
 Changes in 0.70.4:
+  o Client Changes
+    * The trove that satisfies a dependency that is broken by erase is
+      now displayed in the "Troves being removed create unresolved
+      dependencies" message.
   o Build Changes (cvc)
     * CompilePython has been fixed to accept macros in its arguments.
       This bug cropped up in 0.70.3
