@@ -642,10 +642,33 @@ class DependencySet(object):
         c = self.members.setdefault(tag, depClass())
         c.addDep(dep)
 
+    def addDeps(self, depClass, deps):
+        self.hash = None
+        tag = depClass.tag
+        c = self.members.setdefault(tag, depClass())
+
+        for dep in deps:
+            c.addDep(dep)
+
     def iterDeps(self):
         for depClass in self.members.itervalues():
             for dep in depClass.members.itervalues():
                 yield depClass.__class__, dep
+
+    def iterDepsByClass(self, depClass):
+        if depClass.tag in self.members:
+            c = self.members[depClass.tag]
+            for dep in c.members.itervalues():
+                yield dep
+
+    def hasDepClass(self, depClass):
+        return depClass.tag in self.members
+
+    def removeDeps(self, depClass, deps):
+        self.hash = None
+        c = self.members[depClass.tag]
+        for dep in deps:
+            del c.members[dep.name]
 
     def addEmptyDepClass(self, depClass):
         """ adds an empty dependency class, which for flavors has 
@@ -815,15 +838,20 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     sets are merged with the old flavor.
     """
     flavor = oldFlavor.copy()
-    if (DEP_CLASS_IS in flavor.getDepClasses() 
-        and DEP_CLASS_IS in newFlavor.getDepClasses()):
-        oldArchDeps = flavor.members[DEP_CLASS_IS]
-        newArchDeps = newFlavor.members[DEP_CLASS_IS]
+    ISD = InstructionSetDependency
+    if (flavor.hasDepClass(ISD) and newFlavor.hasDepClass(ISD)):
 
-        for majArch in oldArchDeps.members.keys():
-            if majArch not in newArchDeps.members:
-                del flavor.members[DEP_CLASS_IS].members[majArch]
+        arches = set()
 
+        for dep in newFlavor.iterDepsByClass(ISD):
+            arches.add(dep.name)
+
+        oldArches = []
+        for dep in oldFlavor.iterDepsByClass(ISD):
+            if dep.name not in arches:
+                oldArches.append(dep)
+        flavor.removeDeps(ISD, oldArches)
+            
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 
@@ -838,26 +866,21 @@ def mergeFlavor(flavor, mergeBase):
         return mergeBase
     if not mergeBase:
         return flavor
-    flavorInsSet = flavor.getDepClasses().get(DEP_CLASS_IS, None)
-    flavorUseSet = flavor.getDepClasses().get(DEP_CLASS_USE, None)
-    # Note that flavorInsSet might be empty but nonzero
-    needsIns = (flavorInsSet is None)
-    needsUse = (flavorUseSet is None)
+    needsIns = not flavor.hasDepClass(InstructionSetDependency)
+    needsUse = not flavor.hasDepClass(UseDependency)
     if not (needsIns or needsUse):
         return flavor
 
     mergedFlavor = flavor.copy()
     if needsIns:
-        insSet = mergeBase.getDepClasses().get(DEP_CLASS_IS, None)
-        if insSet is not None:
-            for insSet in insSet.getDeps():
-                mergedFlavor.addDep(InstructionSetDependency, insSet)
+        insSets = list(mergeBase.iterDepsByClass(InstructionSetDependency))
+        if insSets:
+            mergedFlavor.addDeps(InstructionSetDependency, insSets)
 
     if needsUse:
-        useSet = mergeBase.getDepClasses().get(DEP_CLASS_USE, None)
-        if useSet is not None:
-            useSet = useSet.getDeps().next()
-            mergedFlavor.addDep(UseDependency, useSet)
+        useSet = list(mergeBase.iterDepsByClass(UseDependency))
+        if useSet:
+            mergedFlavor.addDeps(UseDependency, useSet)
     return mergedFlavor
 
 def formatFlavor(flavor):
@@ -865,9 +888,9 @@ def formatFlavor(flavor):
     Formats a flavor and returns a string which parseFlavor can 
     handle.
     """
-    def _singleClass(depClass):
+    def _singleClass(deps):
         l = []
-        for dep in depClass.getDeps():
+        for dep in deps:
             flags = dep.getFlags()[0]
 
             if flags:
@@ -882,13 +905,13 @@ def formatFlavor(flavor):
         return " ".join(l)
 
     classes = flavor.getDepClasses()
-    insSet = classes.get(DEP_CLASS_IS, None)
-    useFlags = classes.get(DEP_CLASS_USE, None)
+    insSet = list(flavor.iterDepsByClass(InstructionSetDependency))
+    useFlags = list(flavor.iterDepsByClass(UseDependency))
 
-    if insSet is not None:
+    if insSet:
         insSet = _singleClass(insSet)
 
-    if useFlags is not None:
+    if useFlags:
         # strip the use() bit
         useFlags = _singleClass(useFlags)[4:-1]
 
