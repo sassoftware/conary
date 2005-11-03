@@ -25,7 +25,7 @@ V_REFTRV = 2
 
 class ClientClone:
 
-    def createClone(self, targetBranch, troveList = []):
+    def createCloneJob(self, targetBranch, troveList = []):
 
         def _createSourceVersion(targetBranchVersionList, sourceVersion):
             assert(targetBranchVersionList)
@@ -201,7 +201,6 @@ class ClientClone:
             for info in cloneSources:
                 if info[0].startswith("fileset"):
                     raise CloneError, "File sets cannot be cloned"
-                    return
 
                 if info not in allTroveInfo:
                     needed.append(info)
@@ -288,7 +287,7 @@ class ClientClone:
                 except KeyError:
                     print "No versions of %s exist on branch %s." \
                                 % (srcTroveName, targetBranch.asString()) 
-                    return 1
+                    return False, None
 
                 trv = self.repos.getTrove(srcTroveName, currentVersionList[-1],
                                      deps.DependencySet(), withFiles = False)
@@ -297,7 +296,7 @@ class ClientClone:
                 else:
                     log.error("Cannot find cloned source for %s=%s" %
                                 (srcTroveName, sourceVersion.asString()))
-                    return 1
+                    return False, None
                 del currentVersionList
 
             # we know newSourceVersion is right at this point. now find the new
@@ -321,11 +320,11 @@ class ClientClone:
                         not _isSibling(info[1], newVersion):
                 log.error("clone only supports cloning troves to parent "
                           "and sibling branches")
-                return 1
+                return False, None
 
         if not cloneJob:
             log.warning("Nothing to clone!")
-            return 1
+            return False, None
 
         allTroves = self.repos.getTroves([ x[0] for x in cloneJob ])
 
@@ -461,7 +460,7 @@ class ClientClone:
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
 
-        self.repos.commitChangeSet(cs)
+        return True, cs
 
 class CloneError(Exception):
 

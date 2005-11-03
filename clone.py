@@ -13,10 +13,21 @@
 #
 
 from repository import netclient
-from conaryclient import ConaryClient
+from conaryclient import ConaryClient, cmdline
 import updatecmd
 import versions
 import sys
+
+def displayCloneJob(cs):
+    
+    indent = '   '
+    for csTrove in cs.iterNewTroveList():
+        newInfo = str(csTrove.getNewVersion())
+        flavor = csTrove.getNewFlavor()
+        if flavor:
+            newInfo += '[%s]' % flavor
+
+        print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)
 
 def CloneTrove(cfg, targetBranch, troveSpecList):
 
@@ -32,4 +43,16 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
         cloneSources += repos.findTrove(cfg.installLabelPath, spec)
 
     client = ConaryClient(cfg)
-    client.createClone(targetBranch, cloneSources)
+    okay, cs = client.createCloneJob(targetBranch, cloneSources)
+    if not okay:
+        return
+
+    if cfg.interactive:
+        print 'The following clones will be created:'
+        displayCloneJob(cs)
+        print
+        okay = cmdline.askYn('continue with clone? [y/N]', default=False)
+        if not okay:
+            return
+
+    client.repos.commitChangeSet(cs)
