@@ -3,6 +3,8 @@ Changes in 0.70.4:
     * The trove that satisfies a dependency that is broken by erase is
       now displayed in the "Troves being removed create unresolved
       dependencies" message.
+    * Components are now displayed on the same line its package in
+      "conary update" output.
   o Build Changes (cvc)
     * CompilePython has been fixed to accept macros in its arguments.
       This bug cropped up in 0.70.3
