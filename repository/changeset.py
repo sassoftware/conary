@@ -601,9 +601,7 @@ class ChangeSet(streams.StreamSet):
             origVer = troveCs.getNewVersion()
 
 	    oldVer = troveCs.getOldVersion()
-	    newBr = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
-	    newVer = newBr.createVersion(oldVer.trailingRevision())
-            del newBr
+	    newVer = oldVer.createBranch(targetBranchLabel, withVerRel = 1)
 
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
