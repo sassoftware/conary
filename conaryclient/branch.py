@@ -20,11 +20,13 @@ class ClientBranch:
     BRANCH_SOURCE_ONLY = 1
     BRANCH_BINARY_ONLY = 2
 
-    def createBranchJob(self, newLabel, troveList = [], branchType=BRANCH_ALL):
+    def createBranchChangeSet(self, newLabel, 
+                              troveList = [], branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
                                           branchType = branchType)
 
-    def createShadowJob(self, newLabel, troveList = [], branchType=BRANCH_ALL):
+    def createShadowChangeSet(self, newLabel, troveList = [], 
+                              branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
                                           branchType = branchType)
 

@@ -43,7 +43,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
         cloneSources += repos.findTrove(cfg.installLabelPath, spec)
 
     client = ConaryClient(cfg)
-    okay, cs = client.createCloneJob(targetBranch, cloneSources)
+    okay, cs = client.createCloneChangeSet(targetBranch, cloneSources)
     if not okay:
         return
 

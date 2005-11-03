@@ -63,11 +63,11 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     troveList = [ x for x in itertools.chain(*result.itervalues())]
 
     if makeShadow:
-        dups, cs = client.createShadowJob(newLabel, troveList, 
-                                          branchType=branchType)
+        dups, cs = client.createShadowChangeSet(newLabel, troveList, 
+                                                branchType=branchType)
     else:
-        dups, cs = client.createBranchJob(newLabel, troveList, 
-                                          branchType=branchType)
+        dups, cs = client.createBranchChangeSet(newLabel, troveList, 
+                                                branchType=branchType)
 
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())

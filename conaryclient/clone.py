@@ -25,7 +25,7 @@ V_REFTRV = 2
 
 class ClientClone:
 
-    def createCloneJob(self, targetBranch, troveList = []):
+    def createCloneChangeSet(self, targetBranch, troveList = []):
 
         def _createSourceVersion(targetBranchVersionList, sourceVersion):
             assert(targetBranchVersionList)
