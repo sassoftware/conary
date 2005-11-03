@@ -5,6 +5,9 @@ Changes in 0.70.4:
       dependencies" message.
     * Components are now displayed on the same line its package in
       "conary update" output.
+    * A new 'interactive' option has been added to conary configuration. 
+      When set to true, conary will display info about clone, branch, 
+      update, and erase operations and then ask before proceding.
   o Build Changes (cvc)
     * CompilePython has been fixed to accept macros in its arguments.
       This bug cropped up in 0.70.3
