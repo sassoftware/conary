@@ -3,22 +3,20 @@ Changes in 0.70.4:
     * The trove that satisfies a dependency that is broken by erase is
       now displayed in the "Troves being removed create unresolved
       dependencies" message.
-    * Components are now displayed on the same line its package in
-      "conary update" output.
+    * Components are now displayed on the same line as their parent
+      package in "conary update" output.
     * A new 'interactive' option has been added to conary configuration. 
       When set to true, conary will display info about clone, branch, 
-      update, and erase operations and then ask before proceding.
+      update, and erase operations, and then ask before proceding.
   o Build Changes (cvc)
-    * CompilePython has been fixed to accept macros in its arguments.
-      This bug cropped up in 0.70.3
+    * The CompilePython action has been fixed to accept macros at the
+      beginning of its arguments, fixing a bug new in Conary 0.70.3.
   o Repository Changes
-    * Repository now serves up OpenPGP Keys it has stored, in the same
-      manner as "Limited Keyservers". Limited meaning users can only
-      retrieve keys. No search or browse capability is implied. The page
-      is available under /getOpenPGPKey?search=KEY_ID. This page is not
-      really intended for end user browsing so much as evenutally imbuing
-      conary with the ability to automatically retrieve OpenPGP Keys used
-      to make package signatures.
+    * The repository now serves up stored OpenPGP keys as a "Limited
+      Keyserver"; users can retrieve keys, but not search or browse them.
+      The keys are available via /getOpenPGPKey?search=KEY_ID. This
+      is meant only to allow conary to automatically retrieve OpenPGP
+      keys used to sign packages.
 
 Changes in 0.70.3:
   o Client Changes (conary)
