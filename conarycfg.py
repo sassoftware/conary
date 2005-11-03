@@ -406,6 +406,7 @@ class ConaryConfiguration(SectionedConfig):
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
 	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],
+	'interactive'		: [ BOOL, False ],
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'updateThreshold'       : [ INT, 10],
