@@ -193,17 +193,28 @@ class Archive(_Source):
 
 	else:
             m = magic.magic(f)
-            if f.endswith(".tar"):
-                tarflags = "-xf"
-            elif (isinstance(m, magic.bzip) or f.endswith(".bz2")
-                  or f.endswith(".tbz2")):
-                tarflags = "-jxf"
-            elif (isinstance(m, magic.gzip) or f.endswith(".gz")
-                  or f.endswith(".tgz") or f.endswith(".Z")):
-                tarflags = "-zxf"
+            _uncompress = "cat"
+            
+            # There are things we know we know...
+            _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
+                           "tar.gz", "tar.bz2", "tar.Z"]
+            _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
+
+            if True in [f.endswith(x) for x in _tarSuffix]:
+                _unpack = "tar -C %s -xf -" % (destDir,)
+            elif True in [f.endswith(x) for x in _cpioSuffix]:
+                _unpack = "( cd %s ; cpio -imd )" % (destDir,)
             else:
-                raise SourceError, "unknown archive compression"
-            util.execute("tar -C %s %s %s" % (destDir, tarflags, f))
+                raise SourceError, "unknown archive compression: " + f
+
+            # Question: can magic() ever get these wrong?!
+            if isinstance(m, magic.bzip) or f.endswith("bz2"):
+                _uncompress = "bzip2 -d -c"
+            if isinstance(m, magic.gzip) or f.endswith("gz") \
+                   or f.endswith(".Z"):
+                _uncompress = "gzip -d -c"
+
+            util.execute("%s < %s | %s" % (_uncompress, f, _unpack))
 
         if guessMainDir:
             after = set(os.listdir(self.builddir))
