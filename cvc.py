@@ -51,7 +51,7 @@ def usage(rc = 1):
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] [--trust-threshold <int>]"
     print "                    <trove>[=<version>]"
-    print "       cvc clone <target-branch> <trove>[=<version>]+ "
+    print "       cvc clone <target-branch> <trove>[=<version>][[flavor]]+ "
     print "                 [--skip-build-info]"
     print "       cvc commit [--message <message>]"
     print '                  [--signature-key "<fingerprint>"]'
@@ -76,9 +76,15 @@ def usage(rc = 1):
     print "                <trove2>[=version2][[flavor2]]..."
     print "       cvc update <version>"
     print 
-    print "branch flags:  --just-source"
-    print "               --just-binary"
+    print "branch flags:  --binary-only"
+    print "               --source-only"
+    print "               --test"
     print
+    print "clone flags:   --skip-build-info"
+    print "               --test"
+    print
+    print "commit flags:  --message <msg>"
+    print 
     print 'common flags:  --build-label <label>'
     print '               --config-file <path>'
     print '               --config "<item> <value>"'
@@ -99,14 +105,12 @@ def usage(rc = 1):
     print "               --debug-exceptions"
     print "               --quiet"
     print ""
+    print "shadow flags:  --binary-only"
+    print "               --source-only"
+    print "               --test"
     print ""
     print "sign flags:    --quiet"
     print '               --signature-key "<fingerprint>"'
-    print ""
-    print "commit flags:  --message <msg>"
-    print ""
-    print "shadow flags:  --source-only"
-    print "               --binary-only"
     return rc
 
 def realMain(cfg, argv=sys.argv):
@@ -146,6 +150,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["source-only"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
+    argDef["test"] = NO_PARAM
     argDef["unknown-flags"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
@@ -221,6 +226,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
+        test = argSet.pop('test', False)
 
         if argSet: return usage()
         if len(args) < 3: return usage()
@@ -229,8 +235,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         target = args[1]
         troveSpecs = args[2:]
 
-        branch.branch(repos, cfg, target, troveSpecs, makeShadow=makeShadow, 
-                      sourceOnly=sourceOnly, binaryOnly=binaryOnly)
+        branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow, 
+                      sourceOnly = sourceOnly, binaryOnly = binaryOnly,
+                      test = test)
 
     elif (args[0] == "commit") or (args[0] == "ci"): # mimic cvs's shortcuts
         level = log.getVerbosity()
@@ -267,8 +274,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
         import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
+        test = argSet.pop('test', False)
         if argSet: return usage()
-        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo)
+        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, test = test)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

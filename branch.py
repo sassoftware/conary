@@ -52,7 +52,7 @@ def displayBranchJob(cs, shadow=False):
                                        
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
-           sourceOnly = False, binaryOnly = False):
+           sourceOnly = False, binaryOnly = False, test = False):
     branchType = _getBranchType(binaryOnly, sourceOnly)
 
     client = conaryclient.ConaryClient(cfg)
@@ -86,4 +86,5 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
         if not okay: 
             return
 
-    client.repos.commitChangeSet(cs)
+    if not test:
+        client.repos.commitChangeSet(cs)
