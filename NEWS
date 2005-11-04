@@ -19,6 +19,8 @@ Changes in 0.70.4:
     * Clone now supports --skip-build-info for less rigid version checks
       on cloned troves
     * Fixed usage message to better reflect reality
+    * Clone got confused cloning to a branch which has an alternate, 
+      compatible version now works
   o Repository Changes
     * The repository now serves up stored OpenPGP keys as a "Limited
       Keyserver"; users can retrieve keys, but not search or browse them.

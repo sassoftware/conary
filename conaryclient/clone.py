@@ -101,13 +101,18 @@ class ClientClone:
             for name, cloneSourceVersion, flavor in infoList:
                 q[name] = { srcBranch : [ flavor ] }
 
+            import lib
+            lib.epdb.st()
             currentVersions = repos.getTroveLeavesByBranch(q, bestFlavor = True)
             dupCheck = {}
 
             for name, versionDict in currentVersions.iteritems():
                 lastVersion = versionDict.keys()[0]
                 assert(len(versionDict[lastVersion]) == 1)
-                assert(versionDict[lastVersion][0] == singleFlavor)
+                if versionDict[lastVersion][0] != singleFlavor:
+                    # This flavor doesn't exist on the branch
+                    continue
+
                 leafMap[(name, infoVersionMap[name, singleFlavor], 
                          singleFlavor)] = (name, lastVersion, singleFlavor)
                 if lastVersion.getSourceVersion() == srcVersion:
