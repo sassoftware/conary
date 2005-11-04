@@ -1848,12 +1848,13 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires('I{foo}', I{filterexp})} where C{'I{foo}'} can be
     C{'I{/path/to/file}'} or C{'I{packagename}:I{component[}(I{FLAGS})I{]}'}
     (components are the only troves that can be required).
+
     For executables that are executed only through wrappers that use
     C{LD_LIBRARY_PATH} to find the libraries instead of embedding an
     C{RPATH} in the binary, you will need to provide a synthetic
-    rpath using the C{r.Requires(rpath=I{rpath})} or
-    C{r.Requires(rpath=(I{filterExp}: I{rpath}))} calls, which are
-    tested in the order provided.  The C{I{rpath}} is a standard
+    RPATH using the C{r.Requires(rpath=I{RPATH})} or
+    C{r.Requires(rpath=(I{filterExp}, I{RPATH}))} calls, which are
+    tested in the order provided.  The C{I{RPATH}} is a standard
     Unix-style path string containing one or more directory names,
     separated only by colon characters.
     """
