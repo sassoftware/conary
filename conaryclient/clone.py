@@ -101,8 +101,6 @@ class ClientClone:
             for name, cloneSourceVersion, flavor in infoList:
                 q[name] = { srcBranch : [ flavor ] }
 
-            import lib
-            lib.epdb.st()
             currentVersions = repos.getTroveLeavesByBranch(q, bestFlavor = True)
             dupCheck = {}
 
