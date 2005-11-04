@@ -203,7 +203,7 @@ class Archive(_Source):
             if True in [f.endswith(x) for x in _tarSuffix]:
                 _unpack = "tar -C %s -xf -" % (destDir,)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
-                _unpack = "( cd %s ; cpio -imd )" % (destDir,)
+                _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
             else:
                 raise SourceError, "unknown archive compression: " + f
 
