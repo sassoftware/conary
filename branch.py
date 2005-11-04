@@ -72,6 +72,9 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())
 
+    if not cs:
+        return
+
     if cfg.interactive:
         if makeShadow:
             branchOps = 'shadows'
