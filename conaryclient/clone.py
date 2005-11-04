@@ -25,7 +25,9 @@ V_REFTRV = 2
 
 class ClientClone:
 
-    def createCloneChangeSet(self, targetBranch, troveList = []):
+    def createCloneChangeSet(self, targetBranch, troveList = [],
+                             updateTroveInfo=False):
+        # if updateTroveInfo is True, rewrite the 
 
         def _createSourceVersion(targetBranchVersionList, sourceVersion):
             assert(targetBranchVersionList)
@@ -140,23 +142,24 @@ class ClientClone:
                (branchToCheck != targetBranch and 
                         _isUphill(verToCheck, targetBranch))
 
-        def _iterAllVersions(trv):
+        def _iterAllVersions(trv, rewriteTroveInfo=True):
             # return all versions which need rewriting except for file versions
-            # and the version of the trove itself. file versoins are handled
+            # and the version of the trove itself. file versions are handled
             # separately since we can clone even if the files don't already
             # exist on the target branch (we just add them), and trove versions
             # are always rewritten even when cloning to the same branch
             # (while other versions are not)
 
-            for troveTuple in trv.troveInfo.loadedTroves.iter():
-                yield ((V_LOADED, troveTuple),
-                       (troveTuple.name(), troveTuple.version(),
-                        troveTuple.flavor()))
+            if rewriteTroveInfo:
+                for troveTuple in trv.troveInfo.loadedTroves.iter():
+                    yield ((V_LOADED, troveTuple),
+                           (troveTuple.name(), troveTuple.version(),
+                            troveTuple.flavor()))
 
-            for troveTuple in trv.troveInfo.buildReqs.iter():
-                yield ((V_BREQ, troveTuple),
-                       (troveTuple.name(), troveTuple.version(),
-                        troveTuple.flavor()))
+                for troveTuple in trv.troveInfo.buildReqs.iter():
+                    yield ((V_BREQ, troveTuple),
+                           (troveTuple.name(), troveTuple.version(),
+                            troveTuple.flavor()))
 
             for troveInfo in trv.iterTroveList():
                 yield ((V_REFTRV, troveInfo), troveInfo)
@@ -180,8 +183,9 @@ class ClientClone:
             else:
                 assert(0)
 
-        def _versionsNeeded(needDict, trv, sourceBranch, targetBranch):
-            for (mark, src) in _iterAllVersions(trv):
+        def _versionsNeeded(needDict, trv, sourceBranch, targetBranch,
+                            rewriteTroveInfo):
+            for (mark, src) in _iterAllVersions(trv, rewriteTroveInfo):
                 if _needsRewrite(sourceBranch, targetBranch, src[1]):
                     l = needDict.setdefault(src, [])
                     l.append(mark)
@@ -334,7 +338,8 @@ class ClientClone:
 
         needDict = {}
         for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
-            _versionsNeeded(needDict, trv, info[1].branch(), targetBranch)
+            _versionsNeeded(needDict, trv, info[1].branch(), targetBranch,
+                            updateTroveInfo)
 
         for version in versionMap:
             if version in needDict:
@@ -395,7 +400,7 @@ class ClientClone:
                     allFilesNeeded.append((pathId, fileId, version))
 
             needsNewVersions = []
-            for (mark, src) in _iterAllVersions(trv):
+            for (mark, src) in _iterAllVersions(trv, updateTroveInfo):
                 if _needsRewrite(sourceBranch, targetBranch, src[1]):
                     _updateVersion(trv, mark, versionMap[src])
 

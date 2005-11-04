@@ -51,7 +51,8 @@ def usage(rc = 1):
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] [--trust-threshold <int>]"
     print "                    <trove>[=<version>]"
-    print "       cvc clone <target-branch> <trove>[=<version>]+"
+    print "       cvc clone <target-branch> <trove>[=<version>]+ "
+    print "                 [--skip-troveinfo]"
     print "       cvc commit [--message <message>]"
     print '                  [--signature-key "<fingerprint>"]'
     print "       cvc config"
@@ -140,6 +141,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["sha1s"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
+    argDef["skip-troveinfo"] = NO_PARAM
     argDef["sources"] = NO_PARAM
     argDef["source-only"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
@@ -260,12 +262,13 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	else:
 	    cfg.display()
     elif (args[0] == "clone"):
-        if argSet: return usage()
         if len(args) < 3:
             return usage()
 
         import clone
-        clone.CloneTrove(cfg, args[1], args[2:])
+        skipTroveInfo = argSet.pop('skip-troveinfo', False)
+        if argSet: return usage()
+        clone.CloneTrove(cfg, args[1], args[2:], not skipTroveInfo)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

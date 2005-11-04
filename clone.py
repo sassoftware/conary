@@ -29,7 +29,7 @@ def displayCloneJob(cs):
 
         print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)
 
-def CloneTrove(cfg, targetBranch, troveSpecList):
+def CloneTrove(cfg, targetBranch, troveSpecList, updateTroveInfo=True):
 
     targetBranch = versions.VersionFromString(targetBranch)
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
@@ -40,7 +40,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
     cloneSources = list(itertools.chain(*cloneSources.itervalues()))
 
     client = ConaryClient(cfg)
-    okay, cs = client.createCloneChangeSet(targetBranch, cloneSources)
+    okay, cs = client.createCloneChangeSet(targetBranch, cloneSources,
+                                           updateTroveInfo=updateTroveInfo)
     if not okay:
         return
 
