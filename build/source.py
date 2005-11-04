@@ -194,6 +194,13 @@ class Archive(_Source):
 	else:
             m = magic.magic(f)
             _uncompress = "cat"
+
+            # Question: can magic() ever get these wrong?!
+            if isinstance(m, magic.bzip) or f.endswith("bz2"):
+                _uncompress = "bzip2 -d -c"
+            elif isinstance(m, magic.gzip) or f.endswith("gz") \
+                   or f.endswith(".Z"):
+                _uncompress = "gzip -d -c"
             
             # There are things we know we know...
             _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
@@ -204,15 +211,16 @@ class Archive(_Source):
                 _unpack = "tar -C %s -xf -" % (destDir,)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
+            elif _uncompress != 'cat':
+                # if we know we've got an archive, we'll default to
+                # assuming it's an archive of a tar for now
+                # TODO: do something smarter about the contents of the 
+                # archive
+                _unpack = "tar -C %s -xf -" % (destDir,)
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            # Question: can magic() ever get these wrong?!
-            if isinstance(m, magic.bzip) or f.endswith("bz2"):
-                _uncompress = "bzip2 -d -c"
-            if isinstance(m, magic.gzip) or f.endswith("gz") \
-                   or f.endswith(".Z"):
-                _uncompress = "gzip -d -c"
+            
 
             util.execute("%s < %s | %s" % (_uncompress, f, _unpack))
 
