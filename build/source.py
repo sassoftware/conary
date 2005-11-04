@@ -205,7 +205,7 @@ class Archive(_Source):
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
             else:
-                raise SourceError, "unknown archive compression: " + f
+                raise SourceError, "unknown archive format: " + f
 
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
