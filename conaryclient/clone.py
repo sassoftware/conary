@@ -26,8 +26,9 @@ V_REFTRV = 2
 class ClientClone:
 
     def createCloneChangeSet(self, targetBranch, troveList = [],
-                             updateTroveInfo=False):
-        # if updateTroveInfo is True, rewrite the 
+                             updateBuildInfo=True):
+        # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
+        # info
 
         def _createSourceVersion(targetBranchVersionList, sourceVersion):
             assert(targetBranchVersionList)
@@ -339,7 +340,7 @@ class ClientClone:
         needDict = {}
         for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
             _versionsNeeded(needDict, trv, info[1].branch(), targetBranch,
-                            updateTroveInfo)
+                            updateBuildInfo)
 
         for version in versionMap:
             if version in needDict:
@@ -400,7 +401,7 @@ class ClientClone:
                     allFilesNeeded.append((pathId, fileId, version))
 
             needsNewVersions = []
-            for (mark, src) in _iterAllVersions(trv, updateTroveInfo):
+            for (mark, src) in _iterAllVersions(trv, updateBuildInfo):
                 if _needsRewrite(sourceBranch, targetBranch, src[1]):
                     _updateVersion(trv, mark, versionMap[src])
 
