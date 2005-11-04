@@ -1848,15 +1848,24 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires('I{foo}', I{filterexp})} where C{'I{foo}'} can be
     C{'I{/path/to/file}'} or C{'I{packagename}:I{component[}(I{FLAGS})I{]}'}
     (components are the only troves that can be required).
+    For executables that are executed only through wrappers that use
+    C{LD_LIBRARY_PATH} to find the libraries instead of embedding an
+    C{RPATH} in the binary, you will need to provide a synthetic
+    rpath using the C{r.Requires(rpath=I{rpath})} or
+    C{r.Requires(rpath=(I{filterExp}: I{rpath}))} calls, which are
+    tested in the order provided.  The C{I{rpath}} is a standard
+    Unix-style path string containing one or more directory names,
+    separated only by colon characters.
     """
     invariantexceptions = (
 	'%(docdir)s/',
     )
     monodisPath = None
-    _privateDepMap = {}
 
     def __init__(self, *args, **keywords):
         self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        self._privateDepMap = {}
+        self.rpathFixup = []
         policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -1870,15 +1879,24 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
+        rpath = keywords.pop('rpath', None)
+        if rpath:
+            if type(rpath) is str:
+                rpath = ('.*', rpath)
+            assert(type(rpath) == tuple)
+            self.rpathFixup.append(rpath)
         _addInfo.updateArgs(self, *args, **keywords)
 
     def preProcess(self):
-        self.systemLibPaths = set(os.path.normpath(x % self.macros)
+        macros = self.macros
+        self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
         # anything that any buildreqs have caused to go into ld.so.conf
         # is a system library by definition
         self.systemLibPaths |= set(os.path.normpath(x[:-1])
                                    for x in file('/etc/ld.so.conf').readlines())
+        self.rpathFixup = [(filter.Filter(x, macros), y % macros)
+                           for x, y in self.rpathFixup]
 
     def _ELFPathFixup(self, path, m, pkg):
         """
@@ -1890,12 +1908,24 @@ class Requires(_addInfo, _BuildPackagePolicy):
         for depClass, dep in pkg.requiresMap[path].iterDeps():
             if dep.getName()[0] in self._privateDepMap:
                 found = True
-        if m and 'RPATH' in m.contents and m.contents['RPATH']:
-            rpath = m.contents['RPATH']
+
+        def _canonicalRPATH(rpath):
             # normalize all elements of RPATH
-            rpathList = [ os.path.normpath(x) for x in rpath.split(':') ]
+            l = [ os.path.normpath(x) for x in rpath.split(':') ]
             # prune system paths from RPATH
-            rpathList = [ x for x in rpathList if x not in self.systemLibPaths ]
+            l = [ x for x in l if x not in self.systemLibPaths ]
+            return l
+
+        # fixup should come first so that its path elements can override
+        # the included RPATH if necessary
+        if self.rpathFixup:
+            for f, rpath in self.rpathFixup:
+                if f.match(path):
+                    rpathList = _canonicalRPATH(rpath)
+                    break
+
+        if m and 'RPATH' in m.contents and m.contents['RPATH']:
+            rpathList += _canonicalRPATH(m.contents['RPATH'])
 
         if not found and not rpathList:
             return

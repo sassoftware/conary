@@ -11,6 +11,10 @@ Changes in 0.70.4:
   o Build Changes (cvc)
     * The CompilePython action has been fixed to accept macros at the
       beginning of its arguments, fixing a bug new in Conary 0.70.3.
+    * The Requires policy can now be given synthetic RPATH elements;
+      this is useful when programs are only intended to be run under
+      scripts that set LD_LIBRARY_PATH and so do not intrinsically have
+      the information they need to find their libraries.
   o Repository Changes
     * The repository now serves up stored OpenPGP keys as a "Limited
       Keyserver"; users can retrieve keys, but not search or browse them.
