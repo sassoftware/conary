@@ -11,12 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
+import sys
 
 from repository import netclient
 from conaryclient import ConaryClient, cmdline
-import updatecmd
 import versions
-import sys
 
 def displayCloneJob(cs):
     
@@ -34,13 +34,10 @@ def CloneTrove(cfg, targetBranch, troveSpecList):
     targetBranch = versions.VersionFromString(targetBranch)
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
 
-    cloneSources = []
-
-    for troveSpec in troveSpecList:
-        parts = troveSpec.split('=', 1) 
-
-        spec = updatecmd.parseTroveSpec(troveSpec)
-        cloneSources += repos.findTrove(cfg.installLabelPath, spec)
+    troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecList]
+    cloneSources = repos.findTroves(cfg.installLabelPath, 
+                                    troveSpecs, cfg.flavor)
+    cloneSources = list(itertools.chain(*cloneSources.itervalues()))
 
     client = ConaryClient(cfg)
     okay, cs = client.createCloneChangeSet(targetBranch, cloneSources)
