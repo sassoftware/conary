@@ -81,7 +81,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
         print 'The following %s will be created:' % branchOps
         displayBranchJob(cs, shadow=makeShadow)
         print
-        okay = cmdline.askYn('continue with %s? [y/N]' % branchOp.lower(), 
+        okay = cmdline.askYn('continue with %s? [y/N]' % branchOps.lower(), 
                              default=False)
         if not okay: 
             return
