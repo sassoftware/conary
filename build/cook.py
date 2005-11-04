@@ -897,13 +897,15 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         # FIXME checkin imports cook functions as well, perhaps move
         # SourceState or some functions here to a third file?
         import checkin
-        state = checkin.ConaryStateFromFile('CONARY').getSourceState()
-        if state.getName() == srcName and \
-                        state.getVersion() != versions.NewVersion():
-            if state.getVersion().trailingRevision().version != versionStr:
-                return state.getVersion().branch().createVersion(
-                            versions.Revision('%s-1' % (versionStr)))
-            return state.getVersion()
+        conaryState = checkin.ConaryStateFromFile('CONARY')
+        if conaryState.hasSourceState():
+            state = conaryState.getSourceState()
+            if state.getName() == srcName and \
+                            state.getVersion() != versions.NewVersion():
+                if state.getVersion().trailingRevision().version != versionStr:
+                    return state.getVersion().branch().createVersion(
+                                versions.Revision('%s-1' % (versionStr)))
+                return state.getVersion()
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
