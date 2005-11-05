@@ -18,7 +18,6 @@ import httplib
 import itertools
 import os
 import socket
-import tempfile
 import urllib
 import xml
 import xmlrpclib
