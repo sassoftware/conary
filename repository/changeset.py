@@ -1224,7 +1224,7 @@ class dictAsCsf:
         # XXX there must be a better way, but I can't think of it
         f = contObj.get()
         (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
-        #os.unlink(path)
+        os.unlink(path)
         gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
         util.copyfileobj(f, gzf)
         del f
