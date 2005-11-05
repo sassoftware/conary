@@ -1934,10 +1934,10 @@ class Requires(_addInfo, _BuildPackagePolicy):
         def _findSonameInRpath(soname):
             for rpath in rpathList:
                 destpath = '/'.join((self.macros.destdir, rpath, soname))
-                if util.exists(destpath):
+                if os.path.exists(destpath):
                     return rpath
                 destpath = '/'.join((rpath, soname))
-                if util.exists(destpath):
+                if os.path.exists(destpath):
                     return rpath
             # didn't find anything
             return None
