@@ -1,3 +1,7 @@
+Changes in 0.70.5:
+  o Client Changes
+    * Files changing to config files across distributed repositories now works
+
 Changes in 0.70.4:
   o Client Changes
     * The trove that satisfies a dependency that is broken by erase is
