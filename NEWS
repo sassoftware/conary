@@ -21,6 +21,7 @@ Changes in 0.70.4:
     * Fixed usage message to better reflect reality
     * Cloning to a branch which already has a version with a compatible
       flavor now works.
+    * cpio archive files are now supported for r.addArchive()
   o Repository Changes
     * The repository now serves up stored OpenPGP keys as a "Limited
       Keyserver"; users can retrieve keys, but not search or browse them.
