@@ -17,6 +17,7 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
+import itertools
 import os
 import resource
 import shutil
@@ -525,9 +526,11 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     l = []
     flavor = deps.DependencySet()
     size = 0
-    for (pathId, path, fileId, version) in recipeObj.iterFileList():
-	fileObj = repos.getFileVersion(pathId, fileId, version)
-	l.append((pathId, path, version, fileId))
+    fileObjList = repos.getFileVersions([ (x[0], x[2], x[3]) for x in 
+                                                recipeObj.iterFileList() ])
+    for (pathId, path, fileId, version), fileObj in \
+                        itertools.izip(recipeObj.iterFileList(), fileObjList):
+	l.append((pathId, path, version, fileId, fileObj.flags.isConfig()))
         if fileObj.hasContents:
             size += fileObj.contents.size()
 
@@ -535,11 +538,13 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 	    flavor.union(fileObj.flavor())
 	changeSet.addFile(None, fileId, fileObj.freeze())
 
-	# since the file is already in the repository (we just got it from
+	# Since the file is already in the repository (we just got it from
 	# there, so it must be there!) leave the contents out. this
 	# means that the change set we generate can't be used as the 
 	# source of an update, but it saves sending files across the
-	# network for no reason
+	# network for no reason. For local builds we go back through this
+        # list and grab the contents after we've determined the target
+        # version
 
     targetVersion = nextVersion(repos, db, fullName, sourceVersion, flavor, 
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
@@ -549,7 +554,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     provides.addDep(deps.TroveDependencies, deps.Dependency(fullName))
     fileset.setProvides(provides)
 
-    for (pathId, path, version, fileId) in l:
+    for (pathId, path, version, fileId, isConfig) in l:
 	fileset.addFile(pathId, path, version, fileId)
 
     fileset.setBuildTime(time.time())
@@ -563,6 +568,16 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
     changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
+
+    if targetVersion.isOnLocalHost():
+        # We need the file contents. Go get 'em
+
+        # pass (fileId, fileVersion)
+        contentList = repos.getFileContents([ (x[3], x[2]) for x in l ])
+        for (pathId, path, version, fileId, isConfig), contents in \
+                                                itertools.izip(l, contentList):
+            changeSet.addFileContents(pathId, changeset.ChangedFileTypes.file, 
+                                      contents, isConfig)
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 
                                                 fileset.getFlavor()) ]
