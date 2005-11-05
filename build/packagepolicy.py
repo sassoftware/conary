@@ -656,6 +656,7 @@ class SharedLibrary(policy.Policy):
             d = {'subtrees': keywords['subtrees']}
             self.recipe.ExecutableLibraries(**d)
             self.recipe.CheckSonames(**d)
+            self.recipe.NormalizeLibrarySymlinks(**d)
             # Provides and Requires need a different limitation...
             d = {'sonameSubtrees': keywords['subtrees']}
             self.recipe.Provides(**d)

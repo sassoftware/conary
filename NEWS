@@ -1,11 +1,15 @@
 Changes in 0.70.5:
   o Client Changes
-    * Files changing to config files across distributed repositories now works
+    * Files changing to config files across distributed repositories now works.
   o Build Changes (cvc)
-    * Locally cooked filesets now include file contents making them
-      installable
-    * Fileset cooks now retrieves all of the file objects in a single
-      network request per repository
+    * Locally cooked filesets now include file contents, making the
+      filesets installable.
+    * Fileset cooks now retrieve all of the file objects in a single
+      network request per repository.
+    * The new NormalizeLibrarySymlinks policy runs the ldconfig program
+      in all system library directories.  This ensures that all the
+      same symlinks that ldconfig would create when the shlib tag handler
+      runs are packaged.  It also warns if ldconfig finds missing files.
 
 Changes in 0.70.4:
   o Client Changes

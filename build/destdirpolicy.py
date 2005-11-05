@@ -603,6 +603,7 @@ class ReadableDocs(policy.Policy):
                       ' to mode 0%o', path, mode & 07777)
             os.chmod(fullpath, mode)
 
+
 class Strip(policy.Policy):
     """
     Strips executables and libraries of debugging information.
@@ -721,6 +722,40 @@ class Strip(policy.Policy):
                 except IOError, msg:
                     if msg.errno == errno.ENOENT:
                         pass
+
+
+class NormalizeLibrarySymlinks(policy.Policy):
+    """
+    Runs the ldconfig program in each system library directory.
+    Without this, when ldconfig is run from the shlib tag handler,
+    it can create unowned symlinks that are later packaged and
+    cause problems updating because a newly-packaged file already
+    exists on the filesystem.
+
+    Pass in additional system libraries only by calling
+    C{r.SharedLibrary(subtrees='I{/path/to/libraries/}')}; do not
+    pass them in directly.  Exceptions can be passed in directly by
+    calling C{r.NormalizeLibrarySymlinks(exceptions='I{/path/to/libraries/}')}.
+    """
+    invariantsubtrees = librarydirs
+
+    def do(self):
+        macros = self.macros
+        subtrees = self.invariantsubtrees
+        if self.subtrees:
+            subtrees.extend(self.subtrees)
+        for path in subtrees:
+            path = util.normpath(path % macros)
+            fullpath = '/'.join((self.macros.destdir, path))
+            if not os.path.exists(fullpath):
+                continue
+            oldlist = os.listdir(fullpath)
+            util.execute('%(essentialsbindir)s/ldconfig -n '%macros + fullpath)
+            newlist = os.listdir(fullpath)
+            if len(oldlist) != len(newlist):
+                self.warn('ldconfig found missing files in %s: %s', path,
+                          ', '.join(sorted(list(set(newlist)-set(oldlist)))))
+
 
 class NormalizeCompression(policy.Policy):
     """
@@ -1138,6 +1173,7 @@ def DefaultPolicy(recipe):
 	ExecutableLibraries(recipe),
 	ReadableDocs(recipe),
 	Strip(recipe),
+        NormalizeLibrarySymlinks(recipe),
 	NormalizeCompression(recipe),
 	NormalizeManPages(recipe),
 	NormalizeInfoPages(recipe),

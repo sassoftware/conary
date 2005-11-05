@@ -469,9 +469,15 @@ class Ldconfig(BuildCommand):
     symlinks for a library.  Conary packages should include all the
     appropriate symlinks in the packages.  This is not a replacement
     for marking a file as a shared library; C{ldconfig} still needs
-    to be run after libraries are installed.
+    to be run after libraries are installed.  Note that C{ldconfig}
+    will automatically be run for all system libraries as defined
+    by the C{SharedLibrary} policy.
     """
     template = '%%(essentialsbindir)s/ldconfig -n %%(destdir)s/%(args)s'
+    def do(self, macros):
+        BuildCommand.do(self, macros)
+        # since we already did this, don't do it again in policy
+        self.recipe.NormalizeLibrarySymlinks(exceptions=self.arglist)
 
 
 class _FileAction(BuildAction):
