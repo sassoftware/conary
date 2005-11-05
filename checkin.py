@@ -417,7 +417,7 @@ def checkout(repos, cfg, workDir, name, callback=None):
 
 def commit(repos, cfg, message, callback=None):
     if not callback:
-        callback = CheckinCallback
+        callback = CheckinCallback()
 
     if cfg.name is None or cfg.contact is None:
 	log.error("name and contact information must be set for commits")
