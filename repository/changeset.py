@@ -1151,7 +1151,8 @@ def fileChangeSet(pathId, old, new):
     if old and old.__class__ == new.__class__:
 	if isinstance(new, files.RegularFile) and      \
 		  isinstance(old, files.RegularFile)   \
-		  and new.contents.sha1() != old.contents.sha1():
+		  and ((new.contents.sha1() != old.contents.sha1()) or
+                       (not old.flags.isConfig() and new.flags.isConfig())):
 	    contentsHash = new.contents.sha1()
     elif isinstance(new, files.RegularFile):
 	    contentsHash = new.contents.sha1()
