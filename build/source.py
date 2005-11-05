@@ -220,8 +220,6 @@ class Archive(_Source):
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            
-
             util.execute("%s < %s | %s" % (_uncompress, f, _unpack))
 
         if guessMainDir:
