@@ -23,28 +23,43 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define GET_REAL(name) if (!real_##name) real_##name = dlsym(RTLD_NEXT, #name);
-#define GET_PATH() p = prepend_destdir(pathname)
-#define PUT_PATH() free((void *)p)
 #define PRINTF(...)
 /* #define PRINTF(...) printf(__VA_ARGS__) */
 
+#define GET_PATH(name)	PRINTF("%s %s\n", #name, pathname); \
+			if (!real_##name) real_##name = dlsym(RTLD_NEXT, #name); \
+			p = prepend_destdir(pathname) ;
+
+#define PUT_PATH(rval)	free((void *)p); \
+			if (ret != rval || errno != ENOENT) return ret;
+
 
 static const char *prepend_destdir(const char *pathname) {
-    char *p;
-    static int destlen;
-    static char *destdir;
-    static int init;
-
+    char *p = NULL;
+    char *destdir = NULL;
+    char *wrapdir = NULL;
+    int destlen = 0;
+    
     if (pathname[0] != '/') return NULL;
-    if (!destdir && init) return NULL;
     if (!destdir) {
-        init = 1;
         destdir = getenv("DESTDIR");
         if (!destdir) {
             return NULL;
         }
         destlen = strlen(destdir);
+    }
+
+    wrapdir = getenv("WRAPDIR");
+    /* if we're asked to "wrap" just one subdirectory tree and this is
+       not one of those, bail out */
+    if (wrapdir) {
+	int wlen, plen;
+	wlen = strlen(wrapdir);
+	plen = strlen(pathname);
+	if (plen < wlen)
+	    return NULL;
+	if (strncmp(wrapdir, pathname, wlen))
+	    return NULL;
     }
 
     p = (char *) malloc(strlen(pathname)+destlen+1);
@@ -61,124 +76,237 @@ static const char *prepend_destdir(const char *pathname) {
  * opendir() C library call.
  */
 
-int open(const char *pathname, int flags, mode_t mode) {
-    static int (*real_open)(const char *pathname, int flags, mode_t mode);
+int access(const char *pathname, int mode) {
+    static int (*real_access)(const char *pathname, int mode) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("open\n");
-    GET_REAL(open);
-    GET_PATH();
-    if (p) ret = real_open(p, flags, mode);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
+    GET_PATH(access);   
+    if (p) {
+	ret = real_access(p, mode);
+	PUT_PATH(-1);
+    }
+    return real_access(pathname, mode);
+}
 
+int open(const char *pathname, int flags, mode_t mode) {
+    static int (*real_open)(const char *pathname, int flags, mode_t mode) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(open);
+    if (p) {
+	ret = real_open(p, flags, mode);
+	PUT_PATH(-1);
+    }
     return real_open(pathname, flags, mode);
 }
 
 int open64(const char *pathname, int flags, mode_t mode) {
-    static int (*real_open64)(const char *pathname, int flags, mode_t mode);
+    static int (*real_open64)(const char *pathname, int flags, mode_t mode) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("open64\n");
-    GET_REAL(open64);
-    GET_PATH();
-    if (p) ret = real_open64(p, flags, mode);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
-
+    GET_PATH(open64);
+    if (p) {
+	ret = real_open64(p, flags, mode);
+	PUT_PATH(-1);
+    }
     return real_open64(pathname, flags, mode);
 }
 
-
 int stat(const char *pathname, struct stat *buf) {
-    static int (*real_stat)(const char *pathname, struct stat *buf);
+    static int (*real_stat)(const char *pathname, struct stat *buf) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("stat\n");
-    GET_REAL(stat);
-    GET_PATH();
-    if (p) ret = real_stat(p, buf);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
-
+    GET_PATH(stat);
+    if (p) {
+	ret = real_stat(p, buf);
+	PUT_PATH(-1);
+    }
     return real_stat(pathname, buf);
 }
 
 int stat64(const char *pathname, struct stat64 *buf) {
-    static int (*real_stat64)(const char *pathname, struct stat64 *buf);
+    static int (*real_stat64)(const char *pathname, struct stat64 *buf) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("stat64\n");
-    GET_REAL(stat64);
-    GET_PATH();
-    if (p) ret = real_stat64(p, buf);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
-
+    GET_PATH(stat64);
+    if (p) {
+	ret = real_stat64(p, buf);
+	PUT_PATH(-1);
+    }
     return real_stat64(pathname, buf);
 }
 
 int lstat(const char *pathname, struct stat *buf) {
-    static int (*real_lstat)(const char *pathname, struct stat *buf);
+    static int (*real_lstat)(const char *pathname, struct stat *buf) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("lstat\n");
-    GET_REAL(lstat);
-    GET_PATH();
-    if (p) ret = real_lstat(p, buf);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
-
+    GET_PATH(lstat);
+    if (p) {
+	ret = real_lstat(p, buf);
+	PUT_PATH(-1);
+    }
     return real_lstat(pathname, buf);
 }
 
 int lstat64(const char *pathname, struct stat64 *buf) {
-    static int (*real_lstat64)(const char *pathname, struct stat64 *buf);
+    static int (*real_lstat64)(const char *pathname, struct stat64 *buf) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("lstat64\n");
-    GET_REAL(lstat64);
-    GET_PATH();
-    if (p) ret = real_lstat64(p, buf);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
-
+    GET_PATH(lstat64);
+    if (p) {
+	ret = real_lstat64(p, buf);
+	PUT_PATH(-1);
+    }
     return real_lstat64(pathname, buf);
 }
 
-int chmod(const char *pathname, mode_t mode) {
-    static int (*real_chmod)(const char *pathname, mode_t mode);
+int __xstat(int ver, const char *pathname, struct stat *buf) {
+    static int (*real___xstat)(int ver, const char *pathname, struct stat *buf) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("chmod\n");
-    GET_REAL(chmod);
-    GET_PATH();
-    if (p) ret = real_chmod(p, mode);
-    PUT_PATH();
-    if (ret != -1 || errno != ENOENT) return ret;
+    GET_PATH(__xstat);
+    if (p) {
+	ret = real___xstat(ver, p, buf);
+	PUT_PATH(-1);
+    }
+    return real___xstat(ver, pathname, buf);
+}
 
+int __xstat64(int ver, const char *pathname, struct stat64 *buf) {
+    static int (*real___xstat64)(int ver, const char *pathname, struct stat64 *buf) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(__xstat64);
+    if (p) {
+	ret = real___xstat64(ver, p, buf);
+	PUT_PATH(-1);
+    }
+    return real___xstat64(ver, pathname, buf);
+}
+
+int __lxstat(int ver, const char *pathname, struct stat *buf) {
+    static int (*real___lxstat)(int ver, const char *pathname, struct stat *buf) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(__lxstat);
+    if (p) {
+	ret = real___lxstat(ver, p, buf);
+	PUT_PATH(-1);
+    }
+    return real___lxstat(ver, pathname, buf);
+}
+
+int __lxstat64(int ver, const char *pathname, struct stat64 *buf) {
+    static int (*real___lxstat64)(int ver, const char *pathname, struct stat64 *buf) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(__lxstat64);
+    if (p) {
+	ret = real___lxstat64(ver, p, buf);
+	PUT_PATH(-1);
+    }
+    return real___lxstat64(ver, pathname, buf);
+}
+
+int chdir(const char *pathname) {
+    static int (*real_chdir)(const char *pathname) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(chdir);
+    if (p) {
+	ret = real_chdir(p);
+	PUT_PATH(-1);
+    }
+    return real_chdir(pathname);
+}
+
+int mkdir(const char *pathname, mode_t mode) {
+    static int (*real_mkdir)(const char *pathname, mode_t mode) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(mkdir);
+    if (p) {
+	ret = real_mkdir(p, mode);
+	PUT_PATH(-1);
+    }
+    return real_mkdir(pathname, mode);
+}
+    
+int rmdir(const char *pathname) {
+    static int (*real_rmdir)(const char *pathname) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(rmdir);
+    if (p) {
+	ret = real_rmdir(p);
+	PUT_PATH(-1);
+    }
+    return real_rmdir(pathname);
+}
+
+int chmod(const char *pathname, mode_t mode) {
+    static int (*real_chmod)(const char *pathname, mode_t mode) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(chmod);
+    if (p) {
+	ret = real_chmod(p, mode);
+	PUT_PATH(-1);
+    }
     return real_chmod(pathname, mode);
 }
 
-int unlink(const char *pathname) {
-    static int (*real_unlink)(const char *pathname);
+int chown(const char *pathname, uid_t owner, gid_t group) {
+    static int (*real_chown)(const char *pathname, uid_t owner, gid_t group) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("unlink\n");
-    GET_REAL(unlink);
-    GET_PATH();
-    if (p) ret = real_unlink(p);
-    PUT_PATH();
-    if (ret != 0 || errno != ENOENT) return ret;
+    GET_PATH(chown);
+    if (p) {
+	ret = real_chown(p, owner, group);
+	PUT_PATH(-1);
+    }
+    return real_chown(pathname, owner, group);
+}
 
+int lchown(const char *pathname, uid_t owner, gid_t group) {
+    static int (*real_lchown)(const char *pathname, uid_t owner, gid_t group) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(lchown);
+    if (p) {
+	ret = real_lchown(p, owner, group);
+	PUT_PATH(-1);
+    }
+    return real_lchown(pathname, owner, group);
+}
+
+int unlink(const char *pathname) {
+    static int (*real_unlink)(const char *pathname) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(unlink);
+    if (p) {
+	ret = real_unlink(p);
+	PUT_PATH(0);
+    }
     return real_unlink(pathname);
 }
 
@@ -186,62 +314,58 @@ int unlink(const char *pathname) {
 /* C library bits that do not directly map to a syscall */
 
 int opendir(const char *pathname) {
-    static int (*real_opendir)(const char *pathname);
+    static int (*real_opendir)(const char *pathname) = NULL;
     const char *p;
     int ret;
 
-    PRINTF("opendir\n");
-    GET_REAL(opendir);
-    GET_PATH();
-    if (p) ret = real_opendir(p);
-    PUT_PATH();
-    if (ret != 0 || errno != ENOENT) return ret;
-
+    GET_PATH(opendir);
+    if (p) {
+	ret = real_opendir(p);
+	PUT_PATH(0);
+    }
     return real_opendir(pathname);
 }
 
 void *dlopen(const char *pathname, int flags) {
-    static void * (*real_dlopen)(const char *pathname, int flags);
+    static void * (*real_dlopen)(const char *pathname, int flags) = NULL;
     const char *p;
     void *ret;
 
-    PRINTF("dlopen\n");
-    GET_REAL(dlopen);
-    GET_PATH();
-    if (p) ret = real_dlopen(p, flags);
-    PUT_PATH();
-    if (ret != NULL || errno != ENOENT) return ret;
-
+    /* If the value of file is 0, dlopen() shall provide a handle on a global symbol object. */
+    if (pathname == NULL)
+	return real_dlopen(pathname, flags);
+    
+    GET_PATH(dlopen);
+    if (p) {
+	ret = real_dlopen(p, flags);
+	PUT_PATH(NULL);
+    }
     return real_dlopen(pathname, flags);
 }
 
 FILE *fopen(const char *pathname, const char *mode) {
-    static void * (*real_fopen)(const char *pathname, const char *mode);
+    static void * (*real_fopen)(const char *pathname, const char *mode) = NULL;
     const char *p;
     FILE *ret;
 
-    PRINTF("fopen\n");
-    GET_REAL(fopen);
-    GET_PATH();
-    if (p) ret = real_fopen(p, mode);
-    PUT_PATH();
-    if (ret != NULL || errno != ENOENT) return ret;
-
+    GET_PATH(fopen);
+    if (p) {
+	ret = real_fopen(p, mode);
+	PUT_PATH(NULL);
+    }
     return real_fopen(pathname, mode);
 }
 
 FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
-    static void * (*real_freopen)(const char *pathname, const char *mode, FILE *stream);
+    static void * (*real_freopen)(const char *pathname, const char *mode, FILE *stream) = NULL;
     const char *p;
     FILE *ret;
 
-    PRINTF("freopen\n");
-    GET_REAL(freopen);
-    GET_PATH();
-    if (p) ret = real_freopen(p, mode, stream);
-    PUT_PATH();
-    if (ret != NULL || errno != ENOENT) return ret;
-
+    GET_PATH(freopen);
+    if (p) {
+	ret = real_freopen(p, mode, stream);
+	PUT_PATH(NULL);
+    }
     return real_freopen(pathname, mode, stream);
 }
 
