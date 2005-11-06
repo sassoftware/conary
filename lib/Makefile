@@ -53,7 +53,7 @@ cstreamsmodule.so: $(cstreamsmodule_objs)
 	$(CC) -shared -o $@ $^
 
 filename_wrapper.so: filename_wrapper.c
-	$(CC) -fPIC -rdynamic -c filename_wrapper.c
+	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
 	$(CC) -shared -o filename_wrapper.so filename_wrapper.o -lc -ldl
 
 install: pyfiles-install
