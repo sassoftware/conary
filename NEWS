@@ -1,6 +1,9 @@
 Changes in 0.70.5:
   o Client Changes
     * Files changing to config files across distributed repositories now works.
+    * The update code uses more consistent use of trove sources, and only
+      makes explicit calls to the repository if asked.  This should make it
+      possible to create interesting update filters.
   o Build Changes (cvc)
     * Locally cooked filesets now include file contents, making the
       filesets installable.

@@ -46,7 +46,7 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 class ClientUpdate:
 
     def _resolveDependencies(self, uJob, jobSet, split = False,
-                             resolveDeps = True):
+                             resolveDeps = True, useRepos = True):
 
         def _selectResolutionTrove(troveTups, installFlavor, affFlavorDict):
             """ determine which of the given set of troveTups is the 
@@ -176,9 +176,14 @@ class ClientUpdate:
             depList = []
             cannotResolve = []
 
+        resolveSource = uJob.getSearchSource()
+        if useRepos:
+            resolveSource = trovesource.stack(resolveSource, self.repos)
+            
+
         while depList and pathIdx < len(self.cfg.installLabelPath):
             nextCheck = [ x[1] for x in depList ]
-            sugg = self.repos.resolveDependencies(
+            sugg = resolveSource.resolveDependencies(
                             self.cfg.installLabelPath[pathIdx], 
                             nextCheck)
 
@@ -946,8 +951,7 @@ class ClientUpdate:
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
-                         restrictToTroveSource = False, 
-                         ignorePrimaryPins = True):
+                         useAffinity = True, ignorePrimaryPins = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1081,7 +1085,7 @@ class ClientUpdate:
                 toFind[(troveName, newVersionStr, newFlavorStr)] = \
                                         oldTrove, isAbsolute
             else:
-                if not (isAbsolute or sync or restrictToTroveSource):
+                if not (isAbsolute or not useAffinity):
                     # not isAbsolute means keepExisting. when using
                     # keepExisting, branch affinity doesn't make sense - we are
                     # installing a new, generally unrelated version of this
@@ -1092,21 +1096,20 @@ class ClientUpdate:
                     toFind[(troveName, newVersionStr, newFlavorStr)] \
                                     = oldTrove, isAbsolute
         results = {}
-        if restrictToTroveSource:
-            results.update(uJob.getTroveSource().findTroves(None, toFind))
-        elif sync:
-            source = trovesource.ReferencedTrovesSource(self.db)
-            results.update(source.findTroves(None, toFind))
+        searchSource = uJob.getSearchSource()
+
+        if not useAffinity:
+            results.update(searchSource.findTroves(None, toFind))
         else:
             if toFind:
                 log.debug("looking up troves w/ database affinity")
-                results.update(self.repos.findTroves(
+                results.update(searchSource.findTroves(
                                         self.cfg.installLabelPath, toFind, 
                                         self.cfg.flavor,
                                         affinityDatabase=self.db))
             if toFindNoDb:
                 log.debug("looking up troves w/o database affinity")
-                results.update(self.repos.findTroves(
+                results.update(searchSource.findTroves(
                                            self.cfg.installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
 
@@ -1154,16 +1157,27 @@ class ClientUpdate:
         if changeSetList:
             jobSet.update(changeSetList)
 
-            # some of these items may already be available in troveSource;
-            # don't go back over the wire for those
+            # FIXME changeSetSource: I should just be able to call 
+            # csSource.createChangeSet but it can't handle recursive
+            # createChangeSet calls, and you can only call createChangeSet
+            # once on a csSource.  So, we avoid having to call it more than
+            # once by checking to see if the changeSets are already in the
+            # update job.
             hasTroves = uJob.getTroveSource().hasTroves(
-                    [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
-            changeSetList = [ x[1] for x in 
-                                    itertools.izip(hasTroves, changeSetList)
-                                    if x[0] is not True ]
+                [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
 
-            cs = self.repos.createChangeSet(changeSetList, withFiles = False,
-                                            recurse = recurse)
+            changeSetList = [ x[1] for x in
+                              itertools.izip(hasTroves, changeSetList)
+                               if x[0] is not True ]
+
+            csSource = trovesource.TroveSourceStack(
+                                         uJob.getSearchSource(),
+                                         self.repos)
+
+            cs, notFound = csSource.createChangeSet(changeSetList, 
+                                                    withFiles = False,
+                                                    recurse = recurse)
+            assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
             del cs
 
@@ -1222,7 +1236,8 @@ class ClientUpdate:
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
-                        checkPathConflicts = True, ignorePrimaryPins = True):
+                        checkPathConflicts = True, ignorePrimaryPins = True,
+                        resolveRepos = True):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1261,22 +1276,42 @@ class ClientUpdate:
         @type fromChangesets: list of changeset.ChangeSetFromFile
         @param ignorePrimaryPins: If True, pins on primary troves are
         ignored otherwise they are treated normally.
+        @param resolveRepos: If True, search the repository for resolution
+        troves.
         @rtype: tuple
         """
         callback.preparingChangeSet()
 
         uJob = database.UpdateJob(self.db)
 
-        for cs in fromChangesets:
-            uJob.getTroveSource().addChangeSet(cs, includesFileContents = True)
+        useAffinity = False
+
+        if fromChangesets:
+            csSource = trovesource.ChangesetFilesTroveSource(self.db)
+            for cs in fromChangesets:
+                csSource.addChangeSet(cs, includesFileContents = True)
+                # FIXME ChangeSetSource: We shouldn't have to add this to 
+                # uJob.troveSource() at this point, since the 
+                # changeset is not part of the job yet.  But given the 
+                # way changeSetSource.createChangeSet is written
+                # (it can't handle recursive changeSet creation, e.g.)
+                # we have no choice.  Search FIXME ChangeSetSource for 
+                # a matching comment
+                uJob.getTroveSource().addChangeSet(cs,
+                                                   includesFileContents = True)
+
+            uJob.setSearchSource(csSource)
+        elif sync:
+            uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
+        else:
+            uJob.setSearchSource(self.repos)
+            useAffinity = True
 
         jobSet, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
                                         recurse = recurse,
                                         updateMode = updateByDefault,
-                                        sync = sync, 
-                                        restrictToTroveSource = 
-                                            (len(fromChangesets) > 0),
+                                        useAffinity = useAffinity,
                                         ignorePrimaryPins = ignorePrimaryPins)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
@@ -1296,7 +1331,8 @@ class ClientUpdate:
         # jobs in the updated jobSet
         (depList, suggMap, cannotResolve, splitJob) = \
             self._resolveDependencies(uJob, jobSet, split = split,
-                                      resolveDeps = resolveDeps)
+                                      resolveDeps = resolveDeps,
+                                      useRepos = resolveRepos)
 
         if depList:
             raise DepResolutionFailure(depList)

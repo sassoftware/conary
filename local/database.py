@@ -99,6 +99,17 @@ class UpdateJob:
     def getTroveSource(self):
         return self.troveSource
 
+    def setSearchSource(self, *troveSources):
+        if len(troveSources) > 1:
+            troveSource = trovesource.TroveSourceStack(*troveSources)
+        else:
+            troveSource = troveSources[0]
+
+        self.searchSource = troveSource
+
+    def getSearchSource(self):
+        return self.searchSource
+
     def addJob(self, job):
         self.jobs.append(job)
 
@@ -112,12 +123,14 @@ class UpdateJob:
     def getPrimaryJobs(self):
         return self.primaries
 
-    def __init__(self, db):
+    def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
         self.rollback = None
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
+
+        self.searchSource = searchSource
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,

@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from deps import deps
 
 import changeset
 import findtrove
@@ -104,6 +105,12 @@ class SearchableTroveSource(AbstractTroveSource):
 
     def getTroves(self, troveList, withFiles = True):
         raise NotImplementedError
+
+    def createChangeSet(self, jobList, withFiles = True, recurse = False,
+                        withFileContents = False):
+        # return changeset, and unhandled jobs
+        cs = changeset.ReadOnlyChangeSet()
+        return cs, jobList
     
     def __init__(self):
         self.searchAsDatabase()
@@ -374,6 +381,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.db = db
         self.troveCsMap = {}
         self.jobMap = {}
+        self.providesMap = {}
         self.csList= []
         self.invalidated = False
 
@@ -382,6 +390,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for trvCs in cs.iterNewTroveList():
             info = (trvCs.getName(), trvCs.getNewVersion(), 
                     trvCs.getNewFlavor())
+            self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
+
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
                     # FIXME: there is no such exception in this context
@@ -444,6 +454,24 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         assert(not self.invalidated)
         return [ x in self.troveCsMap for x in troveList ]
 
+    def resolveDependencies(self, label, depList):
+        suggMap = {}
+        for depSet in depList:
+            l = []
+            suggMap[depSet] = l
+
+            for (depClass, dep) in depSet.iterDeps():
+                singleDep = deps.DependencySet()
+                singleDep.addDep(depClass, dep)
+
+                for provSet, troveTup in self.providesMap.iteritems():
+                    #if label and troveTup[1].branch().label() != label:
+                    #    continue
+
+                    if provSet.satisfies(singleDep):
+                        l.append(troveTup)
+        return suggMap
+
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, useDatabase = True):
         # Returns the changeset plus a remainder list of the bits it
@@ -466,7 +494,12 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         assert((withFiles and withFileContents) or
                (not withFiles and not withFileContents))
 
-        assert(not recurse)
+        if recurse:
+            # FIXME: can't handle recursive change set creation,
+            # just bail
+            cs = changeset.ReadOnlyChangeSet()
+            return cs, jobList
+
         troves = []
         for job in jobList:
             if job[1][0] is not None:
@@ -587,3 +620,138 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 cs.merge(subCs)
 
         return (cs, remainder)
+
+
+class TroveSourceStack(SearchableTroveSource):
+
+    def __init__(self, *sources):
+        self.sources = []
+        for source in sources:
+            if isinstance(source, TroveSourceStack):
+                for subSource in source.iterSources():
+                    self.addSource(source)
+            else:
+                self.addSource(source)
+
+    def addSource(self, source):
+        if source is not None and source not in self.sources:
+            self.sources.append(source)
+
+    def hasSource(self, source):
+        return source in self.sources
+
+    def iterSources(self):
+        for source in self.sources:
+            yield source
+
+    def copy(self):
+        return TroveSourceStack(*self.sources)
+
+    def __repr__(self):
+        return 'TroveSourceStack(%s)' % (', '.join(repr(x) for x in self.sources))
+
+    def trovesByName(self, name):
+        return list(chain(*(x.trovesByName(name) for x in self.sources)))
+        
+    def getTroves(self, troveList, withFiles = True):
+        # XXX I don't have a test case that tests this yet
+        troveList = list(enumerate(troveList)) # make a copy and add indexes
+        numTroves = len(troveList)
+        results = [None] * numTroves
+
+        for source in self.sources:
+            newTroveList = []
+            newIndexes = []
+            troves = source.getTroves([x[0] for x in troveList], 
+                                      withFiles=withFiles)
+            for ((index, troveTup), trove) in intertools.izip(troveList, 
+                                                              troves):
+                if trove is None:
+                    newTroveList.append((index, troveTup))
+                else:
+                    results[index] = trove
+                    
+    def findTroves(self, labelPath, troves, defaultFlavor=None, 
+                   acrossLabels=True, acrossFlavors=True, 
+                   affinityDatabase=None, allowMissing=False):
+
+        troves = list(troveSpecs)
+
+        results = {}
+        troveFinder = findtrove.TroveFinder(self, labelPath, 
+                                            defaultFlavor, acrossLabels,
+                                            acrossFlavors, affinityDatabase,
+                                            allowNoLabel=self._allowNoLabel,
+                                            bestFlavor=self._bestFlavor,
+                                            getLeaves=self._getLeavesOnly)
+
+        for source in self.sources[:-1]:
+            troveFinder.setTroveSource(source)
+
+            foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)
+
+            newTroveSpecs = []
+            for troveSpec in troveSpecs:
+                if troveSpec in foundTroves:
+                    results[troveSpec] = foundTroves[troveSpec]
+                else:
+                    newTroveSpecs.append(troveSpec)
+
+            troveSpecs = newTroveSpecs
+
+        troveFinder.setTroveSource(self.sources[-1])
+
+        results.update(troveFinder.findTroves(troveSpecs, 
+                                              allowMissing=allowMissing))
+        return results
+
+    def resolveDependencies(self, label, depList):
+        results = {}
+
+        depList = set(depList)
+
+        for source in self.sources:
+            if not depList:
+                break
+
+            sugg = source.resolveDependencies(label, depList)
+            for depSet, troves in sugg.iteritems():
+                depList.remove(depSet)
+                results[depSet] = troves
+        
+        return results
+
+    def createChangeSet(self, jobList, withFiles = True, recurse = False,
+                        withFileContents = False):
+
+        cs = changeset.ReadOnlyChangeSet()
+
+        for source in self.sources:
+            if not jobList:
+                break
+
+            res = source.createChangeSet(jobList, 
+                                       withFiles = withFiles,
+                                       withFileContents = withFileContents,
+                                       recurse = recurse)
+            if isinstance(res, (list, tuple)):
+                newCs, jobList = res
+            else: 
+                newCs, jobList = res, None
+            cs.merge(newCs)
+
+        return cs, jobList
+
+def stack(source1, source2):
+    """ create a trove source that will search first source1, then source2 """
+
+    if source1 is source2:
+        return source1
+
+    if isinstance(source1, TroveSourceStack):
+        if source1.hasSource(source2):
+            return source1
+        source1.copy().addSource(source2)
+        return source1
+    
+    return TroveSourceStack(source1, source2)
