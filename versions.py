@@ -67,7 +67,7 @@ class SerialNumber(object):
 
     def __cmp__(self, other):
         if self.__class__ != other.__class__:
-            return False
+            return NotImplemented
 
         i = 0
         for i in range(min(len(self.numList), len(other.numList))):
@@ -144,7 +144,8 @@ class Revision(AbstractRevision):
     __slots__ = ( "version", "sourceCount", "buildCount", "timeStamp" )
 
     def __cmp__(self, other):
-        assert(isinstance(other, Revision))
+        if not (isinstance(other, Revision)):
+            return NotImplemented
         assert(self.timeStamp > 0 and other.timeStamp > 0)
         return cmp(self.timeStamp, other.timeStamp)
 
@@ -570,7 +571,8 @@ class VersionSequence(AbstractVersion):
         self.strRep = None
 
     def __cmp__(self, other):
-        assert(self.__class__ == other.__class__)
+        if self.__class__ != other.__class__:
+            return NotImplemented
 	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
 	return cmp(self.versions[-1].timeStamp, other.versions[-1].timeStamp)
 
