@@ -749,12 +749,17 @@ class NormalizeLibrarySymlinks(policy.Policy):
             fullpath = '/'.join((self.macros.destdir, path))
             if not os.path.exists(fullpath):
                 continue
-            oldlist = os.listdir(fullpath)
+            oldfiles = set(os.listdir(fullpath))
             util.execute('%(essentialsbindir)s/ldconfig -n '%macros + fullpath)
-            newlist = os.listdir(fullpath)
-            if len(oldlist) != len(newlist):
+            newfiles = set(os.listdir(fullpath))
+            addedfiles = newfiles - oldfiles
+            removedfiles = oldfiles - newfiles
+            if addedfiles:
                 self.warn('ldconfig found missing files in %s: %s', path,
-                          ', '.join(sorted(list(set(newlist)-set(oldlist)))))
+                          ', '.join(sorted(list(addedfiles))))
+            if removedfiles:
+                self.warn('ldconfig removed files in %s: %s', path,
+                          ', '.join(sorted(list(removedfiles))))
 
 
 class NormalizeCompression(policy.Policy):
