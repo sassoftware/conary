@@ -124,7 +124,7 @@ class Run(BuildCommand):
     """
     Run a shell command with simple macro substitution: C{r.Run('echo foo')}
     """
-    keywords = {'dir': '', 'filewrap': False}
+    keywords = {'dir': '', 'filewrap': False, 'wrapdir': None}
     template = "%%(envcmd)s%%(cdcmd)s%(args)s"
 
     def __init__(self, *args, **kwargs):
@@ -138,11 +138,20 @@ class Run(BuildCommand):
                 to avoid the need to modify programs that need to
                 be run after the build and assume that they are not
                 run until after installation.
+        @keyword wrapdir: points to a directory, defaults to None.
+                Like C{filewrap}, except it limits the %(destdir)s
+                substitution only to the tree under the given directory.
         """
         BuildCommand.__init__(self, *args, **kwargs)
 
     def do(self, macros):
 	macros = macros.copy()
+
+        envStr = ''
+        if self.wrapdir:
+            self.filewrap = True
+            envStr += ' export WRAPDIR=%(wrapdir)s ; '
+            macros.wrapdir = self.wrapdir           
         if self.filewrap:
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-2])
             localcopy = '/'.join((basedir, 'lib', 'filename_wrapper.so'))
@@ -150,16 +159,15 @@ class Run(BuildCommand):
                 macros.fnw = localcopy
             else:
                 macros.fnw = '%(libdir)s/conary/filename_wrapper.so'
-            macros.envcmd = (
-                'export DESTDIR=%(destdir)s;'
-                'export LD_PRELOAD=%(fnw)s;'
-            )
-        else:
-	    macros.envcmd = ''
+            envStr += ' export LD_PRELOAD=%(fnw)s ; ' + \
+                      ' export DESTDIR=%(destdir)s ; '
+        macros.envcmd = envStr
+
         if self.dir:
             macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
 	else:
 	    macros.cdcmd = ''
+       
         util.execute(self.command %macros)
 
 class Automake(BuildCommand):
