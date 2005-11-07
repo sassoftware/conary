@@ -10,6 +10,11 @@ Changes in 0.70.5:
       in all system library directories.  This ensures that all the
       same symlinks that ldconfig would create when the shlib tag handler
       runs are packaged.  It also warns if ldconfig finds missing files.
+    * New argument to r.Run(), "wrapdir" behaves similarly to "filewrap"
+      but limits the scope of %(destdir)s relocation only to the directories
+      under %(wrapdir)s. Works best for applications that install under one
+      single directory, like /opt/<app>
+
 
 Changes in 0.70.4:
   o Client Changes
