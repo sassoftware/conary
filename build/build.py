@@ -150,7 +150,7 @@ class Run(BuildCommand):
         envStr = ''
         if self.wrapdir:
             self.filewrap = True
-            envStr += ' export WRAPDIR=%(wrapdir)s ; '
+            envStr += 'export WRAPDIR=%(wrapdir)s; '
             macros.wrapdir = self.wrapdir           
         if self.filewrap:
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-2])
@@ -159,8 +159,8 @@ class Run(BuildCommand):
                 macros.fnw = localcopy
             else:
                 macros.fnw = '%(libdir)s/conary/filename_wrapper.so'
-            envStr += ' export LD_PRELOAD=%(fnw)s ; ' + \
-                      ' export DESTDIR=%(destdir)s ; '
+            envStr += (' export LD_PRELOAD=%(fnw)s;'
+                       ' export DESTDIR=%(destdir)s;')
         macros.envcmd = envStr
 
         if self.dir:
