@@ -230,7 +230,7 @@ class FrozenVersionStream(InfoStream):
 
     def twm(self, diff, base):
 	if self.v == base.v:
-	    self.v = diff
+	    self.thaw(diff)
 	    return False
 	elif self.v != diff:
 	    return True
