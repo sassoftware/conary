@@ -291,6 +291,10 @@ class TroveStore:
 	troveVersion = trove.getVersion()
 	troveItemId = self.getItemId(trove.getName())
 
+        isPackage = (not trove.getName().startswith('group') and
+                     not trove.getName().startswith('fileset') and
+                     ':' not in trove.getName())
+
 	# does this version already exist (for another flavor?)
 	newVersion = False
 	troveVersionId = self.versionTable.get(troveVersion, None)
@@ -441,6 +445,12 @@ class TroveStore:
 	    # make sure the versionId and nodeId exists for this (we need
 	    # a nodeId, or the version doesn't get timestamps)
 	    versionId = self.versionTable.get(version, None)
+
+            # sanity check - version/flavor of components must match the
+            # version/flavor of the package
+            assert(not isPackage or versionId == troveVersionId)
+            assert(not isPackage or flavorId == troveFlavorId)
+
 	    if versionId is not None:
 		nodeId = self.versionOps.nodes.getRow(itemId, 
 						      versionId, None)
