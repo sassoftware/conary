@@ -117,12 +117,7 @@ class BuildComponent(dict):
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 	    if depClass == 'soname':
                 if '/' in main:
-                    base = os.path.basename(main)
-                    log.error(
-                        'soname %s contains "/" character, truncating to %s',
-                        main, base
-                    )
-                    main = base
+                    main = os.path.basename(main)
                 assert(abi)
                 curClass = deps.SonameDependencies
                 flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
