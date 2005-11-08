@@ -2081,6 +2081,15 @@ class Requires(_addInfo, _BuildPackagePolicy):
         return True
 
     def _addRequirement(self, path, info, flags, pkg, depClass):
+        if depClass == deps.FileDependencies:
+            pathMap = self.recipe.autopkg.pathMap
+            if info in pathMap and info not in pkg.providesMap:
+                # if a package requires a file, includes that file,
+                # and does not provide that file, it should error out
+                self.error('%s requires %s, which is included but not'
+                           ' provided; use'
+                           " r.Provides('file: %s')", path, info, info)
+                return
         if path not in pkg.requiresMap:
             # BuildPackage only fills in requiresMap for ELF files; we may
             # need to create a few more DependencySets.
