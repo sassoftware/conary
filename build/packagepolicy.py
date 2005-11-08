@@ -2083,7 +2083,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
     def _addRequirement(self, path, info, flags, pkg, depClass):
         if depClass == deps.FileDependencies:
             pathMap = self.recipe.autopkg.pathMap
-            if info in pathMap and info not in pkg.providesMap:
+            componentMap = self.recipe.autopkg.componentMap
+            if info in pathMap and info not in componentMap[info].providesMap:
                 # if a package requires a file, includes that file,
                 # and does not provide that file, it should error out
                 self.error('%s requires %s, which is included but not'
