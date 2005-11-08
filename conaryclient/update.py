@@ -499,6 +499,11 @@ class ClientUpdate:
             return set(eraseList)
 
         def _removeDuplicateErasures(jobSet):
+            # in case where you have 
+            # (a, (oldV, oldF), (newV, newF)),
+            # (a, (oldV, oldF), (newV2, newF2))
+            # call outdated troves to fix up so that both troves
+            # don't remove the same thing
             outdated = {}
             for job in jobSet:
                 if job[2][0] is not None:
@@ -870,8 +875,12 @@ class ClientUpdate:
         if absJob:
             # try and match up everything absolute with something already
             # installed. respecting locks is important.
+            
+            # don't allow updating to old versions that are already in 
+            # an upgrade 
             removeSet = set(((x[0], x[1][0], x[1][1])
-                             for x in newJob if x[1][0] is not None))
+                             for x in newJob if x[1][0] is not None
+                                            and x[2][0] is not None))
 
             outdated = self.db.outdatedTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in absJob],
@@ -937,6 +946,11 @@ class ClientUpdate:
                     # the old one isn't pinned
                     newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
                                 (newInfo[1], newInfo[2]), False))
+
+                    # this job could be replacing an erase job.  
+                    # just get rid of it.
+                    newJob.discard((newInfo[0], (oldInfo[1], oldInfo[2]),
+                                    (None, None), False))
 
         _removeDuplicateAdditions(newJob)
         _matchRelativeUpdates(newJob)
