@@ -13,11 +13,16 @@ Changes in 0.70.5:
       in all system library directories.  This ensures that all the
       same symlinks that ldconfig would create when the shlib tag handler
       runs are packaged.  It also warns if ldconfig finds missing files.
-    * New argument to r.Run(), "wrapdir" behaves similarly to "filewrap"
-      but limits the scope of %(destdir)s relocation only to the directories
-      under %(wrapdir)s. Works best for applications that install under one
-      single directory, like /opt/<app>
+    * New argument to r.Run(): "wrapdir" keyword argument behaves much
+      like "filewrap" but takes a string argument, which limits the scope of
+      %(destdir)s relocation only to the directories under the specified
+      wrapdir, which is interpreted relative to %(destdir)s.  Works best
+      for applications that install under one single directory, such
+      as /opt/<app>
     * Clone, branch, and shadow all take --info now instead of --test
+    * ELF files that dlopen() libraries can now be provided with
+      synthetic soname dependencies with
+      r.Requires('soname: libfoo.so', '/path/to/file')
   o Server Changes 
     * Packages added to the repository are checked to ensure the version and
       flavor of all referenced components are the same as for the package

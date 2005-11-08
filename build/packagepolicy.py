@@ -1858,6 +1858,17 @@ class Requires(_addInfo, _BuildPackagePolicy):
     tested in the order provided.  The C{I{RPATH}} is a standard
     Unix-style path string containing one or more directory names,
     separated only by colon characters.
+
+    Executables that use C{dlopen()} to open a shared library will
+    not automatically have a dependency on that shared library.
+    If the program unconditionally requires that it be able to
+    C{dlopen()} the shared library, encode that requirement by
+    manually creating the requirement by calling
+    C{r.Requires('soname: I{libfoo.so}', 'I{filterexp}')} or
+    C{r.Requires('soname: I{/path/to/libfoo.so}', 'I{filterexp}')}
+    depending on whether the library is in a system library
+    directory or not.  (It needs to be the same as how the
+    soname dependency is expressed by the providing package.)
     """
     invariantexceptions = (
 	'%(docdir)s/',
@@ -1954,7 +1965,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 if set(dep.flags.keys()).issubset(set(provided.flags.keys())):
                     # we need the new name, but we need to keep the old flags
                     dep = deps.Dependency(provided.getName()[0], dep.flags)
-            elif '/' in oldName:
+            elif depClass.tag == deps.DEP_CLASS_SONAME:
                 elfClass, soname = oldName.split('/', 1)
                 rpath = _findSonameInRpath(soname)
                 if rpath:
@@ -1985,7 +1996,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
 	for info in self.included:
 	    for filt in self.included[info]:
 		if filt.match(path):
-                    self._markManualRequirement(info, path, pkg)
+                    self._markManualRequirement(info, path, pkg, m)
 
         # now check for automatic dependencies besides ELF
         if f.inode.perms() & 0111 and m and m.name == 'script':
@@ -2029,10 +2040,22 @@ class Requires(_addInfo, _BuildPackagePolicy):
         f.requires.set(pkg.requiresMap[path])
         pkg.requires.union(f.requires())
     
-    def _markManualRequirement(self, info, path, pkg):
+    def _markManualRequirement(self, info, path, pkg, m):
+        flags = []
         if self._checkInclusion(info, path):
-            if info[0] == "/":
+            if info[0] == '/':
                 depClass = deps.FileDependencies
+            if info.startswith('soname:'):
+                if not m or m.name != 'ELF':
+                    # only an ELF file can have a soname requirement
+                    return
+                # we need to synthesize a dependency that encodes the
+                # same ABI as this binary
+                depClass = deps.SonameDependencies
+                for depType, dep, f in m.contents['requires']:
+                    if depType == 'abi':
+                        flags = f
+                        info = '%s/%s' %(dep, info.split(None, 1)[1])
             else: # by process of elimination, must be a trove
                 if info.startswith('group-'):
                     self.error('group dependency %s not allowed', info)
@@ -2044,7 +2067,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                     self.error('package dependency %s not allowed', info)
                     return
                 depClass = deps.TroveDependencies
-            self._addRequirement(path, info, [], pkg, depClass)
+            self._addRequirement(path, info, flags, pkg, depClass)
 
     def _checkInclusion(self, info, path):
         if info in self.excluded:
@@ -2065,7 +2088,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
         # in some cases, we get literal "(flags)" from the recipe
         if '(' in info:
             flagindex = info.index('(')
-            flags = set(info[flagindex+1:-1].split())
+            flags = set(info[flagindex+1:-1].split() + list(flags))
             info = info.split('(')[0]
         if flags:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
