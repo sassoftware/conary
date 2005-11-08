@@ -17,6 +17,7 @@ Changes in 0.70.5:
       but limits the scope of %(destdir)s relocation only to the directories
       under %(wrapdir)s. Works best for applications that install under one
       single directory, like /opt/<app>
+    * Clone, branch, and shadow all take --info now instead of --test
   o Server Changes 
     * Packages added to the repository are checked to ensure the version and
       flavor of all referenced components are the same as for the package

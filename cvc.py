@@ -77,11 +77,11 @@ def usage(rc = 1):
     print "       cvc update <version>"
     print 
     print "branch flags:  --binary-only"
+    print "               --info"
     print "               --source-only"
-    print "               --test"
     print
-    print "clone flags:   --skip-build-info"
-    print "               --test"
+    print "clone flags:   --info"
+    print "               --skip-build-info"
     print
     print "commit flags:  --message <msg>"
     print 
@@ -106,8 +106,8 @@ def usage(rc = 1):
     print "               --quiet"
     print ""
     print "shadow flags:  --binary-only"
+    print "               --info"
     print "               --source-only"
-    print "               --test"
     print ""
     print "sign flags:    --quiet"
     print '               --signature-key "<fingerprint>"'
@@ -132,6 +132,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
     argDef["flavor"] = ONE_PARAM
+    argDef["info"] = NO_PARAM
     argDef["macro"] = MULT_PARAM
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
@@ -150,7 +151,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["source-only"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
-    argDef["test"] = NO_PARAM
     argDef["unknown-flags"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
@@ -226,7 +226,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
-        test = argSet.pop('test', False)
+        info = argSet.pop('info', False)
 
         if argSet: return usage()
         if len(args) < 3: return usage()
@@ -237,7 +237,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
         branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow, 
                       sourceOnly = sourceOnly, binaryOnly = binaryOnly,
-                      test = test)
+                      info = info)
 
     elif (args[0] == "commit") or (args[0] == "ci"): # mimic cvs's shortcuts
         level = log.getVerbosity()
@@ -274,9 +274,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
         import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
-        test = argSet.pop('test', False)
+        info = argSet.pop('info', False)
         if argSet: return usage()
-        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, test = test)
+        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

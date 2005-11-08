@@ -52,7 +52,7 @@ def displayBranchJob(cs, shadow=False):
                                        
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
-           sourceOnly = False, binaryOnly = False, test = False):
+           sourceOnly = False, binaryOnly = False, info = False):
     branchType = _getBranchType(binaryOnly, sourceOnly)
 
     client = conaryclient.ConaryClient(cfg)
@@ -75,7 +75,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     if not cs:
         return
 
-    if cfg.interactive:
+    if cfg.interactive or info:
         if makeShadow:
             branchOps = 'shadows'
         else:
@@ -83,11 +83,13 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
 
         print 'The following %s will be created:' % branchOps
         displayBranchJob(cs, shadow=makeShadow)
+
+    if cfg.interactive:
         print
         okay = cmdline.askYn('continue with %s? [y/N]' % branchOps.lower(), 
                              default=False)
         if not okay: 
             return
 
-    if not test:
+    if not info:
         client.repos.commitChangeSet(cs)

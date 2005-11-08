@@ -30,7 +30,7 @@ def displayCloneJob(cs):
         print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
-               test = False):
+               info = False):
 
     targetBranch = versions.VersionFromString(targetBranch)
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
@@ -46,13 +46,15 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     if not okay:
         return
 
-    if cfg.interactive:
+    if cfg.interactive or info:
         print 'The following clones will be created:'
         displayCloneJob(cs)
+
+    if cfg.interactive:
         print
         okay = cmdline.askYn('continue with clone? [y/N]', default=False)
         if not okay:
             return
 
-    if not test:
+    if not info:
         client.repos.commitChangeSet(cs)
