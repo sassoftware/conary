@@ -2088,7 +2088,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 # and does not provide that file, it should error out
                 self.error('%s requires %s, which is included but not'
                            ' provided; use'
-                           " r.Provides('file: %s')", path, info, info)
+                           " r.Provides('file', '%s')", path, info, info)
                 return
         if path not in pkg.requiresMap:
             # BuildPackage only fills in requiresMap for ELF files; we may
