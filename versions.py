@@ -608,6 +608,11 @@ class VersionSequence(AbstractVersion):
             if isinstance(item, AbstractLabel):
                 yield item
 
+    def iterRevisions(self):
+        for item in self.versions:
+            if isinstance(item, AbstractRevision):
+                yield item
+
     def closeness(self, other):
         """
         Measures the "closeness" (the inverse of the distance) between two
@@ -714,23 +719,38 @@ class VersionSequence(AbstractVersion):
         return [ x.timeStamp for x in self.versions
                  if isinstance(x, AbstractRevision)]
 
+    def _clearVersionCache(self):
+        if min(self.timeStamps()) != 0:
+            # we're changing the timeStamps, invalidate the cache
+            # if a timeStamp has _any_ timeStamps of 0, we can't
+            # freeze the string
+            frzStr = self.freeze()
+            if self is thawedVersionCache.get(frzStr, None):
+                del thawedVersionCache[frzStr]
+
+        # if it has timeStamps, its not allowed in the from-string cache
+        stringVersionCache.pop(self.asString(), None)
+    
+
     def setTimeStamps(self, timeStamps, clearCache=True):
         if clearCache:
-            if max(self.timeStamps()) != 0:
-                # we're changing the timeStamps, invalidate the cache
-                frzStr = self.freeze()
-                if self is thawedVersionCache.get(frzStr, None):
-                    del thawedVersionCache[frzStr]
-
-            # if it has timeStamps, its not allowed in the from-string cache
-            stringVersionCache.pop(self.asString(), None)
-
+            self._clearVersionCache()
+            
         i = 0
         for item in self.versions:
             if isinstance(item, AbstractRevision):
                 item.timeStamp = timeStamps[i]
                 i += 1
 
+    def resetTimeStamps(self, clearCache=True):
+        """ set timeStamps to time.time(), can be used to add somewhat 
+            arbitrary timestamps to user-supplied strings
+        """
+        if clearCache:
+            self._clearVersionCache()
+
+        for item in self.iterRevisions():
+            item.timeStamp = time.time()
 
     def iterLabels(self):
         """
