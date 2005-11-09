@@ -13,18 +13,7 @@
 # full details.
 #
 
-PYTHONORDER="python2.4 python24 python"
-
-for p in $PYTHONORDER; do
-    if type $p > /dev/null 2>&1; then
-	PYTHON=$p
-	break
-    fi
-done
-
-if [ -z "$PYTHON" ]; then
-    echo "ERROR: suitable python not found"
-    exit 1
-fi
-
-exec $PYTHON @conarydir@/$(basename $0) "$@"
+bindir=$(dirname $0)
+bin=$(basename $0)
+export PYTHONPATH=$bindir/..
+exec $bindir/../commands/$bin "$@"

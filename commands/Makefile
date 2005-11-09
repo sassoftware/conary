@@ -12,6 +12,8 @@
 # full details.
 #
 
+TOPDIR=..
+
 bin_files = \
 	conary		\
 	cvc		\
@@ -22,18 +24,22 @@ extra_dist = Makefile
 dist_files = $(bin_files) $(extra_dist)
 
 all: default-all
+	mkdir -p $(TOPDIR)/bin
+	install -m755 conary-wrapper $(TOPDIR)/bin/conary-wrapper
+	for f in $(bin_files); do \
+		ln -sf conary-wrapper $(TOPDIR)/bin/$$f; \
+	done
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
 
 install: install-mkdirs
-	install -m 755 conary-wrapper $(DESTDIR)$(bindir)
 	for f in $(bin_files); do \
-		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
+		install -m755 $$f $(DESTDIR)$(bindir)/$$f; \
 	done
 
 dist: default-dist
 
 clean: default-clean
 
-include ../Make.rules
+include $(TOPDIR)/Make.rules

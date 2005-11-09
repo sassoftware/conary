@@ -21,10 +21,11 @@ export prefix = /usr
 export bindir = $(prefix)/bin
 export libdir = $(prefix)/lib
 export mandir = $(prefix)/share/man
-export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
+export sitedir = $(libdir)/python$(PYVERSION)/site-packages/
+export conarydir = $(sitedir)/conary
 export conarylibdir = $(libdir)/conary
 
-SUBDIRS=commands conary man
+SUBDIRS=commands conary man scripts
 
 extra_files = \
 	LICENSE			\
