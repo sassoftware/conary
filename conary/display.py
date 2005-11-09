@@ -15,17 +15,17 @@
 Provides the output for the "conary query" command
 """
 
-from conary import files
 import itertools
 import os
-from conary.lib import util
-from conary.lib import log
 import time
 
+from conary import files
+from conary import updatecmd
 from conary.deps import deps
-from lib.sha1helper import sha1ToString, md5ToString
+from conary.lib import log
+from conary.lib import util
+from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary.repository import errors
-import updatecmd
 
 _troveFormat  = "%-39s %s"
 _troveFormatWithFlavor  = "%-39s %s%s"
