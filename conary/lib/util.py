@@ -15,7 +15,7 @@
 import bdb
 from conary.build import fixedglob
 import bz2
-import epdb
+import debugger
 import errno
 import log
 import misc
@@ -111,7 +111,7 @@ def genExcepthook(dumpStack=True, debugCtrlC=False, prefix='conary-stack-'):
                 log.warning("Could not write extended traceback: %s" % msg)
         sys.stderr.write(string.joinfields(lines, ""))
         if sys.stdout.isatty() and sys.stdin.isatty():
-            epdb.post_mortem(tb, type, value)
+            debugger.post_mortem(tb, type, value)
         else:
             sys.exit(1)
     return excepthook

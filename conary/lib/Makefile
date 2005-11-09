@@ -14,8 +14,9 @@
 
 python_files=	    __init__.py		\
 		    enum.py		\
-		    epdb.py		\
+		    debugger.py		\
 		    erlcompleter.py	\
+		    epdb.py     	\
 		    log.py		\
 		    logger.py		\
 		    magic.py		\

@@ -136,8 +136,8 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
     if argSet.has_key('debugger'):
 	del argSet['debugger']
-	from conary.lib import epdb
-	epdb.set_trace()
+	from conary.lib import debugger
+	debugger.set_trace()
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError, 
                                             debugCtrlC=True)
 

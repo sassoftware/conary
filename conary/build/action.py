@@ -21,7 +21,7 @@ import string
 import tempfile
 import traceback
 
-from conary.lib import epdb, log, util, stackutil
+from conary.lib import debugger, log, util, stackutil
 
 # build.py and policy.py need some common definitions
 
@@ -76,7 +76,7 @@ class Action:
 
     def doAction(self):
 	if self.debug:
-	    epdb.set_trace()
+	    debugger.set_trace()
 	self.do()
 
     def do(self):
@@ -144,7 +144,7 @@ def genExcepthook(self):
             except Exception, msg:
                 log.warning("Could not write extended traceback: %s" % msg)
         if cfg.debugRecipeExceptions and self.recipe.isatty():
-            epdb.post_mortem(tb, type, exc_msg)
+            debugger.post_mortem(tb, type, exc_msg)
         else:
             sys.exit(1)
     return excepthook
@@ -173,7 +173,7 @@ class RecipeAction(Action):
     # virtual method for actually executing the action
     def doAction(self):
 	if self.debug:
-	    epdb.set_trace()
+	    debugger.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do()
