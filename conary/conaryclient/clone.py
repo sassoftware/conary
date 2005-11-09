@@ -164,17 +164,19 @@ class ClientClone:
             # (while other versions are not)
 
             if rewriteTroveInfo:
-                for troveTuple in trv.troveInfo.loadedTroves.iter():
+                for troveTuple in \
+                            [ x for x in trv.troveInfo.loadedTroves.iter() ]:
                     yield ((V_LOADED, troveTuple),
                            (troveTuple.name(), troveTuple.version(),
                             troveTuple.flavor()))
 
-                for troveTuple in trv.troveInfo.buildReqs.iter():
+                for troveTuple in \
+                            [ x for x in trv.troveInfo.buildReqs.iter() ]:
                     yield ((V_BREQ, troveTuple),
                            (troveTuple.name(), troveTuple.version(),
                             troveTuple.flavor()))
 
-            for troveInfo in trv.iterTroveList():
+            for troveInfo in [ x for x in trv.iterTroveList() ]:
                 yield ((V_REFTRV, troveInfo), troveInfo)
 
         def _updateVersion(trv, mark, newVersion):
@@ -393,6 +395,9 @@ class ClientClone:
         del needDict
 
         for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
+            from conary.lib import epdb
+            if info[0] == 'desktop-file-utils':
+                epdb.stc('f')
             assert(newVersion == versionMap[(trv.getName(), trv.getVersion(),
                                              trv.getFlavor())])
 
