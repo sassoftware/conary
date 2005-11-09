@@ -12,8 +12,8 @@
 # full details.
 #
 
-from local import database
 from conary.lib import log
+from conary.local import database
 from conary.repository import changeset
 
 def listRollbacks(db, cfg):
