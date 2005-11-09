@@ -14,7 +14,6 @@
 
 import base64
 import cPickle
-import fsrepos
 import os
 import re
 import sys
@@ -24,7 +23,7 @@ from conary import files, trove, versions, sqlite3
 from conary.deps import deps
 from conary.lib import log, sha1helper, util
 from conary.repository import changeset, errors, xmlshims
-from conary.repository.netrepos import trovestore
+from conary.repository.netrepos import fsrepos, trovestore
 from conary.datastore import IntegrityError
 from conary.dbstore import idtable
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
