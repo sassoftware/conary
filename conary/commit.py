@@ -11,13 +11,14 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.repository import changeset
-from conary.repository import errors
-from repository import filecontainer
-from conary.lib import log
 import os
 import tempfile
+
 from conary import versions
+from conary.lib import log
+from conary.repository import changeset
+from conary.repository import errors
+from conary.repository import filecontainer
 
 def doCommit(repos, changeSetFile, targetLabel):
     try:
