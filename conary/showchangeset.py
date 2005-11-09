@@ -19,12 +19,11 @@ import time
 import sys
 
 #conary
-import display
+from conary import display
 from conary import files
 from conary.lib import log
-from lib.sha1helper import sha1ToString
-from repository import repository
-
+from conary.lib.sha1helper import sha1ToString
+from conary.repository import repository
 
 def usage():
     print "conary showcs   <changeset> [trove[=version]]"
