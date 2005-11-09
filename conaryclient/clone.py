@@ -30,29 +30,30 @@ class ClientClone:
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
 
-        def _createSourceVersion(targetBranchVersionList, sourceVersion):
-            assert(targetBranchVersionList)
+        def _createSourceVersion(targetBranch, targetBranchVersionList, 
+                                 sourceVersion):
             # sort oldest to newest
-            targetBranchVersionList.sort()
-            upstream = sourceVersion.trailingRevision().getVersion()
+            revision = sourceVersion.trailingRevision().copy()
 
-            # find the newest version in the list which shares the same version
-            # as the new one we're going to commit (the list is sorted oldest
-            # to newest)
-            match = None
-            for possibleVersion in targetBranchVersionList:
-                if possibleVersion.trailingRevision().getVersion() == upstream:
-                    # copy to avoid polluting the version cache
-                    match = possibleVersion.copy()
+            desiredVersion = targetBranch.createVersion(revision)
+            # this could have too many .'s in it
+            if desiredVersion.shadowLength() < revision.shadowCount():
+                # this truncates the dotted version string
+                revision.getSourceCount().truncateShadowCount(
+                                            desiredVersion.shadowLength())
+                desiredVersion = targetBranch.createVersion(revision)
 
-            if not match:
-                match = targetBranchVersionList[0].branch().createVersion(
-                            versions.Revision("%s-0" % 
-                                sourceVersion.trailingRevision().getVersion()))
+            # the last shadow count is not allowed to be a 0
+            if [ x for x in revision.getSourceCount().iterCounts() ][-1] \
+                                        == 0 :
+                desiredVersion.incrementSourceCount()
 
-            match.incrementSourceCount()
-                                 
-            return match
+            versions.VersionFromString(desiredVersion.asString())
+
+            while desiredVersion in targetBranchVersionList:
+                desiredVersion.incrementSourceCount()
+                
+            return desiredVersion
 
         def _isUphill(ver, uphill):
             if not isinstance(uphill, versions.Branch):
@@ -72,8 +73,16 @@ class ClientClone:
             return False 
 
         def _isSibling(ver, possibleSibling):
-            verBranch = ver.branch()
-            sibBranch = possibleSibling.branch()
+            if isinstance(ver, versions.Version) and \
+               isinstance(possibleSibling, versions.Version):
+                verBranch = ver.branch()
+                sibBranch = possibleSibling.branch()
+            elif isinstance(ver, versions.Branch) and \
+                 isinstance(possibleSibling, versions.Branch):
+                verBranch = ver
+                sibBranch = possibleSibling
+            else:
+                assert(0)
 
             verHasParent = verBranch.hasParentBranch()
             sibHasParent = sibBranch.hasParentBranch()
@@ -252,16 +261,12 @@ class ClientClone:
                                      deps.DependencySet(), withFiles = False)
                 if trv.troveInfo.clonedFrom() == version:
                     versionMap[info] = trv.getVersion()
-                else:
-                    versionMap[info] = _createSourceVersion(currentVersionList, 
-                                                            version)
-                    cloneJob.append((info, versionMap[info]))
-            else:
-                newVersion = targetBranch.createVersion(
-                    versions.Revision(
-                        "%s-1" % version.trailingRevision().getVersion()))
-                versionMap[info] = newVersion
-                cloneJob.append((info, newVersion))
+
+            if info not in versionMap:
+                versionMap[info] = _createSourceVersion(
+                            targetBranch, currentVersionList, version)
+
+                cloneJob.append((info, versionMap[info]))
 
         # now go through the binaries; sort them into buckets based on the
         # source trove each came from. we can't clone troves which came
