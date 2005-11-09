@@ -2,6 +2,9 @@ Changes in 0.70.6:
   o Code Structure
     * conary now imports all python modules from a toplevel "conary"
       module.  This prevents conary from polluting the module namespace.
+  o Client Changes
+    * Clone didn't handle shadow version numbers correctly (and could create
+      inconsistent version numbers)
 
 Changes in 0.70.5:
   o Client Changes
@@ -32,8 +35,6 @@ Changes in 0.70.5:
       r.Requires('soname: libfoo.so', '/path/to/file')
     * r.Requires now enforces that packages that require a file and
       include that required file must also explicitly provide it. (bz #148)
-    * Clone didn't handle shadow version numbers correctly (and could create
-      inconsistent version numbers)
   o Server Changes 
     * Packages added to the repository are checked to ensure the version and
       flavor of all referenced components are the same as for the package
