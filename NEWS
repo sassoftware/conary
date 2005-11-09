@@ -1,3 +1,8 @@
+Changes in 0.70.6:
+  o Code Structure
+    * conary now imports all python modules from a toplevel "conary"
+      module.  This prevents conary from polluting the module namespace.
+
 Changes in 0.70.5:
   o Client Changes
     * Files changing to config files across distributed repositories now works.
