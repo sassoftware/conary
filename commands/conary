@@ -293,7 +293,7 @@ def realMain(cfg, argv=sys.argv):
         # import this late to reduce the dependency set for
         # the main conary command in the common case.  This lets
         # conary run even if, for example, libelf is missing
-        from build import cook
+        from conary.build import cook
 	log.setVerbosity(log.DEBUG)
 
 	if argSet: return usage()
