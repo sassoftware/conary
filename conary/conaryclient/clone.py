@@ -395,9 +395,6 @@ class ClientClone:
         del needDict
 
         for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
-            from conary.lib import epdb
-            if info[0] == 'desktop-file-utils':
-                epdb.stc('f')
             assert(newVersion == versionMap[(trv.getName(), trv.getVersion(),
                                              trv.getFlavor())])
 
