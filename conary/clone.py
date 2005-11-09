@@ -14,9 +14,9 @@
 import itertools
 import sys
 
-from repository import netclient
-from conaryclient import ConaryClient, cmdline
 from conary import versions
+from conary.conaryclient import ConaryClient, cmdline
+from conary.repository import netclient
 
 def displayCloneJob(cs):
     
