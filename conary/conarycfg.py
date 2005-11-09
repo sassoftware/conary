@@ -21,10 +21,10 @@ import sre_constants
 import sys
 import copy
 
-from conary import deps
 from conary import versions
 from conary.build import use
-from conary.lib import log,util
+from conary.deps import deps, arch
+from conary.lib import log, util
 
 (STRING,
     BOOL,
@@ -174,9 +174,9 @@ class ConfigFile:
 	    else:
 		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
         elif type == FLAVOR:
-            self.__dict__[key] = deps.deps.parseFlavor(val)
+            self.__dict__[key] = deps.parseFlavor(val)
         elif type == FLAVORLIST:
-            self.__dict__[key].append(deps.deps.parseFlavor(val))
+            self.__dict__[key].append(deps.parseFlavor(val))
         elif type == FINGERPRINT:
             self.__dict__['signatureKeyMap'] = None
             if val in ('', 'None'):
@@ -211,7 +211,7 @@ class ConfigFile:
         elif type == CALLBACK:
             self.__dict__[key]('display')
         elif type == FLAVOR:
-            flavorStr = deps.deps.formatFlavor(value)
+            flavorStr = deps.formatFlavor(value)
             if self.getDisplayOption('prettyPrint'):
                 flavorList = flavorStr.split(",")
 
@@ -390,7 +390,7 @@ class ConaryConfiguration(SectionedConfig):
 
     defaults = {
 	'autoResolve'	        : [ BOOL, False ],
-        'buildFlavor'           : [ FLAVOR, deps.deps.DependencySet() ],
+        'buildFlavor'           : [ FLAVOR, deps.DependencySet() ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
 	'buildPath'		: '/var/tmp/conary-builds',
 	'context'		: None,
@@ -539,7 +539,7 @@ class ConaryConfiguration(SectionedConfig):
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
         if self.flavor == []:
-            self.flavor = [deps.deps.DependencySet()]
+            self.flavor = [deps.DependencySet()]
 
         self.flavor = self.flavorConfig.toDependency(override=self.flavor)
 
@@ -548,24 +548,24 @@ class ConaryConfiguration(SectionedConfig):
         
         # if any flavor has an instruction set, don't merge
         for flavor in self.flavor:
-            if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
+            if deps.DEP_CLASS_IS in flavor.getDepClasses():
                 hasIns = True
                 break
 
         if not hasIns:
             # use all the flavors for the main arch first
-            for depList in deps.arch.currentArch:
+            for depList in arch.currentArch:
                 for flavor in self.flavor:
-                    insSet = deps.deps.DependencySet()
+                    insSet = deps.DependencySet()
                     for dep in depList:
-                        insSet.addDep(deps.deps.InstructionSetDependency, dep)
+                        insSet.addDep(deps.InstructionSetDependency, dep)
                     newFlavor = flavor.copy()
                     newFlavor.union(insSet)
                     newFlavors.append(newFlavor)
             self.flavor = newFlavors
 
         # buildFlavor is installFlavor + overrides
-        self.buildFlavor = deps.deps.overrideFlavor(self.flavor[0], 
+        self.buildFlavor = deps.overrideFlavor(self.flavor[0], 
                                                     self.buildFlavor)
 	self.flavorConfig.populateBuildFlags()
 

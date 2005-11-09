@@ -648,7 +648,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     try:
         recipeObj.checkBuildRequirements(cfg, sourceVersion, 
                                          ignoreDeps=ignoreDeps)
-    except CookError:
+    except recipe.RecipeDependencyError:
         return
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
@@ -901,7 +901,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     if os.path.exists('CONARY'):
         # FIXME checkin imports cook functions as well, perhaps move
         # SourceState or some functions here to a third file?
-        import checkin
+        from conary import checkin
         conaryState = checkin.ConaryStateFromFile('CONARY')
         if conaryState.hasSourceState():
             state = conaryState.getSourceState()
