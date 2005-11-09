@@ -14,18 +14,17 @@
 #
 
 import re
-
-from conary.lib import log
 import sys
-from repository.netclient import NetworkRepositoryClient
-from conary import callbacks
-from updatecmd import parseTroveSpec
-from checkin import fullLabel
-import repository
 import base64
 import urllib
-from lib.openpgpfile import KeyNotFound
-from conarycfg import selectSignatureKey
+
+from conary import callbacks
+from conary.checkin import fullLabel
+from conary.conarycfg import selectSignatureKey
+from conary.lib import log
+from conary.lib.openpgpfile import KeyNotFound
+from conary.repository.netclient import NetworkRepositoryClient
+from conary.updatecmd import parseTroveSpec
 
 class SignatureCallback(callbacks.SignatureCallback, callbacks.LineOutput):
 
