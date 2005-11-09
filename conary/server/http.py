@@ -11,28 +11,27 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+from mod_python import apache
+from mod_python.util import FieldStorage
+from urllib import unquote
 import itertools
-from conary import metadata
+import kid
 import os
 import string
 import sys
 import traceback
-from urllib import unquote
 
-import kid
-import templates
-
-from conary.repository.netrepos import netserver
-from conary.repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
-from conary.web.webhandler import WebHandler
-from conary.web.fields import strFields, intFields, listFields, boolFields
-from conary.web.webauth import getAuth
-from conary.repository import shimclient
+from conary import metadata
 from conary import versions
 from conary.deps import deps
-
-from mod_python import apache
-from mod_python.util import FieldStorage
+from conary.repository import shimclient
+from conary.repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
+from conary.repository.netrepos import netserver
+from conary.server import templates
+from conary.web.fields import strFields, intFields, listFields, boolFields
+from conary.web.webauth import getAuth
+from conary.web.webhandler import WebHandler
 
 class ServerError(Exception):
     def __str__(self):
