@@ -11,19 +11,20 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
 import grp
 import os
 import pwd
 import socket
 import stat
-import streams
 import string
 import struct
 import tempfile
 import time
 
-from conary.lib import util, sha1helper, log
+from conary import streams
 from conary.deps import deps
+from conary.lib import util, sha1helper, log
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
