@@ -15,16 +15,16 @@
 Provides the output for the "conary repquery" command
 """
 
-from conary.deps import deps
-from conary.repository import errors
-import display
-from conary import files
-from conary.lib import log
-from conary import metadata
 import time
-from conary import versions
 
-from lib.sha1helper import sha1ToString
+from conary import display
+from conary import files
+from conary import metadata
+from conary import versions
+from conary.deps import deps
+from conary.lib import log
+from conary.lib.sha1helper import sha1ToString
+from conary.repository import errors
 
 _troveFormat  = display._troveFormat
 _formatFlavor  = display._formatFlavor
