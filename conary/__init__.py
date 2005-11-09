@@ -25,4 +25,9 @@ The Conary Repository System
 @group Files: datastore, files, filecontainer
 """
 
-__all__ = [ 'callbacks' ]
+def _enableOldStyleImports():
+    # automatically append conary to the path, so that internal imports in
+    # conary will work
+    import os
+    import sys
+    sys.path.append(os.path.dirname(sys.modules[__name__].__file__))
