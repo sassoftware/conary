@@ -13,13 +13,11 @@
 # full details.
 #
 
-# get the path
-import conary
+from conary import conarycfg
+from conary.lib import options, util
+from conary.repository.netclient import NetworkRepositoryClient
+from conary import versions
 
-import conarycfg
-from lib import options, util
-from repository.netclient import NetworkRepositoryClient
-import versions
 import os
 import sys
 import shlex
