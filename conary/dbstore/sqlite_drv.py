@@ -12,7 +12,7 @@
 # full details.
 #
 
-import sqlite3
+from conary import sqlite3
 from base_drv import BaseDatabase, BaseCursor
 
 class Cursor(BaseCursor):
