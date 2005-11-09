@@ -591,7 +591,7 @@ class HttpHandler(WebHandler):
     @strFields(search = '')
     @checkAuth(write = False)
     def getOpenPGPKey(self, auth, search, **kwargs):
-        from lib.openpgpfile import KeyNotFound
+        from conary.lib.openpgpfile import KeyNotFound
         # This function mimics limited key server behavior. The keyserver line
         # for a gpg command must be formed manually--because gpg doesn't
         # automatically know how to talk to limited key servers.
