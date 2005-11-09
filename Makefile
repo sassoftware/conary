@@ -57,7 +57,7 @@ dist: $(dist_files)
 	@echo "=== sanity building/testing conary ==="; \
 	cd $(DISTDIR); \
 	make > /dev/null; \
-	./conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
+	./bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
 	cd -; \
 	rm -rf $(DISTDIR)
 
