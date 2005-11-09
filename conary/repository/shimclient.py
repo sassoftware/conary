@@ -11,7 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import netclient
+from conary.repository import netclient
 
 # this returns the same server for any server name or label
 # requested; because a shim can only refer to one server.
