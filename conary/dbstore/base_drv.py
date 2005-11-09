@@ -136,17 +136,19 @@ class BindlessCursor(BaseCursor):
 
 # A class to handle database operations
 class BaseDatabase:
+    # need to figure out a statement generic enough for all kinds of backends
+    alive_check = "select 1 where 1 = 1"
+    basic_transaction = "begin transaction"
+    cursorClass = BaseCursor
+    type = "base"
+
     def __init__(self, db):
         assert(db)
-        self.type = "base"
         self.database = db
         self.dbh = None
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
         self.__transaction = None
-        # need to figure out a statement generic enough for all kinds of backends
-        self.alive_check = "select 1 where 1 = 1"
-        self.cursorClass = BaseCursor
         
     # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
@@ -200,7 +202,7 @@ class BaseDatabase:
         assert(not name)
         assert(self.dbh)
         c = self.cursor()
-        c.execute("begin transaction") 
+        c.execute(self.basic_transaction)
         self.__transaction = 1
         return c
         

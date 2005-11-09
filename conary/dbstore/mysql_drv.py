@@ -30,12 +30,11 @@ class Cursor(BindlessCursor):
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
-    def __init__(self, db):
-        BaseDatabase.__init__(self, db)
-        self.type = "mysql"
-        self.avail_check = "select version(), current_date()"
-        self.cursorClass = Cursor
-        
+    alive_check = "select version(), current_date()"
+    basic_transaction = "begin"
+    cursorClass = Cursor
+    type = "mysql"
+    
     def connect(self):
         assert(self.database)
         cdb = self._connectData(["user", "passwd", "host", "db"])
@@ -46,7 +45,6 @@ class Database(BaseDatabase):
         self._getSchema()
         return True 
                                  
-    
     def _getSchema(self):
         BaseDatabase._getSchema(self)
         c = self.cursor()
@@ -78,4 +76,3 @@ class Database(BaseDatabase):
             self.tables[t] = [ x[2] for x in c.fetchall() ]
         self._getSchemaVersion()
         return self.version
-    

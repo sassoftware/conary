@@ -35,12 +35,10 @@ class Cursor(BaseCursor):
         
 
 class Database(BaseDatabase):
-    def __init__(self, db):
-        BaseDatabase.__init__(self, db)
-        self.type = "sqlite"
-        self.avail_check = "select count(*) from sqlite_master"
-        self.cursorClass = Cursor
-        
+    type = "sqlite"
+    alive_check = "select count(*) from sqlite_master"
+    cursorClass = Cursor
+
     def connect(self, timeout=10000):
         assert(self.database)
         cdb = self._connectData()
