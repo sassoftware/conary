@@ -19,7 +19,8 @@ python_files	= __init__.py \
 		  base_drv.py \
 		  mysql_drv.py \
 		  postgresql_drv.py \
-		  sqlite_drv.py
+		  sqlite_drv.py	\
+		  sql_error.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)
