@@ -448,8 +448,10 @@ class TroveStore:
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
-            assert(not isPackage or versionId == troveVersionId)
-            assert(not isPackage or flavorId == troveFlavorId)
+            assert(trove.isRedirect() or 
+                            (not isPackage or versionId == troveVersionId))
+            assert(trove.isRedirect() or 
+                            (not isPackage or flavorId == troveFlavorId))
 
 	    if versionId is not None:
 		nodeId = self.versionOps.nodes.getRow(itemId, 
