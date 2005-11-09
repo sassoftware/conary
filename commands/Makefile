@@ -17,7 +17,11 @@ bin_files = \
 	cvc		\
         cvcdesc
 
-dest_files = $(bin_files)
+extra_dist = Makefile
+
+dist_files = $(bin_files) $(extra_dist)
+
+all: default-all
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
@@ -27,5 +31,9 @@ install: install-mkdirs
 	for f in $(bin_files); do \
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
+
+dist: default-dist
+
+clean: default-clean
 
 include ../Make.rules

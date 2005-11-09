@@ -65,7 +65,7 @@ install: all install-mkdirs install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 
-distcheck: dist
+dist: default-dist
 
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so

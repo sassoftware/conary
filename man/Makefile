@@ -12,10 +12,16 @@
 # full details.
 #
 
-dist_files = \
+man_files = \
 	conary.1	\
 	cvc.1		\
 	cvcdesc.1
+
+extra_dist = Makefile
+
+dist_files = $(man_files) $(extra_dist)
+
+all: default-all
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(mandir)/man1
@@ -24,3 +30,9 @@ install: install-mkdirs
 	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
 	install -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
 	install -m 644 cvcdesc.1 $(DESTDIR)$(mandir)/man1
+
+dist: default-dist
+
+clean: default-clean
+
+include ../Make.rules
