@@ -16,6 +16,7 @@ import pickle
 
 #conary imports
 from conary import conarycfg, metadata
+from conary.conaryclient import clone, update
 from conary.deps import deps
 from conary.lib import util
 from conary.local import database
