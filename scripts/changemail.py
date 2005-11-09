@@ -13,16 +13,14 @@
 # full details.
 #
 
-# get the path
-import conary
-
-import checkin
-from conary.lib import options, util
 import os
 import sys
 import tempfile
 import textwrap
+
+from conary import checkin
 from conary import versions
+from conary.lib import options, util
 
 def usage(exitcode=1):
     sys.stderr.write("\n".join((
