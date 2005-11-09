@@ -65,14 +65,13 @@ import sys
 import MySQLdb
 import textwrap
 
-import conary
-import conarycfg
-from conary.deps import deps
-from local import database
-from conary.lib import util
-from repository import netclient
+from conary import conarycfg
+from conary import updatecmd
 from conary import versions
-import updatecmd
+from conary.deps import deps
+from conary.lib import util
+from conary.local import database
+from conary.repository import netclient
 
 class bugzMine:
 
