@@ -24,20 +24,20 @@ import xml
 import xmlrpclib
 
 #conary
-from conary.repository import changeset
 from conary import datastore
-from conary.deps import deps
-from conary.repository import errors
 from conary import files
-from conary.repository import filecontents
-from conary.repository import findtrove
-from conary.lib import log, util
-from conary.lib import openpgpfile
 from conary import metadata
-from conary.repository import repository
-from conary.repository import transport
 from conary import trove
 from conary import versions
+from conary.deps import deps
+from conary.lib import log, util
+from conary.lib import openpgpfile
+from conary.repository import changeset
+from conary.repository import errors
+from conary.repository import filecontents
+from conary.repository import findtrove
+from conary.repository import repository
+from conary.repository import transport
 from conary.repository import xmlshims
 
 # FIXME: remove these compatibility exception classes later

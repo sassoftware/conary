@@ -12,7 +12,7 @@
 # full details.
 # 
 
-import sqlite3
+from conary import sqlite3
 
 class InstanceTable:
     """

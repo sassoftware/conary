@@ -32,25 +32,23 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 thisFile = sys.modules[__name__].__file__
 thisPath = os.path.dirname(thisFile)
 if thisPath:
-    mainPath = thisPath + "/.."
+    mainPath = thisPath + "/../.."
 else:
-    mainPath = ".."
+    mainPath = "../.."
 mainPath = os.path.realpath(mainPath)
+sys.path.insert(0, mainPath)
 
-sys.path.append(mainPath)
-
-from repository.netrepos import netserver
-from repository.netrepos import netauth
-from conary.repository import changeset
-from conary.repository import errors
-from repository.netrepos.netserver import NetworkRepositoryServer
-from repository.filecontainer import FileContainer
-from conarycfg import ConfigFile
-from conarycfg import STRINGDICT, BOOLEAN
+from conary.conarycfg import ConfigFile
+from conary.conarycfg import STRINGDICT, BOOLEAN
 from conary.lib import options
 from conary.lib import util
-
-from lib.tracelog import initLog, logMe
+from conary.lib.tracelog import initLog, logMe
+from conary.repository import changeset
+from conary.repository import errors
+from conary.repository.filecontainer import FileContainer
+from conary.repository.netrepos import netauth
+from conary.repository.netrepos import netserver
+from conary.repository.netrepos.netserver import NetworkRepositoryServer
 
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
@@ -266,7 +264,6 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
     def reset(self, authToken, clientVersion):
         import shutil
-        from repository.netrepos import fsrepos
         try:
             shutil.rmtree(self.repPath + '/contents')
         except OSError, e:
@@ -323,7 +320,7 @@ def addUser(userName, otherArgs):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    import sqlite3
+    from conary import sqlite3
     authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,

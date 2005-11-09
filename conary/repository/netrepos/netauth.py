@@ -14,11 +14,11 @@
 import md5
 import os
 import re
-import sqlite3
 import sys
 
+from conary import sqlite3
 from conary.repository import errors
-from lib.tracelog import logMe
+from conary.lib.tracelog import logMe
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists

@@ -12,7 +12,7 @@
 # full details.
 # 
 
-from dbstore import idtable
+from conary.dbstore import idtable
 
 class Items(idtable.IdTable):    
     # we create the table as a "traditional" IdTable and then personalize it

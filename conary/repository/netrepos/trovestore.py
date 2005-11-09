@@ -12,17 +12,15 @@
 # full details.
 # 
 
-import changelog
-import cltable
 import copy
 
-from conary import files, metadata, sqlite3, trove, versions
+from conary import files, metadata, sqlite3, trove, versions, changelog
 from conary.deps import deps
 from conary.lib.tracelog import logMe
 from conary.local import deptable
 from conary.local import troveinfo, versiontable, sqldb
 from conary.repository.netrepos import instances, items, keytable, flavors
-from conary.repository.netrepos import trovefiles, versionops
+from conary.repository.netrepos import trovefiles, versionops, cltable
 
 class LocalRepVersionTable(versiontable.VersionTable):
 

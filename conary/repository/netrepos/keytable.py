@@ -12,12 +12,13 @@
 # full details.
 #
 
-import sqlite3
-from conary.lib import openpgpfile, openpgpkey
 import StringIO
 import base64
+
+from conary import sqlite3
+from conary.constants import version
+from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
-from constants import version
 
 class OpenPGPKeyTable:
     def __init__(self, db):

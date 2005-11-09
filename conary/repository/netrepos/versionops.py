@@ -12,9 +12,9 @@
 # full details.
 # 
 
-from dbstore import idtable
 from conary import versions
-from repository.errors import DuplicateBranch
+from conary.dbstore import idtable
+from conary.repository.errors import DuplicateBranch
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch):

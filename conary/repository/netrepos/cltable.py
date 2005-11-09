@@ -12,7 +12,7 @@
 # full details.
 # 
 
-import changelog
+from conary import changelog
 
 class ChangeLogTable:
     """

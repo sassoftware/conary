@@ -14,23 +14,21 @@
 
 # implements a db-based repository
 
-from conary.deps import deps
 import os
-from conary.lib import util, stackutil, log, openpgpfile
-from netauth import NetworkAuthorization
-import repository
-import repository.netclient
-from repository.repository import AbstractRepository
-from repository.repository import ChangeSetJob
-from datastore import DataStoreRepository, DataStore
-from conary.repository import changeset
-from conary.repository import errors
-from conary.repository import filecontents
-import sqlite3
 import sys
-from conary import trovestore
+
 from conary import versions
-from lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
+from conary.deps import deps
+from conary.lib import util, stackutil, log, openpgpfile
+from conary.repository import changeset, errors, filecontents
+from conary.repository.netrepos import trovestore
+from conary.datastore import DataStoreRepository, DataStore
+from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
+from conary.repository.netrepos.netauth import NetworkAuthorization
+from conary.repository.repository import AbstractRepository
+from conary.repository.repository import ChangeSetJob
+from conary.repository import repository, netclient
+from conary import sqlite3
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -365,7 +363,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.name = name
 	map = dict(repositoryMap)
 	map[name] = self
-	self.reposSet = repository.netclient.NetworkRepositoryClient(map)
+	self.reposSet = netclient.NetworkRepositoryClient(map)
 	
 	self.troveStore = troveStore
 

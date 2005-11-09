@@ -14,36 +14,27 @@
 
 import base64
 import cPickle
-from conary.deps import deps
-from conary.repository import changeset
-from repository import repository
-from conary.repository import errors
-from netauth import NetworkAuthorization
 import fsrepos
-from conary.lib import log
-from conary import files
 import os
-import sys
 import re
-from conary.lib import sha1helper
-import sqlite3
+import sys
 import tempfile
-from conary import trove
-from conary.lib import util
-from conary.repository import xmlshims
-from repository import repository
-from dbstore import idtable
-from local import sqldb
-from local import versiontable
-from conary import trovestore
-from conary import versions
-from datastore import IntegrityError
-from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
-from lib.openpgpfile import TRUST_FULL
-from trove import DigitalSignature
-from lib.openpgpkey import getKeyCache
-import base64
-from lib.tracelog import logMe
+
+from conary import files, trove, versions, sqlite3
+from conary.deps import deps
+from conary.lib import log, sha1helper, util
+from conary.repository import changeset, errors, xmlshims
+from conary.repository.netrepos import trovestore
+from conary.datastore import IntegrityError
+from conary.dbstore import idtable
+from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
+from conary.lib.openpgpfile import TRUST_FULL
+from conary.lib.openpgpkey import getKeyCache
+from conary.lib.tracelog import logMe
+from conary.local import sqldb, versiontable
+from conary.repository.netrepos.netauth import NetworkAuthorization
+from conary.repository import repository
+from conary.trove import DigitalSignature
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
