@@ -13,12 +13,12 @@
 #
 
 from conary import conaryclient
-from conaryclient import cmdline
-from conary.lib import log
-from local import update
-from conary.repository import errors
-from updatecmd import UpdateCallback
 from conary import versions
+from conary.conaryclient import cmdline
+from conary.lib import log
+from conary.local import update
+from conary.repository import errors
+from conary.updatecmd import UpdateCallback
 
 def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
                      callback = None):
