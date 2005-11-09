@@ -33,6 +33,7 @@ import types
 from conary import conaryclient, files, updatecmd, versions
 from conary.build import buildpackage, usergroup, destdirpolicy
 from conary.build import macros, packagepolicy, source, use
+from conary.build import build, policy
 from conary.deps import deps
 from conary.lib import log, magic, util
 from conary.local import database
@@ -144,8 +145,8 @@ def localImport(d, package, modules=()):
     l.append(m)
 
 def setupRecipeDict(d, filename):
-    localImport(d, 'build', ('build', 'action'))
-    localImport(d, 'build.recipe', ('PackageRecipe', 'GroupRecipe',
+    localImport(d, 'conary.build', ('build', 'action'))
+    localImport(d, 'conary.build.recipe', ('PackageRecipe', 'GroupRecipe',
                                     'RedirectRecipe', 'FilesetRecipe',
                                     'BuildPackageRecipe',
                                     'CPackageRecipe',
@@ -157,10 +158,10 @@ def setupRecipeDict(d, filename):
                                     # XXX when all recipes have been migrated
                                     # we can get rid of loadRecipe
                                     ('loadSuperClass', 'loadRecipe')))
-    localImport(d, 'lib', ('util',))
+    localImport(d, 'conary.lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
         localImport(d, x)
-    localImport(d, 'build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
+    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
     d['filename'] = filename
     _copyReusedRecipes(d)
 
