@@ -19,7 +19,7 @@ bin_files = \
 	cvc		\
         cvcdesc
 
-extra_dist = Makefile
+extra_dist = Makefile conary-wrapper
 
 dist_files = $(bin_files) $(extra_dist)
 
