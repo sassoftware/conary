@@ -535,7 +535,7 @@ class ConaryConfiguration(SectionedConfig):
 
 
     def initializeFlavors(self):
-        import flavorcfg
+        from conary import flavorcfg
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
         if self.flavor == []:
