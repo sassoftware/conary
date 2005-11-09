@@ -38,8 +38,8 @@ import tempfile
 #conary imports
 from conary.lib import magic
 from conary.lib import util
-import macros
-import policy
+from conary.build import macros
+from conary.build import policy
 
 # used in multiple places, should be maintained in one place
 # probably needs to migrate to some form of configuration
