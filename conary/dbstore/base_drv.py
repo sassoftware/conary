@@ -181,6 +181,9 @@ class BaseDatabase:
             del c
         return 1
 
+    def closed(self):
+        return self.dbh is None
+
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
