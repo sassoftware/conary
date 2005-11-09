@@ -23,7 +23,7 @@ all: default-all
 install:
 	# see conary-wrapper symlink in ../Makefile to make scripts
 	# available in $(bindir)
-	install -m 755 rpm2cpio $(DESTDIR)$(conarydatadir)
+	install -m 755 rpm2cpio $(DESTDIR)$(bindir)
 	install -m 755 convertcontents $(DESTDIR)$(conarydir)
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)

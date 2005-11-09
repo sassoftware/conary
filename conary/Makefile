@@ -14,7 +14,7 @@
 
 all: subdirs constants.py
 
-SUBDIRS=build local repository server lib pysqlite3 deps config web \
+SUBDIRS=build local repository server lib pysqlite3 deps web \
         conaryclient dbstore
 
 python_files = __init__.py	\
@@ -24,7 +24,6 @@ python_files = __init__.py	\
 	checkin.py		\
 	clone.py		\
 	commit.py		\
-	conary.py		\
 	conarycfg.py		\
 	constants.py		\
 	cvc.py			\

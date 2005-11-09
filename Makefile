@@ -25,7 +25,7 @@ export sitedir = $(libdir)/python$(PYVERSION)/site-packages/
 export conarydir = $(sitedir)/conary
 export conarylibdir = $(libdir)/conary
 
-SUBDIRS=commands conary man scripts
+SUBDIRS=commands conary config man scripts
 
 extra_files = \
 	LICENSE			\

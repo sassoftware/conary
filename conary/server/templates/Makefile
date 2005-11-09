@@ -43,8 +43,8 @@ all:
 install: pyfiles-install kidfiles-install
 
 kidfiles-install:
-	cp -a $(kid_files) $(DESTDIR)/$(conarydir)/$(DIR)/; \
-	kidc --strip-dest-dir $(DESTDIR) $(DESTDIR)/$(conarydir)/$(DIR)/ ||:
+	cp -a $(kid_files) $(DESTDIR)/$(sitedir)/$(DIR)/; \
+	kidc --strip-dest-dir $(DESTDIR) $(DESTDIR)/$(sitedir)/$(DIR)/ ||:
 
 dist: default-dist
 
