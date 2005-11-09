@@ -12,28 +12,20 @@
 # full details.
 #
 
-arch_files =	alpha	\
-		ia64	\
-		ppc	\
-		ppc64	\
-		s390	\
-		sparc	\
-		sparc64	\
-		x86	\
-		x86_64
+bin_files = \
+	conary		\
+	cvc		\
+        cvcdesc
 
-dist_files = Makefile $(arch_files)
+dest_files = $(bin_files)
 
-all: default-all
+install-mkdirs:
+	mkdir -p $(DESTDIR)$(bindir)
 
-install:
-	mkdir -p $(DESTDIR)/etc/conary/arch/; \
-	for f in $(arch_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/arch/$$f; \
+install: install-mkdirs
+	install -m 755 conary-wrapper $(DESTDIR)$(bindir)
+	for f in $(bin_files); do \
+		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
 
-dist: default-dist
-
-clean: default-clean
-
-include ../../../Make.rules
+include ../Make.rules

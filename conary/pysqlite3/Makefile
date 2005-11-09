@@ -20,4 +20,4 @@ dist: clean
 	mkdir -p $(DISTDIR)/$(DIR)
 	tar cSpf - --exclude CVS --exclude build --exclude dist . | tar xSpf - -C $(DISTDIR)/$(DIR) 
 
-include ../Make.rules
+include ../../Make.rules

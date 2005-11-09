@@ -66,7 +66,7 @@ clean: default-clean
 
 dist: default-dist
 
-include ../Make.rules
+include ../../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
 CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS) -g
 

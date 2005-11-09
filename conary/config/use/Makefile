@@ -57,4 +57,4 @@ dist: default-dist
 
 clean: default-clean
 
-include ../../Make.rules
+include ../../../Make.rules

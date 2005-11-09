@@ -12,28 +12,15 @@
 # full details.
 #
 
-arch_files =	alpha	\
-		ia64	\
-		ppc	\
-		ppc64	\
-		s390	\
-		sparc	\
-		sparc64	\
-		x86	\
-		x86_64
+dist_files = \
+	conary.1	\
+	cvc.1		\
+	cvcdesc.1
 
-dist_files = Makefile $(arch_files)
+install-mkdirs:
+	mkdir -p $(DESTDIR)$(mandir)/man1
 
-all: default-all
-
-install:
-	mkdir -p $(DESTDIR)/etc/conary/arch/; \
-	for f in $(arch_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/arch/$$f; \
-	done
-
-dist: default-dist
-
-clean: default-clean
-
-include ../../../Make.rules
+install: install-mkdirs
+	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
+	install -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
+	install -m 644 cvcdesc.1 $(DESTDIR)$(mandir)/man1

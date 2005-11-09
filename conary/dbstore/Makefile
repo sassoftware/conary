@@ -12,7 +12,7 @@
 # full details.
 #
 
-TOPDIR	= ..
+TOPDIR	= ../..
 
 python_files	= __init__.py \
 		  idtable.py \
