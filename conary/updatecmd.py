@@ -11,20 +11,21 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary import callbacks
-from conaryclient.cmdline import parseTroveSpec
-from conaryclient import cmdline
-from conary.deps import deps
-from conary.lib import log
-from conary.lib import util
-from local import database
-from conary.repository import changeset
-from conary.repository import errors
-from conary import conaryclient
 import os
 import sys
 import thread
 import urllib2
+
+from conary import callbacks
+from conary import conaryclient
+from conary.deps import deps
+from conary.lib import log
+from conary.lib import util
+from conary.local import database
+from conary.repository import changeset
+from conary.repository import errors
+from conaryclient import cmdline
+from conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line 
 # conary client
