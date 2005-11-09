@@ -19,7 +19,7 @@ import os
 import sys
 
 from conary import rpmhelper
-from lib import util
+from conary.lib import util
 
 def usage():
     print "Usage: rpm2cpio <rpmpackage> | cpio -ivumd"

@@ -262,8 +262,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
-        from trove import DigitalSignature
-        signature = DigitalSignature()
+        signature = trove.DigitalSignature()
         signature.set(digsig)
         encSig = base64.b64encode(signature.freeze())
         self.c[version].addDigitalSignature(name, self.fromVersion(version),
@@ -274,7 +273,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[label].addNewAsciiPGPKey(user, keyData)
 
     def addNewPGPKey(self, label, user, keyData):
-        import base64
         encKeyData = base64.b64encode(keyData)
         self.c[label].addNewPGPKey(user, encKeyData)
 

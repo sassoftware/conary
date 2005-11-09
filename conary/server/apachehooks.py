@@ -19,13 +19,12 @@ import traceback
 import xmlrpclib
 import zlib
 
-from repository.netrepos import netserver
-from repository.filecontainer import FileContainer
+from conary import conarycfg
 from conary.repository import changeset
 from conary.repository import errors
-import conarycfg
-
-from web.webauth import getAuth
+from conary.repository.filecontainer import FileContainer
+from conary.repository.netrepos import netserver
+from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
 
@@ -95,7 +94,7 @@ def post(port, isSecure, repos, req):
         req.write(resp)
         return apache.OK
     else:
-        from http import HttpHandler
+        from conary.http import HttpHandler
         httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port) 
         return httpHandler._methodHandler()
 
@@ -169,7 +168,7 @@ def get(port, isSecure, repos, req):
 
         return apache.OK
     else:
-        from http import HttpHandler
+        from conary.http import HttpHandler
 
         if isSecure:
             protocol = "https"
