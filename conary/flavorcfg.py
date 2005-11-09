@@ -18,7 +18,7 @@ import os.path
 #conary
 from build import use
 from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
-import deps.deps
+from conary.deps import deps
 from conary.lib import log
 
 # XXX hack -- need a better way to add to list of config types
@@ -131,7 +131,7 @@ class ArchConfig(ConfigFile):
 class UseFlagConfig(ConfigFile):
     defaults = {
 	'name'	                : [ STRING, None ],
-        'sense'                 : [ FLAGSENSE, deps.deps.FLAG_SENSE_PREFERRED ],
+        'sense'                 : [ FLAGSENSE, deps.FLAG_SENSE_PREFERRED ],
 	'buildName'	        : [ STRING, None ],
 	'buildRequired'	        : [ BOOL,   True ],
 	'shortDoc'	        : [ STRING, '' ],
@@ -159,13 +159,13 @@ class UseFlagConfig(ConfigFile):
         if type == FLAGSENSE:
             val = val.lower()
             if val == "disallowed":
-                sense = deps.deps.FLAG_SENSE_DISALLOWED
+                sense = deps.FLAG_SENSE_DISALLOWED
             elif val == "preferred":
-                sense = deps.deps.FLAG_SENSE_PREFERRED
+                sense = deps.FLAG_SENSE_PREFERRED
             elif val == "prefernot":
-                sense = deps.deps.FLAG_SENSE_PREFERNOT
+                sense = deps.FLAG_SENSE_PREFERNOT
             elif val == "required":
-                sense = deps.deps.FLAG_SENSE_REQUIRED
+                sense = deps.FLAG_SENSE_REQUIRED
             else:
                 raise ParseError, ("%s: unknown use value %s") % (filePath, val)
             self.__dict__[key] = sense
@@ -174,13 +174,13 @@ class UseFlagConfig(ConfigFile):
 
     def displayKey(self, key, value, type, out):
         if type == FLAGSENSE:
-            if value == deps.deps.FLAG_SENSE_DISALLOWED:
+            if value == deps.FLAG_SENSE_DISALLOWED:
                 out.write('%s: %s\n' % (key, "disallowed"))
-            elif value == deps.deps.FLAG_SENSE_PREFERRED:
+            elif value == deps.FLAG_SENSE_PREFERRED:
                 out.write('%s: %s\n' % (key, "preferred"))
-            elif value == deps.deps.FLAG_SENSE_PREFERNOT:
+            elif value == deps.FLAG_SENSE_PREFERNOT:
                 out.write('%s: %s\n' % (key, "prefernot"))
-            elif value == deps.deps.FLAG_SENSE_REQUIRED:
+            elif value == deps.FLAG_SENSE_REQUIRED:
                 out.write('%s: %s\n' % (key, "required"))
         else:
             ConfigFile.displayKey(self, key, value, type, out)
@@ -229,23 +229,23 @@ class FlavorConfig:
                        self.arches[arch].read(os.path.join(archDir, arch))
 
     def toDependency(self, override=None):
-        useFlags = deps.deps.DependencySet()
+        useFlags = deps.DependencySet()
         flags = [x.toDepFlag() for x in self.flags.values() ] 
 
-        useFlags.addDep(deps.deps.UseDependency, 
-                        deps.deps.Dependency("use", flags))
+        useFlags.addDep(deps.UseDependency, 
+                        deps.Dependency("use", flags))
         if override:
             if isinstance(override, list):
                 newUseFlags = []
                 for flavor in override:
                     useFlagsCopy = useFlags.copy()
                     useFlagsCopy.union(flavor,
-                                 mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+                                 mergeType = deps.DEP_MERGE_TYPE_OVERRIDE)
                     newUseFlags.append(useFlagsCopy)
                 return newUseFlags
             else:
                 useFlags.union(override,
-                               mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+                               mergeType = deps.DEP_MERGE_TYPE_OVERRIDE)
         return useFlags
 
     def populateBuildFlags(self):

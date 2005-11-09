@@ -19,15 +19,12 @@ import os
 import re
 import sre_constants
 import sys
-
-import deps
-import deps.arch
-import deps.deps
 import copy
-from build import use
-from conary.lib import log,util
-from conary import versions
 
+from conary import deps
+from conary import versions
+from conary.build import use
+from conary.lib import log,util
 
 (STRING,
     BOOL,

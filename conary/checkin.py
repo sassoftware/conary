@@ -26,7 +26,7 @@ from local import update
 from conary.repository import changeset, errors
 import changelog
 from build import cook
-import deps
+from conary import deps
 from conary import files
 from conary.lib import log
 from conary.lib import magic

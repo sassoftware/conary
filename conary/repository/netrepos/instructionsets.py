@@ -12,7 +12,7 @@
 # full details.
 # 
 
-import deps.deps
+from conary.deps import deps
 
 class InstructionSets:
     def __init__(self, db):
@@ -48,11 +48,11 @@ class InstructionSets:
             frozen = " ".join((base, flags))
         else:
             frozen = base
-        return deps.deps.InstructionSetDependency.thawDependency(frozen)
+        return deps.InstructionSetDependency.thawDependency(frozen)
     
     def addId(self, isd):
         cu = self.db.cursor()
-        assert(isinstance(isd, deps.deps.Dependency))
+        assert(isinstance(isd, deps.Dependency))
         base, flags = self._freezeIsd(isd)
         cu.execute("INSERT INTO InstructionSets VALUES (NULL, ?, ?)",
                    (base, flags))
@@ -63,7 +63,7 @@ class InstructionSets:
         cu.execute("DELETE FROM InstructionSets WHERE isnSetId=?", (theId,))
 
     def __delitem__(self, isd):
-        assert(isinstance(isd, deps.deps.Dependency))
+        assert(isinstance(isd, deps.Dependency))
         base, flags = self._freezeIsd(isd)
         cu = self.db.cursor()
         query = "DELETE FROM InstructionSets WHERE base=? "
@@ -75,7 +75,7 @@ class InstructionSets:
             cu.execute(query, (base, flags))
 
     def __getitem__(self, isd):
-        assert(isinstance(isd, deps.deps.Dependency))
+        assert(isinstance(isd, deps.Dependency))
         base, flags = self._freezeIsd(isd)
         cu = self.db.cursor()
         query = "SELECT isnSetId from InstructionSets WHERE base=? AND "

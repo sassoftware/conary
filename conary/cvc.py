@@ -24,7 +24,7 @@ from conary.lib import util
 from conary.lib import log
 from local import database
 from build import cook,use,signtrove
-import deps
+from conary import deps
 from conary.repository import errors, netclient
 from repository.netclient import NetworkRepositoryClient
 import branch

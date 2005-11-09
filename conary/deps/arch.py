@@ -12,7 +12,7 @@
 # full details.
 #
 
-import deps
+from conary.deps import deps
 import os
 
 def x86flags(archTag, baseArch, extraFlags, ofInterest):
