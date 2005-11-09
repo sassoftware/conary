@@ -18,27 +18,27 @@ import httplib
 import itertools
 import os
 import socket
+import sys
 import urllib
 import xml
 import xmlrpclib
 
 #conary
-import changeset
-import datastore
-from deps import deps
-import errors
-import files
-import filecontents
-import findtrove
-from lib import log, util
-import metadata
-import repository
-import sys
-import transport
-import trove
-import versions
-import xmlshims
-from lib import openpgpfile
+from conary.repository import changeset
+from conary import datastore
+from conary.deps import deps
+from conary.repository import errors
+from conary import files
+from conary.repository import filecontents
+from conary.repository import findtrove
+from conary.lib import log, util
+from conary.lib import openpgpfile
+from conary import metadata
+from conary.repository import repository
+from conary.repository import transport
+from conary import trove
+from conary import versions
+from conary.repository import xmlshims
 
 # FIXME: remove these compatibility exception classes later
 AlreadySignedError = errors.AlreadySignedError

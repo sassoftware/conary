@@ -41,14 +41,14 @@ sys.path.append(mainPath)
 
 from repository.netrepos import netserver
 from repository.netrepos import netauth
-from repository import changeset
-from repository import errors
+from conary.repository import changeset
+from conary.repository import errors
 from repository.netrepos.netserver import NetworkRepositoryServer
 from repository.filecontainer import FileContainer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT, BOOLEAN
-from lib import options
-from lib import util
+from conary.lib import options
+from conary.lib import util
 
 from lib.tracelog import initLog, logMe
 

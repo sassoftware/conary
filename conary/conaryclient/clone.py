@@ -11,13 +11,13 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import build
-from build.nextversion import nextVersion
-from deps import deps
 import itertools
-from lib import log
-from repository import changeset
-import versions
+
+from conary import versions
+from conary.build.nextversion import nextVersion
+from conary.deps import deps
+from conary.lib import log
+from conary.repository import changeset
 
 V_LOADED = 0
 V_BREQ = 1

@@ -11,9 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from deps import deps
-from repository import changeset
-import versions
+from conary.deps import deps
+from conary.repository import changeset
+from conary import versions
 
 class ClientBranch:
     BRANCH_ALL         = 0

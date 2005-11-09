@@ -18,16 +18,14 @@ into BuildComponents.  These BuildComponents are used to create Packages
 and create changesets from the files created during the build process
 """
 
-import files
-import lib.elf
-from lib import log
-from lib import sha1helper
 import os
 import string
 import time
-import use
 
-from deps import deps
+from conary import files
+from conary.lib import log, sha1helper, elf
+from conary.build import use
+from conary.deps import deps
 
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
@@ -79,7 +77,7 @@ class BuildComponent(dict):
             os.chmod(realPath, f.inode.perms() | 0400)
 
         if f.hasContents and isinstance(f, files.RegularFile):
-            results = lib.elf.inspect(realPath)
+            results = elf.inspect(realPath)
             if results != None:
                 requires, provides = results
                 abi = None

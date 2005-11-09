@@ -11,7 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import versions
+from conary import versions
 
 class RepositoryMismatch(Exception):
     pass
@@ -128,8 +128,8 @@ class AlreadySignedError(RepositoryError):
     def __init__(self, error = "Already signed"):
         self.error=error
 
-from trove import DigitalSignatureVerificationError, TroveIntegrityError
-from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
+from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
+from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that

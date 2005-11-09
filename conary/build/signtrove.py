@@ -15,10 +15,10 @@
 
 import re
 
-from lib import log
+from conary.lib import log
 import sys
 from repository.netclient import NetworkRepositoryClient
-import callbacks
+from conary import callbacks
 from updatecmd import parseTroveSpec
 from checkin import fullLabel
 import repository

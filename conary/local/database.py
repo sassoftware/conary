@@ -18,24 +18,15 @@ import os
 import shutil
 
 #conary
-from build import tags
-from conarycfg import RegularExpressionList
-from callbacks import UpdateCallback
-import datastore
-from deps import deps
-from lib import log
-from lib import util
-import localrep
-from repository import changeset
-from repository import errors
-from repository import filecontents
-from repository import filecontainer
-from repository import repository
-from repository import trovesource
-import sqldb
-import trove
-import update
-import versions
+from conary import datastore, trove, versions
+from conary.build import tags
+from conary.callbacks import UpdateCallback
+from conary.conarycfg import RegularExpressionList
+from conary.deps import deps
+from conary.lib import log, util
+from conary.local import localrep, sqldb, update
+from conary.repository import changeset, errors, filecontents, filecontainer
+from conary.repository import repository, trovesource
 
 OldDatabaseSchema = sqldb.OldDatabaseSchema
 

@@ -132,7 +132,7 @@ def usage(rc = 1):
     return rc
 
 def openRepository(repMap):
-    from repository import netclient, errors
+    from conary.repository import netclient, errors
     try:
         return netclient.NetworkRepositoryClient(repMap)
     except errors.OpenError, e:
@@ -412,7 +412,7 @@ def realMain(cfg, argv=sys.argv):
         troves = otherArgs[2:]
         verify.verify(troves, db, cfg, all=all)
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
-        from repository import changeset
+        from conary.repository import changeset
         ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
@@ -552,7 +552,7 @@ def realMain(cfg, argv=sys.argv):
 	sys.exit(1)
 
 def main(argv=sys.argv):
-    from repository import errors
+    from conary.repository import errors
     try:
         if '--skip-default-config' in argv:
             argv = argv[:]

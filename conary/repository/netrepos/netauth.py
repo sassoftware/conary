@@ -17,7 +17,7 @@ import re
 import sqlite3
 import sys
 
-from repository import errors
+from conary.repository import errors
 from lib.tracelog import logMe
 
 # FIXME: remove these compatibilty error classes later

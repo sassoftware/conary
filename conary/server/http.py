@@ -12,7 +12,7 @@
 # full details.
 #
 import itertools
-import metadata
+from conary import metadata
 import os
 import string
 import sys
@@ -28,8 +28,8 @@ from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
 from repository import shimclient
-import versions
-from deps import deps
+from conary import versions
+from conary.deps import deps
 
 from mod_python import apache
 from mod_python.util import FieldStorage
@@ -245,7 +245,7 @@ class HttpHandler(WebHandler):
     @checkAuth(write=False)
     def getFile(self, auth, path, pathId, fileId, fileV):
         from mimetypes import guess_type
-        from lib import sha1helper
+        from conary.lib import sha1helper
         
         pathId = sha1helper.md5FromString(pathId)
         fileId = sha1helper.sha1FromString(fileId)

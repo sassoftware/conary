@@ -12,7 +12,7 @@
 # full details.
 #
 
-import versions
+from conary import versions
 
 class VersionTable:
     """

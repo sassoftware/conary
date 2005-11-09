@@ -11,16 +11,16 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import callbacks
+from conary import callbacks
 from conaryclient.cmdline import parseTroveSpec
 from conaryclient import cmdline
-from deps import deps
-from lib import log
-from lib import util
+from conary.deps import deps
+from conary.lib import log
+from conary.lib import util
 from local import database
-from repository import changeset
-from repository import errors
-import conaryclient
+from conary.repository import changeset
+from conary.repository import errors
+from conary import conaryclient
 import os
 import sys
 import thread

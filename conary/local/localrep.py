@@ -12,14 +12,14 @@
 # full details.
 #
 
-import database
-import datastore
 import gzip
-from repository import repository
-from StringIO import StringIO
 import sha
 import zlib
-from lib import openpgpfile
+from StringIO import StringIO
+
+from conary import datastore
+from conary.lib import openpgpfile
+from conary.repository import repository
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 

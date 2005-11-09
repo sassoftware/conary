@@ -18,9 +18,9 @@ downloads and unpacking layers of files.
 """
 
 import errno
-from lib import log
-from lib import sha1helper
-from lib import util
+from conary.lib import log
+from conary.lib import sha1helper
+from conary.lib import util
 import os
 import socket
 import sys

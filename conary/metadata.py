@@ -14,11 +14,11 @@
 import textwrap
 import time
 import urlparse
-import versions
+from conary import versions
 import xml.dom.minidom
 import xml.parsers.expat
 
-from lib import log
+from conary.lib import log
 from dbstore import idtable
 from fmtroves import TroveCategories, LicenseCategories
 from httplib import HTTPConnection

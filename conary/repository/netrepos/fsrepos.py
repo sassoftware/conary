@@ -14,22 +14,22 @@
 
 # implements a db-based repository
 
-from deps import deps
+from conary.deps import deps
 import os
-from lib import util, stackutil, log, openpgpfile
+from conary.lib import util, stackutil, log, openpgpfile
 from netauth import NetworkAuthorization
 import repository
 import repository.netclient
 from repository.repository import AbstractRepository
 from repository.repository import ChangeSetJob
 from datastore import DataStoreRepository, DataStore
-from repository import changeset
-from repository import errors
-from repository import filecontents
+from conary.repository import changeset
+from conary.repository import errors
+from conary.repository import filecontents
 import sqlite3
 import sys
-import trovestore
-import versions
+from conary import trovestore
+from conary import versions
 from lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):

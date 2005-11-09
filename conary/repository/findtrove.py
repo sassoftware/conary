@@ -12,10 +12,9 @@
 # full details.
 #
 
-from deps import deps
-import errors
-import versions
-
+from conary.deps import deps
+from conary.repository import errors
+from conary import versions
 
 ######################################
 # Query Types

@@ -21,8 +21,8 @@ import zlib
 
 from repository.netrepos import netserver
 from repository.filecontainer import FileContainer
-from repository import changeset
-from repository import errors
+from conary.repository import changeset
+from conary.repository import errors
 import conarycfg
 
 from web.webauth import getAuth

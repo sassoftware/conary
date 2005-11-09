@@ -15,11 +15,11 @@
 """
 Module implementing tag file handling
 """
-
-import conarycfg
-import filter
-from lib import log
 import os
+
+from conary import conarycfg
+from conary.build import filter
+from conary.lib import log
 
 EXCLUDE, INCLUDE = range(2)
 

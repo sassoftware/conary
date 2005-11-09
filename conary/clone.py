@@ -16,7 +16,7 @@ import sys
 
 from repository import netclient
 from conaryclient import ConaryClient, cmdline
-import versions
+from conary import versions
 
 def displayCloneJob(cs):
     

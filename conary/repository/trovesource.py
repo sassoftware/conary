@@ -11,12 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from deps import deps
 
-import changeset
-import findtrove
 import itertools
-import trove
+
+from conary import trove
+from conary.deps import deps
+from conary.repository import changeset, findtrove
 
 class AbstractTroveSource:
     """ Provides the interface necessary for performing

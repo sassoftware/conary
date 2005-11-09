@@ -12,8 +12,8 @@
 # full details.
 # 
 
-from deps import deps
-import versions
+from conary import versions
+from conary.deps import deps
 
 NO_FLAG_MAGIC = '-*none*-'
 

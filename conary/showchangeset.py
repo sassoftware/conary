@@ -20,8 +20,8 @@ import sys
 
 #conary
 import display
-import files
-from lib import log
+from conary import files
+from conary.lib import log
 from lib.sha1helper import sha1ToString
 from repository import repository
 

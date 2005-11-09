@@ -23,12 +23,13 @@ keys are assumed to be unique.
 import errno
 import fcntl
 import gzip
-from lib import log
 import os
-from lib import util
-from lib import sha1helper
-from repository import filecontents
 import sha
+
+from conary.lib import log
+from conary.lib import util
+from conary.lib import sha1helper
+from conary.repository import filecontents
 
 class DataStore:
 

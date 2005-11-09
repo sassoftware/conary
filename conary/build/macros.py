@@ -16,7 +16,7 @@
 Module implementing the "macro" dictionary class
 """
 
-from lib import util
+from conary.lib import util
 
 class Macros(dict):
     def __init__(self, macros={}, shadow=False):

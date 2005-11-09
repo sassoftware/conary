@@ -18,11 +18,11 @@ Defines the datastreams stored in a changeset
 import copy
 import itertools
 import struct
-import versions
+from conary import versions
 
-from deps import deps
+from conary.deps import deps
 
-from lib import cstreams
+from conary.lib import cstreams
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream

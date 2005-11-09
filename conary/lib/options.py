@@ -15,7 +15,7 @@
 Command-line option handling
 """
 
-from lib import log, util
+from conary.lib import log, util
 import sys
 
 
@@ -136,7 +136,7 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
     if argSet.has_key('debugger'):
 	del argSet['debugger']
-	from lib import epdb
+	from conary.lib import epdb
 	epdb.set_trace()
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError, 
                                             debugCtrlC=True)

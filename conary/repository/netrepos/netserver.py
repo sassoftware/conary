@@ -14,29 +14,29 @@
 
 import base64
 import cPickle
-from deps import deps
-from repository import changeset
+from conary.deps import deps
+from conary.repository import changeset
 from repository import repository
-from repository import errors
+from conary.repository import errors
 from netauth import NetworkAuthorization
 import fsrepos
-from lib import log
-import files
+from conary.lib import log
+from conary import files
 import os
 import sys
 import re
-from lib import sha1helper
+from conary.lib import sha1helper
 import sqlite3
 import tempfile
-import trove
-from lib import util
-from repository import xmlshims
+from conary import trove
+from conary.lib import util
+from conary.repository import xmlshims
 from repository import repository
 from dbstore import idtable
 from local import sqldb
 from local import versiontable
-import trovestore
-import versions
+from conary import trovestore
+from conary import versions
 from datastore import IntegrityError
 from lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from lib.openpgpfile import TRUST_FULL

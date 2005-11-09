@@ -17,10 +17,10 @@ Implements branch and shadow command line functionality.
 """
 import itertools
 
-import conaryclient
+from conary import conaryclient
 from conaryclient import cmdline
-import versions
-from lib import log
+from conary import versions
+from conary.lib import log
 import updatecmd
 
 def _getBranchType(binaryOnly, sourceOnly):

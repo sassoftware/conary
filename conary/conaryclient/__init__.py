@@ -15,17 +15,16 @@ import os
 import pickle
 
 #conary imports
-import conarycfg
-import metadata
-from deps import deps
-from lib import util
-from local import database
-from repository.netclient import NetworkRepositoryClient
+from conary import conarycfg, metadata
+from conary.deps import deps
+from conary.lib import util
+from conary.local import database
+from conary.repository.netclient import NetworkRepositoryClient
 
 # mixins for ConaryClient
-from branch import ClientBranch
-from clone import ClientClone
-from update import ClientUpdate
+from conary.conaryclient.branch import ClientBranch
+from conary.conaryclient.clone import ClientClone
+from conary.conaryclient.update import ClientUpdate
 
 CloneError = clone.CloneError
 CloneIncomplete = clone.CloneIncomplete

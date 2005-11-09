@@ -53,11 +53,12 @@ Each file table entry looks like::
   arbitrary file table data
 """
 
-from repository import filecontents
 import gzip
 import os
 import struct
-from lib import util
+
+from conary.lib import util
+from conary.repository import filecontents
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 SUBFILE_MAGIC = 0x3FBB

@@ -12,28 +12,19 @@
 # full details.
 #
 
-from deps import deps
+from StringIO import StringIO
+import struct
+import tempfile
 import difflib
-from lib import enum
-from lib import log
 import errno
-import filecontainer
-import filecontents
-import files
 import gzip
 import itertools
 import os
-from lib import patch
-import errors
-from lib import sha1helper
-import streams
-import struct
-import tempfile
-import trove
-from lib import util
-import versions
 
-from StringIO import StringIO
+from conary import files, streams, trove, versions
+from conary.deps import deps
+from conary.lib import enum, log, patch, sha1helper, util
+from conary.repository import filecontainer, filecontents, errors
 
 # "refr" being the same length as "file" matters
 # "ptr" is for links

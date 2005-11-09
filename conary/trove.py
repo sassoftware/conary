@@ -16,15 +16,15 @@ Implements troves (packages, components, etc.) for the repository
 """
 
 import changelog
-import files
+from conary import files
 import itertools
-from lib import sha1helper
+from conary.lib import sha1helper
 from lib.openpgpkey import getKeyCache
 from lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 import streams
 import struct
-import versions
-from deps import deps
+from conary import versions
+from conary.deps import deps
 from changelog import ChangeLog
 from streams import FrozenVersionStream
 from streams import StringVersionStream

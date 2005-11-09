@@ -36,8 +36,8 @@ import stat
 import tempfile
 
 #conary imports
-from lib import magic
-from lib import util
+from conary.lib import magic
+from conary.lib import util
 import macros
 import policy
 

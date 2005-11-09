@@ -14,11 +14,10 @@
 #
 import os
 
-from deps import deps
-from lib import log
-
-from repository import changeset
-from repository.filecontainer import BadContainer
+from conary.deps import deps
+from conary.lib import log
+from conary.repository import changeset
+from conary.repository.filecontainer import BadContainer
 
 def parseTroveSpec(specStr):
     if specStr.find('[') > 0 and specStr[-1] == ']':

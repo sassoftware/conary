@@ -40,7 +40,7 @@ export their namespaces.
 import itertools
 
 #conary
-from deps import deps
+from conary.deps import deps
 
 class Flag(dict):
 

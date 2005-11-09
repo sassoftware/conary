@@ -15,21 +15,21 @@
 import changelog
 import cltable
 import copy
-from deps import deps
+from conary.deps import deps
 from local import deptable
 import instances
 import items
 import keytable
-import files
+from conary import files
 import flavors
-import metadata
+from conary import metadata
 import sqlite3
-import trove
-import trovefiles
+from conary import trove
+from conary import trovefiles
 import versionops
-import versions
+from conary import versions
 
-from local import troveinfo
+from local from conary import troveinfo
 from local import versiontable
 from local import sqldb
 

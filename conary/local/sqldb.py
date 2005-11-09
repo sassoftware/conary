@@ -12,16 +12,9 @@
 # full details.
 #
 
-import deps.arch
-import deps.deps
-import deptable
-import files
-import sqlite3
-import trove
-import troveinfo
-import versions
-import versiontable
-from dbstore import idtable
+from conary import deps, files, sqlite3, trove, versions
+from conary.dbstore import idtable
+from conary.local import deptable, troveinfo, versiontable
 
 class Tags(idtable.CachedIdTable):
 

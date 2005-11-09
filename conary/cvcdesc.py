@@ -18,11 +18,11 @@ Generates an XML trove description file.
 
 import sys
 
-from lib import options
-from lib import util
-from lib import log
+from conary.lib import options
+from conary.lib import util
+from conary.lib import log
 import conarycfg
-import metadata
+from conary import metadata
 import xmlrpclib
 
 from repository import netclient

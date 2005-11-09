@@ -14,7 +14,8 @@
 
 import os
 from StringIO import StringIO
-from lib import sha1helper
+
+from conary.lib import sha1helper
 
 SEEK_SET=-1
 SEEK_CUR=1

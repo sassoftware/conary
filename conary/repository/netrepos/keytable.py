@@ -13,7 +13,7 @@
 #
 
 import sqlite3
-from lib import openpgpfile, openpgpkey
+from conary.lib import openpgpfile, openpgpkey
 import StringIO
 import base64
 from textwrap import wrap

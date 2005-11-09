@@ -12,11 +12,10 @@
 # full details.
 #
 
-import deps.deps
-import versions
-import files
 import base64
-from lib import sha1helper
+
+from conary import deps, files, versions
+from conary.lib import sha1helper
 
 class NetworkConvertors(object):
 

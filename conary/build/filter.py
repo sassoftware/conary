@@ -18,10 +18,11 @@ mode bit masks (positive and negative) are applied to the mode of the
 file as it appears in the filesystem.
 """
 
-from lib import log
 import os
 import re
 import stat
+
+from conary.lib import log
 
 class Filter:
     """

@@ -15,15 +15,15 @@
 Provides the output for the "conary verify" command
 """
 
-from deps import deps
+from conary.deps import deps
 import display
-import files
-from lib import log
+from conary import files
+from conary.lib import log
 import time
-from repository import errors
+from conary.repository import errors
 import sys
 import showchangeset
-import versions
+from conary import versions
 from local import update
 
 from lib.sha1helper import sha1ToString

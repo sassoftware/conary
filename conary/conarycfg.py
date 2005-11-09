@@ -25,8 +25,8 @@ import deps.arch
 import deps.deps
 import copy
 from build import use
-from lib import log,util
-import versions
+from conary.lib import log,util
+from conary import versions
 
 
 (STRING,

@@ -19,7 +19,7 @@ import os.path
 from build import use
 from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
 import deps.deps
-from lib import log
+from conary.lib import log
 
 # XXX hack -- need a better way to add to list of config types
 FLAGSENSE = 2222

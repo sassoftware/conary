@@ -15,7 +15,7 @@
 Base classes used for destdirpolicy and packagepolicy.
 """
 
-from lib import util, log
+from conary.lib import util, log
 import filter
 import os
 import action

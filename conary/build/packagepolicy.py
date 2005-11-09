@@ -26,17 +26,12 @@ import os
 import re
 import stat
 
-import buildpackage
-from local import database
-from deps import deps
-import destdirpolicy
-import files
-import filter
-from lib import elf, util, log
-import policy
-import use
-import tags
-
+from conary import files
+from conary.build import buildpackage, destdirpolicy, filter, policy
+from conary.build import tags, use
+from conary.deps import deps
+from conary.lib import elf, util, log
+from conary.local import database
 
 class NonBinariesInBindirs(policy.Policy):
     """

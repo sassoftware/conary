@@ -19,12 +19,13 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import gzip
-from lib import log, magic
-import lookaside
 import os
-import rpmhelper
-from lib import util
-import action
+
+from conary.lib import log, magic
+from conary.build import lookaside
+from conary import rpmhelper
+from conary.lib import util
+from conary.build import action
 
 class _Source(action.RecipeAction):
     keywords = {'rpm': '',

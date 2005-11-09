@@ -38,10 +38,9 @@ import tempfile
 import textwrap
 
 #conary imports
-import action
-import fixedglob
-from lib import log, util
-from use import Use
+from conary.build import action, fixedglob
+from conary.lib import log, util
+from conary.build.use import Use
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -74,7 +73,7 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.debug:
-	    from lib import epdb
+	    from conary.lib import epdb
 	    epdb.set_trace()
 	if self.use:
 	    if self.linenum is None:

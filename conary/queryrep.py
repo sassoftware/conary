@@ -15,14 +15,14 @@
 Provides the output for the "conary repquery" command
 """
 
-from deps import deps
-from repository import errors
+from conary.deps import deps
+from conary.repository import errors
 import display
-import files
-from lib import log
-import metadata
+from conary import files
+from conary.lib import log
+from conary import metadata
 import time
-import versions
+from conary import versions
 
 from lib.sha1helper import sha1ToString
 

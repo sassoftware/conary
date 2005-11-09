@@ -15,16 +15,13 @@
 """
 Provides superclasses for build and policy.
 """
-
-from lib import epdb
-from lib import log
 import os
-from lib import util
 import sys
 import string
 import tempfile
 import traceback
-from lib import stackutil
+
+from conary.lib import epdb, log, util, stackutil
 
 # build.py and policy.py need some common definitions
 

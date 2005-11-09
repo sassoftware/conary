@@ -13,7 +13,7 @@
 # 
 
 from dbstore import idtable
-import versions
+from conary import versions
 from repository.errors import DuplicateBranch
 
 class BranchTable(idtable.IdTable):

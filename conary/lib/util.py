@@ -13,7 +13,7 @@
 #
 
 import bdb
-from build import fixedglob
+from conary.build import fixedglob
 import bz2
 import epdb
 import errno

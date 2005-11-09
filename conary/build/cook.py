@@ -28,26 +28,16 @@ import time
 import traceback
 import types
 
-import buildinfo, buildpackage, lookaside, policy, use, recipe
-import callbacks
-import conaryclient
-import constants
-from deps import deps
-import files
-from lib import log
-from lib import logger
-from lib import sha1helper
-from lib import util
-from local import database
-from repository import changeset
-from repository import filecontents
-from repository import errors
-from repository.netclient import NetworkRepositoryClient
-import trove
-from conaryclient.cmdline import parseTroveSpec
-import versions
-from nextversion import nextVersion
-from conarycfg import selectSignatureKey
+from conary import callbacks, conaryclient, constants, files, trove, versions
+from conary.build import buildinfo, buildpackage, lookaside, policy, use, recipe
+from conary.build.nextversion import nextVersion
+from conary.conarycfg import selectSignatureKey
+from conary.deps import deps
+from conary.lib import log, logger, sha1helper, util
+from conary.local import database
+from conary.repository import changeset, errors, filecontents
+from conary.conaryclient.cmdline import parseTroveSpec
+from conary.repository.netclient import NetworkRepositoryClient
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):

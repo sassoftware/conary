@@ -67,11 +67,11 @@ import textwrap
 
 import conary
 import conarycfg
-from deps import deps
+from conary.deps import deps
 from local import database
-from lib import util
+from conary.lib import util
 from repository import netclient
-import versions
+from conary import versions
 import updatecmd
 
 class bugzMine:

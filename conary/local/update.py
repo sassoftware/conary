@@ -24,26 +24,19 @@ the way of a newly created file will be overwritten.  Otherwise an error
 is produced.
 """
 import errno
+import itertools
+import os
 import sha
 import stat
 import sys
 import tempfile
-import os
 
-from callbacks import UpdateCallback
-from repository import changeset
-from repository import filecontents
-from deps import deps
-import files
-import itertools
-from lib import log
-from lib import patch
-from lib import sha1helper
-from lib import util
-import trove
-import versions
-
-from build import tags
+from conary import files, trove, versions
+from conary.build import tags
+from conary.callbacks import UpdateCallback
+from conary.deps import deps
+from conary.lib import log, patch, sha1helper, util
+from conary.repository import changeset, filecontents
 
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1

@@ -14,7 +14,7 @@
 
 import copy
 import re
-from lib import util
+from conary.lib import util
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1

@@ -13,23 +13,12 @@
 #
 
 # defines the Conary repository
-
-import changeset
-import datastore
-import deps.deps
-import errors
-import files
-from lib import patch
-from lib import sha1helper
 import sha
 import tempfile
-import trove
-from lib import util
-from lib import openpgpkey
-from lib import openpgpfile
-import versions
 
-import filecontents
+from conary.repository import changeset, errors, filecontents
+from conary import datastore, deps, files, trove, versions
+from conary.lib import patch, sha1helper, util, openpgpkey, openpgpfile
 
 # FIXME: remove these compatibility exception classes later
 TroveNotFound = errors.TroveNotFound

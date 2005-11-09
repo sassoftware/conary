@@ -13,8 +13,8 @@
 #
 
 # conary imports
-import build
-from lib import util
+from conary.build import build
+from conary.lib import util
 
 class User(build.BuildAction):
     """

@@ -12,7 +12,7 @@
 # full details.
 # 
 
-from deps import deps
+from conary.deps import deps
 
 class Flavors:
     # manages the Flavors and FlavorMap tables

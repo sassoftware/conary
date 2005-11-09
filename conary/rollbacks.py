@@ -13,8 +13,8 @@
 #
 
 from local import database
-from lib import log
-from repository import changeset
+from conary.lib import log
+from conary.repository import changeset
 
 def listRollbacks(db, cfg):
     def verStr(cfg, version):

@@ -18,27 +18,27 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 
-import callbacks
+from conary import callbacks
 import copy
 import difflib
 from build import recipe, lookaside
 from local import update
-from repository import changeset, errors
+from conary.repository import changeset, errors
 import changelog
 from build import cook
 import deps
-import files
-from lib import log
-from lib import magic
+from conary import files
+from conary.lib import log
+from conary.lib import magic
 import os
-from lib import sha1helper
-from lib import openpgpfile
+from conary.lib import sha1helper
+from conary.lib import openpgpfile
 import sys
 import time
-import trove
+from conary import trove
 import updatecmd
-from lib import util
-import versions
+from conary.lib import util
+from conary import versions
 from conarycfg import selectSignatureKey
 
 # mix UpdateCallback and CookCallback, since we use both.

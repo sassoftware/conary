@@ -12,10 +12,8 @@
 # full details.
 #
 import grp
-from lib import log
 import os
 import pwd
-from lib import sha1helper
 import socket
 import stat
 import streams
@@ -23,9 +21,9 @@ import string
 import struct
 import tempfile
 import time
-from lib import util
 
-from deps import deps
+from conary.lib import util, sha1helper, log
+from conary.deps import deps
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1

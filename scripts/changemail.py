@@ -17,12 +17,12 @@
 import conary
 
 import checkin
-from lib import options, util
+from conary.lib import options, util
 import os
 import sys
 import tempfile
 import textwrap
-import versions
+from conary import versions
 
 def usage(exitcode=1):
     sys.stderr.write("\n".join((

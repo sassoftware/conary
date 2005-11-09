@@ -30,26 +30,13 @@ import tempfile
 import types
 
 #conary
-import build
-import buildpackage
-import usergroup
-import conaryclient
-import cook
-from deps import deps
-import destdirpolicy
-import files
-from lib import log
-from lib import magic
-from lib import util
-from local import database
-import macros
-import packagepolicy
-from repository import errors, trovesource
-import source
-import use
-import updatecmd
-import versions
-
+from conary import conaryclient, files, updatecmd, versions
+from conary.build import buildpackage, usergroup, destdirpolicy
+from conary.build import macros, packagepolicy, source, use
+from conary.deps import deps
+from conary.lib import log, magic, util
+from conary.local import database
+from conary.repository import errors, trovesource
 
 baseMacros = {
     # paths
@@ -873,7 +860,7 @@ class _AbstractPackageRecipe(Recipe):
                 log.error("Could not find the following troves "
                           "needed to cook this recipe:\n"  
                           "%s" % '\n'.join(sorted(missingReqs)))
-                raise cook.CookError, 'unresolved build dependencies'
+                raise RecipeDependencyError, 'unresolved build dependencies'
         self.buildReqMap = reqMap
         self.ignoreDeps = ignoreDeps
 
@@ -2202,7 +2189,7 @@ class FilesetRecipe(Recipe):
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.requestedFiles = {}
-	
+
 class RecipeFileError(Exception):
     def __init__(self, msg):
         self.msg = msg
@@ -2212,3 +2199,6 @@ class RecipeFileError(Exception):
 
     def __str__(self):
 	return repr(self)
+
+class RecipeDependencyError(RecipeFileError):
+    pass

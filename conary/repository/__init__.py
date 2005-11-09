@@ -12,4 +12,4 @@
 # full details.
 #
 
-import changeset
+from conary.repository import changeset

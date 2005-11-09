@@ -17,16 +17,14 @@ import time
 import traceback
 import sys
 
-from callbacks import UpdateCallback
-import conarycfg
-from deps import deps
-from lib import log
-from local import database
-from repository import changeset
-from repository import trovesource
-from repository.netclient import NetworkRepositoryClient
-import trove
-import versions
+from conary.callbacks import UpdateCallback
+from conary import conarycfg
+from conary.deps import deps
+from conary.lib import log
+from conary.local import database
+from conary.repository import changeset, trovesource
+from conary.repository.netclient import NetworkRepositoryClient
+from conary import trove, versions
 
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 

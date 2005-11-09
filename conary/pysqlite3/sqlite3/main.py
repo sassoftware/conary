@@ -1,5 +1,5 @@
 from __future__ import nested_scopes
-import _sqlite3 as _sqlite
+import conary._sqlite3 as _sqlite
 
 import copy, new, sys, weakref
 from types import *

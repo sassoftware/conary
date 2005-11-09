@@ -1,4 +1,4 @@
-import _sqlite3 as _sqlite
+import conary._sqlite3 as _sqlite
 
 """Python interface to the SQLite embedded database engine."""
 
@@ -49,7 +49,7 @@ UNICODESTRING = DBAPITypeObject(_sqlite.UNICODESTRING)
 # Exceptions
 #------------------------------------------------------------------------------
 
-from _sqlite3 import Warning, Error, InterfaceError, \
+from conary._sqlite3 import Warning, Error, InterfaceError, \
     DatabaseError, DataError, OperationalError, IntegrityError, InternalError, \
     ProgrammingError, NotSupportedError
 
@@ -60,7 +60,7 @@ from _sqlite3 import Warning, Error, InterfaceError, \
 def connect(*args, **kwargs):
     return Connection(*args, **kwargs)
 
-from _sqlite3 import encode, decode
+from conary._sqlite3 import encode, decode
 
 __all__ = ['connect','IntegrityError', 'InterfaceError', 'InternalError',
            'NotSupportedError', 'OperationalError',
