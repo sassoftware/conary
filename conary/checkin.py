@@ -32,14 +32,14 @@ from conary import updatecmd
 from conary import versions
 from conary.build import cook
 from conary.build import recipe, lookaside
+from conary.conarycfg import selectSignatureKey
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import openpgpfile
 from conary.lib import sha1helper
 from conary.lib import util
+from conary.local import update
 from conary.repository import changeset, errors
-from conarycfg import selectSignatureKey
-from local import update
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
