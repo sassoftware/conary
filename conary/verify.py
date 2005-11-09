@@ -14,20 +14,18 @@
 """
 Provides the output for the "conary verify" command
 """
-
-from conary.deps import deps
-import display
-from conary import files
-from conary.lib import log
-import time
-from conary.repository import errors
 import sys
-import showchangeset
+import time
+
+from conary import display
+from conary import files
+from conary import showchangeset
 from conary import versions
-from local import update
-
-from lib.sha1helper import sha1ToString
-
+from conary.deps import deps
+from conary.lib import log
+from conary.lib.sha1helper import sha1ToString
+from conary.local import update
+from conary.repository import errors
 
 def usage():
     print "conary verify [--all] [trove[=version]]*"
