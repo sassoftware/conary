@@ -12,26 +12,12 @@
 # full details.
 #
 
-TOPDIR	= ../..
+class DBStoreError(Exception):
+    def __init__(self, args):
+        self._args = args
 
-python_files	= __init__.py \
-		  idtable.py \
-		  base_drv.py \
-		  mysql_drv.py \
-		  postgresql_drv.py \
-		  sqlite_drv.py	\
-		  sql_error.py
+    def __str__(self):
+        return str(args)
 
-extra_dist = Makefile
-dist_files = $(python_files) $(extra_dist)
-
-all: default-all
-
-install: pyfiles-install
-
-dist: default-dist
-
-clean: default-clean
-
-include $(TOPDIR)/Make.rules
-
+class ColumnNotUnique(DBStoreError):
+    pass

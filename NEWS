@@ -4,6 +4,8 @@ Changes in 0.70.5:
     * The update code uses more consistent use of trove sources, and only
       makes explicit calls to the repository if asked.  This should make it
       possible to create interesting update filters.
+    * Clone updated sequences it was iterating over, which is generally
+      a bad idea (and caused clone to commit inconsistent troves)
   o Build Changes (cvc)
     * Locally cooked filesets now include file contents, making the
       filesets installable.

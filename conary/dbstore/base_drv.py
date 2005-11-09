@@ -181,6 +181,9 @@ class BaseDatabase:
             del c
         return 1
 
+    def closed(self):
+        return self.dbh is None
+
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
@@ -191,15 +194,16 @@ class BaseDatabase:
         return self.dbh.commit()
 
     # transaction support
-    def transaction(self, name):
+    def transaction(self, name = None):
         "start transaction [ named point ]"
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
         c = self.cursor()
-        c.execute("begin transaction")        
+        c.execute("begin transaction") 
         self.__transaction = 1
         return c
+        
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints

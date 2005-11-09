@@ -22,12 +22,12 @@ from urllib import unquote
 import kid
 import templates
 
-from repository.netrepos import netserver
-from repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
-from web.webhandler import WebHandler
-from web.fields import strFields, intFields, listFields, boolFields
-from web.webauth import getAuth
-from repository import shimclient
+from conary.repository.netrepos import netserver
+from conary.repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
+from conary.web.webhandler import WebHandler
+from conary.web.fields import strFields, intFields, listFields, boolFields
+from conary.web.webauth import getAuth
+from conary.repository import shimclient
 from conary import versions
 from conary.deps import deps
 

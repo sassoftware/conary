@@ -12,11 +12,27 @@
 # full details.
 #
 
-import sqlite3
+from conary import sqlite3
 from base_drv import BaseDatabase, BaseCursor
+import sql_error
 
 class Cursor(BaseCursor):
-    pass
+    def execute(self, sql, *params, **kw):
+        try:
+            inAutoTrans = False
+            if not self.dbh.inTransaction:
+                inAutoTrans = True    
+            BaseCursor.execute(self, sql, *params, **kw)
+            # commit any transactions which were opened automatically
+            # by the sqlite3 bindings and left hanging:
+            if inAutoTrans and self.dbh.inTransaction:
+                self.dbh.commit()
+        except sqlite3.ProgrammingError, e:
+            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+                raise sql_error.ColumnNotUnique(e)
+            else:
+                raise
+        
 
 class Database(BaseDatabase):
     def __init__(self, db):
@@ -54,4 +70,3 @@ class Database(BaseDatabase):
                 self.tables.setdefault(tbl_name, []).append(name)
         self._getSchemaVersion()
         return self.version
-    
