@@ -16,9 +16,10 @@ Implements changelog entries for repository commits.
 """
 
 import os
-import streams
 import string
 import tempfile
+
+from conary import streams
 
 _CHANGELOG_NAME    = 1
 _CHANGELOG_CONTACT = 2
