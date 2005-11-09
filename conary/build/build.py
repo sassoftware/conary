@@ -73,8 +73,8 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.debug:
-	    from conary.lib import epdb
-	    epdb.set_trace()
+	    from conary.lib import debugger
+	    debugger.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do(self.recipe.macros)

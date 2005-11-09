@@ -131,13 +131,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:
 	#    import traceback, sys, string
-        #    import lib.epdb
-        #    lib.epdb.st()
+        #    import lib.debugger
+        #    lib.debugger.st()
 	#    excInfo = sys.exc_info()
 	#    lines = traceback.format_exception(*excInfo)
 	#    print string.joinfields(lines, "")
 	#    if sys.stdout.isatty() and sys.stdin.isatty():
-	#	lib.epdb.post_mortem(excInfo[2])
+	#	lib.debugger.post_mortem(excInfo[2])
 	#    raise
 
     def urlBase(self):
