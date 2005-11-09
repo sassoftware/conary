@@ -11,18 +11,18 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from httplib import HTTPConnection
+from urllib2 import urlopen
 import textwrap
 import time
 import urlparse
-from conary import versions
 import xml.dom.minidom
 import xml.parsers.expat
 
+from conary import versions
+from conary.dbstore import idtable
+from conary.fmtroves import TroveCategories, LicenseCategories
 from conary.lib import log
-from dbstore import idtable
-from fmtroves import TroveCategories, LicenseCategories
-from httplib import HTTPConnection
-from urllib2 import urlopen
 
 class MDClass:
     (SHORT_DESC, LONG_DESC,
