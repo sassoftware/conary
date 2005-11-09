@@ -18,24 +18,24 @@ Provides the output for the "cvc" subcommands
 
 import os
 import sys
+import xmlrpclib
 
+from conary import branch
+from conary import checkin
+from conary import conarycfg
+from conary import constants
+from conary import deps
+from conary import flavorcfg
+from conary import updatecmd
+from conary import versions
+from conary.build import cook, use, signtrove
+from conary.lib import log
+from conary.lib import openpgpfile
 from conary.lib import options
 from conary.lib import util
-from conary.lib import log
-from local import database
-from build import cook,use,signtrove
-from conary import deps
+from conary.local import database
 from conary.repository import errors, netclient
-from repository.netclient import NetworkRepositoryClient
-import branch
-import checkin
-import conarycfg
-from conary import constants
-import flavorcfg
-import updatecmd
-from conary import versions
-import xmlrpclib
-from conary.lib import openpgpfile
+from conary.repository.netclient import NetworkRepositoryClient
 
 sys.excepthook = util.genExcepthook()
 
