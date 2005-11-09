@@ -16,8 +16,8 @@
 import os.path
 
 #conary
-from build import use
-from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
+from conary.build import use
+from conary.conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
 from conary.deps import deps
 from conary.lib import log
 
