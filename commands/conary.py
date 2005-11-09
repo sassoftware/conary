@@ -27,27 +27,13 @@ import os
 import xmlrpclib
 
 #conary
-import callbacks
-import checkin
-import commit
-import conarycfg
-import constants
-import cscmd
-import deps
-import display
-import flavorcfg
-from lib import log
-from lib import options
-from lib import util
-from local import database
-import queryrep
-import conaryclient
-import rollbacks
-import showchangeset
-import updatecmd
-import verify
-import versions
-from trove import DigitalSignatureVerificationError
+from conary import callbacks, checkin, commit, conarycfg, constants
+from conary import cscmd, deps, display, flavorcfg
+from conary import queryrep, conaryclient, rollbacks, showchangeset
+from conary import updatecmd, verify, versions
+from conary.lib import log, options, util
+from conary.local import database
+from conary.trove import DigitalSignatureVerificationError
 
 sys.excepthook = util.genExcepthook()
 
