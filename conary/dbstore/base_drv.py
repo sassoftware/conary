@@ -200,9 +200,10 @@ class BaseDatabase:
         assert(not name)
         assert(self.dbh)
         c = self.cursor()
-        c.execute("begin transaction")        
+        c.execute("begin transaction") 
         self.__transaction = 1
         return c
+        
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
