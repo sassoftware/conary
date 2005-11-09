@@ -52,7 +52,7 @@ class ClientClone:
 
             while desiredVersion in targetBranchVersionList:
                 desiredVersion.incrementSourceCount()
-                
+
             return desiredVersion
 
         def _isUphill(ver, uphill):
@@ -227,6 +227,10 @@ class ClientClone:
             allTroves.update(x for x in itertools.izip(needed, troves))
             cloneSources = [ x for x in itertools.chain(
                                 *(t.iterTroveList() for t in troves)) ]
+
+        # make sure there are no zeroed timeStamps - targetBranch may be
+        # a user-supplied string
+        targetBranch.resetTimeStamps()
 
         # split out the binary and sources
         sourceTroveInfo = [ x for x in allTroveInfo 

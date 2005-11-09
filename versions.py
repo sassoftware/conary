@@ -720,7 +720,8 @@ class VersionSequence(AbstractVersion):
                  if isinstance(x, AbstractRevision)]
 
     def _clearVersionCache(self):
-        if min(self.timeStamps()) != 0:
+        timeStamps = self.timeStamps()
+        if timeStamps and min(timeStamps) != 0:
             # we're changing the timeStamps, invalidate the cache
             # if a timeStamp has _any_ timeStamps of 0, we can't
             # freeze the string
@@ -733,7 +734,7 @@ class VersionSequence(AbstractVersion):
     
 
     def setTimeStamps(self, timeStamps, clearCache=True):
-        if clearCache:
+        if clearCache and self.timeStamps:
             self._clearVersionCache()
             
         i = 0
