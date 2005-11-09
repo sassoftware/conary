@@ -61,7 +61,8 @@ dist: $(dist_files)
 	cd -; \
 	rm -rf $(DISTDIR)
 
-distcheck: dist
+tag:
+	hg tag conary-$(VERSION)
 
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
