@@ -17,47 +17,22 @@ import sys
 
 import conary
 import sqlite3
-from conary import versions
-
-def renameSeq(s, old, new):
-    for l in s.iterLabels():
-        if l == old:
-            l.host = new.host
-            l.namespace = new.namespace
-            l.branch = new.branch
 
 def rename(cu, old, new):
     print 'renaming %s to %s' %(old, new)
-    oldLabel = versions.Label(old)
-    newLabel = versions.Label(new)
-
     cu.execute("select versionid, version from versions")
-    for (versionId, oldVersion) in [ x for x in cu]:
+    for (versionId, version) in [ x for x in cu]:
         if not versionId: continue
-
-        vObj = versions.VersionFromString(oldVersion)
-        renameSeq(vObj, oldLabel, newLabel)
-        version = vObj.asString()
-
-        if oldVersion != version:
-            print oldVersion, version
-
+        version = version.replace(old, new)
         cu.execute("update versions set version=? where versionid=?", 
                    version, versionId)
 
     cu.execute("select name from sqlite_master where name='Branches'")
     if cu.fetchone() is not None:
         cu.execute("select branchid, branch from branches")
-        for (branchId, oldBranch) in [ x for x in cu]:
+        for (branchId, branch) in [ x for x in cu]:
             if not branchId: continue
-
-            bObj = versions.VersionFromString(oldBranch)
-            renameSeq(bObj, oldLabel, newLabel)
-            branch = bObj.asString()
-
-            if oldBranch != branch:
-                print oldBranch, branch
-
+            branch = branch.replace(old, new)
             cu.execute("update branches set branch=? where branchid=?", 
                        branch, branchId)
 
@@ -78,7 +53,13 @@ else:
 
 cu = db.cursor()
 
-rename(cu, "conary.rpath.com@rpl:1", 
-           "conary.rpath.com@something:else")
+rename(cu, "conary.specifix.com@spx:devel", 
+           "conary.specifix.com@spx:olddevelshadow")
+
+rename(cu, "conary.specifix.com@spx:linux", 
+           "conary.specifix.com@spx:devel")
+
+rename(cu, "contrib.specifix.com@spx:linux", 
+           "contrib.specifix.com@spx:devel")
 
 db.commit()

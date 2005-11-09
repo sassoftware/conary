@@ -15,9 +15,17 @@
 import re
 import MySQLdb as mysql
 from base_drv import BaseDatabase, BindlessCursor
+import sql_error
 
 class Cursor(BindlessCursor):
-    pass
+    def execute(self, sql, *params, **kw):
+        try:
+            BindlessCursor.execute(self, sql, *params, **kw)
+        except mysql.IntegrityError, e:
+            if e[1].startswith("Duplicate"):
+                raise sql_error.ColumnNotUnique(e)
+            else:
+                raise
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
