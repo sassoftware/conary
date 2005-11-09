@@ -18,8 +18,7 @@ import gzip
 import os
 import sys
 
-import conary
-import rpmhelper
+from conary import rpmhelper
 from lib import util
 
 def usage():
