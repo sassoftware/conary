@@ -194,7 +194,7 @@ class BaseDatabase:
         return self.dbh.commit()
 
     # transaction support
-    def transaction(self, name):
+    def transaction(self, name = None):
         "start transaction [ named point ]"
         # basic class does not support savepoints
         assert(not name)
