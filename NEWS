@@ -1,4 +1,4 @@
-Changes in 0.70.6:
+Changes in 0.71.0:
   o Code Structure
     * conary now imports all python modules from a toplevel "conary"
       module.  This prevents conary from polluting the module namespace.
