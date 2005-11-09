@@ -15,22 +15,23 @@
 Implements troves (packages, components, etc.) for the repository
 """
 
-import changelog
-from conary import files
 import itertools
-from conary.lib import sha1helper
-from lib.openpgpkey import getKeyCache
-from lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
-import streams
 import struct
+
+from conary import changelog
+from conary import files
+from conary import streams
 from conary import versions
+from conary.changelog import ChangeLog
 from conary.deps import deps
-from changelog import ChangeLog
-from streams import FrozenVersionStream
-from streams import StringVersionStream
-from streams import DependenciesStream
-from streams import ByteStream
-from streams import SMALL, LARGE
+from conary.lib import sha1helper
+from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
+from conary.lib.openpgpkey import getKeyCache
+from conary.streams import ByteStream
+from conary.streams import DependenciesStream
+from conary.streams import FrozenVersionStream
+from conary.streams import SMALL, LARGE
+from conary.streams import StringVersionStream
 
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
