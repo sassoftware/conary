@@ -14,7 +14,7 @@
 # full details.
 #
 
-import cvc
+from conary import cvc
 import sys
 
 if __name__ == "__main__":

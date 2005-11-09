@@ -14,7 +14,7 @@
 # full details.
 #
 
-import conary
+from conary import conary
 import sys
 
 if __name__ == "__main__":

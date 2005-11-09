@@ -14,7 +14,7 @@
 # full details.
 #
 
-import cvcdesc 
+from conary import cvcdesc 
 import sys
 
 if __name__ == "__main__":
