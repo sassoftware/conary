@@ -14,11 +14,11 @@
 """
 Base classes used for destdirpolicy and packagepolicy.
 """
+import os
 
 from conary.lib import util, log
-import filter
-import os
-import action
+from conary.build import filter
+from conary.build import action
 
 
 
