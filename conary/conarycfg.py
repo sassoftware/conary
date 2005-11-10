@@ -41,7 +41,8 @@ from conary.lib import log, util
     FLAVORLIST,
     FINGERPRINT,
     FINGERPRINT_MAP,
-) = range(15)
+    PATH,
+) = range(16)
 
 BOOLEAN=BOOL
 
@@ -128,6 +129,9 @@ class ConfigFile:
 	    type = self.types[key]
 	if type == STRING:
 	    self.__dict__[key] = val
+	if type == PATH:
+            val = os.path.expanduser(val)
+	    self.__dict__[key]  = val
 	if type == INT:
             try:
 	        self.__dict__[key] = int(val)
@@ -142,7 +146,8 @@ class ConfigFile:
 	elif type == STRINGLIST:
 	    self.__dict__[key].append(val)
 	elif type == STRINGPATH:
-	    self.__dict__[key] = val.split(":")
+            vals = val.split(":")
+	    self.__dict__[key] = [ os.path.expanduser(x) for x in vals ]
 	elif type == CALLBACK:
 	    self.__dict__[key]('set', key, val)
 	elif type == LABEL:
@@ -193,7 +198,7 @@ class ConfigFile:
             self.__dict__[key].append((label, fingerprint))
 
     def displayKey(self, key, value, type, out):
-        if type in (INT,STRING):
+        if type in (INT,STRING,PATH):
             out.write("%-25s %s\n" % (key, value))
         elif type == LABEL:
             out.write("%-25s %s\n" % (key, value.asString()))
@@ -392,10 +397,10 @@ class ConaryConfiguration(SectionedConfig):
 	'autoResolve'	        : [ BOOL, False ],
         'buildFlavor'           : [ FLAVOR, deps.DependencySet() ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
-	'buildPath'		: '/var/tmp/conary-builds',
+	'buildPath'		: [ PATH, '/var/tmp/conary-builds'],
 	'context'		: None,
 	'contact'		: None,
-	'dbPath'		: '/var/lib/conarydb',
+	'dbPath'		: [ PATH, '/var/lib/conarydb'],
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
         'excludeTroves'         : [ REGEXPLIST, RegularExpressionList() ],
@@ -404,15 +409,15 @@ class ConaryConfiguration(SectionedConfig):
         'localRollbacks'        : [ BOOL, False ],
 	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],
 	'interactive'		: [ BOOL, False ],
-	'lookaside'		: '/var/cache/conary',
+	'lookaside'		: [ PATH, '/var/cache/conary'],
 	'name'			: None,
 	'updateThreshold'       : [ INT, 10],
 	'repositoryMap'	        : [ STRINGDICT, {} ],
-	'root'			: '/',
+	'root'			: [ PATH, '/'],
 	'sourceSearchDir'	: '.',
-	'tmpDir'		: '/var/tmp/',
+	'tmpDir'		: [ PATH, '/var/tmp/'],
         'threaded'              : [ BOOL, True ],
-        'useDirs'                : [ STRINGPATH, ('/etc/conary/use', 
+        'useDirs'               : [ STRINGPATH, ('/etc/conary/use', 
                                                   '/etc/conary/distro/use',
                                                   '~/.conary/use')],
         'archDirs'               : [ STRINGPATH, ('/etc/conary/arch', 
