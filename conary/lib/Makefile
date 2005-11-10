@@ -55,7 +55,7 @@ cstreamsmodule.so: $(cstreamsmodule_objs)
 
 filename_wrapper.so: filename_wrapper.c
 	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
-	$(CC) -shared -o filename_wrapper.so filename_wrapper.o -lc -ldl
+	$(CC) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl
 
 install: pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
