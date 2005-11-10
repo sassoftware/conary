@@ -161,7 +161,7 @@ class Revision(AbstractRevision):
 	Returns a string representation of a Release.
 	"""
 	if versus and self.version == versus.version:
-	    if versus and self.sourceCount == versus.sourceCount:
+	    if self.sourceCount == versus.sourceCount:
 		if self.buildCount is None:
 		    rc = str(self.sourceCount)
 		else:
@@ -169,7 +169,7 @@ class Revision(AbstractRevision):
 	    else:
 		rc = str(self.sourceCount)
 	else:
-	    rc = self.version + '-' + str(self.sourceCount)
+	    rc = '-'.join((self.version, str(self.sourceCount)))
 
 	if self.buildCount != None:
 	    if rc:
@@ -178,7 +178,7 @@ class Revision(AbstractRevision):
 		rc = str(self.buildCount)
 
 	if frozen:
-	    rc = self.freezeTimestamp() + ":" + rc
+	    rc = ':'.join((self.freezeTimestamp(), rc))
 
 	return rc
 
