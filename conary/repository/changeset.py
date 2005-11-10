@@ -1031,8 +1031,6 @@ class ReadOnlyChangeSet(ChangeSet):
                     util.tupleListBsearchInsert(self.fileQueue, entry, 
                                                 self.fileQueueCmp)
             except PathIdsConflictError, err:
-                from conary.lib import epdb
-                epdb.st()
                 pathId = err.pathId
                 # look up the trove and file that caused the pathId 
                 # conflict.  
