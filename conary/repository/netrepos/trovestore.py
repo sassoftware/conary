@@ -13,12 +13,15 @@
 # 
 
 import copy
+import itertools
 
 from conary import files, metadata, sqlite3, trove, versions, changelog
 from conary.deps import deps
+from conary.lib import util
 from conary.lib.tracelog import logMe
 from conary.local import deptable
 from conary.local import troveinfo, versiontable, sqldb
+from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
 from conary.repository.netrepos import trovefiles, versionops, cltable
 
@@ -558,87 +561,175 @@ class TroveStore:
 					 troveFlavorId))
 
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
-	return self._getTrove(troveName = troveName, 
-			      troveVersion = troveVersion,
-			      troveFlavor = troveFlavor, withFiles = withFiles)
+	iter = self.iterTroves(( (troveName, troveVersion, troveFlavor), ),
+                               withFiles = withFiles)
+        trv = [ x for x in iter ][0]
 
-    def _getTrove(self, troveName = None, troveNameId = None, 
-		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None, withFiles = True):
-	if not troveNameId:
-	    troveNameId = self.items[troveName]
-	if not troveName:
-	    troveName = self.items.getId(troveNameId)
-	if not troveVersion:
-	    troveVersion = self.versionTable.getId(troveVersionId, troveNameId)
-	if not troveVersionId:
-	    troveVersionId = self.versionTable[troveVersion]
-	if troveFlavor is 0:
-	    troveFlavor = self.flavors.getId(troveFlavorId)
-	if troveFlavorId is None:
-	    troveFlavorId = self.flavors[troveFlavor]
+        if trv is None:
+	    raise errors.TroveMissing(troveName, troveVersion)
 
-	if min(troveVersion.timeStamps()) == 0:
-	    # XXX this would be more efficient if it used troveVersionId
-	    # for the lookup
-	    troveVersion.setTimeStamps(
-		self.versionTable.getTimeStamps(troveVersion, troveNameId))
+        return trv
 
+    def iterTroves(self, troveInfoList, withFiles = True):
 	cu = self.db.cursor()
-	cu.execute("""SELECT instances.instanceId, 
-                             instances.isRedirect, ChangeLogs.name, 
-			     ChangeLogs.contact,
-			     ChangeLogs.message FROM
-		      Instances INNER JOIN Nodes ON 
-		             Instances.itemId=Nodes.itemId AND
-			     Instances.versionId=Nodes.versionId
-		        LEFT OUTER JOIN ChangeLogs ON
-			     Nodes.nodeId = ChangeLogs.NodeId
-		      WHERE  Instances.itemId=? AND
-			     Instances.versionId=? AND
-			     Instances.flavorId=?""",
-		      troveNameId, troveVersionId, troveFlavorId)
 
-	result = cu.fetchone()
-	troveInstanceId = result[0]
-        isRedirect = result[1]
-	if result[2] is not None:
-	    changeLog = changelog.ChangeLog(*result[2:5])
-	else:
-	    changeLog = None
+        cu.execute("""CREATE TABLE gtl(idx INTEGER PRIMARY KEY,
+                        name STRING, version STRING, flavor STRING)""",
+                   start_transaction = False)
+        for idx, info in enumerate(troveInfoList):
+            if not info[2]:
+                flavorStr = "'none'"
+            else:
+                flavorStr = "'%s'" % info[2].freeze()
 
-        assert(troveFlavor is not None)
+            cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" 
+                       % flavorStr, idx, info[0], info[1].asString(),
+                       start_transaction = False)
 
-	trv = trove.Trove(troveName, troveVersion, troveFlavor,
-			      changeLog, isRedirect = isRedirect)
-        cu.execute("SELECT includedId, byDefault from TroveTroves WHERE "
-                   "instanceId=?", troveInstanceId)
-        for (instanceId, byDefault) in cu:
-	    (itemId, versionId, flavorId, isPresent) = \
-                     self.instances.getId(instanceId)
-	    name = self.items.getId(itemId)
-	    flavor = self.flavors.getId(flavorId)
-	    version = self.versionTable.getId(versionId, itemId)
+        cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect, 
+                             Nodes.timeStamps, Changelogs.name, 
+                             ChangeLogs.contact, ChangeLogs.message
+                            FROM 
+                                gtl, Items, Versions, Flavors, Instances as I,
+                                Nodes
+                            LEFT OUTER JOIN ChangeLogs ON
+                                Nodes.nodeId = ChangeLogs.nodeId
+                            WHERE
+                                Items.item = gtl.name AND
+                                Versions.version = gtl.version AND
+                                Flavors.flavor = gtl.flavor AND
+                                I.itemId = Items.itemId AND
+                                I.versionId = Versions.versionId AND
+                                I.flavorId = flavors.flavorId AND
+                                I.itemId = Nodes.itemId AND
+                                I.versionId = Nodes.versionId
+                            ORDER BY 
+                                gtl.idx""")
 
-	    trv.addTrove(name, version, flavor, byDefault = byDefault)
+        troveIdList = [ x for x in cu ]
 
+        cu.execute("DROP TABLE gtl", start_transaction = False)
+
+        cu.execute("CREATE TABLE gtlInst (idx INTEGER PRIMARY KEY, "
+                      "instanceId INTEGER)", start_transaction = False)
+        for singleTroveIds in troveIdList:
+            cu.execute("INSERT INTO gtlInst VALUES (?, ?)", 
+                       singleTroveIds[0], singleTroveIds[1], 
+                       start_transaction = False)
+
+        troveTrovesCursor = self.db.cursor()
+        troveTrovesCursor.execute("""
+                        SELECT idx, item, version, flavor, byDefault,
+                               Nodes.timeStamps
+                        FROM 
+                            gtlInst, TroveTroves, Instances, Items,
+                            Versions, Flavors, Nodes
+                        WHERE
+                            gtlInst.instanceId = TroveTroves.instanceId AND
+                            TroveTroves.includedId = Instances.instanceId AND
+                            Instances.itemId = Items.itemId AND
+                            Instances.versionId = versions.versionId AND
+                            Instances.flavorId = Flavors.flavorId AND
+                            Instances.itemId = Nodes.itemId AND
+                            Instances.versionId = Nodes.versionId
+                        ORDER BY
+                            gtlInst.idx
+                   """)
+        troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
+
+        troveFilesCursor = self.db.cursor()
         if withFiles:
-            versionCache = {}
-            cu.execute("SELECT pathId, path, versionId, fileId FROM "
-                   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = ?", 
-                   troveInstanceId)
-            for (pathId, path, versionId, fileId) in cu:
-                version = versionCache.get(versionId, None)
-                if not version:
-                    version = self.versionTable.getBareId(versionId)
-                    versionCache[versionId] = version
+            troveFilesCursor.execute("""
+                        SELECT idx, pathId, path, version, fileId
+                        FROM 
+                            gtlInst, TroveFiles, Versions, FileStreams
+                        WHERE
+                            gtlInst.instanceId = TroveFiles.instanceId AND
+                            TroveFiles.versionId = versions.versionId AND
+                            TroveFiles.streamId = FileStreams.streamId
+                        ORDER BY
+                            gtlInst.idx
+                       """)
+            troveFilesCursor = util.PeekIterator(troveFilesCursor)
+        else:
+            troveFilesCursor = util.PeekIterator(iter(()))
 
-                trv.addFile(pathId, path, version, fileId)
+        if not troveIdList:
+            # if there are no matches, drop this now (since we can't drop
+            # it inside the while loop
+            cu.execute("DROP TABLE gtlInst", start_transaction = False)
 
-        self.depTables.get(cu, trv, troveInstanceId)
-        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
+        neededIdx = 0
+        while troveIdList:
+            # [0:4] because we don't need the changelog information
+            (idx, troveInstanceId, isRedirect, timeStamps) =  \
+                        troveIdList.pop(0)[0:4]
 
-	return trv
+            # make sure we've returned something for everything up to this
+            # point
+            while neededIdx < idx:
+                neededIdx += 1
+                yield None
+
+            # we need the one after this next time through
+            neededIdx += 1
+
+            singleTroveInfo = troveInfoList[idx]
+
+            if singleTroveIds[4] is not None:
+                changeLog = changelog.ChangeLog(*singleTroveIds[4:7])
+            else:
+                changeLog = None
+
+            singleTroveInfo[1].setTimeStamps(
+                    [ float(x) for x in timeStamps.split(":") ])
+
+            trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
+                              singleTroveInfo[2], changeLog, 
+                              isRedirect = isRedirect)
+
+            try:
+                while troveTrovesCursor.peek()[0] == idx:
+                    idxA, name, version, flavor, byDefault, timeStamps = \
+                                                troveTrovesCursor.next()
+                    version = versions.VersionFromString(version)
+                    if flavor == 'none':
+                        flavor = deps.DependencySet()
+                    else:
+                        flavor = deps.ThawDependencySet(flavor)
+
+                    version.setTimeStamps(
+                            [ float(x) for x in timeStamps.split(":") ])
+
+                    trv.addTrove(name, version, flavor, byDefault = byDefault)
+            except StopIteration:
+                # we're at the end; that's okay
+                pass
+
+            try:
+                while troveFilesCursor.peek()[0] == idx:
+                    idxA, pathId, path, versionId, fileId = \
+                            troveFilesCursor.next()
+                    version = versions.VersionFromString(versionId)
+                    trv.addFile(pathId, path, version, fileId)
+            except StopIteration:
+                # we're at the end; that's okay
+                pass
+
+            self.depTables.get(cu, trv, troveInstanceId)
+            self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
+
+            # if we're at the end, go ahead and free up the database in
+            # case this iterator doesn't get fully drained
+            if not troveIdList:
+                cu.execute("DROP TABLE gtlInst", start_transaction = False)
+
+            yield trv
+
+        # yield None for anything not found at the end
+        while neededIdx < len(troveInfoList):
+            neededIdx += 1
+            yield None
 
     def findFileVersion(self, fileId):
         cu = self.db.cursor()
@@ -722,38 +813,10 @@ class TroveStore:
         # this only needs a list of (pathId, fileId) pairs, but it sometimes
         # gets (pathId, fileId, version) pairs instead (which is what
         # the network repository client uses)
-	cu = self.db.cursor()
-
-	cu.execute("""
-	    CREATE TEMPORARY TABLE getFilesTbl(rowId INTEGER PRIMARY KEY,
-					       fileId BINARY)
-	""", start_transaction = False)
-
-        try:
-            verCache = {}
-            lookup = range(len(l) + 1)
-            for tup in l:
-                (pathId, fileId) = tup[:2]
-                cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
-                           fileId, start_transaction = False)
-                lookup[cu.lastrowid] = (pathId, fileId)
-
-            cu.execute("""
-                SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
-                        getFilesTbl.fileId = FileStreams.fileId 
-            """)
-
-            d = {}
-            for rowId, stream in cu:
-                pathId, fileId = lookup[rowId]
-                if stream is not None:
-                    f = files.ThawFile(stream, pathId)
-                else:
-                    f = None
-                d[(pathId, fileId)] = f
-        finally:
-            cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
-	return d
+        retr = FileRetriever(self.db)
+        d = retr.get(l)
+        del retr
+        return d
 
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
@@ -784,3 +847,42 @@ class TroveStore:
 	    self.versionOps.needsCleanup = False
 
 	self.db.commit()
+
+class FileRetriever:
+
+    def __init__(self, db):
+        self.cu = db.cursor()
+        self.cu.execute("""
+            CREATE TEMPORARY TABLE getFilesTbl(rowId INTEGER PRIMARY KEY,
+                                               fileId BINARY)
+        """, start_transaction = False)
+
+    def get(self, l):
+        lookup = range(len(l) + 1)
+        for tup in l:
+            (pathId, fileId) = tup[:2]
+            self.cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
+                       fileId, start_transaction = False)
+            lookup[self.cu.lastrowid] = (pathId, fileId)
+
+        self.cu.execute("""
+            SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
+                    getFilesTbl.fileId = FileStreams.fileId 
+        """)
+
+        d = {}
+        for rowId, stream in self.cu:
+            pathId, fileId = lookup[rowId]
+            if stream is not None:
+                f = files.ThawFile(stream, pathId)
+            else:
+                f = None
+            d[(pathId, fileId)] = f
+
+        self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
+
+        return d
+
+    def __del__(self):
+        self.cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
+

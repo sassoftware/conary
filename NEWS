@@ -1,3 +1,10 @@
+Changes in 0.71.1:
+  o Server Changes 
+    * Added iterTroves() call which iterates over large numbers of troves
+      much more efficiently than a single getTrove() call would.
+    * Split out FileRetriever object to allow file information to be pulled
+      from the repository inside of an iterTroves() loop
+
 Changes in 0.71.0:
   o Code Structure
     * conary now imports all python modules from a toplevel "conary"
