@@ -58,7 +58,7 @@ filename_wrapper.so: filename_wrapper.c
 	$(CC) -shared -o filename_wrapper.so filename_wrapper.o -lc -ldl
 
 install: pyfiles-install
-	mkdir -p $(DESTDIR)$(conarydir)/$(DIR)
+	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
 	install -m 755 $(python_modules) $(DESTDIR)$(sitedir)/$(DIR)
 	mkdir -p $(DESTDIR)$(conarylibdir)
 	install -m 755 $(wrapper_libs) $(DESTDIR)$(conarylibdir)/
