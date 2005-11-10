@@ -46,11 +46,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def getTrove(self, pkgName, version, flavor, pristine = True,
                  withFiles = True):
-	try:
-	    return self.troveStore.getTrove(pkgName, version, flavor,
-                                            withFiles = withFiles)
-	except KeyError:
-	    raise errors.TroveMissing(pkgName, version)
+        return self.troveStore.getTrove(pkgName, version, flavor,
+                                        withFiles = withFiles)
 
     def addTrove(self, pkg):
 	return self.troveStore.addTrove(pkg)
@@ -165,13 +162,75 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# make a copy to remove things from
 	troveList = troveList[:]
 
-	# don't use a for in here since we grow troveList inside of
-	# this loop
-	while troveList:
+        class troveListWrapper:
+
+            def next(self):
+                if not self.l and self.new:
+                    # self.l (and self.trvIterator) are empty; look to
+                    # self.new for new jobs we need
+
+                    troveList = []
+                    for job in self.new:
+                        # do we need the old trove?
+                        if job[1][0] is not None:
+                            troveList.append((job[0], job[1][0], job[1][1]))
+
+                        # do we need the new trove?
+                        if job[2][0] is not None:
+                            troveList.append((job[0], job[2][0], job[2][1]))
+
+                    # flip to the new job set and it's trove iterator, and
+                    # reset self.new for later additions
+                    self.trvIterator = self.troveStore.iterTroves(
+                                troveList, withFiles = self.withFiles)
+                    self.l = self.new
+                    self.new = []
+
+                if self.l:
+                    job = self.l.pop(0)
+
+                    # Does it have an old job?
+                    if job[1][0] is None:
+                        old = None
+                    else:
+                        old = self.trvIterator.next()
+                        if old is None:
+                            [ x for x in self.trvIterator ]
+                            raise errors.TroveMissing(job[0], job[1][0])
+
+                    # Does it have an new job
+                    if job[2][0] is None:
+                        new = None
+                    else:
+                        new = self.trvIterator.next()
+                        if new is None:
+                            [ x for x in self.trvIterator ]
+                            raise errors.TroveMissing(job[0], job[2][0])
+
+                    return job, old, new
+                else:
+                    raise StopIteration
+
+            def __iter__(self):
+                while True:
+                    yield self.next()
+            
+            def append(self, item):
+                self.new.append(item)
+
+            def __init__(self, l, troveStore, withFiles):
+                self.trvIterator = None
+                self.new = l
+                self.l = []
+                self.troveStore = troveStore
+                self.withFiles = withFiles
+
+        fileGenerator = trovestore.FileRetriever(self.troveStore.db)
+        troveWrapper = troveListWrapper(troveList, self.troveStore, withFiles)
+
+        for job in troveWrapper:
 	    (troveName, (oldVersion, oldFlavor), 
-		        (newVersion, newFlavor), absolute) = \
-		troveList[0]
-	    del troveList[0]
+		        (newVersion, newFlavor), absolute), old, new = job
 
 	    # make sure we haven't already generated this changeset; since
 	    # troves can be included from other troves we could try
@@ -208,10 +267,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                          (None, None), absolute))
                 else:
                     # remove this trove and any trove contained in it
-                    old = self.getTrove(troveName, oldVersion, oldFlavor)
                     cs.oldTrove(troveName, oldVersion, oldFlavor)
                     for (name, version, flavor) in old.iterTroveList():
-                        troveList.append((name, (version, flavor),
+                        troveWrapper.append((name, (version, flavor),
                                                 (None, None), absolute))
 		continue
 
@@ -224,21 +282,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                      (newVersion, newFlavor), absolute))
                 continue
 
-            new = self.getTrove(troveName, newVersion, newFlavor, 
-                                withFiles = withFiles)
-	 
-	    if oldVersion:
-                old = self.getTrove(troveName, oldVersion, oldFlavor,
-                                    withFiles = withFiles)
-	    else:
-		old = None
-
 	    (troveChgSet, filesNeeded, pkgsNeeded) = \
 				new.diff(old, absolute = absolute)
 
 	    if recurse:
 		for (pkgName, old, new, oldFlavor, newFlavor) in pkgsNeeded:
-		    troveList.append((pkgName, (old, oldFlavor),
+		    troveWrapper.append((pkgName, (old, oldFlavor),
 					       (new, newFlavor), absolute))
 
 	    cs.newTrove(troveChgSet)
@@ -267,7 +316,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
             filesNeeded = newFilesNeeded
             del newFilesNeeded
-            idIdx = self.troveStore.getFiles(getList)
+            idIdx = fileGenerator.get(getList)
 
             # Walk this in reverse order. This may seem odd, but the
             # order in the final changeset is set by sorting that happens
@@ -358,7 +407,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, path, repositoryMap, logFile = None, requireSigs = False):
+    def __init__(self, name, troveStore, path, repositoryMap, logFile = None, 
+                 requireSigs = False):
 	self.top = path
 	self.name = name
 	map = dict(repositoryMap)

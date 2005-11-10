@@ -523,5 +523,36 @@ class BZ2File:
             # read some more data and try to get enough uncompressed
             # data to return
 
+class PeekIterator:
+
+    def _next(self):
+        try:
+            self.val = self.iter.next()
+        except StopIteration:
+            self.done = True
+
+    def peek(self):
+        if self.done:
+            raise StopIteration
+
+        return self.val
+
+    def next(self):
+        if self.done:
+            raise StopIteration
+
+        val = self.val
+        self._next()
+        return val
+
+    def __iter__(self):
+        while True:
+            yield self.next()
+
+    def __init__(self, iter):
+        self.done = False
+        self.iter = iter
+        self._next()
+
 exists = misc.exists
 removeIfExists = misc.removeIfExists
