@@ -4,6 +4,9 @@ Changes in 0.71.1:
       much more efficiently than a single getTrove() call would.
     * Split out FileRetriever object to allow file information to be pulled
       from the repository inside of an iterTroves() loop
+  o Client Changes
+    * Config file options that take a path as a value now support ~ for 
+      home directory substitution
 
 Changes in 0.71.0:
   o Code Structure

@@ -57,7 +57,7 @@ generated_files = *.pyo *.pyc
 
 subdirs: default-subdirs
 
-constants.py: constants.py.in Makefile
+constants.py: constants.py.in ../Makefile
 	sed s,@version@,$(VERSION),g $< > $@
 
 install: all install-subdirs pyfiles-install

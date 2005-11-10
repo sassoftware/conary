@@ -711,13 +711,19 @@ class PathIdsConflictError(Exception):
         else:
             path1, path2 = self.getPaths()
             trove1, trove2 = self.getTroves()
-            v1 = trove1.getNewVersion().trailingRevision().asString()
-            v2 = trove2.getNewVersion().trailingRevision().asString()
+            v1 = trove1.getNewVersion().trailingRevision()
+            v2 = trove2.getNewVersion().trailingRevision()
+            trove1Info = '(%s %s)' % (trove1.getName(), v1)
+            trove2Info = '(%s %s)' % (trove2.getName(), v2)
+            if path1:
+                trove1Info = path1 + ' ' + trove1Info
+            if path2:
+                trove2Info = path2 + ' ' + trove2Info
+
             return (('PathIdConflictsError:\n'
-                     '  %s (%s %s)\n'
+                     '  %s\n'
                      '     conflicts with\n'
-                     '  %s (%s %s)') % (path1, trove1.getName(), v1,
-                                                 path2, trove2.getName(), v2))
+                     '  %s') % (trove1Info, trove2Info))
 
 class ReadOnlyChangeSet(ChangeSet):
 
@@ -1029,14 +1035,16 @@ class ReadOnlyChangeSet(ChangeSet):
                 # look up the trove and file that caused the pathId 
                 # conflict.  
                 for myTrove in self.iterNewTroveList():
-                    conflict1 = [ x for x in \
-                                  myTrove.getNewFileList() if x[0] == pathId]
+                    files = (myTrove.getNewFileList() 
+                             + myTrove.getChangedFileList())
+                    conflict1 = [ x for x in files if x[0] == pathId]
                     if conflict1:
                         conflict1 = conflict1[0]
                         break
                 for otherTrove in otherCs.iterNewTroveList():
-                    conflict2 = [ x for x in \
-                                  otherTrove.getNewFileList() if x[0] == pathId]
+                    files = (otherTrove.getNewFileList() 
+                             + otherTrove.getChangedFileList())
+                    conflict2 = [ x for x in files if x[0] == pathId]
                     if conflict2:
                         conflict2 = conflict2[0]
                         break

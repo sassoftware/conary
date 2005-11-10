@@ -12,6 +12,7 @@
 # full details.
 # 
 
+from conary import sqlite3
 from conary import versions
 from conary.deps import deps
 
@@ -248,13 +249,14 @@ class DependencyTables:
 
     def add(self, cu, trove, troveId):
         assert(cu.con.inTransaction)
-        self._createTmpTable(cu, "NeededDeps")
+        self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
-        prov = trove.getProvides()
+    def _add(self, cu, troveId, provides, requires):
+        self._createTmpTable(cu, "NeededDeps")
 
 	stmt = cu.compile("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)")
         self._populateTmpTable(cu, stmt, [], troveId, 
-                               trove.getRequires(), prov)
+                               requires, provides)
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
                             "Provides", ("Dependencies",))
 
@@ -284,8 +286,39 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
+    def _restrictResolveByLabel(self, label):
+        """ Restrict resolution by label
+            We move this out so that other dependency algorithms 
+            can restrict resolution by other criteria.  Not exactly providing
+            a clean external interface but it avoids having to rewrite 
+            dependency code to use different criterea
+        """
+        if not label:
+            return "", ""
+            
+            
+        restrictJoin = """\
+                           INNER JOIN Instances ON
+                              %(provides)s.instanceId = Instances.instanceId
+                           INNER JOIN Nodes ON
+                              Instances.itemId = Nodes.itemId AND
+                              Instances.versionId = Nodes.versionId
+                           INNER JOIN LabelMap ON
+                              LabelMap.itemId = Nodes.itemId AND
+                              LabelMap.branchId = Nodes.branchId
+                           INNER JOIN Labels ON
+                              Labels.labelId = LabelMap.labelId
+""" 
+        restrictWhere = """\
+                            WHERE 
+                              Labels.label = '%s'
+""" % label
+
+        return restrictJoin, restrictWhere
+        
+        
     def _resolveStmt(self, requiresTable, providesTableList, depTableList,
-                     providesLabel = None):
+                     restrictBy = None, restrictor=None):
         subselect = ""
 
         depTableClause = ""
@@ -327,28 +360,17 @@ class DependencyTables:
                               %(requires)s.depId = %(provides)s.depId
 """ % substTable
 
-            if providesLabel:
-                subselect += """\
-                           INNER JOIN Instances ON
-                              %(provides)s.instanceId = Instances.instanceId
-                           INNER JOIN Nodes ON
-                              Instances.itemId = Nodes.itemId AND
-                              Instances.versionId = Nodes.versionId
-                           INNER JOIN LabelMap ON
-                              LabelMap.itemId = Nodes.itemId AND
-                              LabelMap.branchId = Nodes.branchId
-                           INNER JOIN Labels ON
-                              Labels.labelId = LabelMap.labelId
-""" % substTable
+            if restrictor:
+                joinRestrict, whereRestrict = restrictor(restrictBy)
+                subselect += joinRestrict % substTable
+       
 
             subselect += """\
 %(depClause)s""" % substTable
             
-            if providesLabel:
-                subselect += """\
-                            WHERE 
-                              Labels.label = '%s'
-""" % providesLabel
+            if restrictor:
+                subselect += whereRestrict % substTable
+                
 
         return """
                 SELECT Matched.reqDepId as depId,
@@ -1033,7 +1055,9 @@ class DependencyTables:
 
         return (unsatisfiedList, unresolveableList, changeSetList)
 
-    def resolve(self, label, depSetList):
+    def _resolve(self, depSetList, selectTemplate, restrictor=None, 
+                 restrictBy=None):
+
         cu = self.db.cursor()
 
 	cu.execute("BEGIN")
@@ -1053,29 +1077,45 @@ class DependencyTables:
                             None, ("Dependencies", "TmpDependencies"), 
                             multiplier = -1)
 
-        full = """SELECT depNum, Items.item, Versions.version, 
-                         Nodes.timeStamps, flavor FROM 
-                        (%s)
-                      INNER JOIN Instances ON
-                        provInstanceId == Instances.instanceId
-                      INNER JOIN Items ON
-                        Instances.itemId == Items.itemId
-                      INNER JOIN Versions ON
-                        Instances.versionId == Versions.versionId
-                      INNER JOIN Flavors ON
-                        Instances.flavorId == Flavors.flavorId
-                      INNER JOIN Nodes ON
-                        Instances.itemId == Nodes.itemId AND
-                        Instances.versionId == Nodes.versionId
-                      ORDER BY
-                        Nodes.finalTimestamp DESC
-                    """ % self._resolveStmt( "TmpRequires", 
+        full = selectTemplate % self._resolveStmt( "TmpRequires", 
                                 ("Provides",), ("Dependencies",),
-                                providesLabel = label.asString())
+                                restrictBy = restrictBy, restrictor = restrictor)
                     
         cu.execute(full,start_transaction = False)
 
-        # this depends intimately on things being sorted newest to oldest
+        return depList, cu
+
+    def _addResult(self, depId, value, depList, depSetList, result):
+        depSetId = -depList[depId][0] - 1
+        depSet = depSetList[depSetId]
+        result.setdefault(depSet, []).append(value)
+
+
+    def resolve(self, label, depSetList):
+        """ Determine troves that provide the given dependencies, 
+            restricting by label and limiting to latest version for 
+            each (name, flavor) pair.
+        """
+        selectTemplate = """SELECT depNum, Items.item, Versions.version, 
+                             Nodes.timeStamps, flavor FROM 
+                            (%s)
+                          INNER JOIN Instances ON
+                            provInstanceId == Instances.instanceId
+                          INNER JOIN Items ON
+                            Instances.itemId == Items.itemId
+                          INNER JOIN Versions ON
+                            Instances.versionId == Versions.versionId
+                          INNER JOIN Flavors ON
+                            Instances.flavorId == Flavors.flavorId
+                          INNER JOIN Nodes ON
+                            Instances.itemId == Nodes.itemId AND
+                            Instances.versionId == Nodes.versionId
+                          ORDER BY
+                            Nodes.finalTimestamp DESC
+                        """ 
+        depList, cu = self._resolve(depSetList, selectTemplate,
+                                    restrictBy = label.asString(), 
+                                    restrictor = self._restrictResolveByLabel)
 
         depSolutions = [ {} for x in xrange(len(depList)) ]
 
@@ -1087,23 +1127,35 @@ class DependencyTables:
                                            (versionStr, timeStamps))
 
         result = {}
-
-	# depSolutions and depList are based on individual dependencies.
-	# depList has a pointer into depSetList 
-
         for depId, troveSet in enumerate(depSolutions):
-            if not troveSet: continue
-	    # depSetList is indexed by 0, depList pointers 
-	    # are such that -1 -> depSetList[0], -2 -> depSetList[1]
-            depSetId = -depList[depId][0] - 1
-            depSet = depSetList[depSetId]
-            result.setdefault(depSet, []).append(
-                  [ (x[0][0], 
-                     versions.strToFrozen(x[1][0], x[1][1].split(":")),
-                     x[0][1]) for x in troveSet.items() ])
+            if not troveSet:
+                continue
+
+            troveSet = [ (x[0][0], 
+                          versions.strToFrozen(x[1][0], x[1][1].split(":")),
+                          x[0][1]) for x in troveSet.items() ]
+            self._addResult(depId, troveSet, depList, depSetList, result)
+        self.db.rollback()
+        return result
+
+    def resolveToIds(self, depSetList):
+        """ Resolve dependencies, leaving the results as instanceIds
+        """
+        selectTemplate = """SELECT depNum, provInstanceId FROM (%s)"""
+        depList, cu = self._resolve(depSetList, selectTemplate)
+
+        result = {}
+        depSolutions = {}
+        for depId, troveId in cu:
+            depId = -depId
+            depSolutions.setdefault(depId, []).append(troveId)
+
+        for depId, sols in depSolutions.iteritems():
+            if not sols:
+                continue
+            self._addResult(depId, sols, depList, depSetList, result)
 
         self.db.rollback()
-
         return result
 
     def getLocalProvides(self, depSetList):
@@ -1164,3 +1216,25 @@ class DependencyTables:
         DepTable(db, "Dependencies")
         DepProvides(db, 'Provides')
         DepRequires(db, 'Requires')
+
+class DependencyDatabase(DependencyTables):
+    """ Creates a thin database (either on disk or in memory) 
+        for managing dependencies
+    """
+    def __init__(self, path=":memory:"):
+	db = sqlite3.connect(path, timeout=30000)
+        DependencyTables.__init__(self, db)
+
+    def add(self, troveId, provides, requires):
+        cu = self.db.cursor()
+        self._add(cu, troveId, provides, requires)
+
+    def delete(self):
+        cu = self.db.cursor()
+        DependencyDatabase.delete(self, cu, troveId)
+
+    def commit(self):
+        self.db.commit()
+
+    def resolve(self, label, depSetList):
+        return self.resolveToIds(list(depSetList))
