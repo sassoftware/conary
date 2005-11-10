@@ -16,6 +16,7 @@ import itertools
 
 from conary import trove
 from conary.deps import deps
+from conary.local import deptable
 from conary.repository import changeset, findtrove
 
 class AbstractTroveSource:
@@ -385,12 +386,17 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.csList= []
         self.invalidated = False
 
+        self.depDb = deptable.DependencyDatabase()
+
     def addChangeSet(self, cs, includesFileContents = False):
         relative = []
-        for trvCs in cs.iterNewTroveList():
+        self.idMap = {}
+        for idx, trvCs in enumerate(cs.iterNewTroveList()):
             info = (trvCs.getName(), trvCs.getNewVersion(), 
                     trvCs.getNewFlavor())
             self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
+            self.depDb.add(idx, trvCs.getProvides(), trvCs.getRequires())
+            self.idMap[idx] = info
 
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
@@ -401,7 +407,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                              trvCs.isAbsolute())] = cs, includesFileContents
                 continue
 
+
             relative.append((trvCs, info))
+
+        self.depDb.commit()
 
         present = self.db.hasTroves([ (x[0].getName(), x[0].getOldVersion(),
                                        x[0].getOldFlavor()) for x in relative ])
@@ -455,23 +464,15 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         return [ x in self.troveCsMap for x in troveList ]
 
     def resolveDependencies(self, label, depList):
-        suggMap = {}
-        for depSet in depList:
-            l = []
-            suggMap[depSet] = l
+        suggMap = self.depDb.resolve(label, depList)
+        for depSet, solListList in suggMap.iteritems():
+            newSolListList = []
+            for solList in solListList:
+                newSolListList.append([ self.idMap[x] for x in solList ])
 
-            for (depClass, dep) in depSet.iterDeps():
-                singleDep = deps.DependencySet()
-                singleDep.addDep(depClass, dep)
-
-                for provSet, troveTup in self.providesMap.iteritems():
-                    #if label and troveTup[1].branch().label() != label:
-                    #    continue
-
-                    if provSet.satisfies(singleDep):
-                        l.append(troveTup)
+            suggMap[depSet] = newSolListList
         return suggMap
-
+            
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, useDatabase = True):
         # Returns the changeset plus a remainder list of the bits it
