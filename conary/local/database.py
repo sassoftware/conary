@@ -418,6 +418,8 @@ class Database(SqlDbRepository):
         if isRollback:
             flags |= update.MISSINGFILESOKAY
 
+        self.db.begin()
+
 	for trove in cs.iterNewTroveList():
 	    if trove.getName().endswith(":source"):
                 raise SourceComponentInstall

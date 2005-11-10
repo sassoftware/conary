@@ -573,7 +573,7 @@ class TroveStore:
     def iterTroves(self, troveInfoList, withFiles = True):
 	cu = self.db.cursor()
 
-        cu.execute("""CREATE TABLE gtl(idx INTEGER PRIMARY KEY,
+        cu.execute("""CREATE TEMPORARY TABLE gtl(idx INTEGER PRIMARY KEY,
                         name STRING, version STRING, flavor STRING)""",
                    start_transaction = False)
         for idx, info in enumerate(troveInfoList):
@@ -610,7 +610,7 @@ class TroveStore:
 
         cu.execute("DROP TABLE gtl", start_transaction = False)
 
-        cu.execute("CREATE TABLE gtlInst (idx INTEGER PRIMARY KEY, "
+        cu.execute("CREATE TEMPORARY TABLE gtlInst (idx INTEGER PRIMARY KEY, "
                       "instanceId INTEGER)", start_transaction = False)
         for singleTroveIds in troveIdList:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)", 

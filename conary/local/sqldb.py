@@ -448,6 +448,16 @@ class Database:
             self.db.close()
         del self.db
 
+    def begin(self):
+	"""
+	Force the database to begin a transaction; this locks the database
+	so no one can touch it until a commit() or rollback().
+	"""
+	self.db._begin()
+
+    def rollback(self):
+	self.db.rollback()
+
     def versionCheck(self):
         cu = self.db.cursor()
         count = cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
