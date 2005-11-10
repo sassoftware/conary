@@ -28,11 +28,16 @@ class Cursor(BaseCursor):
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.commit()
         except sqlite3.ProgrammingError, e:
+            if inAutoTrans and self.dbh.inTransaction:
+                self.dbh.rollback()
             if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
                 raise sql_error.ColumnNotUnique(e)
             else:
                 raise
-        
+        except:
+            if inAutoTrans and self.dbh.inTransaction:
+                self.dbh.rollback()
+            raise
 
 class Database(BaseDatabase):
     type = "sqlite"
