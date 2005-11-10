@@ -104,12 +104,8 @@ class BindlessCursor(BaseCursor):
         for key in regex.findall(sql):
             keys.add(key)
             sql = re.sub(":" + key, "%("+key+")s", sql)
-        sql = re.sub("[(]\s?[?]", "( %s", sql)
-        sql = re.sub("[=]\s?[?]", "= %s", sql)
-        sql = re.sub("[,]\s?[?]", ", %s", sql)
-        sql = re.sub("[<]\s?[?]", "< %s", sql)
-        sql = re.sub("[>]\s?[?]", "> %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT)\s?[?]", "\g<kw> %s", sql) 
+        sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
+        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT)(\s+)?[?]", "\g<kw> %s", sql) 
         return (sql, keys)
 
     # we need to "fix" the sql code before calling out
