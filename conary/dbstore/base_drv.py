@@ -107,7 +107,9 @@ class BindlessCursor(BaseCursor):
         sql = re.sub("[(]\s?[?]", "( %s", sql)
         sql = re.sub("[=]\s?[?]", "= %s", sql)
         sql = re.sub("[,]\s?[?]", ", %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN)\s?[?]", "\g<kw> %s", sql) 
+        sql = re.sub("[<]\s?[?]", "< %s", sql)
+        sql = re.sub("[>]\s?[?]", "> %s", sql)
+        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT)\s?[?]", "\g<kw> %s", sql) 
         return (sql, keys)
 
     # we need to "fix" the sql code before calling out
