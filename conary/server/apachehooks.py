@@ -94,7 +94,7 @@ def post(port, isSecure, repos, req):
         req.write(resp)
         return apache.OK
     else:
-        from conary.http import HttpHandler
+        from conary.server.http import HttpHandler
         httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port) 
         return httpHandler._methodHandler()
 
@@ -168,7 +168,7 @@ def get(port, isSecure, repos, req):
 
         return apache.OK
     else:
-        from conary.http import HttpHandler
+        from conary.server.http import HttpHandler
 
         if isSecure:
             protocol = "https"
