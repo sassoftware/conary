@@ -286,7 +286,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				new.diff(old, absolute = absolute)
 
 	    if recurse:
-		for (pkgName, old, new, oldFlavor, newFlavor) in pkgsNeeded:
+                for (pkgName, (old, oldFlavor), (new, newFlavor),
+                                isAbsolute) in pkgsNeeded:
 		    troveWrapper.append((pkgName, (old, oldFlavor),
 					       (new, newFlavor), absolute))
 

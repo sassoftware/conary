@@ -818,15 +818,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 i += 2
 
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
-                                new.diff(old, absolute = absolute) 
+                                new.diff(old, absolute = absolute)
                 # newFilesNeeded = [ (pathId, oldFileVersion, newFileVersion) ]
                 filesNeeded += [ (x[0], troveName, 
                         (oldVersion, oldFlavor, x[1], x[2]),
                         (newVersion, newFlavor, x[3], x[4])) for x in newFilesNeeded ]
 
                 if recurse:
-                    for (otherTroveName, otherOldVersion, otherNewVersion, 
-                         otherOldFlavor, otherNewFlavor) in pkgsNeeded:
+                    for (otherTroveName, (otherOldVersion, otherOldFlavor),
+                                         (otherNewVersion, otherNewFlavor),
+                         otherIsAbsolute) in pkgsNeeded:
                         chgSetList.append((otherTroveName, 
                                            (otherOldVersion, otherOldFlavor),
                                            (otherNewVersion, otherNewFlavor),

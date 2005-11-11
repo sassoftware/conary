@@ -390,7 +390,8 @@ class Database(SqlDbRepository):
         trvChgs = newGroup.diff(instGroup)[2]
 
         resultDict = {}
-        for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChgs:
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
+                            isAbsolute) in trvChgs:
             if newVersion:
                 resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
                                                              oldFlavor)

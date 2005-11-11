@@ -359,9 +359,9 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
                          trove.getFlavor(), fullVersions,
                          showFlavors)
 	changes = localTrv.diff(trove)[2]
-	changesByOld = dict(((x[0], x[1], x[3]), x) for x in changes)
+	changesByOld = dict(((x[0], x[1][0], x[1][1]), x) for x in changes)
         troveList = itertools.chain(trove.iterTroveList(),
-                    [ (x[0], x[2], x[4]) for x in changes if x[1] is None ])
+            [ (x[0], x[2][0], x[2][1]) for x in changes if x[1][0] is None ])
         # XXX we _could_ display the local trove version for conary q,
         # but that would be a change in behavior...
         #if showDiff:
@@ -376,7 +376,7 @@ def _displayTroveInfo(db, trove, localTrv, ls, ids, sha1s,
             else:
                 change = changesByOld.get((troveName, ver, fla), None)
                 if change: 
-                    newVer, newFla = change[2], change[4]
+                    newVer, newFla = change[2]
                     needFlavor = (showFlavors or 
                                   (newFla is not None and newFla != fla))
                 else:
