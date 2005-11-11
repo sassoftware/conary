@@ -9,6 +9,8 @@ Changes in 0.71.1:
       home directory substitution
     * Trove.diff() returns a standard job list instead of the previous
       only-used-here format
+  o Code Structure
+    * Split build/recipe.py into several smaller files
 
 Changes in 0.71.0:
   o Code Structure
