@@ -176,10 +176,10 @@ class BaseDatabase:
             c.execute(self.alive_check)
         except:
             # database connection lost
-            return 0
+            return False
         else:
             del c
-        return 1
+        return True
 
     def closed(self):
         return self.dbh is None
@@ -222,6 +222,7 @@ class BaseDatabase:
         self.functions = []
         self.sequences = []
         self.version = 0
+
     def _getSchemaVersion(self):
         assert(self.dbh)
         c = self.cursor()
