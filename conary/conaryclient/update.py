@@ -613,6 +613,26 @@ class ClientUpdate:
                 newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
 
         # def _mergeGroupChanges -- main body begins here
+
+        availableTroves, referencedTroves = self.db.db.getCompleteTroveSet()
+        existsTrv = trove.Trove("@update", versions.NewVersion(), 
+                                deps.DependencySet(), None)
+
+        [ existsTrv.addTrove(*x) for x in availableTroves ]
+        [ existsTrv.addTrove(*x) for x in referencedTroves ]
+
+        availableTrove = trove.Trove("@update", versions.NewVersion(),
+                                     deps.DependencySet(), None)
+        for trvCs in uJob.getTroveSource().csList[0].iterNewTroveList():
+            availableTrove.addTrove(trvCs.getName(), trvCs.getNewVersion(),
+                                    trvCs.getNewFlavor())
+
+        job = availableTrove.diff(existsTrv)[2]
+
+        from conary import lib
+        lib.epdb.st()
+
+        # ---------------- ORIGINAL CODE
             
         # jobQueue is (job, ignorePins)
         jobQueue = []
