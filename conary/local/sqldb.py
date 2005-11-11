@@ -1805,37 +1805,6 @@ order by
     def getTrovesWithProvides(self, depSetList):
         return self.depTables.getLocalProvides(depSetList)
 
-    def getCompleteTroveSet(self):
-        # returns two sets; one is all of the troves which are installed,
-        # the other is all of the troves which are referenced but not
-        # installed
-        cu = self.db.cursor()
-        cu.execute("""
-                SELECT troveName, version, flavor, isPresent FROM
-                    Instances, Versions, Flavors
-                WHERE
-                    Instances.versionId = Versions.versionId AND
-                    Instances.flavorId = Flavors.flavorId
-            """)
-
-        # it's much faster to build up lists and then turn them into
-        # sets than build up the set one member at a time
-        installed = []
-        referenced = []
-        for (name, version, flavor, isPresent) in cu:
-            if flavor is None:
-                flavor = ""
-
-            info = (name, versions.VersionFromString(version),
-                    deps.deps.ThawDependencySet(flavor))
-
-            if isPresent:
-                installed.append(info)
-            else:
-                referenced.append(info)
-
-        return set(installed), set(referenced)
-
     def close(self):
 	self.db.close()
 
