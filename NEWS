@@ -4,9 +4,15 @@ Changes in 0.71.1:
       much more efficiently than a single getTrove() call would.
     * Split out FileRetriever object to allow file information to be pulled
       from the repository inside of an iterTroves() loop
+    * The web interface shows the troves contained in a group trove instead
+      of trying to list all files in a group.
   o Client Changes
     * Config file options that take a path as a value now support ~ for 
       home directory substitution
+    * Trove.diff() returns a standard job list instead of the previous
+      only-used-here format
+  o Code Structure
+    * Split build/recipe.py into several smaller files
 
 Changes in 0.71.0:
   o Code Structure

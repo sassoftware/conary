@@ -29,6 +29,7 @@ from conary import flavorcfg
 from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove
+from conary.build import errors as builderrors
 from conary.lib import log
 from conary.lib import openpgpfile
 from conary.lib import options
@@ -456,6 +457,8 @@ def main(argv=sys.argv):
             "An unknown exception occured on the repository server:"
         print >> sys.stderr, "\t%s" % str(e)
     except errors.RepositoryError, e:
+        print >> sys.stderr, str(e)
+    except builderrors.BuildError, e:
         print >> sys.stderr, str(e)
     except database.OpenError, e:
         print >> sys.stderr, str(e)

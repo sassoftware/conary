@@ -1114,7 +1114,8 @@ order by
         linkByName = {}
         trvChanges = currentTrv.diff(pristineTrv)[2]
         makeLink = set()
-        for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChanges:
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), isAbs) \
+                                                in trvChanges:
             if oldVersion is None:
                 badInstanceId = instanceDict[(name, newVersion, newFlavor)]
                 # we know it isn't in the pristine; if it was, it would
@@ -1134,7 +1135,8 @@ order by
                 currentTrv.addTrove(name, version, flavor, presentOkay = True)
 
         trvChanges = currentTrv.diff(pristineTrv)[2]
-        for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChanges:
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), isAbs) \
+                                                in trvChanges:
             if (name, oldVersion, oldFlavor) not in makeLink: continue
             if newVersion is None: continue
 

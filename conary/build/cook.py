@@ -29,7 +29,9 @@ import traceback
 import types
 
 from conary import callbacks, conaryclient, constants, files, trove, versions
-from conary.build import buildinfo, buildpackage, lookaside, policy, use, recipe
+from conary.build import buildinfo, buildpackage, lookaside, policy, use
+from conary.build import recipe, loadrecipe
+from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
@@ -203,7 +205,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
         raise CookError('recipe class must have name and version defined')
     if '-' in recipeClass.version:
-        raise recipe.RecipeFileError(
+        raise builderrors.RecipeFileError(
             "Version string %s has illegal '-' character" %recipeClass.version)
 
     log.info("Building %s", recipeClass.name)
@@ -250,22 +252,23 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     macros['buildlabel'] = buildBranch.label().asString()
 
     db = database.Database(cfg.root, cfg.dbPath)
-    if issubclass(recipeClass, recipe._AbstractPackageRecipe):
+    if recipeClass.getType() in (recipe.RECIPE_TYPE_PACKAGE, 
+                                 recipe.RECIPE_TYPE_INFO):
 	ret = cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, 
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
                                 ignoreDeps = ignoreDeps, logBuild = logBuild)
-    elif issubclass(recipeClass, recipe.RedirectRecipe):
+    elif recipeClass.getType() == recipe.RECIPE_TYPE_REDIRECT:
 	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
                               alwaysBumpCount = alwaysBumpCount)
-    elif issubclass(recipeClass, recipe.GroupRecipe):
+    elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
 	ret = cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, 
 			      macros = macros, targetLabel = targetLabel,
                               alwaysBumpCount = alwaysBumpCount)
-    elif issubclass(recipeClass, recipe.FilesetRecipe):
+    elif recipeClass.getType() == recipe.RECIPE_TYPE_FILESET:
 	ret = cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, 
 				macros = macros, targetLabel = targetLabel,
                                 alwaysBumpCount = alwaysBumpCount)
@@ -327,7 +330,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 	recipeObj.setup()
         recipeObj.findTroves()
 	use.track(False)
-    except recipe.RecipeFileError, msg:
+    except builderrors.RecipeFileError, msg:
 	raise CookError(str(msg))
 
     redirects = recipeObj.getRedirections()
@@ -409,7 +412,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         use.track(True)
 	recipeObj.setup()
 	use.track(False)
-    except recipe.RecipeFileError, msg:
+    except builderrors.RecipeFileError, msg:
 	raise CookError(str(msg))
 
     grpFlavor = deps.DependencySet()
@@ -418,7 +421,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     groupNames = recipeObj.getGroupNames()
     try:
         failedDeps = recipeObj.findAllTroves()
-    except recipe.RecipeFileError, msg:
+    except builderrors.RecipeFileError, msg:
 	raise CookError(str(msg))
 
     if failedDeps:
@@ -648,7 +651,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     try:
         recipeObj.checkBuildRequirements(cfg, sourceVersion, 
                                          ignoreDeps=ignoreDeps)
-    except recipe.RecipeDependencyError:
+    except builderrors.RecipeDependencyError:
         return
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
@@ -1011,9 +1014,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    log.error('Error setting build flag values: %s' % msg)
 	    sys.exit(1)
 	try:
-	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
+	    loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
             version = None
-	except recipe.RecipeFileError, msg:
+	except builderrors.RecipeFileError, msg:
 	    raise CookError(str(msg))
 
 	recipeClass = loader.getRecipe()
@@ -1053,11 +1056,12 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    sys.exit(1)
 
         try:
-            (loader, sourceVersion) = recipe.recipeLoaderFromSourceComponent(
+            (loader, sourceVersion) = \
+                            loadrecipe.recipeLoaderFromSourceComponent(
                                         name, cfg, repos,
                                         versionStr=versionStr,
                                         labelPath = labelPath)[0:2]
-        except recipe.RecipeFileError, msg:
+        except builderrors.RecipeFileError, msg:
             raise CookError(str(msg))
 
         recipeClass = loader.getRecipe()

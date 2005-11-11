@@ -673,7 +673,8 @@ class Trove(streams.StreamSet):
             replaces = {}
             replaced = {}
 
-            for (name, oldVersion, newVersion, oldFlavor, newFlavor) in troves:
+            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
+                                      isAbs) in troves:
                 if newVersion:
                     byDef = derivativeTrove.includeTroveByDefault(
                                                 name, newVersion, newFlavor)
@@ -1202,6 +1203,10 @@ class Trove(streams.StreamSet):
 		for flavor in added[name]:
 		    for version in added[name][flavor]:
 			trvList.append((name, None, version, None, flavor))
+
+            trvList = [ (x[0], (x[1], x[3]), (x[2], x[4]), absolute)
+                                for x in trvList ]
+
 	    return (chgSet, filesNeeded, trvList)
 
 	# use added and removed to assemble a list of trove diffs which need
@@ -1356,6 +1361,9 @@ class Trove(streams.StreamSet):
             # this don't have additions to go with them
             for oldInfo in set(_iterInfo(removed, name)):
                 trvList.append((name, oldInfo[1], None, oldInfo[2], None))
+
+        trvList = [ (x[0], (x[1], x[3]), (x[2], x[4]), absolute)
+                            for x in trvList ]
 
 	return (chgSet, filesNeeded, trvList)
 
