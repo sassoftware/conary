@@ -1805,6 +1805,50 @@ order by
     def getTrovesWithProvides(self, depSetList):
         return self.depTables.getLocalProvides(depSetList)
 
+    def getCompleteTroveSet(self, names):
+        # returns two sets; one is all of the troves which are installed,
+        # the other is all of the troves which are referenced but not
+        # installed
+        cu = self.db.cursor()
+
+        cu.execute("CREATE TEMPORARY TABLE gcts(troveName STRING)",
+                   start_transaction = False)
+        for name in names:
+            cu.execute("INSERT INTO gcts VALUES (?)", name, 
+                       start_transaction = False)
+
+        cu.execute("""
+                SELECT Instances.troveName, version, flavor, isPresent FROM
+                    gcts LEFT OUTER JOIN Instances 
+                        USING (troveName)
+                    JOIN Versions 
+                        USING(versionId)
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                WHERE
+                    Instances.troveName IS NOT NULL
+            """)
+
+        # it's much faster to build up lists and then turn them into
+        # sets than build up the set one member at a time
+        installed = []
+        referenced = []
+        for (name, version, flavor, isPresent) in cu:
+            if flavor is None:
+                flavor = ""
+
+            info = (name, versions.VersionFromString(version),
+                    deps.deps.ThawDependencySet(flavor))
+
+            if isPresent:
+                installed.append(info)
+            else:
+                referenced.append(info)
+
+        cu.execute("DROP TABLE gcts", start_transaction = False)
+
+        return set(installed), set(referenced)
+
     def close(self):
 	self.db.close()
 
