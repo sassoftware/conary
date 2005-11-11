@@ -19,6 +19,7 @@ kid_files =	add_group.kid		\
 		choose_branch.kid	\
 		error.kid		\
 		files.kid		\
+		group_contents.kid	\
 		library.kid		\
 		main_page.kid		\
 		metadata.kid		\
