@@ -30,8 +30,10 @@ from conary import files
 from conary import trove
 from conary import updatecmd
 from conary import versions
-from conary.build import cook
-from conary.build import recipe, lookaside
+import build.errors
+from conary.build import cook, recipe
+from conary.build import loadrecipe, lookaside
+from conary.build import errors as builderrors
 from conary.conarycfg import selectSignatureKey
 from conary.lib import log
 from conary.lib import magic
@@ -302,8 +304,8 @@ def _verifyAtHead(repos, headPkg, state):
 def _getRecipeLoader(cfg, repos, recipeFile):
     # load the recipe; we need this to figure out what version we're building
     try:
-        loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
-    except recipe.RecipeFileError, e:
+        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
+    except build.errors.RecipeFileError, e:
 	log.error("unable to load recipe file %s: %s", recipeFile, str(e))
         return None
     except IOError, e:
@@ -469,11 +471,17 @@ def commit(repos, cfg, message, callback=None):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if issubclass(recipeClass, recipe._AbstractPackageRecipe):
+    if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
-        recipeObj = recipeClass(cfg, lcache, srcdirs)
+
+        try:
+            recipeObj = recipeClass(cfg, lcache, srcdirs)
+        except builderrors.RecipeFileError, msg:
+            log.error(str(msg))
+            sys.exit(1)
+
         recipeObj.populateLcache()
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
