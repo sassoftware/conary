@@ -234,12 +234,13 @@ def _permsVisit(arg, dirname, names):
 	    mode |= 0700
 	    os.chmod(path, mode)
 
-def remove(paths):
+def remove(paths, quiet=False):
     for path in braceGlob(paths):
 	if os.path.isdir(path) and not os.path.islink(path):
 	    log.warning('Not removing directory %s', path)
 	elif os.path.exists(path) or os.path.islink(path):
-	    log.debug('deleting [file] %s', path)
+            if not quiet:
+                log.debug('deleting [file] %s', path)
 	    os.remove(path)
 	else:
 	    log.warning('file %s does not exist when attempting to delete [file]', path)

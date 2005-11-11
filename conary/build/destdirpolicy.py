@@ -442,7 +442,8 @@ class RemoveNonPackageFiles(policy.Policy):
     ]
 
     def doFile(self, path):
-	util.remove(self.macros['destdir']+path)
+        self.info("Removing %s", path)
+        util.remove(self.macros['destdir']+path, quiet=True)
 
 class FixupMultilibPaths(policy.Policy):
     """
