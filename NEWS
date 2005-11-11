@@ -11,6 +11,9 @@ Changes in 0.71.1:
       home directory substitution
     * Trove.diff() returns a standard job list instead of the previous
       only-used-here format
+  o Build Changes (cvc)
+    * Additional calls are emulated by the filename_wrapper for the
+      r.Run calls.
   o Code Structure
     * Split build/recipe.py into several smaller files
 
