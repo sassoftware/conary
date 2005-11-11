@@ -83,6 +83,9 @@ class SerialNumber(object):
 
         return self.numList == other.numList
 
+    def __nonzero__(self):
+        return self.numList and self.numList != [0]
+
     def __ne__(self, other):
         return not self == other
 
