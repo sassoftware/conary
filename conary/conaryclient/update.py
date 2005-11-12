@@ -614,16 +614,36 @@ class ClientUpdate:
 
         # def _mergeGroupChanges -- main body begins here
 
-        # relative jobs don't work yet, not even erasures
-        assert(not [ x for x in primaryJobList if x[3] is False ] )
+        erasePrimaries =    set(x for x in primaryJobList 
+                                    if x[2][0] is None)
+        relativePrimaries = set(x for x in primaryJobList 
+                                    if x[2][0] is not None and
+                                       not x[3])
+        absolutePrimaries = set(x for x in primaryJobList 
+                                    if x[3])
+        assert(len(relativePrimaries) + len(absolutePrimaries) +
+               len(erasePrimaries) == len(primaryJobList))
 
+        # relative jobs don't work yet, not even erasures
+        assert(not relativePrimaries)
+        assert(not erasePrimaries)
+
+        troveSource = uJob.getTroveSource()
+
+        # Build the trove which contains all of the absolute change sets
+        # we may need to install. Build a set of all of the trove names
+        # in that trove as well.
         availableTrove = trove.Trove("@update", versions.NewVersion(),
                                      deps.DependencySet(), None)
+        troveList = [ (x[0], x[2][0], x[2][1]) for x in absolutePrimaries ]
         names = set()
-        for trvCs in uJob.getTroveSource().csList[0].iterNewTroveList():
-            availableTrove.addTrove(trvCs.getName(), trvCs.getNewVersion(),
-                                    trvCs.getNewFlavor())
-            names.add(trvCs.getName())
+        while troveList:
+            info = troveList.pop(0)
+            availableTrove.addTrove(presentOkay = True, *info)
+            names.add(info[0])
+
+            trv = troveSource.getTrove(withFiles = False, *info)
+            troveList += [ x for x in trv.iterTroveList() ]
 
         installedTroves, referencedTroves = \
                             self.db.db.getCompleteTroveSet(names)
@@ -650,10 +670,9 @@ class ClientUpdate:
         del jobList, installJobs, updateJobs
 
         newTroves = [ ((x[0], x[2][0], x[2][1]), ignorePrimaryPins) 
-                            for x in primaryJobList if x[2][0] is not None ]
+                            for x in absolutePrimaries ]
 
         newJob = set()
-        troveSource = uJob.getTroveSource()
 
         while newTroves:
             newInfo, ignorePins = newTroves.pop(0)
