@@ -614,6 +614,9 @@ class ClientUpdate:
 
         # def _mergeGroupChanges -- main body begins here
 
+        # relative jobs don't work yet, not even erasures
+        assert(not [ x for x in primaryJobList if x[3] is False ] )
+
         availableTrove = trove.Trove("@update", versions.NewVersion(),
                                      deps.DependencySet(), None)
         names = set()
@@ -630,10 +633,49 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedTroves ]
 
-        job = availableTrove.diff(existsTrv)[2]
+        jobList = availableTrove.diff(existsTrv)[2]
 
-        from conary import lib
-        lib.epdb.st()
+        installJobs = [ x for x in jobList if x[1][0] is     None and
+                                              x[2][0] is not None ]
+        updateJobs = [ x for x in jobList if x[1][0] is not None and
+                                             x[2][0] is not None ]
+        pins = self.db.trovesArePinned([ (x[0], x[1][0], x[1][1]) 
+                                                    for x in updateJobs ])
+        jobByNew = dict( ((job[0], job[2][0], job[2][1]), (job[1], pin)) for
+                        (job, pin) in itertools.izip(updateJobs, pins) )
+        jobByNew.update(
+                   dict( ((job[0], job[2][0], job[2][1]), (job[1], False)) for
+                        job in installJobs))
+
+        del jobList, installJobs, updateJobs
+
+        newTroves = [ ((x[0], x[2][0], x[2][1]), ignorePrimaryPins) 
+                            for x in primaryJobList if x[2][0] is not None ]
+
+        newJob = set()
+        troveSource = uJob.getTroveSource()
+
+        while newTroves:
+            newInfo, ignorePins = newTroves.pop(0)
+
+            replaced, pinned = jobByNew[newInfo]
+            if (newInfo[0], replaced[0], replaced[1]) in referencedTroves:
+                continue
+
+            if pinned and not ignorePins:
+                continue
+
+            newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), False))
+
+            trv = troveSource.getTrove(withFiles = False, *newInfo)
+            if not trv.isCollection(): continue
+
+            for info in trv.iterTroveList():
+                newTroves.append((info, pinned and ignorePins))
+
+        print "\n".join(str(x) for x in newJob)
+        import sys
+        sys.exit(0)
 
         # ---------------- ORIGINAL CODE
             
