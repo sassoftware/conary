@@ -172,7 +172,7 @@ class Revision(AbstractRevision):
 	    else:
 		rc = str(self.sourceCount)
 	else:
-	    rc = '-'.join((self.version, str(self.sourceCount)))
+	    rc = self.version + '-' + str(self.sourceCount)
 
 	if self.buildCount != None:
 	    if rc:
@@ -181,7 +181,7 @@ class Revision(AbstractRevision):
 		rc = str(self.buildCount)
 
 	if frozen:
-	    rc = ':'.join((self.freezeTimestamp(), rc))
+	    rc = self.freezeTimestamp() + ':' + rc
 
 	return rc
 
