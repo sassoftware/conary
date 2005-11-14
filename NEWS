@@ -12,6 +12,8 @@ Changes in 0.71.1:
     * Trove.diff() returns a standard job list instead of the previous
       only-used-here format
     * /var/log/conary tracks all update, remove, rollback, and erase events
+    * Progress output is simplified when stdout is not a tty (no line 
+      overwrites)
   o Build Changes (cvc)
     * Additional calls are emulated by the filename_wrapper for the
       r.Run calls.
