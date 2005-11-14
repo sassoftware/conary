@@ -575,12 +575,30 @@ class HttpHandler(WebHandler):
     def pgpAdminForm(self, auth):
         admin = self.repServer.auth.check(self.authToken,admin=True)
         userId = self.repServer.auth.getUserIdByName(self.authToken[0])
+
         if admin:
             users = dict(self.repServer.auth.iterUsers())
+            users[None] = '--Nobody--'
         else:
             users = {userId: self.authToken[0]}
+
+        # build a dict of useful information about each user's OpenPGP Keys
+        # xml-rpc calls must be made before kid template is invoked
+        openPgpKeys = {}
+        for userId in users.keys():
+            keys = []
+            for fingerprint in self.repServer.listUsersMainKeys(self.authToken, 0, userId):
+                keyPacket = {}
+                keyPacket['fingerprint'] = fingerprint
+                keyPacket['subKeys'] = self.repServer.listSubkeys(self.authToken, 0, fingerprint)
+                keyPacket['uids'] = self.repServer.getOpenPGPKeyUserIds(self.authToken, 0, fingerprint)
+                keys.append(keyPacket)
+            openPgpKeys[userId] = keys
+
+        # FIXME: keyTable must be abolished once rBO catches up. It is left
+        # in for now to synchronize the transition.
         self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    users = users, admin=admin)
+                    users = users, admin=admin, openPgpKeys = openPgpKeys)
         return apache.OK
 
     @checkAuth(write = True)
