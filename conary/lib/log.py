@@ -63,6 +63,8 @@ class SysLog:
 
 def openSysLog(root, path):
     global syslog
+    if not path:
+        path = '/dev/null'
     syslog = SysLog(root, path)
 
 def error(*args):
