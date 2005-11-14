@@ -37,13 +37,14 @@ syslog = None
 
 class SysLog:
     # class responsible for /var/log/conary
-    def __call__(self, str, *args):
+    def __call__(self, str, needsNewLine = True, *args):
         "Logs a message to /var/log/conary"
         global sysLogFile
         msg = str % args
         self.f.write(time.strftime("[%b %d %H:%M:%S] ") + self.indent)
         self.f.write(msg)
-        self.f.write("\n")
+        if needsNewLine:
+            self.f.write("\n")
         self.f.flush()
 
     def command(self):
@@ -54,6 +55,13 @@ class SysLog:
     def commandComplete(self):
         self.indent = ""
         self("command complete")
+
+    def traceback(self, lines):
+        for line in lines:
+            self(line, needsNewLine = False)
+
+        self.indent = ""
+        self("command failed")
 
     def __init__(self, root, path):
         path = root + os.path.sep + path

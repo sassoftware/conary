@@ -31,6 +31,8 @@ import tempfile
 import traceback
 import weakref
 
+import log
+
 # Simple ease-of-use extensions to python libraries
 
 def normpath(path):
@@ -100,6 +102,8 @@ def genExcepthook(dumpStack=True, debugCtrlC=False, prefix='conary-stack-'):
         if type == KeyboardInterrupt and not debugCtrlC:
             sys.exit(1)
         lines = traceback.format_exception(type, value, tb)
+        if log.syslog is not None:
+            log.syslog.traceback(lines)
         if dumpStack:
             try:
                 (tbfd,path) = tempfile.mkstemp('', prefix)
