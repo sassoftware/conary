@@ -416,8 +416,9 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                        x[0].getOldFlavor()) for x in relative ])
         for (trvCs, info), isPresent in itertools.izip(relative, present):
             if not isPresent:
-                # FIXME: there is no such exception in this context
-                raise MissingTrove
+                # we can't serve up troves from this change set so pretend
+                # it doesn't exist
+                continue
             
             if info in self.troveCsMap:
                 # FIXME: there is no such exception in this context
