@@ -1818,7 +1818,8 @@ order by
                        start_transaction = False)
 
         cu.execute("""
-                SELECT Instances.troveName, version, flavor, isPresent FROM
+                SELECT Instances.troveName, version, flavor, isPresent,
+                       timeStamps FROM
                     gcts LEFT OUTER JOIN Instances 
                         USING (troveName)
                     JOIN Versions 
@@ -1833,12 +1834,14 @@ order by
         # sets than build up the set one member at a time
         installed = []
         referenced = []
-        for (name, version, flavor, isPresent) in cu:
+        for (name, version, flavor, isPresent, timeStamps) in cu:
             if flavor is None:
                 flavor = ""
 
-            info = (name, versions.VersionFromString(version),
-                    deps.deps.ThawDependencySet(flavor))
+            v = versions.VersionFromString(version)
+	    v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+
+            info = (name, v, deps.deps.ThawDependencySet(flavor))
 
             if isPresent:
                 installed.append(info)
