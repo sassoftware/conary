@@ -415,11 +415,14 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         if not okay:
             return
 
+    log.syslog.command()
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves, threshold = cfg.trustThreshold)
+                       callback = callback, autoPinList = cfg.pinTroves, 
+                       threshold = cfg.trustThreshold)
 
+    log.syslog.commandComplete()
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it

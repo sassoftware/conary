@@ -18,7 +18,7 @@ import pickle
 from conary import conarycfg, metadata
 from conary.conaryclient import clone, update
 from conary.deps import deps
-from conary.lib import util
+from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 
@@ -69,6 +69,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
+        log.openSysLog(self.cfg.root, self.cfg.logFile)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):

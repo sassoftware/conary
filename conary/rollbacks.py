@@ -12,6 +12,7 @@
 # full details.
 #
 
+from conary import conaryclient
 from conary.lib import log
 from conary.local import database
 from conary.repository import changeset
@@ -53,11 +54,20 @@ def listRollbacks(db, cfg):
 	print
 
 def apply(db, repos, cfg, *names, **kwargs):
+    # Instantiating the client initializes our log file; all of this rollback
+    # stuff ought to go through the client instead of directly to the database
+    # object anyway
+    client = conaryclient.ConaryClient(cfg)
+
+    log.syslog.command()
+
     replaceFiles = kwargs.get('replaceFiles', False)
     try:
 	db.applyRollbackList(repos, names, replaceFiles=replaceFiles)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1
+
+    log.syslog.commandComplete()
 
     return 0

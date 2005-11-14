@@ -411,6 +411,7 @@ class ConaryConfiguration(SectionedConfig):
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
 	'interactive'		: [ BOOL, False ],
+        'logFile'               : [ STRING, '/var/log/conary' ],
 	'lookaside'		: [ PATH, '/var/cache/conary'],
 	'name'			: None,
 	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],

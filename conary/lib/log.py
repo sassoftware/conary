@@ -24,9 +24,46 @@ For example::
 """
 
 import logging
+import os
 import sys
+import time
 
 from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+from conary import constants
+
+import util
+
+syslog = None
+
+class SysLog:
+    # class responsible for /var/log/conary
+    def __call__(self, str, *args):
+        "Logs a message to /var/log/conary"
+        global sysLogFile
+        msg = str % args
+        self.f.write(time.strftime("[%b %d %H:%M:%S] ") + self.indent)
+        self.f.write(msg)
+        self.f.write("\n")
+        self.f.flush()
+
+    def command(self):
+        self(("version %s: " + " ".join(sys.argv[1:])) % 
+                                                constants.version)
+        self.indent = "  "
+
+    def commandComplete(self):
+        self.indent = ""
+        self("command complete")
+
+    def __init__(self, root, path):
+        path = root + os.path.sep + path
+        util.mkdirChain(os.path.dirname(path))
+        self.f = open(path, "a")
+        self.indent = ""
+
+def openSysLog(root, path):
+    global syslog
+    syslog = SysLog(root, path)
 
 def error(*args):
     "Log an error"

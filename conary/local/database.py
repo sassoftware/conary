@@ -583,6 +583,23 @@ class Database(SqlDbRepository):
                 except OSError:
                     pass
 
+        # log everything
+	for trvCs in cs.iterNewTroveList():
+            if not trvCs.getOldVersion():
+                log.syslog("installed %s=%s[%s]", trvCs.getName(),
+                         trvCs.getNewVersion(), 
+                         deps.formatFlavor(trvCs.getNewFlavor()))
+            else:
+                log.syslog("updated %s=%s[%s]--%s[%s]", trvCs.getName(),
+                         trvCs.getOldVersion(), 
+                         deps.formatFlavor(trvCs.getOldFlavor()),
+                         trvCs.getNewVersion(), 
+                         deps.formatFlavor(trvCs.getNewFlavor()))
+
+	for (name, version, flavor) in cs.getOldTroveList():
+            log.syslog("removed %s=%s[%s]", name, version,
+                       deps.formatFlavor(flavor))
+
         callback.committingTransaction()
 	self.commit()
 
@@ -597,6 +614,7 @@ class Database(SqlDbRepository):
 
 	for trv in self.db.iterFindByPath(path):
 	    self.db.removeFileFromTrove(trv, path)
+            log.syslog("removed file %s from %s", path, trv.getName())
 
         self.db.commit()
 
