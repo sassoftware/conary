@@ -318,8 +318,9 @@ class ClientUpdate:
 
         return redirectHack
 
-    def _mergeGroupChanges(self, uJob, primaryJobList, redirectHack, 
-                           recurse, ineligible, ignorePrimaryPins):
+    def _mergeGroupChanges(self, uJob, primaryJobList, transitiveClosure,
+                           redirectHack, recurse, ineligible, 
+                           ignorePrimaryPins):
 
         def _newBase(newTrv):
             """
@@ -624,8 +625,7 @@ class ClientUpdate:
         assert(len(relativePrimaries) + len(absolutePrimaries) +
                len(erasePrimaries) == len(primaryJobList))
 
-        # relative jobs don't work yet, not even erasures
-        assert(not relativePrimaries)
+        # erases don't work
         assert(not erasePrimaries)
 
         troveSource = uJob.getTroveSource()
@@ -635,21 +635,31 @@ class ClientUpdate:
         # in that trove as well.
         availableTrove = trove.Trove("@update", versions.NewVersion(),
                                      deps.DependencySet(), None)
-        troveList = [ (x[0], x[2][0], x[2][1]) for x in absolutePrimaries ]
         names = set()
-        while troveList:
-            info = troveList.pop(0)
-            availableTrove.addTrove(presentOkay = True, *info)
-            names.add(info[0])
+        for job in transitiveClosure:
+            if job[2][0] is None: continue
+            if not job[3]: continue
+            availableTrove.addTrove(job[0], job[2][0], job[2][1],
+                                    presentOkay = True)
+            names.add(job[0])
 
-            trv = troveSource.getTrove(withFiles = False, *info)
-            troveList += [ x for x in trv.iterTroveList() ]
+        # Build the set of all relative install jobs (transitive closure)
+        relativeUpdateJobs = set(job for job in transitiveClosure if
+                                    job[1][0] is not None and not job[3])
 
+        # Get all of the currently installed and referenced troves which
+        # match something being installed absolute. Troves being removed
+        # through a relative changeset aren't allowed to be removed by
+        # something else.
         installedTroves, referencedTroves = \
                             self.db.db.getCompleteTroveSet(names)
+        installedTroves.difference_update(
+                (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
+        referencedTroves.difference_update(
+                (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
+
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
-
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedTroves ]
 
@@ -669,16 +679,37 @@ class ClientUpdate:
 
         del jobList, installJobs, updateJobs
 
-        newTroves = [ ((x[0], x[2][0], x[2][1]), ignorePrimaryPins) 
-                            for x in absolutePrimaries ]
+        # Relative jobs override pins and need to match up against the
+        # right thing.
+        jobByNew.update(
+                    dict( ((job[0], job[2][0], job[2][1]), (job[1], True)) for
+                        job in relativeUpdateJobs))
+
+        # True means install this by default (after all, these are all
+        # primaries)
+        newTroves = [ ((x[0], x[2][0], x[2][1]), ignorePrimaryPins, True) 
+                            for x in itertools.chain(absolutePrimaries, 
+                                                     relativePrimaries) ]
 
         newJob = set()
 
         while newTroves:
-            newInfo, ignorePins = newTroves.pop(0)
+            newInfo, ignorePins, byDefault = newTroves.pop(0)
 
             replaced, pinned = jobByNew[newInfo]
-            if (newInfo[0], replaced[0], replaced[1]) in referencedTroves:
+            if replaced[0] is not None:
+                if (newInfo[0], replaced[0], replaced[1]) in referencedTroves:
+                    # Don't install this trove because it's predecessor was not
+                    # installed
+                    continue
+
+                if not self.db.hasTrove(newInfo[0], replaced[0], replaced[1]):
+                    # relative changsets may specify items which aren't
+                    # installed
+                    continue
+            elif not byDefault:
+                # This trove is being newly installed, but it's not supposed
+                # to be installed by default
                 continue
 
             if pinned and not ignorePins:
@@ -690,8 +721,12 @@ class ClientUpdate:
             if not trv.isCollection(): continue
 
             for info in trv.iterTroveList():
-                newTroves.append((info, pinned and ignorePins))
+                newTroves.append((info, pinned and ignorePins, 
+                                  trv.includeTroveByDefault(*info)))
 
+        return newJob
+
+        print
         print "\n".join(str(x) for x in newJob)
         import sys
         sys.exit(0)
@@ -1082,6 +1117,8 @@ class ClientUpdate:
         jobsFromChangeSetFiles = set()
         # These are items being removed.
         removeJob = set()
+        # This is the full, transitive closure of the job
+        transitiveClosure = set()
 
         splittable = True
 
@@ -1119,6 +1156,7 @@ class ClientUpdate:
                 splittable = False
                 uJob.getTroveSource().addChangeSet(item, 
                                                    includesFileContents = True)
+                transitiveClosure.update(item.getJobSet(primaries = False))
                 jobsFromChangeSetFiles.update(item.getJobSet(primaries = True))
                 continue
 
@@ -1278,13 +1316,15 @@ class ClientUpdate:
                                                     recurse = recurse)
             assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
+            transitiveClosure.update(cs.getJobSet(primaries = False))
             del cs
 
         del changeSetList
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
-        newJob = self._mergeGroupChanges(uJob, jobSet, redirectHack, 
-                                         recurse, oldItems, ignorePrimaryPins)
+        newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
+                                         redirectHack, recurse, oldItems, 
+                                         ignorePrimaryPins)
         if not newJob:
             raise NoNewTrovesError
 
