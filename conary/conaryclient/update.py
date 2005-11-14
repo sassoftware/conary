@@ -719,6 +719,7 @@ class ClientUpdate:
 
             trv = troveSource.getTrove(withFiles = False, *newInfo)
             if not trv.isCollection(): continue
+            if not recurse: continue
 
             for info in trv.iterTroveList():
                 newTroves.append((info, pinned and ignorePins, 
