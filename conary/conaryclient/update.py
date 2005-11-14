@@ -614,6 +614,9 @@ class ClientUpdate:
                 newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
 
         # def _mergeGroupChanges -- main body begins here
+        import epdb
+        epdb.st('f')
+
 
         erasePrimaries =    set(x for x in primaryJobList 
                                     if x[2][0] is None)
@@ -645,7 +648,7 @@ class ClientUpdate:
 
         # Build the set of all relative install jobs (transitive closure)
         relativeUpdateJobs = set(job for job in transitiveClosure if
-                                    job[1][0] is not None and not job[3])
+                                    job[2][0] is not None and not job[3])
 
         # Get all of the currently installed and referenced troves which
         # match something being installed absolute. Troves being removed
@@ -676,7 +679,7 @@ class ClientUpdate:
         jobByNew.update(
                    dict( ((job[0], job[2][0], job[2][1]), (job[1], False)) for
                         job in installJobs))
-
+        
         del jobList, installJobs, updateJobs
 
         # Relative jobs override pins and need to match up against the
