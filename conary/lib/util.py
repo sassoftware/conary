@@ -555,5 +555,19 @@ class PeekIterator:
         self.iter = iter
         self._next()
 
+class IterableQueue:
+
+    def add(self, item):
+        self.l.append(item)
+
+    def __iter__(self):
+        while self.l:
+            yield self.l.pop(0)
+
+        raise StopIteration
+
+    def __init__(self):
+        self.l = []
+
 exists = misc.exists
 removeIfExists = misc.removeIfExists
