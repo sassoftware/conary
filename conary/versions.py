@@ -268,13 +268,14 @@ class Revision(AbstractRevision):
 
         return 0
 
-    def shadowChangedUpstreamVersion(self):
+    def shadowChangedUpstreamVersion(self, shadowLength):
         """ returns True if this revision is a) on a shadow 
             and b) the parent branch's source count is 0, 
             implying that the upstream version # has been changed
         """
+        i = shadowLength - 1
         if (self.sourceCount.shadowCount() and
-            [ x for x in self.sourceCount.iterCounts()][-2] == 0):
+            [ x for x in self.sourceCount.iterCounts()][i] == 0):
             # 0 means there's no corresponding parent
             # source with this version number
             return True
@@ -883,7 +884,7 @@ class Version(VersionSequence):
 
         trailing = self.versions[-1]
         if trailing.buildCount is None:
-            if trailing.shadowChangedUpstreamVersion():
+            if trailing.shadowChangedUpstreamVersion(self.shadowLength()):
                 return False
             else:
                 return True
