@@ -39,7 +39,9 @@ class SysLog:
     # class responsible for /var/log/conary
     def __call__(self, str, *args):
         "Logs a message to /var/log/conary"
-        global sysLogFile
+        if not self.f:
+            self.open()
+
         msg = str % args
         self.f.write(time.strftime("[%b %d %H:%M:%S] ") + self.indent)
         self.f.write(msg)
@@ -56,17 +58,23 @@ class SysLog:
         self("command complete")
 
     def traceback(self, lines):
+        if not self.f:
+            self.open()
+
         for line in lines:
             self.f.write(line)
 
         self.indent = ""
         self("command failed")
 
+    def open(self):
+        util.mkdirChain(os.path.dirname(self.path))
+        self.f = open(self.path, "a")
+
     def __init__(self, root, path):
-        path = root + os.path.sep + path
-        util.mkdirChain(os.path.dirname(path))
-        self.f = open(path, "a")
+        self.path = root + os.path.sep + path
         self.indent = ""
+        self.f = None
 
 def openSysLog(root, path):
     global syslog
