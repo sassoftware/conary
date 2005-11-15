@@ -17,11 +17,14 @@ Changes in 0.71.1:
     * Tracebacks during logged commands get copied to the log
     * Code which checked to see if a shadow has been locally modified didn't 
       work for shadows more than a single level deep
+    * Changesets will be used as a source for dependency resolution when
+      performing dependency resolution.
   o Build Changes (cvc)
     * Additional calls are emulated by the filename_wrapper for the
       r.Run calls.
   o Code Structure
     * Split build/recipe.py into several smaller files
+    * Move epdb code into its own package
 
 Changes in 0.71.0:
   o Code Structure
