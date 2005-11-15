@@ -20,7 +20,7 @@ import sys
 from conary.callbacks import UpdateCallback
 from conary import conarycfg
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
 from conary.repository.netclient import NetworkRepositoryClient
@@ -395,8 +395,7 @@ class ClientUpdate:
 
             return r
 
-	def _findErasures(primaryErases, origNewJob, referencedTroves, 
-                          recurse):
+	def _findErasures(primaryErases, newJob, referencedTroves, recurse):
 	    # each node is a ((name, version, flavor), state, edgeList
 	    #		       fromUpdate)
 	    # state is ERASE, KEEP, or UNKNOWN
@@ -411,43 +410,59 @@ class ClientUpdate:
 	    KEEP = 2
 	    UNKNOWN = 3
 
-            newJob = set(origNewJob)
+            jobQueue = util.IterableQueue()
+            # The order of this chain matters. It's important that we handle
+            # all of the erasures we already know about before getting to the
+            # ones which are implicit. That gets the state right for ones
+            # which are explicit (since arriving there implicitly gets
+            # ignored)
+            for job in itertools.chain(primaryErases, newJob, jobQueue):
+                if job[1][0] is None: 
+                    # skip new installs
+                    continue  
 
-            # Make sure troves which the changeset thinks should be removed
-            # get considered for removal. Ones which need to be removed
-            # for a new trove to be installed are guaranteed to be removed.
-            oldTroves = [ ((job[0], job[1][0], job[1][1]), True, ERASE) for
-                                job in newJob
-                                if job[1][0] is not None and 
-                                   job[2][0] is not None ]
-            oldTroves += [ ((job[0], job[1][0], job[1][1]), False, UNKNOWN) for
-                                job in newJob
-                                if job[1][0] is not None and 
-                                   job[2][0] is None ]
+                oldInfo = (job[0], job[1][0], job[1][1])
 
-            # Create the nodes for the graph, one for each trove being
-            # removed.
-            for info, fromUpdate, state in oldTroves:
-                if info in nodeIdx:
-                    # the node is marked to erase multiple times in
-                    # newJob! this can happen, for example, on 
-                    # "update +foo=2.0 -foo=1.0" (not to mention it
-                    # happening from complex, overlapping groups)
-                    idx = nodeIdx[info]
-                    otherState = nodeList[idx][1]
-                    assert(state is UNKNOWN or otherState is UNKNOWN)
-                    if otherState is UNKNOWN:
-                        nodeList[idx] = [ (info, state, [], fromUpdate) ]
+                if oldInfo in nodeIdx:
+                    # See the note above about chain order (this wouldn't
+                    # work w/o it)
                     continue
 
-                nodeIdx[info] = len(nodeList)
-                nodeList.append([ info, state, [], fromUpdate ])
+                if not self.db.hasTrove(*oldInfo):
+                    # no need to erase something we don't have installed
+                    continue
 
-            del oldTroves
+                # primary erasures and erasures which are part of an
+                # update are guaranteed to occur
+                if job in primaryErases:
+                    assert(not job[2][0])
+                    state = ERASE
+                    fromUpdate = False
+                elif job in newJob:
+                    assert(job[2][0])
+                    state = ERASE
+                    fromUpdate = True
+                else:
+                    # If it's pinned, we keep it. XXX this needs to be
+                    # batched
+                    if self.db.trovesArePinned([ oldInfo ])[0]:
+                        state = KEEP
+                    else:
+                        state = UNKNOWN
 
-            # Primary troves are always erased.
-            for info in primaryErases:
-                nodeList[nodeIdx[info]][1] = ERASE
+                    fromUpdate = False
+
+                assert(oldInfo not in nodeIdx)
+                nodeIdx[oldInfo] = len(nodeList)
+                nodeList.append([ oldInfo, state, [], fromUpdate ])
+
+                trv = self.db.getTrove(withFiles = False, pristine = False,
+                                       *oldInfo)
+                if not trv.isCollection(): continue
+
+                for inclInfo in trv.iterTroveList():
+                    jobQueue.add((inclInfo[0], inclInfo[1:], (None, None), 
+                                  False))
 
             # For nodes which we haven't decided to erase, we need to track
             # down all of the collections which include those troves.
@@ -614,10 +629,6 @@ class ClientUpdate:
                 newJob.add((name, (oldVer, oldFla), (newVer, newFla), False))
 
         # def _mergeGroupChanges -- main body begins here
-        import epdb
-        epdb.st('f')
-
-
         erasePrimaries =    set(x for x in primaryJobList 
                                     if x[2][0] is None)
         relativePrimaries = set(x for x in primaryJobList 
@@ -627,9 +638,6 @@ class ClientUpdate:
                                     if x[3])
         assert(len(relativePrimaries) + len(absolutePrimaries) +
                len(erasePrimaries) == len(primaryJobList))
-
-        # erases don't work
-        assert(not erasePrimaries)
 
         troveSource = uJob.getTroveSource()
 
@@ -661,12 +669,28 @@ class ClientUpdate:
         referencedTroves.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
 
+        # Build the set of the incoming troves which are either already
+        # installed or already referenced. This is purely for consistency
+        # checking later on
+        avail = set(availableTrove.iterTroveList())
+        alreadyInstalled = installedTroves & avail
+        alreadyReferenced = referencedTroves & avail
+        del avail
+
+        # Remove the alreadyReferenced set from both the troves which are
+        # already installed. This lets us get a good match for such troves
+        # if we decide to install them later.
+        referencedTroves.difference_update(alreadyReferenced)
+
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedTroves ]
 
         jobList = availableTrove.diff(existsTrv)[2]
+
+        import epdb
+        epdb.st('f')
 
         installJobs = [ x for x in jobList if x[1][0] is     None and
                                               x[2][0] is not None ]
@@ -688,16 +712,34 @@ class ClientUpdate:
                     dict( ((job[0], job[2][0], job[2][1]), (job[1], True)) for
                         job in relativeUpdateJobs))
 
-        # True means install this by default (after all, these are all
-        # primaries)
-        newTroves = [ ((x[0], x[2][0], x[2][1]), ignorePrimaryPins, True) 
+        # first True means its primary, second True means install this by 
+        # default (after all, these are all primaries)
+        newTroves = [ ((x[0], x[2][0], x[2][1]), True, ignorePrimaryPins, 
+                        True) 
                             for x in itertools.chain(absolutePrimaries, 
                                                      relativePrimaries) ]
 
         newJob = set()
 
+        import epdb
+        epdb.st('f')
+
         while newTroves:
-            newInfo, ignorePins, byDefault = newTroves.pop(0)
+            newInfo, isPrimary, ignorePins, byDefault = newTroves.pop(0)
+
+            if newInfo in alreadyInstalled:
+                # No need to install it twice
+                continue
+            elif newInfo in alreadyReferenced:
+                if isPrimary:
+                    # They really want it installed this time. We removed
+                    # this entry from the already-installed @update trove
+                    # so byJob already tells us the best match for it.
+                    pass
+                else:
+                    # We already know about this trove, and decided we
+                    # don't want it.
+                    continue
 
             replaced, pinned = jobByNew[newInfo]
             if replaced[0] is not None:
@@ -714,6 +756,8 @@ class ClientUpdate:
                 # This trove is being newly installed, but it's not supposed
                 # to be installed by default
                 continue
+            elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
+                continue
 
             if pinned and not ignorePins:
                 continue
@@ -725,8 +769,12 @@ class ClientUpdate:
             if not recurse: continue
 
             for info in trv.iterTroveList():
-                newTroves.append((info, pinned and ignorePins, 
+                newTroves.append((info, False, pinned and ignorePins, 
                                   trv.includeTroveByDefault(*info)))
+
+	eraseSet = _findErasures(erasePrimaries, newJob, set(), recurse)
+        assert(not x for x in newJob if x[2][0] is None)
+        newJob.update(eraseSet)
 
         return newJob
 
