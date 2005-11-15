@@ -1864,6 +1864,16 @@ class Requires(_addInfo, _BuildPackagePolicy):
     depending on whether the library is in a system library
     directory or not.  (It needs to be the same as how the
     soname dependency is expressed by the providing package.)
+
+    For (unusual) cases where a system library is not listed
+    in C{ld.so.conf} but is instead found through a search through
+    special subdirectories with architecture-specific names (like
+    C{i686} and C{tls}), you can pass in a string or list of
+    strings specifying the directory or list of directories.
+    C{r.Requires(sonameSubtrees='/directoryname')} or
+    C{r.Requires(sonameSubtrees=['/list', '/of', '/dirs'])}
+    These are B{not} regular expressions.  They will have macro
+    expansion expansion done on them.
     """
     invariantexceptions = (
 	'%(docdir)s/',
