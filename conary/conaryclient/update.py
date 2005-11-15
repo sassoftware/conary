@@ -516,6 +516,17 @@ class ClientUpdate:
                  dict( ((job[0], job[2][0], job[2][1]), job[1]) for
                         job in localUpdates if job[1][0] is not None and
                                                job[2][0] is not None)
+
+        # Troves which were locally updated to version on the same branch
+        # no longer need to be listed as referenced. The trove which replaced
+        # it is always a better match for the new items (installed is better
+        # than not installed as long as the branches are the same)
+        for job in localUpdates:
+            if job[1][0] is not None and job[2][0] is not None and \
+                             job[1][0].branch() == job[2][0].branch():
+                del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
+                referencedTroves.remove((job[0], job[1][0], job[1][1]))
+
         del installedTrove, referencedTrove, localUpdates
 
         # Build the set of the incoming troves which are either already
