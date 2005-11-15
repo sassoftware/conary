@@ -24,6 +24,8 @@ Changes in 0.71.1:
       r.Run calls.
   o Code Structure
     * Split build/recipe.py into several smaller files
+    * Moved OpenPGP keyTable access up call stack so that it can now be
+      accessed outside of kid templates.
     * Move epdb code into its own package
 
 Changes in 0.71.0:
