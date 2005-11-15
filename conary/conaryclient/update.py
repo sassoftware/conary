@@ -503,6 +503,21 @@ class ClientUpdate:
         referencedTroves.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
 
+        # The job between referencedTroves and installedTroves tells us
+        # a lot about what the user has done to his system. 
+        installedTrove = trove.Trove("@exists", versions.NewVersion(),
+                                     deps.DependencySet(), None)
+        [ installedTrove.addTrove(*x) for x in installedTroves ]
+        referencedTrove = trove.Trove("@exists", versions.NewVersion(),
+                                      deps.DependencySet(), None)
+        [ referencedTrove.addTrove(*x) for x in referencedTroves ]
+        localUpdates = installedTrove.diff(referencedTrove)[2]
+        localUpdatesByPresent = \
+                 dict( ((job[0], job[2][0], job[2][1]), job[1]) for
+                        job in localUpdates if job[1][0] is not None and
+                                               job[2][0] is not None)
+        del installedTrove, referencedTrove, localUpdates
+
         # Build the set of the incoming troves which are either already
         # installed or already referenced. This is purely for consistency
         # checking later on
@@ -522,9 +537,6 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in referencedTroves ]
 
         jobList = availableTrove.diff(existsTrv)[2]
-
-        import epdb
-        epdb.st('f')
 
         installJobs = [ x for x in jobList if x[1][0] is     None and
                                               x[2][0] is not None ]
@@ -576,21 +588,31 @@ class ClientUpdate:
                     continue
 
             replaced, pinned = jobByNew[newInfo]
+            replacedInfo = (newInfo[0], replaced[0], replaced[1])
             if replaced[0] is not None:
-                if (newInfo[0], replaced[0], replaced[1]) in referencedTroves:
+                if replacedInfo in referencedTroves:
                     # Don't install this trove because it's predecessor was not
                     # installed
                     continue
 
-                if not self.db.hasTrove(newInfo[0], replaced[0], replaced[1]):
+                if not self.db.hasTrove(*replacedInfo):
                     # relative changsets may specify items which aren't
                     # installed
                     continue
+
+                if replacedInfo in localUpdatesByPresent:
+                    # The trove being removed was explicitly updated to that
+                    # version. We don't want to replace that trove if it was
+                    # switched to a different branch
+                    if replacedInfo[1].branch() != \
+                                localUpdatesByPresent[replacedInfo][0].branch():
+                        continue
             elif not byDefault:
                 # This trove is being newly installed, but it's not supposed
                 # to be installed by default
                 continue
             elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
+                # New trove matches excludeTroves
                 continue
 
             if pinned and not ignorePins:
