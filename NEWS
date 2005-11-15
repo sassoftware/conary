@@ -17,8 +17,8 @@ Changes in 0.71.1:
     * Tracebacks during logged commands get copied to the log
     * Code which checked to see if a shadow has been locally modified didn't 
       work for shadows more than a single level deep
-    * Changesets will be used as a source for dependency resolution when
-      performing dependency resolution.
+    * When you are installing from changesets using --from-files, other troves
+      in the changesets can be used for dependency resolution
   o Build Changes (cvc)
     * Additional calls are emulated by the filename_wrapper for the
       r.Run calls.
