@@ -588,8 +588,8 @@ def main(argv):
 
     try:
         # if it is already in the repository, pull it out
-        repos.findTrove(cfg.buildLabel, recipe.packagename+':source',
-                        None, None)
+        repos.findTrove(cfg.buildLabel, (recipe.packagename+':source',
+                                         None, None))
         checkin.checkout(repos, cfg, packagedir, recipe.packagename)
     except errors.TroveNotFound:
         checkin.newPackage(repos, cfg, recipe.packagename)
