@@ -174,6 +174,7 @@ class StatWindow(gtk.Window):
 
         cols = (('Num calls', set_num_caller_calls, sort_num_calls),
                 ('Total time', set_t_time, sort_t_time),
+                ('Cumulative time', set_c_time, sort_c_time),
                 ('Parent function', set_func, sort_func))
         setup_tree_view(self.callerview, self.callerstore, cols)
         # set to number of calls, decending
@@ -205,6 +206,7 @@ class StatWindow(gtk.Window):
             caller.func = func
             caller. nc = nc
             caller. tt = stats.stats[func][2]
+            caller. ct = stats.stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Parent function')
@@ -220,6 +222,7 @@ class StatWindow(gtk.Window):
             caller.func = func
             caller. nc = nc
             caller. tt = stats.stats[func][2]
+            caller. ct = stats.stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Child function')
