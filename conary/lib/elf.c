@@ -156,12 +156,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	elf_getshstrndx (elf, &shstrndx);
 	name = elf_strptr (elf, shstrndx, shdr.sh_name);
 
-	if (NULL == name) {
-	    PyErr_SetString(ElfError, "section name is NULL");
-	    return 1;
-	}
-
-	if (shdr.sh_type == SHT_NOBITS) {
+	if (shdr.sh_type == SHT_NOBITS || name == NULL) {
 	    /* this section has no data, skip it */
 	    continue;
 	}
