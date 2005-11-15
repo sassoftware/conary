@@ -489,8 +489,18 @@ class ClientUpdate:
             names.add(job[0])
 
         # Build the set of all relative install jobs (transitive closure)
-        relativeUpdateJobs = set(job for job in transitiveClosure if
-                                    job[2][0] is not None and not job[3])
+        relativeUpdateJobs = [ job for job in transitiveClosure if
+                                    job[2][0] is not None and not job[3] ]
+        
+        # Look for relative updates whose sources are not currently installed
+        notPresent = [ i for i, isPresent in 
+            enumerate(self.db.hasTroves([ (x[0], x[1][0], x[1][1]) for x 
+                                            in relativeUpdateJobs ]))
+            if not isPresent ]
+        for idx in reversed(notPresent):
+            del relativeUpdateJobs[idx]
+
+        relativeUpdateJobs = set(relativeUpdateJobs)
 
         # Get all of the currently installed and referenced troves which
         # match something being installed absolute. Troves being removed
@@ -601,15 +611,15 @@ class ClientUpdate:
             replaced, pinned = jobByNew[newInfo]
             replacedInfo = (newInfo[0], replaced[0], replaced[1])
             if replaced[0] is not None:
-                if replacedInfo in referencedTroves:
+                if not isPrimary and replacedInfo in referencedTroves:
                     # Don't install this trove because it's predecessor was not
                     # installed
                     continue
 
                 if not self.db.hasTrove(*replacedInfo):
-                    # relative changsets may specify items which aren't
-                    # installed
-                    continue
+                    # We don't have the item we're updating from, so we
+                    # need to convert this to a new install
+                    replaced = (None, None)
 
                 if replacedInfo in localUpdatesByPresent:
                     # The trove being removed was explicitly updated to that
