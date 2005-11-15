@@ -489,18 +489,17 @@ class ClientUpdate:
             names.add(job[0])
 
         # Build the set of all relative install jobs (transitive closure)
-        relativeUpdateJobs = [ job for job in transitiveClosure if
-                                    job[2][0] is not None and not job[3] ]
+        relativeUpdateJobs = set(job for job in transitiveClosure if
+                                    job[2][0] is not None and not job[3])
         
         # Look for relative updates whose sources are not currently installed
-        notPresent = [ i for i, isPresent in 
-            enumerate(self.db.hasTroves([ (x[0], x[1][0], x[1][1]) for x 
-                                            in relativeUpdateJobs ]))
-            if not isPresent ]
-        for idx in reversed(notPresent):
-            del relativeUpdateJobs[idx]
-
-        relativeUpdateJobs = set(relativeUpdateJobs)
+        relativeUpdates = [ ((x[0], x[1][0], x[1][1]), job)
+                    for x in relativeUpdateJobs if x[1][0] is not None]
+        isPresent = self.db.hasTroves([ x[0] for x in relativeUpdates ])
+        for (info, job), isPresent in itertools.chain(relativeUpdates,
+                                                      isPresent):
+            if not isPresent:
+                relativeUpdateJobs.remove(job)
 
         # Get all of the currently installed and referenced troves which
         # match something being installed absolute. Troves being removed
@@ -624,9 +623,12 @@ class ClientUpdate:
                 if replacedInfo in localUpdatesByPresent:
                     # The trove being removed was explicitly updated to that
                     # version. We don't want to replace that trove if it was
-                    # switched to a different branch
-                    if replacedInfo[1].branch() != \
-                                localUpdatesByPresent[replacedInfo][0].branch():
+                    # switched to a different branch, unless the branch
+                    # it was switched to is the same as the branch for the
+                    # newer version.
+                    if (replacedInfo[1].branch() != \
+                          localUpdatesByPresent[replacedInfo][0].branch()) and \
+                       replacedInfo[1].branch() != newInfo[1].branch():
                         continue
             elif not byDefault:
                 # This trove is being newly installed, but it's not supposed
