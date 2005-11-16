@@ -412,21 +412,24 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         self.depDb.commit()
 
-        present = self.db.hasTroves([ (x[0].getName(), x[0].getOldVersion(),
+        if relative:
+            present = self.db.hasTroves([ 
+                                      (x[0].getName(), x[0].getOldVersion(),
                                        x[0].getOldFlavor()) for x in relative ])
-        for (trvCs, info), isPresent in itertools.izip(relative, present):
-            if not isPresent:
-                # FIXME: there is no such exception in this context
-                raise MissingTrove
-            
-            if info in self.troveCsMap:
-                # FIXME: there is no such exception in this context
-                raise DuplicateTrove
-            self.troveCsMap[info] = cs
-            self.jobMap[(info[0], (trvCs.getOldVersion(), 
-                                   trvCs.getOldFlavor()), 
-                         info[1:], trvCs.isAbsolute())] = \
-                                            (cs, includesFileContents)
+
+            for (trvCs, info), isPresent in itertools.izip(relative, present):
+                if not isPresent:
+                    # FIXME: there is no such exception in this context
+                    raise MissingTrove
+                
+                if info in self.troveCsMap:
+                    # FIXME: there is no such exception in this context
+                    raise DuplicateTrove
+                self.troveCsMap[info] = cs
+                self.jobMap[(info[0], (trvCs.getOldVersion(), 
+                                       trvCs.getOldFlavor()), 
+                             info[1:], trvCs.isAbsolute())] = \
+                                                (cs, includesFileContents)
 
         self.csList.append(cs)
 
