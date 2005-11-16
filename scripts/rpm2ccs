@@ -21,15 +21,14 @@ import stat
 import sys
 import tempfile
 
-import conary
-import checkin
-import conarycfg
-import rpmhelper
+from conary import checkin
+from conary import conarycfg
+from conary import rpmhelper
 
-from build import cook
-from lib import util
-from repository.netclient import NetworkRepositoryClient
-from repository import errors
+from conary.build import cook
+from conary.lib import util
+from conary.repository.netclient import NetworkRepositoryClient
+from conary.repository import errors
 
 
 chkconfigRe = re.compile(r'([ \t]*)(/sbin/)?chkconfig.*')
@@ -550,6 +549,7 @@ def main(argv):
         return usage()
 
     cfg = conarycfg.ConaryConfiguration()
+    cfg.initializeFlavors()
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
     create = CHANGESET
@@ -592,7 +592,7 @@ def main(argv):
                                          None, None))
         checkin.checkout(repos, cfg, packagedir, recipe.packagename)
     except errors.TroveNotFound:
-        checkin.newPackage(repos, cfg, recipe.packagename)
+        checkin.newTrove(repos, cfg, recipe.packagename)
 
     os.chdir(packagedir)
 

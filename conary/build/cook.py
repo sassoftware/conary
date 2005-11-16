@@ -211,7 +211,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     log.info("Building %s", recipeClass.name)
     if not use.Arch.keys():
 	log.error('No architectures have been defined in %s -- '
-		  'cooking is not possible' % cfg.archDir) 
+		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
 	sys.exit(1)
     try:
 	use.setBuildFlagsFromFlavor(recipeClass.name, cfg.buildFlavor)
