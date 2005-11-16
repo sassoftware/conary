@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Client Changes:
+    * The update-conary option has been renamed updateconary per
+      bugzilla #428
+
 Changes in 0.71.1:
   o Server Changes 
     * Added iterTroves() call which iterates over large numbers of troves

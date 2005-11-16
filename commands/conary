@@ -55,7 +55,7 @@ def usage(rc = 1):
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
-    print "       conary update-conary"
+    print "       conary updateconary"
     print "       conary usage"
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
@@ -463,7 +463,7 @@ def realMain(cfg, argv=sys.argv):
                                         tags, fullVersions, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
-    elif otherArgs[1] == "update-conary":
+    elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
     elif otherArgs[1] in ["update", "erase"]:

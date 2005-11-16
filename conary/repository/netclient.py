@@ -1199,7 +1199,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.InvalidServerVersion, \
                   ("While talking to " + hostInfo + " ...\n"
                    "Server protocol version does not have the "
-                   "necessary support for the update-conary call")
+                   "necessary support for the updateconary call")
         ver = version.trailingRevision()
         return self.c[version].getConaryUrl(self.fromVersion(ver),
                                             self.fromFlavor(flavor))
