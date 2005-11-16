@@ -337,6 +337,9 @@ class ClientUpdate:
 	    KEEP = 2
 	    UNKNOWN = 3
 
+            import epdb
+            epdb.st('f')
+
             jobQueue = util.IterableQueue()
             # The order of this chain matters. It's important that we handle
             # all of the erasures we already know about before getting to the
@@ -382,6 +385,8 @@ class ClientUpdate:
                 assert(oldInfo not in nodeIdx)
                 nodeIdx[oldInfo] = len(nodeList)
                 nodeList.append([ oldInfo, state, [], fromUpdate ])
+
+                if not recurse: continue
 
                 trv = self.db.getTrove(withFiles = False, pristine = False,
                                        *oldInfo)
@@ -475,6 +480,24 @@ class ClientUpdate:
 
         troveSource = uJob.getTroveSource()
 
+        import epdb
+        epdb.st('f')
+
+        # ineligible needs to be a transittve closure when recurse is set
+        if recurse:
+            itemQueue = util.IterableQueue()
+            newIneligible = []
+            for item in itertools.chain(ineligible, itemQueue):
+                newIneligible.append(item)
+                trv = self.db.getTrove(withFiles = False, *item)
+                if not trv.isCollection(): continue
+
+                for subItem in trv.iterTroveList():
+                    itemQueue.add(subItem)
+
+            ineligible = set(newIneligible)
+            del newIneligible, itemQueue
+
         # Build the trove which contains all of the absolute change sets
         # we may need to install. Build a set of all of the trove names
         # in that trove as well.
@@ -496,7 +519,7 @@ class ClientUpdate:
         relativeUpdates = [ ((x[0], x[1][0], x[1][1]), job)
                     for x in relativeUpdateJobs if x[1][0] is not None]
         isPresent = self.db.hasTroves([ x[0] for x in relativeUpdates ])
-        for (info, job), isPresent in itertools.chain(relativeUpdates,
+        for (info, job), isPresent in itertools.izip(relativeUpdates,
                                                       isPresent):
             if not isPresent:
                 relativeUpdateJobs.remove(job)
@@ -507,8 +530,10 @@ class ClientUpdate:
         # something else.
         installedTroves, referencedTroves = \
                             self.db.db.getCompleteTroveSet(names)
+        installedTroves.difference_update(ineligible)
         installedTroves.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
+        referencedTroves.difference_update(ineligible)
         referencedTroves.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
 
@@ -828,6 +853,9 @@ class ClientUpdate:
                 results.update(searchSource.findTroves(
                                            self.cfg.installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
+
+        import epdb
+        epdb.st('f')
 
         for troveSpec, (oldTroveInfo, isAbsolute) in \
                 itertools.chain(toFind.iteritems(), toFindNoDb.iteritems()):
