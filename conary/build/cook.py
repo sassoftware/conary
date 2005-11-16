@@ -995,11 +995,11 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
-            raise Cookerror, \
-                ("Cannot specify version string when cooking recipe file")
+            raise CookError, \
+                ("Must not specify version string when cooking recipe file")
 	if emerge:
 	    raise CookError, \
-		("troves must be emerged from directly from a repository")
+		("Troves must be emerged directly from a repository")
 
 	recipeFile = name
 
