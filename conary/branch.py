@@ -22,6 +22,8 @@ from conary import updatecmd
 from conary import versions
 from conary.lib import log
 from conaryclient import cmdline
+from conary.build.cook import signAbsoluteChangeset
+from conary.conarycfg import selectSignatureKey
 
 def _getBranchType(binaryOnly, sourceOnly):
     if binaryOnly and sourceOnly:
@@ -90,6 +92,10 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
                              default=False)
         if not okay: 
             return
+
+    sigKey = selectSignatureKey(cfg, newLabel)
+    if sigKey:
+        signAbsoluteChangeset(cs, sigKey)
 
     if not info:
         client.repos.commitChangeSet(cs)

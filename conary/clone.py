@@ -17,6 +17,8 @@ import sys
 from conary import versions
 from conary.conaryclient import ConaryClient, cmdline
 from conary.repository import netclient
+from conary.build.cook import signAbsoluteChangeset
+from conary.conarycfg import selectSignatureKey
 
 def displayCloneJob(cs):
     
@@ -55,6 +57,10 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
         okay = cmdline.askYn('continue with clone? [y/N]', default=False)
         if not okay:
             return
+
+    sigKey = selectSignatureKey(cfg, targetBranch.label().asString())
+    if sigKey:
+        signAbsoluteChangeset(cs, sigKey)
 
     if not info:
         client.repos.commitChangeSet(cs)
