@@ -520,56 +520,57 @@ class InstallBucket(policy.Policy):
     def test(self):
         return False
 
-def _markConfig(policy, filename, fullpath):
-    policy.dbg('config: %s', filename)
-    f = file(fullpath)
-    f.seek(0, 2)
-    if f.tell():
-	# file has contents
-	f.seek(-1, 2)
-	lastchar = f.read(1)
-	f.close()
-	if lastchar != '\n':
-	    policy.error("config file %s missing trailing newline" %filename)
-    f.close()
-    policy.recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
     """
-    Mark all files below /etc as config files:
-    C{r.EtcConfig(exceptions=I{filterexp})}
+    Deprecated class included only for backwards compatibility; use
+    C{Config} instead.
     """
-    invariantsubtrees = [ '%(sysconfdir)s', '%(taghandlerdir)s']
+    def updateArgs(self, *args, **keywords):
+        self.warn('EtcConfig deprecated, please use Config instead')
+        self.recipe.Config(*args, **keywords)
+    def do(self):
+        pass
 
-    def doFile(self, file):
-        m = self.recipe.magic[file]
+
+class Config(policy.Policy):
+    """
+    Mark all files below C{%(sysconfdir)s} (/etc) and
+    C{%(taghandlerdir)s} as config files; exceptions as
+    C{r.Config(exceptions=I{filterexp})}
+    Mark explicit inclusions as config files:
+    C{r.Config(I{filterexp})}
+    """
+    invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
+
+    def doFile(self, filename):
+        m = self.recipe.magic[filename]
 	if m and m.name == "ELF":
 	    # an ELF file cannot be a config file, some programs put
 	    # ELF files under /etc (X, for example), and tag handlers
 	    # can be ELF or shell scripts; we just want tag handlers
 	    # to be config files if they are shell scripts.
 	    # Just in case it was not intentional, warn...
-            self.dbg('ELF file %s found in config directory', file)
+            if self.macros.sysconfdir in filename:
+                self.dbg('ELF file %s found in config directory', filename)
 	    return
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self, file, fullpath)
-
-
-class Config(policy.Policy):
-    """
-    Mark only explicit inclusions as config files:
-    C{r.Config(I{filterexp})}
-    """
-
-    # change inclusions to default to none, instead of all files
-    keywords = policy.Policy.keywords.copy()
-    keywords['inclusions'] = []
-
-    def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self, filename, fullpath)
+	    self._markConfig(filename, fullpath)
+
+    def _markConfig(self, filename, fullpath):
+        self.dbg(filename)
+        f = file(fullpath)
+        f.seek(0, 2)
+        if f.tell():
+            # file has contents
+            f.seek(-1, 2)
+            lastchar = f.read(1)
+            f.close()
+            if lastchar != '\n':
+                self.error("config file %s missing trailing newline" %filename)
+        f.close()
+        self.recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 
 class InitialContents(policy.Policy):
@@ -585,7 +586,7 @@ class InitialContents(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-        self.recipe.EtcConfig(exceptions=args)
+        self.recipe.Config(exceptions=args)
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
