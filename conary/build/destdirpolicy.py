@@ -791,7 +791,9 @@ class NormalizeCompression(policy.Policy):
         # pipeline is faster in a multiprocessing environment
 
         def _mktmp(fullpath):
-            return tempfile.mkstemp('.temp', '', os.path.dirname(fullpath))[1]
+            fd, path = tempfile.mkstemp('.temp', '', os.path.dirname(fullpath))
+            os.close(fd)
+            return path
 
         def _move(tmppath, fullpath):
             os.chmod(tmppath, os.lstat(fullpath).st_mode)
