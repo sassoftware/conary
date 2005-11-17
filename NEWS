@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Client Changes:
     * The update-conary option has been renamed updateconary per
       bugzilla #428
+  o Build Changes:
+    * Combined the EtcConfig and Config policies, and deprecated
+      the EtcConfig policy.
 
 Changes in 0.71.1:
   o Server Changes 
