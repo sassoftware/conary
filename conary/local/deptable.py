@@ -1138,7 +1138,7 @@ class DependencyTables:
         self.db.rollback()
         return result
 
-    def resolveToIds(self, depSetList):
+    def _resolveToIds(self, depSetList, restrictor=None, restrictBy=None):
         """ Resolve dependencies, leaving the results as instanceIds
         """
         selectTemplate = """SELECT depNum, provInstanceId FROM (%s)"""
@@ -1157,6 +1157,10 @@ class DependencyTables:
 
         self.db.rollback()
         return result
+        
+    def resolveToIds(self, depSetList):
+        return self._resolveToIds(depSetList)
+       
 
     def getLocalProvides(self, depSetList):
         cu = self.db.cursor()
