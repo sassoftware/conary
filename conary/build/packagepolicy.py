@@ -231,6 +231,45 @@ class ImproperlyShared(policy.Policy):
                 self.error("Possibly architecture-specific file %s in shared data directory", file)
 
 
+class CheckDesktopFiles(policy.Policy):
+    """
+    Warns about possible errors in desktop files, such as missing icon
+    files; C{r.CheckDesktopFiles(exceptions=I{filterexp}} if (for
+    example) an icon is provided somehow, directly or indirectly, by a
+    runtime requirement of this package.
+    """
+    invariantsubtrees = [ '%(datadir)s/applications/' ]
+    invariantinclusions = [ r'.*\.desktop' ]
+
+    def doFile(self, filename):
+        self.checkIcon(filename)
+
+    def checkIcon(self, filename):
+        fullname = self.macros.destdir + '/' + filename
+        iconfiles = [x.split('=', 1)[1].strip()
+                     for x in file(fullname).readlines()
+                     if x.startswith('Icon=')]
+        for iconfilename in iconfiles:
+            if iconfilename.startswith('/'):
+                fulliconfilename = self.macros.destdir + '/' + iconfilename
+                if not os.path.exists(fulliconfilename):
+                    self.error('%s says Icon=%s must exist, but is missing',
+                               filename, iconfilename)
+            elif '/' in iconfilename:
+                self.error('Illegal line Icon=%s in %s',
+                           iconfilename, filename)
+            else:
+                fulldatadir = self.macros.destdir + '/' + self.macros.datadir
+                for root, dirs, files in os.walk(fulldatadir):
+                    if iconfilename in files:
+                        return
+                # didn't find anything
+                self.error('%s says Icon=%s must exist, but it does not exist'
+                           ' anywhere in %s',
+                           filename, iconfilename, self.macros.datadir)
+
+
+
 class CheckSonames(policy.Policy):
     """
     Warns about various possible shared library packaging errors:
@@ -2461,6 +2500,7 @@ def DefaultPolicy(recipe):
         NonMultilibComponent(recipe),
         NonMultilibDirectories(recipe),
 	ImproperlyShared(recipe),
+        CheckDesktopFiles(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),
 	CheckDestDir(recipe),

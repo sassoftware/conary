@@ -11,6 +11,9 @@ Changes in @NEW@:
     * A use flag has been added for xen defaulting to 'sense prefernot'.  This
       flag should be used to specify flavors for xen domU builds where special
       provisions are made for paravirtualized domU.
+    * Added new CheckDesktopFiles policy to catch some more common errors
+      in .desktop files.  (For now, it looks for common cases of missing
+      icons; more may be added over time.)
 
 Changes in 0.71.1:
   o Server Changes 
