@@ -51,7 +51,7 @@ def recurseTroveInfo(repos, trvInfo):
         trvs.extend(recurseTroveInfo(repos, subTrvInfo))
     return trvs
 
-def signTroves(cfg, specStrList, callback = 0):
+def signTroves(cfg, specStrList, recurse = False, callback = 0):
     troveStr = ""
     troves = []
     trv = []
@@ -75,11 +75,14 @@ def signTroves(cfg, specStrList, callback = 0):
             troveStr += str(trvInfo[0]) + str(trvInfo[1].asString()) + " " + str(trvInfo[2]) + "\n"
 
         for trvInfo in trvList:
-            troves.extend(recurseTroveInfo(repos, trvInfo))
+            if recurse:
+                troves.extend(recurseTroveInfo(repos, trvInfo))
+            else:
+                troves.append(trvInfo)
         for trvInfo in troves:
             trv.append(repos.getTrove(trvInfo[0],trvInfo[1],trvInfo[2],True))
 
-    if cfg.quiet:
+    if not cfg.interactive:
         answer = "Y"
     else:
         print troveStr

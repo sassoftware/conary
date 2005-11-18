@@ -142,6 +142,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
+    argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
@@ -176,7 +177,6 @@ def realMain(cfg, argv=sys.argv):
 
     context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
-
 
     if context:
         cfg.setContext(context)
@@ -313,7 +313,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         if argSet.has_key('quiet'):
             cfg.quiet = True
             del argSet['quiet']
-        signtrove.signTroves(cfg, args[1:])
+        recurse = argSet.pop('recurse', False)
+        signtrove.signTroves(cfg, args[1:], recurse)
     elif (args[0] == "newpkg"):
         dir = argSet.pop('dir', None)
 
