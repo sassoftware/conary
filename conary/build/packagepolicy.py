@@ -350,6 +350,59 @@ class CheckDestDir(policy.Policy):
                                     file, rpath)
                         break
 
+
+class EtcConfig(policy.Policy):
+    """
+    Deprecated class included only for backwards compatibility; use
+    C{Config} instead.
+    """
+    def updateArgs(self, *args, **keywords):
+        self.warn('EtcConfig deprecated, please use Config instead')
+        self.recipe.Config(*args, **keywords)
+    def do(self):
+        pass
+
+
+class Config(policy.Policy):
+    """
+    Mark all files below C{%(sysconfdir)s} (/etc) and
+    C{%(taghandlerdir)s} as config files; exceptions as
+    C{r.Config(exceptions=I{filterexp})}
+    Mark explicit inclusions as config files:
+    C{r.Config(I{filterexp})}
+    """
+    invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
+
+    def doFile(self, filename):
+        m = self.recipe.magic[filename]
+        if m and m.name == "ELF":
+            # an ELF file cannot be a config file, some programs put
+            # ELF files under /etc (X, for example), and tag handlers
+            # can be ELF or shell scripts; we just want tag handlers
+            # to be config files if they are shell scripts.
+            # Just in case it was not intentional, warn...
+            if self.macros.sysconfdir in filename:
+                self.dbg('ELF file %s found in config directory', filename)
+            return
+        fullpath = self.macros.destdir + filename
+        if os.path.isfile(fullpath) and util.isregular(fullpath):
+            self._markConfig(filename, fullpath)
+
+    def _markConfig(self, filename, fullpath):
+        self.dbg(filename)
+        f = file(fullpath)
+        f.seek(0, 2)
+        if f.tell():
+            # file has contents
+            f.seek(-1, 2)
+            lastchar = f.read(1)
+            f.close()
+            if lastchar != '\n':
+                self.error("config file %s missing trailing newline" %filename)
+        f.close()
+        self.recipe.ComponentSpec(_config=filename)
+
+
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
@@ -439,6 +492,13 @@ class ComponentSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
 
+    def updateArgs(self, *args, **keywords):
+        if '_config' in keywords:
+            config=keywords.pop('_config')
+            self.recipe.PackageSpec(_config=config)
+            self.extraFilters.append(('config', util.literalRegex(config)))
+	_filterSpec.updateArgs(self, *args, **keywords)
+
     def doProcess(self, recipe):
 	compFilters = []
 	self.macros = recipe.macros
@@ -467,6 +527,7 @@ class ComponentSpec(_filterSpec):
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
 
+
 class PackageSpec(_filterSpec):
     """
     Determines which package (and optionally also component) each file is in:
@@ -480,8 +541,11 @@ class PackageSpec(_filterSpec):
         needed by C{PackageSpec}.
         """
         _filterSpec.__init__(self, *args, **keywords)
+        self.configFiles = []
         
     def updateArgs(self, *args, **keywords):
+        if '_config' in keywords:
+            self.configFiles.append(keywords.pop('_config'))
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             newTrove = args[0] % self.recipe.macros
@@ -510,6 +574,11 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
+        # flag all config files
+        for confname in self.configFiles:
+            self.recipe.autopkg.pathMap[confname].flags.isConfig(True)
+
+
 class InstallBucket(policy.Policy):
     """
     Stub for older recipes
@@ -519,58 +588,6 @@ class InstallBucket(policy.Policy):
 
     def test(self):
         return False
-
-
-class EtcConfig(policy.Policy):
-    """
-    Deprecated class included only for backwards compatibility; use
-    C{Config} instead.
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('EtcConfig deprecated, please use Config instead')
-        self.recipe.Config(*args, **keywords)
-    def do(self):
-        pass
-
-
-class Config(policy.Policy):
-    """
-    Mark all files below C{%(sysconfdir)s} (/etc) and
-    C{%(taghandlerdir)s} as config files; exceptions as
-    C{r.Config(exceptions=I{filterexp})}
-    Mark explicit inclusions as config files:
-    C{r.Config(I{filterexp})}
-    """
-    invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
-
-    def doFile(self, filename):
-        m = self.recipe.magic[filename]
-	if m and m.name == "ELF":
-	    # an ELF file cannot be a config file, some programs put
-	    # ELF files under /etc (X, for example), and tag handlers
-	    # can be ELF or shell scripts; we just want tag handlers
-	    # to be config files if they are shell scripts.
-	    # Just in case it was not intentional, warn...
-            if self.macros.sysconfdir in filename:
-                self.dbg('ELF file %s found in config directory', filename)
-	    return
-	fullpath = self.macros.destdir + filename
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    self._markConfig(filename, fullpath)
-
-    def _markConfig(self, filename, fullpath):
-        self.dbg(filename)
-        f = file(fullpath)
-        f.seek(0, 2)
-        if f.tell():
-            # file has contents
-            f.seek(-1, 2)
-            lastchar = f.read(1)
-            f.close()
-            if lastchar != '\n':
-                self.error("config file %s missing trailing newline" %filename)
-        f.close()
-        self.recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 
 class InitialContents(policy.Policy):
@@ -1525,8 +1542,6 @@ class ComponentRequires(policy.Policy):
             'data': frozenset(('lib', 'runtime', 'devellib')),
             'devellib': frozenset(('devel',)),
             'lib': frozenset(('devel', 'devellib', 'runtime')),
-            # while config is not an automatic component, its meaning
-            # is standardized
             'config': frozenset(('runtime', 'lib', 'devellib', 'devel')),
         }
         self.overridesMap = {}
@@ -2449,11 +2464,11 @@ def DefaultPolicy(recipe):
 	CheckSonames(recipe),
         RequireChkconfig(recipe),
 	CheckDestDir(recipe),
+	EtcConfig(recipe),
+	Config(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
         InstallBucket(recipe),
-	EtcConfig(recipe),
-	Config(recipe),
 	InitialContents(recipe),
 	Transient(recipe),
 	SharedLibrary(recipe),

@@ -5,6 +5,8 @@ Changes in @NEW@:
   o Build Changes:
     * Combined the EtcConfig and Config policies, and deprecated
       the EtcConfig policy.
+    * All config files default to being put into a :config component.
+      This is overridden by any ComponentSpec specifications in the recipe.
 
 Changes in 0.71.1:
   o Server Changes 
