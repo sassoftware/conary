@@ -3,6 +3,9 @@ Changes in @NEW@:
     * The update-conary option has been renamed updateconary per
       bugzilla #428
     * buildPath can be set in contexts
+    * cvc co <foo> will work even if there are two foos on the same label with
+      different branches.  In that case, it will warn about the older foo 
+      which it doesn't check out
   o Build Changes:
     * Combined the EtcConfig and Config policies, and deprecated
       the EtcConfig policy.
