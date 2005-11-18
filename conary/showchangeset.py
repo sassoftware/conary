@@ -177,11 +177,12 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                                                      tags=tags, sha1s=sha1s,
                                                      pathId=pathId, pathIds=ids)
                     printedData = True
-            if printedData:
-                print
             if deps:
                 depformat('Requires', trove.getRequires())
                 depformat('Provides', trove.getProvides())
+                printedData = True
+            if printedData:
+                print
         for (troveName, version, flavor) in cs.oldTroves:
             print "remove %s %s" % (troveName, version.asString())
 
