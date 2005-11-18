@@ -372,8 +372,9 @@ class ConaryContext(ConfigSection):
         by the values in the context that have been set.  Values that are 
         unset in the context do not override the default config values.
     """
-    defaults = { 'buildFlavor'      : [FLAVOR,    None],
-                 'buildLabel'       : [LABEL,     None],
+    defaults = { 'buildFlavor'      : [ FLAVOR,    None],
+                 'buildLabel'       : [ LABEL,     None],
+                 'buildPath'        : [ PATH,      None],
                  'flavor'           : [ FLAVORLIST, [] ],
                  'installLabelPath' : [ LABELLIST, None],
                  'contact'	    : None,
