@@ -7,6 +7,9 @@ Changes in @NEW@:
       the EtcConfig policy.
     * All config files default to being put into a :config component.
       This is overridden by any ComponentSpec specifications in the recipe.
+    * A use flag has been added for xen defaulting to 'sense prefernot'.  This
+      flag should be used to specify flavors for xen domU builds where special
+      provisions are made for paravirtualized domU.
 
 Changes in 0.71.1:
   o Server Changes 
