@@ -17,7 +17,6 @@ checking in changes; checking out the latest version; displaying logs
 and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
-import copy
 import difflib
 import os
 import sys
@@ -35,13 +34,14 @@ from conary.build import cook, recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.conarycfg import selectSignatureKey
+from conary.conaryclient import cmdline
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import openpgpfile
-from conary.lib import sha1helper
 from conary.lib import util
 from conary.local import update
 from conary.repository import changeset, errors
+from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
@@ -52,230 +52,6 @@ class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
 # makePathId() returns 16 random bytes, for use as a pathId
 makePathId = lambda: os.urandom(16)
 
-class ConaryState:
-
-    def __init__(self, context=None, source=None):
-        self.context = context
-        self.source = source
-
-    def write(self, filename):
-	f = open(filename, "w")
-        self._write(f)
-        if self.hasSourceState():
-            self.source._write(f)
-            
-    def _write(self, f):
-        if self.getContext():
-            f.write("context %s\n" % self.getContext())
-
-    def hasContext(self):
-        return bool(self.context )
-
-    def getContext(self):
-        return self.context 
-
-    def setContext(self, name):
-        self.context = name
-
-    def getSourceState(self):
-        if not self.source:
-            raise ConaryStateError, 'No source state defined in CONARY'
-        return self.source
-
-    def setSourceState(self, sourceState):
-        self.source = sourceState
-
-    def hasSourceState(self):
-        return bool(self.source)
-
-    def copy(self):
-        if self.hasSourceState():
-            sourceState = self.getSourceState().copy()
-        else:
-            sourceState = None
-        return ConaryState(self.context, sourceState)
-        
-class SourceState(trove.Trove):
-
-    __slots__ = [ "branch", "pathMap", "lastMerged" ]
-
-    def setPathMap(self, map):
-        self.pathMap = map
-
-    def removeFilePath(self, file):
-	for (pathId, path, fileId, version) in self.iterFileList():
-	    if path == file: 
-		self.removeFile(pathId)
-		return True
-
-	return False
-
-    def _write(self, f):
-        """
-	Returns a string representing file information for this trove
-	trove, which can later be read by the read() method. This is
-	only used to create the Conary control file when dealing with
-	:source component checkins, so things like trove dependency
-	information is not needed.  The format of the string is:
-
-	<file count>
-	PATHID1 PATH1 FILEID1 VERSION1
-	PATHID2 PATH2 FILEID2 VERSION2
-	.
-	.
-	.
-	PATHIDn PATHn FILEIDn VERSIONn
-	"""
-        assert(len(self.troves) == 0)
-
-        f.write("name %s\n" % self.getName())
-        f.write("version %s\n" % self.getVersion().freeze())
-        f.write("branch %s\n" % self.getBranch().freeze())
-        if self.getLastMerged() is not None:
-            f.write("lastmerged %s\n" % self.getLastMerged().freeze())
-
-        rc = []
-        rc.append("%d\n" % (len(self.idMap)))
-
-        rc += [ "%s %s %s %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
-                                sha1helper.sha1ToString(x[1][1]),
-                                x[1][2].asString())
-                for x in self.idMap.iteritems() ]
-
-	f.write("".join(rc))
-
-
-    def changeBranch(self, branch):
-	self.branch = branch
-
-    def getBranch(self):
-        return self.branch
-
-    def setLastMerged(self, ver = None):
-        self.lastMerged = ver
-
-    def getLastMerged(self):
-        return self.lastMerged
-
-    def getRecipeFileName(self):
-        # XXX this is not the correct way to solve this problem
-        # assumes a fully qualified trove name
-        name = self.getName().split(':')[0]
-        return os.path.join(os.getcwd(), name + '.recipe')
-
-    def expandVersionStr(self, versionStr):
-	if versionStr[0] == "@":
-	    # get the name of the repository from the current branch
-	    repName = self.getVersion().branch().label().getHost()
-	    return repName + versionStr
-	elif versionStr[0] != "/" and versionStr.find("@") == -1:
-	    # non fully-qualified version; make it relative to the current
-	    # branch
-	    return self.getVersion().branch().asString() + "/" + versionStr
-
-	return versionStr
-
-    def copy(self, classOverride = None):
-        new = trove.Trove.copy(self, classOverride = classOverride)
-        new.branch = self.branch.copy()
-        new.pathMap = copy.copy(self.pathMap)
-        if self.lastMerged:
-            new.lastMerged = self.lastMerged.copy()
-        else:
-            new.lastMerged = None
-        return new
-
-    def __init__(self, name, version, branch, changeLog = None, 
-                 lastmerged = None, isRedirect = False):
-        assert(not isRedirect)
-        assert(not changeLog)
-
-	trove.Trove.__init__(self, name, version, 
-                             deps.deps.DependencySet(), None)
-        self.branch = branch
-        self.pathMap = {}
-        self.lastMerged = lastmerged
-
-class ConaryStateFromFile(ConaryState):
-
-    def parseFile(self, filename):
-	f = open(filename)
-        lines = f.readlines()
-
-	fields = lines[0][:-1].split()
-        if fields[0] == 'context':
-            self.context = fields[1]
-            lines = lines[1:]
-        else:
-            self.context = None
-
-        if lines:
-            self.source = SourceStateFromLines(lines)
-        else:
-            self.source = None
-
-    def __init__(self, file):
-	if not os.path.isfile(file):
-	    raise CONARYFileMissing
-
-	self.parseFile(file)
-        
-
-class SourceStateFromLines(SourceState):
-
-    # name : (isVersion, required)
-    fields = { 'name'       : (False, True ),
-               'version'    : (True,  True ),
-               'branch'     : (True,  True ),
-               'lastmerged' : (True,  False) }
-
-    def readFileList(self, lines):
-	fileCount = int(lines[0][:-1])
-
-        for line in lines[1:]:
-            # chop
-            line = line[:-1]
-	    fields = line.split()
-	    pathId = sha1helper.md5FromString(fields.pop(0))
-	    version = fields.pop(-1)
-	    fileId = sha1helper.sha1FromString(fields.pop(-1))
-	    path = " ".join(fields)
-
-	    version = versions.VersionFromString(version)
-	    self.addFile(pathId, path, version, fileId)
-
-    def parseLines(self, lines):
-        kwargs = {}
-
-        while lines:
-	    fields = lines[0][:-1].split()
-
-            # the file count ends the list of fields
-            if len(fields) == 1: break
-	    assert(len(fields) == 2)
-            del lines[0]
-
-	    what = fields[0]
-            assert(not kwargs.has_key(what))
-            isVer = self.fields[what][0]
-
-	    if isVer:
-                kwargs[what] = versions.ThawVersion(fields[1])
-	    else:
-                kwargs[what] = fields[1]
-
-        required = set([ x[0] for x in self.fields.items() if x[1][1] ])
-        assert((set(kwargs.keys()) & required) == required)
-
-	SourceState.__init__(self, **kwargs)
-
-	self.readFileList(lines)
-
-    def __init__(self, lines):
-        self.parseLines(lines)
-
-    def copy(self):
-        return SourceState.copy(self, classOverride = SourceState)
 
 def _verifyAtHead(repos, headPkg, state):
     # get the latest version on our branch
@@ -341,22 +117,29 @@ def checkout(repos, cfg, workDir, name, callback=None):
         callback = CheckinCallback()
 
     # We have to be careful with labels
-    parts = name.split('=', 1) 
-    if len(parts) == 1:
-        versionStr = None
-    else:
-        versionStr = parts[1]
-        name = parts[0]
-    name += ":source"
+    name, versionStr, flavor = cmdline.parseTroveSpec(name)
+    if flavor:
+        log.error('source troves do not have flavors')
+        return
+        
+    sourceName = name + ":source"
     try:
-        trvList = repos.findTrove(cfg.buildLabel, (name, versionStr, None))
+        trvList = repos.findTrove(cfg.buildLabel, 
+                                  (sourceName, versionStr, None))
     except errors.TroveNotFound, e:
         log.error(str(e))
         return
     if len(trvList) > 1:
-	log.error("branch %s matches more than one version", versionStr)
-	return
-    trvInfo = trvList[0]
+        trvList.sort()
+
+        notSelected = [ '%s=%s' % (name, x[1].branch()) for x in trvList[1:]]
+        log.warning('The following source branches were matched by your'
+                    ' checkout command but not chosen.  To check them out'
+                    ' use cvc co %s=<branch> for the following branches:\n\n'
+                    ' %s\n' % (name, '\n'.join(notSelected)))
+        trvInfo = trvList[-1]
+    else:
+        trvInfo = trvList[0]
 	
     if not workDir:
 	workDir = trvInfo[0].split(":")[0]
@@ -1410,14 +1193,3 @@ def setContext(cfg, contextName=None, ask=False):
 
     state.setContext(contextName)
     state.write('CONARY')
-
-class ConaryStateError(Exception):
-    pass
-
-class CONARYFileMissing(ConaryStateError):
-    """
-    This exception is raised when the CONARY file specified does not
-    exist
-    """
-    def __str__(self):
-        return 'CONARY state file does not exist.'

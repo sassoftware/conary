@@ -40,6 +40,7 @@ from conary.local import database
 from conary.repository import changeset, errors, filecontents
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.repository.netclient import NetworkRepositoryClient
+from conary.state import ConaryStateFromFile
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -902,10 +903,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     srcName = name + ':source'
     sourceVerison = None
     if os.path.exists('CONARY'):
-        # FIXME checkin imports cook functions as well, perhaps move
-        # SourceState or some functions here to a third file?
-        from conary import checkin
-        conaryState = checkin.ConaryStateFromFile('CONARY')
+        conaryState = ConaryStateFromFile('CONARY')
         if conaryState.hasSourceState():
             state = conaryState.getSourceState()
             if state.getName() == srcName and \

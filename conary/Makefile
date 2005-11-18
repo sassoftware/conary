@@ -39,6 +39,7 @@ python_files = __init__.py	\
 	rollbacks.py		\
 	rpmhelper.py		\
         showchangeset.py        \
+	state.py		\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
