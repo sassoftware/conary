@@ -897,7 +897,7 @@ class NormalizeManPages(policy.Policy):
 		if len(lines) == 1:
 		    line = lines[0]
 		    # remove newline and other trailing whitespace if it exists
-		    line = line.rstrip() # chop-chop
+		    line = line.rstrip()
 		    match = self.soexp.search(line)
 		    if match:
 			matchlist = match.group(1).split('/')
@@ -906,7 +906,8 @@ class NormalizeManPages(policy.Policy):
 			    # no directory specified, or in the same
 			    # directory:
 			    targetpath = os.sep.join((dirname, matchlist[l-1]))
-			    if os.path.exists(targetpath):
+			    if (os.path.exists(targetpath) and
+                                os.path.isfile(targetpath)):
                                 self.dbg('replacing %s (%s) with symlink %s',
                                          name, match.group(0),
                                          os.path.basename(match.group(1)))
