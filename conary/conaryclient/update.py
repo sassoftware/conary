@@ -691,7 +691,8 @@ class ClientUpdate:
                 newTroves.append((info, False, pinned and ignorePins, 
                                   trv.includeTroveByDefault(*info)))
 
-	eraseSet = _findErasures(erasePrimaries, newJob, set(), recurse)
+	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
+                                 recurse)
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
 
