@@ -666,7 +666,7 @@ class ClientUpdate:
             trv = troveSource.getTrove(withFiles = False, *newInfo)
 
             if pinned:
-                if replacedInfo[1]:
+                if replaced[0] is not None:
                     # try and install the two troves next to each other
                     assert(replacedInfo[1] is not None)
                     oldTrv = self.db.getTrove(withFiles = False, 
@@ -678,7 +678,8 @@ class ClientUpdate:
 
                     if newHashes.compatibleWith(oldHashes):
                         replaced = (None, None)
-                elif not ignorePins:
+
+                if replaced[0] is not None and not ignorePins:
                     continue
 
             newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), False))
