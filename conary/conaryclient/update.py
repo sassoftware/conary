@@ -337,21 +337,22 @@ class ClientUpdate:
 	    KEEP = 2
 	    UNKNOWN = 3
 
-            import epdb
-            epdb.st('f')
-
             jobQueue = util.IterableQueue()
             # The order of this chain matters. It's important that we handle
             # all of the erasures we already know about before getting to the
             # ones which are implicit. That gets the state right for ones
             # which are explicit (since arriving there implicitly gets
             # ignored)
-            for job in itertools.chain(primaryErases, newJob, jobQueue):
-                if job[1][0] is None: 
-                    # skip new installs
-                    continue  
+            for job, ignorePins in itertools.chain(
+                        itertools.izip(primaryErases, itertools.repeat(True)), 
+                        itertools.izip(newJob, itertools.repeat(False)),
+                        jobQueue):
 
                 oldInfo = (job[0], job[1][0], job[1][1])
+
+                if oldInfo[1] is None: 
+                    # skip new installs
+                    continue  
 
                 if oldInfo in nodeIdx:
                     # See the note above about chain order (this wouldn't
@@ -361,6 +362,9 @@ class ClientUpdate:
                 if not self.db.hasTrove(*oldInfo):
                     # no need to erase something we don't have installed
                     continue
+
+                # XXX this needs to be batched
+                pinned = self.db.trovesArePinned([ oldInfo ])[0]
 
                 # primary erasures and erasures which are part of an
                 # update are guaranteed to occur
@@ -373,9 +377,8 @@ class ClientUpdate:
                     state = ERASE
                     fromUpdate = True
                 else:
-                    # If it's pinned, we keep it. XXX this needs to be
-                    # batched
-                    if self.db.trovesArePinned([ oldInfo ])[0]:
+                    # If it's pinned, we keep it.
+                    if not ignorePins and pinned:
                         state = KEEP
                     else:
                         state = UNKNOWN
@@ -393,8 +396,8 @@ class ClientUpdate:
                 if not trv.isCollection(): continue
 
                 for inclInfo in trv.iterTroveList():
-                    jobQueue.add((inclInfo[0], inclInfo[1:], (None, None), 
-                                  False))
+                    jobQueue.add(((inclInfo[0], inclInfo[1:], (None, None), 
+                                  False), pinned and ignorePins))
 
             # For nodes which we haven't decided to erase, we need to track
             # down all of the collections which include those troves.
@@ -446,8 +449,8 @@ class ClientUpdate:
             return set(eraseList)
 
 
-        def _getPathHashes(trvSrc, db, trv, isCollection, inDb = False):
-            if not isCollection: return trv.getPathHashes()
+        def _getPathHashes(trvSrc, db, trv, inDb = False):
+            if not trv.isCollection(): return trv.getPathHashes()
 
             ph = None
             for info in trv.iterTroveList():
@@ -480,10 +483,7 @@ class ClientUpdate:
 
         troveSource = uJob.getTroveSource()
 
-        import epdb
-        epdb.st('f')
-
-        # ineligible needs to be a transittve closure when recurse is set
+        # ineligible needs to be a transitive closure when recurse is set
         if recurse:
             itemQueue = util.IterableQueue()
             newIneligible = []
@@ -663,12 +663,26 @@ class ClientUpdate:
                 # New trove matches excludeTroves
                 continue
 
-            if pinned and not ignorePins:
-                continue
+            trv = troveSource.getTrove(withFiles = False, *newInfo)
+
+            if pinned:
+                if replacedInfo[1]:
+                    # try and install the two troves next to each other
+                    assert(replacedInfo[1] is not None)
+                    oldTrv = self.db.getTrove(withFiles = False, 
+                                              pristine = False, *replacedInfo)
+                    oldHashes = _getPathHashes(troveSource, self.db, oldTrv, 
+                                               inDb = True)
+                    newHashes = _getPathHashes(uJob.getTroveSource(), self.db,
+                                               trv, inDb = False)
+
+                    if newHashes.compatibleWith(oldHashes):
+                        replaced = (None, None)
+                elif not ignorePins:
+                    continue
 
             newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), False))
 
-            trv = troveSource.getTrove(withFiles = False, *newInfo)
             if not trv.isCollection(): continue
             if not recurse: continue
 
@@ -853,9 +867,6 @@ class ClientUpdate:
                 results.update(searchSource.findTroves(
                                            self.cfg.installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
-
-        import epdb
-        epdb.st('f')
 
         for troveSpec, (oldTroveInfo, isAbsolute) in \
                 itertools.chain(toFind.iteritems(), toFindNoDb.iteritems()):
