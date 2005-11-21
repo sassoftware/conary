@@ -456,6 +456,7 @@ class Database:
 	self.db._begin()
 
     def rollback(self):
+        self.needsCleanup = False
 	self.db.rollback()
 
     def versionCheck(self):

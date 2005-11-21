@@ -541,6 +541,7 @@ class Database(SqlDbRepository):
             for err in errList: log.error(err)
             raise CommitError, 'file system job contains errors'
         if test:
+            self.db.rollback()
             return
 
         if not justDatabase:

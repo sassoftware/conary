@@ -6,6 +6,8 @@ Changes in @NEW@:
     * cvc co <foo> will work even if there are two foos on the same label with
       different branches.  In that case, it will warn about the older foo 
       which it doesn't check out
+    * Test mode didn't work for updates and erases which were split into
+      multiple jobs
   o Build Changes:
     * Combined the EtcConfig and Config policies, and deprecated
       the EtcConfig policy.
