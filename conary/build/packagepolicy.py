@@ -1907,7 +1907,14 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires(rpath=(I{filterExp}, I{RPATH}))} calls, which are
     tested in the order provided.  The C{I{RPATH}} is a standard
     Unix-style path string containing one or more directory names,
-    separated only by colon characters.
+    separated only by colon characters, except for one significant
+    change: Each path component is interpreted using shell-style globs,
+    which are checked first in the C{%(destdir)s} and then on the
+    installed system.  (The globs are useful for cases like perl
+    where statically determining the entire content of the path
+    is difficult.  Use globs only for variable parts of paths; be
+    as specific as you can without using the glob feature any more
+    than necessary.)
 
     Executables that use C{dlopen()} to open a shared library will
     not automatically have a dependency on that shared library.
@@ -1982,11 +1989,31 @@ class Requires(_addInfo, _BuildPackagePolicy):
             if dep.getName()[0] in self._privateDepMap:
                 found = True
 
-        def _canonicalRPATH(rpath):
+        def appendUnique(ul, items):
+            for item in items:
+                if item not in ul:
+                    ul.append(item)
+
+        def _canonicalRPATH(rpath, glob=False):
             # normalize all elements of RPATH
             l = [ os.path.normpath(x) for x in rpath.split(':') ]
-            # prune system paths from RPATH
-            l = [ x for x in l if x not in self.systemLibPaths ]
+            # prune system paths and relative paths from RPATH
+            l = [ x for x in l
+                  if x not in self.systemLibPaths and x.startswith('/') ]
+            if glob:
+                destdir = self.macros.destdir
+                dlen = len(destdir)
+                gl = []
+                for item in l:
+                    # prefer destdir elements
+                    paths = util.braceGlob(destdir + '/' + item)
+                    paths = [ os.path.normpath(x[dlen:]) for x in paths ]
+                    appendUnique(gl, paths)
+                    # then look on system
+                    paths = util.braceGlob(item)
+                    paths = [ os.path.normpath(x) for x in paths ]
+                    appendUnique(gl, paths)
+                l = gl
             return l
 
         # fixup should come first so that its path elements can override
@@ -1994,7 +2021,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if self.rpathFixup:
             for f, rpath in self.rpathFixup:
                 if f.match(path):
-                    rpathList = _canonicalRPATH(rpath)
+                    # synthetic RPATH items are globbed
+                    rpathList = _canonicalRPATH(rpath, glob=True)
                     break
 
         if m and 'RPATH' in m.contents and m.contents['RPATH']:
