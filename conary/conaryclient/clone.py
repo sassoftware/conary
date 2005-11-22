@@ -152,7 +152,7 @@ class ClientClone:
                             # they're not equal - only allow versions 
                             # to be equal to the latest version
                             if clonedVer < trv.getVersion():
-                                clonedVer = None
+                                clonedVer = trv.getVersion()
                                 infoList.extend(alreadyCloned)
                                 alreadyCloned = []
                             continue
@@ -169,7 +169,7 @@ class ClientClone:
             buildVersion = nextVersion(repos, None,
                                 [ x[0] for x in infoList ], srcVersion, flavor)
 
-            if buildVersion != clonedVer:
+            if clonedVer and buildVersion != clonedVer:
                 # oops!  We have foo:runtime at build count 2, but the other
                 # binaries want to be at build count 3 
                 # FIXME: can we just assume that buildVersion > clonedVer
