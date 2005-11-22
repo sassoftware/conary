@@ -713,13 +713,16 @@ class Strip(policy.Policy):
 
     def postProcess(self):
         if self.debuginfo:
-            for file in sorted(self.debugfiles):
-                builddirpath = '%(topbuilddir)s/' % self.dm +file
-                dir = os.path.dirname(file)
+            for filename in sorted(self.debugfiles):
+                builddirpath = '%(topbuilddir)s/' % self.dm +filename
+                dir = os.path.dirname(filename)
                 util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
                 try:
-                    shutil.copy2(builddirpath,
-                                 '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
+                    targetfile = '%(destdir)s%(debugsrcdir)s/'%self.dm +filename
+                    shutil.copy2(builddirpath, targetfile)
+                    # these files only need to be readable; avoid warnings
+                    # about group-writeable files, etc.
+                    os.chmod(targetfile, 0644)
                 except IOError, msg:
                     if msg.errno == errno.ENOENT:
                         pass
