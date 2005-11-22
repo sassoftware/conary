@@ -129,20 +129,57 @@ class ClientClone:
                                         name, version in dupCheck.iteritems() ],
                                    withFiles = False)
 
+
+
+            clonedVer = None
+            alreadyCloned = []
+
             for trv in trvs:
                 assert(trv.getFlavor() == singleFlavor)
                 name = trv.getName()
                 info = (name, trv.troveInfo.clonedFrom(), trv.getFlavor())
                 if info in infoList:
-                    # no need to reclone this one
+                    # we might not need to reclone this one _if_ 
+                    # everything else can end up with this same 
+                    # version
+
+                    if clonedVer:
+                        # we have two+ troves that potentially don't need
+                        # to be recloned - make sure they agree on what
+                        # the target version should be
+
+                        if clonedVer != trv.getVersion():
+                            # they're not equal - only allow versions 
+                            # to be equal to the latest version
+                            if clonedVer < trv.getVersion():
+                                clonedVer = None
+                                infoList.extend(alreadyCloned)
+                                alreadyCloned = []
+                            continue
+
+                    else:
+                        clonedVer = trv.getVersion()
+
                     infoList.remove(info)
-                    versionMap[info] = trv.getVersion()
+                    alreadyCloned.append(info)
 
             if not infoList:
                 return ([], None)
 
             buildVersion = nextVersion(repos, None,
                                 [ x[0] for x in infoList ], srcVersion, flavor)
+
+            if buildVersion != clonedVer:
+                # oops!  We have foo:runtime at build count 2, but the other
+                # binaries want to be at build count 3 
+                # FIXME: can we just assume that buildVersion > clonedVer
+                infoList.extend(alreadyCloned)
+                buildVersion = nextVersion(repos, None,
+                                [ x[0] for x in infoList ], srcVersion, flavor)
+            else:   
+                for info in alreadyCloned:
+                    versionMap[info] = clonedVer
+                
             return infoList, buildVersion
 
         def _needsRewrite(sourceBranch, targetBranch, verToCheck):
