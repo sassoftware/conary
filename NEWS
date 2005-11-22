@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 0.71.2
   o Client Changes:
     * The update-conary option has been renamed updateconary per
       bugzilla #428
