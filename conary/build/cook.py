@@ -1143,7 +1143,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 # that can be controlled
                 if sys.stdin.isatty():
                     os.tcsetpgrp(0, os.getpgrp())
-            except AttributError:
+            except AttributeError:
                 # stdin might not even have an isatty method
                 pass
 
