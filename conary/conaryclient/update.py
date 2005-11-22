@@ -550,14 +550,27 @@ class ClientUpdate:
                  dict( ((job[0], job[2][0], job[2][1]), job[1]) for
                         job in localUpdates if job[1][0] is not None and
                                                job[2][0] is not None)
+        localUpdatesByMissing = \
+                 dict( ((job[0], job[1][0], job[1][1]), job[2]) for
+                        job in localUpdates if job[1][0] is not None and
+                                               job[2][0] is not None)
+
+        import epdb
+        epdb.st('f')
+
+        avail = set(availableTrove.iterTroveList())
 
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
         # it is always a better match for the new items (installed is better
-        # than not installed as long as the branches are the same)
+        # than not installed as long as the branches are the same). This
+        # doesn't apply if the trove which was originally installed is
+        # part of this update though, as troves which are referenced and
+        # part of the update are handled separately.
         for job in localUpdates:
             if job[1][0] is not None and job[2][0] is not None and \
-                             job[1][0].branch() == job[2][0].branch():
+                     job[1][0].branch() == job[2][0].branch() and \
+                     (job[0], job[1][0], job[1][1]) not in avail:
                 del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                 referencedTroves.remove((job[0], job[1][0], job[1][1]))
 
@@ -566,9 +579,9 @@ class ClientUpdate:
         # Build the set of the incoming troves which are either already
         # installed or already referenced. This is purely for consistency
         # checking later on
-        avail = set(availableTrove.iterTroveList())
         alreadyInstalled = installedTroves & avail
         alreadyReferenced = referencedTroves & avail
+
         del avail
 
         # Remove the alreadyReferenced set from both the troves which are
@@ -612,9 +625,6 @@ class ClientUpdate:
 
         newJob = set()
 
-        import epdb
-        epdb.st('f')
-
         while newTroves:
             newInfo, isPrimary, ignorePins, byDefault = newTroves.pop(0)
 
@@ -629,7 +639,11 @@ class ClientUpdate:
                     pass
                 else:
                     # We already know about this trove, and decided we
-                    # don't want it.
+                    # don't want it. We do want to keep the item which
+                    # replaced it though.
+                    if newInfo in localUpdatesByMissing:
+                        info = (newInfo[0],) + localUpdatesByMissing[newInfo]
+                        alreadyInstalled.add(info)
                     continue
 
             replaced, pinned = jobByNew[newInfo]
