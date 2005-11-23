@@ -480,8 +480,8 @@ class ClientUpdate:
                 trv = db.getTrove(withFiles = False, pristine = False, *item)
                 if not trv.isCollection(): continue
 
-                newItems = set(trv.iterTroveList())
-                itemQueue.add(newItems - fullSet)
+                for x in trv.iterTroveList():
+                    itemQueue.add(x)
 
             return fullSet
 
@@ -913,7 +913,7 @@ class ClientUpdate:
         #   1. oldItems -- items which we should not remove as a side effect
         #   2. changeSetList -- job we need to create a change set for
 
-        if not changeSetList and not jobSet:
+        if not changeSetList:
             raise NoNewTrovesError
 
         if changeSetList:

@@ -1093,8 +1093,11 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         client = conaryclient.ConaryClient(cfg)
         try:
             changeSet = changeset.ChangeSetFromFile(changeSetFile)
+            job = [ (x[0], (None, None), (x[1], x[2]), True) for 
+                            x in changeSet.getPrimaryTroveList() ]
             (updJob, suggMap) = \
-                client.updateChangeSet([changeSet], recurse=True, resolveDeps=False)
+                client.updateChangeSet(job, recurse=True, resolveDeps=False,
+                            fromChangesets = [ changeSet ])
             client.applyUpdate(updJob)
 
         except (conaryclient.UpdateError, errors.CommitError), e:
