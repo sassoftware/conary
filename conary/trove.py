@@ -33,6 +33,9 @@ from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
+def troveIsCollection(str):
+    return not(":" in str or str.startswith("fileset-"))
+
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
     _SINGLE_TROVE_TUP_VERSION = 1
