@@ -324,10 +324,21 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
         callback = callbacks.UpdateCallback()
 
     fromChangesets = []
-    
+
     for path in fromFiles:
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
+
+    # Look for items which look like files in the applyList and convert
+    # them into fromChangesets w/ the primary sets
+    for item in changeSpecs[:]:
+        if util.exists(item):
+            cs = changeset.ChangeSetFromFile(item)
+            fromChangesets.append(cs)
+            changeSpecs.remove(item)
+            for trvInfo in cs.getPrimaryTroveList():
+                changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
+                      trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
 
     applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
                                         updateByDefault, allowChangeSets=True)
@@ -418,7 +429,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves, threshold = cfg.trustThreshold)
+                       callback = callback, autoPinList = cfg.pinTroves, 
+                       threshold = cfg.trustThreshold)
 
 
 # we grab a url from the repo based on our version and flavor,
