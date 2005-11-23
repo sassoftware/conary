@@ -412,8 +412,13 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         self.depDb.commit()
 
-        present = self.db.hasTroves([ (x[0].getName(), x[0].getOldVersion(),
+        if relative:
+            present = self.db.hasTroves([ 
+                                      (x[0].getName(), x[0].getOldVersion(),
                                        x[0].getOldFlavor()) for x in relative ])
+        else:
+            present = []
+
         for (trvCs, info), isPresent in itertools.izip(relative, present):
             if not isPresent:
                 # we can't serve up troves from this change set so pretend

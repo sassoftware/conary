@@ -83,6 +83,9 @@ class SerialNumber(object):
 
         return self.numList == other.numList
 
+    def __nonzero__(self):
+        return self.numList and self.numList != [0]
+
     def __ne__(self, other):
         return not self == other
 
@@ -161,7 +164,7 @@ class Revision(AbstractRevision):
 	Returns a string representation of a Release.
 	"""
 	if versus and self.version == versus.version:
-	    if versus and self.sourceCount == versus.sourceCount:
+	    if self.sourceCount == versus.sourceCount:
 		if self.buildCount is None:
 		    rc = str(self.sourceCount)
 		else:
@@ -178,7 +181,7 @@ class Revision(AbstractRevision):
 		rc = str(self.buildCount)
 
 	if frozen:
-	    rc = self.freezeTimestamp() + ":" + rc
+	    rc = self.freezeTimestamp() + ':' + rc
 
 	return rc
 
@@ -265,13 +268,14 @@ class Revision(AbstractRevision):
 
         return 0
 
-    def shadowChangedUpstreamVersion(self):
+    def shadowChangedUpstreamVersion(self, shadowLength):
         """ returns True if this revision is a) on a shadow 
             and b) the parent branch's source count is 0, 
             implying that the upstream version # has been changed
         """
+        i = shadowLength - 1
         if (self.sourceCount.shadowCount() and
-            [ x for x in self.sourceCount.iterCounts()][-2] == 0):
+            [ x for x in self.sourceCount.iterCounts()][i] == 0):
             # 0 means there's no corresponding parent
             # source with this version number
             return True
@@ -880,7 +884,7 @@ class Version(VersionSequence):
 
         trailing = self.versions[-1]
         if trailing.buildCount is None:
-            if trailing.shadowChangedUpstreamVersion():
+            if trailing.shadowChangedUpstreamVersion(self.shadowLength()):
                 return False
             else:
                 return True

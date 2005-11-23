@@ -113,17 +113,16 @@ class SignatureCallback:
     def __init(self):
         pass
 
-
-
 class LineOutput:
     def _message(self, msg):
-        self.out.write("\r")
-        self.out.write(msg)
-        if len(msg) < self.last:
-            i = self.last - len(msg)
-            self.out.write(" " * i + "\b" * i)
-        self.out.flush()
-        self.last = len(msg)
+        if self.out.isatty():
+            self.out.write("\r")
+            self.out.write(msg)
+            if len(msg) < self.last:
+                i = self.last - len(msg)
+                self.out.write(" " * i + "\b" * i)
+            self.out.flush()
+            self.last = len(msg)
 
     def __del__(self):
         if self.last:

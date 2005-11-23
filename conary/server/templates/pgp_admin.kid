@@ -19,7 +19,6 @@
       <form action="pgpChangeOwner" method="post">
         <input type="hidden" name="key" value="${fingerprint}"/>
         <select name="owner">
-            <option value="${None}">--Nobody--</option>
             <option py:for="userId, userName in users.items()" value="${userName}"
                     py:attrs="{'selected': (userId==userid) and 'selected' or None}"
                     py:content="userName" />
@@ -37,14 +36,14 @@
         ${brokenkey}
     </div>
 
-    <div py:def="printKeyTableEntry(key, userId)" py:strip="True">
+    <div py:def="printKeyTableEntry(keyEntry, userId)" py:strip="True">
      <tr class="key-ids">
       <td>
-        <div>pub: ${breakKey(key)}</div>
-        <div py:for="id in keyTable.getUserIds(key)"> uid: &#160; &#160; ${id}</div>
-        <div py:for="subkey in keyTable.getSubkeys(key)">sub: ${breakKey(subkey)}</div>
+        <div>pub: ${breakKey(keyEntry['fingerprint'])}</div>
+        <div py:for="id in keyEntry['uids']"> uid: &#160; &#160; ${id}</div>
+        <div py:for="subKey in keyEntry['subKeys']">sub: ${breakKey(subKey)}</div>
       </td>
-      <td py:if="admin" style="text-align: right;">${generateOwnerListForm(key, users, userId)}</td>
+      <td py:if="admin" style="text-align: right;">${generateOwnerListForm(keyEntry['fingerprint'], users, userId)}</td>
      </tr>
     </div>
 
@@ -63,12 +62,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <div py:for="key in keyTable.getUsersMainKeys(None)" py:strip="True">
-                      ${printKeyTableEntry(key, None)}
-                    </div>
                     <div py:for="userId, userName in users.items()" py:strip="True">
-                      <div py:for="key in keyTable.getUsersMainKeys(userId)" py:strip="True">
-                          ${printKeyTableEntry(key, userId)}
+                      <div py:for="keyEntry in openPgpKeys[userId]" py:strip="True">
+                          ${printKeyTableEntry(keyEntry, userId)}
                       </div>
                     </div>
                 </tbody>

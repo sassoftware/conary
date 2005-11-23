@@ -1,14 +1,57 @@
+Changes in 0.71.2
+  o Client Changes:
+    * The update-conary option has been renamed updateconary per
+      bugzilla #428
+    * buildPath can be set in contexts
+    * cvc co <foo> will work even if there are two foos on the same label with
+      different branches.  In that case, it will warn about the older foo 
+      which it doesn't check out
+    * Test mode didn't work for updates and erases which were split into
+      multiple jobs
+  o Build Changes:
+    * Combined the EtcConfig and Config policies, and deprecated
+      the EtcConfig policy.
+    * All config files default to being put into a :config component.
+      This is overridden by any ComponentSpec specifications in the recipe.
+    * A use flag has been added for xen defaulting to 'sense prefernot'.  This
+      flag should be used to specify flavors for xen domU builds where special
+      provisions are made for paravirtualized domU.
+    * Added new CheckDesktopFiles policy to catch some more common errors
+      in .desktop files.  (For now, it looks for common cases of missing
+      icons; more may be added over time.)
+    * The Requires policy now interprets synthetic RPATH elements (passed in
+      with the rpath= keyword argument) as shell-style globs that are
+      interpreted relative first to the destdir and then to the system.
+
 Changes in 0.71.1:
   o Server Changes 
     * Added iterTroves() call which iterates over large numbers of troves
       much more efficiently than a single getTrove() call would.
     * Split out FileRetriever object to allow file information to be pulled
       from the repository inside of an iterTroves() loop
+    * The web interface shows the troves contained in a group trove instead
+      of trying to list all files in a group.
   o Client Changes
     * Config file options that take a path as a value now support ~ for 
       home directory substitution
     * Trove.diff() returns a standard job list instead of the previous
       only-used-here format
+    * /var/log/conary tracks all update, remove, rollback, and erase events
+    * Progress output is simplified when stdout is not a tty (no line 
+      overwrites)
+    * Tracebacks during logged commands get copied to the log
+    * Code which checked to see if a shadow has been locally modified didn't 
+      work for shadows more than a single level deep
+    * When you are installing from changesets using --from-files, other troves
+      in the changesets can be used for dependency resolution
+  o Build Changes (cvc)
+    * Additional calls are emulated by the filename_wrapper for the
+      r.Run calls.
+  o Code Structure
+    * Split build/recipe.py into several smaller files
+    * Moved OpenPGP keyTable access up call stack so that it can now be
+      accessed outside of kid templates.
+    * Move epdb code into its own package
 
 Changes in 0.71.0:
   o Code Structure

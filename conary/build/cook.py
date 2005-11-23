@@ -40,6 +40,7 @@ from conary.local import database
 from conary.repository import changeset, errors, filecontents
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.repository.netclient import NetworkRepositoryClient
+from conary.state import ConaryStateFromFile
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -211,7 +212,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     log.info("Building %s", recipeClass.name)
     if not use.Arch.keys():
 	log.error('No architectures have been defined in %s -- '
-		  'cooking is not possible' % cfg.archDir) 
+		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
 	sys.exit(1)
     try:
 	use.setBuildFlagsFromFlavor(recipeClass.name, cfg.buildFlavor)
@@ -902,10 +903,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     srcName = name + ':source'
     sourceVerison = None
     if os.path.exists('CONARY'):
-        # FIXME checkin imports cook functions as well, perhaps move
-        # SourceState or some functions here to a third file?
-        from conary import checkin
-        conaryState = checkin.ConaryStateFromFile('CONARY')
+        conaryState = ConaryStateFromFile('CONARY')
         if conaryState.hasSourceState():
             state = conaryState.getSourceState()
             if state.getName() == srcName and \
@@ -995,11 +993,11 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
-            raise Cookerror, \
-                ("Cannot specify version string when cooking recipe file")
+            raise CookError, \
+                ("Must not specify version string when cooking recipe file")
 	if emerge:
 	    raise CookError, \
-		("troves must be emerged from directly from a repository")
+		("Troves must be emerged directly from a repository")
 
 	recipeFile = name
 
@@ -1148,7 +1146,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 # that can be controlled
                 if sys.stdin.isatty():
                     os.tcsetpgrp(0, os.getpgrp())
-            except AttributError:
+            except AttributeError:
                 # stdin might not even have an isatty method
                 pass
 

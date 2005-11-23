@@ -83,7 +83,6 @@ import time
             </table>
 
             <hr />
-
             <div py:strip="True" py:if="troves[0].getName().endswith(':source')">
                 ${sourceTroveInfo(troves[0])}
                 <p><a href="files?t=${troveName};v=${quote(troves[0].getVersion().freeze())};f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
@@ -91,7 +90,9 @@ import time
             <div py:strip="True" py:if="not trove.getName().endswith(':source')"
                  py:for="trove in troves">
                 ${binaryTroveInfo(trove)}
-                <p><a href="files?t=${troveName};v=${quote(trove.getVersion().freeze())};f=${quote(trove.getFlavor().freeze())}">Show Files</a></p>
+                <p><a href="files?t=${troveName};v=${quote(trove.getVersion().freeze())};f=${quote(trove.getFlavor().freeze())}">
+                    Show ${troveName.startswith('group-') and 'Troves' or 'Files'}</a>
+                </p>
             </div>
     
 

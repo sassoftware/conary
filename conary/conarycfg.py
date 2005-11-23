@@ -372,8 +372,9 @@ class ConaryContext(ConfigSection):
         by the values in the context that have been set.  Values that are 
         unset in the context do not override the default config values.
     """
-    defaults = { 'buildFlavor'      : [FLAVOR,    None],
-                 'buildLabel'       : [LABEL,     None],
+    defaults = { 'buildFlavor'      : [ FLAVOR,    None],
+                 'buildLabel'       : [ LABEL,     None],
+                 'buildPath'        : [ PATH,      None],
                  'flavor'           : [ FLAVORLIST, [] ],
                  'installLabelPath' : [ LABELLIST, None],
                  'contact'	    : None,
@@ -394,12 +395,15 @@ class ConaryConfiguration(SectionedConfig):
     sectionType = ConaryContext
 
     defaults = {
+        'archDirs'               : [ STRINGPATH, ('/etc/conary/arch', 
+                                                  '/etc/conary/distro/arch',
+                                                  '~/.conary/arch')],
 	'autoResolve'	        : [ BOOL, False ],
         'buildFlavor'           : [ FLAVOR, deps.DependencySet() ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
 	'buildPath'		: [ PATH, '/var/tmp/conary-builds'],
-	'context'		: None,
 	'contact'		: None,
+	'context'		: None,
 	'dbPath'		: [ PATH, '/var/lib/conarydb'],
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
@@ -407,26 +411,24 @@ class ConaryConfiguration(SectionedConfig):
         'flavor'                : [ FLAVORLIST, [] ],
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
-	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],
 	'interactive'		: [ BOOL, False ],
+        'logFile'               : [ STRING, '/var/log/conary' ],
 	'lookaside'		: [ PATH, '/var/cache/conary'],
 	'name'			: None,
-	'updateThreshold'       : [ INT, 10],
+	'pinTroves'		: [ REGEXPLIST, RegularExpressionList() ],
+        'quiet'                 : [ BOOL, False ],
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: [ PATH, '/'],
+        'signatureKey'          : [ FINGERPRINT, None ],
+        'signatureKeyMap'       : [ FINGERPRINT_MAP, None ],
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: [ PATH, '/var/tmp/'],
         'threaded'              : [ BOOL, True ],
+        'trustThreshold'        : [ INT, 0 ],
+	'updateThreshold'       : [ INT, 10],
         'useDirs'               : [ STRINGPATH, ('/etc/conary/use', 
                                                   '/etc/conary/distro/use',
                                                   '~/.conary/use')],
-        'archDirs'               : [ STRINGPATH, ('/etc/conary/arch', 
-                                                  '/etc/conary/distro/arch',
-                                                  '~/.conary/arch')],
-        'quiet'                 : [ BOOL, False ],
-        'signatureKey'          : [ FINGERPRINT, None ],
-        'trustThreshold'        : [ INT, 0 ],
-        'signatureKeyMap'       : [ FINGERPRINT_MAP, None ],
     }
 
     def __init__(self, readConfigFiles=True):

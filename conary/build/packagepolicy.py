@@ -231,6 +231,45 @@ class ImproperlyShared(policy.Policy):
                 self.error("Possibly architecture-specific file %s in shared data directory", file)
 
 
+class CheckDesktopFiles(policy.Policy):
+    """
+    Warns about possible errors in desktop files, such as missing icon
+    files; C{r.CheckDesktopFiles(exceptions=I{filterexp}} if (for
+    example) an icon is provided somehow, directly or indirectly, by a
+    runtime requirement of this package.
+    """
+    invariantsubtrees = [ '%(datadir)s/applications/' ]
+    invariantinclusions = [ r'.*\.desktop' ]
+
+    def doFile(self, filename):
+        self.checkIcon(filename)
+
+    def checkIcon(self, filename):
+        fullname = self.macros.destdir + '/' + filename
+        iconfiles = [x.split('=', 1)[1].strip()
+                     for x in file(fullname).readlines()
+                     if x.startswith('Icon=')]
+        for iconfilename in iconfiles:
+            if iconfilename.startswith('/'):
+                fulliconfilename = self.macros.destdir + '/' + iconfilename
+                if not os.path.exists(fulliconfilename):
+                    self.error('%s says Icon=%s must exist, but is missing',
+                               filename, iconfilename)
+            elif '/' in iconfilename:
+                self.error('Illegal line Icon=%s in %s',
+                           iconfilename, filename)
+            else:
+                fulldatadir = self.macros.destdir + '/' + self.macros.datadir
+                for root, dirs, files in os.walk(fulldatadir):
+                    if iconfilename in files:
+                        return
+                # didn't find anything
+                self.error('%s says Icon=%s must exist, but it does not exist'
+                           ' anywhere in %s',
+                           filename, iconfilename, self.macros.datadir)
+
+
+
 class CheckSonames(policy.Policy):
     """
     Warns about various possible shared library packaging errors:
@@ -350,6 +389,59 @@ class CheckDestDir(policy.Policy):
                                     file, rpath)
                         break
 
+
+class EtcConfig(policy.Policy):
+    """
+    Deprecated class included only for backwards compatibility; use
+    C{Config} instead.
+    """
+    def updateArgs(self, *args, **keywords):
+        self.warn('EtcConfig deprecated, please use Config instead')
+        self.recipe.Config(*args, **keywords)
+    def do(self):
+        pass
+
+
+class Config(policy.Policy):
+    """
+    Mark all files below C{%(sysconfdir)s} (/etc) and
+    C{%(taghandlerdir)s} as config files; exceptions as
+    C{r.Config(exceptions=I{filterexp})}
+    Mark explicit inclusions as config files:
+    C{r.Config(I{filterexp})}
+    """
+    invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
+
+    def doFile(self, filename):
+        m = self.recipe.magic[filename]
+        if m and m.name == "ELF":
+            # an ELF file cannot be a config file, some programs put
+            # ELF files under /etc (X, for example), and tag handlers
+            # can be ELF or shell scripts; we just want tag handlers
+            # to be config files if they are shell scripts.
+            # Just in case it was not intentional, warn...
+            if self.macros.sysconfdir in filename:
+                self.dbg('ELF file %s found in config directory', filename)
+            return
+        fullpath = self.macros.destdir + filename
+        if os.path.isfile(fullpath) and util.isregular(fullpath):
+            self._markConfig(filename, fullpath)
+
+    def _markConfig(self, filename, fullpath):
+        self.dbg(filename)
+        f = file(fullpath)
+        f.seek(0, 2)
+        if f.tell():
+            # file has contents
+            f.seek(-1, 2)
+            lastchar = f.read(1)
+            f.close()
+            if lastchar != '\n':
+                self.error("config file %s missing trailing newline" %filename)
+        f.close()
+        self.recipe.ComponentSpec(_config=filename)
+
+
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
@@ -439,6 +531,13 @@ class ComponentSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
 
+    def updateArgs(self, *args, **keywords):
+        if '_config' in keywords:
+            config=keywords.pop('_config')
+            self.recipe.PackageSpec(_config=config)
+            self.extraFilters.append(('config', util.literalRegex(config)))
+	_filterSpec.updateArgs(self, *args, **keywords)
+
     def doProcess(self, recipe):
 	compFilters = []
 	self.macros = recipe.macros
@@ -467,6 +566,7 @@ class ComponentSpec(_filterSpec):
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
 
+
 class PackageSpec(_filterSpec):
     """
     Determines which package (and optionally also component) each file is in:
@@ -480,8 +580,11 @@ class PackageSpec(_filterSpec):
         needed by C{PackageSpec}.
         """
         _filterSpec.__init__(self, *args, **keywords)
+        self.configFiles = []
         
     def updateArgs(self, *args, **keywords):
+        if '_config' in keywords:
+            self.configFiles.append(keywords.pop('_config'))
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             newTrove = args[0] % self.recipe.macros
@@ -510,6 +613,11 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
+        # flag all config files
+        for confname in self.configFiles:
+            self.recipe.autopkg.pathMap[confname].flags.isConfig(True)
+
+
 class InstallBucket(policy.Policy):
     """
     Stub for older recipes
@@ -519,57 +627,6 @@ class InstallBucket(policy.Policy):
 
     def test(self):
         return False
-
-def _markConfig(policy, filename, fullpath):
-    policy.dbg('config: %s', filename)
-    f = file(fullpath)
-    f.seek(0, 2)
-    if f.tell():
-	# file has contents
-	f.seek(-1, 2)
-	lastchar = f.read(1)
-	f.close()
-	if lastchar != '\n':
-	    policy.error("config file %s missing trailing newline" %filename)
-    f.close()
-    policy.recipe.autopkg.pathMap[filename].flags.isConfig(True)
-
-class EtcConfig(policy.Policy):
-    """
-    Mark all files below /etc as config files:
-    C{r.EtcConfig(exceptions=I{filterexp})}
-    """
-    invariantsubtrees = [ '%(sysconfdir)s', '%(taghandlerdir)s']
-
-    def doFile(self, file):
-        m = self.recipe.magic[file]
-	if m and m.name == "ELF":
-	    # an ELF file cannot be a config file, some programs put
-	    # ELF files under /etc (X, for example), and tag handlers
-	    # can be ELF or shell scripts; we just want tag handlers
-	    # to be config files if they are shell scripts.
-	    # Just in case it was not intentional, warn...
-            self.dbg('ELF file %s found in config directory', file)
-	    return
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self, file, fullpath)
-
-
-class Config(policy.Policy):
-    """
-    Mark only explicit inclusions as config files:
-    C{r.Config(I{filterexp})}
-    """
-
-    # change inclusions to default to none, instead of all files
-    keywords = policy.Policy.keywords.copy()
-    keywords['inclusions'] = []
-
-    def doFile(self, filename):
-	fullpath = self.macros.destdir + filename
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self, filename, fullpath)
 
 
 class InitialContents(policy.Policy):
@@ -585,7 +642,7 @@ class InitialContents(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-        self.recipe.EtcConfig(exceptions=args)
+        self.recipe.Config(exceptions=args)
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
@@ -1524,8 +1581,6 @@ class ComponentRequires(policy.Policy):
             'data': frozenset(('lib', 'runtime', 'devellib')),
             'devellib': frozenset(('devel',)),
             'lib': frozenset(('devel', 'devellib', 'runtime')),
-            # while config is not an automatic component, its meaning
-            # is standardized
             'config': frozenset(('runtime', 'lib', 'devellib', 'devel')),
         }
         self.overridesMap = {}
@@ -1852,7 +1907,14 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires(rpath=(I{filterExp}, I{RPATH}))} calls, which are
     tested in the order provided.  The C{I{RPATH}} is a standard
     Unix-style path string containing one or more directory names,
-    separated only by colon characters.
+    separated only by colon characters, except for one significant
+    change: Each path component is interpreted using shell-style globs,
+    which are checked first in the C{%(destdir)s} and then on the
+    installed system.  (The globs are useful for cases like perl
+    where statically determining the entire content of the path
+    is difficult.  Use globs only for variable parts of paths; be
+    as specific as you can without using the glob feature any more
+    than necessary.)
 
     Executables that use C{dlopen()} to open a shared library will
     not automatically have a dependency on that shared library.
@@ -1864,6 +1926,16 @@ class Requires(_addInfo, _BuildPackagePolicy):
     depending on whether the library is in a system library
     directory or not.  (It needs to be the same as how the
     soname dependency is expressed by the providing package.)
+
+    For (unusual) cases where a system library is not listed
+    in C{ld.so.conf} but is instead found through a search through
+    special subdirectories with architecture-specific names (like
+    C{i686} and C{tls}), you can pass in a string or list of
+    strings specifying the directory or list of directories.
+    C{r.Requires(sonameSubtrees='/directoryname')} or
+    C{r.Requires(sonameSubtrees=['/list', '/of', '/dirs'])}
+    These are B{not} regular expressions.  They will have macro
+    expansion expansion done on them.
     """
     invariantexceptions = (
 	'%(docdir)s/',
@@ -1917,11 +1989,31 @@ class Requires(_addInfo, _BuildPackagePolicy):
             if dep.getName()[0] in self._privateDepMap:
                 found = True
 
-        def _canonicalRPATH(rpath):
+        def appendUnique(ul, items):
+            for item in items:
+                if item not in ul:
+                    ul.append(item)
+
+        def _canonicalRPATH(rpath, glob=False):
             # normalize all elements of RPATH
             l = [ os.path.normpath(x) for x in rpath.split(':') ]
-            # prune system paths from RPATH
-            l = [ x for x in l if x not in self.systemLibPaths ]
+            # prune system paths and relative paths from RPATH
+            l = [ x for x in l
+                  if x not in self.systemLibPaths and x.startswith('/') ]
+            if glob:
+                destdir = self.macros.destdir
+                dlen = len(destdir)
+                gl = []
+                for item in l:
+                    # prefer destdir elements
+                    paths = util.braceGlob(destdir + '/' + item)
+                    paths = [ os.path.normpath(x[dlen:]) for x in paths ]
+                    appendUnique(gl, paths)
+                    # then look on system
+                    paths = util.braceGlob(item)
+                    paths = [ os.path.normpath(x) for x in paths ]
+                    appendUnique(gl, paths)
+                l = gl
             return l
 
         # fixup should come first so that its path elements can override
@@ -1929,7 +2021,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if self.rpathFixup:
             for f, rpath in self.rpathFixup:
                 if f.match(path):
-                    rpathList = _canonicalRPATH(rpath)
+                    # synthetic RPATH items are globbed
+                    rpathList = _canonicalRPATH(rpath, glob=True)
                     break
 
         if m and 'RPATH' in m.contents and m.contents['RPATH']:
@@ -2435,14 +2528,15 @@ def DefaultPolicy(recipe):
         NonMultilibComponent(recipe),
         NonMultilibDirectories(recipe),
 	ImproperlyShared(recipe),
+        CheckDesktopFiles(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),
 	CheckDestDir(recipe),
+	EtcConfig(recipe),
+	Config(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
         InstallBucket(recipe),
-	EtcConfig(recipe),
-	Config(recipe),
 	InitialContents(recipe),
 	Transient(recipe),
 	SharedLibrary(recipe),

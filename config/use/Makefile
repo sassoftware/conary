@@ -41,6 +41,7 @@ use_files =	alternatives	\
 		tcpwrappers	\
 		tk		\
 		X		\
+		xen		\
 		xfce
 
 dist_files = Makefile $(use_files)

@@ -19,14 +19,21 @@ python_files = __init__.py	\
 	buildpackage.py		\
 	cook.py			\
 	destdirpolicy.py	\
+	errors.py	        \
 	filter.py 		\
+	filesetrecipe.py	\
 	fixedglob.py		\
+	grouprecipe.py		\
+	inforecipe.py		\
+	loadrecipe.py		\
 	lookaside.py		\
 	macros.py		\
 	nextversion.py		\
 	packagepolicy.py	\
+	packagerecipe.py	\
 	policy.py		\
 	recipe.py		\
+	redirectrecipe.py       \
 	signtrove.py		\
 	source.py		\
 	tags.py			\

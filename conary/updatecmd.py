@@ -333,7 +333,11 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
     # them into fromChangesets w/ the primary sets
     for item in changeSpecs[:]:
         if util.exists(item):
-            cs = changeset.ChangeSetFromFile(item)
+            try:
+                cs = changeset.ChangeSetFromFile(item)
+            except:
+                continue
+
             fromChangesets.append(cs)
             changeSpecs.remove(item)
             for trvInfo in cs.getPrimaryTroveList():
@@ -426,12 +430,14 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         if not okay:
             return
 
+    log.syslog.command()
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
                        callback = callback, autoPinList = cfg.pinTroves, 
                        threshold = cfg.trustThreshold)
 
+    log.syslog.commandComplete()
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -447,14 +453,16 @@ def updateConary(cfg, conaryVersion):
     db = database.Database(cfg.root, cfg.dbPath)    
     troves = db.trovesByName("conary")
 
-    # filter based on the version of conary this is (after all, we should
-    # try to update ourself; not something else)
-    troves = [ x for x in troves if 
+    if len(troves) > 1:
+        # filter based on the version of conary this is (after all, we should
+        # try to update ourself; not something else)
+        troves = [ x for x in troves if 
                    x[1].trailingRevision().getVersion() == conaryVersion ]
 
-    # FIXME: what should we do if this comes back as having more than
-    # one version of conary installed?
+    # FIXME: if no conary troves are found to be installed, should we
+    # attempt a recover/install anyway?
     assert(len(troves)==1)
+
     (name, version, flavor) = troves[0]   
     client = conaryclient.ConaryClient(cfg)
     csUrl = client.getConaryUrl(version, flavor)

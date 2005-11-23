@@ -21,18 +21,20 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
+#include <utime.h>
+#include <dirent.h>
 
 #define PRINTF(...)
-/* #define PRINTF(...) printf(__VA_ARGS__) */
+/* #define PRINTF(...) fprintf(stderr, __VA_ARGS__) */
 
-#define GET_PATH(name)	PRINTF("%s %s\n", #name, pathname); \
+#define GET_PATH(name)	PRINTF("[wrp %5d] %s %s\n", getpid(), #name, pathname); \
 			if (!real_##name) real_##name = dlsym(RTLD_NEXT, #name); \
 			p = prepend_destdir(pathname) ;
 
 #define PUT_PATH(rval)	free((void *)p); \
 			if (ret != rval || errno != ENOENT) return ret;
-
 
 static const char *prepend_destdir(const char *pathname) {
     char *p = NULL;
@@ -179,7 +181,7 @@ int __xstat(int ver, const char *pathname, struct stat *buf) {
     }
     return real___xstat(ver, pathname, buf);
 }
-
+    
 int __xstat64(int ver, const char *pathname, struct stat64 *buf) {
     static int (*real___xstat64)(int ver, const char *pathname, struct stat64 *buf) = NULL;
     const char *p;
@@ -271,6 +273,19 @@ int chmod(const char *pathname, mode_t mode) {
     return real_chmod(pathname, mode);
 }
 
+int lchmod(const char *pathname, mode_t mode) {
+    static int (*real_lchmod)(const char *pathname, mode_t mode) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(lchmod);
+    if (p) {
+	ret = real_lchmod(p, mode);
+	PUT_PATH(-1);
+    }
+    return real_lchmod(pathname, mode);
+}
+
 int chown(const char *pathname, uid_t owner, gid_t group) {
     static int (*real_chown)(const char *pathname, uid_t owner, gid_t group) = NULL;
     const char *p;
@@ -305,23 +320,132 @@ int unlink(const char *pathname) {
     GET_PATH(unlink);
     if (p) {
 	ret = real_unlink(p);
-	PUT_PATH(0);
+	free((void*)p);
+	if (ret == 0)
+	    return ret;
     }
     return real_unlink(pathname);
 }
 
+int symlink(const char *oldpath, const char *pathname) {
+    static int (*real_symlink)(const char *oldpath, const char *pathname) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(symlink);
+    if (p) {
+	ret = real_symlink(oldpath, p);
+	PUT_PATH(-1);
+    }
+    return real_symlink(oldpath, pathname);
+}
+
+int utime(const char *pathname, const struct utimbuf *buf) {
+    static int (*real_utime)(const char *pathname, const struct utimbuf *buf) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(utime);
+    if (p) {
+	ret = real_utime(p, buf);
+	PUT_PATH(-1);
+    }
+    return real_utime(pathname, buf);
+}
+
+int utimes(const char *pathname, const struct timeval tv[2]) {
+    static int (*real_utimes)(const char *pathname, const struct timeval tv[2]) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(utimes);
+    if (p) {
+	ret = real_utimes(p, tv);
+	PUT_PATH(-1);
+    }
+    return real_utimes(pathname, tv);
+}
+
+int readlink(const char *pathname, char *buf, size_t bufsiz) {
+    static int (*real_readlink)(const char *pathname, char *buf, size_t bufsiz) = NULL;
+    const char *p;
+    int ret;
+
+    GET_PATH(readlink);
+    if (p) {
+	ret = real_readlink(p, buf, bufsiz);
+	PUT_PATH(-1);
+    }
+    return real_readlink(pathname, buf, bufsiz);
+}
+
+
+/* These ones are more... complex, shall we say */
+int link(const char *oldpath, const char *pathname) {
+    static int (*real_link)(const char *oldpath, const char *pathname) = NULL;
+    const char *op, *pn;
+    int ret;
+
+    PRINTF("[wrp %5d] %s %s %s\n", getpid(), "link", oldpath, pathname);   
+    if (!real_link) real_link = dlsym(RTLD_NEXT, "link"); 
+    /* we can't use the std macros employed by all the other
+       fuunctions because of the extra work we have to do around with
+       wrapping both pathnames... */
+    op = prepend_destdir(oldpath);
+    pn = prepend_destdir(pathname);
+
+    if (pn) {
+	ret = real_link(op ? op : oldpath, pn);
+	/* putpath */
+	free((void *)pn);
+	if (ret == 0) {
+	    if (op) free((void *)op);
+	    return ret;
+	}
+    }
+    ret = real_link(op ? op : oldpath, pathname);
+    if (op) free((void *)op);
+    return ret;
+}
+
+int rename(const char *oldpath, const char *pathname) {
+    static int (*real_rename)(const char *oldpath, const char *pathname) = NULL;
+    const char *op, *pn;
+    int ret;
+
+    PRINTF("[wrp %5d] %s %s %s\n", getpid(), "rename", oldpath, pathname);   
+    if (!real_rename) real_rename = dlsym(RTLD_NEXT, "rename"); 
+    /* we can't use the std macros employed by all the other
+       fuunctions because of the extra work we have to do around with
+       wrapping both pathnames... */
+    op = prepend_destdir(oldpath);
+    pn = prepend_destdir(pathname);
+
+    if (pn) {
+	ret = real_rename(op ? op : oldpath, pn);
+	/* putpath */
+	free((void *)pn);
+	if (ret == 0) {
+	    if (op) free((void *)op);
+	    return ret;
+	}
+    }
+    ret = real_rename(op ? op : oldpath, pathname);
+    if (op) free((void *)op);
+    return ret;
+}
 
 /* C library bits that do not directly map to a syscall */
 
-int opendir(const char *pathname) {
-    static int (*real_opendir)(const char *pathname) = NULL;
+DIR *opendir(const char *pathname) {
+    static DIR * (*real_opendir)(const char *pathname) = NULL;
     const char *p;
-    int ret;
+    DIR *ret;
 
     GET_PATH(opendir);
     if (p) {
 	ret = real_opendir(p);
-	PUT_PATH(0);
+	PUT_PATH(NULL);
     }
     return real_opendir(pathname);
 }
@@ -344,7 +468,7 @@ void *dlopen(const char *pathname, int flags) {
 }
 
 FILE *fopen(const char *pathname, const char *mode) {
-    static void * (*real_fopen)(const char *pathname, const char *mode) = NULL;
+    static FILE * (*real_fopen)(const char *pathname, const char *mode) = NULL;
     const char *p;
     FILE *ret;
 

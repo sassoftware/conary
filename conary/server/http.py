@@ -20,6 +20,7 @@ import kid
 import os
 import string
 import sys
+import textwrap
 import traceback
 
 from conary import metadata
@@ -66,8 +67,8 @@ class HttpHandler(WebHandler):
         self._protocol = protocol
         self._port = port
 
-        if 'server.templates' in sys.modules:
-            self.templatePath = os.path.dirname(sys.modules['server.templates'].__file__) + os.path.sep
+        if 'conary.server.templates' in sys.modules:
+            self.templatePath = os.path.dirname(sys.modules['conary.server.templates'].__file__) + os.path.sep
         else:
             self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
                         
@@ -147,6 +148,7 @@ class HttpHandler(WebHandler):
             char = 'A'
             defaultPage = True
         troves = self.repos.troveNamesOnServer(self.serverName)
+
         # keep a running total of each letter we see so that the display
         # code can skip letters that have no troves
         totals = dict.fromkeys(list(string.digits) + list(string.uppercase), 0)
@@ -225,19 +227,26 @@ class HttpHandler(WebHandler):
         f = deps.ThawDependencySet(f)
        
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
-        fileIters = []
-        for trove in self.repos.walkTroveSet(parentTrove):
-            files = self.repos.iterFilesInTrove(
-                trove.getName(),
-                trove.getVersion(),
-                trove.getFlavor(),
-                withFiles = True,
-                sortByPath = True)
-            fileIters.append(files)
-            
-        self._write("files", 
-            troveName = t,
-            fileIters = itertools.chain(*fileIters))
+        
+        # non-source group troves only show contained troves
+        if t.startswith('group-') and not t.endswith(':source'):
+            troves = sorted(parentTrove.iterTroveList())
+            self._write("group_contents", troveName = t, troves = troves)
+        else: # source troves and non-group troves 
+            fileIters = []
+            for trove in self.repos.walkTroveSet(parentTrove):
+                files = self.repos.iterFilesInTrove(
+                    trove.getName(),
+                    trove.getVersion(),
+                    trove.getFlavor(),
+                    withFiles = True,
+                    sortByPath = True)
+                fileIters.append(files)
+                
+            self._write("files", 
+                troveName = t,
+                fileIters = itertools.chain(*fileIters))
+           
         return apache.OK
 
     @strFields(path = None, pathId = None, fileId = None, fileV = None)
@@ -566,12 +575,30 @@ class HttpHandler(WebHandler):
     def pgpAdminForm(self, auth):
         admin = self.repServer.auth.check(self.authToken,admin=True)
         userId = self.repServer.auth.getUserIdByName(self.authToken[0])
+
         if admin:
             users = dict(self.repServer.auth.iterUsers())
+            users[None] = '--Nobody--'
         else:
             users = {userId: self.authToken[0]}
+
+        # build a dict of useful information about each user's OpenPGP Keys
+        # xml-rpc calls must be made before kid template is invoked
+        openPgpKeys = {}
+        for userId in users.keys():
+            keys = []
+            for fingerprint in self.repServer.listUsersMainKeys(self.authToken, 0, userId):
+                keyPacket = {}
+                keyPacket['fingerprint'] = fingerprint
+                keyPacket['subKeys'] = self.repServer.listSubkeys(self.authToken, 0, fingerprint)
+                keyPacket['uids'] = self.repServer.getOpenPGPKeyUserIds(self.authToken, 0, fingerprint)
+                keys.append(keyPacket)
+            openPgpKeys[userId] = keys
+
+        # FIXME: keyTable must be abolished once rBO catches up. It is left
+        # in for now to synchronize the transition.
         self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    users = users, admin=admin)
+                    users = users, admin=admin, openPgpKeys = openPgpKeys)
         return apache.OK
 
     @checkAuth(write = True)
@@ -606,3 +633,11 @@ class HttpHandler(WebHandler):
             return apache.OK
         self._write("pgp_get_key", keyId = search, keyData = keyData)
         return apache.OK
+
+
+def flavorWrap(f):
+    f = str(f).replace(" ", "\n")
+    f = f.replace(",", " ")
+    f = f.replace("\n", "\t")
+    f = textwrap.wrap(f, expand_tabs=False, replace_whitespace=False)
+    return ",\n".join(x.replace(" ", ",") for x in f)

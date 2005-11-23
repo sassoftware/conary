@@ -21,15 +21,14 @@ import stat
 import sys
 import tempfile
 
-import conary
-import checkin
-import conarycfg
-import rpmhelper
+from conary import checkin
+from conary import conarycfg
+from conary import rpmhelper
 
-from build import cook
-from lib import util
-from repository.netclient import NetworkRepositoryClient
-from repository import errors
+from conary.build import cook
+from conary.lib import util
+from conary.repository.netclient import NetworkRepositoryClient
+from conary.repository import errors
 
 
 chkconfigRe = re.compile(r'([ \t]*)(/sbin/)?chkconfig.*')
@@ -125,9 +124,9 @@ class taghandlerBuilder:
         if self.preScript:
             print 'Conary does not implement pre scripts.'
             print 'Most pre scripts add users/groups, which conary does'
-            print 'using r.User() and r.Group(); you may need to use the'
-            print '--recipe option and manually modify or add r.User()'
-            print 'and/or r.Group() lines.'
+            print 'using UserInfoRecipe and GroupInfoRecipe; you may need'
+            print 'to create these other recipes separately; rpm2ccs will'
+            print 'not create them for you.'
         if postUn:
             print 'Conary handles postuninstall in a way that is not'
             print 'compatible with RPM postun scripts.'
@@ -395,7 +394,7 @@ class recipeBuilder:
             "        # RPMs may not follow conary rules for config files for",
             "        # each file in /etc, so we'll stick to only files marked",
             "        # as config files in the RPM proper",
-            "        r.EtcConfig(exceptions='.*')",
+            "        r.Config(exceptions='.*')",
             "",
             "        # We also need to disable a lot of other policy that is",
             "        # very useful when building software, but not when",
@@ -408,16 +407,23 @@ class recipeBuilder:
             "        r.NonBinariesInBindirs(exceptions='.*')",
             "        r.FilesInMandir(exceptions='.*')",
             "        r.BadInterpreterPaths(exceptions='.*')",
+            "        r.NonMultilibComponent(exceptions='.*')",
+            "        r.NonMultilibDirectories(exceptions='.*')",
             "        r.ImproperlyShared(exceptions='.*')",
+            "        r.CheckDesktopFiles(exceptions='.*')",
             "        r.CheckSonames(exceptions='.*')",
             "        r.RequireChkconfig(exceptions='.*')",
             "        r.CheckDestDir(exceptions='.*')",
             "        r.DanglingSymlinks(exceptions='.*')",
             "        r.WarnWriteable(exceptions='.*')",
             "        r.WorldWriteableExecutables(exceptions='.*')",
+            "        r.FilesForDirectories(exceptions='.*')",
             "        # ObsoletePaths does not honor exceptions",
             "        del r.ObsoletePaths",
             "        r.IgnoredSetuid(exceptions='.*')",
+            "        r.LinkCount(exceptions='.*')",
+            "        del r.EnforceSonameBuildRequirements",
+            "        del r.EnforceConfigLogBuildRequirements",
             "",
         ]
 
@@ -496,7 +502,7 @@ class recipeBuilder:
         # pull user/group definition information, if any, out of the scripts
         self.tag = taghandlerBuilder(self)
 
-        # XXX add any User/Group bits needed for this recipe -- guess from
+        # XXX write UserInfoRecipe and GroupInfoRecipe -- guess from
         # current system first, then by trying to parse any adduser/group
         # lines (or maybe the other way around?)
 
@@ -550,6 +556,7 @@ def main(argv):
         return usage()
 
     cfg = conarycfg.ConaryConfiguration()
+    cfg.initializeFlavors()
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
     create = CHANGESET
@@ -588,11 +595,11 @@ def main(argv):
 
     try:
         # if it is already in the repository, pull it out
-        repos.findTrove(cfg.buildLabel, recipe.packagename+':source',
-                        None, None)
+        repos.findTrove(cfg.buildLabel, (recipe.packagename+':source',
+                                         None, None))
         checkin.checkout(repos, cfg, packagedir, recipe.packagename)
     except errors.TroveNotFound:
-        checkin.newPackage(repos, cfg, recipe.packagename)
+        checkin.newTrove(repos, cfg, recipe.packagename)
 
     os.chdir(packagedir)
 

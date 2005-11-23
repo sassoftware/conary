@@ -47,7 +47,7 @@ def usage(rc = 1):
     print "       conary localcommit  <changeset>"
     print "       conary pin          <pkgname>[=<version>][[flavor]]*"
     print "       conary query        <pkgname>[=<version>][[flavor]]*"
-    print "       conary remove       <path>"
+    print "       conary remove       <path>+"
     print "       conary repquery     <pkgname>[=<version>][[flavor]]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
@@ -55,7 +55,7 @@ def usage(rc = 1):
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
-    print "       conary update-conary"
+    print "       conary updateconary"
     print "       conary usage"
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
@@ -392,7 +392,14 @@ def realMain(cfg, argv=sys.argv):
 	    os.unlink(fullPath)
 	else:
 	    log.warning("%s has already been removed", fullPath)
-	db.removeFile(otherArgs[2])
+        # this call should move into conaryclient; for now we need
+        # this to instantiate the log
+        from conary import conaryclient
+        client = conaryclient.ConaryClient(cfg)
+        log.syslog.command()
+        for path in otherArgs[2:]:
+            db.removeFile(otherArgs[2])
+        log.syslog.commandComplete()
     elif (otherArgs[1] == "rollback"):
         kwargs = {}
 	if argSet.has_key('replace-files'):
@@ -456,7 +463,7 @@ def realMain(cfg, argv=sys.argv):
                                         tags, fullVersions, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
-    elif otherArgs[1] == "update-conary":
+    elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
     elif otherArgs[1] in ["update", "erase"]:

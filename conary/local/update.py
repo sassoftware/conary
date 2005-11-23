@@ -1408,8 +1408,8 @@ def shlibAction(root, shlibList, tagScript = None):
 	log.debug("running ldconfig")
 	pid = os.fork()
 	if not pid:
-	    os.chdir(root)
 	    os.chroot(root)
+	    os.chdir('/')
 	    try:
 		# XXX add a test case for an invalid ldconfig binary
 		os.execl(p, p)

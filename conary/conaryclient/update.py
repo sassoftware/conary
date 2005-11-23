@@ -62,31 +62,37 @@ class ClientUpdate:
             #    just because its got a better flavor)
             # 3. pick the best flavor out of the remaining
 
-            flavoredList = []
 
-            for troveTup in troveTups:
-                f = installFlavor.copy()
-                affFlavors = affFlavorDict[troveTup[0]]
-                if affFlavors:
-                    affFlavor = affFlavors[0][2]
-                    flavorsMatch = True
-                    for newF in [x[2] for x in affFlavors[1:]]:
-                        if newF != affFlavor:
-                            flavorsMatch = False
-                            break
-                    if flavorsMatch:
-                        f.union(affFlavor,
-                                mergeType=deps.DEP_MERGE_TYPE_PREFS)
+            if installFlavor:
+                flavoredList = []
+                for troveTup in troveTups:
+                    f = installFlavor.copy()
+                    affFlavors = affFlavorDict[troveTup[0]]
+                    if affFlavors:
+                        affFlavor = affFlavors[0][2]
+                        flavorsMatch = True
+                        for newF in [x[2] for x in affFlavors[1:]]:
+                            if newF != affFlavor:
+                                flavorsMatch = False
+                                break
+                        if flavorsMatch:
+                            f.union(affFlavor,
+                                    mergeType=deps.DEP_MERGE_TYPE_PREFS)
 
-                flavoredList.append((f, troveTup))
+                    flavoredList.append((f, troveTup))
+            else:
+                flavoredList = [ (None, x) for x in troveTups ]
 
             trovesByNB = {}
             for installFlavor, (n,v,f) in flavoredList:
                 b = v.branch()
                 myTimeStamp = v.timeStamps()[-1]
-                myScore = installFlavor.score(f)
-                if myScore is False:
-                    continue
+                if installFlavor is None:
+                    myScore = 0
+                else:
+                    myScore = installFlavor.score(f)
+                    if myScore is False:
+                        continue
 
                 if (n,b) in trovesByNB:
                     curScore, curTimeStamp, curTup = trovesByNB[n,b]

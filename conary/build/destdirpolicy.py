@@ -713,13 +713,16 @@ class Strip(policy.Policy):
 
     def postProcess(self):
         if self.debuginfo:
-            for file in sorted(self.debugfiles):
-                builddirpath = '%(topbuilddir)s/' % self.dm +file
-                dir = os.path.dirname(file)
+            for filename in sorted(self.debugfiles):
+                builddirpath = '%(topbuilddir)s/' % self.dm +filename
+                dir = os.path.dirname(filename)
                 util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
                 try:
-                    shutil.copy2(builddirpath,
-                                 '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
+                    targetfile = '%(destdir)s%(debugsrcdir)s/'%self.dm +filename
+                    shutil.copy2(builddirpath, targetfile)
+                    # these files only need to be readable; avoid warnings
+                    # about group-writeable files, etc.
+                    os.chmod(targetfile, 0644)
                 except IOError, msg:
                     if msg.errno == errno.ENOENT:
                         pass
@@ -791,7 +794,9 @@ class NormalizeCompression(policy.Policy):
         # pipeline is faster in a multiprocessing environment
 
         def _mktmp(fullpath):
-            return tempfile.mkstemp('.temp', '', os.path.dirname(fullpath))[1]
+            fd, path = tempfile.mkstemp('.temp', '', os.path.dirname(fullpath))
+            os.close(fd)
+            return path
 
         def _move(tmppath, fullpath):
             os.chmod(tmppath, os.lstat(fullpath).st_mode)
@@ -895,7 +900,7 @@ class NormalizeManPages(policy.Policy):
 		if len(lines) == 1:
 		    line = lines[0]
 		    # remove newline and other trailing whitespace if it exists
-		    line = line.rstrip() # chop-chop
+		    line = line.rstrip()
 		    match = self.soexp.search(line)
 		    if match:
 			matchlist = match.group(1).split('/')
@@ -904,7 +909,8 @@ class NormalizeManPages(policy.Policy):
 			    # no directory specified, or in the same
 			    # directory:
 			    targetpath = os.sep.join((dirname, matchlist[l-1]))
-			    if os.path.exists(targetpath):
+			    if (os.path.exists(targetpath) and
+                                os.path.isfile(targetpath)):
                                 self.dbg('replacing %s (%s) with symlink %s',
                                          name, match.group(0),
                                          os.path.basename(match.group(1)))

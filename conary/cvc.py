@@ -26,6 +26,7 @@ from conary import conarycfg
 from conary import constants
 from conary import deps
 from conary import flavorcfg
+from conary import state
 from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove
@@ -142,6 +143,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
+    argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
@@ -170,13 +172,12 @@ def realMain(cfg, argv=sys.argv):
 
     context = cfg.context
     if os.path.exists('CONARY'):
-        state = checkin.ConaryStateFromFile('CONARY')
-        if state.hasContext():
-            context = state.getContext()
+        conaryState = state.ConaryStateFromFile('CONARY')
+        if conaryState.hasContext():
+            context = conaryState.getContext()
 
     context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
-
 
     if context:
         cfg.setContext(context)
@@ -313,7 +314,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         if argSet.has_key('quiet'):
             cfg.quiet = True
             del argSet['quiet']
-        signtrove.signTroves(cfg, args[1:])
+        recurse = argSet.pop('recurse', False)
+        signtrove.signTroves(cfg, args[1:], recurse)
     elif (args[0] == "newpkg"):
         dir = argSet.pop('dir', None)
 
@@ -414,9 +416,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         log.setVerbosity(log.INFO)
         
         xmlSource = args[1]
-        state = checkin.ConaryStateFromFile("CONARY").getSourceState()
-        troveName = state.getName()
-        troveBranch = state.getVersion().branch()
+        conaryState = state.ConaryStateFromFile("CONARY").getSourceState()
+        troveName = conaryState.getName()
+        troveBranch = conaryState.getVersion().branch()
        
         log.info("describing trove %s with %s", troveName, xmlSource)
         xmlFile = open(xmlSource)
@@ -462,7 +464,7 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except database.OpenError, e:
         print >> sys.stderr, str(e)
-    except checkin.ConaryStateError, e:
+    except state.ConaryStateError, e:
         print >> sys.stderr, str(e)
     except openpgpfile.KeyNotFound, e:
         print >> sys.stderr, str(e)
