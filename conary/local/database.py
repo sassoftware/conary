@@ -152,8 +152,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 		 withFiles = True):
 	return self.db.getTrove(name, version, flavor, pristine = pristine)
 
-    def getTroves(self, troveList, pristine = True):
-        return self.db.getTroves(troveList, pristine)
+    def getTroves(self, troveList, pristine = True, withFiles = True):
+        return self.db.getTroves(troveList, pristine, withFiles = withFiles)
 
     def getTroveLatestVersion(self, name, branch):
         cu = self.db.db.cursor()

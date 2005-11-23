@@ -1239,14 +1239,15 @@ order by
 
         return result
 
-    def getTroves(self, troveList, pristine):
+    def getTroves(self, troveList, pristine, withFiles = True):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
         for i, instanceId in enumerate(instances):
             if instanceId is not None:
                 instances[i] = self._getTrove(pristine, 
-                                              troveInstanceId = instanceId)
+                                              troveInstanceId = instanceId,
+                                              withFiles = withFiles)
 
         return instances
 
