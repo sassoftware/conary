@@ -470,6 +470,21 @@ class ClientUpdate:
 
             return ph
 
+        def _troveTransitiveClosure(db, itemList):
+            itemQueue = util.IterableQueue()
+            fullSet = set()
+            for item in itertools.chain(itemList, itemQueue):
+                if item in fullSet: continue
+                fullSet.add(item)
+
+                trv = db.getTrove(withFiles = False, pristine = False, *item)
+                if not trv.isCollection(): continue
+
+                newItems = set(trv.iterTroveList())
+                itemQueue.add(newItems - fullSet)
+
+            return fullSet
+
         # def _mergeGroupChanges -- main body begins here
         erasePrimaries =    set(x for x in primaryJobList 
                                     if x[2][0] is None)
@@ -485,18 +500,10 @@ class ClientUpdate:
 
         # ineligible needs to be a transitive closure when recurse is set
         if recurse:
-            itemQueue = util.IterableQueue()
-            newIneligible = []
-            for item in itertools.chain(ineligible, itemQueue):
-                newIneligible.append(item)
-                trv = self.db.getTrove(withFiles = False, *item)
-                if not trv.isCollection(): continue
+            ineligible = _troveTransitiveClosure(self.db, ineligible)
 
-                for subItem in trv.iterTroveList():
-                    itemQueue.add(subItem)
-
-            ineligible = set(newIneligible)
-            del newIneligible, itemQueue
+        import epdb
+        epdb.st('f')
 
         # Build the trove which contains all of the absolute change sets
         # we may need to install. Build a set of all of the trove names
@@ -554,9 +561,6 @@ class ClientUpdate:
                  dict( ((job[0], job[1][0], job[1][1]), job[2]) for
                         job in localUpdates if job[1][0] is not None and
                                                job[2][0] is not None)
-
-        import epdb
-        epdb.st('f')
 
         avail = set(availableTrove.iterTroveList())
 
@@ -719,7 +723,8 @@ class ClientUpdate:
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
-                         useAffinity = True, ignorePrimaryPins = True):
+                         useAffinity = True, ignorePrimaryPins = True,
+                         forceJobClosure = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -742,13 +747,46 @@ class ClientUpdate:
                                 if not isPresent ])
             return newItems, oldItems
 
+        def _jobTransitiveClosure(db, troveSource, jobSet):
+            # This is an expensive operation. Use it carefully.
+            jobQueue = util.IterableQueue()
+            jobClosure = set()
+
+            for job in itertools.chain(jobSet, jobQueue):
+                if job in jobClosure:
+                    continue
+
+                if job[2][0] is None:
+                    continue
+
+                jobClosure.add(job)
+                if not trove.troveIsCollection(job[0]): continue
+
+                if job[1][0] is None:
+                    oldTrv = None
+                else:
+                    oldTrv = db.getTroves((job[0], job[1][0], job[1][1]),
+                                     withFiles = False, pristine = False)[0]
+                    if oldTrv is None:
+                        # XXX batching these would be much more efficient
+                        oldTrv = troveSource.getTrove(job[0], job[1][0],
+                                                      job[1][1], 
+                                                      withFiles = False)
+
+                newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                              withFiles = False)
+
+                recursiveJob = newTrv.diff(oldTrv, absolute = job[3])[2]
+                for x in recursiveJob:
+                    jobQueue.add(x)
+
+            return jobClosure
+
         # def _updateChangeSet -- body starts here
 
         # This job describes updates from a networked repository. Duplicates
         # (including installing things already installed) are skipped.
         newJob = set()
-        # This job is from a changeset file.
-        jobsFromChangeSetFiles = set()
         # These are items being removed.
         removeJob = set()
         # This is the full, transitive closure of the job
@@ -759,41 +797,6 @@ class ClientUpdate:
         toFind = {}
         toFindNoDb = {}
         for item in itemList:
-            if isinstance(item, changeset.ChangeSetFromFile):
-                if keepExisting:
-                    # We need to mark absolute troves in this changeset
-                    # as relative to preserve proper keepExisting behavior.
-                    newList = []
-                    for troveCs in item.iterNewTroveList():
-                        log.debug("found %s=%s[%s]" %
-                                  (troveCs.getName(), 
-                                   troveCs.getNewVersion().asString(),
-                                   str(troveCs.getNewFlavor())))
-                        if troveCs.isAbsolute():
-                            # XXX we could just flip the absolute bit instead
-                            # of going through all of this...
-                            log.debug("(switching to relative install to "
-                                      "force prevent rooting)")
-                            newTrove = trove.Trove(troveCs.getName(), 
-                                            troveCs.getNewVersion(), 
-                                            troveCs.getNewFlavor(), 
-                                            troveCs.getChangeLog())
-                            newTrove.applyChangeSet(troveCs)
-                            newCs = newTrove.diff(None, absolute = False)[0]
-                            newList.append(newCs)
-
-                    for troveCs in newList:
-                        # new replaces old
-                        item.newTrove(troveCs)
-
-
-                splittable = False
-                uJob.getTroveSource().addChangeSet(item, 
-                                                   includesFileContents = True)
-                transitiveClosure.update(item.getJobSet(primaries = False))
-                jobsFromChangeSetFiles.update(item.getJobSet(primaries = True))
-                continue
-
             (troveName, (oldVersionStr, oldFlavorStr),
                         (newVersionStr, newFlavorStr), isAbsolute) = item
             assert(oldVersionStr is None or not isAbsolute)
@@ -901,32 +904,20 @@ class ClientUpdate:
         # want to track them though to ensure they aren't removed by some
         # other action.
         changeSetList, oldItems = _separateInstalledItems(newJob)
-        jobSet, oldItems2 = _separateInstalledItems(jobsFromChangeSetFiles)
-
-        # Give nice warnings for things in oldItems2 (whose installs were
-        # requested, but are already there). XXX It seems like this would
-        # be a good idea for all jobs, not just ones which came from change
-        # set files?
-        for item in oldItems2:
-            log.warning("trove %s %s is already installed -- skipping",
-                        item[0], item[1].asString())
-
-        oldItems.update(oldItems2)
         log.debug("items already installed: %s", oldItems)
 
         changeSetList.update(removeJob)
-        del newJob, removeJob, oldItems2, jobsFromChangeSetFiles
+        del newJob, removeJob
 
-        # we now have three things
-        #   1. jobFromChangeSetFiles -- job which came from .ccs files
-        #   2. oldItems -- items which we should not remove as a side effect
-        #   3. changeSetList -- job we need to create a change set for
+        # we now have two things
+        #   1. oldItems -- items which we should not remove as a side effect
+        #   2. changeSetList -- job we need to create a change set for
 
         if not changeSetList and not jobSet:
             raise NoNewTrovesError
 
         if changeSetList:
-            jobSet.update(changeSetList)
+            jobSet = changeSetList
 
             # FIXME changeSetSource: I should just be able to call 
             # csSource.createChangeSet but it can't handle recursive
@@ -956,6 +947,17 @@ class ClientUpdate:
         del changeSetList
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
+
+        if forceJobClosure and recurse:
+            # The transitiveClosure we computed can't be trusted; we need
+            # to build another one. We could do this all the time, but it's
+            # expensive
+            transitiveClosure = _jobTransitiveClosure(self.db,
+                                            uJob.getTroveSource(), jobSet)
+        elif forceJobClosure:
+            transitiveClosure = jobSet
+        # else we trust the transitiveClosure which was passed in
+
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
                                          redirectHack, recurse, oldItems, 
                                          ignorePrimaryPins)
@@ -1058,8 +1060,15 @@ class ClientUpdate:
         uJob = database.UpdateJob(self.db)
 
         useAffinity = False
+        forceJobClosure = False
 
         if fromChangesets:
+            # when --from-file is used we need to explicitly compute the
+            # transitive closure for our job. we normally trust the 
+            # repository to give us the right thing, but that won't
+            # work when we're pulling jobs out of the change set
+            forceJobClosure = True
+
             csSource = trovesource.ChangesetFilesTroveSource(self.db)
             for cs in fromChangesets:
                 csSource.addChangeSet(cs, includesFileContents = True)
@@ -1085,7 +1094,8 @@ class ClientUpdate:
                                         recurse = recurse,
                                         updateMode = updateByDefault,
                                         useAffinity = useAffinity,
-                                        ignorePrimaryPins = ignorePrimaryPins)
+                                        ignorePrimaryPins = ignorePrimaryPins,
+                                        forceJobClosure = forceJobClosure)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
