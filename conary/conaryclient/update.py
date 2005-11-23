@@ -592,6 +592,9 @@ class ClientUpdate:
 
         del avail
 
+        import epdb
+        epdb.st('f')
+
         # Remove the alreadyReferenced set from both the troves which are
         # already installed. This lets us get a good match for such troves
         # if we decide to install them later.
@@ -718,12 +721,12 @@ class ClientUpdate:
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
 
-        return newJob
+        # items which were updated to redirects should be removed, no matter
+        # what
+        for info in redirects:
+            newJob.add((info[0], (info[1], info[2]), (None, None), False))
 
-        print
-        print "\n".join(str(x) for x in newJob)
-        import sys
-        sys.exit(0)
+        return newJob
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
