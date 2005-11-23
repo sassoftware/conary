@@ -592,9 +592,6 @@ class ClientUpdate:
 
         del avail
 
-        import epdb
-        epdb.st('f')
-
         # Remove the alreadyReferenced set from both the troves which are
         # already installed. This lets us get a good match for such troves
         # if we decide to install them later.
@@ -664,11 +661,15 @@ class ClientUpdate:
                     # Don't install this trove because it's predecessor was not
                     # installed
                     continue
-
-                if not self.db.hasTrove(*replacedInfo):
+                elif not self.db.hasTrove(*replacedInfo):
                     # We don't have the item we're updating from, so we
                     # need to convert this to a new install
                     replaced = (None, None)
+                elif not isPrimary and not redirectHack.get(newInfo, (None,)):
+                    # an empty list in redirectHack means the trove we're
+                    # redirecting from wasn't installed, so we shouldn't install
+                    # this trove either
+                    continue
 
                 if replacedInfo in localUpdatesByPresent:
                     # The trove being removed was explicitly updated to that
@@ -686,6 +687,11 @@ class ClientUpdate:
                 continue
             elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
                 # New trove matches excludeTroves
+                continue
+            elif not isPrimary and not redirectHack.get(newInfo, (None,)):
+                # an empty list in redirectHack means the trove we're
+                # redirecting from wasn't installed, so we shouldn't install
+                # this trove either
                 continue
 
             trv = troveSource.getTrove(withFiles = False, *newInfo)
@@ -723,7 +729,7 @@ class ClientUpdate:
 
         # items which were updated to redirects should be removed, no matter
         # what
-        for info in redirects:
+        for info in set(itertools.chain(*redirectHack.values())):
             newJob.add((info[0], (info[1], info[2]), (None, None), False))
 
         return newJob
