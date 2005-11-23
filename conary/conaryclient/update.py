@@ -903,22 +903,20 @@ class ClientUpdate:
         # Items which are already installed shouldn't be installed again. We
         # want to track them though to ensure they aren't removed by some
         # other action.
-        changeSetList, oldItems = _separateInstalledItems(newJob)
+        jobSet, oldItems = _separateInstalledItems(newJob)
         log.debug("items already installed: %s", oldItems)
 
-        changeSetList.update(removeJob)
+        jobSet.update(removeJob)
         del newJob, removeJob
 
         # we now have two things
         #   1. oldItems -- items which we should not remove as a side effect
-        #   2. changeSetList -- job we need to create a change set for
+        #   2. jobSet -- job we need to create a change set for
 
-        if not changeSetList:
+        if not jobSet:
             raise NoNewTrovesError
 
-        if changeSetList:
-            jobSet = changeSetList
-
+        if jobSet:
             # FIXME changeSetSource: I should just be able to call 
             # csSource.createChangeSet but it can't handle recursive
             # createChangeSet calls, and you can only call createChangeSet
@@ -926,25 +924,28 @@ class ClientUpdate:
             # once by checking to see if the changeSets are already in the
             # update job.
             hasTroves = uJob.getTroveSource().hasTroves(
-                [ (x[0], x[2][0], x[2][1]) for x in changeSetList ] )
+                [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
 
-            changeSetList = [ x[1] for x in
-                              itertools.izip(hasTroves, changeSetList)
+            reposChangeSetList = [ x[1] for x in
+                              itertools.izip(hasTroves, jobSet)
                                if x[0] is not True ]
+
+            if reposChangeSetList != jobSet:
+                # we can't trust the closure from the changeset we're getting
+                # since we're not getting everything for jobSet
+                forceJobClosure = True
 
             csSource = trovesource.TroveSourceStack(
                                          uJob.getSearchSource(),
                                          self.repos)
 
-            cs, notFound = csSource.createChangeSet(changeSetList, 
+            cs, notFound = csSource.createChangeSet(reposChangeSetList, 
                                                     withFiles = False,
                                                     recurse = recurse)
             assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
             transitiveClosure.update(cs.getJobSet(primaries = False))
             del cs
-
-        del changeSetList
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
 
