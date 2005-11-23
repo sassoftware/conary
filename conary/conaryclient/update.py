@@ -342,10 +342,11 @@ class ClientUpdate:
             # all of the erasures we already know about before getting to the
             # ones which are implicit. That gets the state right for ones
             # which are explicit (since arriving there implicitly gets
-            # ignored)
+            # ignored). Handling updates from newJob first prevents duplicates
+            # from primaryErases
             for job, ignorePins in itertools.chain(
-                        itertools.izip(primaryErases, itertools.repeat(True)), 
                         itertools.izip(newJob, itertools.repeat(False)),
+                        itertools.izip(primaryErases, itertools.repeat(True)), 
                         jobQueue):
 
                 oldInfo = (job[0], job[1][0], job[1][1])
@@ -501,9 +502,6 @@ class ClientUpdate:
         # ineligible needs to be a transitive closure when recurse is set
         if recurse:
             ineligible = _troveTransitiveClosure(self.db, ineligible)
-
-        import epdb
-        epdb.st('f')
 
         # Build the trove which contains all of the absolute change sets
         # we may need to install. Build a set of all of the trove names
