@@ -109,7 +109,8 @@ class ClientBranch:
 
                 key = (trove.getName(), branchedTrove.getVersion(),
                        trove.getFlavor())
-                branchedTroves[key] = branchedTrove.diff(None)[0]
+                branchedTroves[key] = branchedTrove.diff(None,
+                                                         absolute = True)[0]
 
             # check for duplicates - XXX this could be more efficient with
             # a better repository API

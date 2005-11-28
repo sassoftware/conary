@@ -597,8 +597,8 @@ class HttpHandler(WebHandler):
 
         # FIXME: keyTable must be abolished once rBO catches up. It is left
         # in for now to synchronize the transition.
-        self._write("pgp_admin", keyTable = self.troveStore.keyTable,
-                    users = users, admin=admin, openPgpKeys = openPgpKeys)
+        self._write("pgp_admin", users = users, admin=admin,
+                    openPgpKeys = openPgpKeys)
         return apache.OK
 
     @checkAuth(write = True)
