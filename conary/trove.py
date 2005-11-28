@@ -425,8 +425,7 @@ class Trove(streams.StreamSet):
     # makes sure we don't add data to troves and forget to make it part
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
-                  "changeLog", "troveInfo", "troves", "idMap", "redirect",
-                  "immutable" ]
+                  "changeLog", "troveInfo", "troves", "idMap", "redirect" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -722,8 +721,6 @@ class Trove(streams.StreamSet):
         @type skipIntegrityChecks: boolean
 	@rtype: dict
 	"""
-
-        assert(not self.immutable)
 
 	self.redirect.set(trvCs.getIsRedirect())
         if self.redirect():
@@ -1304,18 +1301,26 @@ class Trove(streams.StreamSet):
     def getPathHashes(self):
         return self.troveInfo.pathHashes
 
-    def __init__(self, name, version, flavor, changeLog, isRedirect = False):
-        if name.count(':') > 1:
-            raise TroveError, 'More than one ":" is not allowed in a trove name'
+    def __init__(self, name, version = None, flavor = None, changeLog = None, 
+                 isRedirect = False):
         streams.StreamSet.__init__(self)
-        assert(flavor is not None)
-	self.name.set(name)
-	self.version.set(version)
-	self.flavor.set(flavor)
-        if changeLog:
-            self.changeLog.thaw(changeLog.freeze())
-        self.redirect.set(isRedirect)
-        self.immutable = False
+
+        if isinstance(name, AbstractTroveChangeSet):
+            trvCs = name
+            assert(trvCs.isAbsolute())
+            self.name.set(trvCs.getName())
+            self.applyChangeSet(trvCs)
+        else:
+            if name.count(':') > 1:
+                raise TroveError, \
+                            'More than one ":" is not allowed in a trove name'
+            assert(flavor is not None)
+            self.name.set(name)
+            self.version.set(version)
+            self.flavor.set(flavor)
+            if changeLog:
+                self.changeLog.thaw(changeLog.freeze())
+            self.redirect.set(isRedirect)
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
