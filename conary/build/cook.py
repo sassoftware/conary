@@ -138,9 +138,7 @@ def signAbsoluteChangeset(cs, fingerprint):
     for troveCs in [ x for x in cs.iterNewTroveList() ]:
         # instantiate each trove from the troveCs so we can generate
         # the signature
-        t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
-                        troveCs.getNewFlavor(), troveCs.getChangeLog())
-        t.applyChangeSet(troveCs)
+        t = trove.Trove(troveCs)
         t.addDigitalSignature(fingerprint)
         # create a new troveCs that has the new signature included in it
         newTroveCs = t.diff(None, absolute = 1)[0]
