@@ -1,3 +1,10 @@
+Changes in 0.80.0:
+  o Client Changes:
+    * The logic for defining updates across a hierarchy has been completely
+      replaced. Instead of rigidly following the trove digraph, we flatten
+      the update to choose how troves get updated, and walk the hierarchy
+      to determine which updates to actually apply.
+
 Changes in 0.71.2
   o Client Changes:
     * The update-conary option has been renamed updateconary per
