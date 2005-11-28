@@ -108,6 +108,9 @@ class SignatureCallback:
         pass
 
 class LineOutput:
+    last = 0
+    out = sys.stdout
+
     def _message(self, msg):
         if self.out.isatty():
             self.out.write("\r")
@@ -121,7 +124,7 @@ class LineOutput:
     def __del__(self):
         if self.last:
             self._message("")
-            print "\r",
+            print >> self.out, "\r",
             self.out.flush()
 
     def __init__(self, f = sys.stdout):
