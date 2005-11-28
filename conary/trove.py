@@ -26,7 +26,7 @@ from conary.changelog import ChangeLog
 from conary.deps import deps
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
-from conary.lib.openpgpkey import getKeyCache
+from conary.lib import openpgpkey
 from conary.streams import ByteStream
 from conary.streams import DependenciesStream
 from conary.streams import FrozenVersionStream
@@ -142,9 +142,9 @@ _DIGSIG_TIMESTAMP     = 2
 
 class DigitalSignature(streams.StreamSet):
     streamDict = {
-        _DIGSIG_FINGERPRINT     : (SMALL, streams.StringStream,    'fingerprint' ),
-        _DIGSIG_SIGNATURE       : (SMALL, streams.StringStream,    'signature'   ),
-        _DIGSIG_TIMESTAMP       : (SMALL, streams.IntStream,       'timestamp'   ),
+        _DIGSIG_FINGERPRINT  : (SMALL, streams.StringStream,   'fingerprint' ),
+        _DIGSIG_SIGNATURE    : (SMALL, streams.StringStream,   'signature'   ),
+        _DIGSIG_TIMESTAMP    : (SMALL, streams.IntStream,      'timestamp'   ),
     }
 
     def _mpiToLong(self, data):
@@ -220,8 +220,8 @@ _TROVESIG_DIGSIG = 1
 class TroveSignatures(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVESIG_SHA1            : ( SMALL, streams.Sha1Stream,    'sha1'        ),
-        _TROVESIG_DIGSIG          : ( LARGE, DigitalSignatures,     'digitalSigs' ),
+        _TROVESIG_SHA1      : ( SMALL, streams.Sha1Stream,    'sha1'        ),
+        _TROVESIG_DIGSIG    : ( LARGE, DigitalSignatures,     'digitalSigs' ),
     }
 
     # this code needs to be called any time we're making a derived
@@ -437,41 +437,67 @@ class Trove(streams.StreamSet):
                                                     'versionStrings' : True,
                                                     'pathHashes' : True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
-        if skipIntegrityChecks:
-            self.computeSignatures()
-        else:
-            sha1_orig = self.troveInfo.sigs.sha1()
-            sha1_new = self.computeSignatures()
-            if sha1_orig:
-                assert(sha1_orig == sha1_new)
-        keyCache = getKeyCache()
+        """
+        Computes a new signature for this trove and stores it.
+
+        @param keyId: ID of the key use for signing
+        @type keyId: str
+        """
+        sha1_orig = self.troveInfo.sigs.sha1()
+        self.computeSignatures()
+        assert(skipIntegrityChecks or not sha1_orig or 
+               sha1_orig == self.troveInfo.sigs.sha1())
+
+        keyCache = openpgpkey.getKeyCache()
         key = keyCache.getPrivateKey(keyId)
         sig = key.signString(self.troveInfo.sigs.sha1())
         self.troveInfo.sigs.digitalSigs.add(sig)
 
-    #these functions reduce code duplication in netauth and netserver
-    #since we're going to need to pass the frozen form over the net
     def addPrecomputedDigitalSignature(self, sig):
+        """
+        Adds a previously computed signature. This allows signatures to be
+        added to troves.
+
+        @param sig: Signature to add
+        @type sig: DigitalSignature
+        """
         sha1_orig = self.troveInfo.sigs.sha1()
         sha1_new = self.computeSignatures()
         if sha1_orig:
             assert(sha1_orig == sha1_new)
+
         signature = DigitalSignature()
         signature.set(sig)
-        self.troveInfo.sigs.digitalSigs.addStream(_DIGSIGS_DIGSIGNATURE, signature)
+        self.troveInfo.sigs.digitalSigs.addStream(_DIGSIGS_DIGSIGNATURE, 
+                                                  signature)
 
     def getDigitalSignature(self, keyId):
+        """
+        Returns the signature created by the key whose keyId is passed.
+
+        @param keyId: Id for the key whose signature is returns
+        @type keyId: str
+        @rtype: DigitalSignature
+        """
         return self.troveInfo.sigs.digitalSigs.getSignature(keyId)
 
-    # return codes:
-    # 0 completely unknown voracity:
-    #    either we didn't have the key or we have no reason to trust the signing key
-    # positive values indicate a successful verification
-    #   the higher the value, the more we trust the signing key
-    # missingKeys is a list of missing fingerprints. pass a (blank?) list if you care to collect them...
-    #raise an exception if there were any bad signatures
-    #raise an exception if the trust level is beneath threshold
     def verifyDigitalSignatures(self, threshold = 0, keyCache = None):
+        """
+        Verifies the digial signature(s) for the trove against the keys
+        contained in keyCache.
+
+        The highest trust level verified is return along with the list of
+        keys which were unavailable. A trust level of zero means no trusted
+        keys were available. Invalid signatures raise 
+        DigitalSignatureVerificationError.
+
+        @param threshold: trust level required; trust levels below this result
+        in DigitalSignatureVerificationError
+        @type threshold: int
+        @param keyCache: cache of keys to verify against
+        @type keyCache: openpgpkey.OpenPGPKeyFileCache
+        @rtype: (int, list)
+        """
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
@@ -481,7 +507,7 @@ class Trove(streams.StreamSet):
             assert(sha1_orig == sha1_new)
 
         if keyCache is None:
-            keyCache = getKeyCache()
+            keyCache = openpgpkey.getKeyCache()
 
         for signature in self.troveInfo.sigs.digitalSigs.iter():
             try:
@@ -495,21 +521,42 @@ class Trove(streams.StreamSet):
             maxTrust = max(lev,maxTrust)
 
         if len(badFingerprints):
-            raise DigitalSignatureVerificationError("Trove signatures made by the following keys are bad: %s" % (' '.join(badFingerprints)))
+            raise DigitalSignatureVerificationError(
+                    "Trove signatures made by the following keys are bad: %s" 
+                            % (' '.join(badFingerprints)))
         if maxTrust < threshold:
-            raise DigitalSignatureVerificationError("Trove does not meet minimum trust level: %s" %self.getName())
+            raise DigitalSignatureVerificationError(
+                    "Trove does not meet minimum trust level: %s" 
+                            % self.getName())
         return maxTrust, missingKeys
 
     def computeSignatures(self, store = True):
+        """
+        Recomputes the sha1 signature of this trove.
+
+        @param store: The newly computed sha1 is stored as the sha1 for this 
+        trove.
+        @type store: boolean
+        @rtype: string
+        """
         s = self._sigString()
         sha1 = sha1helper.sha1String(s)
+
         if store:
             self.troveInfo.sigs.sha1.set(sha1)
+
         return sha1
 
     def verifySignatures(self):
+        """
+        Verifies the sha1 signature of this trove.
+
+        @rtype: boolean
+        """
+
         s = self._sigString()
         sha1 = sha1helper.sha1String(s)
+
         return sha1 == self.troveInfo.sigs.sha1()
 
     def copy(self, classOverride = None):
@@ -546,13 +593,6 @@ class Trove(streams.StreamSet):
 
     def getSigs(self):
         return self.troveInfo.sigs
-
-    def setSigs(self, sigs):
-        # make sure the signature block being applied to this trove is
-        # correct for this trove
-        check = self.computeSignatures(store=False)
-        assert(check == sigs.sha1())
-        self.troveInfo.sigs = sigs
 
     def isRedirect(self):
         return self.redirect()
