@@ -21,6 +21,8 @@ import urllib
 from conary import callbacks
 from conary.checkin import fullLabel
 from conary.conarycfg import selectSignatureKey
+from conary.deps import deps
+from conary.conarycfg import selectSignatureKey
 from conary.lib import log
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netclient import NetworkRepositoryClient
@@ -45,7 +47,7 @@ class SignatureCallback(callbacks.SignatureCallback, callbacks.LineOutput):
                           % (got, need))
 
 def recurseTroveInfo(repos, trvInfo):
-    trv = repos.getTroves([trvInfo])[0]
+    trv = repos.getTrove(*trvInfo)
     trvs = [trvInfo]
     for subTrvInfo in trv.iterTroveList():
         trvs.extend(recurseTroveInfo(repos, subTrvInfo))
@@ -56,11 +58,13 @@ def signTroves(cfg, specStrList, recurse = False, callback = 0):
     troves = []
     trv = []
     repos = NetworkRepositoryClient(cfg.repositoryMap)
+
     if not callback:
         if cfg.quiet:
             callback = callbacks.SignatureCallback()
         else:
             callback = SignatureCallback()
+
     for specStr in specStrList:
         name, versionStr, flavor = parseTroveSpec(specStr)
 
@@ -72,64 +76,63 @@ def signTroves(cfg, specStrList, recurse = False, callback = 0):
             return
 
         for trvInfo in trvList:
-            troveStr += str(trvInfo[0]) + str(trvInfo[1].asString()) + " " + str(trvInfo[2]) + "\n"
+            troveStr += "%s=%s[%s]\n" % (trvInfo[0], trvInfo[1].asString(),
+                                         deps.formatFlavor(trvInfo[2]))
 
-        for trvInfo in trvList:
             if recurse:
                 troves.extend(recurseTroveInfo(repos, trvInfo))
             else:
                 troves.append(trvInfo)
-        for trvInfo in troves:
-            trv.append(repos.getTrove(trvInfo[0],trvInfo[1],trvInfo[2],True))
 
-    if not cfg.interactive:
-        answer = "Y"
-    else:
+        trv += repos.getTroves(troves, withFiles = True)
+
+    if cfg.interactive:
         print troveStr
         print "Total: %d troves" % len(troves)
         print "Are you sure you want to digitally sign these troves [y/N]?"
         answer = sys.stdin.readline()
+        if ansert[0].upper() != 'Y':
+            return
 
-    if answer[0].upper() == 'Y':
-
-        n = len(troves)
-        for i in range(n):
-            callback.getTroveInfo(i+1,n)
-            trvInfo = troves[i]
-            signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
-            if signatureKey:
-                try:
-                    trv[i].getDigitalSignature(signatureKey)
-                    if not cfg.quiet:
-                        print "\nTrove: ",str(trvInfo[0]) + str(trvInfo[1].asString()) + " " + str(trvInfo[2]) + "\nis already signed by key: " + cfg.signatureKey
-                        return
-                except KeyNotFound:
-                    pass
-
-        n = len(troves)
-        for i in range(n):
-            callback.signTrove(i+1,n)
-            trvInfo = troves[i]
-            signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
-            if signatureKey:
-                try:
-                    trv[i].addDigitalSignature(signatureKey)
-                except KeyNotFound:
-                    print "\nKey:", signatureKey, "is not in your keyring."
+    n = len(troves)
+    for i in range(n):
+        callback.getTroveInfo(i+1,n)
+        trvInfo = troves[i]
+        signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
+        if signatureKey:
+            try:
+                trv[i].getDigitalSignature(signatureKey)
+                if not cfg.quiet:
+                    print "\nTrove: ",str(trvInfo[0]) + str(trvInfo[1].asString()) + " " + str(trvInfo[2]) + "\nis already signed by key: " + cfg.signatureKey
                     return
+            except KeyNotFound:
+                pass
 
-        misfires = []
-        for i in range(n):
-            callback.sendSignature(i+1,n)
-            trvInfo = troves[i]
-            signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
-            if signatureKey:
-                try:
-                    repos.addDigitalSignature(trvInfo[0],trvInfo[1],trvInfo[2], trv[i].getDigitalSignature(signatureKey) )
-                except KeyNotFound:
-                    misfires.append(trvInfo[0])
-        if misfires:
-            kError = KeyNotFound('')
-            kError.error = 'The following troves could not be signed: %s' \
-                           % str(misfires)
-            raise kError
+    n = len(troves)
+    for i in range(n):
+        callback.signTrove(i+1,n)
+        trvInfo = troves[i]
+        signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
+        if signatureKey:
+            try:
+                trv[i].addDigitalSignature(signatureKey)
+            except KeyNotFound:
+                print "\nKey:", signatureKey, "is not in your keyring."
+                return
+
+    misfires = []
+    for i in range(n):
+        callback.sendSignature(i+1,n)
+        trvInfo = troves[i]
+        signatureKey = selectSignatureKey(cfg, trv[i].getVersion().branch().label().asString())
+        if signatureKey:
+            try:
+                repos.addDigitalSignature(trvInfo[0],trvInfo[1],trvInfo[2], trv[i].getDigitalSignature(signatureKey) )
+            except KeyNotFound:
+                misfires.append(trvInfo[0])
+
+    if misfires:
+        kError = KeyNotFound('')
+        kError.error = 'The following troves could not be signed: %s' \
+                       % str(misfires)
+        raise kError
