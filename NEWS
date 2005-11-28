@@ -6,6 +6,8 @@ Changes in 0.80.0:
       to determine which updates to actually apply.
     * Dependency resolution could include troves which caused duplicate 
       removals for the troves those included troves replace
+    * Chroot handling was broken in 0.71.2 and prevented the user name
+      lookup code for the chroot from exiting back out of the chroot
 
 Changes in 0.71.2
   o Client Changes:

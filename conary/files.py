@@ -697,8 +697,9 @@ class UserGroupIdCache:
 
 	if root and root != '/':
 	    curDir = os.open(".", os.O_RDONLY)
+            # this doesn't chdir into the root to allow us to chroot
+            # back out again
 	    os.chroot(root)
-	    os.chdir("/")
 	
 	try:
 	    theId = self.nameLookupFn(name)[2]
