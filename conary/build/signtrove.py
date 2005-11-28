@@ -23,7 +23,6 @@ from conary import trove
 from conary.checkin import fullLabel
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
-from conary.conarycfg import selectSignatureKey
 from conary.lib import log
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netclient import NetworkRepositoryClient
