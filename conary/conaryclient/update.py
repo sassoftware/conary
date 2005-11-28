@@ -220,10 +220,16 @@ class ClientUpdate:
                                     for x in suggList ])
 
             if troves:
-                # we found good suggestions, merge in those troves
+                # We found good suggestions, merge in those troves. Items
+                # which are being removed by the current job cannot be 
+                # removed again.
+                beingRemoved = set((x[0], x[1][0], x[1][1]) for x in
+                                    jobSet if x[1][0] is not None )
+
                 newJob = self._updateChangeSet(troves, uJob,
                                           keepExisting = False,
                                           recurse = False,
+                                          ineligible = beingRemoved,
                                           ignorePrimaryPins = False)[0]
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
@@ -737,7 +743,7 @@ class ClientUpdate:
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, ignorePrimaryPins = True,
-                         forceJobClosure = False):
+                         forceJobClosure = False, ineligible = set()):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -973,7 +979,8 @@ class ClientUpdate:
         # else we trust the transitiveClosure which was passed in
 
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
-                                         redirectHack, recurse, oldItems, 
+                                         redirectHack, recurse, 
+                                         oldItems | ineligible, 
                                          ignorePrimaryPins)
         if not newJob:
             raise NoNewTrovesError
