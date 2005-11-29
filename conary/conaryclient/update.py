@@ -966,6 +966,7 @@ class ClientUpdate:
             assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
             transitiveClosure.update(cs.getJobSet(primaries = False))
+            splittable = False
             del cs
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
