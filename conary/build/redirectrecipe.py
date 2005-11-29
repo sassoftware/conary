@@ -2,7 +2,7 @@ from conary.repository import errors
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
-from recipe import Recipe, RECIPE_TYPE_REDIRECT
+from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
