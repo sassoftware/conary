@@ -779,7 +779,7 @@ class Database(SqlDbRepository):
 	self.root = root
 
         if path == ":memory:": # memory-only db
-            SqlDbRepository.__init__(self, root)
+            SqlDbRepository.__init__(self, ':memory:')
         else:
             top = util.joinPaths(root, path)
 

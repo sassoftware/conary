@@ -63,6 +63,11 @@ INODE_STREAM_GROUP = 4
 SMALL = streams.SMALL
 LARGE = streams.LARGE
 
+FILE_TYPE_DIFF = '\x01'
+
+def fileStreamIsDiff(fileStream):
+    return fileStream[0] == FILE_TYPE_DIFF
+
 class DeviceStream(streams.StreamSet):
 
     streamDict = { DEVICE_STREAM_MAJOR : (SMALL, streams.IntStream,  "major"),
@@ -267,7 +272,7 @@ class File(streams.StreamSet):
 	if other is None or self.lsTag != other.lsTag:
 	    return self.freeze()
 
-	rc = [ "\x01", self.lsTag ]
+	rc = [ FILE_TYPE_DIFF, self.lsTag ]
         rc.append(streams.StreamSet.diff(self, other))
 
 	return "".join(rc)

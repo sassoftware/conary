@@ -18,6 +18,7 @@ import urllib2
 
 from conary import callbacks
 from conary import conaryclient
+from conary import display
 from conary.deps import deps
 from conary.lib import log
 from conary.lib import util
@@ -158,20 +159,18 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.restored = 0
         self.updateHunk = (num, total)
 
-    def setUpdateJob(self, job):
+    def setUpdateJob(self, jobs):
         self.lock.acquire()
+        self._message('')
         if self.updateHunk[1] < 2:
-            lines = [ 'Applying update job:' ]
+            self.out.write('Applying update job:\n')
         else:
-            lines = [ 'Applying update job %d of %d:' %self.updateHunk ]
+            self.out.write('Applying update job %d of %d:\n' % self.updateHunk)
         # erase anything that is currently displayed
         self._message('')
-        indent = '    '
-        lines.extend(formatUpdateJobInfo(job, indent = indent))
-        for line in lines:
-            # don't use self._message since we are not expecting to erase
-            # this line.
+        for line in self.formatter.formatJobTups(jobs, indent='    '):
             self.out.write(line + '\n')
+
         self.lock.release()
 
     def __init__(self):
@@ -184,133 +183,20 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateText = None
         self.lock = thread.allocate_lock()
 
+        self.formatter = display.JobTupFormatter()
 
-def formatJob(job, verbose=False):
-    # format a single job entry
-    (name, (oldVersion, oldFlavor),
-           (newVersion, newFlavor), absolute) = job
-    if newVersion:
-        newTVersion = newVersion.trailingRevision()
-    if oldVersion:
-        oldTVersion = oldVersion.trailingRevision()
+def displayUpdateInfo(updJob):
+    jobLists = updJob.getJobs()
 
-    if verbose:
-        if newVersion:
-            newInfo = '%s[%s]' % (newVersion.asString(), 
-                                  deps.formatFlavor(newFlavor))
-        if oldVersion:
-            oldInfo = '%s[%s]' % (oldVersion.asString(), 
-                                  deps.formatFlavor(oldFlavor))
-    else:
-        if oldVersion:
-            oldInfo = oldTVersion.asString()
+    formatter = display.JobTupFormatter()
+    formatter.prepareJobLists(jobLists)
 
-        if newVersion:
-            newInfo = newTVersion.asString()
-
-    if not oldVersion:
-        # if there is no oldVersion, this is a new trove
-        return "%s=%s" % (name, newInfo), 'Install'
-    elif not newVersion:
-        # if there is no newVersion, this is a new trove
-        return "%s=%s" % (name, oldInfo), 'Erase  '
-
-    if oldVersion.branch() != newVersion.branch():
-        # kind = 'Br'
-        kind = 'Update '
-        oldInfo = oldVersion.asString()
-        newInfo = newVersion.asString()
-    elif oldTVersion.getVersion() != newTVersion.getVersion():
-        # kind = 'V'
-        kind = 'Update '
-    elif (oldTVersion.getSourceCount() !=
-          newTVersion.getSourceCount()):
-        # kind = 'S'
-        kind = 'Update '
-    else:
-        # kind = 'B'
-        kind = 'Update '
-    if oldFlavor != newFlavor:
-        flavors = deps.flavorDifferences([oldFlavor, newFlavor])
-        oldFlavor = flavors[oldFlavor]
-        newFlavor = flavors[newFlavor]
-        if not verbose and oldFlavor:
-            oldInfo = '%s[%s]' % (oldInfo, deps.formatFlavor(oldFlavor))
-        if not verbose and newFlavor:
-            newInfo = '%s[%s]' % (newInfo, deps.formatFlavor(newFlavor))
-
-    return "%s (%s -> %s)" % (name, oldInfo, newInfo), kind
-
-def formatCollapsedJobs(jobList):
-    # take a list of jobs that starts with a package update job and
-    # continues with componet update jobs (that are a part of the same
-    # package) and return a formatted string representing the job
-    # for both the packages and the components.
-    if len(jobList) == 1:
-        # if we only have one job, we're just doing something to the
-        # package, not to any components.  Treat it as a single update
-        return formatJob(jobList[0])
-
-    # otherwise, form up a slightly modified job that collapses all
-    # the components into the name of the package.
-    pkg = jobList[0]
-    pkgName = pkg[0]
-    pkgLen = len(pkgName)
-    collapsedName = '%s(%s)' % (pkgName,
-                                # get the :component name for each component
-                                ' '.join(x[0][pkgLen:] for x in jobList[1:]))
-    return formatJob((collapsedName, ) + pkg[1:])
-
-def formatUpdateJobInfo(jobList, verbose=False, indent=''):
-    lines = []
-    currentPkg = None
-    collapsedInfo = []
-    # use sorted() here to collapse component and package update info
-    # line into one line.  We assume that foo sorts before foo:bar.
-    for job in sorted(jobList):
-        name = job[0]
-        # if we're in the middle of processing a package, check to
-        # see if this is a component of that package.  
-        if currentPkg:
-            if name.startswith(currentPkg[0]) and job[1:] == currentPkg[1]:
-                # If it is, collapse the component into the package line.
-                collapsedInfo.append(job)
-                continue
-            else:
-                # otherwise, dump what we have so far
-                lines.append(formatCollapsedJobs(collapsedInfo))
-                collapsedInfo = []
-                currentPkg = None
-
-        # if we're not dealing with a component, and there is not
-        # currently a package, set the current package as this job
-        if not currentPkg and ':' not in name:
-            collapsedInfo.append(job)
-            currentPkg = (name + ':', job[1:])
-            continue
-
-        # this is a lone job. format it by itself.
-        lines.append(formatJob(job, verbose=verbose))
-
-    if collapsedInfo:
-        # handle any left over collapsed info
-        lines.append(formatCollapsedJobs(collapsedInfo))
-
-    lines = ("%s%s %s" % (indent, x[1], x[0]) for x in lines)
-    return lines
-
-def displayUpdateJobInfo(jobList, verbose=False):
-    indent = '    '
-    new = formatUpdateJobInfo(jobList, verbose=verbose, indent=indent)
-    if new:
-        print '\n'.join(new)
-
-def displayUpdateInfo(updJob, verbose=False):
-    totalJobs = len(updJob.getJobs())
-    for num, job in enumerate(updJob.getJobs()):
+    totalJobs = len(jobLists)
+    for num, job in enumerate(jobLists):
         if totalJobs > 1:
-            print 'Job %d of %d:' %(num + 1, totalJobs)
-        displayUpdateJobInfo(job, verbose)
+            print 'Job %d of %d:' % (num + 1, totalJobs)
+        for line in formatter.formatJobTups(job, indent='    '):
+            print line
     return
 
 def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None, 

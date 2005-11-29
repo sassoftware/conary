@@ -469,7 +469,7 @@ class ChangeSet(streams.StreamSet):
 
                 origFile = db.getFileVersion(pathId, curFileId, curVersion)
 
-                if csInfo[0] == "\x01":
+                if files.fileStreamIsDiff(csInfo):
                     # this is a diff, not an absolute change
                     newFile = origFile.copy()
                     newFile.twm(csInfo, origFile)

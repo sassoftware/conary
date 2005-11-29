@@ -17,10 +17,10 @@ Provides the output for the "conary verify" command
 import sys
 import time
 
-from conary import display
 from conary import files
 from conary import showchangeset
 from conary import versions
+from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.lib.sha1helper import sha1ToString
@@ -32,8 +32,7 @@ def usage():
     print ""
 
 def verify(troveNameList, db, cfg, all=False):
-    (troveNames, hasVersions, hasFlavors) = \
-                    display.parseTroveStrings(troveNameList)
+    troveNames = [ cmdline.parseTroveSpec(x) for x in troveNameList ]
     if not troveNames and not all:
         usage()
         log.error("must specify either a trove or --all")

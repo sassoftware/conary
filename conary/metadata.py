@@ -276,7 +276,7 @@ def fetchFreshmeat(troveName):
     except xml.parsers.expat.ExpatError:
         raise NoFreshmeatRecord
 
-def showDetails(repos, cfg, troveName, branch, sourceTrove):
+def formatDetails(repos, cfg, troveName, branch, sourceTrove):
     md = repos.getMetadata([troveName, branch], branch.label())
     while not md and branch.hasParentBranch():
         lastHost = branch.label().getHost()
@@ -299,13 +299,12 @@ def showDetails(repos, cfg, troveName, branch, sourceTrove):
         wrapper = textwrap.TextWrapper(initial_indent='    ',
                                        subsequent_indent='    ')
         wrapped = wrapper.wrap(md.getLongDesc())
-        wrappedDesc = "\n".join(wrapped)
 
         for l in md.getLicenses():
-            print "License   : %s" % l
+            yield "License   : %s" % l
         for c in md.getCategories():
-            print "Category  : %s" % c
-        print "Summary   : %s" % md.getShortDesc()
-        print "Description: \n%s" % (wrappedDesc)
-    else:
-        log.info("no details found for %s", troveName)
+            yield "Category  : %s" % c
+        yield "Summary   : %s" % md.getShortDesc()
+        yield "Description: "
+        for line in wrapped:
+            yield line

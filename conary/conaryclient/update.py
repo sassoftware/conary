@@ -894,7 +894,8 @@ class ClientUpdate:
         searchSource = uJob.getSearchSource()
 
         if not useAffinity:
-            results.update(searchSource.findTroves(None, toFind))
+            results.update(searchSource.findTroves(self.cfg.installLabelPath,
+                                                   toFind))
         else:
             if toFind:
                 log.debug("looking up troves w/ database affinity")
@@ -1106,7 +1107,7 @@ class ClientUpdate:
                 uJob.getTroveSource().addChangeSet(cs,
                                                    includesFileContents = True)
 
-            uJob.setSearchSource(csSource)
+            uJob.setSearchSource(trovesource.stack(csSource, self.repos))
         elif sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
         else:

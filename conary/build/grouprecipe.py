@@ -12,6 +12,7 @@
 # full details.
 #
 from itertools import chain, izip
+import tempfile
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
 from conary.build.errors import RecipeFileError
@@ -19,7 +20,7 @@ from conary.build import macros
 from conary.build import use
 from conary import conaryclient
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, util
 from conary.repository import errors, trovesource
 from conary import versions
 
@@ -127,7 +128,9 @@ class SingleGroup:
         oldDbPath = cfg.dbPath
         cfg.setValue('dbPath', ':memory:')
         oldRoot = cfg.root
-        cfg.setValue('root', ':memory:')
+        tmpDir = tempfile.mkdtemp()
+        cfg.setValue('root', tmpDir)
+
         oldInstallLabelPath = cfg.installLabelPath
         resolveLabelPath = labelPath
         cfg.installLabelPath = labelPath
@@ -158,6 +161,8 @@ class SingleGroup:
         # restore config
         cfg.setValue('dbPath', oldDbPath)
         cfg.setValue('root', oldRoot)
+        util.rmtree(tmpDir)
+
         cfg.installLabelPath = oldInstallLabelPath
         cfg.autoResolve = oldAutoResolve
         cfg.flavor = oldFlavor

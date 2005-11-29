@@ -30,34 +30,6 @@ class AbstractTroveDatabase:
     def commitChangeSet(self, cs):
 	raise NotImplementedError
 
-    def findTrove(self, labelPath, (name, versionstr, flavor), 
-                  defaultFlavor = None,
-                  acrossRepositories = False, affinityDatabase = None):
-	"""
-	Looks up a trove in the repository based on the name and
-	version provided. If any errors occur, TroveNotFound is
-	raised with an appropriate error message. Multiple matches
-	could be found if versionStr refers to a label, or if 
-        affinityDatabase is used and there are multiple matches.
-
-	@param labelPath: Path of labels to look on if no branch
-	is specified. If only a branch name is given (not a complete label),
-	the repository names from these labels are used as the repository
-	name for the branch name to form a complete label.
-	@param name: Trove name
-	@type name: str
-	@param versionStr: Trove version
-	@type versionStr: str
-	@param flavor: only troves compatible with this flavor will be returned
-	@type flavor: deps.DependencySet
-        @param acrossRepositories: normally findTrove only returns matches
-        from a single repository (the first one with a match). if this is
-        set it continues searching through all repositories
-        @type acrossRepositories: boolean
-	@rtype: list of (troveName, troveVersion, troveFlavor)
-	"""
-	raise NotImplementedError
-
     def getFileVersion(self, pathId, fileId, version, withContents = 0):
 	"""
 	Returns the file object for the given (pathId, fileId, version).
@@ -80,7 +52,7 @@ class AbstractTroveDatabase:
 
 	raise NotImplementedError
 
-    def getTrove(self, troveName, version, flavor):
+    def getTrove(self, troveName, version, flavor, withFiles=True):
 	"""
 	Returns the trove which matches (troveName, version, flavor). If
 	the trove does not exist, TroveMissing is raised.
@@ -133,46 +105,6 @@ class AbstractTroveDatabase:
 	created and returned as the fourth element in the tuple.
 	"""
 	raise NotImplementedError
-
-    def walkTroveSet(self, trove, ignoreMissing = True):
-	"""
-	Generator returns all of the troves included by trove, including
-	trove itself.
-	"""
-	yield trove
-	seen = { trove.getName() : [ (trove.getVersion(),
-				      trove.getFlavor()) ] }
-
-	troveList = [x for x in trove.iterTroveList()]
-
-	while troveList:
-	    (name, version, flavor) = troveList[0]
-	    del troveList[0]
-
-	    if seen.has_key(name):
-		match = False
-		for (ver, fla) in seen[name]:
-		    if version == ver and fla == flavor:
-			match = True
-			break
-		if match: continue
-
-		seen[name].append((version, flavor))
-	    else:
-		seen[name] = [ (version, flavor) ]
-
-	    try:
-                trv = self.getTrove(name, version, flavor)
-
-                yield trv
-
-                troveList += [ x for x in trv.iterTroveList() ]
-	    except errors.TroveMissing:
-		if not ignoreMissing:
-		    raise
-	    except KeyError:
-		if not ignoreMissing:
-		    raise
 
 class IdealRepository(AbstractTroveDatabase):
 

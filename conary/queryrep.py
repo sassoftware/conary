@@ -14,253 +14,167 @@
 """
 Provides the output for the "conary repquery" command
 """
-
+import itertools
 import time
 
+from conary.conaryclient import cmdline
 from conary import display
-from conary import files
-from conary import metadata
-from conary import versions
 from conary.deps import deps
 from conary.lib import log
-from conary.lib.sha1helper import sha1ToString
-from conary.repository import errors
+from conary import versions
 
-_troveFormat  = display._troveFormat
-_formatFlavor  = display._formatFlavor
-_displayOneTrove  = display._displayOneTrove
-_troveFormatWithFlavor = display._troveFormatWithFlavor
-_fileFormat = display._fileFormat
-_grpFormat  = display._grpFormat
 
-def displayTroves(repos, cfg, troveList = [], all = False, ls = False, 
+def displayTroves(repos, cfg, troveSpecs = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
-                  fullVersions = False, info = False, tags = False,
-                  deps = False, showBuildReqs = False, showFlavors = False):
-    hasVersions = False
-    hasFlavors = False
+                  info = False, tags = False, deps = False,
+                  showBuildReqs = False):
+    """
+       Displays information about troves found in repositories
 
-    emptyList = (not troveList)
+       @param repos: a network repository client 
+       @type repos: repository.netclient.NetworkRepositoryClient
+       @param cfg: conary config
+       @type cfg: conarycfg.ConaryConfiguration
+       @param troveSpecs: troves to search for
+       @type troveSpecs: list of troveSpecs (n[=v][[f]])
+       @param all: If true, find all versions of the specified troves, 
+                   not just the leaves
+       @type all: bool
+       @param leaves: If true, find all leaves of the specified troves,
+                      regardless of whether they match the cfg flavor 
+       @type leaves: bool
+       @param ls: If true, list files in the trove
+       @type ls: bool
+       @param ids: If true, list pathIds for files in the troves
+       @type ids: bool
+       @param sha1s: If true, list sha1s for files in the troves
+       @type sha1s: bool
+       @param tags: If true, list tags for files in the troves
+       @type tags: bool
+       @param info: If true, display general information about the trove
+       @type info: bool
+       @param deps: If true, display provides and requires information for the
+                    trove.
+       @type deps: bool
+       @param showDiff: If true, display the difference between the local and
+                        pristine versions of the trove
+       @type showDiff: bool
+       @rtype: None
+    """
 
-    if troveList:
-        (troves, hasVersions, hasFlavors) = \
-                    display.parseTroveStrings(troveList)
+
+    troveTups, namesOnly, primary  = getTrovesToDisplay(repos, cfg, troveSpecs, 
+                                                        all, leaves)
+    iterChildren = not namesOnly
+
+    dcfg = display.DisplayConfig(repos, ls, ids, sha1s, cfg.fullVersions, tags, 
+                                 info, deps, showBuildReqs, cfg.fullFlavors,
+                                 iterChildren)
+
+    if primary:
+        dcfg.setPrimaryTroves(set(troveTups))
+
+    if dcfg.needFiles() and all:
+        log.error('cannot use "all" with commands that require file lists')
+
+    formatter = display.TroveFormatter(dcfg)
+
+    display.displayTroves(dcfg, formatter, troveTups)
+
+
+def getTrovesToDisplay(repos, cfg, troveSpecs, all, leaves):
+    """ Finds troves that match the given trove specifiers, using the
+        current configuration, and parameters
+
+        @param repos: a network repository client
+        @type repos: repository.netclient.NetworkRepositoryClient
+        @param cfg: conary config
+        @type cfg: conarycfg.ConaryConfiguration
+        @param troveSpecs: troves to search for
+        @type troveSpecs: list of troveSpecs (n[=v][[f]])
+        @param all: If true, find all versions of the specified troves, 
+                   not just the leaves
+        @type all: bool
+        @param leaves: If true, find all leaves of the specified troves,
+                       regardless of whether they match the cfg flavor 
+        @type leaves: bool
+
+        @rtype: troveTupleList (list of (name, version, flavor) tuples)
+                and a boolean that is true if all troveSpecs passed in do not 
+                specify version or flavor
+    """
+
+    namesOnly = True
+
+    if troveSpecs:
+        primary = True
+        troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecs ]
     else:
-	# this returns a sorted list
-        troves = []
+        primary = False
+        troveSpecs = []
+
+    for troveSpec in troveSpecs:
+        if troveSpec[1:] != (None, None):
+            namesOnly = False
+
+    if not (all or leaves) and not troveSpecs:
         for label in cfg.installLabelPath:
-            troves += [ (x, None, None) for x in repos.troveNames(label) ]
-            troves.sort()
-
-    if True in (hasVersions, hasFlavors, ls, ids, sha1s, info, tags, deps,
-                showBuildReqs):
-	if all:
-	    log.error("--all cannot be used with queries which display file "
-		      "lists")
-	    return
-	for troveName, versionStr, flavor in troves:
-	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      info, tags, deps, fullVersions, flavor, 
-                              showBuildReqs, showFlavors)
-	    continue
+            troveSpecs += [ (x, None, None) for x in repos.troveNames(label) ]
+            troveSpecs.sort()
+        allowMissing = True
     else:
-	if all or leaves:
-            repositories = {}
-            allHosts = [ x.getHost() for x in cfg.installLabelPath ]
-            for (name, versionStr, flavor) in troves:
-                if versionStr and versionStr[0] != '@':
-                    hostList = versions.Label(versionStr).getHost()
-                else:
-                    hostList = allHosts
-                    
+        allowMissing = False
+
+    troveTups = []
+    if all or leaves:
+        if troveSpecs:
+            for (n, vS, fS) in troveSpecs:
+                hostList = None
+                if vS:
+                    try:
+                        label = versions.Label(vS)
+                        hostList = [label.getHost()]
+                    except versions.ParseError:
+                        pass
+                    if not hostList:
+                        try:
+                            ver = versions.VersionFromString(vS)
+                            host = ver.branch().label().getHost()
+                        except versions.ParseError:
+                            pass
+                if not hostList:
+                    hostList =  [ x.getHost() for x in cfg.installLabelPath ]
+
+                repositories = {}
                 for host in hostList:
                     d = repositories.setdefault(host, {})
-                    l = d.setdefault(name, [])
-                    l.append(flavor)
-
-            if all:
-                fn = repos.getTroveVersionList
-            else:
-                fn = repos.getAllTroveLeaves
-
-            flavors = {}
-            for host, names in repositories.iteritems():
-                d = fn(host, names)
-                repos.queryMerge(flavors, d)
-	else:
-            flavors = {}
-            for label in cfg.installLabelPath:
-                d = dict.fromkeys([ x[0] for x in troves ],
-                                  { label : cfg.flavor } )
-                d = repos.getTroveLeavesByLabel(d, bestFlavor = True)
-                repos.queryMerge(flavors, d)
-
-        displayc = display.DisplayCache()
-	for troveName, versionStr, flavor in troves:
-            if not flavors.has_key(troveName):
-		if all or leaves:
-		    log.error('No versions for "%s" were found in the '
-			      'repository', troveName)
-		elif troveList:
-                    # only display this error if the user has actually 
-                    # requested a specific trove, otherwise, missing
-                    # troves are a result of flavor filtering 
-                    log.error('No versions with labels "%s" for "%s" were '
-                              'found in the repository.', 
-                              " ".join([ x.asString() for x 
-                                       in cfg.installLabelPath ]),
-                              troveName)
-                continue
-
-            displayc.cache(troveName, flavors[troveName], fullVersions)
-
-            versionList = flavors[troveName].keys()
-            versionList.sort()
-            
-	    for version in reversed(versionList):
-		for flavor in flavors[troveName][version]:
-		    if all or len(flavors[troveName][version]) > 1 or showFlavors:
-			print _troveFormatWithFlavor %(
-                            troveName, displayc[troveName, version],
-                            display._formatFlavor(flavor))
-		    else:
-                        if flavor is not None:
-                            found = False
-                            for installFlavor in cfg.flavor:
-                                if installFlavor.satisfies(flavor):
-                                    found = True
-                                    break
-                            if not found:
-                                continue
-			print _troveFormat % (troveName, 
-					      displayc[troveName, version])
-            displayc.clearCache(troveName)
-
-
-def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, tags, showDeps, fullVersions, flavor, 
-                      showBuildReqs, showFlavors):
-    withFiles = ids
-
-    try:
-	troveList = repos.findTrove(cfg.installLabelPath, 
-                                    (troveName, versionStr, flavor),
-                                    cfg.flavor, 
-                                    acrossLabels = True,
-                                    acrossFlavors = True)
-    except errors.TroveNotFound, e:
-	log.error(str(e))
-	return
-
-    for (troveName, troveVersion, troveFlavor) in troveList:
-        trove = repos.getTrove(troveName, troveVersion, troveFlavor, 
-                               withFiles = withFiles)
-        sourceName = trove.getSourceName()
-        if sourceName:
-            try:
-                sourceTrove = repos.getTrove(sourceName, 
-                        troveVersion.getSourceVersion(), deps.DependencySet(),
-                        withFiles = False)
-            except errors.TroveMissing:
-                sourceTrove = None
-        elif troveName.endswith(':source'):
-            sourceTrove = trove
+                    l = d.setdefault(n, [])
+                    l.append(fS)
         else:
-            sourceTrove = None
+            repositories = dict.fromkeys((x.getHost() for x in cfg.installLabelPath), {})
 
-        if ls or tags or sha1s or ids:
-            outerTrove = trove
-            for trove in repos.walkTroveSet(outerTrove):
-                iter = repos.iterFilesInTrove(trove.getName(), 
-                            trove.getVersion(), trove.getFlavor(), 
-                            sortByPath = True, withFiles = True)
-                for (pathId, path, fileId, version, fObj) in iter:
-                    display.printFile(fObj, path, verbose=ls, tags=tags, 
-                                      sha1s=sha1s, pathId=pathId, pathIds=ids)
-	elif info:
-            if trove.getBuildTime():
-                buildTime = time.strftime("%c",
-                                    time.localtime(trove.getBuildTime()))
-            else:
-                buildTime = "(unknown)"
+        if all:
+            fn = repos.getTroveVersionList
+        else:
+            fn = repos.getAllTroveLeaves
 
-            if trove.getSize():
-                size = "%s" % trove.getSize()
-            else:
-                size = "(unknown)"
+        troveDict = {}
+        for host, names in repositories.iteritems():
+            d = fn(host, names)
+            repos.queryMerge(troveDict, d)
 
-	    print "%-30s %s" % \
-		(("Name      : %s" % trove.getName(),
-		 ("Build time: %s" % buildTime)))
+        for n, verDict in troveDict.iteritems():
+            for v, flavors in reversed(sorted(verDict.iteritems())):
+                for f in flavors:
+                    troveTups.append((n, v, f))
+    else:
+        results = repos.findTroves(cfg.installLabelPath, 
+                                   troveSpecs, cfg.flavor, 
+                                   acrossLabels = True,
+                                   acrossFlavors = True,
+                                   allowMissing = allowMissing)
+        for troveSpec in troveSpecs:
+            # make latest items be at top of list
+            troveTups.extend(sorted(reversed(results.get(troveSpec, []))))
 
-	    if fullVersions:
-		print "Version   :", troveVersion.asString()
-		print "Label     : %s" % \
-                            troveVersion.branch().label().asString()
-
-	    else:
-		print "%-30s %s" % \
-		    (("Version   : %s" % 
-                                troveVersion.trailingRevision().asString()),
-		     ("Label     : %s" % 
-                                troveVersion.branch().label().asString()))
-
-            print "%-30s" % ("Size      : %s" % size)
-            print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
-
-
-
-            metadata.showDetails(repos, cfg, trove.getName(),
-                                 troveVersion.branch(),
-                                 sourceTrove)
-            
-            if sourceTrove:
-                cl = sourceTrove.getChangeLog()
-                if cl:
-                    print "Change log: %s (%s)" % (cl.getName(), 
-                                                   cl.getContact())
-                    lines = cl.getMessage().split("\n")[:-1]
-                    for l in lines:
-                        print "    " + l
-	elif showBuildReqs:
-            for (n,v,f) in sorted(trove.getBuildRequirements()):
-                _displayOneTrove(n,v,f, fullVersions, showFlavors)
-        elif showDeps:
-            troveList = [trove]
-            while troveList:
-                trove = troveList[0]
-                troveList = troveList[1:]
-                if trove.isCollection():
-                    newTroves = sorted(
-                                [ x for x in repos.walkTroveSet(trove)][1:], 
-                                key=lambda y: y.getName())
-                    troveList = newTroves + troveList
-                print trove.getName()
-                for name, dep in (('Provides', trove.provides.deps),
-                                  ('Requires', trove.requires.deps)):
-                    print '  %s:' %name
-                    if not dep:
-                        print '     None'
-                    else:
-                        lines = str(dep).split('\n')
-                        for l in lines:
-                            print '    ', l
-                print
-	else:
-            _displayOneTrove(trove.getName(),trove.getVersion(),
-                             trove.getFlavor(), 
-                             fullVersions or len(troveList) > 1, 
-                             showFlavors)
-	    for (name, ver, flavor) in sorted(trove.iterTroveList()):
-                _displayOneTrove(name, ver, flavor,
-                        fullVersions or ver.branch() != troveVersion.branch(),
-                        showFlavors, format=_grpFormat)
-
-	    iter = repos.iterFilesInTrove(troveName, troveVersion, troveFlavor,
-                                          sortByPath = True, withFiles = False)
-	    for (pathId, path, fileId, ver) in iter:
-		if fullVersions or ver.branch() != troveVersion.branch():
-		    print _fileFormat % (path, ver.asString())
-		else:
-		    print _fileFormat % (path, 
-					 ver.trailingRevision().asString())
+    return troveTups, namesOnly, primary

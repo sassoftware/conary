@@ -409,6 +409,8 @@ class ConaryConfiguration(SectionedConfig):
 	'dumpStackOnError'      : [ BOOL, True ], 
         'excludeTroves'         : [ REGEXPLIST, RegularExpressionList() ],
         'flavor'                : [ FLAVORLIST, [] ],
+        'fullVersions'          : [ BOOL, False ],
+        'fullFlavors'           : [ BOOL, False ],
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
 	'interactive'		: [ BOOL, False ],

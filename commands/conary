@@ -28,7 +28,7 @@ import xmlrpclib
 
 #conary
 from conary import callbacks, checkin, commit, conarycfg, constants
-from conary import cscmd, deps, display, flavorcfg
+from conary import cscmd, deps, flavorcfg, query
 from conary import queryrep, conaryclient, rollbacks, showchangeset
 from conary import updatecmd, verify, versions
 from conary.lib import log, options, util
@@ -70,7 +70,10 @@ def usage(rc = 1):
     print ""
     print 'common flags:    --build-label <label>'
     print '                 --config-file <path>'
+    print "                 --components"
     print '                 --config "<item> <value>"'
+    print "                 --flavors"
+    print "                 --full-versions"
     print '                 --install-label <label>'
     print "                 --root <root>"
     print "                 --context <context>"
@@ -78,8 +81,6 @@ def usage(rc = 1):
     print "query flags:     --buildreqs"
     print "                 --deps"
     print "                 --diff"
-    print "                 --flavors"
-    print "                 --full-versions"
     print "                 --ids"
     print "                 --info"
     print "                 --ls"
@@ -156,6 +157,7 @@ def realMain(cfg, argv=sys.argv):
 
     argDef["all"] = NO_PARAM
     argDef["buildreqs"] = NO_PARAM
+    argDef["components"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["context"] = ONE_PARAM
@@ -205,6 +207,12 @@ def realMain(cfg, argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+
+    if argSet.pop('full-versions', False):
+        cfg.fullVersions = True
+
+    if argSet.pop('flavors', False):
+        cfg.fullFlavors = True
 
     context = cfg.context
     if os.path.exists('CONARY'):
@@ -328,8 +336,6 @@ def realMain(cfg, argv=sys.argv):
 	showDiff = argSet.pop('diff', False)
 	ids = argSet.pop('ids', False)
 	sha1s = argSet.pop('sha1s', False)
-	fullVersions = argSet.pop('full-versions', False)
-	showFlavors = argSet.pop('flavors', False)
 	showBuildReqs = argSet.pop('buildreqs', False)
 
 	db = openDatabase(cfg.root, cfg.dbPath)
@@ -338,10 +344,10 @@ def realMain(cfg, argv=sys.argv):
 
 	if len(otherArgs) >= 2:
 	    try:
-                display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
-                                      fullVersions, tags, info=info, deps=deps,
-                                      showBuildReqs=showBuildReqs, 
-                                      showFlavors=showFlavors, showDiff=showDiff)
+                query.displayTroves(db, cfg, otherArgs[2:], paths, ls, ids, 
+                                    sha1s, tags, info=info, deps=deps, 
+                                    showBuildReqs=showBuildReqs, 
+                                    showDiff=showDiff)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1
@@ -351,7 +357,6 @@ def realMain(cfg, argv=sys.argv):
         cfg.requireInstallLabelPath()
 	all = argSet.pop('all', False)
 	ls = argSet.pop('ls', False)
-	fullVersions = argSet.pop('full-versions', False)
 	ids = argSet.pop('ids', False)
 	info = argSet.pop('info', False)
 	tags = argSet.pop('tags', False)
@@ -359,7 +364,6 @@ def realMain(cfg, argv=sys.argv):
 	leaves = argSet.pop('leaves', False)
 	showDeps = argSet.pop('deps', False)
 	showBuildReqs = argSet.pop('buildreqs', False)
-	showFlavors = argSet.pop('flavors', False)
 
 	repos = openRepository(cfg.repositoryMap)
 
@@ -367,8 +371,7 @@ def realMain(cfg, argv=sys.argv):
 
 	if len(otherArgs) >= 2:
 	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    fullVersions, info, tags, showDeps, showBuildReqs,
-                    showFlavors]
+                    info, tags, showDeps, showBuildReqs ]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:
@@ -460,7 +463,7 @@ def realMain(cfg, argv=sys.argv):
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
-                                        tags, fullVersions, showChanges, 
+                                        tags, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
     elif otherArgs[1] == "updateconary":

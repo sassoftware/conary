@@ -38,6 +38,7 @@ from conary.repository import filecontents
 from conary.repository import findtrove
 from conary.repository import repository
 from conary.repository import transport
+from conary.repository import trovesource
 from conary.repository import xmlshims
 
 # FIXME: remove these compatibility exception classes later
@@ -182,7 +183,8 @@ class ServerCache:
 	self.map = repMap
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
-			      repository.AbstractRepository):
+			      repository.AbstractRepository, 
+                              trovesource.SearchableTroveSource):
 
     def close(self, *args):
         pass
@@ -1277,3 +1279,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # span repositories. it has no effect on any other operation.
 	self.c = ServerCache(repMap)
         self.localRep = localRepository
+
+        trovesource.SearchableTroveSource.__init__(self)
+        self.searchAsRepository()

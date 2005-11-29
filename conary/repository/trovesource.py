@@ -14,10 +14,11 @@
 
 import itertools
 
+from conary import files
 from conary import trove
 from conary.deps import deps
 from conary.local import deptable
-from conary.repository import changeset, findtrove
+from conary.repository import changeset, errors, findtrove
 
 class AbstractTroveSource:
     """ Provides the interface necessary for performing
@@ -51,6 +52,9 @@ class AbstractTroveSource:
     def getTroves(self, troveList, withFiles = True):
         raise NotImplementedError
 
+    def hasTroves(self, troveList):
+        return [False] * len(troveList)
+
     def getTrove(self, name, version, flavor, withFiles = True):
         return self.getTroves([(name, version, flavor)], withFiles)[0]
 
@@ -75,6 +79,49 @@ class AbstractTroveSource:
                               defaultFlavor, acrossSources, acrossFlavors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
+
+    def walkTroveSet(self, trove, ignoreMissing = True,
+                     withFiles=True):
+	"""
+	Generator returns all of the troves included by trove, including
+	trove itself.
+	"""
+	yield trove
+	seen = { trove.getName() : [ (trove.getVersion(),
+				      trove.getFlavor()) ] }
+
+	troveList = [x for x in trove.iterTroveList()]
+
+	while troveList:
+	    (name, version, flavor) = troveList[0]
+	    del troveList[0]
+
+	    if seen.has_key(name):
+		match = False
+		for (ver, fla) in seen[name]:
+		    if version == ver and fla == flavor:
+			match = True
+			break
+		if match: continue
+
+		seen[name].append((version, flavor))
+	    else:
+		seen[name] = [ (version, flavor) ]
+
+	    try:
+                trv = self.getTrove(name, version, flavor, withFiles=withFiles)
+
+                yield trv
+
+                troveList += [ x for x in trv.iterTroveList() ]
+	    except errors.TroveMissing:
+		if not ignoreMissing:
+		    raise
+	    except KeyError:
+		if not ignoreMissing:
+		    raise
+
+
 
 # constants mostly stolen from netrepos/netserver
 _GET_TROVE_ALL_VERSIONS = 1
@@ -102,6 +149,9 @@ class SearchableTroveSource(AbstractTroveSource):
     """
 
     def trovesByName(self, name):
+        raise NotImplementedError
+
+    def iterAllTroveNames(self):
         raise NotImplementedError
 
     def getTroves(self, troveList, withFiles = True):
@@ -291,6 +341,9 @@ class SimpleTroveSource(SearchableTroveSource):
     def trovesByName(self, name):
         return self._trovesByName.get(name, [])
 
+    def iterAllTroveNames(self):
+        return iter(self._trovesByName)
+
     def __len__(self):
         return len(list(self))
         
@@ -385,6 +438,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.providesMap = {}
         self.csList= []
         self.invalidated = False
+        self.erasuresMap = {}
+        self.rooted = {}
 
         self.depDb = deptable.DependencyDatabase()
 
@@ -410,29 +465,21 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             relative.append((trvCs, info))
 
+        for info in cs.getOldTroveList():
+            self.erasuresMap[info] = cs
+            
         self.depDb.commit()
 
         if relative:
-            present = self.db.hasTroves([ 
-                                      (x[0].getName(), x[0].getOldVersion(),
-                                       x[0].getOldFlavor()) for x in relative ])
-        else:
-            present = []
-
-        for (trvCs, info), isPresent in itertools.izip(relative, present):
-            if not isPresent:
-                # we can't serve up troves from this change set so pretend
-                # it doesn't exist
-                continue
-            
-            if info in self.troveCsMap:
-                # FIXME: there is no such exception in this context
-                raise DuplicateTrove
-            self.troveCsMap[info] = cs
-            self.jobMap[(info[0], (trvCs.getOldVersion(), 
-                                   trvCs.getOldFlavor()), 
-                         info[1:], trvCs.isAbsolute())] = \
-                                            (cs, includesFileContents)
+            for (trvCs, info) in relative:
+                if info in self.troveCsMap:
+                    # FIXME: there is no such exception in this context
+                    raise DuplicateTrove
+                self.troveCsMap[info] = cs
+                self.jobMap[(info[0], (trvCs.getOldVersion(), 
+                                       trvCs.getOldFlavor()), 
+                             info[1:], trvCs.isAbsolute())] = \
+                                                (cs, includesFileContents)
 
         self.csList.append(cs)
 
@@ -444,31 +491,103 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         return l
 
+    def iterAllTroveNames(self):
+        troveNames = set()
+        for name, _, _ in self.troveCsMap:
+            troveNames.add(name)
+        return iter(troveNames)
+
+    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
+        cs = self.troveCsMap[n,v,f]
+        trvCs = cs.getNewTroveVersion(n,v,f)
+        fileList = trvCs.getNewFileList()
+        if not fileList:    
+            return
+
+        if not withFiles:
+            if sortByPath:
+                for item in sorted(fileList):
+                    yield item
+            else:
+                for item in fileList:
+                    yield item
+            return
+
+        if sortByPath:
+            # files stored in changesets are sorted by pathId, and must be
+            # retrieved in that order.  But we want to display them by 
+            # path.  So, retrieve the info from the changeset by pathId
+            # and stored it in a dict to be retrieved after sorting by
+            # path
+            changes = {}
+            for pathId, path, fileId, version in fileList:
+                changes[pathId] = cs.getFileChange(None, fileId)
+
+            fileList = sorted(fileList, key=lambda x: x[1])
+
+        for pathId, path, fileId, version in fileList:
+            change = changes[pathId]
+            fileObj = files.ThawFile(change, pathId)
+            yield pathId, path, fileId, version, fileObj
+
     def getTroves(self, troveList, withFiles = True):
-        assert(not withFiles)
         assert(not self.invalidated)
         retList = []
 
         for info in troveList:
+            if info not in self.troveCsMap:
+                retList.append(None)
+                continue
+
             trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
             if trvCs.getOldVersion() is None:
 		newTrove = trove.Trove(trvCs.getName(), trvCs.getNewVersion(),
                                        trvCs.getNewFlavor(), 
                                        trvCs.getChangeLog())
+                if withFiles:
+                    for pathId, path, fileId, version in trvCs.getNewFileList():
+                        newTrove.addFile(pathId, path, version, fileId)
             else:
                 newTrove = self.db.getTrove(trvCs.getName(), 
                                             trvCs.getOldVersion(),
-                                            trvCs.getOldFlavor())
+                                            trvCs.getOldFlavor(),
+                                            withFiles=withFiles)
 
             newTrove.applyChangeSet(trvCs, skipIntegrityChecks = not withFiles)
             retList.append(newTrove)
 
         return retList
 
+    def getTroveChangeSets(self, jobList, withFiles=False):
+        trvCsList = []
+        for job in jobList:
+            name, (oldVer, oldFla), (newVer, newFla) = job[:3]
+            if newVer:
+                info = (name, newVer, newFla)
+                trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
+                assert((trvCs.getOldVersion(), trvCs.getOldFlavor()) == 
+                       (oldVer, oldFla))
+                trvCsList.append(trvCs)
+            else:
+                raise NotImplementedError, 'we don"t store erasures'
+        return trvCsList
+
+    def getTroveChangeSet(self, job, withFiles=False):
+        return self.getTroveChangeSets([job], withFiles)[0]
+
     def hasTroves(self, troveList):
         assert(not self.invalidated)
         return [ x in self.troveCsMap for x in troveList ]
 
+    def getChangeSet(self, job):
+        name, (oldVer, oldFla), (newVer, newFla) = job[:3]
+        if newVer:
+            info = (name, newVer, newFla)
+            return self.troveCsMap[info]
+        else:
+            info = (name, oldVer, oldFla)
+            return self.erasuresMap[info]
+            
     def resolveDependencies(self, label, depList):
         suggMap = self.depDb.resolve(label, depList)
         for depSet, solListList in suggMap.iteritems():
@@ -497,7 +616,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             return trv
 
-        assert(not self.invalidated)
         assert((withFiles and withFileContents) or
                (not withFiles and not withFileContents))
 
@@ -589,10 +707,14 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         if rootMap:
             # we can't root changesets multiple times
-            self.invalidated = True
+            for info in rootMap:
+                assert(info not in self.rooted)
+
             for subCs in self.csList:
                 if subCs.isAbsolute():
                     subCs.rootChangeSet(self.db, rootMap)
+
+            self.rooted.update(rootMap)
 
         # assemble jobs directly from changesets and update those changesets
         # to not have jobs we don't need
@@ -647,6 +769,24 @@ class TroveSourceStack(SearchableTroveSource):
     def hasSource(self, source):
         return source in self.sources
 
+    def hasTroves(self, troveList):
+        results = [False] * len(troveList)
+
+        troveList = list(enumerate(troveList)) 
+
+        for source in self.sources:
+            newTroveList = []
+            hasTroves = source.hasTroves([x[1] for x in troveList])
+
+            for ((index, troveTup), hasTrove) in itertools.izip(troveList, 
+                                                                hasTroves):
+                if not hasTrove:
+                    newTroveList.append((index, troveTup))
+                else:
+                    results[index] = True
+        return results
+        
+
     def iterSources(self):
         for source in self.sources:
             yield source
@@ -661,7 +801,6 @@ class TroveSourceStack(SearchableTroveSource):
         return list(chain(*(x.trovesByName(name) for x in self.sources)))
         
     def getTroves(self, troveList, withFiles = True):
-        # XXX I don't have a test case that tests this yet
         troveList = list(enumerate(troveList)) # make a copy and add indexes
         numTroves = len(troveList)
         results = [None] * numTroves
@@ -669,31 +808,46 @@ class TroveSourceStack(SearchableTroveSource):
         for source in self.sources:
             newTroveList = []
             newIndexes = []
-            troves = source.getTroves([x[0] for x in troveList], 
+            troves = source.getTroves([x[1] for x in troveList], 
                                       withFiles=withFiles)
-            for ((index, troveTup), trove) in intertools.izip(troveList, 
-                                                              troves):
+            for ((index, troveTup), trove) in itertools.izip(troveList, troves):
                 if trove is None:
                     newTroveList.append((index, troveTup))
                 else:
                     results[index] = trove
+        return results
                     
-    def findTroves(self, labelPath, troves, defaultFlavor=None, 
+    def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False):
-
-        troves = list(troveSpecs)
+        troveSpecs = list(troveSpecs)
 
         results = {}
-        troveFinder = findtrove.TroveFinder(self, labelPath, 
-                                            defaultFlavor, acrossLabels,
-                                            acrossFlavors, affinityDatabase,
-                                            allowNoLabel=self._allowNoLabel,
-                                            bestFlavor=self._bestFlavor,
-                                            getLeaves=self._getLeavesOnly)
+
+        someRequireLabel = False
+        for source in self.sources:
+            if not source._allowNoLabel:
+                assert(labelPath)
+                someRequireLabel = True
+
+                
 
         for source in self.sources[:-1]:
-            troveFinder.setTroveSource(source)
+            # FIXME: it should be possible to reuse the trove finder
+            # but the bestFlavr and getLeaves data changes per source
+            # and is passed into several TroveFinder sub objects.  
+            # TroveFinder should be cleaned up
+            if someRequireLabel and source._allowNoLabel:
+                sourceLabelPath = None
+            else:
+                sourceLabelPath = labelPath
+                
+            troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
+                                            defaultFlavor, acrossLabels,
+                                            acrossFlavors, affinityDatabase,
+                                            allowNoLabel=source._allowNoLabel,
+                                            bestFlavor=source._bestFlavor,
+                                            getLeaves=source._getLeavesOnly)
 
             foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)
 
@@ -706,7 +860,21 @@ class TroveSourceStack(SearchableTroveSource):
 
             troveSpecs = newTroveSpecs
 
-        troveFinder.setTroveSource(self.sources[-1])
+        source = self.sources[-1]
+
+        if someRequireLabel and source._allowNoLabel:
+            sourceLabelPath = None
+        else:
+            sourceLabelPath = labelPath
+         
+        troveFinder = findtrove.TroveFinder(source, labelPath, 
+                                        defaultFlavor, acrossLabels,
+                                        acrossFlavors, affinityDatabase,
+                                        allowNoLabel=source._allowNoLabel,
+                                        bestFlavor=source._bestFlavor,
+                                        getLeaves=source._getLeavesOnly)
+
+
 
         results.update(troveFinder.findTroves(troveSpecs, 
                                               allowMissing=allowMissing))
@@ -749,6 +917,15 @@ class TroveSourceStack(SearchableTroveSource):
 
         return cs, jobList
 
+    def getFileVersion(self, pathId, fileId, version):
+        for source in self.sources:
+            try:
+                return source.getFileVersion(pathId, fileId, version)
+            # FIXME: there should be a better error for this
+            except KeyError:
+                continue
+        return None
+
 def stack(source1, source2):
     """ create a trove source that will search first source1, then source2 """
 
@@ -762,3 +939,286 @@ def stack(source1, source2):
         return source1
     
     return TroveSourceStack(source1, source2)
+
+class AbstractJobSource(AbstractTroveSource):
+
+    # new, modified and old files.  Used to describe the files returned 
+    # by iterFilesInJob
+
+    NEW_F = 0
+    MOD_F = 1
+    OLD_F = 2
+
+    def iterAllJobs(self):
+        raise NotImplementedError
+    
+    def findJob(self, name, oldVer, oldFla, newVer, newFla):
+        raise NotImplementedError
+
+    def findTroves(self, *args, **kw):
+        raise NotImplementedError
+
+    def getTroves(self, troves, withFiles=False):
+        raise NotImplementedError
+
+    def getTroveVersionList(self, name, withFlavors=False):
+        raise NotImplementedError
+
+    def iterFilesInJob(self, job, sortByPath=False, withFiles=False,
+                                                    withOldFiles=False):
+        raise NotImplementedError
+
+
+class JobSource(AbstractJobSource):
+
+    def __init__(self, newTroveSource, oldTroveSource):
+        self.newTroveSource = newTroveSource
+        self.oldTroveSource = oldTroveSource
+        self.jobMap = {}
+        self.jobsByNew = {}
+        self.oldTroveList = SimpleTroveSource()
+        self.newTroveList = SimpleTroveSource()
+        self.allTroveList = SimpleTroveSource()
+        self.eraseJobs = []
+
+    def iterAllJobs(self):
+        return iter(self.jobMap)
+
+    def getTroveCsList(self, jobList, withFiles=False):
+        raise NotImplementedError
+        # basically needs to call createChangeSet, which, of course,
+        # defeats the whole point of doing this with a job list.
+
+    def addJob(self, job, value=None):
+        if value is None:
+            self.jobMap[job[:3]] = job[3]
+        else:
+            self.jobMap[job[:3]] = value
+
+        name = job[0]
+
+        if job[1][0] is not None:
+            self.oldTroveList.addTrove(name, *job[1])
+            self.allTroveList.addTrove(name, *job[1])
+
+        if job[2][0] is not None:
+            self.newTroveList.addTrove(name, *job[2])
+            self.allTroveList.addTrove(name, *job[2])
+            self.jobsByNew[name, job[2][0], job[2][1]] = job
+
+    def findTroves(self, *args, **kw):
+        return self.allTroves.findTroves(*args, **kw)
+
+    def findJobs(self, jobList):
+        """ Finds a job given a changeSpec
+            foo=--1.0 will match a fresh install to 1.0
+            foo=1.0 will match a fresh install or an upgrade to 1.0
+            foo will match an install, upgrade or erasure of foo
+            foo=1.0-- will match an erasure of foo v. 1.0
+            foo=1.0--2.0 will match an upgrade of foo from 1.0 to 2.0
+        """
+        allRes = {}
+
+        newTroves = []
+        oldTroves = []
+        for (n, (oldVS, oldFS), (newVS, newFS), isAbs) in jobList:
+            if isAbs:
+                assert(not oldVS and not oldFS)
+
+                newTroves.append((n, newVS, newFS))
+                oldTroves.append((n, None, None))
+                continue
+            else:
+                oldTroves.append((n, oldVS, oldFS))
+
+                if newVS or newFS:
+                    newTroves.append((n, newVS, newFS))
+
+        newTroves = self.newTroveList.findTroves(None, newTroves, 
+                                                 allowMissing=True)
+        oldTroves = self.oldTroveList.findTroves(None, oldTroves)
+
+        for (n, (oldVS, oldFS), (newVS, newFS), isAbs) in jobList:
+            results = []
+            if isAbs:
+                newTups = newTroves.get((n, newVS, newFS), None)
+                oldTups = oldTroves[n, None, None]
+                oldTups.append((n, None, None))
+            else:
+                oldTups = oldTroves[n, oldVS, oldFS]
+
+                if newVS or newFS:
+                    newTups = newTroves[n, newVS, newFS]
+                else:
+                    newTups = None
+
+            if newTups is None:
+                for oldTup in oldTups:
+                    job = (n, oldTup[1:], (None, None))
+                    if job in self.jobMap:
+                        results.append(job)
+            else:
+                for newTup in newTups:  
+                    job = self.jobsByNew[newTup]
+                    for oldTup in oldTups:
+                        if job[1] == oldTup[1:]:
+                            results.append(job)
+
+            allRes[(n, (oldVS, oldFS), (newVS, newFS), isAbs)] = results
+
+        return allRes
+
+    def iterFilesInJob(self, jobTup, sortByPath=False, withFiles=False,
+                                                    withOldFiles=False):
+        # basically needs to call createChangeSet, which defeats the
+        # purpose of this class.
+        raise NotImplementedError
+            
+class ChangeSetJobSource(JobSource):
+    def __init__(self, newTroveSource, oldTroveSource):
+        JobSource.__init__(self, newTroveSource, oldTroveSource)
+        self.csSource = ChangesetFilesTroveSource(oldTroveSource)
+
+    def addChangeSet(self, cs):
+        self.csSource.addChangeSet(cs)
+        
+        for trvCs in cs.iterNewTroveList():
+            name = trvCs.getName()
+            newVer, newFla = trvCs.getNewVersion(), trvCs.getNewFlavor()
+            oldVer, oldFla = trvCs.getOldVersion(), trvCs.getOldFlavor()
+            isAbs = trvCs.isAbsolute()
+
+
+            job = (name, (oldVer, oldFla), (newVer, newFla))
+            self.addJob(job, (isAbs, cs))
+
+        for (name, oldVer, oldFla) in cs.getOldTroveList():
+            job = (name, (oldVer, oldFla), (None, None))
+            self.addJob(job, (False, cs))
+            self.eraseJobs.append(job)
+
+    def getChangeSet(self, job):
+        return self.csSource.getChangeSet(job)
+
+    def getTroveChangeSet(self, job, withFiles=False):
+        return self.getTroveChangeSets([job], withFiles=withFiles)[0]
+
+    def getTroveChangeSets(self, jobList, withFiles=False):
+        # NOTE: we can't store erasures as TroveChangeSets :(
+        # they would fail to behave well with merges, so they're not allowed
+        erasures = [ x for x in jobList if not x[2][0]]
+        assert(not erasures)
+
+        return self.csSource.getTroveChangeSets(jobList, withFiles=withFiles)
+        
+    def getTrove(self, n, v, f, withFiles=False):
+        return self.csSource.getTrove(n, v, f, withFiles=withFiles)
+
+    def iterFilesInJob(self, job, withFiles=False, withOldFiles=False,
+                        sortByPath=False):
+        # FIXME: do I need to get all files for a cs at once?
+        iter = self._iterFilesInJob(job, withFiles, withOldFiles)
+        if sortByPath:
+            return sorted(iter, key=lambda x: x[1])
+        else:
+            return iter
+                            
+    def _iterFilesInJob(self, job, withFiles=False, withOldFiles=False):
+        def _getOldFile(pathId, fileId, version):
+            return self.oldTroveSource.getFileVersion(pathId, fileId, version)
+
+        if withOldFiles:
+            assert(withFiles)
+
+        n, (oldVer, oldFla), (newVer, newFla) = job[:3]
+
+        isDel = not newVer
+        newTrove = None
+
+        if not isDel:
+            trvCs = self.getTroveChangeSet(job, withFiles=withFiles)
+            oldTrove = None
+        else:
+            oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
+                                                    withFiles=True)
+            trvCs = None
+
+        if not withFiles:
+            if isDel:
+                return
+            for fileInfo in itertools.chain(trvCs.getNewFileList(), 
+                                            trvCs.getChangedFileList()):
+                yield fileInfo
+            return
+        else:
+            
+
+            cs = self.getChangeSet(job)
+
+            if isDel:
+                fileList = [(x, self.OLD_F) for x in oldTrove.iterFileList()]
+
+            else:
+                newFiles = trvCs.getNewFileList()
+                modFiles = trvCs.getChangedFileList()
+                oldFiles = trvCs.getOldFileList()
+
+                fileList = []
+                fileList += [(x, self.NEW_F) for x in newFiles] 
+                fileList += [(x, self.MOD_F) for x in modFiles]
+                fileList += [((x, None, None, None), self.OLD_F) for x in oldFiles]
+
+
+                if oldFiles or modFiles:
+                    oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
+                                                            withFiles=True)
+
+                if newFiles or modFiles:
+                    newTrove = self.newTroveSource.getTrove(n, newVer, newFla,
+                                                                withFiles=True)
+
+            # sort files by pathId
+            # FIXME this is job-wide, it probably needs to be changeset wide
+            fileList.sort() 
+
+            for (pathId, path, fileId, version), modType in fileList:
+                oldFileObj = None
+                fileObj = None
+
+                if modType is self.NEW_F:
+                    change = cs.getFileChange(None, fileId)
+                    fileObj = files.ThawFile(change, pathId)
+                elif modType is self.MOD_F:
+                    (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
+                    change = cs.getFileChange(oldFileId, fileId)
+
+                    if withOldFiles or files.fileStreamIsDiff(change):
+                        oldFileObj = _getOldFile(pathId, oldFileId, oldVersion)
+
+                    if files.fileStreamIsDiff(change):
+                        fileObj = oldFileObj.copy()
+                        fileObj.twm(change, fileObj)
+                    else:
+                        fileObj = files.ThawFile(change, pathId)
+
+                    if path is None:
+                        path = oldPath
+                else:
+                    assert(modType == self.OLD_F)
+                    fileObj = None
+                    if isDel:
+                        oldPath, oldFileId, oldVersion = path, fileId, version
+                        path = fileId = version = None
+                    else:
+                        (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
+
+                    oldFileObj = _getOldFile(pathId, oldFileId, oldVersion)
+
+                if withOldFiles:
+                    yield (pathId, path, fileId, version, fileObj, oldPath,
+                           oldFileId, oldVersion, oldFileObj, modType)
+                elif modType == self.OLD_F:
+                    yield (pathId, oldPath, oldFileId, 
+                           oldVersion, oldFileObj, modType)
+                else:
+                    yield pathId, path, fileId, version, fileObj, modType
