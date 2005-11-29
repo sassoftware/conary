@@ -35,6 +35,7 @@ python_files = __init__.py	\
 	flavorcfg.py		\
         fmtroves.py             \
         metadata.py             \
+	query.py		\
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
