@@ -8,6 +8,15 @@ Changes in 0.80.0:
       removals for the troves those included troves replace
     * Chroot handling was broken in 0.71.2 and prevented the user name
       lookup code for the chroot from exiting back out of the chroot
+    * showchangeset on relative changesets now displays them as jobs.
+    * query and queryrep now exclude components if they match their 
+      package name
+  o Code structure:
+    * queryrep, query, showchangeset, and update --info all use the same 
+      code to determine how to display their data.  Display.py was changed
+      to perform general display operations.
+    * query.py added
+    * added JobSource concept for searching and manipulating lists of jobs.
 
 Changes in 0.71.2
   o Client Changes:
