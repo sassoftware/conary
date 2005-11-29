@@ -1,7 +1,8 @@
 from conary.repository import errors
+from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
-from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
+from recipe import Recipe, RECIPE_TYPE_REDIRECT
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
@@ -40,7 +41,7 @@ class RedirectRecipe(Recipe):
                 pkgList = self.repos.findTrove(self.branch.label(), 
                                                (name, versionStr, desFlavor))
             except errors.TroveNotFound, e:
-                raise RecipeFileError, "Couldn't find redirect trove: " + str(e)
+                raise builderrors.RecipeFileError, "Couldn't find redirect trove: " + str(e)
 
             assert(len(pkgList) == 1)
             packageSet[pkgList[0]] = fromName
