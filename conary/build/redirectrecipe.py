@@ -1,3 +1,4 @@
+from conary.repository import errors
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
