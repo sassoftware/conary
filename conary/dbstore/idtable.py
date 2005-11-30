@@ -44,7 +44,7 @@ class IdTable:
 
         return id
 
-    # XXX: use dbstore sequences
+    # DBSTORE: use dbstore sequences
     def addId(self, item):
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s (%s, %s) VALUES (NULL, ?)" %(

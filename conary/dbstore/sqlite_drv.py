@@ -73,3 +73,25 @@ class Database(BaseDatabase):
                 self.tables.setdefault(tbl_name, []).append(name)
         self._getSchemaVersion()
         return self.version
+
+    def analyze(self):
+        if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
+            # ANALYZE didn't appear until 3.2.3
+            return
+
+        # perform table analysis to help the optimizer
+        doAnalyze = False
+        cu = self.cursor()
+        # if there are pending changes, just re-run ANALYZE
+        if self.dbh.inTransaction:
+            doAnalyze = True
+        else:
+            # check to see if the sqlite_stat1 table exists.
+            # ANALYZE creates it.
+            if "sqlite_stat1" not in self.tables:
+                doAnalyze = True
+                
+        if doAnalyze:
+            cu.execute('ANALYZE')
+            self._getSchema()
+

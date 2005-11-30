@@ -188,6 +188,11 @@ class BaseDatabase:
         assert (self.dbh)
         return self.cursorClass(self.dbh)
 
+    # perform the equivalent of a analyze on $self
+    def analyze(self):
+        assert(self.database)
+        pass
+    
     def commit(self):
         assert(self.dbh)
         self.__transaction = 0

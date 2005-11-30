@@ -24,11 +24,11 @@ from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, util
-from conary.local import localrep, sqldb, update
+from conary.local import localrep, sqldb, schema, update
 from conary.repository import changeset, errors, filecontents, filecontainer
 from conary.repository import repository, trovesource
 
-OldDatabaseSchema = sqldb.OldDatabaseSchema
+OldDatabaseSchema = schema.OldDatabaseSchema
 
 class Rollback:
 

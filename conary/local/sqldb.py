@@ -14,7 +14,9 @@
 
 from conary import deps, files, sqlite3, trove, versions
 from conary.dbstore import idtable
-from conary.local import deptable, troveinfo, versiontable
+from conary.local import deptable, troveinfo, versiontable, schema
+
+OldDatabaseSchema = schema.OldDatabaseSchema
 
 class Tags(idtable.CachedIdTable):
 
@@ -32,31 +34,7 @@ class DBTroveFiles:
         self.db = db
 	self.tags = Tags(self.db)
         
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "DBTroveFiles" not in tables:
-            cu.execute("""CREATE TABLE DBTroveFiles(
-					  streamId INTEGER PRIMARY KEY,
-					  pathId BINARY,
-					  versionId INTEGER,
-					  path STR,
-                                          fileId BINARY,
-					  instanceId INTEGER,
-					  isPresent INTEGER,
-					  stream BINARY)
-		       """)
-	    cu.execute("CREATE INDEX DBTroveFilesIdx ON "
-		       "DBTroveFiles(fileId)")
-	    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON "
-		       "DBTroveFiles(instanceId)")
-	    cu.execute("CREATE INDEX DBTroveFilesPathIdx ON "
-		       "DBTroveFiles(path)")
-
-	    cu.execute("""CREATE TABLE DBFileTags(
-					  streamId INT,
-					  tagId INT)
-		       """)
+        schema.createDBTroveFiles(db)
 
     def __getitem__(self, instanceId):
 	cu = self.db.cursor()
@@ -166,23 +144,7 @@ class DBInstanceTable:
     """
     def __init__(self, db):
         self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "Instances" not in tables:
-            cu.execute("""CREATE TABLE Instances(
-				instanceId INTEGER PRIMARY KEY, 
-				troveName STR, 
-				versionId INT, 
-				flavorId INT,
-				timeStamps STR,
-				isPresent INT,
-                                pinned BOOLEAN)""")
-	    cu.execute("CREATE INDEX InstancesNameIdx ON "
-		       "Instances(troveName)")
-	    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
-		       "Instances(troveName, versionId, flavorId)")
+        schema.createInstances(db)
 
     def iterNames(self):
 	cu = self.db.cursor()
@@ -355,61 +317,16 @@ class Flavors(idtable.IdTable):
 	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
 	
 class DBFlavorMap(idtable.IdMapping):
-
     def __init__(self, db):
 	idtable.IdMapping.__init__(self, db, "DBFlavorMap", "instanceId", 
 				   "flavorId")
 
-def _doAnalyze(db):
-    if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
-        # ANALYZE didn't appear until 3.2.3
-        return
-
-    # perform table analysis to help the optimizer
-    doAnalyze = False
-    cu = db.cursor()
-    # if there are pending changes, just re-run ANALYZE
-    if db.inTransaction:
-        doAnalyze = True
-    else:
-        # check to see if the sqlite_stat1 table exists. ANALYZE
-        # creates it.
-        cu.execute("SELECT COUNT(*) FROM sqlite_master "
-                   "WHERE tbl_name='sqlite_stat1' AND type='table'")
-        if not cu.fetchone()[0]:
-            doAnalyze = True
-
-    if doAnalyze:
-        cu.execute('ANALYZE')
 
 class Database:
-
-    schemaVersion = 13
-
-    def _createSchema(self, cu):
-        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
-                   "name='TroveTroves'")
-        if cu.next()[0] == 0:
-            cu.execute("""CREATE TABLE TroveTroves(instanceId INTEGER, 
-					           includedId INTEGER,
-                                                   byDefault BOOLEAN,
-                                                   inPristine BOOLEAN)""")
-	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
-			    "TroveTroves(instanceId)")
-	    # this index is so we can quickly tell what troves are needed
-	    # by another trove
-	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
-			    "TroveTroves(includedId)")
-
-            # XXX this index is used to enforce that TroveTroves  
-            # only contains unique TroveTrove (instanceId, includedId)
-            # pairs.
-	    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
-			    "TroveTroves(instanceId,includedId)")
-
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
 
+        self.schemaVersion = schema.getDatabaseVersion(self.db)        
         try:
             self.db._begin()
         except sqlite3.ProgrammingError, e:
@@ -422,10 +339,17 @@ class Database:
                 readOnly = True
         else:
             readOnly = False
-
+            
+        if readOnly and self.schemaVersion != schema.VERSION:
+            raise OldDatabaseSchema(
+                "The Conary database on this system is too old. "
+                "It will be automatically\nconverted as soon as you "
+                "run Conary with write permissions for the database\n"
+                "(which normally means as root).")          
         if not self.versionCheck():
             raise OldDatabaseSchema
-        self._createSchema(self.db.cursor())
+        
+        schema.createTroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
 	self.versionTable = versiontable.VersionTable(self.db)
@@ -434,8 +358,9 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        if not readOnly:
-            _doAnalyze(self.db)
+        # DBSTORE: when moving to dbstore, put this back
+        #if not readOnly:
+        #    self.db.analyze()
 
         if self.db.inTransaction:
             self.db.commit()
@@ -472,319 +397,10 @@ class Database:
 
             cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
             cu.execute("INSERT INTO DatabaseVersion VALUES (?)", 
-                       self.schemaVersion)
-        else:
-            version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
-            if version == 2 or version == 3 or version == 4:
-                import deptable, itertools, sys
-                class FakeTrove:
-                    def setRequires(self, req):
-                        self.r = req
-                    def setProvides(self, prov):
-                        self.p = prov
-                    def getRequires(self):
-                        return self.r
-                    def getProvides(self):
-                        return self.p
-                    def __init__(self):
-                        self.r = deps.deps.DependencySet()
-                        self.p = deps.deps.DependencySet()
-
-                try:
-                    cu.execute("UPDATE DatabaseVersion SET version=7")
-                except sqlite3.ProgrammingError:
-                    raise OldDatabaseSchema(
-                      "The Conary database on this system is too old. "      \
-                      "It will be automatically\nconverted as soon as you "  \
-                      "run Conary with write permissions for the database\n" \
-                      "(which normally means as root).")
-
-                msg = "Converting database..."
-                print msg,
-                sys.stdout.flush()
-
-                if version == 2:
-                    cu.execute("ALTER TABLE DBInstances ADD COLUMN pinned "
-                               "BOOLEAN")
-
-                instances = [ x[0] for x in 
-                              cu.execute("select instanceId from DBInstances") ]
-                dtbl = deptable.DependencyTables(self.db)
-                troves = []
-
-                for instanceId in instances:
-                    trv = FakeTrove()
-                    dtbl.get(cu, trv, instanceId)
-                    troves.append(trv)
-
-                cu.execute("delete from dependencies")
-                cu.execute("delete from requires")
-                cu.execute("delete from provides")
-
-                version = 5
-                for instanceId, trv in itertools.izip(instances, troves):
-                    dtbl.add(cu, trv, instanceId)
-
-                self.db.commit()
-
-                print "\r%s\r" %(' '*len(msg)),
-                sys.stdout.flush()
-
-            if version == 5:
-                import sys
-                cu.execute("ALTER TABLE TroveTroves ADD COLUMN inPristine "
-                           "INTEGER")
-                cu.execute("UPDATE TroveTroves SET inPristine=?", True)
-
-                # erase unused versions
-                msg = "Removing unused version strings...\r"
-                print msg,
-                sys.stdout.flush()
-                cu.execute("""
-                        DELETE FROM Versions WHERE versionId IN 
-                            (SELECT versions.versionid FROM versions 
-                                LEFT OUTER JOIN 
-                                    (SELECT versionid AS usedversions FROM 
-                                     dbinstances UNION 
-                                     SELECT versionid AS
-                                     usedversions FROM dbtrovefiles) 
-                                ON usedversions = versions.versionid 
-                             WHERE 
-                                usedversions IS NULL)
-                """)
-
-                cu.execute("UPDATE DatabaseVersion SET version=6")
-                version = 6
-                print "\r%s\r" %(' ' * len(msg)),
-                sys.stdout.flush()
-
-            if version == 6:
-                cu.execute('''DELETE FROM TroveTroves 
-                              WHERE TroveTroves.ROWID in (
-                                SELECT Second.ROWID
-                                 FROM TroveTroves AS First
-                                 JOIN TroveTroves as Second 
-                                 ON(First.instanceId=Second.instanceId AND
-                                    First.includedId=Second.includedId AND
-                                    First.ROWID < Second.ROWID))''')
-                cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
-                           "TroveTroves(instanceId,includedId)")
-                cu.execute("UPDATE DatabaseVersion SET version=7")
-                version = 7
-
-            if version == 7:
-                # we don't alter here because lots of indices have changed
-                # names; this is just easier
-                import sys
-                msg = "Converting database to new schema..."
-                print msg,
-                sys.stdout.flush()
-                cu.execute('DROP INDEX InstancesNameIdx')
-                cu.execute('DROP INDEX InstancesIdx')
-                DBInstanceTable(self.db)
-                cu.execute('INSERT INTO Instances SELECT * FROM DBInstances')
-                cu.execute('DROP TABLE DBInstances')
-                Flavors(self.db)
-                cu.execute('INSERT INTO Flavors SELECT * FROM DBFlavors '
-                                'WHERE flavor IS NOT NULL')
-                cu.execute('DROP TABLE DBFlavors')
-                cu.execute("UPDATE DatabaseVersion SET version=8")
-                version = 8
-                self.db.commit()
-                print "\r%s\r" %(' ' * len(msg)),
-
-            if version == 8:
-                import sys
-                msg = "Reordering TroveInfo..."
-                print msg,
-                sys.stdout.flush()
-
-                for klass, infoType in [
-                              (trove.BuildDependencies,
-                               trove._TROVEINFO_TAG_BUILDDEPS),
-                              (trove.LoadedTroves,
-                               trove._TROVEINFO_TAG_LOADEDTROVES) ]:
-                    for instanceId, data in \
-                            [ x for x in cu.execute(
-                                "select instanceId, data from TroveInfo WHERE "
-                                "infoType=?", infoType) ]:
-                        obj = klass(data)
-                        f = obj.freeze()
-                        if f != data:
-                            count += 1
-                            cu.execute("update troveinfo set data=? where "
-                                       "instanceId=? and infoType=?", f,
-                                       instanceId, infoType)
-                            cu.execute("delete from troveinfo where "
-                                       "instanceId=? and infoType=?",
-                                       instanceId, trove._TROVEINFO_TAG_SIGS)
-
-                cu.execute("UPDATE DatabaseVersion SET version=9")
-                self.db.commit()
-                print "\r%s\r" %(' ' * len(msg)),
-                version = 9
-
-            if version == 9:
-                import sys
-
-                cu.execute("SELECT COUNT(*) FROM DBTroveFiles")
-                total = cu.fetchone()[0]
-
-                cu.execute("""SELECT
-                                  instanceId, fileId, stream
-                              FROM
-                                  DBTroveFiles""")
-                changes = []
-                changedTroves = set()
-                msg = ''
-                for i, (instanceId, fileId, stream) in enumerate(cu):
-                    i += 1
-                    if i % 1000 == 0 or (i == total):
-                        msg = ("\rReordering streams and recalculating "
-                               "fileIds... %d/%d" %(i, total))
-                        print msg,
-                        sys.stdout.flush()
-
-                    f = files.ThawFile(stream, fileId)
-                    if not f.provides() and not f.requires():
-                        # if there are no deps, skip
-                        continue
-                    newStream = f.freeze()
-                    if newStream == stream:
-                        # if the stream didn't change, skip
-                        continue
-                    newFileId = f.fileId()
-                    changes.append((newFileId, newStream, fileId))
-                    changedTroves.add(instanceId)
-
-                # make the changes
-                for newFileId, newStream, fileId in changes:
-                    cu.execute("UPDATE DBTroveFiles SET "
-                               "fileId=?, stream=? WHERE fileId=?",
-                               (newFileId, newStream, fileId))
-
-                # delete signatures for the instances we changed
-                for instanceId in changedTroves:
-                    cu.execute("""DELETE FROM
-                                      troveinfo
-                                  WHERE
-                                      instanceId=? AND infoType=?""",
-                               (instanceId, trove._TROVEINFO_TAG_SIGS))
-
-                print "\r%s\r" %(' ' * len(msg)),
-                cu.execute("UPDATE DatabaseVersion SET version=10")
-                self.db.commit()
-                version = 10
-
-            if version == 10:
-                # convert contrib.rpath.com -> contrib.rpath.org
-                import sys
-                msg = ''
-
-                cu.execute('select count(*) from versions')
-                total = cu.fetchone()[0]
-
-                updates = []
-                cu.execute("select versionid, version from versions")
-                for i, (versionId, version) in enumerate(cu):
-                    i += 1
-                    msg = ('\rrenaming contrib.rpath.com to '
-                           'contrib.rpath.org.  %d/%d' %(i, total))
-                    print msg,
-                    sys.stdout.flush()
-
-                    if not versionId:
-                        continue
-                    new = version.replace('contrib.rpath.com',
-                                          'contrib.rpath.org')
-                    if version != new:
-                        updates.append((versionId, new))
-
-                for versionId, version in updates:
-                    cu.execute("""update versions
-                                      set version=?
-                                  where versionid=?""", (version, versionId))
-                    # erase signature troveinfo since the version changed
-                    cu.execute("""delete from
-                                      TroveInfo
-                                  where
-                                          infotype = 9
-                                      and instanceid in
-                                      (select
-                                           instanceid
-                                       from
-                                           versions, instances
-                                       where
-                                           versions.versionid=?)""",
-                               (versionId,))
-                print "\r%s\r" %(' ' * len(msg)),
-                cu.execute("UPDATE DatabaseVersion SET version=11")
-                self.db.commit()
-                version = 11
-
-            if version == 11:
-                import sys
-                # calculate path hashes for every trove
-                instanceIds = [ x[0] for x in cu.execute(
-                        "select instanceId from instances") ]
-                for i, instanceId in enumerate(instanceIds):
-                    if i % 20 == 0:
-                        print "Updating trove %d of %d\r" %  \
-                                    (i, len(instanceIds)),
-                        sys.stdout.flush()
-                    ph = trove.PathHashes()
-                    for path, in cu.execute(
-                            "select path from dbtrovefiles where instanceid=?",
-                            instanceId):
-                        ph.addPath(path)
-                    cu.execute("""
-                        insert into troveinfo(instanceId, infoType, data)
-                            values(?, ?, ?)""", instanceId,
-                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
-
-                print " " * 40 + "\r",
-                cu.execute("UPDATE DatabaseVersion SET version=12")
-                self.db.commit()
-                version = 12
-
-            if version == 12:
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_SIGS)
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_FLAGS)
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_INSTALLBUCKET)
-
-                flags = trove.TroveFlagsStream()
-                flags.isCollection(set = True)
-                collectionStream = flags.freeze()
-                flags.isCollection(set = False)
-                notCollectionStream = flags.freeze()
-
-                cu.execute("""
-                    INSERT INTO TroveInfo
-                        SELECT instanceId, ?, ?
-                            FROM Instances WHERE
-                                NOT (   trovename LIKE '%:%'
-                                     OR trovename LIKE 'fileset-%')
-                    """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
-
-                cu.execute("""
-                    INSERT INTO TroveInfo
-                        SELECT instanceId, ?, ?
-                            FROM Instances WHERE
-                                (   trovename LIKE '%:%'
-                                 OR trovename LIKE 'fileset-%')
-                    """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
-
-                cu.execute("UPDATE DatabaseVersion SET version=13")
-                self.db.commit()
-                version = 13
-
-            if version != self.schemaVersion:
-                return False
-
-        return True
+                       schema.VERSION)
+            return True
+        self.schemaVersion = schema.checkVersion(self.db)       
+        return self.schemaVersion == schema.VERSION
 
     def iterAllTroveNames(self):
 	return self.instances.iterNames()
@@ -1857,15 +1473,3 @@ order by
     def close(self):
 	self.db.close()
 
-class OldDatabaseSchema(Exception):
-
-    def __str__(self):
-        return self.msg
-
-    def __init__(self, msg = None):
-        if msg:
-            self.msg = msg
-        else:
-            self.msg = "The Conary database on this system is too old. "    \
-                       "For information on how to\nconvert this database, " \
-                       "please visit http://wiki.rpath.com/ConaryConversion."

@@ -111,7 +111,9 @@ class TroveStore:
         self.metadataTable = metadata.MetadataTable(self.db)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        sqldb._doAnalyze(self.db)
+        # DBSTORE: when moving to dbstore, enable this
+        #self.db.analyze()
+
         self.db.commit()
 
 	self.streamIdCache = {}
