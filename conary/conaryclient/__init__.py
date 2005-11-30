@@ -68,6 +68,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
+                                             cfg.user,
                                              localRepository = self.db)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 

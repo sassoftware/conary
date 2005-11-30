@@ -65,6 +65,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def doCall(self, clientVersion, *args):
         newArgs = ( clientVersion, ) + args
+
         isException, result = self.__send(self.__name, newArgs)
 	if not isException:
 	    return result
@@ -130,57 +131,70 @@ class ServerCache:
             return url
 
 	server = self.cache.get(serverName, None)
-	if server is None:
-	    url = self.map.get(serverName, None)
-	    if isinstance(url, repository.AbstractTroveDatabase):
-		return url
+        if server is not None:
+            return server
 
-	    if url is None:
-		url = "http://%s/conary/" % serverName
-            protocol, uri = urllib.splittype(url)
-            if protocol == 'http':
-                transporter = transport.Transport(https=False)
-            elif protocol == 'https':
-                transporter = transport.Transport(https=True)
-            server = ServerProxy(url, transporter)
-	    self.cache[serverName] = server
+        url = self.map.get(serverName, None)
+        if isinstance(url, repository.AbstractTroveDatabase):
+            return url
 
-	    try:
-                serverVersions = server.checkVersion()
-	    except Exception, e:
-                if isinstance(e, socket.error):
-                    errmsg = e[1]
-                # includes OS and IO errors
-                elif isinstance(e, EnvironmentError):
-                    errmsg = e.strerror
-                    # sometimes there is a socket error hiding 
-                    # inside an IOError!
-                    if isinstance(errmsg, socket.error):
-                        errmsg = errmsg[1]
-                else:
-                    errmsg = str(e)
-                url = _cleanseUrl(protocol, url)
-		raise errors.OpenError('Error occured opening repository '
-			    '%s: %s' % (url, errmsg))
+        userInfo = self.userMap.find(serverName)
 
-            intersection = set(serverVersions) & set(CLIENT_VERSIONS)
-            if not intersection:
-                url = _cleanseUrl(protocol, url)
-                raise errors.InvalidServerVersion(
-                    "While talking to repository " + url + ":\n"
-                    "Invalid server version.  Server accepts client "
-                    "versions %s, but this client only supports versions %s"
-                    " - download a valid client from wiki.conary.com" %
-                    (",".join([str(x) for x in serverVersions]),
-                     ",".join([str(x) for x in CLIENT_VERSIONS])))
+        if url is None:
+            if userInfo is None:
+                url = "http://%s/conary/" % serverName
+            else:
+                url = "https://%s:%s@%s/conary/" % \
+                    (userInfo[0], userInfo[1], serverName)
+        elif userInfo:
+            s = url.split('/')
+            assert(not s[1])
+            s[2] = '%s:%s@' % userInfo + s[2]
+            url = '/'.join(s)
 
-            transporter.setCompress(True)
+        protocol, uri = urllib.splittype(url)
+        transporter = transport.Transport(https = (protocol == 'https'))
+
+        server = ServerProxy(url, transporter)
+        self.cache[serverName] = server
+
+        try:
+            serverVersions = server.checkVersion()
+        except Exception, e:
+            if isinstance(e, socket.error):
+                errmsg = e[1]
+            # includes OS and IO errors
+            elif isinstance(e, EnvironmentError):
+                errmsg = e.strerror
+                # sometimes there is a socket error hiding 
+                # inside an IOError!
+                if isinstance(errmsg, socket.error):
+                    errmsg = errmsg[1]
+            else:
+                errmsg = str(e)
+            url = _cleanseUrl(protocol, url)
+            raise errors.OpenError('Error occured opening repository '
+                        '%s: %s' % (url, errmsg))
+
+        intersection = set(serverVersions) & set(CLIENT_VERSIONS)
+        if not intersection:
+            url = _cleanseUrl(protocol, url)
+            raise errors.InvalidServerVersion(
+                "While talking to repository " + url + ":\n"
+                "Invalid server version.  Server accepts client "
+                "versions %s, but this client only supports versions %s"
+                " - download a valid client from wiki.conary.com" %
+                (",".join([str(x) for x in serverVersions]),
+                 ",".join([str(x) for x in CLIENT_VERSIONS])))
+
+        transporter.setCompress(True)
 
 	return server
 
-    def __init__(self, repMap):
+    def __init__(self, repMap, userMap):
 	self.cache = {}
 	self.map = repMap
+	self.userMap = userMap
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
@@ -1273,11 +1287,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, localRepository = None):
+    def __init__(self, repMap, userMap, localRepository = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
-	self.c = ServerCache(repMap)
+	self.c = ServerCache(repMap, userMap)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self)
