@@ -22,6 +22,7 @@ from conary import callbacks
 from conary import trove
 from conary.checkin import fullLabel
 from conary.conarycfg import selectSignatureKey
+from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.lib.openpgpfile import KeyNotFound
@@ -68,9 +69,9 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
     if cfg.interactive:
         print troveStr
         print "Total: %d troves" % len(troves)
-        print "Are you sure you want to digitally sign these troves [y/N]?"
+        answer = cmdline.askYn('Are you sure you want to digitally sign these troves [y/N]?', default=False)
         answer = sys.stdin.readline()
-        if ansert[0].upper() != 'Y':
+        if not answer:
             return
 
     # We use a changeset here instead of getTroves because changeset knows

@@ -214,9 +214,6 @@ def realMain(cfg, argv=sys.argv):
     if argSet.pop('flavors', False):
         cfg.fullFlavors = True
 
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        cfg.interactive = False
-
     context = cfg.context
     if os.path.exists('CONARY'):
         state = checkin.ConaryStateFromFile('CONARY')

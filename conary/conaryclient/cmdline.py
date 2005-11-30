@@ -12,6 +12,7 @@
 # full details.
 #
 #
+import sys
 import os
 
 from conary.deps import deps
@@ -165,7 +166,9 @@ def toTroveSpec(name, versionStr, flavor):
 
 def askYn(prompt, default=None):
     while True:
-        resp = raw_input(prompt + ' ')
+        print prompt + ' ',
+        sys.stdout.flush()
+        resp = raw_input()
         if resp.lower() in ('y', 'yes'):
             return True
         elif resp in ('n', 'no'):
