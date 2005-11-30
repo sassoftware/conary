@@ -13,7 +13,7 @@
 #
 
 from conary import deps, files, sqlite3, trove, versions
-from conary.dbstore import idtable
+from conary.dbstore import idtable, migration
 from conary.local import deptable, troveinfo, versiontable, schema
 
 OldDatabaseSchema = schema.OldDatabaseSchema
@@ -326,7 +326,7 @@ class Database:
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
 
-        self.schemaVersion = schema.getDatabaseVersion(self.db)        
+        self.schemaVersion = migration.getDatabaseVersion(self.db)
         try:
             self.db._begin()
         except sqlite3.ProgrammingError, e:

@@ -25,7 +25,8 @@ python_files = __init__.py	\
 		netserver.py	\
 		trovefiles.py	\
 		trovestore.py	\
-		versionops.py
+		versionops.py	\
+		schema.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)
