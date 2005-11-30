@@ -13,7 +13,6 @@
 #
 
 import bdb
-from conary.build import fixedglob
 import bz2
 import debugger
 import errno
@@ -31,7 +30,8 @@ import tempfile
 import traceback
 import weakref
 
-import log
+from conary.build import fixedglob
+from conary.lib import log
 
 # Simple ease-of-use extensions to python libraries
 
@@ -94,30 +94,51 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
-def genExcepthook(dumpStack=True, debugCtrlC=False, prefix='conary-stack-'):
+errorMessage = '''
+*******************************************************************
+*** An error has occurred in conary.
+*** Please run the following script:
+***
+*** conary-debug %(command)s
+***
+*******************************************************************
+
+For more information, or if you have trouble with the conary-debug
+command, go to http://wiki.conary.com/HowToReportProblems for more
+help.
+
+To get a traceback, rerun this command with --config 'debugExceptions True'
+'''
+
+def genExcepthook(debug=False, dumpStack=False, 
+                  debugCtrlC=False, prefix='conary-stack-'):
     def excepthook(type, value, tb):
         if type is bdb.BdbQuit:
             sys.exit(1)
         sys.excepthook = sys.__excepthook__
         if type == KeyboardInterrupt and not debugCtrlC:
             sys.exit(1)
+
         lines = traceback.format_exception(type, value, tb)
         if log.syslog is not None:
             log.syslog.traceback(lines)
-        if dumpStack:
-            try:
-                (tbfd,path) = tempfile.mkstemp('', prefix)
-                output = os.fdopen(tbfd, 'w')
-                stackutil.printTraceBack(tb, output, type, value)
-                output.close()
-                print "*** Note *** An extended traceback has been saved to %s " % path
-            except Exception, msg:
-                log.warning("Could not write extended traceback: %s" % msg)
-        sys.stderr.write(string.joinfields(lines, ""))
-        if sys.stdout.isatty() and sys.stdin.isatty():
-            debugger.post_mortem(tb, type, value)
+
+        if debug:
+            sys.stderr.write(string.joinfields(lines, ""))
+            if sys.stdout.isatty() and sys.stdin.isatty():
+                debugger.post_mortem(tb, type, value)
+            else:
+                sys.exit(1)
+        elif log.getVerbosity() is log.DEBUG:
+            log.debug(''.join(lines))
         else:
-            sys.exit(1)
+            cmd = sys.argv[0]
+            if cmd.endswith('/commands/conary'):
+                cmd = cmd[:len('/commands/conary')] + '/bin/conary'
+            cmd = normpath(cmd)
+            sys.argv[0] = cmd
+            sys.stderr.write(errorMessage % dict(command=' '.join(sys.argv)))
+            
     return excepthook
 
 

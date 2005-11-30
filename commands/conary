@@ -204,6 +204,9 @@ def realMain(cfg, argv=sys.argv):
 	print >> sys.stderr, e
 	sys.exit(1)
 
+    # the user might have specified --config debugExceptions on the commandline
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
@@ -572,7 +575,7 @@ def main(argv=sys.argv):
             cfg = conarycfg.ConaryConfiguration()
 
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
+        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
 	return realMain(cfg, argv)
     except conarycfg.ConaryCfgError, e:
         log.error(str(e))

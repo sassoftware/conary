@@ -441,6 +441,7 @@ class ConaryConfiguration(SectionedConfig):
 	'contact'		: None,
 	'context'		: None,
 	'dbPath'		: [ PATH, '/var/lib/conarydb'],
+	'debugExceptions'       : [ BOOL, False ], 
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
         'excludeTroves'         : [ REGEXPLIST, RegularExpressionList() ],
