@@ -977,7 +977,9 @@ class ClientUpdate:
             # to build another one. We could do this all the time, but it's
             # expensive
             transitiveClosure = _jobTransitiveClosure(self.db,
-                                            uJob.getTroveSource(), jobSet)
+                                            trovesource.stack(
+                                                uJob.getTroveSource(),
+                                                self.repos), jobSet)
         elif forceJobClosure:
             transitiveClosure = jobSet
         # else we trust the transitiveClosure which was passed in

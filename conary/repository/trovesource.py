@@ -56,8 +56,12 @@ class AbstractTroveSource:
         return [False] * len(troveList)
 
     def getTrove(self, name, version, flavor, withFiles = True):
-        return self.getTroves([(name, version, flavor)], withFiles)[0]
-
+        trv = self.getTroves([(name, version, flavor)], withFiles)[0]
+        if trv is None:
+            raise errors.TroveMissing(name, version)
+        else:
+            return trv
+            
     def getTroveVersionList(self, name, withFlavors=False):
         raise NotImplementedError
 
