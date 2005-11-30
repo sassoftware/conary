@@ -187,7 +187,7 @@ class DisplayConfig:
         return self.showBuildReqs
 
     def printTroveHeader(self):
-        return self.info or self.showBuildReqs or self.deps or not self.needFiles()
+        return self.info or self.showBuildReqs or self.deps or self.iterTroves() or not self.needFiles()
 
     def printSimpleHeader(self):
         return not self.info and not self.showBuildReqs
@@ -205,7 +205,7 @@ class DisplayConfig:
         return self.info
 
     def printFiles(self):
-        return self.ls or self.ids or self.sha1s or self.tags or self.iterChildren
+        return self.ls or self.ids or self.sha1s or self.tags or self.iterTroves()
 
     def isVerbose(self):
         return not self.iterFiles()
