@@ -518,10 +518,6 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
     if jobNum and total:
         print formatter.formatJobNum(index, totalJobs)
     
-    if not dcfg.needTroves():
-        for ln in formatter.formatJobTups(jobs):
-            print ln
-
     else:
         for job, comps in formatter.compressJobList(jobs):
             if dcfg.printTroveHeader():
