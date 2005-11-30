@@ -435,7 +435,7 @@ class TroveFormatter(TroveTupFormatter):
             else:
                 lines = str(dep).split('\n')
                 for l in lines:
-                    yield '    ', l
+                    yield '    ' + l
             yield '' 
 
     def formatTroveFiles(self, trove, n, v, f, indent=0):
