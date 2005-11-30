@@ -142,6 +142,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         cs = self.repos.createChangeSet(csList, recurse = recurse, 
                                         withFiles = False, callback = callback)
 
+        deleted = set()
         # filter out non-defaults
         if skipNotByDefault:
             # Find out if troves were included w/ byDefault set (one
@@ -151,11 +152,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                 for (name, changeList) in troveCs.iterChangedTroves():
                     for (changeType, version, flavor, byDef) in changeList:
                         if changeType == '+':
+                            inclusions.setdefault((name, version, flavor), 0)
                             if byDef:
-                                inclusions[(name, version, flavor)] = True
-                            else:
-                                inclusions.setdefault((name, version, flavor), 
-                                                      False)
+                                inclusions[(name, version, flavor)] +=1
 
             # use a list comprehension here because we're modifying the
             # underlying dict in the cs instance
@@ -169,15 +168,42 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                 if item in primaryList: 
                     # the item was explicitly asked for
                     continue
-                elif inclusions[item]:
+                elif inclusions[item] or item in deleted:
                     # the item was included w/ byDefault set (or we might
                     # have already erased it from the changeset)
                     continue
 
-                # don't look at this trove again; we already decided to
-                # erase it
-                inclusions[item] = True
-                cs.delNewTrove(*item)
+                # troveCs was not included byDefault True anywhere.
+                # It may include subcomponents with byDefault True, however.
+                # 
+                # Say troveCs represents an install of foo, byDefault False.
+
+                # If foo:runtime is only included by foo, 
+                # then we don't want foo:runtime either, even if foo:runtime
+                # is included in foo byDefault True.
+                # However, if foo:runtime is included in a higher-level group
+                # byDefault True, then foo:runtime should be included. 
+                # We track not-by-default references to foo:runtime in 
+                # inclusions, and delete foo:runtime only when its last
+                # byDefault referencer was deleted.
+
+                toDelete = [troveCs]
+                while toDelete:
+                    troveCs = toDelete.pop()
+                    item = (troveCs.getName(), troveCs.getNewVersion(),
+                            troveCs.getNewFlavor())
+
+                    deleted.add(item)
+                    cs.delNewTrove(*item)
+
+                    for (name, changeList) in troveCs.iterChangedTroves():
+                        for (changeType, version, flavor, byDef) in changeList:
+                            if changeType == '+' and byDef:
+                                item = (name, version, flavor)
+                                inclusions[item] -= 1
+                                if not inclusions[item]:
+                                    childCs = cs.getNewTroveVersion(*item)
+                                    toDelete.append(childCs)
 
         # now filter excludeList
         fullCsList = []
