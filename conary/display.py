@@ -518,15 +518,14 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
     if jobNum and total:
         print formatter.formatJobNum(index, totalJobs)
     
-    else:
-        for job, comps in formatter.compressJobList(jobs):
-            if dcfg.printTroveHeader():
-                for ln in formatter.formatJobHeader(job, comps):
-                    print ln
+    for job, comps in formatter.compressJobList(jobs):
+        if dcfg.printTroveHeader():
+            for ln in formatter.formatJobHeader(job, comps):
+                print ln
 
-            if dcfg.printFiles():
-                for ln in formatter.formatJobFiles(job):
-                    print ln
+        if dcfg.printFiles():
+            for ln in formatter.formatJobFiles(job):
+                print ln
 
 
 class JobDisplayConfig(DisplayConfig):
