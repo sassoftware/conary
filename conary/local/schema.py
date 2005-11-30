@@ -395,7 +395,8 @@ class MigrateTo_14(SchemaMigration):
         # some trovefiles the first time around
         m10 = MigrateTo_10(self.db)
         m10.migrate()       
-        
+        return self.Version
+    
 def checkVersion(db):
     global VERSION
     version = getDatabaseVersion(db)
