@@ -770,6 +770,10 @@ class TroveSourceStack(SearchableTroveSource):
         if source is not None and source not in self.sources:
             self.sources.append(source)
 
+    def insertSource(self, source, idx=0):
+        if source is not None and source not in self.sources:
+            self.sources.insert(idx, source)
+        
     def hasSource(self, source):
         return source in self.sources
 
@@ -819,6 +823,7 @@ class TroveSourceStack(SearchableTroveSource):
                     newTroveList.append((index, troveTup))
                 else:
                     results[index] = trove
+            troveList = newTroveList
         return results
                     
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
@@ -930,8 +935,16 @@ class TroveSourceStack(SearchableTroveSource):
                 continue
         return None
 
-def stack(source1, source2):
+def stack(*sources):
     """ create a trove source that will search first source1, then source2 """
+    if len(sources) > 2:
+        return stack(sources[0], stack(*sources[1:]))
+    elif len(sources) == 1:
+        return sources[1]
+    elif not sources:
+        return None
+    else:
+        source1, source2 = sources
 
     if source1 is source2:
         return source1
@@ -939,10 +952,16 @@ def stack(source1, source2):
     if isinstance(source1, TroveSourceStack):
         if source1.hasSource(source2):
             return source1
-        source1.copy().addSource(source2)
+        source1 = source1.copy()
+        source1.addSource(source2)
         return source1
-    
-    return TroveSourceStack(source1, source2)
+    elif isinstance(source2, TroveSourceStack):
+        if source2.hasSource(source1):
+            return source2
+        source2 = source2.copy()
+        source2.insertSource(source1)
+        return source2
+    return TroveSourceStack(*sources)
 
 class AbstractJobSource(AbstractTroveSource):
 
