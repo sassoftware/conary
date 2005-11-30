@@ -187,7 +187,7 @@ class DisplayConfig:
         return self.showBuildReqs
 
     def printTroveHeader(self):
-        return not self.needFiles() or self.iterFiles()
+        return self.info or self.showBuildReqs or self.deps or not self.needFiles()
 
     def printSimpleHeader(self):
         return not self.info and not self.showBuildReqs
@@ -389,7 +389,7 @@ class TroveFormatter(TroveTupFormatter):
                  ("Label     : %s" % 
                             v.branch().label().asString()))
 
-        yield '%-30s' % ("Size      : %s" % size),
+        yield '%-30s' % ("Size      : %s" % size)
         if hasattr(troveSource, 'trovesArePinned'):
             yield "Pinned    : %s" % troveSource.trovesArePinned(
                                                             [ (n, v, f) ])[0]
