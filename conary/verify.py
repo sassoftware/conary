@@ -90,7 +90,7 @@ def verifyTrove(trove, db, cfg):
                 break
         if not changed:
             return
-        showchangeset.displayChangeSet(db, None, cs, [], cfg, ls=True, 
+        showchangeset.displayChangeSet(db, cs, [], cfg, ls=True, 
                                        showChanges=True)
     except OSError, err:
         if err.errno == 13:
