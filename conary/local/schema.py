@@ -20,7 +20,7 @@ from conary.dbstore import idtable
 
 # Stuff related to SQL schema maintenance and migration
 
-VERSION = 13
+VERSION = 13 #14
 
 # Schema creation functions
 def createFlavors(db):
@@ -283,10 +283,10 @@ class MigrateTo_10(SchemaMigration):
                 # if there are no deps, skip
                 continue
             newStream = f.freeze()
-            if newStream == stream:
+            newFileId = f.fileId()
+            if newStream == stream and newFileId == fileId:
                 # if the stream didn't change, skip
                 continue
-            newFileId = f.fileId()
             changes.append((newFileId, newStream, fileId))
             changedTroves.add(instanceId)
 
@@ -387,6 +387,14 @@ class MigrateTo_13(SchemaMigration):
             WHERE     (trovename LIKE '%:%' OR trovename LIKE 'fileset-%')
             """, trove._TROVEINFO_TAG_FLAGS, notCollectionStream)
         return self.Version
+
+class MigrateTo_14(SchemaMigration):
+    Version = 14
+    def migrate(self):
+        # we need to rerun the MigrateTo_10 migration since we missed
+        # some trovefiles the first time around
+        m10 = MigrateTo_10(self.db)
+        m10.migrate()       
         
 def checkVersion(db):
     global VERSION
@@ -405,6 +413,7 @@ def checkVersion(db):
     if version == 10: version = MigrateTo_11(db)()
     if version == 11: version = MigrateTo_12(db)()
     if version == 12: version = MigrateTo_13(db)()
+    #if version == 13: version = MigrateTo_14(db)()
 
     return version
 
