@@ -1118,7 +1118,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 resume = None, allowUnknownFlags = False,
                 ignoreDeps = False, profile = False, logBuild = True):
     # this ensures the repository exists
-    repos = NetworkRepositoryClient(cfg.repositoryMap)
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
 
     # do not cook as root!
     # XXX fix emerge to build as non-root user, either build as current

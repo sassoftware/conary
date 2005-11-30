@@ -19,6 +19,7 @@ import base64
 import urllib
 
 from conary import callbacks
+from conary import conaryclient
 from conary import trove
 from conary.checkin import fullLabel
 from conary.conarycfg import selectSignatureKey
@@ -41,7 +42,8 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
     troveStr = ""
     jobList = []
     trv = []
-    repos = NetworkRepositoryClient(cfg.repositoryMap)
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
 
     if callback is None:
         if cfg.quiet:

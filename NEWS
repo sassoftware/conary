@@ -11,6 +11,8 @@ Changes in 0.80.0:
     * showchangeset on relative changesets now displays them as jobs.
     * query and queryrep now exclude components if they match their 
       package name
+    * Removed direct instantiation of NetworkRepositoryClient object; it
+      should be created by calling ConaryClient
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed

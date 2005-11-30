@@ -20,9 +20,10 @@ from conary.local import update
 from conary.repository import errors
 from conary.updatecmd import UpdateCallback
 
-def ChangeSetCommand(repos, cfg, troveSpecs, outFileName, recurse = True,
+def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
                      callback = None):
     client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
     applyList = cmdline.parseChangeList(troveSpecs, allowChangeSets=False)
 
     toFind = []

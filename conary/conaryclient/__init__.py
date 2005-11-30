@@ -317,4 +317,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @param flavor: a conary client flavor object, L{deps.deps.DependencySet}
         """        
         return self.repos.getConaryUrl(version, flavor)
+
+    def getRepos(self):
+        return self.repos
     
