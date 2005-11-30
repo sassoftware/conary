@@ -15,6 +15,7 @@
 Provides Conary's generic config file format, and implements conaryrc
 handling.
 """
+import fnmatch
 import os
 import re
 import sre_constants
@@ -42,7 +43,8 @@ from conary.lib import log, util
     FINGERPRINT,
     FINGERPRINT_MAP,
     PATH,
-) = range(16)
+    USERINFO,
+) = range(17)
 
 BOOLEAN=BOOL
 
@@ -57,6 +59,19 @@ class RegularExpressionList(list):
                 return True
 
         return False
+
+class UserInformation(list):
+
+    def append(self, server, user, password = None):
+        list.append(self, (server, user, password))
+
+    def find(self, server):
+        for (serverGlob, user, password) in self:
+            # this is case insensitve, which is perfect for hostnames
+            if fnmatch.fnmatch(server, serverGlob):
+                return user, password
+
+        return None
 
 class ConfigFile:
 
@@ -136,12 +151,14 @@ class ConfigFile:
             try:
 	        self.__dict__[key] = int(val)
 	    except:
-		raise ParseError, ("%s:%s: expected integer for configuration value '%s'" % (file, self.lineno, key))
+		raise ParseError, ("%s:%s: expected integer for configuration "
+                                   "value '%s'" % (file, self.lineno, key))
 	elif type == STRINGDICT:
             try:
                 (idx, val) = val.split(None, 1)
             except ValueError:
-		raise ParseError, ("%s:%s: expected '<key> <value>' pair for '%s'" % (file, self.lineno, key))
+		raise ParseError, ("%s:%s: expected '<key> <value>' pair for "
+                                   "'%s'" % (file, self.lineno, key))
 	    self.__dict__[key][idx] = val
 	elif type == STRINGLIST:
 	    self.__dict__[key].append(val)
@@ -177,7 +194,8 @@ class ConfigFile:
 	    elif val.lower() in ('1', 'true'):
 		self.__dict__[key] = True
 	    else:
-		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
+		raise ParseError, ("%s:%s: expected True or False for "
+                       " configuration value '%s'" % (file, self.lineno, key))
         elif type == FLAVOR:
             self.__dict__[key] = deps.parseFlavor(val)
         elif type == FLAVORLIST:
@@ -196,14 +214,22 @@ class ConfigFile:
             if fingerprint in ('', 'None'):
                 fingerprint = None
             self.__dict__[key].append((label, fingerprint))
+        elif type == USERINFO:
+            val = val.split(' ')
+            if len(val) < 2 or len(val) > 3:
+                raise ParseError, ("%s:%s: expected <hostglob> <user> "
+                        "<password> for configuration value %s"
+                            % (File, self.lineno, key))
+            self.__dict__[key].append(*val)
 
-    def displayKey(self, key, value, type, out):
+    def displayKey(self, key, value, type, out, hidePasswords):
         if type in (INT,STRING,PATH):
             out.write("%-25s %s\n" % (key, value))
         elif type == LABEL:
             out.write("%-25s %s\n" % (key, value.asString()))
         elif type == LABELLIST:
-            out.write("%-25s %s\n" % (key, " ".join(x.asString() for x in value)))
+            out.write("%-25s %s\n" % (key, 
+                                      " ".join(x.asString() for x in value)))
         elif type == REGEXPLIST:
             out.write("%-25s %s\n" % (key, " ".join([x[0] for x in value])))
         elif type == STRINGPATH:
@@ -246,9 +272,18 @@ class ConfigFile:
                     out.write("%-25s %-25s %s\n" % (key, label, fingerprint))
             else:
                 out.write("%-25s None\n" %key)
+        elif type == USERINFO:
+            for (serverGlob, user, password) in value:
+                if password is None:
+                    out.write("%-25s %s %s\n" % (key, serverGlob, user))
+                elif hidePasswords:
+                    out.write("%-25s %s %s <password>\n" % 
+                              (key, serverGlob, user))
+                else:
+                    out.write("%-25s %s %s %s\n" %
+                              (key, serverGlob, user, password))
         else:
             out.write("%-25s (unknown type)\n" % (key))
-
 
     def display(self, out=None):
         if out is None:
@@ -382,7 +417,8 @@ class ConaryContext(ConfigSection):
                  'excludeTroves'    : [ REGEXPLIST, RegularExpressionList() ],
                  'repositoryMap'    : [ STRINGDICT, {} ],
                  'signatureKey'     : [ FINGERPRINT, None ],
-                 'signatureKeyMap'  : [ FINGERPRINT_MAP, None ] 
+                 'signatureKeyMap'  : [ FINGERPRINT_MAP, None ],
+                 'user'             : [ USERINFO, UserInformation() ] 
                }
 
     def displayKey(self, key, value, type, out):
@@ -431,6 +467,7 @@ class ConaryConfiguration(SectionedConfig):
         'useDirs'               : [ STRINGPATH, ('/etc/conary/use', 
                                                   '/etc/conary/distro/use',
                                                   '~/.conary/use')],
+        'user'                  : [ USERINFO, UserInformation() ] 
     }
 
     def __init__(self, readConfigFiles=True):
@@ -495,8 +532,8 @@ class ConaryConfiguration(SectionedConfig):
 
     def displayKey(self, key, value, type, out):
         # mask out username and password in repository map entries
-        if key == 'repositoryMap':
-            if self.getDisplayOption('hidePasswords'):
+        hidePasswords = self.getDisplayOption('hidePasswords')
+        if key == 'repositoryMap' and hidePasswords:
                 maskedMap = {}
                 for host, map in value.iteritems():
                     maskedMap[host] = re.sub('(https?://)[^:]*:[^@]*@(.*)', 
@@ -504,7 +541,8 @@ class ConaryConfiguration(SectionedConfig):
                                              map)
                 value = maskedMap
 
-        ConfigFile.displayKey(self, key, value, type, out)
+        ConfigFile.displayKey(self, key, value, type, out, 
+                              hidePasswords = hidePasswords)
 
     def setContext(self, name):
         """ Copy the config values from the context named name (if any)
