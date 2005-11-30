@@ -128,6 +128,12 @@ class AlreadySignedError(RepositoryError):
     def __init__(self, error = "Already signed"):
         self.error=error
 
+class DigitalSignatureError(RepositoryError):
+    def __str__(self):
+        return self.error
+    def __init__(self, error = "Trove can't be signed"):
+        self.error=error
+
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 

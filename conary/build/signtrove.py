@@ -117,11 +117,8 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
             repos.addDigitalSignature(trv.getName(), trv.getVersion(),
                                       trv.getFlavor(),
                                       trv.getDigitalSignature(signatureKey))
-        except KeyNotFound:
+        except (errors.AlreadySignedError, KeyNotFound):
             misfires.append(trv.getName())
 
     if misfires:
-        kError = KeyNotFound('')
-        kError.error = 'The following troves could not be signed: %s' \
-                       % str(misfires)
-        raise kError
+        raise errors.DigitalSignatureError('The following troves could not be signed: %s' % str(misfires))

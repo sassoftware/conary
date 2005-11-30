@@ -468,6 +468,8 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except openpgpfile.KeyNotFound, e:
         print >> sys.stderr, str(e)
+    except errors.DigitalSignatureError, e:
+        print >> sys.stderr, str(e)
     except KeyboardInterrupt, e:
         pass
     return 1
