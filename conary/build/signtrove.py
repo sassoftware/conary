@@ -70,7 +70,6 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
         print troveStr
         print "Total: %d troves" % len(troves)
         answer = cmdline.askYn('Are you sure you want to digitally sign these troves [y/N]?', default=False)
-        answer = sys.stdin.readline()
         if not answer:
             return
 
