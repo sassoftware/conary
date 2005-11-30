@@ -103,14 +103,6 @@ def createTroveTroves(db):
     return True
 
 # SCHEMA Migration
-def getDatabaseVersion(db):
-    cu = db.cursor()
-    # DBSTORE: migrating to dbstore will make this obsolete    
-    try:
-        ret = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
-    except sqlite3.DatabaseError:
-        return 0
-    return ret
 
 # redefine to enable stdout messaging for the migration process
 class SchemaMigration(migration.SchemaMigration):
@@ -370,7 +362,7 @@ class MigrateTo_14(SchemaMigration):
     
 def checkVersion(db):
     global VERSION
-    version = getDatabaseVersion(db)
+    version = migration.getDatabaseVersion(db)
     if version == VERSION:
         return version
     
