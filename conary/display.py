@@ -49,33 +49,24 @@ def displayTroves(dcfg, formatter, troveTups):
     # let the formatter know what troves are going to be displayed
     # in order to display the troves
     formatter.prepareTuples(troveTups)
- 
-    if not dcfg.needTroves():
-        if dcfg.hideComponents():
-            iter = skipComponents(([x] for x in troveTups), 
-                                  dcfg.getPrimaryTroves())
-        else:
-            iter = ([x] for x in troveTups)
 
-        for [(n,v,f)] in iter:
-            print formatter.formatNVF(n, v, f)
-    else:
-        iter = iterTroveList(dcfg.getTroveSource(), 
-                             troveTups, 
-                             walkTroves=dcfg.walkTroves(),
-                             iterTroves=dcfg.iterTroves(),
-                             needFiles = dcfg.needFiles())
-        if dcfg.hideComponents():
-            iter = skipComponents(iter, dcfg.getPrimaryTroves())
+    iter = iterTroveList(dcfg.getTroveSource(), 
+                         troveTups, 
+                         walkTroves=dcfg.walkTroves(),
+                         iterTroves=dcfg.iterTroves(),
+                         needTroves = dcfg.needTroves(),
+                         needFiles = dcfg.needFiles())
+    if dcfg.hideComponents():
+        iter = skipComponents(iter, dcfg.getPrimaryTroves())
 
-        for (n,v,f), trv, indent in iter:
-            if dcfg.printTroveHeader():
-                for ln in formatter.formatTroveHeader(trv, n, v, f, indent):
-                    print ln
+    for (n,v,f), trv, indent in iter:
+        if dcfg.printTroveHeader():
+            for ln in formatter.formatTroveHeader(trv, n, v, f, indent):
+                print ln
 
-            if not indent and dcfg.printFiles():
-                for ln in formatter.formatTroveFiles(trv, n, v, f, indent):
-                    print ln
+        if not indent and dcfg.printFiles():
+            for ln in formatter.formatTroveFiles(trv, n, v, f, indent):
+                print ln
 
 def skipComponents(tupList, primaryTroves=[]):
     tups = set()
@@ -87,7 +78,8 @@ def skipComponents(tupList, primaryTroves=[]):
         tups.add((n, v, f))
 
 
-def iterTroveList(troveSource, troveTups, walkTroves=False, iterTroves=False,
+def iterTroveList(troveSource, troveTups, walkTroves=False, 
+                  iterTroves=False, needTroves=False, 
                   needFiles=False):
     """
     Given a troveTup list, iterate over those troves and their child troves
@@ -99,13 +91,19 @@ def iterTroveList(troveSource, troveTups, walkTroves=False, iterTroves=False,
     @type bool
     @param iterTroves: if True, include just the first level of troves below
     the listed troves (but do not recurse)
+    @param needTroves: if True, return trove objects.  Otherwise, return None
+    as each trove objec.t
+    @type bool
     @param needFiles: True if the returned trove objects should contain files
     @type bool
     @rtype: yields (troveTup, troveObj, indent) tuples
     """
     assert(not (walkTroves and iterTroves))
 
-    troves = troveSource.getTroves(troveTups, withFiles=needFiles)
+    if needTroves or walkTroves or iterTroves:
+        troves = troveSource.getTroves(troveTups, withFiles=needFiles)
+    else:
+        troves = [None] * len(troveTups)
     
     indent = 0
 
@@ -126,8 +124,11 @@ def iterTroveList(troveSource, troveTups, walkTroves=False, iterTroves=False,
 
             if iterTroves:
                 newTroveTups = sorted(trv.iterTroveList())
-                newTroves = troveSource.getTroves(newTroveTups, 
-                                                  withFiles=needFiles)
+                if needTroves:
+                    newTroves = troveSource.getTroves(newTroveTups, 
+                                                      withFiles=needFiles)
+                else:
+                    newTroves = [None] * len(newTroveTups)
 
                 for troveTup, trv in itertools.izip(newTroveTups, newTroves):
                     yield troveTup, trv, 1
@@ -224,8 +225,7 @@ class DisplayConfig:
 
     def needTroves(self):
         # we need the trove 
-        return (self.iterChildren or self.walkTroves() or self.info or 
-                self.showBuildReqs)
+        return self.info or self.showBuildReqs
 
     def needFiles(self):
         return self.printFiles()
