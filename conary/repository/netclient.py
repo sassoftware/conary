@@ -54,6 +54,11 @@ CLIENT_VERSIONS = [ 36, 37 ]
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
+    def __init__(self, send, name, host, pwCallback):
+        xmlrpclib._Method.__init__(self, send, name)
+        self.__host = host
+        self.__pwCallback = pwCallback
+
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
 
@@ -63,13 +68,31 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
     def __call__(self, *args):
         return self.doCall(CLIENT_VERSIONS[-1], *args)
 
-    def doCall(self, clientVersion, *args):
-        newArgs = ( clientVersion, ) + args
-        isException, result = self.__send(self.__name, newArgs)
+    def __doCall(self, clientVersion, argList):
+        newArgs = ( clientVersion, ) + argList
+
+        try:
+            isException, result = self.__send(self.__name, newArgs)
+        except xmlrpclib.ProtocolError, e:
+            if e.errcode == 403:
+                raise errors.InsufficientPermission(e.url.split("/")[2])
+                
 	if not isException:
 	    return result
         else:
             self.handleError(result)
+
+    def doCall(self, clientVersion, *args):
+        try:
+            return self.__doCall(clientVersion, args)
+        except errors.InsufficientPermission:
+            # no password was specified -- prompt for it
+            if not self.__pwCallback():
+                raise
+        except:
+            raise
+
+        return self.__doCall(clientVersion, args)
 
     def handleError(self, result):
 	exceptionName = result[0]
@@ -103,8 +126,28 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
 class ServerProxy(xmlrpclib.ServerProxy):
 
+    def __passwordCallback(self):
+        if self.__pwCallback is None:
+            return False
+
+        l = self.__host.split('@')
+
+        if len(l) != 2 or l[0][-1] != ':':
+            return False
+
+        password = self.__pwCallback(l[0][:-1], l[1])
+        l[0] = l[0] + password
+        self.__host = '@'.join(l)
+
+        return True
+
     def __getattr__(self, name):
-        return _Method(self.__request, name)
+        return _Method(self.__request, name, self.__host, 
+                       self.__passwordCallback)
+
+    def __init__(self, url, transporter, pwCallback):
+        xmlrpclib.ServerProxy.__init__(self, url, transporter)
+        self.__pwCallback = pwCallback
 
 class ServerCache:
 
@@ -130,57 +173,74 @@ class ServerCache:
             return url
 
 	server = self.cache.get(serverName, None)
-	if server is None:
-	    url = self.map.get(serverName, None)
-	    if isinstance(url, repository.AbstractTroveDatabase):
-		return url
+        if server is not None:
+            return server
 
-	    if url is None:
-		url = "http://%s/conary/" % serverName
-            protocol, uri = urllib.splittype(url)
-            if protocol == 'http':
-                transporter = transport.Transport(https=False)
-            elif protocol == 'https':
-                transporter = transport.Transport(https=True)
-            server = ServerProxy(url, transporter)
-	    self.cache[serverName] = server
+        url = self.map.get(serverName, None)
+        if isinstance(url, repository.AbstractTroveDatabase):
+            return url
 
-	    try:
-                serverVersions = server.checkVersion()
-	    except Exception, e:
-                if isinstance(e, socket.error):
-                    errmsg = e[1]
-                # includes OS and IO errors
-                elif isinstance(e, EnvironmentError):
-                    errmsg = e.strerror
-                    # sometimes there is a socket error hiding 
-                    # inside an IOError!
-                    if isinstance(errmsg, socket.error):
-                        errmsg = errmsg[1]
-                else:
-                    errmsg = str(e)
-                url = _cleanseUrl(protocol, url)
-		raise errors.OpenError('Error occured opening repository '
-			    '%s: %s' % (url, errmsg))
+        userInfo = self.userMap.find(serverName)
 
-            intersection = set(serverVersions) & set(CLIENT_VERSIONS)
-            if not intersection:
-                url = _cleanseUrl(protocol, url)
-                raise errors.InvalidServerVersion(
-                    "While talking to repository " + url + ":\n"
-                    "Invalid server version.  Server accepts client "
-                    "versions %s, but this client only supports versions %s"
-                    " - download a valid client from wiki.conary.com" %
-                    (",".join([str(x) for x in serverVersions]),
-                     ",".join([str(x) for x in CLIENT_VERSIONS])))
+        if userInfo and userInfo[1] is None:
+            userInfo = (userInfo[0], "")
 
-            transporter.setCompress(True)
+        if url is None:
+            if userInfo is None:
+                url = "http://%s/conary/" % serverName
+            else:
+                url = "https://%s:%s@%s/conary/" % \
+                    (userInfo[0], userInfo[1], serverName)
+        elif userInfo:
+            s = url.split('/')
+            assert(not s[1])
+            s[2] = '%s:%s@' % userInfo + s[2]
+            url = '/'.join(s)
+
+        protocol, uri = urllib.splittype(url)
+        transporter = transport.Transport(https = (protocol == 'https'))
+
+        server = ServerProxy(url, transporter, self.pwPrompt)
+        self.cache[serverName] = server
+
+        try:
+            serverVersions = server.checkVersion()
+        except Exception, e:
+            if isinstance(e, socket.error):
+                errmsg = e[1]
+            # includes OS and IO errors
+            elif isinstance(e, EnvironmentError):
+                errmsg = e.strerror
+                # sometimes there is a socket error hiding 
+                # inside an IOError!
+                if isinstance(errmsg, socket.error):
+                    errmsg = errmsg[1]
+            else:
+                errmsg = str(e)
+            url = _cleanseUrl(protocol, url)
+            raise errors.OpenError('Error occured opening repository '
+                        '%s: %s' % (url, errmsg))
+
+        intersection = set(serverVersions) & set(CLIENT_VERSIONS)
+        if not intersection:
+            url = _cleanseUrl(protocol, url)
+            raise errors.InvalidServerVersion(
+                "While talking to repository " + url + ":\n"
+                "Invalid server version.  Server accepts client "
+                "versions %s, but this client only supports versions %s"
+                " - download a valid client from wiki.conary.com" %
+                (",".join([str(x) for x in serverVersions]),
+                 ",".join([str(x) for x in CLIENT_VERSIONS])))
+
+        transporter.setCompress(True)
 
 	return server
 
-    def __init__(self, repMap):
+    def __init__(self, repMap, userMap, pwPrompt):
 	self.cache = {}
 	self.map = repMap
+	self.userMap = userMap
+	self.pwPrompt = pwPrompt
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
@@ -1273,11 +1333,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, localRepository = None):
+    def __init__(self, repMap, userMap, localRepository = None, 
+                 pwPrompt = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
-	self.c = ServerCache(repMap)
+        if pwPrompt is None:
+            pwPrompt = lambda x, y: None
+
+	self.c = ServerCache(repMap, userMap, pwPrompt)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self)
