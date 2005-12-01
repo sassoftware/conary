@@ -24,7 +24,6 @@ from conary.deps import deps
 from conary.lib import log, sha1helper, util
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, trovestore
-from conary.datastore import IntegrityError
 from conary.dbstore import idtable
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from conary.lib.openpgpfile import TRUST_FULL
@@ -99,7 +98,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
-        except IntegrityError, e:
+        except errors.IntegrityError, e:
             condRollback()
             return (True, ('IntegrityError', str(e)))
 	except trove.TroveIntegrityError, e:

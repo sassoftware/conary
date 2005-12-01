@@ -29,7 +29,7 @@ import sha
 from conary.lib import log
 from conary.lib import util
 from conary.lib import sha1helper
-from conary.repository import filecontents
+from conary.repository import errors, filecontents
 
 class DataStore:
 
@@ -180,7 +180,7 @@ class DataStore:
 	newCount, sha1 = self.incrementCount(path, fileObj = f,
                                              precompressed = precompressed)
         if sha1 and sha1 != hash:
-            raise IntegrityError
+            raise errors.IntegrityError
 
         if newCount == 1 and self.logFile:
             open(self.logFile, "a").write(path + "\n")
@@ -274,6 +274,3 @@ class DataStoreRepository:
     def __init__(self, path, logFile = None, dataStore = None):
 	self.contentsStore = dataStore
 
-class IntegrityError(Exception):
-
-    pass

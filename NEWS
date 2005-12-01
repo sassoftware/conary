@@ -28,6 +28,7 @@ Changes in 0.80.0:
       to perform general display operations.
     * query.py added
     * added JobSource concept for searching and manipulating lists of jobs.
+    * moved datastore.py into repository module
 
 Changes in 0.71.2
   o Client Changes:
