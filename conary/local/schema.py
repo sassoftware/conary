@@ -33,7 +33,8 @@ def createFlavors(db):
 	if cu.fetchone() == None:
 	    # reserve flavor 0 for "no flavor information"
 	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
-
+        db.commit()
+        
 def createDBTroveFiles(db):
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -60,7 +61,7 @@ def createDBTroveFiles(db):
                                       streamId INT,
                                       tagId INT)
                    """)
-
+        db.commit()
 
 def createInstances(db):
     cu = db.cursor()
@@ -78,8 +79,8 @@ def createInstances(db):
         cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
         cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                    "Instances(troveName, versionId, flavorId)")
-    return True
-
+        db.commit()
+        
 def createTroveTroves(db):
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -100,7 +101,7 @@ def createTroveTroves(db):
         # contains unique TroveTrove (instanceId, includedId) pairs.
         cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
                         "TroveTroves(instanceId,includedId)")
-    return True
+        db.commit()
 
 # SCHEMA Migration
 

@@ -19,6 +19,7 @@ VERSION = 7
 
 def createInstances(db):
     cu = db.cursor()
+    commit = False
     cu.execute("""SELECT tbl_name FROM sqlite_master
                   WHERE type='table' or type='view' """)
     tables = [ x[0] for x in cu ]
@@ -43,7 +44,7 @@ def createInstances(db):
         )""")
         cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
                    " Instances(itemId, versionId, flavorId) ")
-
+        commit = True
     if "InstancesView" not in tables:
         cu.execute("""
         CREATE VIEW
@@ -59,9 +60,13 @@ def createInstances(db):
         JOIN Versions on Instances.versionId = Versions.versionId
         JOIN Flavors on Instances.flavorId = Flavors.flavorId
         """)
-
+        commit = True
+    if commit:
+        db.commit()
+    
 def createFlavors(db):        
     cu = db.cursor()
+    commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
     if "Flavors" not in tables:
@@ -84,7 +89,8 @@ def createFlavors(db):
         )""")
         cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
         cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
-
+        commit = True
+        
     if "FlavorScores" not in tables:
         from conary.deps import deps        
         cu.execute("""
@@ -101,15 +107,18 @@ def createFlavors(db):
         )""")
         cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
                           FlavorScores(request, present)""")
-
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
             cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
                        request, present, value)
-                            
+        commit = True
+    if commit:
+        db.commit()
+        
 def createNodes(db):
     cu = db.cursor()
+    commit = False
     cu.execute("""SELECT tbl_name FROM sqlite_master
                   WHERE type='table' or type='view' """)
     tables = [ x[0] for x in cu ]
@@ -138,6 +147,7 @@ def createNodes(db):
                            ON Nodes(itemId, branchId, versionId)""")
         cu.execute("""CREATE INDEX NodesItemVersionIdx
                            ON Nodes(itemId, versionId)""")
+        commit = True
     if 'NodesView' not in tables:
         cu.execute("""
         CREATE VIEW
@@ -155,9 +165,13 @@ def createNodes(db):
         JOIN Branches on Nodes.branchId = Branches.branchId
         JOIN Versions on Nodes.versionId = Versions.versionId
         """)
-            
+        commit = True
+    if commit:
+        db.commit()
+        
 def createLatest(db):
     cu = db.cursor()
+    commit = False
     cu.execute("""SELECT tbl_name FROM sqlite_master
                   WHERE type='table' OR type='view' """)
     tables = [ x[0] for x in cu ]
@@ -186,6 +200,8 @@ def createLatest(db):
         cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
                    "Latest(itemId, branchId, flavorId)")
+        commit = True
+        
     if 'LatestView' not in tables:
         cu.execute("""
         CREATE VIEW
@@ -202,9 +218,13 @@ def createLatest(db):
         JOIN Versions on Latest.versionId = Versions.versionId
         JOIN Flavors on Latest.flavorId = Flavors.flavorId
         """)
-
+        commit = True
+    if commit:
+        db.commit()
+        
 def createUsers(db):        
     cu = db.cursor()
+    commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type "
                "in ('table', 'view')")
     tables = [ x[0] for x in cu ]
@@ -219,7 +239,8 @@ def createUsers(db):
             CONSTRAINT Users_userId_uq
                 UNIQUE(user)
         )""")
-
+        commit = True
+        
     if "UserGroups" not in tables:
         cu.execute("""
         CREATE TABLE UserGroups (
@@ -228,7 +249,8 @@ def createUsers(db):
             CONSTRAINT UserGroups_userGroup_uq
                 UNIQUE(userGroup)
         )""")
-
+        commit = True
+        
     if "UserGroupMembers" not in tables:
         cu.execute("""
         CREATE TABLE UserGroupMembers (
@@ -245,7 +267,8 @@ def createUsers(db):
                                         UserGroupMembers(userGroupId)""")
         cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
                                         UserGroupMembers(userId)""")
-
+        commit = True
+        
     if "Permissions" not in tables:
         cu.execute("""
         CREATE TABLE Permissions (
@@ -274,7 +297,8 @@ def createUsers(db):
             cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
         if "Labels" in tables:
             cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
-
+        commit = True
+        
     if "UserPermissions" not in tables:
         cu.execute("""
         CREATE VIEW UserPermissions AS
@@ -294,7 +318,8 @@ def createUsers(db):
                   JOIN Labels ON 
                       Permissions.labelId = Labels.labelId
         """)
-
+        commit = True
+        
     if "UsersView" not in tables:
         cu.execute("""
         CREATE VIEW
@@ -313,9 +338,14 @@ def createUsers(db):
         JOIN Items using (itemId)
         JOIN Labels on Permissions.labelId = Labels.labelId
         """)
-    
+        commit = True
+
+    if commit:
+        db.commit()
+        
 def createPGPKeys(db):
     cu = db.cursor()
+    commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
     if "PGPKeys" not in tables:
@@ -331,6 +361,7 @@ def createPGPKeys(db):
             CONSTRAINT PGPKeys_fingerprint_uq
                 UNIQUE(fingerprint)
         )""")
+        commit = True
     if "PGPFingerprints" not in tables:
         cu.execute("""
         CREATE TABLE PGPFingerprints(
@@ -340,9 +371,13 @@ def createPGPKeys(db):
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        commit = True
+    if commit:
+        db.commit()
 
 def createTroves(db):
     cu = db.cursor()
+    commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
     if 'FileStreams' not in tables:
@@ -355,7 +390,8 @@ def createTroves(db):
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
         cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")
-
+        commit = True
+        
     if "TroveFiles" not in tables:
         cu.execute("""
         CREATE TABLE TroveFiles(
@@ -373,7 +409,8 @@ def createTroves(db):
         )""")
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
         cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
-
+        commit = True
+        
     if "TroveTroves" not in tables:
         cu.execute("""
         CREATE TABLE TroveTroves(
@@ -395,10 +432,13 @@ def createTroves(db):
         # this index is so we can quickly tell what troves are needed
         # by another trove
         cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+        commit = True
 
+    if commit:
+        db.commit()
 
 def createInstructionSets(db):
-    cu = db.cursor()
+    cu = db.cursor()    
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
     if 'InstructionSets' not in tables:
@@ -408,7 +448,8 @@ def createInstructionSets(db):
             base            STRING,
             flags           STRING
         )""")
-
+        db.commit()
+        
 def createChangeLog(db):        
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -424,7 +465,7 @@ def createChangeLog(db):
                 UNIQUE(nodeId)
         )""")
         cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
-
+        db.commit()
 
 # SCHEMA Migration
 class SchemaMigration(migration.SchemaMigration):
