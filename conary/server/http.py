@@ -93,8 +93,11 @@ class HttpHandler(WebHandler):
         if type(auth) is int:
             return auth
 
+        cfg = conarycfg.ConaryConfiguration()
+        cfg.repositoryMap = self.repServer.map
+        cfg.user.append(self.repServer.map.keys()[0], auth[0], auth[1])
         self.repos = shimclient.ShimNetClient(
-            self.repServer, self._protocol, self._port, auth, self.repServer.map)
+            self.repServer, self._protocol, self._port, auth, cfg.repositoryMap, cfg.user)
         self.serverName = self.repServer.name
 
         if not self.cmd:
