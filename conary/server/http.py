@@ -96,7 +96,7 @@ class HttpHandler(WebHandler):
 
         cfg = conarycfg.ConaryConfiguration()
         cfg.repositoryMap = self.repServer.map
-        cfg.user.append(self.repServer.map.keys()[0], auth[0], auth[1])
+        cfg.user.addServer((self.repServer.map.keys()[0], auth[0], auth[1]))
         self.repos = shimclient.ShimNetClient(
             self.repServer, self._protocol, self._port, auth, cfg.repositoryMap, cfg.user)
         self.serverName = self.repServer.name
