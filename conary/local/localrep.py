@@ -17,9 +17,8 @@ import sha
 import zlib
 from StringIO import StringIO
 
-from conary import datastore
 from conary.lib import openpgpfile
-from conary.repository import repository
+from conary.repository import errors, repository
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -188,7 +187,7 @@ class SqlDataStore:
             digest = sha.new()
             digest.update(rawData)
             if digest.hexdigest() != hash:
-                raise datastore.IntegrityError
+                raise errors.IntegrityError
 
             cu.execute("INSERT INTO DataStore VALUES(?, 1, ?)",
                        hash, data)

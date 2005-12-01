@@ -30,6 +30,9 @@ class InsufficientPermission(Exception):
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
 
+class IntegrityError(RepositoryError):
+    """Files were added which didn't match the expected sha1"""
+
 class MethodNotSupported(RepositoryError):
     """Attempt to call a server method which does not exist"""
 
