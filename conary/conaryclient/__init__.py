@@ -25,6 +25,7 @@ from conary.repository.netclient import NetworkRepositoryClient
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
 from conary.conaryclient.clone import ClientClone
+from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
 
 CloneError = clone.CloneError
@@ -54,7 +55,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
     """
-    def __init__(self, cfg = None):
+    def __init__(self, cfg = None, passwordPrompter = None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
                     If None, the standard Conary configuration is loaded
@@ -64,15 +65,17 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
             cfg.initializeFlavors()
+
+        if passwordPrompter is None:
+            passwordPrompter = password.getPassword
         
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
+                                             cfg.user,
+                                             pwPrompt = passwordPrompter,
                                              localRepository = self.db)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
-
-    def getRepos(self):
-        return self.repos
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
@@ -320,4 +323,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @param flavor: a conary client flavor object, L{deps.deps.DependencySet}
         """        
         return self.repos.getConaryUrl(version, flavor)
+
+    def getRepos(self):
+        return self.repos
     

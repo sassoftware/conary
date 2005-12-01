@@ -195,7 +195,7 @@ class ConfigFile:
 		self.__dict__[key] = True
 	    else:
 		raise ParseError, ("%s:%s: expected True or False for "
-                       " configuration value '%s'" % (file, self.lineno, key))
+                       "configuration value '%s'" % (file, self.lineno, key))
         elif type == FLAVOR:
             self.__dict__[key] = deps.parseFlavor(val)
         elif type == FLAVORLIST:

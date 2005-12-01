@@ -132,14 +132,6 @@ def usage(rc = 1):
     print "                 --resolve"
     return rc
 
-def openRepository(repMap):
-    from conary.repository import netclient, errors
-    try:
-        return netclient.NetworkRepositoryClient(repMap)
-    except errors.OpenError, e:
-	log.error('Unable to open repository %s: %s', path, str(e))
-	sys.exit(1)
-
 def openDatabase(root, path):
     return database.Database(root, path)
 
@@ -272,18 +264,15 @@ def realMain(cfg, argv=sys.argv):
         outFile = otherArgs[-1]
         del otherArgs[-1]
 
-	repos = openRepository(cfg.repositoryMap)
-
-	cscmd.ChangeSetCommand(repos, cfg, otherArgs[2:], outFile, **kwargs)
+	cscmd.ChangeSetCommand(cfg, otherArgs[2:], outFile, **kwargs)
     elif (otherArgs[1] == "commit"):
 	targetBranch = None
 	if argSet.has_key('target-branch'):
 	    targetBranch  = argSet['target-branch']
 	    del argSet['target-branch']
 	if len(otherArgs) < 3: return usage()
-	repos = openRepository(cfg.repositoryMap)
 	for changeSet in otherArgs[2:]:
-	    commit.doCommit(repos, changeSet, targetBranch)
+	    commit.doCommit(cfg, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
         
 	showPasswords = argSet.pop('show-passwords', False)
@@ -368,12 +357,10 @@ def realMain(cfg, argv=sys.argv):
 	showDeps = argSet.pop('deps', False)
 	showBuildReqs = argSet.pop('buildreqs', False)
 
-	repos = openRepository(cfg.repositoryMap)
-
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2:
-	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
+	    args = [cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
                     info, tags, showDeps, showBuildReqs ]
 	    try:
 		queryrep.displayTroves(*args)
@@ -412,9 +399,8 @@ def realMain(cfg, argv=sys.argv):
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
 	if argSet: return usage()
-	repos = openRepository(cfg.repositoryMap)
 	db = openDatabase(cfg.root, cfg.dbPath)
-	args = [db, repos, cfg] + otherArgs[2:]
+	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args, **kwargs)
     elif (otherArgs[1] == "verify"):
 	db = openDatabase(cfg.root, cfg.dbPath)
@@ -464,8 +450,7 @@ def realMain(cfg, argv=sys.argv):
             component = otherArgs[3:]
         cs = changeset.ChangeSetFromFile(cspath)
 	db = database.Database(cfg.root, cfg.dbPath)
-	repos = openRepository(cfg.repositoryMap)
-        showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
+        showchangeset.displayChangeSet(db, cs, component, cfg, ls, 
                                         tags, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)

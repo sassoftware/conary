@@ -17,7 +17,15 @@ class RepositoryMismatch(Exception):
     pass
 
 class InsufficientPermission(Exception):
-    pass
+
+    def __str__(self):
+        if self.server:
+            return "Insufficient permission to access server %s" % self.server
+
+        return "Insufficient permission"
+        
+    def __init__(self, server = None):
+        self.server = server
 
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""

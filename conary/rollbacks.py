@@ -53,17 +53,15 @@ def listRollbacks(db, cfg):
 
 	print
 
-def apply(db, repos, cfg, *names, **kwargs):
-    # Instantiating the client initializes our log file; all of this rollback
-    # stuff ought to go through the client instead of directly to the database
-    # object anyway
+def apply(db, cfg, *names, **kwargs):
     client = conaryclient.ConaryClient(cfg)
 
     log.syslog.command()
 
     replaceFiles = kwargs.get('replaceFiles', False)
     try:
-	db.applyRollbackList(repos, names, replaceFiles=replaceFiles)
+	db.applyRollbackList(client.getRepos(), names, 
+                             replaceFiles=replaceFiles)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1

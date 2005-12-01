@@ -23,6 +23,7 @@ import xmlrpclib
 from conary import branch
 from conary import checkin
 from conary import conarycfg
+from conary import conaryclient
 from conary import constants
 from conary import deps
 from conary import flavorcfg
@@ -207,6 +208,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
     if not callback:
         callback = CheckinCallback()
 
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
     if not args:
 	return usage()
     elif (args[0] == "add"):
@@ -220,7 +224,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	    dir = None
 
 	if argSet or (len(args) != 2): return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args = [repos, cfg, dir, args[1], callback]
 	checkin.checkout(*args)
@@ -233,7 +236,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         if argSet: return usage()
         if len(args) < 3: return usage()
 
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
         target = args[1]
         troveSpecs = args[2:]
 
@@ -251,7 +253,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	    del argSet['message']
 
 	if argSet or len(args) != 1: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	checkin.commit(repos, cfg, message, callback=callback)
         log.setVerbosity(level)
@@ -281,25 +282,21 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
 	checkin.diff(*args)
     elif (args[0] == "annotate"):
 	if argSet or len(args) != 2: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 	args[0] = repos
 	checkin.annotate(*args)
 
     elif (args[0] == "log"):
 	if argSet or len(args) > 2: return usage()
 
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 	args[0] = repos
 	checkin.showLog(*args)
     elif (args[0] == "rdiff"):
 	if argSet or len(args) != 4: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
     elif (args[0] == "remove") or (args[0] == "rm"):
@@ -321,11 +318,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
 	if len(args) != 2 or argSet: return usage()
 	
-	try:
-	    repos = NetworkRepositoryClient(cfg.repositoryMap)
-	except errors.OpenError:
-	    repos = None
-
 	checkin.newTrove(repos, cfg, args[1], dir = dir)
     elif (args[0] == "context"):
         if len(args) > 2:
@@ -340,12 +332,10 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	checkin.setContext(cfg, name, ask=ask)
     elif (args[0] == "merge"):
 	if argSet or not args or len(args) > 1: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
         
 	checkin.merge(repos)
     elif (args[0] == "update") or (args[0] == "up"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
         kwargs = {'callback': callback}
@@ -424,7 +414,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         xmlFile = open(xmlSource)
         xml = xmlFile.read()
 
-        repos = NetworkRepositoryClient(cfg.repositoryMap)
         repos.updateMetadataFromXML(troveName, troveBranch, xml)
         log.setVerbosity(level)
     elif (args[0] == "usage"):	

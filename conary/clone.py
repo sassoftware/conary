@@ -33,16 +33,16 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False):
+    client = ConaryClient(cfg)
+    repos = client.getRepos()
 
     targetBranch = versions.VersionFromString(targetBranch)
-    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
 
     troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecList]
     cloneSources = repos.findTroves(cfg.installLabelPath, 
                                     troveSpecs, cfg.flavor)
     cloneSources = list(itertools.chain(*cloneSources.itervalues()))
 
-    client = ConaryClient(cfg)
     okay, cs = client.createCloneChangeSet(targetBranch, cloneSources,
                                            updateBuildInfo=updateBuildInfo)
     if not okay:

@@ -17,6 +17,7 @@ Provides the output for the "conary repquery" command
 import itertools
 import time
 
+from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
@@ -24,7 +25,7 @@ from conary.lib import log
 from conary import versions
 
 
-def displayTroves(repos, cfg, troveSpecs = [], all = False, ls = False, 
+def displayTroves(cfg, troveSpecs = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
                   info = False, tags = False, deps = False,
                   showBuildReqs = False):
@@ -62,6 +63,8 @@ def displayTroves(repos, cfg, troveSpecs = [], all = False, ls = False,
        @rtype: None
     """
 
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
 
     troveTups, namesOnly, primary  = getTrovesToDisplay(repos, cfg, troveSpecs, 
                                                         all, leaves)

@@ -20,6 +20,7 @@ import time
 import sys
 
 #conary
+from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display, query
 from conary import files
@@ -43,10 +44,13 @@ def usage():
     print "                --all             Combine above tags"
     print ""
 
-def displayChangeSet(db, repos, cs, troveSpecs, cfg, ls = False, tags = False,  
+def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,  
                      showChanges=False,
                      all=False, deps=False, sha1s=False, ids=False,
                      asJob=False):
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
     if not asJob and not showChanges and cs.isAbsolute():
         changeSetSource = trovesource.ChangesetFilesTroveSource(None)
         changeSetSource.addChangeSet(cs)

@@ -414,7 +414,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.name = name
 	map = dict(repositoryMap)
 	map[name] = self
-	self.reposSet = netclient.NetworkRepositoryClient(map)
+        # XXX this client needs to die
+        from conary import conarycfg
+	self.reposSet = netclient.NetworkRepositoryClient(map,
+                                    conarycfg.UserInformation())
 	
 	self.troveStore = troveStore
 
