@@ -345,7 +345,7 @@ def createUsers(db):
         """)
         commit = True
 
-    if "EntitlementsGroups" not in tables:
+    if "EntitlementGroups" not in tables:
         cu.execute("""
         CREATE TABLE EntitlementGroups (
             entGroupId      INTEGER PRIMARY KEY,
