@@ -32,6 +32,7 @@ from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove
 from conary.build import errors as builderrors
+from conary.lib import cfg
 from conary.lib import log
 from conary.lib import openpgpfile
 from conary.lib import options
@@ -428,14 +429,13 @@ def main(argv=sys.argv):
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
-            cfg = conarycfg.ConaryConfiguration(False)
+            ccfg = conarycfg.ConaryConfiguration(False)
         else:
-            cfg = conarycfg.ConaryConfiguration()
+            ccfg = conarycfg.ConaryConfiguration()
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(dumpStack=cfg.dumpStackOnError,
-                                            debug=cfg.debugExceptions)
-	return realMain(cfg, argv)
-    except conarycfg.ConaryCfgError, e:
+        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
+	return realMain(ccfg, argv)
+    except cfg.CfgError, e:
         log.error(str(e))
         sys.exit(1)
     except xmlrpclib.ProtocolError, e:

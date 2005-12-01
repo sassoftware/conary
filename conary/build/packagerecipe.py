@@ -574,8 +574,8 @@ class _AbstractPackageRecipe(Recipe):
 	self.macros.update(use.Arch._getMacros())
         # allow for architecture not to be set -- this could happen 
         # when storing the recipe e.g. 
-	for key in cfg.macroKeys():
-	    self.macros._override(key, cfg['macros.' + key])
+ 	for key in cfg.macros:
+ 	    self.macros._override(key, cfg['macros'][key])
 	self.macros.name = self.name
 	self.macros.version = self.version
         self.packages = { self.name : True }

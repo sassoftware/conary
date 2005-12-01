@@ -31,11 +31,11 @@ from conary import callbacks, checkin, commit, conarycfg, constants
 from conary import cscmd, deps, flavorcfg, query
 from conary import queryrep, conaryclient, rollbacks, showchangeset
 from conary import updatecmd, verify, versions
-from conary.lib import log, options, util
+from conary.lib import cfg,log, options, util
 from conary.local import database
 from conary.trove import DigitalSignatureVerificationError
 
-sys.excepthook = util.genExcepthook()
+sys.excepthook = util.genExcepthook(debug=True)
 
 def usage(rc = 1):
     print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
@@ -555,14 +555,14 @@ def main(argv=sys.argv):
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
-            cfg = conarycfg.ConaryConfiguration(False)
+            ccfg = conarycfg.ConaryConfiguration(False)
         else:
-            cfg = conarycfg.ConaryConfiguration()
+            ccfg = conarycfg.ConaryConfiguration()
 
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
-	return realMain(cfg, argv)
-    except conarycfg.ConaryCfgError, e:
+        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
+	return realMain(ccfg, argv)
+    except cfg.CfgError, e:
         log.error(str(e))
     except xmlrpclib.ProtocolError, e:
 	if e.errcode == 403:
