@@ -25,6 +25,7 @@ import traceback
 
 from conary import metadata
 from conary import versions
+from conary import conarycfg
 from conary.deps import deps
 from conary.repository import shimclient
 from conary.repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
