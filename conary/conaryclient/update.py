@@ -1232,19 +1232,30 @@ class ClientUpdate:
 
         def _applyCs(cs, uJob, removeHints = {}):
             try:
-                rb = self.db.commitChangeSet(cs, uJob,
-                                    replaceFiles = replaceFiles,
-                                    tagScript = tagScript, test = test, 
-                                    justDatabase = justDatabase,
-                                    journal = journal, callback = callback,
-                                    localRollbacks = localRollbacks,
-                                    removeHints = removeHints,
-                                    autoPinList = autoPinList,
-                                    threshold = threshold,)
-            except database.CommitError, e:
-                raise UpdateError, "changeset cannot be applied"
-
-            return rb
+                self.db.commitChangeSet(cs, uJob,
+                                        replaceFiles = replaceFiles,
+                                        tagScript = tagScript, test = test,
+                                        justDatabase = justDatabase,
+                                        journal = journal, callback = callback,
+                                        localRollbacks = localRollbacks,
+                                        removeHints = removeHints,
+                                        autoPinList = autoPinList,
+                                        threshold = threshold)
+            except Exception, e:
+                # an exception happened, clean up
+                rb = uJob.getRollback()
+                if rb:
+                    # remove the last entry from this rollback set
+                    # (which is the rollback entriy that roll back
+                    # applying this changeset)
+                    rb.removeLast()
+                    # if there aren't any entries left in the rollback,
+                    # remove it altogether
+                    if rb.getCount() == 0:
+                        self.db.removeLastRollback()
+                if isinstance(e, database.CommitError):
+                    raise UpdateError, "changeset cannot be applied"
+                raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
 	    # reopen the local database so we don't share a sqlite object

@@ -11,6 +11,9 @@ Changes in 0.80.0:
     * showchangeset on relative changesets now displays them as jobs.
     * query and queryrep now exclude components if they match their 
       package name
+    * Conary cleans up rollbacks when a changeset fails to apply.
+      Previously, an invalid changeset was saved in the rollback
+      stack, which made applying it impossible
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed
