@@ -21,6 +21,7 @@ from conary.callbacks import UpdateCallback
 from conary import conarycfg
 from conary.deps import deps
 from conary.lib import log, util
+from conary.lib import openpgpkey, openpgpfile
 from conary.local import database
 from conary.repository import changeset, trovesource
 from conary.repository.netclient import NetworkRepositoryClient
@@ -1214,7 +1215,8 @@ class ClientUpdate:
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback(),
-                    autoPinList = conarycfg.RegularExpressionList(), threshold = 0):
+                    autoPinList = conarycfg.RegularExpressionList(),
+                    threshold = 0):
 
         def _createCs(repos, job, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
@@ -1230,7 +1232,7 @@ class ClientUpdate:
 
             return baseCs
 
-        def _applyCs(cs, uJob, removeHints = {}):
+        def _applyCs(cs, uJob, removeHints = {}, recurseDepth = 0):
             try:
                 self.db.commitChangeSet(cs, uJob,
                                         replaceFiles = replaceFiles,
@@ -1250,11 +1252,28 @@ class ClientUpdate:
                     # applying this changeset)
                     rb.removeLast()
                     # if there aren't any entries left in the rollback,
-                    # remove it altogether
-                    if rb.getCount() == 0:
+                    # remove it altogether, unless we're about to try again
+                    if (rb.getCount() == 0) and \
+                           (not isinstance(e, openpgpkey.KeyNotFound) and \
+                            (not recurseDepth)):
                         self.db.removeLastRollback()
+                # if the database is still in a transaction, then it
+                # probably shouldn't be.
+                if self.db.db.db.inTransaction:
+                    self.db.db.rollback()
                 if isinstance(e, database.CommitError):
                     raise UpdateError, "changeset cannot be applied"
+                if isinstance(e, openpgpfile.KeyNotFound):
+                    # only retry once.
+                    if recurseDepth < 2:
+                        # ensure we grab the latest keys
+                        for keyId in e.keys:
+                            for val in self.cfg.repositoryMap.values():
+                                openpgpkey.findOpenPGPKey(val, keyId,
+                                                          self.cfg.pubRing)
+                        # try again.
+                        return _applyCs(cs, uJob, removeHints,
+                                 recurseDepth = recurseDepth + 1)
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):

@@ -143,6 +143,7 @@ def realMain(cfg, argv=sys.argv):
     cfgMap["exclude-troves"] = "excludeTroves"
     cfgMap["root"] = "root"
     cfgMap["trust-threshold"] = "trustThreshold"
+    cfgMap["pubring"] = "pubRing"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
@@ -240,6 +241,9 @@ def realMain(cfg, argv=sys.argv):
 	prof.start()
 	profile = True
 	del argSet['profile']
+
+    keyCache = openpgpkey.getKeyCache()
+    keyCache.setPublicPath(cfg.pubRing)
 
     if (len(otherArgs) < 2):
 	return usage()

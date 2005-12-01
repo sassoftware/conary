@@ -177,6 +177,10 @@ class KeyNotFound(Exception):
     def __init__(self, keyId, reason=None):
         if keyId:
             self.error = "OpenPGP key not found for key ID %s" %keyId
+            if isinstance(keyId, list):
+                self.keys = keyId
+            else:
+                self.keys = [keyId]
         else:
             self.error = "No OpenPGP keys found"
         if reason:

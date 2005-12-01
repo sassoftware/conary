@@ -637,7 +637,11 @@ class Database(SqlDbRepository):
     # name looks like "r.%d"
     def removeRollback(self, name):
 	rollback = int(name[2:])
-	shutil.rmtree(self.rollbackCache + "/%d" % rollback)
+        try:
+            shutil.rmtree(self.rollbackCache + "/%d" % rollback)
+        except OSError, e:
+            if e.errno == 2:
+                pass
 	if rollback == self.lastRollback:
 	    self.lastRollback -= 1
 	    self.writeRollbackStatus()

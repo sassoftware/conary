@@ -74,7 +74,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldFile(pathId, fileId, fileObj)
 
     def checkTroveSignatures(self, trv, threshold, keyCache=None):
-        trv.verifyDigitalSignatures(threshold, keyCache)
+        trust, missingKeys = trv.verifyDigitalSignatures(threshold, keyCache)
+        if missingKeys:
+            raise openpgpfile.KeyNotFound(missingKeys)
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.

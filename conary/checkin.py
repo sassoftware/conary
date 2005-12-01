@@ -38,6 +38,7 @@ from conary.conaryclient import cmdline
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import openpgpfile
+from conary.lib import openpgpkey
 from conary.lib import util
 from conary.local import update
 from conary.repository import changeset, errors
@@ -101,15 +102,18 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0):
     #verifyDigitalSignatures can raise a
     #DigitalSignatureVerificationError
     r = 256
+    missingKeys = []
     for troveCs in [ x for x in cs.iterNewTroveList() ]:
         # instantiate each trove from the troveCs so we can verify
         # the signature
         t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor(), troveCs.getChangeLog())
         t.applyChangeSet(troveCs, skipIntegrityChecks = True)
-        r = min(t.verifyDigitalSignatures(trustThreshold)[0], r)
-        # create a new troveCs that has the new signature included in it
-        # replace the old troveCs with the new one in the changeset
+        verTuple = t.verifyDigitalSignatures(trustThreshold)
+        missingKeys.extend(verTuple[1])
+        r = min(verTuple[0], r)
+    if missingKeys:
+        raise openpgpfile.KeyNotFound(missingKeys)
     return r
 
 def checkout(repos, cfg, workDir, name, callback=None):
@@ -164,7 +168,13 @@ def checkout(repos, cfg, workDir, name, callback=None):
                                excludeAutoSource = True,
                                callback=callback)
 
-    verifyAbsoluteChangeset(cs, cfg.trustThreshold)
+    try:
+        verifyAbsoluteChangeset(cs, cfg.trustThreshold)
+    except openpgpfile.KeyNotFound, e:
+        for keyId in e.keys:
+            for val in cfg.repositoryMap.values():
+                openpgpkey.findOpenPGPKey(val, keyId, cfg.pubRing)
+        verifyAbsoluteChangeset(cs, cfg.trustThreshold)
 
     troveCs = cs.iterNewTroveList().next()
 

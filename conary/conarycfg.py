@@ -166,7 +166,7 @@ class ConaryContext(ConfigSection):
     user                  =  CfgUserInfo
 
     def _resetSigMap(self):
-        self.signatureKeyMap = None
+        self.signatureKeyMap = []
 
     def __init__(self, *args, **kw):
         ConfigSection.__init__(self, *args, **kw)
@@ -196,6 +196,7 @@ class ConaryConfiguration(SectionedConfigFile):
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
+    pubRing               =  (CfgPathList, '/etc/conary/pubring.gpg')
     root                  =  (CfgPath, '/')
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
@@ -207,7 +208,6 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '~/.conary/use'))
 
     _sectionType          =  ConaryContext
-
 
     def __init__(self, readConfigFiles=True):
 	SectionedConfigFile.__init__(self)

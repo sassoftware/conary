@@ -13,6 +13,7 @@
 #
 
 import os
+import sys
 from getpass import getpass
 from time import time
 
@@ -236,6 +237,30 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             tries += 1
 
         raise BadPassPhrase
+
+#-----#
+#OpenPGPKeyFinder: download missing keys from the given conary server.
+#-----#
+def findOpenPGPKey(server, keyId, pubRing):
+    pubRingPath = '/'.join(pubRing.split('/')[:-1])
+
+    pid = os.fork()
+    if pid == 0:
+        # we don't care about any of the possible output from this process.
+        # gpg is pretty cavalier about dumping random garbage to stdout/err
+        # regardless of the command line options admonishing it not to.
+        fd = os.open(os.devnull, os.W_OK)
+        os.dup2(fd, sys.stdout.fileno())
+        os.dup2(fd, sys.stderr.fileno())
+        os.close(fd)
+        os.execlp('gpg', 'gpg', '-q', '--no-tty', '--homedir', pubRingPath,
+                  '--no-greeting', '--no-secmem-warning', '--no-verbose',
+                  '--no-mdc-warning', '--no-default-keyring', '--batch',
+                  '--no-permission-warning', '--keyserver',
+                  '%sgetOpenPGPKey?search=%s' % (server, keyId),
+                  '--recv-key', keyId)
+    os.wait()
+    os.remove(pubRingPath + '/secring.gpg')
 
 _keyCache = OpenPGPKeyFileCache()
 
