@@ -17,7 +17,7 @@ import sha
 import tempfile
 
 from conary.repository import changeset, errors, filecontents
-from conary import datastore, deps, files, trove, versions
+from conary import deps, files, trove, versions
 from conary.lib import patch, sha1helper, util, openpgpkey, openpgpfile
 
 # FIXME: remove these compatibility exception classes later

@@ -22,7 +22,7 @@ from conary.deps import deps
 from conary.lib import util, stackutil, log, openpgpfile
 from conary.repository import changeset, errors, filecontents
 from conary.repository.netrepos import trovestore
-from conary.datastore import DataStoreRepository, DataStore
+from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository

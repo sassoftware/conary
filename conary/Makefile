@@ -29,7 +29,6 @@ python_files = __init__.py	\
 	cvc.py			\
         cvcdesc.py              \
 	cscmd.py		\
-	datastore.py		\
 	display.py		\
 	files.py		\
 	flavorcfg.py		\

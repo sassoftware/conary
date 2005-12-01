@@ -24,7 +24,6 @@ import xml
 import xmlrpclib
 
 #conary
-from conary import datastore
 from conary import files
 from conary import metadata
 from conary import trove
@@ -109,7 +108,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == "MethodNotSupported":
 	    raise errors.MethodNotSupported(exceptionArgs[0])
         elif exceptionName == "IntegrityError":
-	    raise datastore.IntegrityError(exceptionArgs[0])
+	    raise errors.IntegrityError(exceptionArgs[0])
         elif exceptionName == 'FileContentsNotFound':
             raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
                                                self.toVersion(exceptionArgs[1])))
