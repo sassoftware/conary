@@ -17,39 +17,57 @@ import os.path
 
 #conary
 from conary.build import use
-from conary.conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
 from conary.deps import deps
 from conary.lib import log
+from conary.lib.cfg import *
 
-# XXX hack -- need a better way to add to list of config types
-FLAGSENSE = 2222
-BOOLDICT = 2223
+class CfgFlagSense(CfgType):
+    @staticmethod
+    def parseString(val):
+        val = val.lower()
+        if val == "disallowed":
+            sense = deps.FLAG_SENSE_DISALLOWED
+        elif val == "preferred":
+            sense = deps.FLAG_SENSE_PREFERRED
+        elif val == "prefernot":
+            sense = deps.FLAG_SENSE_PREFERNOT
+        elif val == "required":
+            sense = deps.FLAG_SENSE_REQUIRED
+        else:
+            raise ParseError, ("unknown use value '%s'") % val
+        return sense
 
+    @staticmethod
+    def format(val, displayOptions={}):
+        if val == deps.FLAG_SENSE_DISALLOWED:
+            return "disallowed"
+        elif val == deps.FLAG_SENSE_PREFERRED:
+            return "preferred"
+        elif val == deps.FLAG_SENSE_PREFERNOT:
+            return "prefernot"
+        elif val == deps.FLAG_SENSE_REQUIRED:
+            return "required"
+  
 class SubArchConfig(ConfigFile):
-    defaults = {
-	'name'	                : [ STRING, None ],
-	'buildName'	        : [ STRING, None ],
-        'subsumes'              : [ STRING, ''   ],
-	'buildRequired'	        : [ BOOL,   True ],
-	'shortDoc'	        : [ STRING, '' ],
-	'longDoc'	        : [ STRING, '' ],
-	'macro'	                : [ STRINGDICT, {} ],
-    } 
-
+    name             = None
+    buildName        = None
+    subsumes         = ''
+    buildRequired    = CfgBool
+    shortDoc         = CfgString
+    longDoc          = CfgString
+    macro            = CfgDict(CfgString)
+  
 class ArchConfig(ConfigFile):
-
-    requiredArchProps = ['bits32', 'bits64', 'LE', 'BE'] 
-
-    defaults = {
-	'name'	                : [ STRING, None ],
-	'buildName'	        : [ STRING, None ],
-	'shortDoc'	        : [ STRING, '' ],
-	'longDoc'	        : [ STRING, '' ],
-        'archProp'              : [ BOOLDICT, {} ],
-	'macro'	                : [ STRINGDICT, {} ],
-    } 
-
-
+  
+    _requiredArchProps = ['bits32', 'bits64', 'LE', 'BE'] 
+  
+    name             = CfgString
+    buildName        = CfgString
+    shortDoc         = CfgString
+    longDoc          = CfgString
+    archProp         = CfgDict(CfgBool)
+    macro            = CfgDict(CfgString)
+ 
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
         if line and line[0] == '[' and line[-1] == ']':
@@ -61,45 +79,31 @@ class ArchConfig(ConfigFile):
             parts[0] = parts[0].lower()
             if parts[0] in ('targetarch', 'optflags', 'unamearch'):
                 line = ' '.join(('macro', parts[0], parts[1]))
-        if self.section:
-            self.sections[self.section].configLine(line, file, lineno)
+        if self._section:
+            self._sections[self._section].configLine(line, file, lineno)
         else:
+
             ConfigFile.configLine(self, line, file, lineno)
 
 
-    def setValue(self, key, val, type=None, file="override"):
-	if type == None:
-	    type = self.types[key]
-        if type == BOOLDICT:
-	    (idx, val) = val.split(None, 1)
-	    if val.lower() in ('0', 'false'):
-		self.__dict__[key][idx] = False
-	    elif val.lower() in ('1', 'true'):
-		self.__dict__[key][idx] = True
-	    else:
-		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
-        else:
-            ConfigFile.setValue(self, key, val, type, file)
-
-
     def setSection(self, sectionName):
-        if sectionName not in self.sections:
-            self.sections[sectionName] = SubArchConfig()
-        self.section = sectionName
+        if sectionName not in self._sections:
+            self._sections[sectionName] = SubArchConfig()
+        self._section = sectionName
 
     def __init__(self, name):
 	ConfigFile.__init__(self)
-        self.section = ''
-        self.sections = {}
+        self._section = ''
+        self._sections = {}
         self.name = name
 
     def read(self, path):
         ConfigFile.read(self, path)
-	if sorted(self.archProp.iterkeys()) != sorted(self.requiredArchProps):
+	if sorted(self.archProp.iterkeys()) != sorted(self._requiredArchProps):
 	    raise RuntimeError, \
 		    ('Arch %s must specify arch properties %s using the'
 		     ' archProp directive' % (self.name,
-		     ', '.join(sorted(self.requiredArchProps))))
+		     ', '.join(sorted(self._requiredArchProps))))
 
     def addArchFlags(self):
         if 'unamearch' not in self.macro:
@@ -109,8 +113,8 @@ class ArchConfig(ConfigFile):
             self.macro['targetarch'] = self.name
         use.Arch._addFlag(self.name, archProps = self.archProp, 
                           macros=self.macro)
-        for subArchName in self.sections:
-            subArch = self.sections[subArchName]
+        for subArchName in self._sections:
+            subArch = self._sections[subArchName]
             subArch.name = subArchName
             newSubsumes = []
             for item in subArch.subsumes.split(','):
@@ -129,14 +133,13 @@ class ArchConfig(ConfigFile):
 
 
 class UseFlagConfig(ConfigFile):
-    defaults = {
-	'name'	                : [ STRING, None ],
-        'sense'                 : [ FLAGSENSE, deps.FLAG_SENSE_PREFERRED ],
-	'buildName'	        : [ STRING, None ],
-	'buildRequired'	        : [ BOOL,   True ],
-	'shortDoc'	        : [ STRING, '' ],
-	'longDoc'	        : [ STRING, '' ],
-    }
+
+    name             = CfgString
+    buildName        = CfgString
+    buildRequired    = (CfgBool, True)
+    sense            = (CfgFlagSense, deps.FLAG_SENSE_PREFERRED)
+    shortDoc         = CfgString
+    longDoc          = CfgString
 
     def __init__(self, name):
 	ConfigFile.__init__(self)
@@ -150,40 +153,6 @@ class UseFlagConfig(ConfigFile):
             self.configLine('sense %s' % contents, path, 1)
         else:
             ConfigFile.read(self, path)
-
-    def setValue(self, key, val, type=None, filePath="override"):
-        if key == 'name':
-            assert(val == self.name)
-	if type == None:
-	    type = self.types[key]
-        if type == FLAGSENSE:
-            val = val.lower()
-            if val == "disallowed":
-                sense = deps.FLAG_SENSE_DISALLOWED
-            elif val == "preferred":
-                sense = deps.FLAG_SENSE_PREFERRED
-            elif val == "prefernot":
-                sense = deps.FLAG_SENSE_PREFERNOT
-            elif val == "required":
-                sense = deps.FLAG_SENSE_REQUIRED
-            else:
-                raise ParseError, ("%s: unknown use value %s") % (filePath, val)
-            self.__dict__[key] = sense
-        else:
-            ConfigFile.setValue(self, key, val, type, filePath)
-
-    def displayKey(self, key, value, type, out):
-        if type == FLAGSENSE:
-            if value == deps.FLAG_SENSE_DISALLOWED:
-                out.write('%s: %s\n' % (key, "disallowed"))
-            elif value == deps.FLAG_SENSE_PREFERRED:
-                out.write('%s: %s\n' % (key, "preferred"))
-            elif value == deps.FLAG_SENSE_PREFERNOT:
-                out.write('%s: %s\n' % (key, "prefernot"))
-            elif value == deps.FLAG_SENSE_REQUIRED:
-                out.write('%s: %s\n' % (key, "required"))
-        else:
-            ConfigFile.displayKey(self, key, value, type, out)
 
     def toDepFlag(self):
         return (self.name, self.sense)

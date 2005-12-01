@@ -13,6 +13,7 @@
 #
 
 python_files=	    __init__.py		\
+		    cfg.py		\
 		    enum.py		\
 		    debugger.py		\
 		    erlcompleter.py	\

@@ -38,10 +38,10 @@ else:
 mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
 
-from conary.conarycfg import ConfigFile
-from conary.conarycfg import STRINGDICT, BOOLEAN
+from conary.conarycfg import CfgRepoMap
 from conary.lib import options
 from conary.lib import util
+from conary.lib.cfg import ConfigFile,CfgPath,CfgInt,CfgBool
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import changeset
 from conary.repository import errors
@@ -281,13 +281,12 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
 class ServerConfig(ConfigFile):
 
-    defaults = {
-	'logFile'		:   None,
-	'port'			:   '8000',
-	'repositoryMap'         : [ STRINGDICT, {} ],
-	'tmpFilePath'           : DEFAULT_FILE_PATH,
-        'requireSigs'           : [ BOOLEAN, False ]
-    }
+    logFile		= CfgPath
+    port		= (CfgInt,  8000)
+    repositoryMap       = CfgRepoMap
+    requireSigs         = (CfgBool, False)
+    tmpFilePath         = CfgPath, DEFAULT_FILE_PATH
+ 
 
     def __init__(self, path="serverrc"):
 	ConfigFile.__init__(self)
@@ -388,8 +387,7 @@ if __name__ == '__main__':
 			baseUrl, otherArgs[2], cfg.repositoryMap,
                         logFile = cfg.logFile, requireSigs = cfg.requireSigs)
 
-    port = int(cfg.port)
-    httpServer = HTTPServer(("", port), HttpRequests)
+    httpServer = HTTPServer(("", cfg.port), HttpRequests)
 
     fds = {}
     fds[httpServer.fileno()] = httpServer

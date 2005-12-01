@@ -110,7 +110,7 @@ help.
 To get a traceback, rerun this command with --config 'debugExceptions True'
 '''
 
-def genExcepthook(debug=False, dumpStack=False, 
+def genExcepthook(debug=True, dumpStack=False, 
                   debugCtrlC=False, prefix='conary-stack-'):
     def excepthook(type, value, tb):
         if type is bdb.BdbQuit:
