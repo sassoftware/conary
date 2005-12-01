@@ -76,6 +76,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission(e.url.split("/")[2])
+            raise
                 
 	if not isException:
 	    return result
@@ -89,8 +90,6 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             # no password was specified -- prompt for it
             if not self.__pwCallback():
                 raise
-
-            raise
         except:
             raise
 
