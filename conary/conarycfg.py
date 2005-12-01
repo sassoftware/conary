@@ -38,6 +38,9 @@ class UserInformation(list):
 
         return None
 
+    def addServerGlob(self, serverGlob, user, password):
+        self.append((serverGlob, user, password))
+
 class CfgUserInfoItem(CfgType):
     def parseString(self, str):
         val = str.split()

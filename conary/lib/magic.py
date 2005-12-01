@@ -18,6 +18,9 @@ import re
 import stat
 import string
 import util
+import javadeps
+import zipfile
+
 
 class Magic:
     def __init__(self, path, basedir):
@@ -46,6 +49,7 @@ class ELF(Magic):
         for prov in provides:
             if prov[0] == 'soname':
                 self.contents['soname'] = prov[1]
+
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):
@@ -79,6 +83,44 @@ class changeset(Magic):
 	Magic.__init__(self, path, basedir)
 
 
+class jar(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+        fullpath = basedir+path
+        jar = zipfile.ZipFile(fullpath)
+        namelist = [ i.filename for i in jar.infolist()
+                     if not i.filename.endswith('/') and i.file_size > 0 ]
+        self.contents['files'] = set()
+        self.contents['provides'] = set()
+        self.contents['requires'] = set()
+        for name in namelist:
+            contents = jar.read(name)
+            if not _javaMagic(contents):
+                continue
+            prov, req = javadeps.getDeps(contents)
+            self.contents['files'].add(name)
+            if prov:
+                self.contents['provides'].add(prov)
+            if req:
+                self.contents['requires'].update(req)
+
+
+class ZIP(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+
+
+class java(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+        fullpath = basedir+path
+        prov, req = javadeps.getDeps(file(fullpath).read())
+        if prov:
+            self.contents['provides'] = set([prov])
+        if req:
+            self.contents['requires'] = req
+
+
 class script(Magic):
     interpreterRe = re.compile(r'^#!\s*([^\s]*)')
     lineRe = re.compile(r'^#!\s*(.*)')
@@ -98,6 +140,13 @@ class ltwrapper(Magic):
 class CIL(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
+
+
+
+def _javaMagic(b):
+    if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":
+        return True
+    return False
 
 
 def magic(path, basedir=''):
@@ -123,6 +172,7 @@ def magic(path, basedir=''):
 
     b = f.read(4096)
     f.close()
+
     if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
 	return ELF(path, basedir, b)
     elif len(b) > 7 and b[0:7] == "!<arch>":
@@ -133,6 +183,15 @@ def magic(path, basedir=''):
 	return bzip(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
+    elif len(b) > 4 and b[0:4] == "PK\x03\x04":
+        if path.endswith('.jar'):
+            return jar(path, basedir, b)
+        #elif path.endswith('.par'):
+        #    perl archive
+        else:
+            return ZIP(path, basedir, b)
+    elif _javaMagic(b):
+        return java(path, basedir, b)
     elif len(b) > 4 and b[0:2] == "#!":
         if b.find(
             '# This wrapper script should never be moved out of the build directory.\n'

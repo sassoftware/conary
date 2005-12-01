@@ -1755,7 +1755,7 @@ class Provides(_BuildPackagePolicy):
                 depSet.addDep(depClass, dep)
             pkg.providesMap[path] = depSet
 
-    def _AddCILDeps(self, path, m, pkg, macros):
+    def _addCILDeps(self, path, m, pkg, macros):
         if not m or m.name != 'CIL':
             return
         fullpath = macros.destdir + path
@@ -1780,6 +1780,15 @@ class Provides(_BuildPackagePolicy):
             pkg.providesMap[path] = deps.DependencySet()
         pkg.providesMap[path].addDep(deps.CILDependencies,
                 deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+
+    def _addJavaDeps(self, path, m, pkg):
+        if not m.contents['provides']:
+            return
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        for prov in m.contents['provides']:
+            pkg.providesMap[path].addDep(deps.JavaDependencies,
+                deps.Dependency(prov, []))
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -1814,7 +1823,11 @@ class Provides(_BuildPackagePolicy):
             if m and m.name == 'ELF':
                 self._ELFPathProvide(path, m, pkg)
             if m and m.name == 'CIL':
-                self._AddCILDeps(path, m, pkg, macros)
+                self._addCILDeps(path, m, pkg, macros)
+            if (m and (m.name == 'java' or m.name == 'jar')
+                and m.contents['provides']):
+                self._addJavaDeps(path, m, pkg)
+
 
         if path not in pkg.providesMap:
             return
@@ -2121,6 +2134,11 @@ class Requires(_addInfo, _BuildPackagePolicy):
                                          deps.CILDependencies)
             p.close()
 
+        if (m and (m.name == 'java' or m.name == 'jar')
+            and m.contents['requires']):
+            for req in m.contents['requires']:
+                self._addRequirement(path, req, [], pkg,
+                                     deps.JavaDependencies)
 
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
