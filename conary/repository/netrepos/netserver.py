@@ -34,6 +34,7 @@ from conary.local import sqldb, versiontable
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository import repository
 from conary.trove import DigitalSignature
+from conary.repository.netrepos import schema
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
@@ -42,8 +43,6 @@ SERVER_VERSIONS = [ 36, 37 ]
 CACHE_SCHEMA_VERSION = 17
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
-
-    schemaVersion = 7
 
     # lets the following exceptions pass:
     #
@@ -1445,160 +1444,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)",
 		       start_transaction = False)
             cu.execute("INSERT INTO DatabaseVersion VALUES (?)", 
-                       self.schemaVersion, start_transaction = False)
-        else:
-            version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
-            if version == 1:
-                #This is the update from using Null as the wildcard for 
-                #Items/Troves and Labels to using 0/ALL
-
-                ## First insert the new Item and Label keys
-                cu.execute("INSERT INTO Items VALUES(0, 'ALL')")
-                cu.execute("INSERT INTO Labels VALUES(0, 'ALL')")
-
-                ## Now replace all Nulls in the following tables with '0'
-                itemTables =   ('Permissions', 'Instances', 'Latest', 
-                                'Metadata', 'Nodes', 'LabelMap')
-                labelTables =  ('Permissions', 'LabelMap')
-                for table in itemTables:
-                    cu.execute('UPDATE %s SET itemId=0 WHERE itemId IS NULL' % 
-                        table)
-                for table in labelTables:
-                    cu.execute('UPDATE %s SET labelId=0 WHERE labelId IS NULL' %
-                        table)
-
-                ## Finally fix the index
-                cu.execute("DROP INDEX PermissionsIdx")
-                cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
-                    Permissions(userGroupId, labelId, itemId)""")
-                cu.execute("UPDATE DatabaseVersion SET version=2")
-                self.db.commit()
-                version = 2
-
-            # migration to version 3
-            # -- add a smaller index for the Latest table
-            if version == 2:
-                cu.execute("CREATE INDEX LatestItemIdx on Latest(itemId)")
-                cu.execute("UPDATE DatabaseVersion SET version=3")
-                self.db.commit()
-                version = 3
-
-            # migration to schema version 4
-            if version == 3:
-                from lib.tracelog import printErr
-                msg = """
-                Conversion to version 4 requires script available
-                from http://wiki.rpath.com/ConaryConversion
-                """
-                printErr(msg)
-                print msg
-                return False
-
-            # schema version 5 adds a few views and various cleanups
-            if version == 4:
-                logMe(3, "migrating schema from version", version)
-                # FlavorScoresIdx was not unique
-                cu.execute("DROP INDEX FlavorScoresIdx")
-                cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx "
-                           "    on FlavorScores(request, present)")
-                # remove redundancy/rename                
-                cu.execute("DROP INDEX NodesIdx")
-                cu.execute("DROP INDEX NodesIdx2")
-                cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
-                                  ON Nodes(itemId, branchId, versionId)""")
-                cu.execute("""CREATE INDEX NodesItemVersionIdx
-                                  ON Nodes(itemId, versionId)""")
-                # the views are added by the __init__ methods of their
-                # respective classes
-                cu.execute("UPDATE DatabaseVersion SET version=5")
-                self.db.commit()
-                version = 5
-
-            if version == 5:
-                logMe(3, "migrating schema from version", version)
-                # calculate path hashes for every trove
-                instanceIds = [ x[0] for x in cu.execute(
-                        "select instanceId from instances") ]
-                for i, instanceId in enumerate(instanceIds):
-                    ph = trove.PathHashes()
-                    for path, in cu.execute(
-                            "select path from trovefiles where instanceid=?",
-                            instanceId):
-                        ph.addPath(path)
-                    cu.execute("""
-                        insert into troveinfo(instanceId, infoType, data)
-                            values(?, ?, ?)""", instanceId,
-                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
-
-                # add a hasTrove flag to the Items table for various 
-                # optimizations
-                # update the Items table                
-                cu.execute(" ALTER TABLE Items ADD COLUMN "
-                           " hasTrove INTEGER NOT NULL DEFAULT 0 ")
-                cu.execute("""
-                UPDATE Items SET hasTrove = 1
-                WHERE Items.itemId IN (
-                    SELECT Instances.itemId FROM Instances
-                    WHERE Instances.isPresent = 1 ) """)
-
-                cu.execute("UPDATE DatabaseVersion SET version=6")
-                self.db.commit()
-                version = 6
-                logMe(3, "finished migrating schema to version", version)
-
-            if version == 6:
-                logMe(3, "migrating schema from version", version)
-
-                # erase signatures due to troveInfo storage changes
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_SIGS)
-                # erase what used to be isCollection, to be replaced
-                # with flags stream
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_FLAGS)
-                # get rid of install buckets
-                cu.execute("DELETE FROM TroveInfo WHERE infoType=?",
-                           trove._TROVEINFO_TAG_INSTALLBUCKET)
-
-                flags = trove.TroveFlagsStream()
-                flags.isCollection(set = True)
-                collectionStream = flags.freeze()
-                flags.isCollection(set = False)
-                notCollectionStream = flags.freeze()
-
-                cu.execute("""
-                    INSERT INTO TroveInfo
-                        (instanceId, infoType, data)
-                    SELECT
-                        instanceId, ?, ?
-                    FROM
-                        Items, Instances
-                    WHERE
-                            NOT (item LIKE '%:%' OR item LIKE 'fileset-%')
-                        AND Items.itemId = Instances.itemId
-                    """, (trove._TROVEINFO_TAG_FLAGS, collectionStream))
-
-                cu.execute("""
-                    INSERT INTO TroveInfo
-                        (instanceId, infoType, data)
-                    SELECT
-                        instanceId, ?, ?
-                    FROM
-                        Items, Instances
-                    WHERE
-                            (item LIKE '%:%' OR item LIKE 'fileset-%')
-                        AND Items.itemId = Instances.itemId
-                    """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
-
-                cu.execute("UPDATE DatabaseVersion SET version=7")
-                self.db.commit()
-                version = 7
-                logMe(3, "finished migrating schema to version", version)
-
-            if version != self.schemaVersion:
-                return False
-
-        return True
+                       schema.VERSION, start_transaction = False)
+            return True        
+        self.schemaVersion = schema.checkVersion(self.db)       
+        return self.schemaVersion == schema.VERSION
 
     def open(self):
         logMe(1)

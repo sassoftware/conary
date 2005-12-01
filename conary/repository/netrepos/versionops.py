@@ -15,6 +15,7 @@
 from conary import versions
 from conary.dbstore import idtable
 from conary.repository.errors import DuplicateBranch
+from conary.repository.netrepos import schema
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch):
@@ -49,6 +50,8 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
+    # DBSTORE: dbstore should handle the case sensitive nature of this
+    # just fine, eliminating the need for overriding the __init__ call   
     def __init__(self, db):
         self.db = db
 	self.tableName = 'branches'
@@ -92,52 +95,7 @@ class LabelTable(idtable.IdTable):
 class LatestTable:
     def __init__(self, db):
         self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("""SELECT tbl_name FROM sqlite_master
-                      WHERE type='table' OR type='view' """)
-        tables = [ x[0] for x in cu ]
-        if 'Latest' not in tables:
-            cu.execute("""
-            CREATE TABLE Latest(
-                itemId          INTEGER, 
-                branchId        INTEGER, 
-                flavorId        INTEGER, 
-                versionId       INTEGER,
-                CONSTRAINT Latest_itemId_fk
-                    FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Latest_branchId_fk
-                    FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Latest_flavorId_fk
-                    FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Latest_versionId_fk
-                    FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Latest_item_branch_flavor_uq
-                    UNIQUE(itemId, branchId, flavorId)
-            )""")
-            cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
-            cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
-                       "Latest(itemId, branchId, flavorId)")
-        if 'LatestView' not in tables:
-            cu.execute("""
-            CREATE VIEW
-                LatestView AS
-            SELECT
-                Items.item as item,
-                Branches.branch as branch,
-                Versions.version as version,
-                Flavors.flavor as flavor
-            FROM
-                Latest
-            JOIN Items on Latest.itemId = Items.itemId
-            JOIN Branches on Latest.branchId = Branches.branchId
-            JOIN Versions on Latest.versionId = Versions.versionId
-            JOIN Flavors on Latest.flavorId = Flavors.flavorId
-            """)
+        schema.createLatest(db)
 
     def __setitem__(self, key, val):
 	(first, second, third) = key
@@ -173,56 +131,10 @@ class LabelMap(idtable.IdPairSet):
 	return self.getByFirst(itemId)
 
 class Nodes:
-
     def __init__(self, db):
 	self.db = db
-        cu = self.db.cursor()
-        cu.execute("""SELECT tbl_name FROM sqlite_master
-                      WHERE type='table' or type='view' """)
-        tables = [ x[0] for x in cu ]
-        if 'Nodes' not in tables:
-	    cu.execute("""
-            CREATE TABLE Nodes(
-                nodeId          INTEGER PRIMARY KEY,
-                itemId          INTEGER,
-                branchId        INTEGER,
-                versionId       INTEGER,
-                timeStamps      STRING,
-                finalTimeStamp  FLOAT,
-                CONSTRAINT Nodes_itemId_fk
-                    FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Nodes_branchId_fk
-                    FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Nodes_versionId_fk
-                    FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT Nodes_item_branch_version_uq
-                    UNIQUE(itemId, branchId, versionId)
-            )""")            
-            cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
-                               ON Nodes(itemId, branchId, versionId)""")
-            cu.execute("""CREATE INDEX NodesItemVersionIdx
-                               ON Nodes(itemId, versionId)""")
-        if 'NodesView' not in tables:
-            cu.execute("""
-            CREATE VIEW
-                NodesView AS
-            SELECT
-                Nodes.nodeId as nodeId,
-                Items.item as item,
-                Branches.branch as branch,
-                Versions.version as version,
-                Nodes.timestamps as timestamps,
-                Nodes.finalTimestamp as finalTimestamp
-            FROM
-                Nodes
-            JOIN Items on Nodes.itemId = Items.itemId
-            JOIN Branches on Nodes.branchId = Branches.branchId
-            JOIN Versions on Nodes.versionId = Versions.versionId
-            """)
-            
+        schema.createNodes(db)
+
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
 	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, ?)",

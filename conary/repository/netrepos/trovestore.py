@@ -23,7 +23,7 @@ from conary.local import deptable
 from conary.local import troveinfo, versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
-from conary.repository.netrepos import trovefiles, versionops, cltable
+from conary.repository.netrepos import versionops, cltable
 
 class LocalRepVersionTable(versiontable.VersionTable):
 
@@ -54,47 +54,14 @@ class LocalRepVersionTable(versiontable.VersionTable):
             raise KeyError, itemId
 
 class TroveStore:
-
-    def _createSchema(self, cu):
-        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
-                   "name='TroveTroves'")
-        if cu.next()[0] == 0:
-            cu.execute("""
-            CREATE TABLE TroveTroves(
-                instanceId      INTEGER, 
-                includedId      INTEGER,
-                byDefault       BOOLEAN,
-                CONSTRAINT TroveTroves_instanceId_fk
-                    FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT TroveTroves_includedId_fk
-                    FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT TroveTroves_instance_included_uq
-                    UNIQUE(instanceId, includedId)
-            )""")
-            # ideally we would attempt to create a unique index on (instance, included)
-            # for sqlite as well for integrity checking, but sqlite's performance will hurt            
-	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
-	    # this index is so we can quickly tell what troves are needed
-	    # by another trove
-	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
-
     def __init__(self, db):
 	self.db = db
-
-	cu = self.db.cursor()
-	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
-				 
+        
+        self.db.commit()
         self.begin()
-	self._createSchema(cu)
-
-        # Order matters!
-        # Create the simple (leaf) tables first, and then the ones
-        # that have foreign keys
-	trovefiles.TroveFiles(self.db)
-	instances.FileStreams(self.db)
-
+        
+        # Order matters! Create the simple (leaf) tables first, and
+        # then the ones that have foreign keys
 	self.items = items.Items(self.db)
 	self.flavors = flavors.Flavors(self.db)
         self.branchTable = versionops.BranchTable(self.db)
@@ -106,7 +73,6 @@ class TroveStore:
 	self.instances = instances.InstanceTable(self.db)
 
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
-        flavors.FlavorScores(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
@@ -116,7 +82,7 @@ class TroveStore:
 
         self.db.commit()
 
-	self.streamIdCache = {}
+        self.streamIdCache = {}
 	self.needsCleanup = False
 
     def __del__(self):
