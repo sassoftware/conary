@@ -11,6 +11,9 @@ Changes in 0.80.0:
     * showchangeset on relative changesets now displays them as jobs.
     * query and queryrep now exclude components if they match their 
       package name
+    * Conary cleans up rollbacks when a changeset fails to apply.
+      Previously, an invalid changeset was saved in the rollback
+      stack, which made applying it impossible
     * Removed direct instantiation of NetworkRepositoryClient object; it
       should be created by calling ConaryClient
     * repositoryMap should not contain usernames and passwords now; user

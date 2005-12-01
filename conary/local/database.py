@@ -35,7 +35,7 @@ class Rollback:
     reposName = "%s/repos.%d"
     localName = "%s/local.%d"
 
-    def addRollback(self, repos, local):
+    def add(self, repos, local):
         repos.writeToFile(self.reposName % (self.dir, self.count))
         local.writeToFile(self.localName % (self.dir, self.count))
         self.count += 1
@@ -52,6 +52,8 @@ class Rollback:
         return self._getChangeSets(self.count - 1)
 
     def removeLast(self):
+        if self.count == 0:
+            return
         os.unlink(self.reposName % (self.dir, self.count - 1))
         os.unlink(self.localName % (self.dir, self.count - 1))
         self.count -= 1
@@ -62,6 +64,9 @@ class Rollback:
             csList = self._getChangeSets(i)
             yield csList[0]
             yield csList[1]
+
+    def getCount(self):
+        return self.count
 
     def __init__(self, dir, load = False):
         self.dir = dir
@@ -77,7 +82,7 @@ class UpdateJob:
 
     def addPinMapping(self, name, pinnedVersion, neededVersion):
         self.pinMapping.add((name, pinnedVersion, neededVersion))
-    
+
     def getPinMaps(self):
         return self.pinMapping
 
@@ -487,7 +492,7 @@ class Database(SqlDbRepository):
                 if e.errno != errno.ENOENT:
                     raise
                 continue
-            
+
 	    entries -= set[path]
 
 	    # listdir excludes . and ..
@@ -516,8 +521,8 @@ class Database(SqlDbRepository):
             if rollback is None:
                 rollback = self.createRollback()
                 uJob.setRollback(rollback)
-            rollback.addRollback(reposRollback, localRollback)
-	    del rollback
+            rollback.add(reposRollback, localRollback)
+            del rollback
 
         if not justDatabase:
             # run preremove scripts before updating the database, otherwise
@@ -538,7 +543,8 @@ class Database(SqlDbRepository):
 
         errList = fsJob.getErrorList()
         if errList:
-            for err in errList: log.error(err)
+            for err in errList:
+                log.error(err)
             raise CommitError, 'file system job contains errors'
         if test:
             self.db.rollback()
@@ -572,7 +578,7 @@ class Database(SqlDbRepository):
 
                 relativePath = path[len(self.root):]
                 if relativePath[0] != '/': relativePath = '/' + relativePath
-                
+
                 if self.db.pathIsOwned(relativePath):
                     list = [ x for x in self.db.iterFindByPath(path)]
                     keep[os.path.dirname(path)] = True
@@ -625,7 +631,7 @@ class Database(SqlDbRepository):
             shutil.rmtree(rbDir)
         os.mkdir(rbDir)
 	self.lastRollback += 1
-	self.writeRollbackStatus()
+        self.writeRollbackStatus()
         return Rollback(rbDir)
 
     # name looks like "r.%d"
@@ -635,6 +641,10 @@ class Database(SqlDbRepository):
 	if rollback == self.lastRollback:
 	    self.lastRollback -= 1
 	    self.writeRollbackStatus()
+
+    def removeLastRollback(self):
+        name = 'r.%d' %self.lastRollback
+        self.removeRollback(name)
 
     def writeRollbackStatus(self):
 	newStatus = self.rollbackCache + ".new"

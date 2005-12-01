@@ -77,6 +77,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                              localRepository = self.db)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
+    def getRepos(self):
+        return self.repos
+
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
         md = {}
