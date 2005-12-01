@@ -18,6 +18,7 @@ import sys
 
 from conary import sqlite3
 from conary.repository import errors
+from conary.repository.netrepos import schema
 from conary.lib.tracelog import logMe
 
 # FIXME: remove these compatibilty error classes later
@@ -540,126 +541,5 @@ class NetworkAuthorization:
         self.name = name
         self.db = db
         self.reCache = {}
-
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type "
-                   "in ('table', 'view')")
-        tables = [ x[0] for x in cu ]
-
-        commit = False
-        
-        if "Users" not in tables:
-            cu.execute("""
-            CREATE TABLE Users (
-                userId          INTEGER PRIMARY KEY,
-                user            STRING,
-                salt            BINARY,
-                password        STRING,
-                CONSTRAINT Users_userId_uq
-                    UNIQUE(user)
-            )""")
-            commit = True
-
-        if "UserGroups" not in tables:
-            cu.execute("""
-            CREATE TABLE UserGroups (
-                userGroupId     INTEGER PRIMARY KEY,
-                userGroup       STRING,
-                CONSTRAINT UserGroups_userGroup_uq
-                    UNIQUE(userGroup)
-            )""")
-            commit = True
-
-        if "UserGroupMembers" not in tables:
-            cu.execute("""
-            CREATE TABLE UserGroupMembers (
-                userGroupId     INTEGER,
-                userId          INTEGER,
-                CONSTRAINT UserGroupMembers_userGroupId_fk
-                    FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE,
-                CONSTRAINT UserGroupMembers_userId_fk
-                    FOREIGN KEY (userId) REFERENCES Users(userId)
-                    ON DELETE CASCADE ON UPDATE CASCADE
-            )""")
-            cu.execute("""CREATE INDEX UserGroupMembersIdx ON
-                                            UserGroupMembers(userGroupId)""")
-            cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
-                                            UserGroupMembers(userId)""")
-            commit = True
-
-        if "Permissions" not in tables:
-            cu.execute("""
-            CREATE TABLE Permissions (
-                userGroupId     INTEGER,
-                labelId         INTEGER NOT NULL,
-                itemId          INTEGER NOT NULL,
-                write           INTEGER,
-                capped          INTEGER,
-                admin           INTEGER,
-                CONSTRAINT Permissions_userGroupId_fk
-                    FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Permissions_labelId_fk
-                    FOREIGN KEY (labelId) REFERENCES Labels(labelId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Permissions_itemId_fk
-                    FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Permissions_ug_l_i_uq
-                    UNIQUE(userGroupId, labelId, itemId)
-            )""")
-            cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
-                          ON Permissions(userGroupId, labelId, itemId)""")
-
-            if "Items" in tables:
-                cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
-            if "Labels" in tables:
-                cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
-
-            commit = True
-
-        if "UserPermissions" not in tables:
-            cu.execute("""
-            CREATE VIEW UserPermissions AS
-                SELECT Users.user AS user,
-                       Users.salt AS salt,
-                       Users.password as password,
-                       Items.item AS permittedTrove,
-                       Permissions.labelId AS permittedLabelId,
-                       Labels.label AS permittedLabel,
-                       Permissions.admin AS admin,
-                       Permissions.write AS write,
-                       Permissions._ROWID_ as aclId
-                 FROM Users
-                      JOIN UserGroupMembers using (userId)
-                      JOIN Permissions using (userGroupId)
-                      JOIN Items using (itemId)
-                      JOIN Labels ON 
-                          Permissions.labelId = Labels.labelId
-            """)
-            commit = True
-
-        if "UsersView" not in tables:
-            cu.execute("""
-            CREATE VIEW
-                UsersView AS
-            SELECT
-                Users.user as user,
-                Items.item as item,
-                Labels.label as label,
-                Permissions.write as W,
-                Permissions.admin as A,
-                Permissions.capped as C
-            FROM
-                Users
-            JOIN UserGroupMembers using (userId)
-            JOIN Permissions using (userGroupId)
-            JOIN Items using (itemId)
-            JOIN Labels on Permissions.labelId = Labels.labelId
-            """)
-            commit = True
-            
-        if commit:
-            self.db.commit()
+        schema.createUsers(db)
 

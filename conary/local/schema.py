@@ -16,7 +16,7 @@ import sys
 import itertools
 from conary import trove, deps, files, sqlite3
 from conary.local import deptable
-from conary.dbstore import idtable
+from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
 
@@ -33,7 +33,8 @@ def createFlavors(db):
 	if cu.fetchone() == None:
 	    # reserve flavor 0 for "no flavor information"
 	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
-
+        db.commit()
+        
 def createDBTroveFiles(db):
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -60,7 +61,7 @@ def createDBTroveFiles(db):
                                       streamId INT,
                                       tagId INT)
                    """)
-
+        db.commit()
 
 def createInstances(db):
     cu = db.cursor()
@@ -78,8 +79,8 @@ def createInstances(db):
         cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
         cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                    "Instances(troveName, versionId, flavorId)")
-    return True
-
+        db.commit()
+        
 def createTroveTroves(db):
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -100,41 +101,12 @@ def createTroveTroves(db):
         # contains unique TroveTrove (instanceId, includedId) pairs.
         cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
                         "TroveTroves(instanceId,includedId)")
-    return True
+        db.commit()
 
 # SCHEMA Migration
-def getDatabaseVersion(db):
-    cu = db.cursor()
-    # DBSTORE: migrating to dbstore will make this obsolete    
-    try:
-        ret = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
-    except sqlite3.DatabaseError:
-        return 0
-    return ret
 
-class SchemaMigration:
-    Version = 0
-    def __init__(self, db):
-        self.db = db
-        self.cu = db.cursor()
-        self.msg = "Converting database schema to version %d..." % self.Version
-        self.version = getDatabaseVersion(db)
-        
-    # likely candidates for overrides    
-    def check(self):
-        return self.version == self.Version - 1            
-    def migrate(self):
-        pass
-    
-    def __call__(self):
-        if not self.check():
-            return self.version
-        self.__start()
-        ret = self.migrate()
-        if ret == self.Version:
-            self.__end()
-        return ret
-    
+# redefine to enable stdout messaging for the migration process
+class SchemaMigration(migration.SchemaMigration):
     def message(self, msg = None):
         if msg is None:
             msg = self.msg
@@ -142,14 +114,6 @@ class SchemaMigration:
         self.msg = msg
         print msg,
         sys.stdout.flush()
-        
-    def __start(self):
-        self.message()
-
-    def __end(self):
-        self.cu.execute("UPDATE DatabaseVersion SET version=?", self.Version)
-        self.db.commit()
-        self.message("")
 
 class MigrateTo_5(SchemaMigration):
     Version = 5
@@ -399,7 +363,7 @@ class MigrateTo_14(SchemaMigration):
     
 def checkVersion(db):
     global VERSION
-    version = getDatabaseVersion(db)
+    version = migration.getDatabaseVersion(db)
     if version == VERSION:
         return version
     

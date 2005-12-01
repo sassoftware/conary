@@ -13,35 +13,13 @@
 # 
 
 from conary.deps import deps
+from conary.repository.netrepos import schema
 
 class Flavors:
     # manages the Flavors and FlavorMap tables
     def __init__(self, db):
         self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "Flavors" not in tables:
-	    cu.execute("""
-            CREATE TABLE Flavors(
-                flavorId        INTEGER PRIMARY KEY,
-                flavor          STRING,
-                CONSTRAINT Flavors_flavor_uq
-                    UNIQUE(flavor)
-            )""")
-            cu.execute("""
-            CREATE TABLE FlavorMap(
-                flavorId        INTEGER,
-                base            STRING,
-                sense           INTEGER,
-                flag            STRING,
-                CONSTRAINT FlavorMap_flavorId_fk
-                    FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
-                    ON DELETE CASCADE ON UPDATE CASCADE
-            )""")
-            cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
-            cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
+        schema.createFlavors(db)
 
     def createFlavor(self, flavor):
 	cu = self.db.cursor()
@@ -87,32 +65,3 @@ class Flavors:
 	    return deps.ThawDependencySet(cu.next()[0])
 	except StopIteration:
             raise KeyError, flavorId
-
-class FlavorScores:
-
-    def __init__(self, db):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "FlavorScores" not in tables:
-            cu.execute("""
-            CREATE TABLE FlavorScores(
-                request         INTEGER,
-                present         INTEGER,
-                value           INTEGER NOT NULL DEFAULT -1000000,
-                CONSTRAINT FlavorScores_request_fk
-                        FOREIGN KEY (request) REFERENCES Flavors(flavorId)
-                        ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT FlavorScores_present_fk
-                        FOREIGN KEY (request) REFERENCES Flavors(flavorId)
-                        ON DELETE CASCADE ON UPDATE CASCADE
-            )""")
-            cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
-                              FlavorScores(request, present)""")
-
-            for (request, present), value in deps.flavorScores.iteritems():
-                if value is None:
-                    value = -1000000
-                cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
-                           request, present, value)
-                            

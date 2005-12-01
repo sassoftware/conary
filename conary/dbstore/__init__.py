@@ -15,6 +15,7 @@
 from base_drv import DBStoreError, DBStoreCursorError
 from base_drv import BaseDatabase as Database
 from base_drv import BaseCursor as Cursor
+from migration import SchemaMigration
 
 # default driver we want to use
 __DRIVER = "sqlite"

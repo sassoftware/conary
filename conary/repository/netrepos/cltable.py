@@ -13,6 +13,7 @@
 # 
 
 from conary import changelog
+from conary.repository.netrepos import schema
 
 class ChangeLogTable:
     """
@@ -20,21 +21,7 @@ class ChangeLogTable:
     """
     def __init__(self, db):
         self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "ChangeLogs" not in tables:
-            cu.execute("""
-            CREATE TABLE ChangeLogs(
-                nodeId          INTEGER,
-                name            STRING, 
-                contact         STRING, 
-                message         STRING,
-                CONSTRAINT ChangeLogs_nodeId_uq
-                    UNIQUE(nodeId)
-            )""")
-	    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
+        schema.createChangeLog(db)
 
     def add(self, nodeId, cl):
         cu = self.db.cursor()
