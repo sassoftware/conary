@@ -19,7 +19,9 @@ import traceback
 import xmlrpclib
 import zlib
 
-from conary import conarycfg
+from conary.lib.cfg import *
+from conary.conarycfg import CfgRepoMap
+
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
@@ -28,21 +30,19 @@ from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
 
-class ServerConfig(conarycfg.ConfigFile):
+class ServerConfig(ConfigFile):
+    commitAction            = CfgString
+    forceSSL                = CfgBool
+    logFile                 = CfgString
+    repositoryMap           = CfgRepoMap
+    repositoryDir           = CfgString
+    serverName              = CfgString
+    tmpDir                  = (CfgPath, '/var/tmp')
+    cacheChangeSets         = CfgBool
+    staticPath              = (CfgPath, '/conary-static')
+    closed                  = CfgString
+    requireSigs             = CfgBool
 
-    defaults = {
-        'commitAction'      :  None,
-        'forceSSL'          :  [ conarycfg.BOOLEAN, False ],
-        'logFile'           :  None,
-        'repositoryMap'     :  [ conarycfg.STRINGDICT, {} ],
-        'repositoryDir'     :  None,
-        'serverName'        :  None,
-        'tmpDir'            :  "/var/tmp",
-        'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
-        'staticPath'        :  "/conary-static",
-        'closed'            :  None,
-        'requireSigs'       :  [ conarycfg.BOOLEAN, False ],
-    }
 
 def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
