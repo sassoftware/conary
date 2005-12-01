@@ -17,6 +17,416 @@ from conary.lib.tracelog import logMe
 
 VERSION = 7
 
+def createInstances(db):
+    cu = db.cursor()
+    cu.execute("""SELECT tbl_name FROM sqlite_master
+                  WHERE type='table' or type='view' """)
+    tables = [ x[0] for x in cu ]
+    if "Instances" not in tables:
+        cu.execute("""
+        CREATE TABLE Instances(
+            instanceId      INTEGER PRIMARY KEY, 
+            itemId          INTEGER, 
+            versionId       INTEGER, 
+            flavorId        INTEGER,
+            isRedirect      INTEGER NOT NULL DEFAULT 0,
+            isPresent       INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT Instances_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Instances_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Instances_flavorId_fk
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+        cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
+                   " Instances(itemId, versionId, flavorId) ")
+
+    if "InstancesView" not in tables:
+        cu.execute("""
+        CREATE VIEW
+            InstancesView AS
+        SELECT
+            Instances.instanceId as instanceId,
+            Items.item as item,
+            Versions.version as version,
+            Flavors.flavor as flavor
+        FROM
+            Instances
+        JOIN Items on Instances.itemId = Items.itemId
+        JOIN Versions on Instances.versionId = Versions.versionId
+        JOIN Flavors on Instances.flavorId = Flavors.flavorId
+        """)
+
+def createFlavors(db):        
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+    tables = [ x[0] for x in cu ]
+    if "Flavors" not in tables:
+        cu.execute("""
+        CREATE TABLE Flavors(
+            flavorId        INTEGER PRIMARY KEY,
+            flavor          STRING,
+            CONSTRAINT Flavors_flavor_uq
+                UNIQUE(flavor)
+        )""")
+        cu.execute("""
+        CREATE TABLE FlavorMap(
+            flavorId        INTEGER,
+            base            STRING,
+            sense           INTEGER,
+            flag            STRING,
+            CONSTRAINT FlavorMap_flavorId_fk
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+        cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
+        cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
+
+    if "FlavorScores" not in tables:
+        from conary.deps import deps        
+        cu.execute("""
+        CREATE TABLE FlavorScores(
+            request         INTEGER,
+            present         INTEGER,
+            value           INTEGER NOT NULL DEFAULT -1000000,
+            CONSTRAINT FlavorScores_request_fk
+                    FOREIGN KEY (request) REFERENCES Flavors(flavorId)
+                    ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT FlavorScores_present_fk
+                    FOREIGN KEY (request) REFERENCES Flavors(flavorId)
+                    ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+        cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
+                          FlavorScores(request, present)""")
+
+        for (request, present), value in deps.flavorScores.iteritems():
+            if value is None:
+                value = -1000000
+            cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
+                       request, present, value)
+                            
+def createNodes(db):
+    cu = db.cursor()
+    cu.execute("""SELECT tbl_name FROM sqlite_master
+                  WHERE type='table' or type='view' """)
+    tables = [ x[0] for x in cu ]
+    if 'Nodes' not in tables:
+        cu.execute("""
+        CREATE TABLE Nodes(
+            nodeId          INTEGER PRIMARY KEY,
+            itemId          INTEGER,
+            branchId        INTEGER,
+            versionId       INTEGER,
+            timeStamps      STRING,
+            finalTimeStamp  FLOAT,
+            CONSTRAINT Nodes_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Nodes_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Nodes_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Nodes_item_branch_version_uq
+                UNIQUE(itemId, branchId, versionId)
+        )""")            
+        cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
+                           ON Nodes(itemId, branchId, versionId)""")
+        cu.execute("""CREATE INDEX NodesItemVersionIdx
+                           ON Nodes(itemId, versionId)""")
+    if 'NodesView' not in tables:
+        cu.execute("""
+        CREATE VIEW
+            NodesView AS
+        SELECT
+            Nodes.nodeId as nodeId,
+            Items.item as item,
+            Branches.branch as branch,
+            Versions.version as version,
+            Nodes.timestamps as timestamps,
+            Nodes.finalTimestamp as finalTimestamp
+        FROM
+            Nodes
+        JOIN Items on Nodes.itemId = Items.itemId
+        JOIN Branches on Nodes.branchId = Branches.branchId
+        JOIN Versions on Nodes.versionId = Versions.versionId
+        """)
+            
+def createLatest(db):
+    cu = db.cursor()
+    cu.execute("""SELECT tbl_name FROM sqlite_master
+                  WHERE type='table' OR type='view' """)
+    tables = [ x[0] for x in cu ]
+    if 'Latest' not in tables:
+        cu.execute("""
+        CREATE TABLE Latest(
+            itemId          INTEGER, 
+            branchId        INTEGER, 
+            flavorId        INTEGER, 
+            versionId       INTEGER,
+            CONSTRAINT Latest_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Latest_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Latest_flavorId_fk
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Latest_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Latest_item_branch_flavor_uq
+                UNIQUE(itemId, branchId, flavorId)
+        )""")
+        cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
+        cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
+                   "Latest(itemId, branchId, flavorId)")
+    if 'LatestView' not in tables:
+        cu.execute("""
+        CREATE VIEW
+            LatestView AS
+        SELECT
+            Items.item as item,
+            Branches.branch as branch,
+            Versions.version as version,
+            Flavors.flavor as flavor
+        FROM
+            Latest
+        JOIN Items on Latest.itemId = Items.itemId
+        JOIN Branches on Latest.branchId = Branches.branchId
+        JOIN Versions on Latest.versionId = Versions.versionId
+        JOIN Flavors on Latest.flavorId = Flavors.flavorId
+        """)
+
+def createUsers(db):        
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type "
+               "in ('table', 'view')")
+    tables = [ x[0] for x in cu ]
+
+    if "Users" not in tables:
+        cu.execute("""
+        CREATE TABLE Users (
+            userId          INTEGER PRIMARY KEY,
+            user            STRING,
+            salt            BINARY,
+            password        STRING,
+            CONSTRAINT Users_userId_uq
+                UNIQUE(user)
+        )""")
+
+    if "UserGroups" not in tables:
+        cu.execute("""
+        CREATE TABLE UserGroups (
+            userGroupId     INTEGER PRIMARY KEY,
+            userGroup       STRING,
+            CONSTRAINT UserGroups_userGroup_uq
+                UNIQUE(userGroup)
+        )""")
+
+    if "UserGroupMembers" not in tables:
+        cu.execute("""
+        CREATE TABLE UserGroupMembers (
+            userGroupId     INTEGER,
+            userId          INTEGER,
+            CONSTRAINT UserGroupMembers_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT UserGroupMembers_userId_fk
+                FOREIGN KEY (userId) REFERENCES Users(userId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+        cu.execute("""CREATE INDEX UserGroupMembersIdx ON
+                                        UserGroupMembers(userGroupId)""")
+        cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
+                                        UserGroupMembers(userId)""")
+
+    if "Permissions" not in tables:
+        cu.execute("""
+        CREATE TABLE Permissions (
+            userGroupId     INTEGER,
+            labelId         INTEGER NOT NULL,
+            itemId          INTEGER NOT NULL,
+            write           INTEGER,
+            capped          INTEGER,
+            admin           INTEGER,
+            CONSTRAINT Permissions_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Permissions_labelId_fk
+                FOREIGN KEY (labelId) REFERENCES Labels(labelId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Permissions_itemId_fk
+                FOREIGN KEY (itemid) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Permissions_ug_l_i_uq
+                UNIQUE(userGroupId, labelId, itemId)
+        )""")
+        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
+                      ON Permissions(userGroupId, labelId, itemId)""")
+
+        if "Items" in tables:
+            cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
+        if "Labels" in tables:
+            cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
+
+    if "UserPermissions" not in tables:
+        cu.execute("""
+        CREATE VIEW UserPermissions AS
+            SELECT Users.user AS user,
+                   Users.salt AS salt,
+                   Users.password as password,
+                   Items.item AS permittedTrove,
+                   Permissions.labelId AS permittedLabelId,
+                   Labels.label AS permittedLabel,
+                   Permissions.admin AS admin,
+                   Permissions.write AS write,
+                   Permissions._ROWID_ as aclId
+             FROM Users
+                  JOIN UserGroupMembers using (userId)
+                  JOIN Permissions using (userGroupId)
+                  JOIN Items using (itemId)
+                  JOIN Labels ON 
+                      Permissions.labelId = Labels.labelId
+        """)
+
+    if "UsersView" not in tables:
+        cu.execute("""
+        CREATE VIEW
+            UsersView AS
+        SELECT
+            Users.user as user,
+            Items.item as item,
+            Labels.label as label,
+            Permissions.write as W,
+            Permissions.admin as A,
+            Permissions.capped as C
+        FROM
+            Users
+        JOIN UserGroupMembers using (userId)
+        JOIN Permissions using (userGroupId)
+        JOIN Items using (itemId)
+        JOIN Labels on Permissions.labelId = Labels.labelId
+        """)
+    
+def createPGPKeys(db):
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+    tables = [ x[0] for x in cu ]
+    if "PGPKeys" not in tables:
+        cu.execute("""
+        CREATE TABLE PGPKeys(
+            keyId           INTEGER PRIMARY KEY,
+            userId          INTEGER,
+            fingerprint     STRING(40),
+            pgpKey          BINARY,
+            CONSTRAINT PGPKeys_userId_fk
+                FOREIGN KEY (userId) REFERENCES Users(userId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT PGPKeys_fingerprint_uq
+                UNIQUE(fingerprint)
+        )""")
+    if "PGPFingerprints" not in tables:
+        cu.execute("""
+        CREATE TABLE PGPFingerprints(
+            keyId           INTEGER,
+            fingerprint     STRING(40) PRIMARY KEY,
+            CONSTRAINT PGPFingerprints_keyId_fk
+                FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+
+def createTroves(db):
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+    tables = [ x[0] for x in cu ]
+    if 'FileStreams' not in tables:
+        cu.execute("""
+        CREATE TABLE FileStreams(
+            streamId INTEGER PRIMARY KEY,
+            fileId BINARY,
+            stream BINARY
+        )""")
+        # in sqlite 2.8.15, a unique here seems to cause problems
+        # (as the versionId isn't unique, apparently)
+        cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")
+
+    if "TroveFiles" not in tables:
+        cu.execute("""
+        CREATE TABLE TroveFiles(
+            instanceId      INTEGER,
+            streamId        INTEGER,
+            versionId       BINARY,
+            pathId          BINARY,
+            path            STRING,
+            CONSTRAINT TroveFiles_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveFiles_streamId_fk
+                FOREIGN KEY (streamId) REFERENCES FileStreams(streamId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+        cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
+        cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
+
+    if "TroveTroves" not in tables:
+        cu.execute("""
+        CREATE TABLE TroveTroves(
+            instanceId      INTEGER, 
+            includedId      INTEGER,
+            byDefault       BOOLEAN,
+            CONSTRAINT TroveTroves_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveTroves_includedId_fk
+                FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveTroves_instance_included_uq
+                UNIQUE(instanceId, includedId)
+        )""")
+        # ideally we would attempt to create a unique index on (instance, included)
+        # for sqlite as well for integrity checking, but sqlite's performance will hurt            
+        cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
+        # this index is so we can quickly tell what troves are needed
+        # by another trove
+        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+
+
+def createInstructionSets(db):
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+    tables = [ x[0] for x in cu ]
+    if 'InstructionSets' not in tables:
+        cu.execute("""
+        CREATE TABLE InstructionSets(
+            isnSetId        INTEGER PRIMARY KEY,
+            base            STRING,
+            flags           STRING
+        )""")
+
+def createChangeLog(db):        
+    cu = db.cursor()
+    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+    tables = [ x[0] for x in cu ]
+    if "ChangeLogs" not in tables:
+        cu.execute("""
+        CREATE TABLE ChangeLogs(
+            nodeId          INTEGER,
+            name            STRING, 
+            contact         STRING, 
+            message         STRING,
+            CONSTRAINT ChangeLogs_nodeId_uq
+                UNIQUE(nodeId)
+        )""")
+        cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
+
+
+# SCHEMA Migration
 class SchemaMigration(migration.SchemaMigration):
     def message(self, msg = None):
         if msg is None:

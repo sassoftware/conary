@@ -19,37 +19,12 @@ from conary import sqlite3
 from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
+from conary.repository.netrepos import schema
 
 class OpenPGPKeyTable:
     def __init__(self, db):
         self.db = db
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "PGPKeys" not in tables:
-            cu.execute("""
-            CREATE TABLE PGPKeys(
-                keyId           INTEGER PRIMARY KEY,
-                userId          INTEGER,
-                fingerprint     STRING(40),
-                pgpKey          BINARY,
-                CONSTRAINT PGPKeys_userId_fk
-                    FOREIGN KEY (userId) REFERENCES Users(userId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT PGPKeys_fingerprint_uq
-                    UNIQUE(fingerprint)
-            )""")
-        if "PGPFingerprints" not in tables:
-            cu.execute("""
-            CREATE TABLE PGPFingerprints(
-                keyId           INTEGER,
-                fingerprint     STRING(40) PRIMARY KEY,
-                CONSTRAINT PGPFingerprints_keyId_fk
-                    FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
-                    ON DELETE CASCADE ON UPDATE CASCADE
-            )""")
-        db.commit()
-
+        schema.createPGPKeys(db)
         # create a keyCache for this keyTable.
         self.keyCache = OpenPGPKeyDBCache(self)
 

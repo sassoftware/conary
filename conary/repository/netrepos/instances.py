@@ -13,6 +13,7 @@
 # 
 
 from conary import sqlite3
+from conary.repository.netrepos import schema
 
 class InstanceTable:
     """
@@ -20,48 +21,9 @@ class InstanceTable:
     """
     def __init__(self, db):
         self.db = db
+        schema.createInstances(db)
+        schema.createTroves(db)
         
-        cu = self.db.cursor()
-        cu.execute("""SELECT tbl_name FROM sqlite_master
-                      WHERE type='table' or type='view' """)
-        tables = [ x[0] for x in cu ]
-        if "Instances" not in tables:
-            cu.execute("""
-            CREATE TABLE Instances(
-                instanceId      INTEGER PRIMARY KEY, 
-                itemId          INTEGER, 
-                versionId       INTEGER, 
-                flavorId        INTEGER,
-                isRedirect      INTEGER NOT NULL DEFAULT 0,
-                isPresent       INTEGER NOT NULL DEFAULT 0,
-                CONSTRAINT Instances_itemId_fk
-                    FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Instances_versionId_fk
-                    FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-                CONSTRAINT Instances_flavorId_fk
-                    FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
-                    ON DELETE RESTRICT ON UPDATE CASCADE
-            )""")
-            cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
-                       " Instances(itemId, versionId, flavorId) ")
-        if "InstancesView" not in tables:
-            cu.execute("""
-            CREATE VIEW
-                InstancesView AS
-            SELECT
-                Instances.instanceId as instanceId,
-                Items.item as item,
-                Versions.version as version,
-                Flavors.flavor as flavor
-            FROM
-                Instances
-            JOIN Items on Instances.itemId = Items.itemId
-            JOIN Versions on Instances.versionId = Versions.versionId
-            JOIN Flavors on Instances.flavorId = Flavors.flavorId
-            """)
-
     def addId(self, itemId, versionId, flavorId, isRedirect, isPresent = True):
 	if isPresent:
 	    isPresent = 1
@@ -125,20 +87,3 @@ class InstanceTable:
 	if not item:
 	    return defValue
 	return item[0]
-
-class FileStreams:
-    def __init__(self, db):
-        self.db = db
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'FileStreams' not in tables:
-            cu.execute("""
-            CREATE TABLE FileStreams(
-                streamId INTEGER PRIMARY KEY,
-                fileId BINARY,
-                stream BINARY
-            )""")
-	    # in sqlite 2.8.15, a unique here seems to cause problems
-	    # (as the versionId isn't unique, apparently)
-	    cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")

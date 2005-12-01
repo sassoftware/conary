@@ -13,21 +13,12 @@
 # 
 
 from conary.deps import deps
-
+from conary.repository.netrepos import schema
 class InstructionSets:
     def __init__(self, db):
         self.db = db
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'InstructionSets' not in tables:
-            cu.execute("""
-            CREATE TABLE InstructionSets(
-                isnSetId        INTEGER PRIMARY KEY,
-                base            STRING,
-                flags           STRING
-            )""")
-
+        schema.createInstructionSets(db)
+        
     def _freezeIsd(self, isd):
         frozen = isd.freeze()
         split = frozen.split(' ', 1)
