@@ -26,7 +26,8 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
-    def check(self, authToken, write = False, admin = False, label = None, trove = None):
+    def check(self, authToken, write = False, admin = False, label = None, 
+              trove = None, forcePassword = False):
         logMe(2, authToken[0], write, admin, label, trove)
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
@@ -168,7 +169,7 @@ class NetworkAuthorization:
 
         try:
             cu.execute("""INSERT INTO Permissions
-                            SELECT userGroupId, ?, ?, ?, ?, ? FROM
+                            SELECT userGroupId, ?, ?, ?, ?, ?, NULL FROM
                                 (SELECT userGroupId FROM userGroups WHERE
                                 userGroup=?)
                         """, labelId, itemId, write, capped, admin, userGroup)
@@ -536,6 +537,131 @@ class NetworkAuthorization:
         cu.execute("SELECT labelId, label FROM Labels")
         for row in cu:
             yield row
+
+    def __checkEntitlementOwner(self, cu, userName, entGroup):
+        """
+        Raises an error or returns the group Id.
+        """
+        # verify that the user has permission to change this entitlement
+        # group
+        cu.execute("""
+                SELECT entGroupAdmin
+                    FROM
+                        Users, UserGroupMembers, Permissions
+                    WHERE
+                        Users.user = ? AND
+                        UserGroupMembers.userId = Users.userId AND
+                        UserGroupMembers.userGroupId = Permissions.userGroupId 
+                        AND 
+                          (Permissions.entGroupAdmin IS NOT NULL OR
+                           Permissions.admin == 1)
+                """, userName)
+        entGroupsEditable = set(x[0] for x in cu)
+
+        cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE "
+                   "entGroup = ?", entGroup)
+        entGroupIds = [ x[0] for x in cu ]
+        if len(entGroupIds) == 1:
+            entGroupId = entGroupIds[0]
+        else:
+            assert(not entGroupIds)
+            entGroupId = -1
+
+        if None in entGroupsEditable:
+            if not entGroupIds:
+                raise errors.UnknownEntitlementGroup
+
+            return entGroupId
+        elif entGroupId in entGroupsEditable:
+            return entGroupId
+
+        raise errors.InsufficientPermission
+
+    def addEntitlement(self, authToken, entGroup, entitlement):
+        cu = self.db.cursor()
+
+        # validate the password
+        if len(entitlement) > 64 or \
+                    not self.check(authToken, forcePassword = True):
+            return errors.InsufficientPermission
+
+        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+
+        # check for duplicates
+        cu.execute("""
+                SELECT COUNT(*) FROM Entitlements WHERE
+                    entGroupId = ? AND entitlement = ?
+                """, entGroupId, entitlement)
+        count = cu.next()[0]
+        if count:
+            raise UserAlreadyExists
+
+        cu.execute("INSERT INTO Entitlements VALUES (?, ?)",
+                   entGroupId, entitlement)
+
+        self.db.commit()
+
+    def addEntitlementGroup(self, authToken, entGroup, userGroup):
+        cu = self.db.cursor()
+
+        if not self.check(authToken, forcePassword = True, admin = True):
+            raise errors.InsufficientPermission
+
+        # check for duplicate
+        cu.execute("SELECT COUNT(*) FROM EntitlementGroups WHERE "
+                   "entGroup = ?", entGroup)
+        if cu.next()[0]:
+            raise errors.GroupAlreadyExists
+
+        cu.execute("SELECT userGroupId FROM userGroups WHERE userGroup=?",
+                   userGroup)
+        l = [ x for x in cu ]
+        if not l:
+            raise errors.GroupNotFound
+
+        assert(len(l) == 1)
+        userGroupId = l[0][0]
+
+        cu.execute("INSERT INTO EntitlementGroups VALUES "
+                   "(NULL, ?, ?)", entGroup, userGroupId)
+
+        self.db.commit()
+
+    def addEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
+        """
+        Gives the userGroup ownership permission for the entGroup entitlement
+        set.
+        """
+        if not self.check(authToken, forcePassword = True, admin = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        cu.execute("""INSERT INTO Permissions 
+                            (userGroupId, labelId, itemId, write,
+                             capped, admin, entGroupAdmin) 
+                       VALUES (
+                          (SELECT userGroupId FROM userGroups WHERE 
+                                          userGroup = ?),
+                          0, 0, 0, 0, 0,
+                          (SELECT entGroupId FROM entitlementGroups WHERE
+                                          entGroup = ?)
+                        )
+                   """, userGroup, entGroup)
+
+    def listEntitlements(self, authToken, entGroup):
+        # validate the password
+        if not self.check(authToken, forcePassword = True):
+            return errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+
+        cu.execute("SELECT entitlement FROM Entitlements WHERE "
+                   "entGroupId = ?", entGroupId)
+
+        return [ x[0] for x in cu ]
 
     def __init__(self, db, name):
         self.name = name

@@ -104,6 +104,12 @@ class UserAlreadyExists(RepositoryError):
 class GroupAlreadyExists(RepositoryError):
     pass
 
+class GroupNotFound(RepositoryError):
+    pass
+
+class UnknownEntitlementGroup(RepositoryError):
+    pass
+
 class PermissionAlreadyExists(RepositoryError):
     pass
 
@@ -162,7 +168,9 @@ simpleExceptions = (
     (KeyNotFound,                'KeyNotFound'),
     (UserAlreadyExists,          'UserAlreadyExists'),
     (UserNotFound,               'UserNotFound'),
+    (GroupNotFound,              'GroupNotFound'),
     (CommitError,                'CommitError'),
     (DuplicateBranch,            'DuplicateBranch'),
     (TroveIntegrityError,        'TroveIntegrityError'),
+    (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
     )

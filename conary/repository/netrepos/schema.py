@@ -278,6 +278,7 @@ def createUsers(db):
             write           INTEGER,
             capped          INTEGER,
             admin           INTEGER,
+            entGroupAdmin   INTEGER,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -286,6 +287,10 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Permissions_entGroupAdmin_fk
+                FOREIGN KEY (entGroupAdmin) REFERENCES 
+                                EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_ug_l_i_uq
                 UNIQUE(userGroupId, labelId, itemId)
@@ -338,6 +343,34 @@ def createUsers(db):
         JOIN Items using (itemId)
         JOIN Labels on Permissions.labelId = Labels.labelId
         """)
+        commit = True
+
+    if "EntitlementsGroups" not in tables:
+        cu.execute("""
+        CREATE TABLE EntitlementGroups (
+            entGroupId      INTEGER PRIMARY KEY,
+            entGroup        STRING,
+            userGroupId     INTEGER,
+            CONSTRAINT EntitlementClasses_entitlementGroup_uq
+                UNIQUE(entGroup),
+            CONSTRAINT EntitlementGroups_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+        commit = True
+
+    if "Entitlements" not in tables:
+        cu.execute("""
+        CREATE TABLE Entitlements (
+            entGroupId      INTEGER,
+            entitlement     BLOB,
+            CONSTRAINT Entitlements_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES Flavors(entitlementGroups)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT EntitlementClasses_entitlement_uq
+                UNIQUE(entGroupId, entitlement)
+        )""")
+
         commit = True
 
     if commit:
