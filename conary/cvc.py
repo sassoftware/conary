@@ -434,7 +434,6 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(dumpStack=cfg.dumpStackOnError,
                                             debug=cfg.debugExceptions)
-        raise RuntimeError
 	return realMain(cfg, argv)
     except conarycfg.ConaryCfgError, e:
         log.error(str(e))
