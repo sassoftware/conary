@@ -141,7 +141,7 @@ class CfgFingerPrint(CfgType):
         return val
             
     
-CfgInstallLabelPath = CfgLineList(CfgLabel, ' ')
+CfgInstallLabelPath = CfgLineList(CfgLabel)
     
 
 class ConaryContext(ConfigSection):
