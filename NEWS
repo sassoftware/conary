@@ -25,6 +25,12 @@ Changes in 0.80.0:
       They are not yet enforced, to give time to rebuild Java packages.
     * CheckDesktopFiles now looks in /usr/share/icons for icons, and
       can find icon names without extensions specified.
+    * Build actions which take a subDir keyword argument now also can
+      take a skipMissingSubDir keyword argument which, if set to True,
+      causes the build action to be skipped if the specified subdirectory
+      does not exist.  By default, those build actions will now raise
+      an error if the directory does not exist, rather than running in
+      the wrong subdirectory as they did previously.
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed

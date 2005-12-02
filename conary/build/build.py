@@ -184,12 +184,18 @@ class Automake(BuildCommand):
 		'preAutoconf': '',
                 'm4Dir': '',
 		'automakeVer': '',
-                'subDir': ''}
+                'subDir': '',
+                'skipMissingSubDir': False,
+               }
     
     def do(self, macros):
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
-                                                 macros.builddir)
+             macros.builddir, error=not self.skipMissingSubDir)
+        if not macros.actionDir:
+            assert(self.skipMissingSubDir)
+            return
+
         if self.m4Dir:
 	    macros.m4DirArgs = '-I %s' %(self.m4Dir)
 	else:
@@ -234,7 +240,9 @@ class Configure(BuildCommand):
 		'configureName': 'configure',
                 'objDir': '',
                 'bootstrapFlags': '--target=%(target)s --host=%(host)s --build=%(build)s',
-		'subDir': ''}
+		'subDir': '',
+                'skipMissingSubDir': False,
+               }
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -246,6 +254,9 @@ class Configure(BuildCommand):
         from the same directory as the sources (srcdir != objdir).
 	It can contain macro references.
 	@keyword subDir: directory in which to run configure
+        @keyword skipMissingSubDir: By default (C{False}) raise an error
+        if C{subDir} does not exist; if C{True}, skip the action if
+        C{subDir} does not exist.
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
 	@keyword configureName: the name of the configure command; normally
@@ -256,7 +267,11 @@ class Configure(BuildCommand):
     def do(self, macros):
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
-                                                 macros.builddir)
+             macros.builddir, error=not self.skipMissingSubDir)
+        if not macros.actionDir:
+            assert(self.skipMissingSubDir)
+            return
+
         if self.objDir:
 	    objDir = self.objDir %macros
             macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
@@ -335,16 +350,21 @@ class Make(BuildCommand):
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': '',
+                'skipMissingSubDir': False,
 		'forceFlags': False}
 
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword preMake: string to be inserted before the "make" command.
-        Use preMake if you need to set an environment variable.  The
-        preMake keyword cannot contain a ;
+        Use C{preMake} if you need to set an environment variable.  The
+        C{preMake} keyword cannot contain a C{;} character.
         @keyword subDir: the directory to enter before running "make"
+        @keyword skipMissingSubDir: By default (C{False}) raise an error
+        if C{subDir} does not exist; if C{True}, skip the action if
+        C{subDir} does not exist.
 	@keyword forceFlags: boolean; if set, unconditionally override
-	the Makefile definitions of *FLAGS (i.e. CFLAGS, CXXFLAGS, LDFLAGS)
+	the Makefile definitions of *FLAGS (that is, C{CFLAGS}, C{CXXFLAGS},
+        C{LDFLAGS})
         """
 	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
@@ -362,7 +382,11 @@ class Make(BuildCommand):
 	else:
 	    macros['overrides'] = ''
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
-                                                 macros.builddir)
+             macros.builddir, error=not self.skipMissingSubDir)
+        if not macros.actionDir:
+            assert(self.skipMissingSubDir)
+            return
+
 	BuildCommand.do(self, macros)
 
 class MakeParallelSubdir(Make):
