@@ -659,6 +659,7 @@ class CPackageRecipe(BuildPackageRecipe):
         'binutils:devellib',
         'gcc:runtime',
         'gcc:lib',
+        'gcc:devel',
         'gcc:devellib',
         'glibc:runtime',
         'glibc:lib',
