@@ -196,7 +196,7 @@ class ConaryConfiguration(SectionedConfigFile):
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList, '/etc/conary/pubring.gpg')
+    pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
     root                  =  (CfgPath, '/')
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
