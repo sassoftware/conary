@@ -15,7 +15,7 @@
 
 from conary import conarycfg
 from conary.lib import options, util
-from conary.repository.netclient import NetworkRepositoryClient
+from conary.conaryclient import ConaryClient
 from conary import versions
 
 import os
@@ -57,7 +57,7 @@ def main(argv):
     if 'module' not in argSet:
         usage()
 
-    repos = NetworkRepositoryClient(cfg.repositoryMap)
+    repos = ConaryClient(cfg).getRepos()
 
     data = [x[:-1] for x in sys.stdin.readlines()]
 
