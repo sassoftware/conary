@@ -123,7 +123,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                     continue
 		(oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
-	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback, threshold = threshold)
+	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
+                                         threshold = threshold)
 
         for trove in self.oldTroveList():
             self.repos.eraseTrove(trove.getName(), trove.getVersion(),

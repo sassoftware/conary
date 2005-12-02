@@ -1270,7 +1270,7 @@ class ClientUpdate:
                         for keyId in e.keys:
                             for val in self.cfg.repositoryMap.values():
                                 openpgpkey.findOpenPGPKey(val, keyId,
-                                                          self.cfg.pubRing)
+                                                          self.cfg.pubRing[-1])
                         # try again.
                         return _applyCs(cs, uJob, removeHints,
                                  recurseDepth = recurseDepth + 1)

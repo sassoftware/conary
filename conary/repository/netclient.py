@@ -1246,7 +1246,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               defaultFlavor, acrossLabels, acrossFlavors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
-	    
+
     def getConaryUrl(self, version, flavor):
         # make sure the server supports us.
         # XXX: when reworking the server cache one can save the extra
@@ -1265,7 +1265,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         ver = version.trailingRevision()
         return self.c[version].getConaryUrl(self.fromVersion(ver),
                                             self.fromFlavor(flavor))
-        
+
     def _commit(self, chgSet, fName, callback = None):
 	serverName = None
 	for trove in chgSet.iterNewTroveList():

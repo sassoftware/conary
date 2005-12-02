@@ -150,7 +150,7 @@ class DisplayConfig:
     # A next step should be to redefine these rules.
         
     def __init__(self, troveSource=None, ls = False, ids = False, 
-                 sha1s = False, 
+                 sha1s = False, digSigs = False,
                  fullVersions = False, tags = False, info = False, 
                  deps = False, showBuildReqs = False, showFlavors = False, 
                  iterChildren = False, showComponents = False):
@@ -159,6 +159,7 @@ class DisplayConfig:
         self.ls = ls
         self.ids = ids
         self.sha1s = sha1s
+        self.digSigs = digSigs
         self.fullVersions = fullVersions
         self.fullFlavors = showFlavors
         self.showComponents = showComponents
@@ -201,6 +202,9 @@ class DisplayConfig:
     def printSha1s(self):
         return self.sha1s
 
+    def printDigSigs(self):
+        return self.digSigs
+
     def printInfo(self):
         return self.info
 
@@ -225,7 +229,7 @@ class DisplayConfig:
 
     def needTroves(self):
         # we need the trove 
-        return self.info or self.showBuildReqs
+        return self.info or self.showBuildReqs or self.digSigs
 
     def needFiles(self):
         return self.printFiles()
@@ -419,6 +423,9 @@ class TroveFormatter(TroveTupFormatter):
         if dcfg.printInfo():
             for line in self.formatInfo(trove):
                 yield line
+        if dcfg.printDigSigs():
+            for line in self.formatDigSigs(trove, indent):
+                yield line
         if dcfg.printBuildReqs():
             for buildReq in sorted(trove.getBuildRequirements()):
                 yield self.formatNVF(*buildReq)
@@ -437,6 +444,13 @@ class TroveFormatter(TroveTupFormatter):
                 for l in lines:
                     yield '    ' + l
             yield '' 
+
+    def formatDigSigs(self, trv, indent=0):
+        sigList = [x for x in trv.troveInfo.sigs.digitalSigs.iter()]
+        for fingerprint, timestamp, sigTuple \
+                in trv.troveInfo.sigs.digitalSigs.iter():
+            yield 2*indent*' ' + 'Digital Signature:'
+            yield 2*indent*' ' + '    %s:' %fingerprint + ' ' + time.ctime(timestamp)
 
     def formatTroveFiles(self, trove, n, v, f, indent=0):
         """ Print information about the files associated with this trove """

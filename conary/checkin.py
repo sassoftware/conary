@@ -95,7 +95,7 @@ def _getRecipeLoader(cfg, repos, recipeFile):
 
     return loader
 
-def verifyAbsoluteChangeset(cs, trustThreshold = 0):
+def verifyAbsoluteChangeset(cs, trustThreshold = 0, ignoreMissingKeys = False):
     # go through all the trove change sets we have in this changeset.
     # verify the digital signatures on each piece
     # return code should be the minimum trust on the entire set
@@ -112,7 +112,7 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0):
         verTuple = t.verifyDigitalSignatures(trustThreshold)
         missingKeys.extend(verTuple[1])
         r = min(verTuple[0], r)
-    if missingKeys:
+    if (not ignoreMissingKeys) and missingKeys:
         raise openpgpfile.KeyNotFound(missingKeys)
     return r
 
@@ -160,7 +160,6 @@ def checkout(repos, cfg, workDir, name, callback=None):
     sourceState = SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
     conaryState = ConaryState(cfg.context, sourceState)
 
-
     cs = repos.createChangeSet([(trvInfo[0],
                                 (None, None), 
                                 (trvInfo[1], trvInfo[2]),
@@ -173,8 +172,9 @@ def checkout(repos, cfg, workDir, name, callback=None):
     except openpgpfile.KeyNotFound, e:
         for keyId in e.keys:
             for val in cfg.repositoryMap.values():
-                openpgpkey.findOpenPGPKey(val, keyId, cfg.pubRing)
-        verifyAbsoluteChangeset(cs, cfg.trustThreshold)
+                openpgpkey.findOpenPGPKey(val, keyId, cfg.pubRing[0])
+        verifyAbsoluteChangeset(cs, cfg.trustThreshold,
+                                ignoreMissingKeys = True)
 
     troveCs = cs.iterNewTroveList().next()
 

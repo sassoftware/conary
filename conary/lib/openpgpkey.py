@@ -165,13 +165,19 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             self.privatePath = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
-        self.publicPaths = [ path ]
+        if isinstance(path, list):
+            self.publicPaths = path
+        else:
+            self.publicPaths = [ path ]
 
     def setTrustDbPath(self, path):
         self.trustDbPaths = [ path ]
 
     def addPublicPath(self, path):
-        self.publicPaths.append(path)
+        if isinstance(path, list):
+            self.publicPaths.extend(path)
+        else:
+            self.publicPaths.append(path)
 
     def setPrivatePath(self, path):
         self.privatePath = path
@@ -260,7 +266,10 @@ def findOpenPGPKey(server, keyId, pubRing):
                   '%sgetOpenPGPKey?search=%s' % (server, keyId),
                   '--recv-key', keyId)
     os.wait()
-    os.remove(pubRingPath + '/secring.gpg')
+    try:
+        os.remove(pubRingPath + '/secring.gpg')
+    except:
+        pass
 
 _keyCache = OpenPGPKeyFileCache()
 

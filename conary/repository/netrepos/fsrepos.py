@@ -101,7 +101,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True,
-                         keyCache = self.troveStore.keyTable.keyCache, threshold = threshold)
+                         keyCache = self.troveStore.keyTable.keyCache,
+                         threshold = threshold)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
