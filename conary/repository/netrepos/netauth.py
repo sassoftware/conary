@@ -27,7 +27,7 @@ GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, 
-              trove = None, forcePassword = False):
+              trove = None):
         logMe(2, authToken[0], write, admin, label, trove)
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
@@ -581,8 +581,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         # validate the password
-        if len(entitlement) > 64 or \
-                    not self.check(authToken, forcePassword = True):
+        if len(entitlement) > 64 or not self.checkUserPass(authToken):
             return errors.InsufficientPermission
 
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
@@ -604,7 +603,7 @@ class NetworkAuthorization:
     def addEntitlementGroup(self, authToken, entGroup, userGroup):
         cu = self.db.cursor()
 
-        if not self.check(authToken, forcePassword = True, admin = True):
+        if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
         # check for duplicate
@@ -632,7 +631,7 @@ class NetworkAuthorization:
         Gives the userGroup ownership permission for the entGroup entitlement
         set.
         """
-        if not self.check(authToken, forcePassword = True, admin = True):
+        if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -649,9 +648,9 @@ class NetworkAuthorization:
                         )
                    """, userGroup, entGroup)
 
-    def listEntitlements(self, authToken, entGroup):
+    def iterEntitlements(self, authToken, entGroup):
         # validate the password
-        if not self.check(authToken, forcePassword = True):
+        if not self.checkUserPass(authToken):
             return errors.InsufficientPermission
 
         cu = self.db.cursor()

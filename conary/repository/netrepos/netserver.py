@@ -232,6 +232,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
+    def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+        entitlement = self.toEntitlement(entitlement)
+        self.auth.addEntitlement(authToken, entGroup, entitlement)
+        return True
+
+    def addEntitlementGroup(self, authToken, clientVersion, entGroup, 
+                            userGroup):
+        self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
+        return True
+
+    def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup, 
+                               entGroup):
+        self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
+        return True
+
+    def listEntitlements(self, authToken, clientVersion, entGroup):
+        return [ self.fromEntitlement(x) for x in 
+                        self.auth.iterEntitlements(authToken, entGroup) ]
+
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):

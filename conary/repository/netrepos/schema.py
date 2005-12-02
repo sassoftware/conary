@@ -291,11 +291,9 @@ def createUsers(db):
             CONSTRAINT Permissions_entGroupAdmin_fk
                 FOREIGN KEY (entGroupAdmin) REFERENCES 
                                 EntitlementGroups(entGroupId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_ug_l_i_uq
-                UNIQUE(userGroupId, labelId, itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
+        cu.execute("""CREATE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
 
         if "Items" in tables:
@@ -532,7 +530,7 @@ class MigrateTo_2(SchemaMigration):
 
         ## Finally fix the index
         cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
+        cu.execute("""CREATE INDEX PermissionsIdx ON 
             Permissions(userGroupId, labelId, itemId)""")
         return self.Version
 

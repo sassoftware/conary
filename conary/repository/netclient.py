@@ -401,6 +401,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
 
+    def addEntitlement(self, serverName, entGroup, entitlement):
+        entitlement = self.fromEntitlement(entitlement)
+        return self.c[serverName].addEntitlement(entGroup, entitlement)
+
+    def addEntitlementGroup(self, serverName, entGroup, userGroup):
+        return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
+
+    def addEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
+        return self.c[serverName].addEntitlementOwnerAcl(userGroup, entGroup)
+
+    def listEntitlements(self, serverName, entGroup):
+        l = self.c[serverName].listEntitlements(entGroup)
+        return [ self.toEntitlement(x) for x in l ]
+
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
 
