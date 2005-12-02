@@ -106,7 +106,7 @@ class _Config:
         self._options[key].__doc__ = None
 
         self._lowerCaseMap[key.lower()] = key
-        self[key] = self._options[key].default
+        self[key] = copy.deepcopy(self._options[key].default)
 
     def addListener(self, key, fn):
         """ 
@@ -375,7 +375,7 @@ class ConfigOption:
         """
         self._callListeners()
 
-        if curVal is self.default:
+        if curVal == self.default:
             return self.valueType.setFromString(curVal, str)
         else:
             return self.valueType.updateFromString(curVal, str)
