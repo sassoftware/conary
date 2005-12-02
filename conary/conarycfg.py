@@ -60,7 +60,7 @@ class CfgUserInfoItem(CfgType):
         elif displayOptions.get('hidePasswords'):
             return '%s %s <password>' % (serverGlob, user)
         else:
-            return '%s %s <password>' % (serverGlob, user, password)
+            return '%s %s %s' % (serverGlob, user, password)
 
 class CfgUserInfo(CfgList):
     def __init__(self, default=[]):
