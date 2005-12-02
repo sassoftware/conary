@@ -219,6 +219,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
+            self.entitlements = loadEntitlements('/etc/conary/entitlements')
         util.settempdir(self.tmpDir)
   
     def readFiles(self):
@@ -307,3 +308,65 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
+def _loadSingleEntitlement(f):
+    # XXX this should be replaced with a real xml parser
+    contents = "".join([ x[:-1] for x in f.readlines()])
+    key = None
+    keyGroup = None
+
+    tokens = []
+
+    while contents:
+        if contents[0] == '<':
+            i = contents.find('>')
+            tag = contents[1:i]
+            tag.strip()
+            contents = contents[i + 1:]
+            tokens.append(tag)
+        else:
+            i = contents.find('<')
+            if i == -1:
+                # okay by xml, not by us
+                raise SyntaxError
+            else:
+                tokens.append(contents[:i])
+                contents = contents[i:]
+
+    d = {}
+    while tokens:
+        openTag = tokens.pop(0)
+        contents = tokens.pop(0)
+        closeTag = tokens.pop(0)
+
+        if closeTag != '/' and closeTag[1:] != openTag:
+            raise SyntaxError
+
+        d[openTag] = contents
+
+    if not 'class' in d or not 'key' in d: 
+        raise SyntaxError
+
+    entServer = d.pop('server')
+    entClass = d.pop('class')
+    endKey = d.pop('key')
+
+    if d: raise SyntaxError
+
+    return (entServer, entClass, endKey)
+
+def loadEntitlements(dirname):
+    if not os.path.isdir(dirname):
+        # that's okay
+        return {}
+
+    paths = os.listdir(dirname)
+
+    entList= []
+
+    for path in paths:
+        if path[0] == '.': continue
+
+        fullPath = os.path.join(dirname, path)
+        entList.append(_loadSingleEntitlement(open(fullPath, "r")))
+
+    return dict((x[0], (x[1], x[2])) for x in entList)
