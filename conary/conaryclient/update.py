@@ -231,7 +231,7 @@ class ClientUpdate:
                                           keepExisting = False,
                                           recurse = False,
                                           ineligible = beingRemoved,
-                                          ignorePrimaryPins = False)[0]
+                                          ignorePrimaryPins = False)
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
@@ -814,8 +814,6 @@ class ClientUpdate:
         # This is the full, transitive closure of the job
         transitiveClosure = set()
 
-        splittable = True
-
         toFind = {}
         toFindNoDb = {}
         for item in itemList:
@@ -968,7 +966,6 @@ class ClientUpdate:
             assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
             transitiveClosure.update(cs.getJobSet(primaries = False))
-            splittable = False
             del cs
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
@@ -994,7 +991,7 @@ class ClientUpdate:
 
         uJob.setPrimaryJobs(jobSet)
 
-        return newJob, splittable
+        return newJob
 
     def fullUpdateItemList(self):
         items = self.db.findUnreferencedTroves()
@@ -1089,6 +1086,7 @@ class ClientUpdate:
 
         useAffinity = False
         forceJobClosure = False
+        splittable = True
 
         if fromChangesets:
             # when --from-file is used we need to explicitly compute the
@@ -1096,6 +1094,7 @@ class ClientUpdate:
             # repository to give us the right thing, but that won't
             # work when we're pulling jobs out of the change set
             forceJobClosure = True
+            splitabble = False
 
             csSource = trovesource.ChangesetFilesTroveSource(self.db)
             for cs in fromChangesets:
@@ -1111,19 +1110,20 @@ class ClientUpdate:
                                                    includesFileContents = True)
 
             uJob.setSearchSource(trovesource.stack(csSource, self.repos))
+            splittable = False
         elif sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
         else:
             uJob.setSearchSource(self.repos)
             useAffinity = True
 
-        jobSet, splittable = self._updateChangeSet(itemList, uJob,
-                                        keepExisting = keepExisting,
-                                        recurse = recurse,
-                                        updateMode = updateByDefault,
-                                        useAffinity = useAffinity,
-                                        ignorePrimaryPins = ignorePrimaryPins,
-                                        forceJobClosure = forceJobClosure)
+        jobSet = self._updateChangeSet(itemList, uJob,
+                                       keepExisting = keepExisting,
+                                       recurse = recurse,
+                                       updateMode = updateByDefault,
+                                       useAffinity = useAffinity,
+                                       ignorePrimaryPins = ignorePrimaryPins,
+                                       forceJobClosure = forceJobClosure)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
