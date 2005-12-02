@@ -2180,6 +2180,9 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if self._checkInclusion(info, path):
             if info[0] == '/':
                 depClass = deps.FileDependencies
+            elif info.startswith('file:'):
+                info = info.split('file:', 1)[1].strip()
+                depClass = deps.FileDependencies
             elif info.startswith('soname:'):
                 if not m or m.name != 'ELF':
                     # only an ELF file can have a soname requirement
