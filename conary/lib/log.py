@@ -31,8 +31,6 @@ import time
 from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 from conary import constants
 
-import util
-
 syslog = None
 
 class SysLog:
@@ -68,6 +66,7 @@ class SysLog:
         self("command failed")
 
     def open(self):
+        from conary.lib import util
         util.mkdirChain(os.path.dirname(self.path))
         self.f = open(self.path, "a")
 

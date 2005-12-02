@@ -60,7 +60,7 @@ class CfgUserInfoItem(CfgType):
         elif displayOptions.get('hidePasswords'):
             return '%s %s <password>' % (serverGlob, user)
         else:
-            return '%s %s <password>' % (serverGlob, user, password)
+            return '%s %s %s' % (serverGlob, user, password)
 
 class CfgUserInfo(CfgList):
     def __init__(self, default=[]):
@@ -141,7 +141,7 @@ class CfgFingerPrint(CfgType):
         return val
             
     
-CfgInstallLabelPath = CfgLineList(CfgLabel, ' ')
+CfgInstallLabelPath = CfgLineList(CfgLabel)
     
 
 class ConaryContext(ConfigSection):
@@ -187,6 +187,7 @@ class ConaryConfiguration(SectionedConfigFile):
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, True)
     debugRecipeExceptions =  CfgBool
+    entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool 
     localRollbacks        =  CfgBool
@@ -196,7 +197,7 @@ class ConaryConfiguration(SectionedConfigFile):
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList, '/etc/conary/pubring.gpg')
+    pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
     root                  =  (CfgPath, '/')
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
@@ -219,7 +220,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
-            self.entitlements = loadEntitlements('/etc/conary/entitlements')
+            self.entitlements = loadEntitlements(self.entitlementDirectory)
         util.settempdir(self.tmpDir)
   
     def readFiles(self):

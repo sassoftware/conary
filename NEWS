@@ -22,6 +22,9 @@ Changes in 0.80.0:
       for if the repository returns a permissions error
   o Building packages:
     * Dependencies are now generated for Java .class and .jar files.
+      They are not yet enforced, to give time to rebuild Java packages.
+    * CheckDesktopFiles now looks in /usr/share/icons for icons, and
+      can find icon names without extensions specified.
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed
@@ -29,6 +32,8 @@ Changes in 0.80.0:
     * query.py added
     * added JobSource concept for searching and manipulating lists of jobs.
     * moved datastore.py into repository module
+    * Stubs have been added for adding python and perl dependencies, and
+      the stubs have been set to be initially ignored.
 
 Changes in 0.71.2
   o Client Changes:

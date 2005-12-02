@@ -28,8 +28,8 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     instance (plus a few other pieces of information) and expose the netclient
     interface without the overhead of XMLRPC.
     """
-    def __init__(self, server, protocol, port, authToken, repMap):
-        netclient.NetworkRepositoryClient.__init__(self, repMap)
+    def __init__(self, server, protocol, port, authToken, repMap, userMap):
+        netclient.NetworkRepositoryClient.__init__(self, repMap, userMap)
         proxy = ShimServerProxy(server, protocol, port, authToken)
         self.c = FakeServerCache(proxy)
 

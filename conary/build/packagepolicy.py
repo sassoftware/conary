@@ -237,11 +237,31 @@ class CheckDesktopFiles(policy.Policy):
     files; C{r.CheckDesktopFiles(exceptions=I{filterexp}} if (for
     example) an icon is provided somehow, directly or indirectly, by a
     runtime requirement of this package.
+
+    C{CheckDesktopFiles} looks for icon files in C{%(destdir)s/%(datadir)s}
+    and C{%(datadir)s/icons}; you can add additional directories (which
+    will be searched both within C{%(destdir)s} and relative to C{/})
+    with C{CheckDesktopFiles(iconDirs='I{/path/to/dir}')} or
+    C{CheckDesktopFiles(iconDirs=('I{/path/to/dir1}', 'I{/path/to/dir2}'))}
     """
     invariantsubtrees = [ '%(datadir)s/applications/' ]
     invariantinclusions = [ r'.*\.desktop' ]
 
+    def __init__(self, *args, **keywords):
+        self.iconDirs = [ '%(datadir)s/icons/' ]
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+        if 'iconDirs' in keywords:
+            iconDirs = keywords.pop('iconDirs')
+            if type(iconDirs) in (list, tuple):
+                self.iconDirs.extend(iconDirs)
+            else:
+                self.iconDirs.append(iconDirs)
+        policy.Policy.updateArgs(self, *args, **keywords)
+
     def doFile(self, filename):
+        self.iconDirs = [ x % self.macros for x in self.iconDirs ]
         self.checkIcon(filename)
 
     def checkIcon(self, filename):
@@ -252,21 +272,30 @@ class CheckDesktopFiles(policy.Policy):
         for iconfilename in iconfiles:
             if iconfilename.startswith('/'):
                 fulliconfilename = self.macros.destdir + '/' + iconfilename
-                if not os.path.exists(fulliconfilename):
+                if (not os.path.exists(fulliconfilename) and
+                    not os.path.exists(iconfilename)):
                     self.error('%s says Icon=%s must exist, but is missing',
                                filename, iconfilename)
             elif '/' in iconfilename:
-                self.error('Illegal line Icon=%s in %s',
+                self.error('Illegal relative path Icon=%s in %s',
                            iconfilename, filename)
             else:
+                ext = '.' in iconfilename
                 fulldatadir = self.macros.destdir + '/' + self.macros.datadir
-                for root, dirs, files in os.walk(fulldatadir):
-                    if iconfilename in files:
-                        return
+                for iconDir in [ fulldatadir ] + self.iconDirs:
+                    for root, dirs, files in os.walk(iconDir):
+                        if ext:
+                            if iconfilename in files:
+                                return
+                        else:
+                            if [ x for x in files
+                                 if x.startswith(iconfilename+'.') ]:
+                                return
                 # didn't find anything
                 self.error('%s says Icon=%s must exist, but it does not exist'
-                           ' anywhere in %s',
-                           filename, iconfilename, self.macros.datadir)
+                           ' anywhere in: %s',
+                           filename, iconfilename,
+                           " ".join([ self.macros.datadir ] + self.iconDirs))
 
 
 

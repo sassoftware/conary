@@ -23,6 +23,8 @@ import sre_constants
 import sys
 import textwrap
 
+from conary.lib import util
+
 class _Config:
     """ Base configuration class.  Supports defining a configuration object, 
         and displaying that object, but has no knowledge of how the input.
@@ -99,8 +101,12 @@ class _Config:
         This config item defines an available configuration setting.
         """
         self._options[key] = ConfigOption(key, type, default)
+
+        # remove the default class documentation from this instance
+        self._options[key].__doc__ = None
+
         self._lowerCaseMap[key.lower()] = key
-        self[key] = self._options[key].default
+        self[key] = copy.deepcopy(self._options[key].default)
 
     def addListener(self, key, fn):
         """ 
@@ -179,11 +185,11 @@ class _Config:
             out = sys.stdout
         self._write(out, self._displayOptions, includeDocs=False)
 
-    def store(self, out):
+    def store(self, out, includeDocs=True):
         """ Write the config file in a format that should be readable
             by the same config file.
         """
-        self._write(out, dict(prettyPrint=False), includeDocs=True)
+        self._write(out, dict(prettyPrint=False), includeDocs=includeDocs)
 
     def displayKey(self, key, out):
         if out is None:
@@ -369,7 +375,7 @@ class ConfigOption:
         """
         self._callListeners()
 
-        if curVal is self.default:
+        if curVal == self.default:
             return self.valueType.setFromString(curVal, str)
         else:
             return self.valueType.updateFromString(curVal, str)
@@ -418,7 +424,8 @@ class ConfigOption:
         tw = textwrap.TextWrapper(initial_indent='# ', 
                                   subsequent_indent='# ', width=70)
         out.write('# %s (Default: %s)\n' % (self.name, ', '.join(self.valueType.toStrings(self.default, displayOptions))))
-        out.write('\n'.join(tw.wrap(self.__doc__)))
+        if self.__doc__:
+            out.write('\n'.join(tw.wrap(self.__doc__)))
         out.write('\n')
 
 
@@ -602,7 +609,7 @@ class CfgLineList(CfgType):
 
     def parseString(self, val):
         return self.listType(self.valueType.parseString(x) \
-                             for x in val.split(self.separator))
+                             for x in val.split(self.separator) if x)
 
     def updateFromString(self, val, str):
         return self.parseString(str)
@@ -611,7 +618,8 @@ class CfgLineList(CfgType):
         return self.listType(self.valueType.copy(x) for x in val)
 
     def toStrings(self, value, displayOptions=None):
-        yield self.separator.join(
+        if value:
+            yield self.separator.join(
                         self.valueType.format(x, displayOptions) for x in value)
 
 
@@ -763,7 +771,7 @@ class ParseError(CfgError):
     Indicates that an error occured parsing the config file.
     """
     def __str__(self):
-	return self.str
+	return self.val
 
-    def __init__(self, str):
-	self.str = str
+    def __init__(self, val):
+	self.val = str(val)

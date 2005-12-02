@@ -35,6 +35,7 @@ from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
 from conary.lib import openpgpfile
+from conary.lib import openpgpkey
 from conary.lib import options
 from conary.lib import util
 from conary.local import database
