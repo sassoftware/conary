@@ -1281,6 +1281,7 @@ class ClientUpdate:
 	    # with the main thread
 	    db = database.Database(cfg.root, cfg.dbPath)
 	    repos = NetworkRepositoryClient(cfg.repositoryMap,
+                                            cfg.user,
 					    localRepository = db)
             callback.setAbortEvent(stopSelf)
 
