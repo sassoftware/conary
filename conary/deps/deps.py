@@ -27,6 +27,8 @@ DEP_CLASS_USERINFO      = 7
 DEP_CLASS_GROUPINFO     = 8
 DEP_CLASS_CIL           = 9
 DEP_CLASS_JAVA          = 10
+DEP_CLASS_PYTHON        = 11
+DEP_CLASS_PERL          = 12
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -591,6 +593,24 @@ class JavaDependencies(DependencyClass):
     depClass = Dependency
     flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(JavaDependencies)
+
+class PythonDependencies(DependencyClass):
+
+    tag = DEP_CLASS_PYTHON
+    tagName = "python"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_HAS_FLAGS
+_registerDepClass(PythonDependencies)
+
+class PerlDependencies(DependencyClass):
+
+    tag = DEP_CLASS_PERL
+    tagName = "perl"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_HAS_FLAGS
+_registerDepClass(PerlDependencies)
 
 class FileDependencies(DependencyClass):
 
