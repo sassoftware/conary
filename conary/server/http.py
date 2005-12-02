@@ -599,8 +599,6 @@ class HttpHandler(WebHandler):
                 keys.append(keyPacket)
             openPgpKeys[userId] = keys
 
-        # FIXME: keyTable must be abolished once rBO catches up. It is left
-        # in for now to synchronize the transition.
         self._write("pgp_admin", users = users, admin=admin,
                     openPgpKeys = openPgpKeys)
         return apache.OK
@@ -613,9 +611,6 @@ class HttpHandler(WebHandler):
     @checkAuth(write = True)
     @strFields(keyData = "")
     def submitPGPKey(self, auth, keyData):
-        # FIXME we need to check if the user has admin rights
-        # to alter somebody else's key
-        #not a problem yet since admins can only touch their own keys atm
         self.repServer.addNewAsciiPGPKey(self.authToken, 0, self.authToken[0], keyData)
         return self._redirect('pgpAdminForm')
 
