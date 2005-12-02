@@ -14,6 +14,7 @@
 
 from mod_python import apache
 from mod_python import util
+from mod_python.util import FieldStorage
 import os
 import traceback
 import xmlrpclib
@@ -114,7 +115,7 @@ def get(port, isSecure, repos, req):
     if uri.endswith('/'):
         uri = uri[:-1]
     cmd = os.path.basename(uri)
-    fields = util.FieldStorage(req)
+    fields = FieldStorage(req)
 
     authToken = getAuth(req)
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
