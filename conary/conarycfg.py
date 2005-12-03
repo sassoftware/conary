@@ -220,7 +220,6 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
-            self.entitlements = loadEntitlements(self.entitlementDirectory)
         util.settempdir(self.tmpDir)
   
     def readFiles(self):
@@ -309,8 +308,36 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
-def _loadSingleEntitlement(f):
+def loadEntitlement(dirName, serverName):
     # XXX this should be replaced with a real xml parser
+
+    fullPath = os.path.join(dirName, serverName)
+    if os.access(fullPath, os.X_OK):
+        pipe = os.pipe()
+        childPid = os.fork()
+        if not childPid:
+            # double fork so we can wait immediately and not worry about
+            # it later on
+            if os.fork(): 
+                # there is probably a better way of exiting without
+                # cleaning things up?
+                os.kill(os.getpid(), 9)
+
+            os.dup2(pipe[1], 1)
+            os.close(0)
+            os.close(2)
+            os.close(pipe[0])
+            os.close(pipe[1])
+            os.execl(fullPath, fullPath, serverName)
+            os.kill(os.getpid(), 9)
+
+        os.close(pipe[1])
+        os.waitpid(childPid, 0)
+
+        f = os.fdopen(pipe[0])
+    else:
+        f = open(fullPath)
+
     contents = "".join([ x[:-1] for x in f.readlines()])
     key = None
     keyGroup = None
@@ -352,22 +379,6 @@ def _loadSingleEntitlement(f):
     endKey = d.pop('key')
 
     if d: raise SyntaxError
+    if entServer != serverName: raise SyntaxError
 
-    return (entServer, entClass, endKey)
-
-def loadEntitlements(dirname):
-    if not os.path.isdir(dirname):
-        # that's okay
-        return {}
-
-    paths = os.listdir(dirname)
-
-    entList= []
-
-    for path in paths:
-        if path[0] == '.': continue
-
-        fullPath = os.path.join(dirname, path)
-        entList.append(_loadSingleEntitlement(open(fullPath, "r")))
-
-    return dict((x[0], (x[1], x[2])) for x in entList)
+    return (entClass, endKey)
