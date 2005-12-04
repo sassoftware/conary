@@ -463,11 +463,13 @@ class QueryByBranch(Query):
             self.addMissing(missing, name)
 
     def _findAllNoFlavor(self, troveSource, missing, finalMap):
+        if not self.queryNoFlavor:
+            return
         if self.getLeaves:
             res = troveSource.getTroveLeavesByBranch(self.queryNoFlavor, 
                                                      bestFlavor=False)
         else:
-            res = troveSource.getTroveVersionssByBranch(self.queryNoFlavor)
+            res = troveSource.getTroveVersionsByBranch(self.queryNoFlavor)
 
         for name in self.queryNoFlavor:
             if name not in res or not res[name]:
