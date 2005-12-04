@@ -996,6 +996,10 @@ class Replace(BuildAction):
 	    self.init_error(TypeError, 
                             'not enough arguments: no file glob supplied')
         self.paths = args[:]
+
+        if [ x for x in self.paths if not x ]:
+	    self.init_error(TypeError, 
+                            'empty file path specified to Replace')
         
         if self.lines:
             if isinstance(self.lines, (list, tuple)):
