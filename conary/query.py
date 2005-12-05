@@ -70,7 +70,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
 
     dcfg = LocalDisplayConfig(db, ls, ids, sha1s, digSigs, cfg.fullVersions,
                               tags, info, deps, showBuildReqs, cfg.fullFlavors,
-                              iterChildren)
+                              iterChildren, cfg.showComponents)
     dcfg.setPrintDiff(showDiff)
 
     formatter = LocalTroveFormatter(dcfg)

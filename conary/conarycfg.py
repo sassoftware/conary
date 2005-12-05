@@ -198,6 +198,7 @@ class ConaryConfiguration(SectionedConfigFile):
     pinTroves		  =  CfgRegExpList
     pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
     root                  =  (CfgPath, '/')
+    showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')

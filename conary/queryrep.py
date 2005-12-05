@@ -74,7 +74,8 @@ def displayTroves(cfg, troveSpecs = [], all = False, ls = False,
 
     dcfg = display.DisplayConfig(repos, ls, ids, sha1s, digSigs,
                                  cfg.fullVersions, tags, info, deps,
-                                 showBuildReqs, cfg.fullFlavors, iterChildren)
+                                 showBuildReqs, cfg.fullFlavors, iterChildren,
+                                 cfg.showComponents)
 
     if primary:
         dcfg.setPrimaryTroves(set(troveTups))

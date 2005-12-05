@@ -205,6 +205,9 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
+    if argSet.pop('components', False):
+        cfg.showComponents = True
+
     if argSet.pop('full-versions', False):
         cfg.fullVersions = True
 
