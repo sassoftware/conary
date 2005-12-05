@@ -702,8 +702,9 @@ class UserGroupIdCache:
 
 	if root and root != '/':
 	    curDir = os.open(".", os.O_RDONLY)
-            # this doesn't chdir into the root to allow us to chroot
+            # chdir to the current root to allow us to chroot
             # back out again
+            os.chdir('/')
 	    os.chroot(root)
 	
 	try:
