@@ -92,7 +92,7 @@ class HttpHandler(WebHandler):
         self.authToken = auth
         
         if type(auth) is int:
-            return auth
+            raise apache.SERVER_ERROR, auth
 
         cfg = conarycfg.ConaryConfiguration()
         cfg.repositoryMap = self.repServer.map
@@ -107,7 +107,7 @@ class HttpHandler(WebHandler):
         try:
             method = self._getHandler(self.cmd)
         except AttributeError:
-            return apache.HTTP_NOT_FOUND
+            raise apache.SERVER_ERROR, apache.HTTP_NOT_FOUND
 
         d = dict(self.fields)
         d['auth'] = auth
