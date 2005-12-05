@@ -66,6 +66,7 @@ def usage(rc = 1):
     print '                [--flavor  "<flavor>"] '
     print '                [--signature-key "<fingerprint>"]'
     print '                [--macro "<macro> <value>"]+ '
+    print '                [--cross "[<host>--]<target>"] '
     print '                <file.recipe|troveName=<version>>[[flavor]]+'
     print '       cvc describe <xml file>'
     print "       cvc diff"
@@ -135,6 +136,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["context"] = ONE_PARAM
+    argDef["cross"] = ONE_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
     argDef["flavor"] = ONE_PARAM
@@ -402,11 +404,26 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             del f
             del argSet['macros']
 
+        crossCompile = argSet.pop('cross', None)
+        if crossCompile:   
+            parts = crossCompile.split('--')
+            fullCross = True
+            if len(parts) == 1:
+                crossTarget = crossCompile
+                crossHost = None
+            else:
+                crossHost, crossTarget = parts
+                if crossHost == 'local':
+                    crossHost = None
+                    fullCross = False
+
+            crossCompile = (crossHost, crossTarget, fullCross)
+
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
-                         profile=profile)
+                         profile=profile, crossCompile=crossCompile)
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()

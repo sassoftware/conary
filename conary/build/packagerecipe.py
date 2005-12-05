@@ -12,6 +12,7 @@
 # full details.
 #
 
+import copy
 import os
 import inspect
 
@@ -82,7 +83,6 @@ baseMacros = {
     'parallelmflags'    : '',
     'sysroot'		: '',
     'os'		: 'linux',
-    'target'		: '%(targetarch)s-unknown-linux',
     'debugedit'         : 'debugedit',
     'strip'             : 'eu-strip', # eu-strip for debuginfo, "strip -g" else
     'strip-archive'     : 'strip -g', # eu-strip segfaults on ar
@@ -95,9 +95,31 @@ baseMacros = {
 crossMacros = {
     # set crossdir from cook, directly or indirectly, before adding the rest
     #'crossdir'		: 'cross-target',
-    'prefix'		: '/opt/%(crossdir)s',
-    'sysroot'		: '%(prefix)s/sys-root',
+    'crossprefix'	: '/opt/%(crossdir)s',
+    'sysroot'		: '%(crossprefix)s/sys-root',
+
+    # cross compiling tools often need critical headers for 
+    # 
     'headerpath'	: '%(sysroot)s/usr/include',
+
+
+
+    # the target platform for the created binaries
+
+    'targetvendor'      : 'unknown',
+    'targetos'          : 'linux',
+    'target'		: '%(targetarch)s-%(targetvendor)s-%(targetos)s',
+    # the platform on which the created binaries should be run
+    # (different from host only when the resulting binary is a cross-compiler)
+    'hostvendor'        : 'unknown',
+    'hostos'            : 'linux',
+    'host'		: '%(hostarch)s-%(hostvendor)s-%(hostos)s',
+
+    # build is the system on which the binaries are being run
+    'buildvendor'       : 'unknown_host',
+    'buildos'           : 'linux',
+    'build'		: '%(buildarch)s-%(buildvendor)s-%(buildos)s',
+
 }
 
 
@@ -554,6 +576,71 @@ class _AbstractPackageRecipe(Recipe):
         for base in inspect.getmro(self.__class__):
             buildReqs.update(getattr(base, 'buildRequires', []))
         self.buildRequires = list(buildReqs)
+
+    def setCrossCompile(self, (crossHost, crossTarget, fullCross)):
+        macros = {}
+        tmpArch = use.Arch.copy()
+
+        buildarch = use.Arch.getCurrentArch()._getMacro('targetarch')
+        macros['buildarch'] = buildarch
+
+        if '-' in crossTarget:
+            arch, vendor, targetOs = crossTarget
+            macros['targetvendor'] = vendor
+            macros['targetos'] = targetOs
+        else:
+            targetArch = crossTarget
+        try:
+            targetFlavor = deps.parseFlavor('is: ' + targetArch)
+        except deps.ParseError, msg:
+            raise CookError, 'Invalid architecture specification %s: arch must be specified as flavor'
+
+        for flag in use.Arch._iterAll():
+            flag._set(False) 
+        use.setBuildFlagsFromFlavor(self.name, targetFlavor)
+        macros['targetarch'] = use.Arch.getCurrentArch()._getMacro('targetarch')
+
+        if crossHost is None:
+            macros['hostarch'] = macros['targetarch']
+        else:
+            assert(crossTarget)
+            # we're building some sort of toolchain binary
+            # like a compiler or binutils
+            if '-' in crossHost:
+                arch, vendor, hostOs = crossHost
+                macros['hostvendor'] = vendor
+                macros['hostos'] = hostOs
+            else:
+                hostArch = crossHost
+            try:
+                hostFlavor = deps.parseFlavor('is: ' + hostArch)
+            except deps.ParseError, msg:
+                raise CookError, 'Invalid architecture specification %s: arch must be specified as flavor'
+
+            tmpArch = copy.deepcopy(use.Arch)
+            for flag in use.Arch._iterAll():
+                flag._set(False) 
+	    use.setBuildFlagsFromFlavor(self.name, hostFlavor)
+            macros['hostarch'] = use.Arch.getCurrentArch()._getMacro('targetarch')
+            use.Arch = tmpArch
+
+        macros['crossdir'] = 'cross-target-%(target)s'
+        
+        if fullCross:
+            macros['cc'] = '%(target)s-gcc'
+            macros['cxx'] = '%(target)s-gxx'
+            macros['strip'] = '%(target)s-strip'
+            macros['strip-archive'] = '%(target)s-strip'
+            
+        myCrossMacros = crossMacros.copy()
+        myCrossMacros.update(macros)
+        
+        self.macros.optflags = '-O2'
+	self.macros.update(use.Arch._getMacros())
+        self.macros.update(myCrossMacros)
+        use.Use.bootstrap._set()
+        newPath = '%(crossprefix)s/bin:' % self.macros
+        os.environ['PATH'] = newPath + os.environ['PATH']
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
         Recipe.__init__(self)
