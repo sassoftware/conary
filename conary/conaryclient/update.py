@@ -1291,10 +1291,20 @@ class ClientUpdate:
 
                 callback.setChangesetHunk(i + 1, len(allJobs))
                 newCs = _createCs(repos, job, uJob)
-                q.put(newCs)
+
+                while True:
+                    # block for no more than 5 seconds so we can
+                    # check to see if we should sbort
+                    try:
+                        q.put(newCs, True, 5)
+                        break
+                    except Queue.Full:
+                        # if the queue is full, check to see if the
+                        # other thread wants to quit
+                        if stopSelf.isSet():
+                            return
 
             callback.setAbortEvent(None)
-
             q.put(None)
 
             # returning terminates the thread
@@ -1316,7 +1326,7 @@ class ClientUpdate:
             for job in allJobs:
                 removeHints.update([ (x[0], x[1][0], x[1][1])
                                         for x in job if x[1][0] is not None ])
-                
+
             if not self.cfg.threaded:
                 for i, job in enumerate(allJobs):
                     callback.setChangesetHunk(i + 1, len(allJobs))
@@ -1341,6 +1351,8 @@ class ClientUpdate:
                     i = 0
                     while True:
                         try:
+                            # get the next changeset object from the
+                            # download thread.  Block for 10 seconds max
                             newCs = csQueue.get(True, 10)
                         except Queue.Empty:
                             if downloadThread.isAlive():
@@ -1357,17 +1369,19 @@ class ClientUpdate:
                         callback.updateDone()
                 finally:
                     stopDownloadEvent.set()
-                    # the download thread _should_ respond to the stopDownloadEvent
-                    # in ~5 seconds.
+                    # the download thread _should_ respond to the
+                    # stopDownloadEvent in ~5 seconds.
                     downloadThread.join(20)
 
                     if downloadThread.isAlive():
-                        log.warning('timeout waiting for download thread to '
-                                    'terminate -- closing database and exiting')
-                        log.warning('the following traceback _may_ be related')
+                        log.warning('timeout waiting for download '
+                                    'thread to terminate -- closing '
+                                    'database and exiting')
                         self.db.close()
                         tb = sys.exc_info()[2]
                         if tb:
+                            log.warning('the following traceback may be '
+                                        'related:')
                             tb = traceback.format_tb(tb)
                             print >>sys.stderr, ''.join(tb)
                         # this will kill the download thread as well
