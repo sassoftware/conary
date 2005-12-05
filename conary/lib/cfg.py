@@ -225,9 +225,23 @@ class ConfigFile(_Config):
 	if os.path.exists(path):
 	    f = open(path, "r")
 	    lineno = 1
-	    for line in f:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+
+                lineCount = 1
+                while len(line) > 1 and '#' not in line and line[-2] == '\\':
+                    # handle \ at the end of the config line.
+                    # keep track of the lines we use so that we can
+                    # give accurate line #s for errors.  This config line
+                    # will be considered to live on its first line even 
+                    # though it spans multiple lines.
+
+                    line = line[:-2] + f.readline()
+                    lineCount += 1
 		self.configLine(line, path, lineno)
-		lineno = lineno + 1
+		lineno = lineno + lineCount
 	    f.close()
 	elif exception:
 	    raise IOError, "No such file or directory: '%s'" % path
