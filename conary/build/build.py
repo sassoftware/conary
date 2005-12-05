@@ -315,7 +315,7 @@ class ManualConfigure(Configure):
                 'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
                 ' CPPFLAGS="%%(cppflags)s"'
                 ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
-	        '%(preConfigure)s %%(configure)s %(args)s')
+	        ' %(preConfigure)s %%(configure)s %(args)s')
 
 class Make(BuildCommand):
     """
