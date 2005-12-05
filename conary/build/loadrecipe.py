@@ -71,7 +71,7 @@ def localImport(d, package, modules=()):
     l = d.setdefault('__localImportModules', [])
     l.append(m)
 
-def setupRecipeDict(d, filename, directory):
+def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.build', ('build', 'action'))
     localImport(d, 'conary.build.loadrecipe', 
                                    ('loadSuperClass', 'loadInstalled',
