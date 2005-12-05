@@ -16,6 +16,7 @@ python_files =	__init__.py	\
 		branch.py       \
 		clone.py        \
 		cmdline.py      \
+		password.py	\
                 update.py
 
 extra_dist = Makefile
