@@ -93,8 +93,6 @@ def usage(rc = 1):
     print "repquery flags:  --all"
     print "                 --buildreqs"    
     print "                 --deps"    
-    print "                 --full-versions"
-    print "                 --flavors"
     print "                 --ids"
     print "                 --info"
     print "                 --leaves"
@@ -105,8 +103,7 @@ def usage(rc = 1):
     print
     print "rollback flags:  --replace-files"
     print
-    print "showcs flags:    --full-versions"
-    print "                 --info"
+    print "showcs flags:    --info"
     print "                 --ls"
     print "                 --show-changes"
     print "                 --tags"
