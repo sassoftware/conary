@@ -254,7 +254,7 @@ def realMain(cfg, argv=sys.argv):
     elif (otherArgs[1] == "changeset"):
         kwargs = {}
         
-        callback = updatecmd.UpdateCallback()
+        callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):
@@ -471,7 +471,7 @@ def realMain(cfg, argv=sys.argv):
         cfg.requireInstallLabelPath()
 	kwargs = {}
 
-        callback = updatecmd.UpdateCallback()
+        callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):

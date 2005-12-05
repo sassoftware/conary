@@ -577,9 +577,9 @@ class JobDisplayConfig(DisplayConfig):
 
 class JobTupFormatter(TroveFormatter):
 
-    def __init__(self, dcfg=None):
+    def __init__(self, dcfg=None, **kw):
         if not dcfg:
-            dcfg = JobDisplayConfig()
+            dcfg = JobDisplayConfig(**kw)
         TroveFormatter.__init__(self, dcfg)
 
     def prepareJobLists(self, jobLists):

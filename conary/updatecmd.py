@@ -173,7 +173,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
         self.lock.release()
 
-    def __init__(self):
+    def __init__(self, cfg=None):
         callbacks.UpdateCallback.__init__(self)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
@@ -183,12 +183,20 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateText = None
         self.lock = thread.allocate_lock()
 
-        self.formatter = display.JobTupFormatter()
+        if cfg:
+            fullVersions = cfg.fullVersions
+            showFlavors = cfg.fullFlavors
+        else:
+            fullVersions = showFlavors = None
 
-def displayUpdateInfo(updJob):
+        self.formatter = display.JobTupFormatter(fullVersions=fullVersions,
+                                                 showFlavors=showFlavors)
+
+def displayUpdateInfo(updJob, cfg):
     jobLists = updJob.getJobs()
 
-    formatter = display.JobTupFormatter()
+    formatter = display.JobTupFormatter(fullVersions=cfg.fullVersions,
+                                        showFlavors=cfg.fullFlavors)
     formatter.prepareJobLists(jobLists)
 
     totalJobs = len(jobLists)
@@ -288,7 +296,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
     if info:
         callback.done()
-        displayUpdateInfo(updJob)
+        displayUpdateInfo(updJob, cfg)
         return
 
     if suggMap:
@@ -310,7 +318,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
     if cfg.interactive:
         print 'The following updates will be performed:'
-        displayUpdateInfo(updJob)
+        displayUpdateInfo(updJob, cfg)
         okay = cmdline.askYn('continue with update? [Y/n]', default=True)
 
         if not okay:
@@ -370,7 +378,7 @@ def updateConary(cfg, conaryVersion):
     (fd, path) = util.mkstemp()
     os.unlink(path)
     dst = os.fdopen(fd, "r+")
-    callback = UpdateCallback()
+    callback = UpdateCallback(cfg)
     dlSize = util.copyfileobj(
         url, dst, bufSize = 16*1024,
         callback = lambda x, m=csSize: callback.downloadingChangeSet(x, m)
@@ -412,7 +420,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
         return
 
     try:
-        callback = UpdateCallback()
+        callback = UpdateCallback(cfg)
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       depCheck = depCheck, test = test, info = info, 
                       callback = callback, ignorePrimaryPins = False)

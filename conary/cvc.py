@@ -46,8 +46,8 @@ sys.excepthook = util.genExcepthook()
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
-    def __init__(self):
-        updatecmd.UpdateCallback.__init__(self)
+    def __init__(self, cfg=None):
+        updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
 
 def usage(rc = 1):
@@ -213,7 +213,7 @@ def realMain(cfg, argv=sys.argv):
 
 def sourceCommand(cfg, args, argSet, profile=False, callback = None):
     if not callback:
-        callback = CheckinCallback()
+        callback = CheckinCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
