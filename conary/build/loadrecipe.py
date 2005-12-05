@@ -71,7 +71,7 @@ def localImport(d, package, modules=()):
     l = d.setdefault('__localImportModules', [])
     l.append(m)
 
-def setupRecipeDict(d, filename):
+def setupRecipeDict(d, filename, directory):
     localImport(d, 'conary.build', ('build', 'action'))
     localImport(d, 'conary.build.loadrecipe', 
                                    ('loadSuperClass', 'loadInstalled',
@@ -94,6 +94,9 @@ def setupRecipeDict(d, filename):
         localImport(d, x)
     localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
     d['filename'] = filename
+    if not directory:
+        directory = os.path.dirname(filename)
+    d['directory'] = directory
     _copyReusedRecipes(d)
 
 _recipesToCopy = []
@@ -126,7 +129,7 @@ def _copyReusedRecipes(moduleDict):
 class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
-                 branch=None, ignoreInstalled=False):
+                 branch=None, ignoreInstalled=False, directory=None):
         self.recipes = {}
         
         if filename[0] != "/":
@@ -143,7 +146,7 @@ class RecipeLoader:
         sys.modules[self.file] = self.module
         f = open(filename)
 
-	setupRecipeDict(self.module.__dict__, filename)
+	setupRecipeDict(self.module.__dict__, filename, directory)
 
         # store cfg and repos, so that the recipe can load
         # recipes out of the repository
@@ -288,7 +291,13 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
                                     ignoreInstalled=False, 
-                                    filterVersions=False):
+                                    filterVersions=False, 
+                                    parentDir=None):
+    # FIXME parentDir specifies the directory to look for 
+    # local copies of recipes called with loadRecipe.  If 
+    # empty, we'll look in the tmp directory where we create the recipe
+    # file for this source component - probably not intended behavior.
+
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
@@ -333,7 +342,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     try:
         loader = RecipeLoader(recipeFile, cfg, repos, component, 
                               sourceComponent.getVersion().branch(),
-                              ignoreInstalled=ignoreInstalled)
+                              ignoreInstalled=ignoreInstalled,
+                              directory=parentDir)
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
@@ -441,6 +451,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     repos = callerGlobals['repos']
     branch = callerGlobals['branch']
     parentPackageName = callerGlobals['name']
+    parentDir = callerGlobals['directory']
     if 'ignoreInstalled' in callerGlobals:
         alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
     else:
@@ -460,8 +471,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     loader = None
     if not (label or versionStr or flavor):
         if name[0] != '/':
-            parentFilePath = callerGlobals['filename']
-            localfile = os.path.dirname(parentFilePath) + '/' + file
+            localfile = parentDir + '/' + file
         else:
             localfile = name + '.recipe'
 
@@ -470,7 +480,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
-            loader = RecipeLoader(localfile, cfg, 
+            loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled)
 
     if not loader:
@@ -504,7 +514,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled,
-                                     filterVersions=True)[0]
+                                     filterVersions=True,
+                                     parentDir=parentDir)[0]
 
 
     for name, recipe in loader.allRecipes().items():
