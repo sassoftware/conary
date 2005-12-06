@@ -601,7 +601,10 @@ class _AbstractPackageRecipe(Recipe):
         macros['targetarch'] = use.Arch.getCurrentArch()._getMacro('targetarch')
 
         if crossHost is None:
-            macros['hostarch'] = macros['targetarch']
+            if fullCross:
+                macros['hostarch'] = macros['targetarch']
+            else:
+                macros['hostarch'] = macros['buildarch']
         else:
             assert(crossTarget)
             # we're building some sort of toolchain binary
