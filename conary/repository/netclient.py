@@ -24,6 +24,7 @@ import xml
 import xmlrpclib
 
 #conary
+from conary import conarycfg
 from conary import files
 from conary import metadata
 from conary import trove
@@ -196,6 +197,9 @@ class ServerCache:
             assert(not s[1])
             s[2] = '%s:%s@' % userInfo + s[2]
             url = '/'.join(s)
+
+        # check for an entitlement for this server
+        ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'))
