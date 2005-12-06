@@ -1236,7 +1236,7 @@ class ClientUpdate:
 
             return baseCs
 
-        def _applyCs(cs, uJob, removeHints = {}, recurseDepth = 0):
+        def _applyCs(cs, uJob, removeHints = {}):
             try:
                 self.db.commitChangeSet(cs, uJob,
                                         replaceFiles = replaceFiles,
@@ -1257,9 +1257,7 @@ class ClientUpdate:
                     rb.removeLast()
                     # if there aren't any entries left in the rollback,
                     # remove it altogether, unless we're about to try again
-                    if (rb.getCount() == 0) and \
-                           (not isinstance(e, openpgpkey.KeyNotFound) and \
-                            (not recurseDepth)):
+                    if (rb.getCount() == 0):
                         self.db.removeLastRollback()
                 # if the database is still in a transaction, then it
                 # probably shouldn't be.
@@ -1267,17 +1265,6 @@ class ClientUpdate:
                     self.db.db.rollback()
                 if isinstance(e, database.CommitError):
                     raise UpdateError, "changeset cannot be applied"
-                if isinstance(e, openpgpfile.KeyNotFound):
-                    # only retry once.
-                    if recurseDepth < 2:
-                        # ensure we grab the latest keys
-                        for keyId in e.keys:
-                            for val in self.cfg.repositoryMap.values():
-                                openpgpkey.findOpenPGPKey(val, keyId,
-                                                          self.cfg.pubRing[-1])
-                        # try again.
-                        return _applyCs(cs, uJob, removeHints,
-                                 recurseDepth = recurseDepth + 1)
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):

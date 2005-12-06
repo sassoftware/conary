@@ -240,7 +240,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
 
     applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
                                         updateByDefault, allowChangeSets=True)
-    
+
     try:
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       tagScript = tagScript, 

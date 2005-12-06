@@ -17,7 +17,7 @@ import sha
 import zlib
 from StringIO import StringIO
 
-from conary.lib import openpgpfile
+from conary.lib import openpgpfile, openpgpkey
 from conary.repository import errors, repository
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
@@ -74,8 +74,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     def checkTroveSignatures(self, trv, threshold, keyCache=None):
         trust, missingKeys = trv.verifyDigitalSignatures(threshold, keyCache)
-        if missingKeys:
-            raise openpgpfile.KeyNotFound(missingKeys)
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
