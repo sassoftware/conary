@@ -52,7 +52,7 @@ class Query:
                  acrossLabels, acrossFlavors, getLeaves, bestFlavor):
         self.map = {}
         self.defaultFlavorPath = defaultFlavorPath
-        if self.defaultFlavorPath is None:
+        if not self.defaultFlavorPath:
             self.query = [{}]
         else:
             self.query = [{} for x in defaultFlavorPath ]
@@ -114,7 +114,7 @@ class QueryByVersion(Query):
     def addQuery(self, troveTup, version, flavorList):
         name = troveTup[0]
         self.map[name] = troveTup
-        if flavorList is None:
+        if not flavorList:
             self.queryNoFlavor[name] = { version : None }
         else:
             for i, flavor in enumerate(flavorList):
@@ -195,7 +195,7 @@ class QueryByLabelPath(Query):
         self.map[name] = troveTup
 
         if self.acrossLabels:
-            if flavorList is None:
+            if not flavorList:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
                 # create one big query: {name : [{label  : [flavor1, flavor2],
@@ -221,7 +221,7 @@ class QueryByLabelPath(Query):
                         d[label] = [flavor]
         else:
             self.query[name] = []
-            if flavorList is None:
+            if not flavorList:
                 for label in labelPath:
                     self.query[name].append({label : None})
             elif self.acrossFlavors:
@@ -368,7 +368,7 @@ class QueryByBranch(Query):
 
     def addQuery(self, troveTup, branch, flavorList):
         name = troveTup[0]
-        if flavorList is None:
+        if not flavorList:
             self.queryNoFlavor[name] = { branch : None }
         else:
             for i, flavor in enumerate(flavorList):
