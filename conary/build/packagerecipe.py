@@ -116,7 +116,7 @@ crossMacros = {
     'host'		: '%(hostarch)s-%(hostvendor)s-%(hostos)s',
 
     # build is the system on which the binaries are being run
-    'buildvendor'       : 'unknown_host',
+    'buildvendor'       : 'unknown_build',
     'buildos'           : 'linux',
     'build'		: '%(buildarch)s-%(buildvendor)s-%(buildos)s',
 
@@ -634,6 +634,12 @@ class _AbstractPackageRecipe(Recipe):
             macros['cxx'] = '%(target)s-gxx'
             macros['strip'] = '%(target)s-strip'
             macros['strip-archive'] = '%(target)s-strip'
+        else:
+            macros['cc'] = '%(host)s-gcc'
+            macros['cxx'] = '%(host)s-gxx'
+            macros['strip'] = '%(host)s-strip'
+
+                
             
         myCrossMacros = crossMacros.copy()
         myCrossMacros.update(macros)
