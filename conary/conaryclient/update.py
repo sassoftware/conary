@@ -1043,11 +1043,15 @@ class ClientUpdate:
         and erase operations. If self.cfg.autoResolve is set, dependencies
         within the job are automatically closed.
 
-	@param itemList: A list of 3-length tuples: (troveName, version,
-	flavor).  If updateByDefault is True, trove names in itemList prefixed
+	@param itemList: A list of change specs: 
+        (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
+        isAbsolute).  isAbsolute specifies whether to try to find an older
+        version of trove on the system to replace if none is specified.
+	If updateByDefault is True, trove names in itemList prefixed
 	by a '-' will be erased. If updateByDefault is False, troves without a
 	prefix will be erased, but troves prefixed by a '+' will be updated.
-        @type itemList: [(troveName, version, flavor), ...]
+        @type itemList: [(troveName, (oldVer, oldFla), 
+                         (newVer, newFla), isAbs), ...]
 	@param keepExisting: If True, troves updated not erase older versions
 	of the same trove, as long as there are no conflicting files in either
 	trove.

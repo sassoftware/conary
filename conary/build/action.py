@@ -135,14 +135,6 @@ def genExcepthook(self):
         except:
             log.warning("could not write out to buildinfo")
 
-        if cfg.dumpStackOnError:
-            try:
-                (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
-                output = os.fdopen(tbfd, 'w')
-                stackutil.printTraceBack(tb, output, type, exc_msg)
-                log.info("** NOTE ** Extended traceback written to %s\n" % path)
-            except Exception, msg:
-                log.warning("Could not write extended traceback: %s" % msg)
         if cfg.debugRecipeExceptions and self.recipe.isatty():
             debugger.post_mortem(tb, type, exc_msg)
         else:
