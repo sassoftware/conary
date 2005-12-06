@@ -278,7 +278,6 @@ def createUsers(db):
             write           INTEGER,
             capped          INTEGER,
             admin           INTEGER,
-            entGroupAdmin   INTEGER,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -288,12 +287,10 @@ def createUsers(db):
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_entGroupAdmin_fk
-                FOREIGN KEY (entGroupAdmin) REFERENCES 
-                                EntitlementGroups(entGroupId)
-                ON DELETE CASCADE ON UPDATE CASCADE
+            CONSTRAINT Permissions_ug_l_i_uq
+                UNIQUE(userGroupId, labelId, itemId)
         )""")
-        cu.execute("""CREATE INDEX PermissionsIdx
+        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
 
         if "Items" in tables:
@@ -354,6 +351,24 @@ def createUsers(db):
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+        commit = True
+
+    if "EntitlementOwners" not in tables:
+        cu.execute("""
+        CREATE TABLE EntitlementOwners (
+            entGroupId      INTEGER,
+            ownerGroupId    INTEGER,
+            CONSTRAINT EntitlementOwners_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES 
+                                EntitlementGroups(entGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT EntitlementOwners_entOwnerId_fk
+                FOREIGN KEY (ownerGroupId) REFERENCES 
+                                userGroups(groupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT EntitlementOwners_entGroupId_ownerGroupId_uq
+                UNIQUE(entGroupId, ownerGroupId)
         )""")
         commit = True
 
@@ -530,7 +545,7 @@ class MigrateTo_2(SchemaMigration):
 
         ## Finally fix the index
         cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("""CREATE INDEX PermissionsIdx ON 
+        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
             Permissions(userGroupId, labelId, itemId)""")
         return self.Version
 

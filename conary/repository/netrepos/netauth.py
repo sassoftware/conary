@@ -169,7 +169,7 @@ class NetworkAuthorization:
 
         try:
             cu.execute("""INSERT INTO Permissions
-                            SELECT userGroupId, ?, ?, ?, ?, ?, NULL FROM
+                            SELECT userGroupId, ?, ?, ?, ?, ? FROM
                                 (SELECT userGroupId FROM userGroups WHERE
                                 userGroup=?)
                         """, labelId, itemId, write, capped, admin, userGroup)
@@ -545,29 +545,39 @@ class NetworkAuthorization:
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
-                SELECT entGroupAdmin
-                    FROM
-                        Users, UserGroupMembers, Permissions
-                    WHERE
-                        Users.user = ? AND
-                        UserGroupMembers.userId = Users.userId AND
+                SELECT entGroupId, admin
+                    FROM Users JOIN UserGroupMembers ON
+                        UserGroupMembers.userId = Users.userId 
+                    LEFT OUTER JOIN Permissions ON
                         UserGroupMembers.userGroupId = Permissions.userGroupId 
+                    LEFT OUTER JOIN EntitlementOwners ON
+                        UserGroupMembers.userGroupId = \
+                                EntitlementOwners.ownerGroupId
+                    WHERE
+                        Users.user = ?
                         AND 
-                          (Permissions.entGroupAdmin IS NOT NULL OR
+                          (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin == 1)
                 """, userName)
-        entGroupsEditable = set(x[0] for x in cu)
+
+        isAdmin = False
+        entGroupsEditable = []
+        for (entGroupId, rowIsAdmin) in cu:
+            if entGroupId is not None:
+                entGroupsEditable.append(entGroupId)
+            isAdmin = isAdmin or rowIsAdmin
 
         cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE "
                    "entGroup = ?", entGroup)
         entGroupIds = [ x[0] for x in cu ]
+
         if len(entGroupIds) == 1:
             entGroupId = entGroupIds[0]
         else:
             assert(not entGroupIds)
             entGroupId = -1
 
-        if None in entGroupsEditable:
+        if isAdmin:
             if not entGroupIds:
                 raise errors.UnknownEntitlementGroup
 
@@ -636,17 +646,13 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        cu.execute("""INSERT INTO Permissions 
-                            (userGroupId, labelId, itemId, write,
-                             capped, admin, entGroupAdmin) 
-                       VALUES (
-                          (SELECT userGroupId FROM userGroups WHERE 
-                                          userGroup = ?),
-                          0, 0, 0, 0, 0,
-                          (SELECT entGroupId FROM entitlementGroups WHERE
-                                          entGroup = ?)
-                        )
-                   """, userGroup, entGroup)
+        entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
+                                "WHERE entGroup = ?", entGroup).next()[0]
+        userGroupId = cu.execute("SELECT userGroupId FROM userGroups "
+                                 "WHERE userGroup = ?", userGroup).next()[0]
+
+        cu.execute("""INSERT INTO EntitlementOwners (entGroupId, ownerGroupId)
+                       VALUES (?, ?)""", entGroupId, userGroupId)
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
