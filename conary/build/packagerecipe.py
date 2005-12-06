@@ -633,13 +633,12 @@ class _AbstractPackageRecipe(Recipe):
             macros['cc'] = '%(target)s-gcc'
             macros['cxx'] = '%(target)s-gxx'
             macros['strip'] = '%(target)s-strip'
-            macros['strip-archive'] = '%(target)s-strip'
+            macros['strip-archive'] = '%(target)s-strip -g'
         else:
             macros['cc'] = '%(host)s-gcc'
             macros['cxx'] = '%(host)s-gxx'
             macros['strip'] = '%(host)s-strip'
-
-                
+            macros['strip-archive'] = '%(host)s-strip -g'
             
         myCrossMacros = crossMacros.copy()
         myCrossMacros.update(macros)
