@@ -335,8 +335,10 @@ def loadEntitlement(dirName, serverName):
         os.waitpid(childPid, 0)
 
         f = os.fdopen(pipe[0])
-    else:
+    elif os.access(fullPath, os.R_OK):
         f = open(fullPath)
+    else:
+        return None
 
     contents = "".join([ x[:-1] for x in f.readlines()])
     key = None

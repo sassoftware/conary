@@ -240,11 +240,12 @@ class ServerCache:
 
 	return server
 
-    def __init__(self, repMap, userMap, pwPrompt):
+    def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
+        self.entitlementDir = entitlementDir
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
@@ -1352,14 +1353,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                      '%s (%s)' %(r.status, r.reason))
 
     def __init__(self, repMap, userMap, localRepository = None, 
-                 pwPrompt = None):
+                 pwPrompt = None, entitlementDir = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: None
 
-	self.c = ServerCache(repMap, userMap, pwPrompt)
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self)

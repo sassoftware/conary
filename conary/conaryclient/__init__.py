@@ -74,7 +74,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              cfg.user,
                                              pwPrompt = passwordPrompter,
-                                             localRepository = self.db)
+                                             localRepository = self.db,
+                                             entitlementDir = 
+                                                    cfg.entitlementDirectory)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
     def getRepos(self):
