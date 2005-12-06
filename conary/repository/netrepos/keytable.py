@@ -48,58 +48,67 @@ class OpenPGPKeyTable:
         # start a transaction so that our SELECT is protected against
         # race conditions
         self.db._begin()
-        r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
-        keyId = r.fetchone()[0]
-        keyRing = StringIO.StringIO(pgpKeyData)
-
-        # make sure it's a public key
-        keyType = openpgpfile.readBlockType(keyRing)
-        keyRing.seek(-1,1)
-        if (keyType >> 2) & 15 != openpgpfile.PKT_PUBLIC_KEY:
-            raise openpgpfile.IncompatibleKey('Key must be a public key')
-
-        if openpgpfile.countKeys(keyRing) != 1:
-            raise openpgpfile.IncompatibleKey('Submit only one key at a time.')
-
-        limit = len(pgpKeyData)
-        while keyRing.tell() < limit:
-            openpgpfile.verifySelfSignatures(openpgpfile.getKeyId(keyRing), keyRing)
-            openpgpfile.seekNextKey(keyRing)
-        keyRing.seek(0)
-
-        mainFingerprint = openpgpfile.getKeyId(keyRing)
-
-        # if this key already exists we need to ensure it's safe to overwrite
-        # the old one, and then just do it.
-        r = cu.execute('SELECT pgpKey FROM PGPKeys WHERE fingerprint=?',mainFingerprint)
-        origKey = cu.fetchone()
-        if origKey:
-            # ensure new key is a superset of old key. we can't allow the repo
-            # to let go of subkeys or revocations.
-            openpgpfile.assertReplaceKeyAllowed(origKey[0], pgpKeyData)
-            #reset the key cache so the changed key shows up
-            keyCache = openpgpkey.getKeyCache()
-            keyCache.reset()
         try:
-            cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
-                       (keyId, userId, mainFingerprint, pgpKeyData))
-        except sqlite3.ProgrammingError, e:
-            # controlled replacement of OpenPGP Keys is allowed. do NOT disable
-            # assertReplaceKeyAllowed without disabling this
-            if e.args[0].startswith("column") and e.args[0].endswith("is not unique"):
-                cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
-                       (pgpKeyData, mainFingerprint))
-            else:
-                raise
-        keyFingerprints = openpgpfile.getFingerprints(keyRing)
-        for fingerprint in keyFingerprints:
+            r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
+            keyId = r.fetchone()[0]
+            keyRing = StringIO.StringIO(pgpKeyData)
+
+            # make sure it's a public key
+            keyType = openpgpfile.readBlockType(keyRing)
+            keyRing.seek(-1,1)
+            if (keyType >> 2) & 15 != openpgpfile.PKT_PUBLIC_KEY:
+                raise openpgpfile.IncompatibleKey('Key must be a public key')
+
+            if openpgpfile.countKeys(keyRing) != 1:
+                raise openpgpfile.IncompatibleKey( \
+                    'Submit only one key at a time.')
+
+            limit = len(pgpKeyData)
+            while keyRing.tell() < limit:
+                openpgpfile.verifySelfSignatures(openpgpfile.getKeyId(keyRing),
+                                                 keyRing)
+                openpgpfile.seekNextKey(keyRing)
+            keyRing.seek(0)
+
+            mainFingerprint = openpgpfile.getKeyId(keyRing)
+
+            # if key already exists we need to ensure it's safe to overwrite
+            # the old one, and then just do it.
+            r = cu.execute('SELECT pgpKey FROM PGPKeys WHERE fingerprint=?',
+                           mainFingerprint)
+            origKey = cu.fetchone()
+            if origKey:
+                # ensure new key is a superset of old key. we can't allow the
+                # repo to let go of subkeys or revocations.
+                openpgpfile.assertReplaceKeyAllowed(origKey[0], pgpKeyData)
+                #reset the key cache so the changed key shows up
+                keyCache = openpgpkey.getKeyCache()
+                keyCache.reset()
             try:
-                cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
-                       (keyId, fingerprint))
-            except sqlite3.ProgrammingError:
-                # ignore duplicate fingerprint errors.
-                pass
-        self.db.commit()
+                cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
+                           (keyId, userId, mainFingerprint, pgpKeyData))
+            except sqlite3.ProgrammingError, e:
+                # controlled replacement of OpenPGP Keys is allowed. do NOT
+                # disable assertReplaceKeyAllowed without disabling this
+                if e.args[0].startswith("column") and \
+                       e.args[0].endswith("is not unique"):
+                    cu.execute( \
+                        'UPDATE PGPKeys set pgpKey=? where fingerprint=?',
+                           (pgpKeyData, mainFingerprint))
+                else:
+                    raise
+            keyFingerprints = openpgpfile.getFingerprints(keyRing)
+            for fingerprint in keyFingerprints:
+                try:
+                    cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
+                           (keyId, fingerprint))
+                except sqlite3.ProgrammingError:
+                    # ignore duplicate fingerprint errors.
+                    pass
+            self.db.commit()
+        except:
+            self.db.rollback()
+            raise
         keyRing.close()
 
     def updateOwner(self, uid, fpr):
