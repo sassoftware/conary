@@ -140,6 +140,11 @@ class _Config:
 
     # --- accessing/setting values ---
     
+    def __contains__(self, name):
+        if name[0] == '_' or name not in self._options:
+            return False
+        return name in self.__dict__
+    
     def __getitem__(self, name):
         """ Provide a dict-list interface to config items """
         # getitem should not be used to access internal values

@@ -161,6 +161,7 @@ class ConaryContext(ConfigSection):
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
     repositoryMap         =  CfgRepoMap
+    root                  =  CfgPath
     signatureKey          =  CfgFingerPrint
     signatureKeyMap       =  CfgFingerPrintMap
     user                  =  CfgUserInfo
@@ -214,7 +215,8 @@ class ConaryConfiguration(SectionedConfigFile):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
-            self.addConfigOption(*info)
+            if info[0] not in self:
+                self.addConfigOption(*info)
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 

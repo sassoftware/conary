@@ -141,7 +141,6 @@ def realMain(cfg, argv=sys.argv):
 
     cfgMap["build-label"] = "buildLabel"
     cfgMap["exclude-troves"] = "excludeTroves"
-    cfgMap["root"] = "root"
     cfgMap["trust-threshold"] = "trustThreshold"
     cfgMap["pubring"] = "pubRing"
 
@@ -176,6 +175,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
+    argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
     argDef["sync"] = NO_PARAM
@@ -223,8 +223,13 @@ def realMain(cfg, argv=sys.argv):
     context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
 
+
     if context:
         cfg.setContext(context)
+
+    root = argSet.pop('root', '')
+    if root:
+        cfg.root = root
 
     l = []
     for labelStr in argSet.get('install-label', []):
