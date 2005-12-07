@@ -247,9 +247,7 @@ def realMain(cfg, argv=sys.argv):
 	del argSet['profile']
 
     keyCache = openpgpkey.getKeyCache()
-    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                   cfg.pubRing[-1])
-    keyCache.setCallback(keyCacheCallback)
+    keyCache.setPublicPath(cfg.pubRing)
 
     if (len(otherArgs) < 2):
 	return usage()

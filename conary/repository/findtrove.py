@@ -396,12 +396,17 @@ class QueryByBranch(Query):
 
             self.addQuery(troveTup, branch, flavorList)
         else:
+            flavor = troveTup[2]
             for dummy, afVersion, afFlavor in affinityTroves:
                 if afVersion.isOnLocalHost():
                     self._addLocalTrove(troveTup)
                     continue
 
-                flavorList = self.overrideFlavors(afFlavor)
+                if flavor:
+                    flavorList = self.overrideFlavors(flavor)
+                else:
+                    flavorList = self.overrideFlavors(afFlavor)
+
                 self.addQuery(troveTup, afVersion.branch(), flavorList)
 
     def _addLocalTrove(self, troveTup):
@@ -735,7 +740,7 @@ class TroveFinder:
 
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
-        if flavor is None and affinityTroves:
+        if affinityTroves:
             if self.query[QUERY_BY_BRANCH].hasName(name):
                 self.remaining.append(troveTup)
                 return

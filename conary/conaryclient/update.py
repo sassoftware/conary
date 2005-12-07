@@ -527,6 +527,8 @@ class ClientUpdate:
         for job in transitiveClosure:
             if job[2][0] is None: continue
             if not job[3]: continue
+            if (job[0], job[2][0], job[2][1]) in ineligible: continue
+
             availableTrove.addTrove(job[0], job[2][0], job[2][1],
                                     presentOkay = True)
             names.add(job[0])
@@ -728,6 +730,9 @@ class ClientUpdate:
             if not recurse: continue
 
             for info in trv.iterTroveList():
+                if info in ineligible:
+                    continue
+
                 newTroves.append((info, False, pinned and ignorePins, 
                                   trv.includeTroveByDefault(*info)))
 
@@ -947,9 +952,9 @@ class ClientUpdate:
             hasTroves = uJob.getTroveSource().hasTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
 
-            reposChangeSetList = [ x[1] for x in
+            reposChangeSetList = set([ x[1] for x in
                               itertools.izip(hasTroves, jobSet)
-                               if x[0] is not True ]
+                               if x[0] is not True ])
 
             if reposChangeSetList != jobSet:
                 # we can't trust the closure from the changeset we're getting
@@ -1236,7 +1241,7 @@ class ClientUpdate:
 
             return baseCs
 
-        def _applyCs(cs, uJob, removeHints = {}):
+        def _applyCs(cs, uJob, removeHints = {}, recurseDepth = 0):
             try:
                 self.db.commitChangeSet(cs, uJob,
                                         replaceFiles = replaceFiles,
@@ -1257,7 +1262,9 @@ class ClientUpdate:
                     rb.removeLast()
                     # if there aren't any entries left in the rollback,
                     # remove it altogether, unless we're about to try again
-                    if (rb.getCount() == 0):
+                    if (rb.getCount() == 0) and \
+                           (not isinstance(e, openpgpkey.KeyNotFound) and \
+                            (not recurseDepth)):
                         self.db.removeLastRollback()
                 # if the database is still in a transaction, then it
                 # probably shouldn't be.
@@ -1265,6 +1272,17 @@ class ClientUpdate:
                     self.db.db.rollback()
                 if isinstance(e, database.CommitError):
                     raise UpdateError, "changeset cannot be applied"
+                if isinstance(e, openpgpfile.KeyNotFound):
+                    # only retry once.
+                    if recurseDepth < 2:
+                        # ensure we grab the latest keys
+                        for keyId in e.keys:
+                            for val in self.cfg.repositoryMap.values():
+                                openpgpkey.findOpenPGPKey(val, keyId,
+                                                          self.cfg.pubRing[-1])
+                        # try again.
+                        return _applyCs(cs, uJob, removeHints,
+                                 recurseDepth = recurseDepth + 1)
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):

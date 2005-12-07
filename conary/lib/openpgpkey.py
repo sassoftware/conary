@@ -16,7 +16,6 @@ import os
 import sys
 from getpass import getpass
 from time import time
-from conary import callbacks
 
 from Crypto.PublicKey import DSA
 from Crypto.PublicKey import RSA
@@ -28,11 +27,9 @@ from openpgpfile import getFingerprint
 from openpgpfile import getKeyEndOfLife
 from openpgpfile import getKeyTrust
 from openpgpfile import seekNextKey
-from openpgpfile import seekKeyById
 from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
 from openpgpfile import KeyNotFound
-from openpgpfile import SEEK_SET, SEEK_CUR, SEEK_END
 
 #-----#
 #OpenPGPKey structure:
@@ -155,9 +152,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     OpenPGPKeyCache based object that reads keys from public and private
     keyrings
     """
-    def __init__(self, callback = callbacks.KeyCacheCallback()):
+    def __init__(self):
         OpenPGPKeyCache.__init__(self)
-        self.callback = callback
         if 'HOME' not in os.environ:
             self.publicPaths = [ '/etc/conary/pubring.gpg' ]
             self.privatePath = None
@@ -186,14 +182,6 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     def setPrivatePath(self, path):
         self.privatePath = path
 
-    def setCallback(self, callback):
-        self.callback = callback
-        pubRing = callback.pubRing
-        if pubRing not in self.publicPaths:
-            self.addPublicPath(pubRing)
-        trustDbPath = '/'.join(pubRing.split('/')[:-1]) + 'trustdb.gpg'
-        self.trustDbPaths.append(trustDbPath)
-
     def getPublicKey(self, keyId):
         # if we have this key cached, return it immediately
         if keyId in self.publicDict:
@@ -203,24 +191,16 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         for i in range(len(self.publicPaths)):
             try:
                 publicPath = self.publicPaths[i]
-                try:
-                    trustDbPath = self.trustDbPaths[i]
-                except:
-                    pass
+                trustDbPath = self.trustDbPaths[i]
                 # translate the keyId to a full fingerprint for consistency
                 fingerprint = getFingerprint(keyId, publicPath)
                 revoked, timestamp = getKeyEndOfLife(keyId, publicPath)
                 cryptoKey = getPublicKey(keyId, publicPath)
                 trustLevel = getKeyTrust(trustDbPath, fingerprint)
-                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                    revoked, timestamp,
-                                                    trustLevel)
+                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp, trustLevel)
                 return self.publicDict[keyId]
             except KeyNotFound:
                 pass
-        # callback should only return True if it found the key.
-        if self.callback.getPublicKey(keyId):
-            return self.getPublicKey(keyId)
         raise KeyNotFound(keyId)
 
     def getPrivateKey(self, keyId, passphrase=None):
@@ -235,8 +215,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         # to deal with handling BadPassPhrase exceptions
         if passphrase is not None:
             cryptoKey = getPrivateKey(keyId, passphrase, self.privatePath)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                 revoked, timestamp)
+            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
             return self.privateDict[keyId]
 
         # next, see if the key has no passphrase (WHY???)
@@ -266,34 +245,10 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         raise BadPassPhrase
 
 #-----#
-#OpenPGPKeyFinder: download missing keys from conary servers.
+#OpenPGPKeyFinder: download missing keys from the given conary server.
 #-----#
-class KeyCacheCallback(callbacks.KeyCacheCallback):
-    def getPublicKey(self, keyId):
-        for server in self.repositoryMap.values():
-            findOpenPGPKey(server, keyId, self.pubRing)
-            # decide if we found the key or not.
-            keyRing = open(self.pubRing)
-            keyRing.seek(0, SEEK_END)
-            limit = keyRing.tell()
-            keyRing.seek(0, SEEK_SET)
-            seekKeyById(keyId, keyRing)
-            found = keyRing.tell() != limit
-            keyRing.close()
-            if found:
-                return True
-        return False
-
 def findOpenPGPKey(server, keyId, pubRing):
     pubRingPath = '/'.join(pubRing.split('/')[:-1])
-
-    # don't depend on repoMap entries ending with /
-    if server[-1] != '/':
-        server += '/'
-
-    secringExists = False
-    if 'secring.gpg' in os.listdir(pubRingPath):
-        secringExists = True
 
     pid = os.fork()
     if pid == 0:
@@ -306,19 +261,16 @@ def findOpenPGPKey(server, keyId, pubRing):
         os.close(fd)
         os.execlp('gpg', 'gpg', '-q', '--no-tty', '--homedir', pubRingPath,
                   '--no-greeting', '--no-secmem-warning', '--no-verbose',
-                  '--no-mdc-warning', '--no-default-keyring', '--keyring',
-                  pubRing.split('/')[-1], '--batch',
+                  '--no-mdc-warning', '--no-default-keyring', '--batch',
                   '--no-permission-warning', '--keyserver',
                   '%sgetOpenPGPKey?search=%s' % (server, keyId),
                   '--keyserver-options', 'timeout=3',
                   '--recv-key', keyId)
     os.wait()
-
-    if not secringExists:
-        try:
-            os.remove(pubRingPath + '/secring.gpg')
-        except:
-            pass
+    try:
+        os.remove(pubRingPath + '/secring.gpg')
+    except:
+        pass
 
 _keyCache = OpenPGPKeyFileCache()
 

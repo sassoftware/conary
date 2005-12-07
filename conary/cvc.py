@@ -192,9 +192,7 @@ def realMain(cfg, argv=sys.argv):
     use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
 
     keyCache = openpgpkey.getKeyCache()
-    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                   cfg.pubRing[-1])
-    keyCache.setCallback(keyCacheCallback)
+    keyCache.setPublicPath(cfg.pubRing)
 
     if 'profile' in argSet:
 	del argSet['profile']
