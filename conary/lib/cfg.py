@@ -374,11 +374,9 @@ class ConfigOption:
             valueType = valueType()
 
         self.valueType = valueType
+        self.default = valueType.getDefault(default)
 
-        if default is not None:
-            self.default = self.valueType.copy(default)
-        else:
-            self.default = self.valueType.copy(valueType.default)
+        
         self.listeners = []
 
     def parseString(self, curVal, str):
@@ -513,6 +511,14 @@ class CfgType:
         """
         return self.parseString(str)
 
+    def getDefault(self, default=None):
+        """ Get the default value for this CfgType
+        """
+        if default is not None:
+            return self.copy(default)
+        else:
+            return self.copy(self.default)
+
     def format(self, val, displayOptions=None):
         """ Return a formated version of val in a format determined by 
             displayOptions.
@@ -532,6 +538,13 @@ class CfgPath(CfgType):
 
     def parseString(self, str):
         return os.path.expanduser(str)
+
+    def getDefault(self, default=None):
+        val = CfgType.getDefault(self, default)
+        if val:
+            return os.path.expanduser(val)
+        else:
+            return val
 
 class CfgInt(CfgType):
      
@@ -625,6 +638,11 @@ class CfgLineList(CfgType):
         return self.listType(self.valueType.parseString(x) \
                              for x in val.split(self.separator) if x)
 
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return [ self.valueType.getDefault(x) for x in default ] 
+
     def updateFromString(self, val, str):
         return self.parseString(str)
 
@@ -654,6 +672,11 @@ class CfgList(CfgType):
     def updateFromString(self, val, str):
         val.extend(self.parseString(str))
         return val
+
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return self.listType(self.valueType.getDefault(x) for x in default)
 
     def copy(self, val):
         return self.listType(self.valueType.copy(x) for x in val)
@@ -704,6 +727,13 @@ class CfgDict(CfgType):
         dvalue = self.valueType.parseString(dvalue)
         return {dkey : dvalue}
 
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return dict((x,self.valueType.getDefault(y)) \
+                        for (x,y) in default.iteritems()) 
+
+
     def toStrings(self, value, displayOptions):
         for key in sorted(value.iterkeys()):
             val = value[key]
@@ -748,6 +778,9 @@ class RegularExpressionList(list):
     def __init__(self, *args, **kw):
         list.__init__(self, *args, **kw)
 
+    def __repr__(self):
+        return 'RegularExpressionList(%s)' % list.__repr__(self)
+
     def addExp(self, val):
         list.append(self, (val, re.compile(val)))
 
@@ -759,7 +792,7 @@ class RegularExpressionList(list):
         return False
 
 class CfgRegExpList(CfgList):
-    def __init__(self, default=[]):
+    def __init__(self, default=RegularExpressionList()):
         CfgList.__init__(self, CfgRegExp,  listType=RegularExpressionList, 
                          default=default)
 
