@@ -169,7 +169,7 @@ class NetworkAuthorization:
 
         try:
             cu.execute("""INSERT INTO Permissions
-                            SELECT userGroupId, ?, ?, ?, ?, ?, NULL FROM
+                            SELECT userGroupId, ?, ?, ?, ?, ? FROM
                                 (SELECT userGroupId FROM userGroups WHERE
                                 userGroup=?)
                         """, labelId, itemId, write, capped, admin, userGroup)

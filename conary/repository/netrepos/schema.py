@@ -15,7 +15,7 @@
 from conary.dbstore import migration
 from conary.lib.tracelog import logMe
 
-VERSION = 8
+VERSION = 7
 
 def createInstances(db):
     cu = db.cursor()
@@ -278,7 +278,6 @@ def createUsers(db):
             write           INTEGER,
             capped          INTEGER,
             admin           INTEGER,
-            entGroupAdmin   INTEGER,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -287,10 +286,6 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_entGroupAdmin_fk
-                FOREIGN KEY (entGroupAdmin) REFERENCES
-                                EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_ug_l_i_uq
                 UNIQUE(userGroupId, labelId, itemId)
@@ -636,14 +631,6 @@ class MigrateTo_7(SchemaMigration):
             """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
         return self.Version
 
-class MigrateTo_8(SchemaMigration):
-    Version = 8
-    def migrate(self):
-        # FIXME: we can't add constraints, so this is incomplete
-        self.cu.execute(
-            "ALTER TABLE Permissions ADD COLUMN entGroupAdmin INTEGER")
-        return self.Version
-
 def checkVersion(db):
     global VERSION
     version = migration.getDatabaseVersion(db)
@@ -657,6 +644,5 @@ def checkVersion(db):
     if version == 4: MigrateTo_5(db)()
     if version == 5: MigrateTo_6(db)()
     if version == 6: MigrateTo_7(db)()
-    if version == 7: MigrateTo_8(db)()
 
     return version
