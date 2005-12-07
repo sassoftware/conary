@@ -15,7 +15,7 @@
 from conary.dbstore import migration
 from conary.lib.tracelog import logMe
 
-VERSION = 7
+VERSION = 8
 
 def createInstances(db):
     cu = db.cursor()
