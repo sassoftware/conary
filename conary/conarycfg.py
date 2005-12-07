@@ -191,7 +191,8 @@ class ConaryConfiguration(SectionedConfigFile):
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
     interactive           =  (CfgBool, False)
-    logFile               =  (CfgPath, '/var/log/conary')
+    logFile               =  (CfgPathList, ('/var/log/conary',
+                                            '~/.conary/log',))
     lookaside             =  (CfgPath, '/var/cache/conary')
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
