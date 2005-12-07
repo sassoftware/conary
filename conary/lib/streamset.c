@@ -177,6 +177,13 @@ static inline int addTag(char** buf, int tag, int valSize, int valLen) {
     /* next is the size.  if a small value is specified, use 15
        bits for the size.  if a large value is specified, use 31
        bits for the size and set the high bit to 1 */
+    if (valSize == DYNAMIC) {
+	if (valLen <= SHRT_MAX) {
+	    valSize = SMALL;
+	} else {
+	    valSize = LARGE;
+	}
+    }
     if (valSize == SMALL) {
 	if (valLen > SHRT_MAX) {
 	    PyErr_SetString(PyExc_TypeError, "short int overflow");
