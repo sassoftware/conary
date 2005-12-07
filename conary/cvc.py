@@ -152,6 +152,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
+    argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
@@ -192,6 +193,10 @@ def realMain(cfg, argv=sys.argv):
     # set the build flavor here, just to set architecture information 
     # which is used when initializing a recipe class
     use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
+
+    root = argSet.pop('root', None)
+    if root:
+        cfg.root = root
 
     keyCache = openpgpkey.getKeyCache()
     keyCache.setPublicPath(cfg.pubRing)
