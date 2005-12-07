@@ -497,7 +497,10 @@ class Trove(streams.StreamSet):
         @type keyCache: openpgpkey.OpenPGPKeyFileCache
         @rtype: (int, list)
         """
-        serverName = self.getVersion().getHost()
+        version = self.getVersion()
+        serverName = None
+        if isinstance(version, (versions.VersionSequence, versions.Label)):
+            serverName = version.getHost()
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
