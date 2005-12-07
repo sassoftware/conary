@@ -279,12 +279,12 @@ def fetchFreshmeat(troveName):
 def formatDetails(repos, cfg, troveName, branch, sourceTrove):
     md = repos.getMetadata([troveName, branch], branch.label())
     while not md and branch.hasParentBranch():
-        lastHost = branch.label().getHost()
+        lastHost = branch.getHost()
         branch = branch.parentBranch()
-        while branch.hasParentBranch() and branch.label().getHost() == lastHost:
+        while branch.hasParentBranch() and branch.getHost() == lastHost:
             branch = branch.parentBranch()
 
-        if branch.label().getHost() != lastHost:
+        if branch.getHost() != lastHost:
             md = repos.getMetadata([troveName, branch], branch.label())
     
     # check source trove for metadata

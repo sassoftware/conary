@@ -389,9 +389,9 @@ def commit(repos, cfg, message, callback=None):
     else:
         troveCs = newState.diff(srcPkg)[0]
 
-    if troveCs.getOldVersion() is not None and \
-            troveCs.getOldVersion().branch().label().getHost() != \
-            troveCs.getNewVersion().branch().label().getHost():
+    if (troveCs.getOldVersion() is not None
+        and troveCs.getOldVersion().getHost() !=
+            troveCs.getNewVersion().getHost()):
         # we can't commit across hosts, so just make an absolute change
         # set instead (yeah, a bit of a hack). this can happen on shadows
         fileMap = {}

@@ -689,13 +689,12 @@ class CfgList(CfgType):
 
 class CfgDict(CfgType):
 
-    dictType = dict
-    
-    def __init__(self, valueType, default={}):
+    def __init__(self, valueType, dictType=dict, default={}):
         if inspect.isclass(valueType) and issubclass(valueType, CfgType):
             valueType = valueType()
 
         self.valueType = valueType
+        self.dictType = dictType
         self.default = default
 
     def setFromString(self, val, str):
@@ -723,15 +722,15 @@ class CfgDict(CfgType):
             dkey, dvalue = val, ''
         else:
             (dkey, dvalue) = vals
-            
+
         dvalue = self.valueType.parseString(dvalue)
         return {dkey : dvalue}
 
     def getDefault(self, default=None):
         if default is None: 
             default = self.default
-        return dict((x,self.valueType.getDefault(y)) \
-                        for (x,y) in default.iteritems()) 
+        return self.dictType((x,self.valueType.getDefault(y)) \
+                             for (x,y) in default.iteritems()) 
 
 
     def toStrings(self, value, displayOptions):

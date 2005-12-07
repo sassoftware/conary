@@ -61,7 +61,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# the get trove netclient provides doesn't work with a
 	# FilesystemRepository (it needs to create a change set which gets
 	# passed)
-	if fileVersion.branch().label().getHost() != self.name:
+	if fileVersion.getHost() != self.name:
 	    assert(not withContents)
 	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
@@ -125,7 +125,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # the get trove netclient provides doesn't work with a
             # FilesystemRepository (it needs to create a change set which gets
             # passed)
-            if fileVersion.branch().label().getHost() == self.name:
+            if fileVersion.getHost() == self.name:
                 fileObj = item[2]
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
@@ -262,7 +262,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				    [(oldVersion, newVersion)]
 
 	    if not newVersion:
-                if oldVersion.branch().label().getHost() != self.name:
+                if oldVersion.getHost() != self.name:
                     externalTroveList.append((troveName,
                                          (oldVersion, oldFlavor),
                                          (None, None), absolute))
@@ -274,9 +274,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                                 (None, None), absolute))
 		continue
 
-            if newVersion.branch().label().getHost() != self.name or \
-               (oldVersion and
-                oldVersion.branch().label().getHost() != self.name):
+            if (newVersion.getHost() != self.name
+                or (oldVersion and oldVersion.getHost() != self.name)):
                 # don't try to make changesets between repositories; the
                 # client can do that itself
                 externalTroveList.append((troveName, (oldVersion, oldFlavor),
@@ -303,9 +302,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
-                if newFileVersion.branch().label().getHost() != self.name or \
-                   (oldFileVersion and
-                    oldFileVersion.branch().label().getHost() != self.name):
+                if (newFileVersion.getHost() != self.name
+                    or (oldFileVersion and
+                        oldFileVersion.getHost() != self.name)):
                     externalFileList.append((pathId, troveName,
                          (oldVersion, oldFlavor, oldFileId, oldFileVersion),
                          (newVersion, newFlavor, newFileId, newFileVersion)))

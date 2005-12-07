@@ -78,17 +78,23 @@ class CfgLabel(CfgType):
             raise ParseError, e
 
 class CfgRepoMapEntry(CfgType):
-        
+
     def format(self, val, displayOptions=None):
         if displayOptions.get('hidePasswords'):
             return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                         r'\1<user>:<password>@\2', val)
+                          r'\1<user>:<password>@\2', val)
         else:
             return val
 
+class RepoMap(dict):
+
+    def getNoPass(self, key):
+        return re.sub('(https?://)[^:]*:[^@]*@(.*)', r'\1\2', self[key])
+
 class CfgRepoMap(CfgDict):
     def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, default=default)
+        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
+                         default=default)
 
 class CfgFlavor(CfgType):
 
