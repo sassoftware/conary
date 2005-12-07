@@ -16,6 +16,7 @@ Implements conaryrc handling.
 """
 import fnmatch
 import os
+from os.path import expanduser
 import sys
 import copy
 
@@ -181,14 +182,14 @@ class ConaryConfiguration(SectionedConfigFile):
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
-    autoResolve           =  (CfgBool, False) 
+    autoResolve           =  (CfgBool, False)
     buildPath             =  '/var/tmp/conary/builds'
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, True)
     debugRecipeExceptions =  CfgBool
     fullVersions          =  CfgBool
-    fullFlavors           =  CfgBool 
+    fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPath, '/var/log/conary')
@@ -196,7 +197,8 @@ class ConaryConfiguration(SectionedConfigFile):
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
+    pubRing               =  (CfgPathList,\
+                              [expanduser('~/.gnupg/pubring.gpg')])
     root                  =  (CfgPath, '/')
     showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
@@ -206,7 +208,7 @@ class ConaryConfiguration(SectionedConfigFile):
     updateThreshold       =  (CfgInt, 10)
     useDirs               =  (CfgPathList, ('/etc/conary/use',
                                             '/etc/conary/distro/use',
-                                            '~/.conary/use'))
+                                            expanduser('~/.conary/use')))
 
     _sectionType          =  ConaryContext
 

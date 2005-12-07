@@ -18,6 +18,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 from conary import files, trove, versions, sqlite3
 from conary.deps import deps
@@ -1273,7 +1274,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.IncompatibleKey('Key %s has been revoked. '
                                   'Signature rejected' %sig[0])
 
-        if (pubKey.getTimestamp()):
+        if (pubKey.getTimestamp()) and (pubKey.getTimestamp() < time.time()):
             raise errors.IncompatibleKey('Key %s has expired. '
                                   'Signature rejected' %sig[0])
 
@@ -1292,42 +1293,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # verify the new signature is actually good
         trv.verifyDigitalSignatures(keyCache = keyCache)
 
-        # start a transaction now, this ensures that queries and updates
-        # are happening in a consistent way.
-        self.db._begin()
         cu = self.db.cursor()
-        trv = self.repos.getTrove(name, version, flavor)
-        trv.addPrecomputedDigitalSignature(sig)
-
         # get the instanceId that corresponds to this trove.
-        # FIXME: get instanceId in a better fashion.
-        # XXX: I'm fairly positive this many LEFT JOINS should be considered harmful
-        query = """SELECT instanceId FROM Instances
-                       LEFT JOIN Items ON Items.itemId=Instances.itemId
-                       LEFT JOIN Versions
-                           ON Versions.versionId=Instances.versionId
-                       LEFT JOIN Flavors
-                           ON Flavors.flavorId=Instances.flavorId
-                   WHERE item=? AND version=? AND flavor=?"""
         # if this instance is unflavored, the magic value is 'none'
         flavorStr = flavor.freeze() or 'none'
-        cu.execute(query, (name, version.asString(), flavorStr))
+        cu.execute("SELECT flavorId from Flavors WHERE flavor=?",
+                   flavorStr)
+        flavorId = cu.fetchone()[0]
+        cu.execute("SELECT versionId FROM Versions WHERE version=?",
+                   version.asString())
+        versionId = cu.fetchone()[0]
+        cu.execute("SELECT itemId from Items WHERE item=?", name)
+        itemId = cu.fetchone()[0]
+
+        cu.execute("""SELECT instanceId FROM Instances
+                      WHERE itemId=? AND versionId=? AND flavorId=?""",
+                   itemId, versionId, flavorId)
         instanceId = cu.fetchone()[0]
 
-        # see if there's any troveinfo in the database now
+        # see if there's currently any troveinfo in the database
         cu.execute("""SELECT COUNT(*) FROM TroveInfo
-                      WHERE instanceId=? AND infoType=9""", (instanceId,))
-        if cu.fetchone()[0]:
-            # if we have TroveInfo, so update it
-            cu.execute("""UPDATE TroveInfo SET data=?
-                          WHERE instanceId=? AND infoType=9""",
-                       (trv.troveInfo.sigs.freeze(), instanceId))
-        else:
-            # otherwise we need to create a new row with the signatures
-            cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)',
-                       (instanceId, trv.troveInfo.sigs.freeze()))
-        self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
-                                   trv.getFlavor())
+                          WHERE instanceId=? AND infoType=9""", (instanceId,))
+        trvInfo = cu.fetchone()[0]
+        # start a transaction now. ensures simultaneous signatures by separate
+        # clients won't cause a race condition.
+        self.db._begin()
+        try:
+            # add the signature while it's protected, to ensure no collissions
+            trv = self.repos.getTrove(name, version, flavor)
+            trv.addPrecomputedDigitalSignature(sig)
+            if trvInfo:
+                # we have TroveInfo, so update it
+                cu.execute("""UPDATE TroveInfo SET data=?
+                              WHERE instanceId=? AND infoType=9""",
+                           (trv.troveInfo.sigs.freeze(), instanceId))
+            else:
+                # otherwise we need to create a new row with the signatures
+                cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)',
+                           (instanceId, trv.troveInfo.sigs.freeze()))
+            self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
+                                       trv.getFlavor())
+        except:
+            self.db.rollback()
+            raise
         self.db.commit()
         return True
 

@@ -240,7 +240,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
 
     applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
                                         updateByDefault, allowChangeSets=True)
-    
+
     try:
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       tagScript = tagScript, 
@@ -408,10 +408,10 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
             if version and flavor:
-                print "%s=%s[%s]" % (name, version.asString(),
+                print "'%s=%s[%s]'" % (name, version.asString(),
                                      deps.formatFlavor(flavor))
             elif flavor:
-                print "%s[%s]" % (name, deps.formatFlavor(flavor))
+                print "'%s[%s]'" % (name, deps.formatFlavor(flavor))
             elif version:
                 print "%s=%s" % (name, version.asString())
             else:
