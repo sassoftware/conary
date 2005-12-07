@@ -152,15 +152,11 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class ServerCache:
 
     def __getitem__(self, item):
-	if isinstance(item, versions.Label):
+	if isinstance(item, (versions.Label, versions.VersionSequence)):
 	    serverName = item.getHost()
 	elif isinstance(item, str):
 	    serverName = item
-	else:
-            if isinstance(item, versions.Branch):
-		serverName = item.label().getHost()
-	    else:
-		serverName = item.branch().label().getHost()
+
         if serverName == 'local':
             raise errors.OpenError(
              '\nError: Tried to access repository on reserved host name'
@@ -519,14 +515,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 name = ""
 
             for ver, flavors in verSet.iteritems():
+                host = ver.getHost()
                 if branches:
-                    host = ver.label().getHost()
                     verStr = self.fromBranch(ver)
                 elif versions:
-                    host = ver.branch().label().getHost()
                     verStr = self.fromVersion(ver)
                 else:
-                    host = ver.getHost()
                     verStr = self.fromLabel(ver)
 
                 versionDict = d.setdefault(host, {})
@@ -652,10 +646,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                        (new, newFlavor), absolute))
                     continue
 
-                serverName = new.branch().label().getHost()
+                serverName = new.getHost()
 
                 if old:
-                    if old.branch().label().getHost() == serverName:
+                    if old.getHost() == serverName:
                         l = serverJobs.setdefault(serverName, [])
                         l.append((troveName, 
                                   (self.fromVersion(old), 
@@ -1030,7 +1024,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if result[i] is not None:
                 continue
 
-            server = version.branch().label().getHost()
+            server = version.getHost()
             if not byServer.has_key(server):
                 byServer[server] = []
             byServer[server].append((i, (self.fromPathId(pathId), 
@@ -1075,7 +1069,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # it since we know that server has the contents; other servers may
             # not
             (fileId, fileVersion) = item[0:2]
-            server = fileVersion.branch().label().getHost()
+            server = fileVersion.getHost()
             l = byServer.setdefault(server, [])
             l.append((i, (fileId, fileVersion)))
 
@@ -1272,13 +1266,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    v = trove.getOldVersion()
 	    if v:
 		if serverName is None:
-		    serverName = v.branch().label().getHost()
-		assert(serverName == v.branch().label().getHost())
+		    serverName = v.getHost()
+		assert(serverName == v.getHost())
 
 	    v = trove.getNewVersion()
 	    if serverName is None:
-		serverName = v.branch().label().getHost()
-	    assert(serverName == v.branch().label().getHost())
+		serverName = v.getHost()
+	    assert(serverName == v.getHost())
 	    
 	url = self.c[serverName].prepareChangeSet()
 

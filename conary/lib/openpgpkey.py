@@ -276,7 +276,11 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         if serverName not in self.repositoryMap:
             server = "http://%s/conary/" % serverName
         else:
-            server = self.repositoryMap[serverName]
+            # get the repositoryMap entry without username/password,
+            # since we're going to use it on a gpg command line and
+            # we don't want to expose them to other users on the system.
+            # The getPublicKey method is not authenticated anyway.
+            server = self.repositoryMap.getNoPass(serverName)
         findOpenPGPKey(server, keyId, self.pubRing)
         # decide if we found the key or not.
         try:
