@@ -729,8 +729,8 @@ class CfgDict(CfgType):
     def getDefault(self, default=None):
         if default is None: 
             default = self.default
-        return dict((x,self.valueType.getDefault(y)) \
-                        for (x,y) in default.iteritems()) 
+        return self.dictType((x,self.valueType.getDefault(y)) \
+                             for (x,y) in default.iteritems()) 
 
 
     def toStrings(self, value, displayOptions):
