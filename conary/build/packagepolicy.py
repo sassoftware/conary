@@ -1811,6 +1811,8 @@ class Provides(_BuildPackagePolicy):
                 deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
 
     def _addJavaDeps(self, path, m, pkg):
+        # FIXME -- disabling until long deps code propagates
+        return
         if not m.contents['provides']:
             return
         if path not in pkg.providesMap:
@@ -2163,7 +2165,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
                                          deps.CILDependencies)
             p.close()
 
-        if (m and (m.name == 'java' or m.name == 'jar')
+        # FIXME -- disabling until long deps code propagates
+        if (False and m and (m.name == 'java' or m.name == 'jar')
             and m.contents['requires']):
             for req in m.contents['requires']:
                 self._addRequirement(path, req, [], pkg,

@@ -29,6 +29,10 @@ Changes in 0.80.0:
   o Building packages:
     * Dependencies are now generated for Java .class and .jar files.
       They are not yet enforced, to give time to rebuild Java packages.
+    * Java dependecy generation has been turned off until 0.80.1 in
+      order to wait until there is a deployed version of Conary with
+      long dependency handling; some .jar files have so many
+      dependencies that they overflowed dependency data structures.
     * CheckDesktopFiles now looks in /usr/share/icons for icons, and
       can find icon names without extensions specified.
     * Build actions which take a subDir keyword argument now also can
