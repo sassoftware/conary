@@ -631,12 +631,12 @@ class _AbstractPackageRecipe(Recipe):
         
         if fullCross:
             macros['cc'] = '%(target)s-gcc'
-            macros['cxx'] = '%(target)s-gxx'
+            macros['cxx'] = '%(target)s-g++'
             macros['strip'] = '%(target)s-strip'
             macros['strip-archive'] = '%(target)s-strip -g'
         else:
             macros['cc'] = '%(host)s-gcc'
-            macros['cxx'] = '%(host)s-gxx'
+            macros['cxx'] = '%(host)s-g++'
             macros['strip'] = '%(host)s-strip'
             macros['strip-archive'] = '%(host)s-strip -g'
             
