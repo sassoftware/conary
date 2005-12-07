@@ -383,9 +383,8 @@ class TroveFormatter(TroveTupFormatter):
              ("Build time: %s" % buildTime)))
 
         if dcfg.fullVersions:
-            yield "Version   :", v
+            yield "Version   : %s" %v
             yield "Label     : %s" % v.branch().label().asString()
-
         else:
             yield "%-30s %s" % \
                 (("Version   : %s" % 
