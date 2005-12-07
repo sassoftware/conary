@@ -56,7 +56,10 @@ Changes in 0.80.0:
     * Stubs have been added for adding python and perl dependencies, and
       the stubs have been set to be initially ignored.
     * The internal structure for conary configuration objects has changed
-
+    * A new DYNAMIC size has been added to the StreamSet object.  This will
+      cause StreamSet to use either a short or long int to store the size
+      of the frozen data that is included in a frozen StreamSet, depending
+      on the size of the data being stored.
 
 Changes in 0.71.2
   o Client Changes:

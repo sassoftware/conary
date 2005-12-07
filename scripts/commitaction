@@ -25,7 +25,8 @@ import imp
 
 def usage(exitcode=1):
     sys.stderr.write("\n".join((
-     "Usage: changeaction --repmap <repmap> --build-label <buildLabel>",
+     "Usage: commitaction --repmap <repmap> --build-label <buildLabel>",
+     "                    [--username <repository username> --password <password>]",
      "                    --module '/path/to/module module options'",
      r"Takes triplets of name\nversion\nflavor\n on standard input",
      ""
@@ -41,21 +42,32 @@ def main(argv):
 
     argDef = {
         'module': options.MULT_PARAM,
+        'username': options.OPT_PARAM,
+        'password': options.OPT_PARAM,
+        'repmap': options.OPT_PARAM,
     }
 
     cfgMap = {
         'build-label': 'buildLabel',
-        'repmap': 'repositoryMap'
     }
 
     cfg = conarycfg.ConaryConfiguration()
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                             argv=argv)
+
+
     # remove argv[0]
     otherArgs = otherArgs[1:]
 
     if 'module' not in argSet:
         usage()
+
+    if 'repmap' in argSet:
+        host, url = argSet['repmap'].split(" ")
+        cfg.repositoryMap.update({host: url})
+        
+        if 'username' in argSet and 'password' in argSet:
+            cfg.user.addServerGlob(host, argSet['username'], argSet['password'])
 
     repos = ConaryClient(cfg).getRepos()
 
