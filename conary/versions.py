@@ -735,12 +735,11 @@ class VersionSequence(AbstractVersion):
 
         # if it has timeStamps, its not allowed in the from-string cache
         stringVersionCache.pop(self.asString(), None)
-    
 
     def setTimeStamps(self, timeStamps, clearCache=True):
         if clearCache and self.timeStamps:
             self._clearVersionCache()
-            
+
         i = 0
         for item in self.versions:
             if isinstance(item, AbstractRevision):
@@ -765,6 +764,16 @@ class VersionSequence(AbstractVersion):
         for item in self.versions:
             if isinstance(item, Label):
                 yield item
+
+    def getHost(self):
+        """
+        Returns the host name from the youngest label in this
+        version sequence.  If there are no labels, None is returned.
+        """
+        for item in reversed(self.versions):
+            if isinstance(item, Label):
+                return item.getHost()
+        return None
 
     def __init__(self, versionList):
         """
@@ -1177,6 +1186,7 @@ class Version(VersionSequence):
             assert(trailingRevision.buildCount is None)
             trailingRevision.buildCount = SerialNumber('0')
         return newV
+
 
 class Branch(VersionSequence):
 
