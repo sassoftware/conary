@@ -16,7 +16,9 @@ import os
 import sys
 from getpass import getpass
 from time import time
+
 from conary import callbacks
+from conary.lib.util import log
 
 from Crypto.PublicKey import DSA
 from Crypto.PublicKey import RSA
@@ -159,14 +161,15 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         OpenPGPKeyCache.__init__(self)
         self.callback = callback
         if 'HOME' not in os.environ:
-            self.publicPaths = [ '/etc/conary/pubring.gpg' ]
-            self.privatePath = None
+            self.publicPaths  = [ '/etc/conary/pubring.gpg' ]
+            self.trustDbPaths = [ '/etc/conary/trustdb.gpg' ]
+            self.privatePath  = None
         else:
-            self.publicPaths = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
-                                 '/etc/conary/pubring.gpg' ]
+            self.publicPaths  = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
+                                  '/etc/conary/pubring.gpg' ]
             self.trustDbPaths = [ os.environ['HOME'] + '/.gnupg/trustdb.gpg',
-                                 '/etc/conary/trustdb.gpg' ]
-            self.privatePath = os.environ['HOME'] + '/.gnupg/secring.gpg'
+                                  '/etc/conary/trustdb.gpg' ]
+            self.privatePath  = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
         if isinstance(path, list):
@@ -191,8 +194,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         pubRing = callback.pubRing
         if pubRing not in self.publicPaths:
             self.addPublicPath(pubRing)
-        trustDbPath = '/'.join(pubRing.split('/')[:-1]) + 'trustdb.gpg'
-        self.trustDbPaths.append(trustDbPath)
+            trustDbPath = '/'.join(pubRing.split('/')[:-1]) + '/trustdb.gpg'
+            self.trustDbPaths.append(trustDbPath)
 
     def getPublicKey(self, keyId):
         # if we have this key cached, return it immediately
@@ -216,7 +219,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                                                     revoked, timestamp,
                                                     trustLevel)
                 return self.publicDict[keyId]
-            except KeyNotFound:
+            except (KeyNotFound, IOError):
                 pass
         # callback should only return True if it found the key.
         if self.callback.getPublicKey(keyId):
@@ -271,9 +274,18 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 class KeyCacheCallback(callbacks.KeyCacheCallback):
     def getPublicKey(self, keyId):
         for server in self.repositoryMap.values():
-            findOpenPGPKey(server, keyId, self.pubRing)
+            try:
+                findOpenPGPKey(server, keyId, self.pubRing)
+            except OSError, e:
+                if e.errno == 2:
+                    log.warning("Can't write to file: %s" % self.pubRing)
+                    return False
+                raise
             # decide if we found the key or not.
-            keyRing = open(self.pubRing)
+            try:
+                keyRing = open(self.pubRing)
+            except IOError:
+                continue
             keyRing.seek(0, SEEK_END)
             limit = keyRing.tell()
             keyRing.seek(0, SEEK_SET)
@@ -304,15 +316,21 @@ def findOpenPGPKey(server, keyId, pubRing):
         os.dup2(fd, sys.stdout.fileno())
         os.dup2(fd, sys.stderr.fileno())
         os.close(fd)
-        os.execlp('gpg', 'gpg', '-q', '--no-tty', '--homedir', pubRingPath,
-                  '--no-greeting', '--no-secmem-warning', '--no-verbose',
-                  '--no-mdc-warning', '--no-default-keyring', '--keyring',
-                  pubRing.split('/')[-1], '--batch',
-                  '--no-permission-warning', '--keyserver',
-                  '%sgetOpenPGPKey?search=%s' % (server, keyId),
-                  '--keyserver-options', 'timeout=3',
-                  '--recv-key', keyId)
-    os.wait()
+        try:
+            os.execlp('gpg', 'gpg', '-q', '--no-tty', '--homedir', pubRingPath,
+                      '--no-greeting', '--no-secmem-warning', '--no-verbose',
+                      '--no-mdc-warning', '--no-default-keyring', '--keyring',
+                      pubRing.split('/')[-1], '--batch',
+                      '--no-permission-warning', '--keyserver',
+                      '%sgetOpenPGPKey?search=%s' % (server, keyId),
+                      '--keyserver-options', 'timeout=3',
+                      '--recv-key', keyId)
+        except:
+            os._exit(-1)
+    newPid, status = os.wait()
+    if os.WEXITSTATUS(status) == 255:
+        log.warning('gpg does not appear to be installed.'
+                    ' Please check your installation')
 
     if not secringExists:
         try:
