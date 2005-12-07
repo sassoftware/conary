@@ -527,6 +527,8 @@ class ClientUpdate:
         for job in transitiveClosure:
             if job[2][0] is None: continue
             if not job[3]: continue
+            if (job[0], job[2][0], job[2][1]) in ineligible: continue
+
             availableTrove.addTrove(job[0], job[2][0], job[2][1],
                                     presentOkay = True)
             names.add(job[0])
@@ -728,6 +730,9 @@ class ClientUpdate:
             if not recurse: continue
 
             for info in trv.iterTroveList():
+                if info in ineligible:
+                    continue
+
                 newTroves.append((info, False, pinned and ignorePins, 
                                   trv.includeTroveByDefault(*info)))
 
@@ -947,9 +952,9 @@ class ClientUpdate:
             hasTroves = uJob.getTroveSource().hasTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
 
-            reposChangeSetList = [ x[1] for x in
+            reposChangeSetList = set([ x[1] for x in
                               itertools.izip(hasTroves, jobSet)
-                               if x[0] is not True ]
+                               if x[0] is not True ])
 
             if reposChangeSetList != jobSet:
                 # we can't trust the closure from the changeset we're getting
