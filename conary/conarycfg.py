@@ -16,7 +16,6 @@ Implements conaryrc handling.
 """
 import fnmatch
 import os
-from os.path import expanduser
 import sys
 import copy
 
@@ -197,8 +196,7 @@ class ConaryConfiguration(SectionedConfigFile):
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList,\
-                              [expanduser('~/.gnupg/pubring.gpg')])
+    pubRing               =  (CfgPathList, ['~/.gnupg/pubring.gpg'])
     root                  =  (CfgPath, '/')
     showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
@@ -208,7 +206,7 @@ class ConaryConfiguration(SectionedConfigFile):
     updateThreshold       =  (CfgInt, 10)
     useDirs               =  (CfgPathList, ('/etc/conary/use',
                                             '/etc/conary/distro/use',
-                                            expanduser('~/.conary/use')))
+                                            '~/.conary/use'))
 
     _sectionType          =  ConaryContext
 
