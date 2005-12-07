@@ -45,7 +45,7 @@ def usage():
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,  
-                     showChanges=False,
+                     showChanges=False, info=False,
                      all=False, deps=False, sha1s=False, ids=False,
                      asJob=False):
 
@@ -71,7 +71,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
 
         dcfg = display.DisplayConfig(changeSetSource, ls=ls, ids=ids, 
                              sha1s=sha1s, fullVersions=cfg.fullVersions, 
-                             tags=tags, deps=deps, 
+                             tags=tags, deps=deps, info=info,
                              showFlavors=cfg.fullFlavors,
                              iterChildren=not namesOnly)
         if primary:
@@ -87,7 +87,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
 
         dcfg = display.JobDisplayConfig(changeSetSource,
                                         ls=ls, ids=ids, sha1s=sha1s, 
-                                        info=False, tags=tags, deps=deps,
+                                        info=info, tags=tags, deps=deps,
                                         showChanges=showChanges,
                                         iterChildren=not namesOnly)
 
