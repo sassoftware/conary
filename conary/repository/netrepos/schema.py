@@ -592,7 +592,7 @@ class MigrateTo_6(SchemaMigration):
         # add a hasTrove flag to the Items table for various
         # optimizations update the Items table
         self.cu.execute(" ALTER TABLE Items ADD COLUMN "
-                   " hasTrove INTEGER NOT NULL DEFAULT 0 ")
+                        " hasTrove INTEGER NOT NULL DEFAULT 0 ")
         self.cu.execute("""
         UPDATE Items SET hasTrove = 1
         WHERE Items.itemId IN (
@@ -635,7 +635,15 @@ class MigrateTo_7(SchemaMigration):
             WHERE (item LIKE '%:%' OR item LIKE 'fileset-%')
             """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
         return self.Version
-    
+
+class MigrateTo_8(SchemaMigration):
+    Version = 8
+    def migrate(self):
+        # FIXME: we can't add constraints, so this is incomplete
+        self.cu.execute(
+            "ALTER TABLE Permissions ADD COLUMN entGroupAdmin INTEGER")
+        return self.Version
+
 def checkVersion(db):
     global VERSION
     version = migration.getDatabaseVersion(db)
@@ -649,5 +657,6 @@ def checkVersion(db):
     if version == 4: MigrateTo_5(db)()
     if version == 5: MigrateTo_6(db)()
     if version == 6: MigrateTo_7(db)()
+    if version == 7: MigrateTo_8(db)()
 
     return version
