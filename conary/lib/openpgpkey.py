@@ -273,8 +273,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
     def findOpenPGPKey(self, server, keyId):
-        # if we can't exec gpg or write to the keyring, go ahead and bail
-        if not self.hasGPG or not self.canWrite:
+        # if we can't exec gpg, go ahead and bail
+        if not self.hasGPG:
             return
 
         pubRingPath = os.path.dirname(self.pubRing)
@@ -334,6 +334,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
                 pass
 
     def getPublicKey(self, keyId, serverName):
+        server = None
         if self.repositoryMap and serverName not in self.repositoryMap:
             server = "http://%s/conary/" % serverName
         else:
@@ -343,6 +344,8 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
             # The getPublicKey method is not authenticated anyway.
             if serverName in self.repositoryMap:
                 server = self.repositoryMap.getNoPass(serverName)
+        if server == None:
+            return False
         self.findOpenPGPKey(server, keyId)
         # decide if we found the key or not.
         try:
@@ -360,7 +363,6 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
     def __init__(self, *args, **kw):
         callbacks.KeyCacheCallback.__init__(self, *args, **kw)
         self.hasGPG = True
-        self.canWrite = True
 
 _keyCache = OpenPGPKeyFileCache()
 
