@@ -116,7 +116,7 @@ crossMacros = {
     'host'		: '%(hostarch)s-%(hostvendor)s-%(hostos)s',
 
     # build is the system on which the binaries are being run
-    'buildvendor'       : 'unknown_build',
+    'buildvendor'       : 'unknown',
     'buildos'           : 'linux',
     'build'		: '%(buildarch)s-%(buildvendor)s-%(buildos)s',
 
@@ -577,80 +577,130 @@ class _AbstractPackageRecipe(Recipe):
             buildReqs.update(getattr(base, 'buildRequires', []))
         self.buildRequires = list(buildReqs)
 
-    def setCrossCompile(self, (crossHost, crossTarget, fullCross)):
-        macros = {}
-        tmpArch = use.Arch.copy()
+    def setCrossCompile(self, (crossHost, crossTarget, crossTool)):
+        """ Tell conary it should cross-compile, or build a part of a
+            cross-compiler toolchain.
 
-        buildarch = use.Arch.getCurrentArch()._getMacro('targetarch')
-        macros['buildarch'] = buildarch
+            Example: setCrossCompile(('x86-foo-linux', 'x86_64', False))
 
-        if '-' in crossTarget:
-            arch, vendor, targetOs = crossTarget
-            macros['targetvendor'] = vendor
-            macros['targetos'] = targetOs
-        else:
-            targetArch = crossTarget
-        try:
-            targetFlavor = deps.parseFlavor('is: ' + targetArch)
-        except deps.ParseError, msg:
-            raise CookError, 'Invalid architecture specification %s: arch must be specified as flavor'
-
-        for flag in use.Arch._iterAll():
-            flag._set(False) 
-        use.setBuildFlagsFromFlavor(self.name, targetFlavor)
-        macros['targetarch'] = use.Arch.getCurrentArch()._getMacro('targetarch')
-
-        if crossHost is None:
-            if fullCross:
-                macros['hostarch'] = macros['targetarch']
+            @param crossHost: the architecture of the machine the built binary 
+                 should run on.  Can be either <arch> or <arch>-<vendor>-<os>.
+                 If None, determine crossHost based on crossTool value.
+            @param crossTarget: the architecture of the machine the built
+                 binary should be targeted for.
+                 Can be either <arch> or <arch>-<vendor>-<os>.
+            @param crossTool: If true, we are building a cross-compiler for
+                 use on this system.  We set values so that the resulting 
+                 binaries from this build should be runnable on the build 
+                 architecture.
+        """
+        def _parseArch(archSpec):
+            if '-' in archSpec:
+                arch, vendor, hostOs = archSpec.split('-')
             else:
-                macros['hostarch'] = macros['buildarch']
-        else:
-            assert(crossTarget)
-            # we're building some sort of toolchain binary
-            # like a compiler or binutils
-            if '-' in crossHost:
-                arch, vendor, hostOs = crossHost
-                macros['hostvendor'] = vendor
-                macros['hostos'] = hostOs
-            else:
-                hostArch = crossHost
+                arch  = archSpec
+                vendor = hostOs = None
+
             try:
-                hostFlavor = deps.parseFlavor('is: ' + hostArch)
+                flavor = deps.parseFlavor('is: ' + arch)
             except deps.ParseError, msg:
-                raise CookError, 'Invalid architecture specification %s: arch must be specified as flavor'
+                raise CookError, 'Invalid architecture specification %s'
 
-            tmpArch = copy.deepcopy(use.Arch)
+            return flavor, vendor, hostOs
+
+        def _setArchFlags(flavor):
+            # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False) 
-	    use.setBuildFlagsFromFlavor(self.name, hostFlavor)
-            macros['hostarch'] = use.Arch.getCurrentArch()._getMacro('targetarch')
+            use.setBuildFlagsFromFlavor(self.name, flavor)
+
+        def _setBuildMacros(macros):
+            # get the necessary information about the build system
+            # the only information we can grab is the arch.
+            macros['buildarch'] = use.Arch._getMacro('targetarch')
+            
+        def _setTargetMacros(crossTarget, macros):
+            targetFlavor, vendor, targetOs = _parseArch(crossTarget)
+            if vendor:
+                macros['targetvendor'] = vendor
+            if targetOs:
+                macros['targetos'] = targetOs
+            _setArchFlags(targetFlavor)
+            macros['targetarch'] = use.Arch._getMacro('targetarch')
+
+        def _setHostMacros(crossHost, macros):
+            hostFlavor, vendor, hostOs = _parseArch(crossHost)
+            if vendor:
+                macros['hostvendor'] = vendor
+            if targetOs:
+                macros['hostos'] = targetOs
+
+            tmpArch = copy.deepcopy(use.Arch)
+            _setArchFlags(hostFlavor)
             use.Arch = tmpArch
 
-        macros['crossdir'] = 'cross-target-%(target)s'
-        
-        if fullCross:
-            macros['cc'] = '%(target)s-gcc'
-            macros['cxx'] = '%(target)s-g++'
-            macros['strip'] = '%(target)s-strip'
-            macros['strip-archive'] = '%(target)s-strip -g'
+            macros['hostarch'] = use.Arch._getMacro('targetarch')
+
+             
+        macros = crossMacros.copy()
+        tmpArch = use.Arch.copy()
+
+        _setBuildMacros(macros)
+        _setTargetMacros(crossTarget, macros)
+
+        if crossHost is None:
+            if crossTool:
+                # we want the resulting binaries to run on 
+                # this machine.
+                macros['hostarch'] = macros['buildarch']
+            else:
+                # we want the resulting binaries to run 
+                # on the target machine.
+                macros['hostarch'] = macros['targetarch']
         else:
-            macros['cc'] = '%(host)s-gcc'
-            macros['cxx'] = '%(host)s-g++'
-            macros['strip'] = '%(host)s-strip'
-            macros['strip-archive'] = '%(host)s-strip -g'
-            
-        myCrossMacros = crossMacros.copy()
-        myCrossMacros.update(macros)
+            _setHostMacros(crossHost, macros)
+
+        # make sure that host != build, so that we are always 
+        # doing a real cross compile.  To make this work, we add
+        # _build to the buildvendor. However, this little munging of 
+        # of the build system should not affect where the expected 
+        # gcc and g++ for local builds are located, so set those local
+        # values first.
         
-        self.macros.optflags = '-O2'
+        origBuild = macros['build'] % macros
+        macros['buildcc'] = '%s-gcc' % (origBuild)
+        macros['buildcxx'] = '%s-g++' % (origBuild)
+
+        if (macros['host'] % macros) == (macros['build'] % macros):
+            macros['buildvendor'] += '_build'
+                
+        if crossTool:
+            # we want the resulting binaries to run on our machine
+            # but be targeted for %(target)s
+            macros['compile'] = origBuild
+        else:
+            # we're expecting the resulting binaries to run on 
+            # target
+            macros['compile'] = '%(target)s'
+
+        macros['cc'] = '%(compile)s-gcc'
+        macros['cxx'] = '%(compile)s-g++'
+        macros['strip'] = '%(compile)s-strip'
+        macros['strip-archive'] = '%(compile)s-strip -g'
+
+        macros['crossdir'] = 'cross-target-%(target)s'
+            
 	self.macros.update(use.Arch._getMacros())
-        self.macros.update(myCrossMacros)
-        use.Use.bootstrap._set()
+        self.macros.update(macros)
         newPath = '%(crossprefix)s/bin:' % self.macros
         os.environ['PATH'] = newPath + os.environ['PATH']
+
+        # set the bootstrap flag
+        # FIXME: this should probably be a cross flag instead.
+        use.Use.bootstrap._set()
     
-    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
+                 crossCompile=None):
         Recipe.__init__(self)
 	self._sources = []
 	self._build = []
@@ -666,7 +716,11 @@ class _AbstractPackageRecipe(Recipe):
 	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
-	self.macros.update(use.Arch._getMacros())
+        if crossCompile:
+            self.setCrossCompile(crossCompile)
+        else:
+            self.macros.update(use.Arch._getMacros())
+
         # allow for architecture not to be set -- this could happen 
         # when storing the recipe e.g. 
  	for key in cfg.macros:

@@ -407,7 +407,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         crossCompile = argSet.pop('cross', None)
         if crossCompile:   
             parts = crossCompile.split('--')
-            fullCross = True
+            isCrossTool = False
+
             if len(parts) == 1:
                 crossTarget = crossCompile
                 crossHost = None
@@ -415,9 +416,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
                 crossHost, crossTarget = parts
                 if crossHost == 'local':
                     crossHost = None
-                    fullCross = False
+                    isCrossTool = True
 
-            crossCompile = (crossHost, crossTarget, fullCross)
+            crossCompile = (crossHost, crossTarget, isCrossTool)
 
         if argSet: return usage()
         

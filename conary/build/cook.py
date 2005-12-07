@@ -640,9 +640,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     srcdirs = [ os.path.dirname(recipeClass.filename),
 		cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
-    recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
-    if crossCompile:
-        recipeObj.setCrossCompile(crossCompile)
+    recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
 
     recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
