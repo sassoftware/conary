@@ -19,7 +19,7 @@ from base_drv import BaseDatabase, BindlessCursor, BaseCursor
 class Cursor(BindlessCursor):
     pass
 
-# FIXME: we should channel exceptions into gereic exception classes
+# FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
     def __init__(self, db):
@@ -27,7 +27,7 @@ class Database(BaseDatabase):
         self.type = "postgresql"
         self.avail_check = "select count(*) from pg_tables"
         self.cursorClass = Cursor
-        
+
     def connect(self, timeout=10000):
         assert(self.database)
         cdb = self._connectData()
@@ -39,7 +39,7 @@ class Database(BaseDatabase):
         self.dbh = pgdb.connect(cstr)
         self._getSchema()
         return True
-    
+
     def _getSchema(self):
         BaseDatabase._getSchema(self)
         c = self.cursor()

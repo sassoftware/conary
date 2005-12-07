@@ -26,9 +26,9 @@ def createInstances(db):
     if "Instances" not in tables:
         cu.execute("""
         CREATE TABLE Instances(
-            instanceId      INTEGER PRIMARY KEY, 
-            itemId          INTEGER, 
-            versionId       INTEGER, 
+            instanceId      INTEGER PRIMARY KEY,
+            itemId          INTEGER,
+            versionId       INTEGER,
             flavorId        INTEGER,
             isRedirect      INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
@@ -63,8 +63,8 @@ def createInstances(db):
         commit = True
     if commit:
         db.commit()
-    
-def createFlavors(db):        
+
+def createFlavors(db):
     cu = db.cursor()
     commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -90,9 +90,9 @@ def createFlavors(db):
         cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
         cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
         commit = True
-        
+
     if "FlavorScores" not in tables:
-        from conary.deps import deps        
+        from conary.deps import deps
         cu.execute("""
         CREATE TABLE FlavorScores(
             request         INTEGER,
@@ -105,17 +105,17 @@ def createFlavors(db):
                     FOREIGN KEY (request) REFERENCES Flavors(flavorId)
                     ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON 
+        cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON
                           FlavorScores(request, present)""")
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
-            cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
+            cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)",
                        request, present, value)
         commit = True
     if commit:
         db.commit()
-        
+
 def createNodes(db):
     cu = db.cursor()
     commit = False
@@ -142,7 +142,7 @@ def createNodes(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Nodes_item_branch_version_uq
                 UNIQUE(itemId, branchId, versionId)
-        )""")            
+        )""")
         cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
                            ON Nodes(itemId, branchId, versionId)""")
         cu.execute("""CREATE INDEX NodesItemVersionIdx
@@ -168,7 +168,7 @@ def createNodes(db):
         commit = True
     if commit:
         db.commit()
-        
+
 def createLatest(db):
     cu = db.cursor()
     commit = False
@@ -178,9 +178,9 @@ def createLatest(db):
     if 'Latest' not in tables:
         cu.execute("""
         CREATE TABLE Latest(
-            itemId          INTEGER, 
-            branchId        INTEGER, 
-            flavorId        INTEGER, 
+            itemId          INTEGER,
+            branchId        INTEGER,
+            flavorId        INTEGER,
             versionId       INTEGER,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -201,7 +201,7 @@ def createLatest(db):
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
                    "Latest(itemId, branchId, flavorId)")
         commit = True
-        
+
     if 'LatestView' not in tables:
         cu.execute("""
         CREATE VIEW
@@ -221,8 +221,8 @@ def createLatest(db):
         commit = True
     if commit:
         db.commit()
-        
-def createUsers(db):        
+
+def createUsers(db):
     cu = db.cursor()
     commit = False
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type "
@@ -240,7 +240,7 @@ def createUsers(db):
                 UNIQUE(user)
         )""")
         commit = True
-        
+
     if "UserGroups" not in tables:
         cu.execute("""
         CREATE TABLE UserGroups (
@@ -250,7 +250,7 @@ def createUsers(db):
                 UNIQUE(userGroup)
         )""")
         commit = True
-        
+
     if "UserGroupMembers" not in tables:
         cu.execute("""
         CREATE TABLE UserGroupMembers (
@@ -268,7 +268,7 @@ def createUsers(db):
         cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
                                         UserGroupMembers(userId)""")
         commit = True
-        
+
     if "Permissions" not in tables:
         cu.execute("""
         CREATE TABLE Permissions (
@@ -289,7 +289,7 @@ def createUsers(db):
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_entGroupAdmin_fk
-                FOREIGN KEY (entGroupAdmin) REFERENCES 
+                FOREIGN KEY (entGroupAdmin) REFERENCES
                                 EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_ug_l_i_uq
@@ -303,7 +303,7 @@ def createUsers(db):
         if "Labels" in tables:
             cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
         commit = True
-        
+
     if "UserPermissions" not in tables:
         cu.execute("""
         CREATE VIEW UserPermissions AS
@@ -320,11 +320,11 @@ def createUsers(db):
                   JOIN UserGroupMembers using (userId)
                   JOIN Permissions using (userGroupId)
                   JOIN Items using (itemId)
-                  JOIN Labels ON 
+                  JOIN Labels ON
                       Permissions.labelId = Labels.labelId
         """)
         commit = True
-        
+
     if "UsersView" not in tables:
         cu.execute("""
         CREATE VIEW
@@ -375,7 +375,7 @@ def createUsers(db):
 
     if commit:
         db.commit()
-        
+
 def createPGPKeys(db):
     cu = db.cursor()
     commit = False
@@ -424,7 +424,7 @@ def createTroves(db):
         # (as the versionId isn't unique, apparently)
         cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")
         commit = True
-        
+
     if "TroveFiles" not in tables:
         cu.execute("""
         CREATE TABLE TroveFiles(
@@ -443,11 +443,11 @@ def createTroves(db):
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
         cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
         commit = True
-        
+
     if "TroveTroves" not in tables:
         cu.execute("""
         CREATE TABLE TroveTroves(
-            instanceId      INTEGER, 
+            instanceId      INTEGER,
             includedId      INTEGER,
             byDefault       BOOLEAN,
             CONSTRAINT TroveTroves_instanceId_fk
@@ -460,7 +460,7 @@ def createTroves(db):
                 UNIQUE(instanceId, includedId)
         )""")
         # ideally we would attempt to create a unique index on (instance, included)
-        # for sqlite as well for integrity checking, but sqlite's performance will hurt            
+        # for sqlite as well for integrity checking, but sqlite's performance will hurt
         cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
         # this index is so we can quickly tell what troves are needed
         # by another trove
@@ -471,7 +471,7 @@ def createTroves(db):
         db.commit()
 
 def createInstructionSets(db):
-    cu = db.cursor()    
+    cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
     if 'InstructionSets' not in tables:
@@ -482,8 +482,8 @@ def createInstructionSets(db):
             flags           STRING
         )""")
         db.commit()
-        
-def createChangeLog(db):        
+
+def createChangeLog(db):
     cu = db.cursor()
     cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
     tables = [ x[0] for x in cu ]
@@ -491,8 +491,8 @@ def createChangeLog(db):
         cu.execute("""
         CREATE TABLE ChangeLogs(
             nodeId          INTEGER,
-            name            STRING, 
-            contact         STRING, 
+            name            STRING,
+            contact         STRING,
             message         STRING,
             CONSTRAINT ChangeLogs_nodeId_uq
                 UNIQUE(nodeId)
@@ -506,11 +506,11 @@ class SchemaMigration(migration.SchemaMigration):
         if msg is None:
             msg = self.msg
         if msg == "":
-            msg = "Finished migration to schema version %d" % (self.Version,)       
+            msg = "Finished migration to schema version %d" % (self.Version,)
         logMe(1, msg)
         self.msg = msg
-    
-# This is the update from using Null as the wildcard for 
+
+# This is the update from using Null as the wildcard for
 # Items/Troves and Labels to using 0/ALL
 class MigrateTo_2(SchemaMigration):
     Version = 2
@@ -520,10 +520,10 @@ class MigrateTo_2(SchemaMigration):
         self.cu.execute("INSERT INTO Labels VALUES(0, 'ALL')")
 
         ## Now replace all Nulls in the following tables with '0'
-        itemTables =   ('Permissions', 'Instances', 'Latest', 
+        itemTables =   ('Permissions', 'Instances', 'Latest',
                         'Metadata', 'Nodes', 'LabelMap')
         for table in itemTables:
-            self.cu.execute('UPDATE %s SET itemId=0 WHERE itemId IS NULL' % 
+            self.cu.execute('UPDATE %s SET itemId=0 WHERE itemId IS NULL' %
                 table)
         labelTables =  ('Permissions', 'LabelMap')
         for table in labelTables:
@@ -532,7 +532,7 @@ class MigrateTo_2(SchemaMigration):
 
         ## Finally fix the index
         cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
+        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON
             Permissions(userGroupId, labelId, itemId)""")
         return self.Version
 
@@ -561,7 +561,7 @@ class MigrateTo_5(SchemaMigration):
         self.cu.execute("DROP INDEX FlavorScoresIdx")
         self.cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx "
                    "    on FlavorScores(request, present)")
-        # remove redundancy/rename                
+        # remove redundancy/rename
         self.cu.execute("DROP INDEX NodesIdx")
         self.cu.execute("DROP INDEX NodesIdx2")
         self.cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx

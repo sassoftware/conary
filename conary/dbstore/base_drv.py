@@ -21,7 +21,7 @@ class DBStoreError(Exception):
 class DBStoreCursorError(DBStoreError):
     def __init__(self, msg, **kwargs):
         DBStoreError.__init__(self, msg, **kwargs)
-                              
+
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
@@ -29,12 +29,12 @@ class BaseCursor:
         self.dbh = dbh
         self._cursor = self._getCursor()
         self.description = None
-        
+
     # this will need to be provided by each separate driver
     def _getCursor(self):
         assert(self.dbh)
         return self.dbh.cursor()
-        
+
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
@@ -49,10 +49,10 @@ class BaseCursor:
         if len(args) == 1 and isinstance(args[0], dict):
             kw.update(args[0])
         return self._cursor.execute(sql, **kw)
-        
+
     # return the column names of the current select
     def __rowDict(self, row):
-        assert(self._cursor and self._cursor.description)       
+        assert(self._cursor and self._cursor.description)
         if row is None:
             return None
         if len(row) != len(self._cursor.description):
@@ -61,7 +61,7 @@ class BaseCursor:
         if not self.description:
             self.description = [ x[0] for x in self._cursor.description ]
         return dict(zip(self.description, row))
-                                                            
+
     # (a,b)
     def fetchone(self):
         return self._cursor.fetchone()
@@ -70,7 +70,7 @@ class BaseCursor:
         return self._cursor.fetchall()
     def fetchmany(self, count=1):
         return self._cursor.fetchmany(count)
-    
+
     # { name_a : a, name_b : b }
     def fetchone_dict(self):
         try:
@@ -147,7 +147,7 @@ class BaseDatabase:
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
         self.__transaction = None
-        
+
     # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
         assert(self.database)
@@ -159,11 +159,11 @@ class BaseDatabase:
         m = regex.match(self.database.strip())
         assert(m)
         return m.groupdict()
-        
+
     def connect(self):
-        assert(self.database)        
+        assert(self.database)
         raise RuntimeError("This connect function has to be provided by the database driver")
-    
+
     def close(self):
         if self.dbh:
             self.dbh.close()
@@ -192,7 +192,7 @@ class BaseDatabase:
     def analyze(self):
         assert(self.database)
         pass
-    
+
     def commit(self):
         assert(self.dbh)
         self.__transaction = 0
@@ -208,7 +208,7 @@ class BaseDatabase:
         c.execute(self.basic_transaction)
         self.__transaction = 1
         return c
-        
+
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
@@ -216,7 +216,7 @@ class BaseDatabase:
         assert(self.__transaction)
         assert(self.dbh)
         self.__transaction = 0
-        return self.dbh.rollback()        
+        return self.dbh.rollback()
 
     # easy access to the schema state
     def _getSchema(self):
@@ -245,7 +245,6 @@ class BaseDatabase:
             except:
                 pass
         self.dbh = self.database = None
-        
 
 
 # A class to handle calls to the SQL functions and procedures
@@ -253,7 +252,6 @@ class Callable:
     def __init__(self, name, call):
         self.name = name
         self.call = call
-        
     def __call__(self, *args):
         assert(self.call is not None)
         apply(self.call, args)

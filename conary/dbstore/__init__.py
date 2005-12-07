@@ -59,11 +59,11 @@ def __get_driver(driver = __DRIVER):
                 driver)
         else:
             return Database
-        
+
     raise DBInvalidBackend(
         "Database backend '%s' is not supported" % (driver,),
         driver)
-    
+
 # create a database connection and return an instance
 # all drivers parse a db string in the form:
 #   [[user[:password]@]host/]database

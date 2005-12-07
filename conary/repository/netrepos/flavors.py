@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from conary.deps import deps
 from conary.repository.netrepos import schema
@@ -47,7 +47,7 @@ class Flavors:
 	    return 0
 
 	cu = self.db.cursor()
-	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?", 
+	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?",
 		   flavor.freeze())
 	item = cu.fetchone()
 	if item is None:
@@ -59,7 +59,7 @@ class Flavors:
 	    return deps.DependencySet()
 
 	cu = self.db.cursor()
-	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?", 
+	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?",
 		   flavorId)
 	try:
 	    return deps.ThawDependencySet(cu.next()[0])

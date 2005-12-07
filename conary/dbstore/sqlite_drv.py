@@ -21,7 +21,7 @@ class Cursor(BaseCursor):
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
-                inAutoTrans = True    
+                inAutoTrans = True
             BaseCursor.execute(self, sql, *params, **kw)
             # commit any transactions which were opened automatically
             # by the sqlite3 bindings and left hanging:
@@ -53,7 +53,7 @@ class Database(BaseDatabase):
         self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
         self._getSchema()
         return True
-    
+
     def _getSchema(self):
         BaseDatabase._getSchema(self)
         c = self.cursor()
@@ -90,7 +90,7 @@ class Database(BaseDatabase):
             # ANALYZE creates it.
             if "sqlite_stat1" not in self.tables:
                 doAnalyze = True
-                
+
         if doAnalyze:
             cu.execute('ANALYZE')
             self._getSchema()
