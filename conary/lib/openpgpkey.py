@@ -274,13 +274,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 class KeyCacheCallback(callbacks.KeyCacheCallback):
     def getPublicKey(self, keyId):
         for server in self.repositoryMap.values():
-            try:
-                findOpenPGPKey(server, keyId, self.pubRing)
-            except OSError, e:
-                if e.errno == 2:
-                    log.warning("Can't write to file: %s" % self.pubRing)
-                    return False
-                raise
+            findOpenPGPKey(server, keyId, self.pubRing)
             # decide if we found the key or not.
             try:
                 keyRing = open(self.pubRing)
@@ -304,8 +298,11 @@ def findOpenPGPKey(server, keyId, pubRing):
         server += '/'
 
     secringExists = False
-    if 'secring.gpg' in os.listdir(pubRingPath):
-        secringExists = True
+    try:
+        if 'secring.gpg' in os.listdir(pubRingPath):
+            secringExists = True
+    except:
+        log.warning("Can't stat directory: %s" % pubRingPath)
 
     pid = os.fork()
     if pid == 0:
