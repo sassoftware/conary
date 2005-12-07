@@ -41,13 +41,17 @@ def usage():
     print "                                  show tagged and untagged)"
     print "                --sha1s           Show sha1s for files"
     print "                --ids             Show fileids"
-    print "                --all             Combine above tags"
+    print "                --all             Combine above tags except show-changes"
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,  
                      showChanges=False,
                      all=False, deps=False, sha1s=False, ids=False,
                      asJob=False):
+
+    if all:
+        ls = deps = sha1s = ids = tags = True
+
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
