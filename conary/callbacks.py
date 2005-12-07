@@ -109,7 +109,7 @@ class SignatureCallback:
 
 class KeyCacheCallback:
 
-    def getPublicKey(self, keyId):
+    def getPublicKey(self, keyId, serverName):
         return False
 
     def __init__(self, repositoryMap = {}, pubRing = ''):

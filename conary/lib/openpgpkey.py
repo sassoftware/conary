@@ -197,7 +197,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             trustDbPath = '/'.join(pubRing.split('/')[:-1]) + '/trustdb.gpg'
             self.trustDbPaths.append(trustDbPath)
 
-    def getPublicKey(self, keyId):
+    def getPublicKey(self, keyId, serverName = None):
         # if we have this key cached, return it immediately
         if keyId in self.publicDict:
             return self.publicDict[keyId]
@@ -222,7 +222,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             except (KeyNotFound, IOError):
                 pass
         # callback should only return True if it found the key.
-        if self.callback.getPublicKey(keyId):
+        if self.callback.getPublicKey(keyId, serverName):
             return self.getPublicKey(keyId)
         raise KeyNotFound(keyId)
 
@@ -272,23 +272,24 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #OpenPGPKeyFinder: download missing keys from conary servers.
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
-    def getPublicKey(self, keyId):
-        for server in self.repositoryMap.values():
-            findOpenPGPKey(server, keyId, self.pubRing)
-            # decide if we found the key or not.
-            try:
-                keyRing = open(self.pubRing)
-            except IOError:
-                continue
-            keyRing.seek(0, SEEK_END)
-            limit = keyRing.tell()
-            keyRing.seek(0, SEEK_SET)
-            seekKeyById(keyId, keyRing)
-            found = keyRing.tell() != limit
-            keyRing.close()
-            if found:
-                return True
-        return False
+    def getPublicKey(self, keyId, serverName):
+        if serverName not in self.repositoryMap:
+            server = "http://%s/conary/" % serverName
+        else:
+            server = self.repositoryMap[serverName]
+        findOpenPGPKey(server, keyId, self.pubRing)
+        # decide if we found the key or not.
+        try:
+            keyRing = open(self.pubRing)
+        except IOError:
+            return False
+        keyRing.seek(0, SEEK_END)
+        limit = keyRing.tell()
+        keyRing.seek(0, SEEK_SET)
+        seekKeyById(keyId, keyRing)
+        found = keyRing.tell() != limit
+        keyRing.close()
+        return found
 
 def findOpenPGPKey(server, keyId, pubRing):
     pubRingPath = '/'.join(pubRing.split('/')[:-1])
