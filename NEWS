@@ -1,4 +1,7 @@
 Changes in 0.80.1:
+  o Client Changes:
+    * user names and passwords are no longer allowed in repository maps
+      (user configuration entries must be used instead)
   o Building packages:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
