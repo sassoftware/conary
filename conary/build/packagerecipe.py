@@ -90,6 +90,9 @@ baseMacros = {
     # filled in at cook time
     'buildbranch'       : '',
     'buildlabel'        : '',
+    'target'		: '%(targetarch)s-unknown-linux',
+    'host'		: '%(targetarch)s-unknown-linux',
+    'build'		: '%(targetarch)s-unknown-linux',
 }
 
 crossMacros = {
@@ -632,14 +635,13 @@ class _AbstractPackageRecipe(Recipe):
             hostFlavor, vendor, hostOs = _parseArch(crossHost)
             if vendor:
                 macros['hostvendor'] = vendor
-            if targetOs:
-                macros['hostos'] = targetOs
+            if hostOs:
+                macros['hostos'] = hostOs
 
             tmpArch = copy.deepcopy(use.Arch)
             _setArchFlags(hostFlavor)
-            use.Arch = tmpArch
-
             macros['hostarch'] = use.Arch._getMacro('targetarch')
+            use.Arch = tmpArch
 
              
         macros = crossMacros.copy()
