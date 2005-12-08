@@ -145,7 +145,7 @@ def getTrovesToDisplay(repos, cfg, troveSpecs, all, leaves):
                     if not hostList:
                         try:
                             ver = versions.VersionFromString(vS)
-                            host = ver.branch().label().getHost()
+                            host = ver.getHost()
                         except versions.ParseError:
                             pass
                 if not hostList:

@@ -95,7 +95,7 @@ def _getRecipeLoader(cfg, repos, recipeFile):
 
     return loader
 
-def verifyAbsoluteChangeset(cs, trustThreshold = 0, ignoreMissingKeys = False):
+def verifyAbsoluteChangeset(cs, trustThreshold = 0):
     # go through all the trove change sets we have in this changeset.
     # verify the digital signatures on each piece
     # return code should be the minimum trust on the entire set
@@ -112,8 +112,6 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0, ignoreMissingKeys = False):
         verTuple = t.verifyDigitalSignatures(trustThreshold)
         missingKeys.extend(verTuple[1])
         r = min(verTuple[0], r)
-    if (not ignoreMissingKeys) and missingKeys:
-        raise openpgpfile.KeyNotFound(missingKeys)
     return r
 
 def checkout(repos, cfg, workDir, name, callback=None):
@@ -167,14 +165,7 @@ def checkout(repos, cfg, workDir, name, callback=None):
                                excludeAutoSource = True,
                                callback=callback)
 
-    try:
-        verifyAbsoluteChangeset(cs, cfg.trustThreshold)
-    except openpgpfile.KeyNotFound, e:
-        for keyId in e.keys:
-            for val in cfg.repositoryMap.values():
-                openpgpkey.findOpenPGPKey(val, keyId, cfg.pubRing[0])
-        verifyAbsoluteChangeset(cs, cfg.trustThreshold,
-                                ignoreMissingKeys = True)
+    verifyAbsoluteChangeset(cs, cfg.trustThreshold)
 
     troveCs = cs.iterNewTroveList().next()
 
@@ -398,9 +389,9 @@ def commit(repos, cfg, message, callback=None):
     else:
         troveCs = newState.diff(srcPkg)[0]
 
-    if troveCs.getOldVersion() is not None and \
-            troveCs.getOldVersion().branch().label().getHost() != \
-            troveCs.getNewVersion().branch().label().getHost():
+    if (troveCs.getOldVersion() is not None
+        and troveCs.getOldVersion().getHost() !=
+            troveCs.getNewVersion().getHost()):
         # we can't commit across hosts, so just make an absolute change
         # set instead (yeah, a bit of a hack). this can happen on shadows
         fileMap = {}

@@ -435,7 +435,7 @@ class ClientClone:
             assert(newVersion == versionMap[(trv.getName(), trv.getVersion(),
                                              trv.getFlavor())])
 
-            newVersionHost = newVersion.branch().label().getHost()
+            newVersionHost = newVersion.getHost()
             sourceBranch = info[1].branch()
 
             # if this is a clone of a clone, use the original clonedFrom value
@@ -448,7 +448,7 @@ class ClientClone:
             # look through files which aren't already on the right host for
             # inclusion in the change set (this could include too many)
             for (pathId, path, fileId, version) in trv.iterFileList():
-                if version.branch().label().getHost() != newVersionHost:
+                if version.getHost() != newVersionHost:
                     allFilesNeeded.append((pathId, fileId, version))
 
             needsNewVersions = []
@@ -488,7 +488,7 @@ class ClientClone:
         newFilesNeeded = []
         for (pathId, newFileId, newFileVersion) in list(set(allFilesNeeded)):
 
-            fileHost = newFileVersion.branch().label().getHost()
+            fileHost = newFileVersion.getHost()
             if fileHost == newVersionHost:
                 # the file is already present in the repository
                 continue

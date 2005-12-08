@@ -30,6 +30,7 @@ StreamSet = cstreams.StreamSet
 StreamSetDef = cstreams.StreamSetDef
 SMALL = cstreams.SMALL
 LARGE = cstreams.LARGE
+DYNAMIC = cstreams.DYNAMIC
 
 class InfoStream(object):
 

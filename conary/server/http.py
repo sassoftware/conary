@@ -38,7 +38,7 @@ from conary.web.webhandler import WebHandler
 class ServerError(Exception):
     def __str__(self):
         return self.str
-        
+
 class InvalidPassword(ServerError):
     str = """Incorrect password."""
 
@@ -72,7 +72,7 @@ class HttpHandler(WebHandler):
             self.templatePath = os.path.dirname(sys.modules['conary.server.templates'].__file__) + os.path.sep
         else:
             self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
-                        
+
     def _getHandler(self, cmd):
         try:
             method = self.__getattribute__(cmd)
@@ -90,7 +90,7 @@ class HttpHandler(WebHandler):
 
         auth = self._getAuth()
         self.authToken = auth
-        
+
         if type(auth) is int:
             raise apache.SERVER_ERROR, auth
 
@@ -202,7 +202,7 @@ class HttpHandler(WebHandler):
     @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
         t = unquote(t)
-        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
+        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]})
         if t not in leaves:
             raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
         versionList = sorted(leaves[t].keys(), reverse = True)
@@ -211,13 +211,13 @@ class HttpHandler(WebHandler):
             reqVer = versionList[0]
         else:
             reqVer = versions.ThawVersion(v)
-            
+
         query = [(t, reqVer, x) for x in leaves[t][reqVer]]
         troves = self.repos.getTroves(query, withFiles = False)
         metadata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
         if t in metadata:
             metadata = metadata[t]
-            
+
         return self._write("trove_info", troveName = t, troves = troves,
             versionList = versionList,
             reqVer = reqVer,
@@ -228,14 +228,14 @@ class HttpHandler(WebHandler):
     def files(self, auth, t, v, f):
         v = versions.ThawVersion(v)
         f = deps.ThawDependencySet(f)
-       
+
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
-        
+
         # non-source group troves only show contained troves
         if t.startswith('group-') and not t.endswith(':source'):
             troves = sorted(parentTrove.iterTroveList())
             return self._write("group_contents", troveName = t, troves = troves)
-        else: # source troves and non-group troves 
+        else: # source troves and non-group troves
             fileIters = []
             for trove in self.repos.walkTroveSet(parentTrove):
                 files = self.repos.iterFilesInTrove(
@@ -245,8 +245,8 @@ class HttpHandler(WebHandler):
                     withFiles = True,
                     sortByPath = True)
                 fileIters.append(files)
-                
-            return self._write("files", 
+
+            return self._write("files",
                 troveName = t,
                 fileIters = itertools.chain(*fileIters))
 
@@ -255,11 +255,11 @@ class HttpHandler(WebHandler):
     def getFile(self, auth, path, pathId, fileId, fileV):
         from mimetypes import guess_type
         from conary.lib import sha1helper
-        
+
         pathId = sha1helper.md5FromString(pathId)
         fileId = sha1helper.sha1FromString(fileId)
         ver = versions.VersionFromString(fileV)
-      
+
         fileObj = self.repos.getFileVersion(pathId, fileId, ver)
         contents = self.repos.getFileContents([(fileId, ver)])[0]
 
@@ -267,15 +267,15 @@ class HttpHandler(WebHandler):
             self.req.content_type = "text/plain"
         else:
             typeGuess = guess_type(path)
-        
-            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path 
+
+            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path
             if typeGuess[0]:
                 self.req.content_type = typeGuess[0]
             else:
                 self.req.content_type = "application/octet-stream"
-            
+
         self.req.headers_out["Content-Length"] = fileObj.sizeString()
-        return contents.get().read() 
+        return contents.get().read()
 
     @checkAuth(write = True)
     @strFields(troveName = "")
@@ -300,12 +300,12 @@ class HttpHandler(WebHandler):
             if not troveNameList:
                 return self._write("error", error = "You must provide a trove name.")
             troveName = troveNameList
-       
+
         source = source.lower()
-        
+
         versions = self.repServer.getTroveVersionList(self.authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None })
-        
+
         branches = {}
         for version in versions[troveName]:
             version = self.repServer.thawVersion(version)
@@ -352,13 +352,13 @@ class HttpHandler(WebHandler):
                        longDesc, source, selUrl, selLicense,
                        selCategory):
         branch = self.repServer.thawVersion(branch)
-        
+
         self.troveStore.updateMetadata(troveName, branch,
                                        shortDesc, longDesc,
                                        selUrl, selLicense,
                                        selCategory, source, "C")
         self._redirect("metadata?troveName=%s" % troveName)
-    
+
     @checkAuth(write = True, admin = True)
     def userlist(self, auth):
         return self._write("user_admin", netAuth = self.repServer.auth)
@@ -369,8 +369,8 @@ class HttpHandler(WebHandler):
         groups = (x[1] for x in self.repServer.auth.iterGroups())
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
-    
-        return self._write("permission", operation='Add', group=userGroupName, trove=None, 
+
+        return self._write("permission", operation='Add', group=userGroupName, trove=None,
             label=None, groups=groups, labels=labels, troves=troves,
             writeperm=None, capped=None, admin=None)
 
@@ -382,7 +382,7 @@ class HttpHandler(WebHandler):
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
 
-        return self._write("permission", operation='Edit', group=group, label=label, 
+        return self._write("permission", operation='Edit', group=group, label=label,
             trove=trove, groups=groups, labels=labels, troves=troves,
             writeperm=writeperm, capped=capped, admin=admin)
 
@@ -394,7 +394,7 @@ class HttpHandler(WebHandler):
         writeperm = (writeperm == "on")
         capped = (capped == "on")
         admin = (admin == "on")
-       
+
         try:
             self.repServer.addAcl(self.authToken, 0, group, trove, label,
                writeperm, capped, admin)
@@ -415,7 +415,7 @@ class HttpHandler(WebHandler):
         admin = (admin == "on")
 
         try:
-            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove, 
+            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove,
                label, writeperm, capped, admin)
         except PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
@@ -423,7 +423,7 @@ class HttpHandler(WebHandler):
 
         return self._write("notice", message = "Permission successfully modified.",
             link = "User Administration", url = "userlist")
-  
+
     @checkAuth(write = True, admin = True)
     def addGroupForm(self, auth):
         users = dict(self.repServer.auth.iterUsers())
@@ -469,7 +469,7 @@ class HttpHandler(WebHandler):
     def deleteGroup(self, auth, userGroupId):
         self.repServer.auth.deleteGroupById(userGroupId)
         self._redirect("userlist")
- 
+
     @checkAuth(write = True, admin = True)
     @strFields(groupId = None, labelId = "", itemId = "")
     def deletePerm(self, auth, groupId, labelId, itemId):
@@ -510,20 +510,20 @@ class HttpHandler(WebHandler):
         else:
             username = self.authToken[0]
             askForOld = True
-        
+
         return self._write("change_password", username = username, askForOld = askForOld)
-   
+
     @checkAuth()
     @strFields(username = None, oldPassword = "",
                password1 = None, password2 = None)
     def chPass(self, auth, username, oldPassword,
                password1, password2):
         admin = self.repServer.auth.check(self.authToken, admin=True)
-        
+
         if username != self.authToken[0]:
             if not admin:
                 raise InsufficientPermission
-        
+
         if self.authToken[1] != oldPassword and self.authToken[0] == username and not admin:
             return self._write("error", error = "Error: old password is incorrect")
         elif password1 != password2:

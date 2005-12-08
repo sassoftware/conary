@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 import copy
 import itertools
@@ -31,7 +31,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM Versions
 		      INNER JOIN Nodes ON Versions.versionId = Nodes.versionId
-		      WHERE Versions.versionId=? AND Nodes.itemId=?""", 
+		      WHERE Versions.versionId=? AND Nodes.itemId=?""",
 		   theId, itemId)
 	try:
 	    (s, t) = cu.next()
@@ -56,10 +56,10 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveStore:
     def __init__(self, db):
 	self.db = db
-        
+
         self.db.commit()
         self.begin()
-        
+
         # Order matters! Create the simple (leaf) tables first, and
         # then the ones that have foreign keys
 	self.items = items.Items(self.db)
@@ -94,7 +94,7 @@ class TroveStore:
 
     def getLabelId(self, label):
         self.versionOps.labels.getOrAddId(label)
-        
+
     def getItemId(self, item):
         return self.items.getOrAddId(item)
 
@@ -147,13 +147,13 @@ class TroveStore:
 	"""
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT version, timeStamps FROM 
+	    SELECT version, timeStamps FROM
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
-		    WHERE itemId=(SELECT itemId from Items 
+		    WHERE itemId=(SELECT itemId from Items
 				WHERE item=?)
 		    AND branchId=(SELECT branchId FROM Branches
 				WHERE branch=?)
-		) INNER JOIN Latest ON 
+		) INNER JOIN Latest ON
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
 		INNER JOIN Nodes ON
 		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
@@ -189,12 +189,12 @@ class TroveStore:
                     vMap[versionStr] = version
                     cu.execute("""
                         INSERT INTO itf VALUES (?, ?, ?)
-                    """, 
+                    """,
                     (troveName, versionStr, versionStr), start_transaction = False)
 
             cu.execute("""
                 SELECT aItem, fullVersion, Flavors.flavor FROM
-                    (SELECT Items.itemId AS aItemId, 
+                    (SELECT Items.itemId AS aItemId,
                             versions.versionId AS aVersionId,
                             Items.item AS aItem,
                             fullVersion FROM
@@ -237,7 +237,7 @@ class TroveStore:
 	""")
 
 	self.fileVersionCache = {}
-	
+
 	return (cu, trove)
 
     def addTroveDone(self, troveInfo):
@@ -245,7 +245,7 @@ class TroveStore:
 	(cu, trove) = troveInfo
 
         logMe(3, trove)
-        
+
 	troveVersion = trove.getVersion()
 	troveItemId = self.getItemId(trove.getName())
 
@@ -257,7 +257,7 @@ class TroveStore:
 	newVersion = False
 	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is not None:
-	    nodeId = self.versionOps.nodes.getRow(troveItemId, 
+	    nodeId = self.versionOps.nodes.getRow(troveItemId,
 						  troveVersionId, None)
 
 	troveFlavor = trove.getFlavor()
@@ -277,18 +277,18 @@ class TroveStore:
 	cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor STR)")
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO NeededFlavors VALUES(?)", 
+	    cu.execute("INSERT INTO NeededFlavors VALUES(?)",
 		       flavor.freeze())
-	    
+
 	del flavorsNeeded
 
 	# it seems like there must be a better way to do this, but I can't
 	# figure it out. I *think* inserting into a view would help, but I
 	# can't with sqlite.
 
-	cu.execute("""SELECT NeededFlavors.flavor FROM	
+	cu.execute("""SELECT NeededFlavors.flavor FROM
 			NeededFlavors LEFT OUTER JOIN Flavors ON
-			    NeededFlavors.flavor = Flavors.Flavor 
+			    NeededFlavors.flavor = Flavors.Flavor
 			WHERE Flavors.flavorId is NULL""")
         # make a list of the flavors we're going to create.  Add them
         # after we have retreived all of the rows from this select
@@ -327,7 +327,7 @@ class TroveStore:
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
-	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
+	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
 					     troveFlavorId,
                                              trove.isRedirect(),
                                              isPresent = True)
@@ -339,19 +339,19 @@ class TroveStore:
             # flavor. update the latest table as needed
             troveBranchId = self.branchTable[troveVersion.branch()]
             cu.execute("DELETE FROM Latest WHERE branchId=? AND itemId=? "
-                       "AND flavorId=?", troveBranchId, troveItemId, 
+                       "AND flavorId=?", troveBranchId, troveItemId,
                        troveFlavorId)
-            cu.execute("""INSERT INTO Latest 
-                            SELECT ?, ?, ?, Instances.versionId 
+            cu.execute("""INSERT INTO Latest
+                            SELECT ?, ?, ?, Instances.versionId
                                 FROM Instances INNER JOIN Nodes ON
                                     Instances.itemId = Nodes.itemId AND
                                     Instances.versionId = Nodes.versionId
-                                WHERE 
-                                    Instances.itemId=? AND 
+                                WHERE
+                                    Instances.itemId=? AND
                                     Instances.flavorId=? AND
                                     Nodes.branchId=?
-                                ORDER BY 
-                                    finalTimestamp DESC 
+                                ORDER BY
+                                    finalTimestamp DESC
                                 LIMIT 1
                        """, troveItemId, troveBranchId, troveFlavorId,
                        troveItemId, troveFlavorId, troveBranchId)
@@ -363,7 +363,7 @@ class TroveStore:
 					   NewFiles.fileId,
 					   NewFiles.stream
 		FROM NewFiles LEFT OUTER JOIN FileStreams ON
-		    NewFiles.fileId = FileStreams.fileId 
+		    NewFiles.fileId = FileStreams.fileId
 		WHERE FileStreams.streamId is NULL
                 """)
 
@@ -371,8 +371,8 @@ class TroveStore:
         # (because they were originally added from a distributed branch)
         # for items whose stream is present in NewFiles
         cu.execute("""
-            INSERT OR REPLACE INTO FileStreams 
-                SELECT FileStreams.streamId, FileStreams.fileId, 
+            INSERT OR REPLACE INTO FileStreams
+                SELECT FileStreams.streamId, FileStreams.fileId,
                        NewFiles.stream
                 FROM NewFiles INNER JOIN FileStreams ON
                     NewFiles.fileId = FileStreams.FileId
@@ -406,24 +406,24 @@ class TroveStore:
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
-            assert(trove.isRedirect() or 
+            assert(trove.isRedirect() or
                             (not isPackage or versionId == troveVersionId))
-            assert(trove.isRedirect() or 
+            assert(trove.isRedirect() or
                             (not isPackage or flavorId == troveFlavorId))
 
 	    if versionId is not None:
-		nodeId = self.versionOps.nodes.getRow(itemId, 
+		nodeId = self.versionOps.nodes.getRow(itemId,
 						      versionId, None)
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
 						    itemId, version,
-						    flavorId, 
+						    flavorId,
 						    updateLatest = False)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
                                                 itemId, version,
-                                                flavorId, 
+                                                flavorId,
                                                 updateLatest = False)
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
@@ -435,15 +435,15 @@ class TroveStore:
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
-	del self.fileVersionCache 
+	del self.fileVersionCache
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):
         cu = self.db.cursor()
-       
+
         itemId = self.getItemId(troveName)
         branchId = self.branchTable[branch]
-       
+
         # if we're updating the default language, always create a new version
         # XXX we can remove one vesionTable.get call from here...
         # XXX this entire mass of code can probably be improved.
@@ -462,7 +462,7 @@ class TroveStore:
             if not latestVersion:
                 raise KeyError, troveName
             version = versions.VersionFromString(latestVersion)
-        
+
         versionId = self.versionTable.get(version, None)
         return self.metadataTable.add(itemId, versionId, branchId, shortDesc, longDesc,
                                       urls, licenses, categories, source, language)
@@ -480,7 +480,7 @@ class TroveStore:
                 branchId = self.branchTable[branch]
             else:
                 return None
-            
+
             if not version:
                 latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
             else:
@@ -496,19 +496,19 @@ class TroveStore:
                     branch = branch.parentBranch()
                 else:
                     return None
-            
+
             md = self.metadataTable.get(itemId, versionId, branchId, language)
-        
+
         md["version"] = versions.VersionFromString(latestVersion).asString()
         md["language"] = language
         return metadata.Metadata(md)
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
         logMe(3, troveName, troveVersion, troveFlavor)
-        
+
 	if not troveVersion:
 	    return self.items.has_key(troveName)
-	
+
 	assert(troveFlavor is not 0)
 
 	troveItemId = self.items.get(troveName, None)
@@ -524,8 +524,8 @@ class TroveStore:
 	troveFlavorId = self.flavors.get(troveFlavor, 0)
 	if troveFlavorId == 0:
             return False
-	
-	return self.instances.isPresent((troveItemId, troveVersionId, 
+
+	return self.instances.isPresent((troveItemId, troveVersionId,
 					 troveFlavorId))
 
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
@@ -550,14 +550,14 @@ class TroveStore:
             else:
                 flavorStr = "'%s'" % info[2].freeze()
 
-            cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" 
+            cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)"
                        % flavorStr, idx, info[0], info[1].asString(),
                        start_transaction = False)
 
-        cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect, 
-                             Nodes.timeStamps, Changelogs.name, 
+        cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect,
+                             Nodes.timeStamps, Changelogs.name,
                              ChangeLogs.contact, ChangeLogs.message
-                            FROM 
+                            FROM
                                 gtl, Items, Versions, Flavors, Instances as I,
                                 Nodes
                             LEFT OUTER JOIN ChangeLogs ON
@@ -571,7 +571,7 @@ class TroveStore:
                                 I.flavorId = flavors.flavorId AND
                                 I.itemId = Nodes.itemId AND
                                 I.versionId = Nodes.versionId
-                            ORDER BY 
+                            ORDER BY
                                 gtl.idx""")
 
         troveIdList = [ x for x in cu ]
@@ -581,15 +581,15 @@ class TroveStore:
         cu.execute("CREATE TEMPORARY TABLE gtlInst (idx INTEGER PRIMARY KEY, "
                       "instanceId INTEGER)", start_transaction = False)
         for singleTroveIds in troveIdList:
-            cu.execute("INSERT INTO gtlInst VALUES (?, ?)", 
-                       singleTroveIds[0], singleTroveIds[1], 
+            cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
+                       singleTroveIds[0], singleTroveIds[1],
                        start_transaction = False)
 
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
                         SELECT idx, item, version, flavor, byDefault,
                                Nodes.timeStamps
-                        FROM 
+                        FROM
                             gtlInst, TroveTroves, Instances, Items,
                             Versions, Flavors, Nodes
                         WHERE
@@ -609,7 +609,7 @@ class TroveStore:
         if withFiles:
             troveFilesCursor.execute("""
                         SELECT idx, pathId, path, version, fileId
-                        FROM 
+                        FROM
                             gtlInst, TroveFiles, Versions, FileStreams
                         WHERE
                             gtlInst.instanceId = TroveFiles.instanceId AND
@@ -653,7 +653,7 @@ class TroveStore:
                     [ float(x) for x in timeStamps.split(":") ])
 
             trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
-                              singleTroveInfo[2], changeLog, 
+                              singleTroveInfo[2], changeLog,
                               isRedirect = isRedirect)
 
             try:
@@ -726,13 +726,13 @@ class TroveStore:
 	troveItemId = self.items[troveName]
 	troveVersionId = self.versionTable[troveVersion]
 	troveFlavorId = self.flavors[troveFlavor]
-	troveInstanceId = self.instances[(troveItemId, troveVersionId, 
+	troveInstanceId = self.instances[(troveItemId, troveVersionId,
 					  troveFlavorId)]
 	versionCache = {}
 
 	cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		   "TroveFiles NATURAL JOIN FileStreams "
-		   "WHERE instanceId = ? %s" %sort, 
+		   "WHERE instanceId = ? %s" %sort,
 		   troveInstanceId)
 
 	versionCache = {}
@@ -758,10 +758,10 @@ class TroveStore:
 	if fileObj:
             if fileStream is None:
                 fileStream = fileObj.freeze()
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)", 
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
 		       (pathId, versionId, fileId, fileStream, path))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)", 
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)",
 		       (pathId, versionId, fileId, path))
 
     def getFile(self, pathId, fileId):
@@ -835,7 +835,7 @@ class FileRetriever:
 
         self.cu.execute("""
             SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
-                    getFilesTbl.fileId = FileStreams.fileId 
+                    getFilesTbl.fileId = FileStreams.fileId
         """)
 
         d = {}

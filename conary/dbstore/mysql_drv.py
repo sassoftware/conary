@@ -34,7 +34,7 @@ class Database(BaseDatabase):
     basic_transaction = "begin"
     cursorClass = Cursor
     type = "mysql"
-    
+
     def connect(self):
         assert(self.database)
         cdb = self._connectData(["user", "passwd", "host", "db"])
@@ -43,8 +43,8 @@ class Database(BaseDatabase):
                 del cdb[x]
         self.dbh = mysql.connect(**cdb)
         self._getSchema()
-        return True 
-                                 
+        return True
+
     def _getSchema(self):
         BaseDatabase._getSchema(self)
         c = self.cursor()
@@ -54,7 +54,7 @@ class Database(BaseDatabase):
         if version < "5.0.2":
             # these old versions can only list tables. that's kind of lame.
             c.execute("show tables")
-            self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])            
+            self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])
             if version > "5":
                 # starting at version 5, tables and views are listed
                 # in one single output. how dumb is that?

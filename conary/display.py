@@ -364,7 +364,7 @@ class TroveFormatter(TroveTupFormatter):
             except (errors.TroveMissing, KeyError):
                 pass
 
-        elif troveName.endswith(':source'):
+        elif n.endswith(':source'):
             sourceTrove = trove
 
         if trove.getBuildTime():
@@ -383,9 +383,8 @@ class TroveFormatter(TroveTupFormatter):
              ("Build time: %s" % buildTime)))
 
         if dcfg.fullVersions:
-            yield "Version   :", v
+            yield "Version   : %s" %v
             yield "Label     : %s" % v.branch().label().asString()
-
         else:
             yield "%-30s %s" % \
                 (("Version   : %s" % 
@@ -679,10 +678,12 @@ class JobFormatter(JobTupFormatter):
         dcfg = self.dcfg
         yield self.formatJobTup(job, comps)
         if dcfg.printInfo():
+            trove = dcfg.troveSource.getTrove(job[0], *job[2])
             for ln in self.formatInfo(trove):
                 yield ln
         elif dcfg.printDeps():
-            for ln in self.formatDeps(trove):
+            trvCs = dcfg.troveSource.getTroveChangeSet(job)
+            for ln in self.formatDeps(trvCs):
                 yield ln
 
     def formatJobFiles(self, job):

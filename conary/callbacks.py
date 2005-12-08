@@ -107,6 +107,15 @@ class SignatureCallback:
     def __init__(self):
         pass
 
+class KeyCacheCallback:
+
+    def getPublicKey(self, keyId, serverName):
+        return False
+
+    def __init__(self, repositoryMap = None, pubRing = ''):
+        self.repositoryMap = repositoryMap
+        self.pubRing = pubRing
+
 class LineOutput:
     last = 0
     out = sys.stdout

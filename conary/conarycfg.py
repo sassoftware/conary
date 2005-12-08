@@ -78,17 +78,23 @@ class CfgLabel(CfgType):
             raise ParseError, e
 
 class CfgRepoMapEntry(CfgType):
-        
+
     def format(self, val, displayOptions=None):
         if displayOptions.get('hidePasswords'):
             return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                         r'\1<user>:<password>@\2', val)
+                          r'\1<user>:<password>@\2', val)
         else:
             return val
 
+class RepoMap(dict):
+
+    def getNoPass(self, key):
+        return re.sub('(https?://)[^:]*:[^@]*@(.*)', r'\1\2', self[key])
+
 class CfgRepoMap(CfgDict):
     def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, default=default)
+        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
+                         default=default)
 
 class CfgFlavor(CfgType):
 
@@ -182,22 +188,23 @@ class ConaryConfiguration(SectionedConfigFile):
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
-    autoResolve           =  (CfgBool, False) 
+    autoResolve           =  (CfgBool, False)
     buildPath             =  '/var/tmp/conary/builds'
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, True)
     debugRecipeExceptions =  CfgBool
     fullVersions          =  CfgBool
-    fullFlavors           =  CfgBool 
+    fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
     interactive           =  (CfgBool, False)
-    logFile               =  (CfgPath, '/var/log/conary')
+    logFile               =  (CfgPathList, ('/var/log/conary',
+                                            '~/.conary/log',))
     lookaside             =  (CfgPath, '/var/cache/conary')
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
+    pubRing               =  (CfgPathList, ['~/.gnupg/pubring.gpg'])
     root                  =  (CfgPath, '/')
     showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
