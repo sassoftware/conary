@@ -26,6 +26,8 @@ Changes in 0.80.0:
     * When in multi-threaded mode, the download thread now checks to see
       if the update thread wants to exit.  This fixes many of the
       "timeout waiting for download thread to terminate" messages.
+    * Fixed bug where conary erase foo --no-deps wouldn't erase a component 
+      of foo if it was required by something else
   o Building packages:
     * Dependencies are now generated for Java .class and .jar files.
       They are not yet enforced, to give time to rebuild Java packages.
