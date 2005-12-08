@@ -221,7 +221,8 @@ class ConaryConfiguration(SectionedConfigFile):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
-            self.addConfigOption(*info)
+            if info[0] not in self:
+                self.addConfigOption(*info)
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 

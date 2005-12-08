@@ -153,6 +153,11 @@ class _Config:
         key = self._lowerCaseMap[key.lower()]
         self.__dict__[key] = value
 
+    def __contains__(self, key):
+        if key[0] == '_' or key.lower() not in self._lowerCaseMap:
+            return False
+        return True
+
     def setValue(self, key, value):
         self[key] = value
 
