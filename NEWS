@@ -48,6 +48,10 @@ Changes in 0.80.0:
       if you have a superclass that is in the repository but a supersuperclass
       locally, conary will find that as well 
     * r.Replace with parameters in the wrong order will now behave correctly
+    * The automatic :config component for configuration files has been
+      disabled because Conary does not handle files moving between
+      troves, and config files were being re-initialized when packages
+      were updated.
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed
