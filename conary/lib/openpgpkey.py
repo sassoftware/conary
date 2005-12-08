@@ -222,7 +222,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             except (KeyNotFound, IOError):
                 pass
         # callback should only return True if it found the key.
-        if self.callback.getPublicKey(keyId, serverName):
+        if serverName and self.callback.getPublicKey(keyId, serverName):
             return self.getPublicKey(keyId)
         raise KeyNotFound(keyId)
 
