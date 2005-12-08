@@ -497,6 +497,10 @@ class Trove(streams.StreamSet):
         @type keyCache: openpgpkey.OpenPGPKeyFileCache
         @rtype: (int, list)
         """
+        version = self.getVersion()
+        serverName = None
+        if isinstance(version, (versions.VersionSequence, versions.Label)):
+            serverName = version.getHost()
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
@@ -510,7 +514,8 @@ class Trove(streams.StreamSet):
 
         for signature in self.troveInfo.sigs.digitalSigs.iter():
             try:
-                key = keyCache.getPublicKey(signature[0])
+                key = keyCache.getPublicKey(signature[0],
+                                            serverName = serverName)
             except KeyNotFound:
                 missingKeys.append(signature[0])
                 continue

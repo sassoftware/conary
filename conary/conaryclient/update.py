@@ -111,14 +111,14 @@ class ClientUpdate:
             else:
                 return scoredList[-1][-1]
 
-        def _checkDeps(jobSet, trvSrc, findOrdering):
+        def _checkDeps(jobSet, trvSrc, findOrdering, resolveDeps):
 
             while True:
                 (depList, cannotResolve, changeSetList) = \
                                 self.db.depCheck(jobSet, uJob.getTroveSource(),
                                                  findOrdering = findOrdering)
 
-                if not cannotResolve:
+                if not cannotResolve or not resolveDeps:
                     return (depList, cannotResolve, changeSetList)
 
                 oldIdx = {}
@@ -127,7 +127,7 @@ class ClientUpdate:
                         oldIdx[(job[0], job[1][0], job[1][1])] = job
 
                 restoreSet = set()
-
+                    
                 for (reqInfo, depSet, provInfoList) in cannotResolve:
                     for provInfo in provInfoList:
                         if provInfo not in oldIdx: continue
@@ -166,13 +166,15 @@ class ClientUpdate:
                         # if there was an install portion of the job,
                         # retain it
                         jobSet.add((job[0], (None, None), job[2], False))
+        # end checkDeps "while True" loop here
 
         # def _resolveDependencies() begins here
 
         pathIdx = 0
         (depList, cannotResolve, changeSetList) = \
                     _checkDeps(jobSet, uJob.getTroveSource(),
-                               findOrdering = split)
+                               findOrdering = split, 
+                               resolveDeps = resolveDeps)
         suggMap = {}
 
         if not resolveDeps:
@@ -238,7 +240,8 @@ class ClientUpdate:
                 lastCheck = depList
                 (depList, cannotResolve, changeSetList) = \
                             _checkDeps(jobSet, uJob.getTroveSource(),
-                                       findOrdering = split)
+                                       findOrdering = split, 
+                                       resolveDeps = resolveDeps)
                 if lastCheck != depList:
                     pathIdx = 0
             else:

@@ -137,7 +137,7 @@ class SourceState(trove.Trove):
     def expandVersionStr(self, versionStr):
 	if versionStr[0] == "@":
 	    # get the name of the repository from the current branch
-	    repName = self.getVersion().branch().label().getHost()
+	    repName = self.getVersion().getHost()
 	    return repName + versionStr
 	elif versionStr[0] != "/" and versionStr.find("@") == -1:
 	    # non fully-qualified version; make it relative to the current

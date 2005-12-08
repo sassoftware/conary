@@ -678,10 +678,12 @@ class JobFormatter(JobTupFormatter):
         dcfg = self.dcfg
         yield self.formatJobTup(job, comps)
         if dcfg.printInfo():
+            trove = dcfg.troveSource.getTrove(job[0], *job[2])
             for ln in self.formatInfo(trove):
                 yield ln
         elif dcfg.printDeps():
-            for ln in self.formatDeps(trove):
+            trvCs = dcfg.troveSource.getTroveChangeSet(job)
+            for ln in self.formatDeps(trvCs):
                 yield ln
 
     def formatJobFiles(self, job):

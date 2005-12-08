@@ -465,7 +465,7 @@ def realMain(cfg, argv=sys.argv):
         showchangeset.displayChangeSet(db, cs, component, cfg, ls, 
                                         tags, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
-                                        deps=showDeps)
+                                        deps=showDeps, info=info)
     elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)

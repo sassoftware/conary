@@ -153,6 +153,11 @@ class _Config:
         key = self._lowerCaseMap[key.lower()]
         self.__dict__[key] = value
 
+    def __contains__(self, key):
+        if key[0] == '_' or key.lower() not in self._lowerCaseMap:
+            return False
+        return True
+
     def setValue(self, key, value):
         self[key] = value
 
@@ -689,13 +694,12 @@ class CfgList(CfgType):
 
 class CfgDict(CfgType):
 
-    dictType = dict
-    
-    def __init__(self, valueType, default={}):
+    def __init__(self, valueType, dictType=dict, default={}):
         if inspect.isclass(valueType) and issubclass(valueType, CfgType):
             valueType = valueType()
 
         self.valueType = valueType
+        self.dictType = dictType
         self.default = default
 
     def setFromString(self, val, str):
@@ -723,15 +727,15 @@ class CfgDict(CfgType):
             dkey, dvalue = val, ''
         else:
             (dkey, dvalue) = vals
-            
+
         dvalue = self.valueType.parseString(dvalue)
         return {dkey : dvalue}
 
     def getDefault(self, default=None):
         if default is None: 
             default = self.default
-        return dict((x,self.valueType.getDefault(y)) \
-                        for (x,y) in default.iteritems()) 
+        return self.dictType((x,self.valueType.getDefault(y)) \
+                             for (x,y) in default.iteritems()) 
 
 
     def toStrings(self, value, displayOptions):
@@ -796,8 +800,9 @@ class CfgRegExpList(CfgList):
         CfgList.__init__(self, CfgRegExp,  listType=RegularExpressionList, 
                          default=default)
 
-    def updateFromString(self, val, str):
-        val.extend(self.parseString(x) for x in val.split())
+    def updateFromString(self, val, newStr):
+        return self.listType(val +
+                     [self.valueType.parseString(x) for x in newStr.split()])
 
     def parseString(self, val):
         return self.listType(
