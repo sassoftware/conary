@@ -20,7 +20,7 @@
         <table style="width: 100%;">
             <tr py:for="pathId, path, fileId, version, fObj in files">
                 <?python #
-                    from lib import sha1helper
+                    from conary.lib import sha1helper
                     import os
                     from urllib import quote
 
