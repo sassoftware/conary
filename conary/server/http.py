@@ -38,7 +38,7 @@ from conary.web.webhandler import WebHandler
 class ServerError(Exception):
     def __str__(self):
         return self.str
-        
+
 class InvalidPassword(ServerError):
     str = """Incorrect password."""
 
@@ -72,7 +72,7 @@ class HttpHandler(WebHandler):
             self.templatePath = os.path.dirname(sys.modules['conary.server.templates'].__file__) + os.path.sep
         else:
             self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
-                        
+
     def _getHandler(self, cmd):
         try:
             method = self.__getattribute__(cmd)
@@ -90,9 +90,9 @@ class HttpHandler(WebHandler):
 
         auth = self._getAuth()
         self.authToken = auth
-        
+
         if type(auth) is int:
-            return auth
+            raise apache.SERVER_ERROR, auth
 
         cfg = conarycfg.ConaryConfiguration()
         cfg.repositoryMap = self.repServer.map
@@ -107,13 +107,14 @@ class HttpHandler(WebHandler):
         try:
             method = self._getHandler(self.cmd)
         except AttributeError:
-            return apache.HTTP_NOT_FOUND
+            raise apache.SERVER_ERROR, apache.HTTP_NOT_FOUND
 
         d = dict(self.fields)
         d['auth'] = auth
-
         try:
-            return method(**d)
+            output = method(**d)
+            self.req.write(output)
+            return apache.OK
         except InsufficientPermission:
             if auth[0] == "anonymous":
                 # if an anonymous user raises InsufficientPermission,
@@ -125,8 +126,10 @@ class HttpHandler(WebHandler):
         except InvalidPassword:
             # if password is invalid, request a new one
             return self._requestAuth()
+        except apache.SERVER_RETURN:
+            raise
         except:
-            self._write("error", shortError = "Error", error = traceback.format_exc())
+            self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
             return apache.OK
 
     def _requestAuth(self):
@@ -137,12 +140,11 @@ class HttpHandler(WebHandler):
     def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
-        self.writeFn(t.serialize(encoding="utf-8", cfg = self.cfg, **values))
+        return t.serialize(encoding="utf-8", cfg = self.cfg, **values)
 
     @checkAuth(write=True)
     def main(self, auth):
-        self._write("main_page")
-        return apache.OK
+        return self._write("main_page")
 
     @strFields(char = '')
     @checkAuth(write=False)
@@ -194,49 +196,46 @@ class HttpHandler(WebHandler):
             for component in components[x]:
                 packages.append(x + ":" + component)
 
-        self._write("browse", packages = sorted(packages), components = components, char = char, totals = totals)
-        return apache.OK
+        return self._write("browse", packages = sorted(packages), components = components, char = char, totals = totals)
 
     @strFields(t = None, v = "")
     @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
         t = unquote(t)
-        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
+        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]})
         if t not in leaves:
-            return apache.HTTP_NOT_FOUND
+            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
         versionList = sorted(leaves[t].keys(), reverse = True)
 
         if not v:
             reqVer = versionList[0]
         else:
             reqVer = versions.ThawVersion(v)
-            
+
         query = [(t, reqVer, x) for x in leaves[t][reqVer]]
         troves = self.repos.getTroves(query, withFiles = False)
         metadata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
         if t in metadata:
             metadata = metadata[t]
-            
-        self._write("trove_info", troveName = t, troves = troves,
-                                  versionList = versionList,
-                                  reqVer = reqVer,
-                                  metadata = metadata)
-           
-        return apache.OK
+
+        return self._write("trove_info", troveName = t, troves = troves,
+            versionList = versionList,
+            reqVer = reqVer,
+            metadata = metadata)
 
     @strFields(t = None, v = None, f = "")
     @checkAuth(write=False)
     def files(self, auth, t, v, f):
         v = versions.ThawVersion(v)
         f = deps.ThawDependencySet(f)
-       
+
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
-        
+
         # non-source group troves only show contained troves
         if t.startswith('group-') and not t.endswith(':source'):
             troves = sorted(parentTrove.iterTroveList())
-            self._write("group_contents", troveName = t, troves = troves)
-        else: # source troves and non-group troves 
+            return self._write("group_contents", troveName = t, troves = troves)
+        else: # source troves and non-group troves
             fileIters = []
             for trove in self.repos.walkTroveSet(parentTrove):
                 files = self.repos.iterFilesInTrove(
@@ -246,23 +245,21 @@ class HttpHandler(WebHandler):
                     withFiles = True,
                     sortByPath = True)
                 fileIters.append(files)
-                
-            self._write("files", 
+
+            return self._write("files",
                 troveName = t,
                 fileIters = itertools.chain(*fileIters))
-           
-        return apache.OK
 
     @strFields(path = None, pathId = None, fileId = None, fileV = None)
     @checkAuth(write=False)
     def getFile(self, auth, path, pathId, fileId, fileV):
         from mimetypes import guess_type
         from conary.lib import sha1helper
-        
+
         pathId = sha1helper.md5FromString(pathId)
         fileId = sha1helper.sha1FromString(fileId)
         ver = versions.VersionFromString(fileV)
-      
+
         fileObj = self.repos.getFileVersion(pathId, fileId, ver)
         contents = self.repos.getFileContents([(fileId, ver)])[0]
 
@@ -270,17 +267,15 @@ class HttpHandler(WebHandler):
             self.req.content_type = "text/plain"
         else:
             typeGuess = guess_type(path)
-        
-            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path 
+
+            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path
             if typeGuess[0]:
                 self.req.content_type = typeGuess[0]
             else:
                 self.req.content_type = "application/octet-stream"
-            
+
         self.req.headers_out["Content-Length"] = fileObj.sizeString()
-        
-        self.req.write(contents.get().read())
-        return apache.OK
+        return contents.get().read()
 
     @checkAuth(write = True)
     @strFields(troveName = "")
@@ -295,24 +290,22 @@ class HttpHandler(WebHandler):
             if loc < (len(troveList)-1):
                 troveName = troveList[loc+1]
 
-        self._write("pick_trove", troveList = troveList,
-                                  troveName = troveName)
-        return apache.OK
+        return self._write("pick_trove", troveList = troveList,
+            troveName = troveName)
 
     @checkAuth(write = True)
     @strFields(troveName = "", troveNameList = "", source = "")
     def chooseBranch(self, auth, troveName, troveNameList, source):
         if not troveName:
             if not troveNameList:
-                self._write("error", error = "You must provide a trove name.")
-                return apache.OK
+                return self._write("error", error = "You must provide a trove name.")
             troveName = troveNameList
-       
+
         source = source.lower()
-        
+
         versions = self.repServer.getTroveVersionList(self.authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None })
-        
+
         branches = {}
         for version in versions[troveName]:
             version = self.repServer.thawVersion(version)
@@ -320,14 +313,13 @@ class HttpHandler(WebHandler):
 
         branches = branches.keys()
         if len(branches) == 1:
-            return self._redirect("getMetadata?troveName=%s;branch=%s" %\
+            self._redirect("getMetadata?troveName=%s;branch=%s" %\
                 (troveName, branches[0].freeze()))
         else:
-            self._write("choose_branch",
+            return self._write("choose_branch",
                            branches = branches,
                            troveName = troveName,
                            source = source)
-        return apache.OK
 
     @checkAuth(write = True)
     @strFields(troveName = None, branch = None, source = "", freshmeatName = "")
@@ -342,17 +334,15 @@ class HttpHandler(WebHandler):
             try:
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
-                self._write("error", error = "No Freshmeat record found.")
-                return apache.OK
+                return self._write("error", error = "No Freshmeat record found.")
         else:
             md = self.troveStore.getMetadata(troveName, branch)
 
         if not md: # fill a stub
             md = metadata.Metadata(None)
 
-        self._write("metadata", metadata = md, branch = branch,
+        return self._write("metadata", metadata = md, branch = branch,
                                 troveName = troveName)
-        return apache.OK
 
     @checkAuth(write = True)
     @listFields(str, selUrl = [], selLicense = [], selCategory = [])
@@ -362,17 +352,16 @@ class HttpHandler(WebHandler):
                        longDesc, source, selUrl, selLicense,
                        selCategory):
         branch = self.repServer.thawVersion(branch)
-        
+
         self.troveStore.updateMetadata(troveName, branch,
                                        shortDesc, longDesc,
                                        selUrl, selLicense,
                                        selCategory, source, "C")
-        return self._redirect("metadata?troveName=%s" % troveName)
-    
+        self._redirect("metadata?troveName=%s" % troveName)
+
     @checkAuth(write = True, admin = True)
     def userlist(self, auth):
-        self._write("user_admin", netAuth = self.repServer.auth)
-        return apache.OK
+        return self._write("user_admin", netAuth = self.repServer.auth)
 
     @checkAuth(write = True, admin = True)
     @strFields(userGroupName = "")
@@ -380,11 +369,10 @@ class HttpHandler(WebHandler):
         groups = (x[1] for x in self.repServer.auth.iterGroups())
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
-    
-        self._write("permission", operation='Add', group=userGroupName, trove=None, 
-                label=None, groups=groups, labels=labels, troves=troves,
-                writeperm=None, capped=None, admin=None)
-        return apache.OK
+
+        return self._write("permission", operation='Add', group=userGroupName, trove=None,
+            label=None, groups=groups, labels=labels, troves=troves,
+            writeperm=None, capped=None, admin=None)
 
     @checkAuth(write = True, admin = True)
     @strFields(group = None, label = "", trove = "")
@@ -394,10 +382,9 @@ class HttpHandler(WebHandler):
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
 
-        self._write("permission", operation='Edit', group=group, label=label, 
-                trove=trove, groups=groups, labels=labels, troves=troves,
-                writeperm=writeperm, capped=capped, admin=admin)
-        return apache.OK
+        return self._write("permission", operation='Edit', group=group, label=label,
+            trove=trove, groups=groups, labels=labels, troves=troves,
+            writeperm=writeperm, capped=capped, admin=admin)
 
     @checkAuth(write = True, admin = True)
     @strFields(group = None, label = "", trove = "",
@@ -407,18 +394,15 @@ class HttpHandler(WebHandler):
         writeperm = (writeperm == "on")
         capped = (capped == "on")
         admin = (admin == "on")
-       
+
         try:
             self.repServer.addAcl(self.authToken, 0, group, trove, label,
                writeperm, capped, admin)
         except PermissionAlreadyExists, e:
-            self._write("error", shortError="Duplicate Permission",
-                    error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
-            return apache.OK
-        self._write("notice", message = "Permission successfully added.",
-                                 link = "User Administration",
-                                 url = "userlist")
-        return apache.OK
+            return self._write("error", shortError="Duplicate Permission",
+                error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
+        return self._write("notice", message = "Permission successfully added.",
+            link = "User Administration", url = "userlist")
 
     @checkAuth(write = True, admin = True)
     @strFields(group = None, label = "", trove = "",
@@ -431,23 +415,19 @@ class HttpHandler(WebHandler):
         admin = (admin == "on")
 
         try:
-            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove, 
+            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove,
                label, writeperm, capped, admin)
         except PermissionAlreadyExists, e:
-            self._write("error", shortError="Duplicate Permission",
-                    error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
-            return apache.OK
+            return self._write("error", shortError="Duplicate Permission",
+                error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
 
-        self._write("notice", message = "Permission successfully modified.",
-                                 link = "User Administration",
-                                 url = "userlist")
-        return apache.OK
-  
+        return self._write("notice", message = "Permission successfully modified.",
+            link = "User Administration", url = "userlist")
+
     @checkAuth(write = True, admin = True)
     def addGroupForm(self, auth):
         users = dict(self.repServer.auth.iterUsers())
-        self._write("add_group", modify = False, userGroupName = None, userGroupId = None, users = users, members = [])
-        return apache.OK
+        return self._write("add_group", modify = False, userGroupName = None, userGroupId = None, users = users, members = [])
 
     @checkAuth(write = True, admin = True)
     @strFields(userGroupName = None)
@@ -456,8 +436,7 @@ class HttpHandler(WebHandler):
         groupId = self.repServer.auth.getGroupIdByName(userGroupName)
         members = list(self.repServer.auth.iterGroupMembers(groupId))
 
-        self._write("add_group", userGroupName = userGroupName, userGroupId = groupId, users = users, members = members, modify = True)
-        return apache.OK
+        return self._write("add_group", userGroupName = userGroupName, userGroupId = groupId, users = users, members = members, modify = True)
 
     @checkAuth(write = True, admin = True)
     @strFields(userGroupName = None)
@@ -467,15 +446,13 @@ class HttpHandler(WebHandler):
         try:
             self.repServer.auth.renameGroup(userGroupId, userGroupName)
         except GroupAlreadyExists:
-            self._write("error", shortError="Invalid Group Name",
-                    error = "The group name you have chosen is already in use.")
-            return apache.OK
+            return self._write("error", shortError="Invalid Group Name",
+                error = "The group name you have chosen is already in use.")
         self.repServer.auth.updateGroupMembers(userGroupId, initialUserIds)
 
         users = dict(self.repServer.auth.iterUsers())
         members = list(self.repServer.auth.iterGroupMembers(userGroupId))
-        self._write("add_group", userGroupName = userGroupName, userGroupId = userGroupId, users = users, members = members, modify = True)
-        return apache.OK
+        return self._write("add_group", userGroupName = userGroupName, userGroupId = userGroupId, users = users, members = members, modify = True)
 
     @checkAuth(write = True, admin = True)
     @strFields(userGroupName = None)
@@ -485,14 +462,14 @@ class HttpHandler(WebHandler):
         for userId in initialUserIds:
             self.repServer.auth.addGroupMember(newGroupId, userId)
 
-        return self._redirect("userlist")
+        self._redirect("userlist")
 
     @checkAuth(write = True, admin = True)
     @intFields(userGroupId = None)
     def deleteGroup(self, auth, userGroupId):
         self.repServer.auth.deleteGroupById(userGroupId)
-        return self._redirect("userlist")
- 
+        self._redirect("userlist")
+
     @checkAuth(write = True, admin = True)
     @strFields(groupId = None, labelId = "", itemId = "")
     def deletePerm(self, auth, groupId, labelId, itemId):
@@ -504,12 +481,11 @@ class HttpHandler(WebHandler):
         if not itemId:
             itemId = None
         self.repServer.auth.deleteAcl(groupId, labelId, itemId)
-        return self._redirect("userlist")
+        self._redirect("userlist")
 
     @checkAuth(write = True, admin = True)
     def addUserForm(self, auth):
-        self._write("add_user")
-        return apache.OK
+        return self._write("add_user")
 
     @checkAuth(write = True, admin = True)
     @strFields(user = None, password = None)
@@ -518,14 +494,13 @@ class HttpHandler(WebHandler):
         self.repServer.addUser(self.authToken, 0, user, password)
         self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin)
 
-        return self._redirect("userlist")
+        self._redirect("userlist")
 
     @checkAuth(write = True, admin = True)
     @strFields(username = None)
     def deleteUser(self, auth, username):
         self.repServer.auth.deleteUserByName(username)
-
-        return self._redirect("userlist")
+        self._redirect("userlist")
 
     @checkAuth()
     @strFields(username = "")
@@ -535,27 +510,26 @@ class HttpHandler(WebHandler):
         else:
             username = self.authToken[0]
             askForOld = True
-        
-        self._write("change_password", username = username, askForOld = askForOld)
-        return apache.OK
-   
+
+        return self._write("change_password", username = username, askForOld = askForOld)
+
     @checkAuth()
     @strFields(username = None, oldPassword = "",
                password1 = None, password2 = None)
     def chPass(self, auth, username, oldPassword,
                password1, password2):
         admin = self.repServer.auth.check(self.authToken, admin=True)
-        
+
         if username != self.authToken[0]:
             if not admin:
                 raise InsufficientPermission
-        
+
         if self.authToken[1] != oldPassword and self.authToken[0] == username and not admin:
-            self._write("error", error = "Error: old password is incorrect")
+            return self._write("error", error = "Error: old password is incorrect")
         elif password1 != password2:
-            self._write("error", error = "Error: passwords do not match")
+            return self._write("error", error = "Error: passwords do not match")
         elif oldPassword == password1:
-            self._write("error", error = "Error: old and new passwords identical, not changing")
+            return self._write("error", error = "Error: old and new passwords identical, not changing")
         else:
             self.repServer.auth.changePassword(username, password1)
             if admin:
@@ -563,9 +537,8 @@ class HttpHandler(WebHandler):
             else:
                 returnLink = ("Main Menu", "main")
 
-            self._write("notice", message = "Password successfully changed",
-                        link = returnLink[0], url = returnLink[1])
-        return apache.OK
+            return self._write("notice", message = "Password successfully changed",
+                link = returnLink[0], url = returnLink[1])
 
     @checkAuth(admin=True)
     @strFields(key=None, owner="")
@@ -573,7 +546,7 @@ class HttpHandler(WebHandler):
         if not owner or owner == '--Nobody--':
             owner = None
         self.repServer.changePGPKeyOwner(self.authToken, 0, owner, key)
-        return self._redirect('pgpAdminForm')
+        self._redirect('pgpAdminForm')
 
     @checkAuth(write = True)
     def pgpAdminForm(self, auth):
@@ -599,25 +572,17 @@ class HttpHandler(WebHandler):
                 keys.append(keyPacket)
             openPgpKeys[userId] = keys
 
-        # FIXME: keyTable must be abolished once rBO catches up. It is left
-        # in for now to synchronize the transition.
-        self._write("pgp_admin", users = users, admin=admin,
-                    openPgpKeys = openPgpKeys)
-        return apache.OK
+        return self._write("pgp_admin", users = users, admin=admin, openPgpKeys = openPgpKeys)
 
     @checkAuth(write = True)
     def pgpNewKeyForm(self, auth):
-        self._write("pgp_submit_key")
-        return apache.OK
+        return self._write("pgp_submit_key")
 
     @checkAuth(write = True)
     @strFields(keyData = "")
     def submitPGPKey(self, auth, keyData):
-        # FIXME we need to check if the user has admin rights
-        # to alter somebody else's key
-        #not a problem yet since admins can only touch their own keys atm
         self.repServer.addNewAsciiPGPKey(self.authToken, 0, self.authToken[0], keyData)
-        return self._redirect('pgpAdminForm')
+        self._redirect('pgpAdminForm')
 
     @strFields(search = '')
     @checkAuth(write = False)
@@ -633,10 +598,8 @@ class HttpHandler(WebHandler):
         try:
             keyData = self.repServer.getAsciiOpenPGPKey(self.authToken, 0, search)
         except KeyNotFound:
-            self._write("error", shortError = "Key Not Found", error = "OpenPGP Key %s is not in this repository" %search)
-            return apache.OK
-        self._write("pgp_get_key", keyId = search, keyData = keyData)
-        return apache.OK
+            return self._write("error", shortError = "Key Not Found", error = "OpenPGP Key %s is not in this repository" %search)
+        return self._write("pgp_get_key", keyId = search, keyData = keyData)
 
 
 def flavorWrap(f):

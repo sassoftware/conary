@@ -54,6 +54,8 @@ def _parseSymbolTable(contents):
             i += 4
         elif tag == 5 or tag == 6:
             i += 8
+            # double counts as two
+            c += 1
         else:
             raise ValueError, 'unknown tag %d' %tag
         c += 1

@@ -77,7 +77,7 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
 
     # We use a changeset here instead of getTroves because changeset knows
     # how to do efficient recursion.
-    cs = repos.createChangeSet(jobList, withFiles = True, 
+    cs = repos.createChangeSet(jobList, withFiles = True,
                                withFileContents = False, recurse = recurse)
 
     totalNum = len([ x for x in cs.iterNewTroveList() ])

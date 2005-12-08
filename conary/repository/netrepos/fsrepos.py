@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 # implements a db-based repository
 
@@ -58,17 +58,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     ### File functions
 
     def getFileVersion(self, pathId, fileId, fileVersion, withContents = 0):
-	# the get trove netclient provides doesn't work with a 
-	# FilesystemRepository (it needs to create a change set which gets 
+	# the get trove netclient provides doesn't work with a
+	# FilesystemRepository (it needs to create a change set which gets
 	# passed)
-	if fileVersion.branch().label().getHost() != self.name:
+	if fileVersion.getHost() != self.name:
 	    assert(not withContents)
 	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
 	file = self.troveStore.getFile(pathId, fileId)
 	if withContents:
 	    if file.hasContents:
-		cont = filecontents.FromDataStore(self.contentsStore, 
+		cont = filecontents.FromDataStore(self.contentsStore,
 						    file.contents.sha1())
 	    else:
 		cont = None
@@ -77,9 +77,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return file
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId, 
+    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
                        fileVersion, fileStream = None):
-	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId, 
+	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId,
                                 fileVersion, fileStream = None)
 
     ###
@@ -101,7 +101,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True,
-                         keyCache = self.troveStore.keyTable.keyCache, threshold = threshold)
+                         keyCache = self.troveStore.keyTable.keyCache,
+                         threshold = threshold)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -117,16 +118,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def getFileContents(self, itemList):
         contents = []
-        
+
         for item in itemList:
             (fileId, fileVersion) = item[0:2]
-    
-            # the get trove netclient provides doesn't work with a 
-            # FilesystemRepository (it needs to create a change set which gets 
+
+            # the get trove netclient provides doesn't work with a
+            # FilesystemRepository (it needs to create a change set which gets
             # passed)
-            if fileVersion.branch().label().getHost() == self.name:
+            if fileVersion.getHost() == self.name:
                 fileObj = item[2]
-                cont = filecontents.FromDataStore(self.contentsStore, 
+                cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
             else:
                 # a bit of sleight of hand here... we look for this file in
@@ -144,8 +145,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
                         withFileContents = True, excludeAutoSource = False):
 	"""
-	troveList is a list of (troveName, flavor, oldVersion, newVersion, 
-        absolute) tuples. 
+	troveList is a list of (troveName, flavor, oldVersion, newVersion,
+        absolute) tuples.
 
 	if oldVersion == None and absolute == 0, then the trove is assumed
 	to be new for the purposes of the change set
@@ -214,7 +215,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             def __iter__(self):
                 while True:
                     yield self.next()
-            
+
             def append(self, item):
                 self.new.append(item)
 
@@ -229,7 +230,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         troveWrapper = troveListWrapper(troveList, self.troveStore, withFiles)
 
         for job in troveWrapper:
-	    (troveName, (oldVersion, oldFlavor), 
+	    (troveName, (oldVersion, oldFlavor),
 		        (newVersion, newFlavor), absolute), old, new = job
 
 	    # make sure we haven't already generated this changeset; since
@@ -251,7 +252,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    if same and otherNew == newVersion:
 			match = True
 			break
-		
+
 		if match: continue
 
 		dupFilter[(troveName, oldFlavor, newFlavor)].append(
@@ -261,8 +262,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				    [(oldVersion, newVersion)]
 
 	    if not newVersion:
-                if oldVersion.branch().label().getHost() != self.name:
-                    externalTroveList.append((troveName, 
+                if oldVersion.getHost() != self.name:
+                    externalTroveList.append((troveName,
                                          (oldVersion, oldFlavor),
                                          (None, None), absolute))
                 else:
@@ -273,9 +274,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                                 (None, None), absolute))
 		continue
 
-            if newVersion.branch().label().getHost() != self.name or \
-               (oldVersion and 
-                oldVersion.branch().label().getHost() != self.name):
+            if (newVersion.getHost() != self.name
+                or (oldVersion and oldVersion.getHost() != self.name)):
                 # don't try to make changesets between repositories; the
                 # client can do that itself
                 externalTroveList.append((troveName, (oldVersion, oldFlavor),
@@ -302,9 +302,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
-                if newFileVersion.branch().label().getHost() != self.name or \
-                   (oldFileVersion and
-                    oldFileVersion.branch().label().getHost() != self.name):
+                if (newFileVersion.getHost() != self.name
+                    or (oldFileVersion and
+                        oldFileVersion.getHost() != self.name)):
                     externalFileList.append((pathId, troveName,
                          (oldVersion, oldFlavor, oldFileId, oldFileVersion),
                          (newVersion, newFlavor, newFileId, newFileVersion)))
@@ -339,7 +339,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		newFile = idIdx[(pathId, newFileId)]
 
 		(filecs, contentsHash) = changeset.fileChangeSet(pathId,
-                                                                 oldFile, 
+                                                                 oldFile,
                                                                  newFile)
 
 		cs.addFile(oldFileId, newFileId, filecs)
@@ -352,7 +352,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if (contentsHash or (oldFile and newFile.flags.isConfig() 
+		if (contentsHash or (oldFile and newFile.flags.isConfig()
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion and oldFile.hasContents:
 			oldCont = self.getFileContents(
@@ -361,7 +361,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    newCont = self.getFileContents(
                             [ (newFileId, newFileVersion, newFile) ])[0]
 
-		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
+		    (contType, cont) = changeset.fileContentsDiff(oldFile,
 						oldCont, newFile, newCont)
 
                     # we don't let config files be ptr types; if they were
@@ -382,7 +382,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if not newFile.flags.isConfig() and \
                                 contType == changeset.ChangedFileTypes.file:
                         cont = filecontents.CompressedFromDataStore(
-                                              self.contentsStore, 
+                                              self.contentsStore,
                                               newFile.contents.sha1())
                         compressed = True
                     else:
@@ -394,7 +394,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if contType == changeset.ChangedFileTypes.ptr:
                         compressed = False
 
-		    cs.addFileContents(pathId, contType, cont, 
+		    cs.addFileContents(pathId, contType, cont,
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
 
@@ -408,7 +408,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, path, repositoryMap, logFile = None, 
+    def __init__(self, name, troveStore, path, repositoryMap, logFile = None,
                  requireSigs = False):
 	self.top = path
 	self.name = name
@@ -418,7 +418,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         from conary import conarycfg
 	self.reposSet = netclient.NetworkRepositoryClient(map,
                                     conarycfg.UserInformation())
-	
+
 	self.troveStore = troveStore
 
 	self.sqlDbPath = self.top + "/sqldb"

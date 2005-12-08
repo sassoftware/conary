@@ -590,7 +590,9 @@ def verifySelfSignatures(keyId, keyRing):
         # find first non-sig packet. that will be the limit
         seekNextPacket(keyRing)
         sigStart = keyRing.tell()
-        packetType = PKT_SIG << 2
+        packetType = readBlockType(keyRing)
+        if packetType != -1:
+            keyRing.seek(-1, SEEK_CUR)
         while (packetType >> 2) & 15 == PKT_SIG:
             seekNextPacket(keyRing)
             packetType = readBlockType(keyRing)
@@ -600,7 +602,7 @@ def verifySelfSignatures(keyId, keyRing):
         keyRing.seek(sigStart)
         intKeyId = fingerprintToInternalKeyId(fingerprint)
         while keyRing.tell() < limit:
-            if intKeyId == getSigId:
+            if intKeyId == getSigId(keyRing):
                 sigPoint = keyRing.tell()
                 try:
                     finalizeSelfSig(mainKeyData, keyRing, fingerprint, mainKey)
@@ -611,6 +613,8 @@ def verifySelfSignatures(keyId, keyRing):
             seekNextPacket(keyRing)
         keyRing.seek(mainKeyPoint)
         numUids = 0
+        # FIXME: this while loop is too delicate. do not assume there is a
+        # self signed signature for the userid packet.
         while keyRing.tell() < limit:
             # find the next userId packet
             data = mainKeyData
@@ -736,7 +740,7 @@ def fingerprintToInternalKeyId(fingerprint):
         return ''
     data = int(fingerprint[-16:],16)
     r = ''
-    while data:
+    for i in range(8):
         r = chr(data%256) + r
         data //= 256
     return r
@@ -746,6 +750,7 @@ def getSigId(keyRing):
     blockType = readBlockType(keyRing)
     if (blockType >> 2) & 15 != PKT_SIG:
         #block is not a signature. it has no sigId
+        keyRing.seek(startPoint, SEEK_SET)
         return ''
     readBlockSize(keyRing, blockType)
     assert (ord(keyRing.read(1)) == 4)
@@ -758,6 +763,8 @@ def getSigId(keyRing):
         subLen = ord(keyRing.read(1))
         if ord(keyRing.read(1)) == 16:
             done = 1
+        else:
+            keyRing.seek(subLen - 1, SEEK_CUR)
     data = keyRing.read(subLen - 1)
     keyRing.seek(startPoint)
     return data

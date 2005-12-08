@@ -15,7 +15,7 @@
 # retrieve the Database version
 def getDatabaseVersion(db):
     cu = db.cursor()
-    # DBSTORE: migrating to dbstore will make this obsolete    
+    # DBSTORE: migrating to dbstore will make this obsolete
     try:
         ret = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
     # DBSTORE: wire this exception through the dbstore exception handling
@@ -31,15 +31,15 @@ class SchemaMigration:
         self.msg = "Converting database schema to version %d..." % self.Version
         # DBSTORE: a dbstore.Database would have this done automatically
         self.version = getDatabaseVersion(db)
-        
-    # likely candidates for overrides    
+
+    # likely candidates for overrides
     def check(self):
-        return self.version == self.Version - 1            
+        return self.version == self.Version - 1
     def migrate(self):
         pass
     def message(self, msg = None):
         pass
-    
+
     def __call__(self):
         if not self.check():
             return self.version
@@ -48,7 +48,7 @@ class SchemaMigration:
         if ret == self.Version:
             self.__end()
         return ret
-    
+
     def __start(self):
         self.message()
 

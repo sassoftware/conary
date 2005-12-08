@@ -93,6 +93,9 @@ Full version strings are displayed instead of abbreviated version numbers
 .B \-\-info
 Displays information on the specified troves, including flavors, requirements
 and pin status.
+.TP
+.B \-\-signatures
+Displays digital signatures for the specified troves.
 .RE
 .TP
 .B rblist
@@ -264,6 +267,9 @@ Displays flavors of the troves
 .TP
 .B \-\-tags
 .\" FIXME: document
+.TP
+.B \-\-signatures
+Displays digital signatures for the specified troves.
 .RE
 .RE
 .TP
@@ -482,6 +488,9 @@ The transient lookaside cache used only during building, normally
 .B name
 The name used in changelog entries when committing changes to source
 components.
+.TP
+.B pubRing
+The filename of the OpenPGP Keyring to refer to for signature keys.
 .TP
 .B repositoryMap
 Maps a hostname from a label to a full URL for a networked repository.

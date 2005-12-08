@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from conary.deps import deps
 from conary.repository.netrepos import schema
@@ -18,7 +18,7 @@ class InstructionSets:
     def __init__(self, db):
         self.db = db
         schema.createInstructionSets(db)
-        
+
     def _freezeIsd(self, isd):
         frozen = isd.freeze()
         split = frozen.split(' ', 1)
@@ -40,7 +40,7 @@ class InstructionSets:
         else:
             frozen = base
         return deps.InstructionSetDependency.thawDependency(frozen)
-    
+
     def addId(self, isd):
         cu = self.db.cursor()
         assert(isinstance(isd, deps.Dependency))
@@ -75,7 +75,7 @@ class InstructionSets:
             cu.execute(query, (base,))
         else:
             query += "flags=?"
-            cu.execute(query, (base, flags))            
+            cu.execute(query, (base, flags))
         row = cu.fetchone()
         if row is None:
             raise KeyError, isd

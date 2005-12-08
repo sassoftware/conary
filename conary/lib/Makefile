@@ -18,6 +18,7 @@ python_files=	    __init__.py		\
 		    debugger.py		\
 		    erlcompleter.py	\
 		    epdb.py     	\
+		    javadeps.py     	\
 		    log.py		\
 		    logger.py		\
 		    magic.py		\

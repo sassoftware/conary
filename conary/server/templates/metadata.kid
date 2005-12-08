@@ -15,7 +15,7 @@
         # or fitness for a particular purpose. See the Common Public License for
         # full details.
         
-        from fmtroves import TroveCategories, LicenseCategories
+        from conary.fmtroves import TroveCategories, LicenseCategories
         source = metadata.getSource()
         if metadata.getVersion():
             # the only number that matters in the metadata version is the source revision

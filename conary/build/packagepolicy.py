@@ -564,7 +564,10 @@ class ComponentSpec(_filterSpec):
         if '_config' in keywords:
             config=keywords.pop('_config')
             self.recipe.PackageSpec(_config=config)
-            self.extraFilters.append(('config', util.literalRegex(config)))
+            # disable creating the automatic :config component
+            # until/unless we handle files moving between
+            # components
+            #self.extraFilters.append(('config', util.literalRegex(config)))
 	_filterSpec.updateArgs(self, *args, **keywords)
 
     def doProcess(self, recipe):
@@ -2179,6 +2182,9 @@ class Requires(_addInfo, _BuildPackagePolicy):
         flags = []
         if self._checkInclusion(info, path):
             if info[0] == '/':
+                depClass = deps.FileDependencies
+            elif info.startswith('file:'):
+                info = info.split('file:', 1)[1].strip()
                 depClass = deps.FileDependencies
             elif info.startswith('soname:'):
                 if not m or m.name != 'ELF':

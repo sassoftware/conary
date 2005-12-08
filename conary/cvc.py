@@ -46,8 +46,8 @@ sys.excepthook = util.genExcepthook()
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
-    def __init__(self):
-        updatecmd.UpdateCallback.__init__(self)
+    def __init__(self, cfg=None):
+        updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
 
 def usage(rc = 1):
@@ -66,6 +66,7 @@ def usage(rc = 1):
     print '                [--flavor  "<flavor>"] '
     print '                [--signature-key "<fingerprint>"]'
     print '                [--macro "<macro> <value>"]+ '
+    print '                [--cross "[<host>--]<target>"] '
     print '                <file.recipe|troveName=<version>>[[flavor]]+'
     print '       cvc describe <xml file>'
     print "       cvc diff"
@@ -135,6 +136,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["context"] = ONE_PARAM
+    argDef["cross"] = ONE_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
     argDef["flavor"] = ONE_PARAM
@@ -150,6 +152,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
+    argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
@@ -191,8 +194,14 @@ def realMain(cfg, argv=sys.argv):
     # which is used when initializing a recipe class
     use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
 
+    root = argSet.pop('root', None)
+    if root:
+        cfg.root = root
+
     keyCache = openpgpkey.getKeyCache()
-    keyCache.setPublicPath(cfg.pubRing)
+    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
+                                                   cfg.pubRing[-1])
+    keyCache.setCallback(keyCacheCallback)
 
     if 'profile' in argSet:
 	del argSet['profile']
@@ -213,7 +222,7 @@ def realMain(cfg, argv=sys.argv):
 
 def sourceCommand(cfg, args, argSet, profile=False, callback = None):
     if not callback:
-        callback = CheckinCallback()
+        callback = CheckinCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -402,11 +411,27 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             del f
             del argSet['macros']
 
+        crossCompile = argSet.pop('cross', None)
+        if crossCompile:   
+            parts = crossCompile.split('--')
+            isCrossTool = False
+
+            if len(parts) == 1:
+                crossTarget = crossCompile
+                crossHost = None
+            else:
+                crossHost, crossTarget = parts
+                if crossHost == 'local':
+                    crossHost = None
+                    isCrossTool = True
+
+            crossCompile = (crossHost, crossTarget, isCrossTool)
+
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
-                         profile=profile)
+                         profile=profile, crossCompile=crossCompile)
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()

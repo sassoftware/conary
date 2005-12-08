@@ -57,7 +57,7 @@ class WebHandler(object):
 
     def _redirect(self, location):
         self.req.headers_out['Location'] = location
-        return apache.HTTP_MOVED_PERMANENTLY
+        raise apache.SERVER_RETURN, apache.HTTP_MOVED_PERMANENTLY
 
     def _handle(self):
         # both GET and POST events are treated the same way

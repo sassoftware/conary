@@ -538,8 +538,8 @@ class Database(SqlDbRepository):
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
-            localrep.LocalRepositoryChangeSetJob(self, cs, callback,
-                                                 autoPinList, threshold = threshold)
+            localrep.LocalRepositoryChangeSetJob( \
+                self, cs, callback, autoPinList, threshold = threshold)
             self.db.mapPinnedTroves(uJob.getPinMaps())
 
         errList = fsJob.getErrorList()

@@ -385,8 +385,8 @@ class ChangeSetJob:
 		    oldVersion = None
                     oldFileId = None
 
-                if fileHostFilter and \
-                 newVersion.branch().label().getHost() not in fileHostFilter:
+                if (fileHostFilter
+                    and newVersion.getHost() not in fileHostFilter):
                     fileObj = None
                     fileStream = None
 		elif tuple is None or (oldVersion == newVersion and

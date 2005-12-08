@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Copyright (c) 2005 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+
+if [ $# -lt 1 ]; then
+	echo "Usage: $0 "'"command that failed"'
+	echo "Example:"
+	echo "$0 "'"conary update gaim"'
+	exit
+fi
+
+tmpDir="/tmp/conaryError"
+if [ ! -d "$tmpDir" ]; then
+	echo "Assembling useful debugging information, please wait."
+	mkdir $tmpDir
+        echo "Error recorded at `date`" > $tmpDir/submit.script
+	echo "Conary version:" >> $tmpDir/submit.script
+	conary --version >> $tmpDir/submit.script 2>&1
+	echo "Conary command that causes the problem:" >> $tmpDir/submit.script 2>&1
+	echo "$1" >> $tmpDir/submit.script 2>&1
+	echo "(run in this case with --debug)" >> $tmpDir/submit.script 2>&1
+
+	$1 --debug >> $tmpDir/submit.script 2>&1
+	conary q --full-versions --flavors --debug &> $tmpDir/conary.q
+	conary config --debug > $tmpDir/conary.config  2>&1
+	tar jcvf $tmpDir/submit.tar.bz2 /var/log/conary $tmpDir/submit.script $tmpDir/conary.config $tmpDir/conary.q > /dev/null 2>&1
+	echo "Please submit $tmpDir/submit.tar.bz2 to the rPath support team"
+        echo "Then, delete $tmpDir (rm -r $tmpDir)"
+else
+	echo "Please inspect and delete $tmpDir (rm -r $tmpDir)"
+fi

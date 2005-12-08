@@ -111,14 +111,14 @@ class ClientUpdate:
             else:
                 return scoredList[-1][-1]
 
-        def _checkDeps(jobSet, trvSrc, findOrdering):
+        def _checkDeps(jobSet, trvSrc, findOrdering, resolveDeps):
 
             while True:
                 (depList, cannotResolve, changeSetList) = \
                                 self.db.depCheck(jobSet, uJob.getTroveSource(),
                                                  findOrdering = findOrdering)
 
-                if not cannotResolve:
+                if not cannotResolve or not resolveDeps:
                     return (depList, cannotResolve, changeSetList)
 
                 oldIdx = {}
@@ -127,7 +127,7 @@ class ClientUpdate:
                         oldIdx[(job[0], job[1][0], job[1][1])] = job
 
                 restoreSet = set()
-
+                    
                 for (reqInfo, depSet, provInfoList) in cannotResolve:
                     for provInfo in provInfoList:
                         if provInfo not in oldIdx: continue
@@ -166,13 +166,15 @@ class ClientUpdate:
                         # if there was an install portion of the job,
                         # retain it
                         jobSet.add((job[0], (None, None), job[2], False))
+        # end checkDeps "while True" loop here
 
         # def _resolveDependencies() begins here
 
         pathIdx = 0
         (depList, cannotResolve, changeSetList) = \
                     _checkDeps(jobSet, uJob.getTroveSource(),
-                               findOrdering = split)
+                               findOrdering = split, 
+                               resolveDeps = resolveDeps)
         suggMap = {}
 
         if not resolveDeps:
@@ -231,14 +233,15 @@ class ClientUpdate:
                                           keepExisting = False,
                                           recurse = False,
                                           ineligible = beingRemoved,
-                                          ignorePrimaryPins = False)[0]
+                                          ignorePrimaryPins = False)
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
                 lastCheck = depList
                 (depList, cannotResolve, changeSetList) = \
                             _checkDeps(jobSet, uJob.getTroveSource(),
-                                       findOrdering = split)
+                                       findOrdering = split, 
+                                       resolveDeps = resolveDeps)
                 if lastCheck != depList:
                     pathIdx = 0
             else:
@@ -527,6 +530,8 @@ class ClientUpdate:
         for job in transitiveClosure:
             if job[2][0] is None: continue
             if not job[3]: continue
+            if (job[0], job[2][0], job[2][1]) in ineligible: continue
+
             availableTrove.addTrove(job[0], job[2][0], job[2][1],
                                     presentOkay = True)
             names.add(job[0])
@@ -728,6 +733,9 @@ class ClientUpdate:
             if not recurse: continue
 
             for info in trv.iterTroveList():
+                if info in ineligible:
+                    continue
+
                 newTroves.append((info, False, pinned and ignorePins, 
                                   trv.includeTroveByDefault(*info)))
 
@@ -813,8 +821,6 @@ class ClientUpdate:
         removeJob = set()
         # This is the full, transitive closure of the job
         transitiveClosure = set()
-
-        splittable = True
 
         toFind = {}
         toFindNoDb = {}
@@ -949,9 +955,9 @@ class ClientUpdate:
             hasTroves = uJob.getTroveSource().hasTroves(
                 [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
 
-            reposChangeSetList = [ x[1] for x in
+            reposChangeSetList = set([ x[1] for x in
                               itertools.izip(hasTroves, jobSet)
-                               if x[0] is not True ]
+                               if x[0] is not True ])
 
             if reposChangeSetList != jobSet:
                 # we can't trust the closure from the changeset we're getting
@@ -968,7 +974,6 @@ class ClientUpdate:
             assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
             transitiveClosure.update(cs.getJobSet(primaries = False))
-            splittable = False
             del cs
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
@@ -994,7 +999,7 @@ class ClientUpdate:
 
         uJob.setPrimaryJobs(jobSet)
 
-        return newJob, splittable
+        return newJob
 
     def fullUpdateItemList(self):
         items = self.db.findUnreferencedTroves()
@@ -1046,11 +1051,15 @@ class ClientUpdate:
         and erase operations. If self.cfg.autoResolve is set, dependencies
         within the job are automatically closed.
 
-	@param itemList: A list of 3-length tuples: (troveName, version,
-	flavor).  If updateByDefault is True, trove names in itemList prefixed
+	@param itemList: A list of change specs: 
+        (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
+        isAbsolute).  isAbsolute specifies whether to try to find an older
+        version of trove on the system to replace if none is specified.
+	If updateByDefault is True, trove names in itemList prefixed
 	by a '-' will be erased. If updateByDefault is False, troves without a
 	prefix will be erased, but troves prefixed by a '+' will be updated.
-        @type itemList: [(troveName, version, flavor), ...]
+        @type itemList: [(troveName, (oldVer, oldFla), 
+                         (newVer, newFla), isAbs), ...]
 	@param keepExisting: If True, troves updated not erase older versions
 	of the same trove, as long as there are no conflicting files in either
 	trove.
@@ -1089,6 +1098,7 @@ class ClientUpdate:
 
         useAffinity = False
         forceJobClosure = False
+        splittable = True
 
         if fromChangesets:
             # when --from-file is used we need to explicitly compute the
@@ -1096,6 +1106,7 @@ class ClientUpdate:
             # repository to give us the right thing, but that won't
             # work when we're pulling jobs out of the change set
             forceJobClosure = True
+            splitabble = False
 
             csSource = trovesource.ChangesetFilesTroveSource(self.db)
             for cs in fromChangesets:
@@ -1111,19 +1122,20 @@ class ClientUpdate:
                                                    includesFileContents = True)
 
             uJob.setSearchSource(trovesource.stack(csSource, self.repos))
+            splittable = False
         elif sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
         else:
             uJob.setSearchSource(self.repos)
             useAffinity = True
 
-        jobSet, splittable = self._updateChangeSet(itemList, uJob,
-                                        keepExisting = keepExisting,
-                                        recurse = recurse,
-                                        updateMode = updateByDefault,
-                                        useAffinity = useAffinity,
-                                        ignorePrimaryPins = ignorePrimaryPins,
-                                        forceJobClosure = forceJobClosure)
+        jobSet = self._updateChangeSet(itemList, uJob,
+                                       keepExisting = keepExisting,
+                                       recurse = recurse,
+                                       updateMode = updateByDefault,
+                                       useAffinity = useAffinity,
+                                       ignorePrimaryPins = ignorePrimaryPins,
+                                       forceJobClosure = forceJobClosure)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
@@ -1232,7 +1244,7 @@ class ClientUpdate:
 
             return baseCs
 
-        def _applyCs(cs, uJob, removeHints = {}, recurseDepth = 0):
+        def _applyCs(cs, uJob, removeHints = {}):
             try:
                 self.db.commitChangeSet(cs, uJob,
                                         replaceFiles = replaceFiles,
@@ -1253,9 +1265,7 @@ class ClientUpdate:
                     rb.removeLast()
                     # if there aren't any entries left in the rollback,
                     # remove it altogether, unless we're about to try again
-                    if (rb.getCount() == 0) and \
-                           (not isinstance(e, openpgpkey.KeyNotFound) and \
-                            (not recurseDepth)):
+                    if (rb.getCount() == 0):
                         self.db.removeLastRollback()
                 # if the database is still in a transaction, then it
                 # probably shouldn't be.
@@ -1263,17 +1273,6 @@ class ClientUpdate:
                     self.db.db.rollback()
                 if isinstance(e, database.CommitError):
                     raise UpdateError, "changeset cannot be applied"
-                if isinstance(e, openpgpfile.KeyNotFound):
-                    # only retry once.
-                    if recurseDepth < 2:
-                        # ensure we grab the latest keys
-                        for keyId in e.keys:
-                            for val in self.cfg.repositoryMap.values():
-                                openpgpkey.findOpenPGPKey(val, keyId,
-                                                          self.cfg.pubRing)
-                        # try again.
-                        return _applyCs(cs, uJob, removeHints,
-                                 recurseDepth = recurseDepth + 1)
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
@@ -1281,6 +1280,7 @@ class ClientUpdate:
 	    # with the main thread
 	    db = database.Database(cfg.root, cfg.dbPath)
 	    repos = NetworkRepositoryClient(cfg.repositoryMap,
+                                            cfg.user,
 					    localRepository = db)
             callback.setAbortEvent(stopSelf)
 
@@ -1290,10 +1290,20 @@ class ClientUpdate:
 
                 callback.setChangesetHunk(i + 1, len(allJobs))
                 newCs = _createCs(repos, job, uJob)
-                q.put(newCs)
+
+                while True:
+                    # block for no more than 5 seconds so we can
+                    # check to see if we should sbort
+                    try:
+                        q.put(newCs, True, 5)
+                        break
+                    except Queue.Full:
+                        # if the queue is full, check to see if the
+                        # other thread wants to quit
+                        if stopSelf.isSet():
+                            return
 
             callback.setAbortEvent(None)
-
             q.put(None)
 
             # returning terminates the thread
@@ -1315,7 +1325,7 @@ class ClientUpdate:
             for job in allJobs:
                 removeHints.update([ (x[0], x[1][0], x[1][1])
                                         for x in job if x[1][0] is not None ])
-                
+
             if not self.cfg.threaded:
                 for i, job in enumerate(allJobs):
                     callback.setChangesetHunk(i + 1, len(allJobs))
@@ -1340,6 +1350,8 @@ class ClientUpdate:
                     i = 0
                     while True:
                         try:
+                            # get the next changeset object from the
+                            # download thread.  Block for 10 seconds max
                             newCs = csQueue.get(True, 10)
                         except Queue.Empty:
                             if downloadThread.isAlive():
@@ -1356,17 +1368,19 @@ class ClientUpdate:
                         callback.updateDone()
                 finally:
                     stopDownloadEvent.set()
-                    # the download thread _should_ respond to the stopDownloadEvent
-                    # in ~5 seconds.
+                    # the download thread _should_ respond to the
+                    # stopDownloadEvent in ~5 seconds.
                     downloadThread.join(20)
 
                     if downloadThread.isAlive():
-                        log.warning('timeout waiting for download thread to '
-                                    'terminate -- closing database and exiting')
-                        log.warning('the following traceback _may_ be related')
+                        log.warning('timeout waiting for download '
+                                    'thread to terminate -- closing '
+                                    'database and exiting')
                         self.db.close()
                         tb = sys.exc_info()[2]
                         if tb:
+                            log.warning('the following traceback may be '
+                                        'related:')
                             tb = traceback.format_tb(tb)
                             print >>sys.stderr, ''.join(tb)
                         # this will kill the download thread as well

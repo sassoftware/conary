@@ -153,6 +153,11 @@ class _Config:
         key = self._lowerCaseMap[key.lower()]
         self.__dict__[key] = value
 
+    def __contains__(self, key):
+        if key[0] == '_' or key.lower() not in self._lowerCaseMap:
+            return False
+        return True
+
     def setValue(self, key, value):
         self[key] = value
 
@@ -225,9 +230,23 @@ class ConfigFile(_Config):
 	if os.path.exists(path):
 	    f = open(path, "r")
 	    lineno = 1
-	    for line in f:
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+
+                lineCount = 1
+                while len(line) > 1 and '#' not in line and line[-2] == '\\':
+                    # handle \ at the end of the config line.
+                    # keep track of the lines we use so that we can
+                    # give accurate line #s for errors.  This config line
+                    # will be considered to live on its first line even 
+                    # though it spans multiple lines.
+
+                    line = line[:-2] + f.readline()
+                    lineCount += 1
 		self.configLine(line, path, lineno)
-		lineno = lineno + 1
+		lineno = lineno + lineCount
 	    f.close()
 	elif exception:
 	    raise IOError, "No such file or directory: '%s'" % path
@@ -270,7 +289,7 @@ class SectionedConfigFile(ConfigFile):
         A SectionedConfigFile allows the definition of sections 
         using [foo] to delineate sections.
 
-        When a new section is discovered, a new sectionType of 
+        When a new section is discovered, a new section with type 
         self._sectionType is assigned.
     """
 
@@ -360,11 +379,9 @@ class ConfigOption:
             valueType = valueType()
 
         self.valueType = valueType
+        self.default = valueType.getDefault(default)
 
-        if default is not None:
-            self.default = self.valueType.copy(default)
-        else:
-            self.default = self.valueType.copy(valueType.default)
+        
         self.listeners = []
 
     def parseString(self, curVal, str):
@@ -499,6 +516,14 @@ class CfgType:
         """
         return self.parseString(str)
 
+    def getDefault(self, default=None):
+        """ Get the default value for this CfgType
+        """
+        if default is not None:
+            return self.copy(default)
+        else:
+            return self.copy(self.default)
+
     def format(self, val, displayOptions=None):
         """ Return a formated version of val in a format determined by 
             displayOptions.
@@ -518,6 +543,13 @@ class CfgPath(CfgType):
 
     def parseString(self, str):
         return os.path.expanduser(str)
+
+    def getDefault(self, default=None):
+        val = CfgType.getDefault(self, default)
+        if val:
+            return os.path.expanduser(val)
+        else:
+            return val
 
 class CfgInt(CfgType):
      
@@ -611,6 +643,11 @@ class CfgLineList(CfgType):
         return self.listType(self.valueType.parseString(x) \
                              for x in val.split(self.separator) if x)
 
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return [ self.valueType.getDefault(x) for x in default ] 
+
     def updateFromString(self, val, str):
         return self.parseString(str)
 
@@ -641,6 +678,11 @@ class CfgList(CfgType):
         val.extend(self.parseString(str))
         return val
 
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return self.listType(self.valueType.getDefault(x) for x in default)
+
     def copy(self, val):
         return self.listType(self.valueType.copy(x) for x in val)
 
@@ -652,13 +694,12 @@ class CfgList(CfgType):
 
 class CfgDict(CfgType):
 
-    dictType = dict
-    
-    def __init__(self, valueType, default={}):
+    def __init__(self, valueType, dictType=dict, default={}):
         if inspect.isclass(valueType) and issubclass(valueType, CfgType):
             valueType = valueType()
 
         self.valueType = valueType
+        self.dictType = dictType
         self.default = default
 
     def setFromString(self, val, str):
@@ -686,9 +727,16 @@ class CfgDict(CfgType):
             dkey, dvalue = val, ''
         else:
             (dkey, dvalue) = vals
-            
+
         dvalue = self.valueType.parseString(dvalue)
         return {dkey : dvalue}
+
+    def getDefault(self, default=None):
+        if default is None: 
+            default = self.default
+        return self.dictType((x,self.valueType.getDefault(y)) \
+                             for (x,y) in default.iteritems()) 
+
 
     def toStrings(self, value, displayOptions):
         for key in sorted(value.iterkeys()):
@@ -734,6 +782,9 @@ class RegularExpressionList(list):
     def __init__(self, *args, **kw):
         list.__init__(self, *args, **kw)
 
+    def __repr__(self):
+        return 'RegularExpressionList(%s)' % list.__repr__(self)
+
     def addExp(self, val):
         list.append(self, (val, re.compile(val)))
 
@@ -745,12 +796,13 @@ class RegularExpressionList(list):
         return False
 
 class CfgRegExpList(CfgList):
-    def __init__(self, default=[]):
+    def __init__(self, default=RegularExpressionList()):
         CfgList.__init__(self, CfgRegExp,  listType=RegularExpressionList, 
                          default=default)
 
-    def updateFromString(self, val, str):
-        val.extend(self.parseString(x) for x in val.split())
+    def updateFromString(self, val, newStr):
+        return self.listType(val +
+                     [self.valueType.parseString(x) for x in newStr.split()])
 
     def parseString(self, val):
         return self.listType(

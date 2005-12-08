@@ -150,7 +150,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={}, 
                targetLabel = None, resume = None, alwaysBumpCount = False, 
                allowUnknownFlags = False, allowMissingSource = False,
-               ignoreDeps = False, logBuild = False, callback = None):
+               ignoreDeps = False, logBuild = False, 
+               crossCompile = None, callback = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -258,7 +259,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 				targetLabel = targetLabel,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
-                                ignoreDeps = ignoreDeps, logBuild = logBuild)
+                                ignoreDeps = ignoreDeps, logBuild = logBuild,
+                                crossCompile = crossCompile)
     elif recipeClass.getType() == recipe.RECIPE_TYPE_REDIRECT:
 	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
@@ -578,7 +580,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
-                      ignoreDeps=False, logBuild=False):
+                      ignoreDeps=False, logBuild=False, crossCompile = None):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -611,7 +613,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                                  sourceVersion, prep=prep,
                                  macros=macros, resume=resume,
                                  ignoreDeps=ignoreDeps, 
-                                 logBuild=logBuild)
+                                 logBuild=logBuild, 
+                                 crossCompile=crossCompile)
     if not result:
         return
 
@@ -627,7 +630,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
 
 def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		       macros={}, resume = None, ignoreDeps=False, 
-                       logBuild=False):
+                       logBuild=False, crossCompile=None):
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
@@ -637,7 +640,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     srcdirs = [ os.path.dirname(recipeClass.filename),
 		cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
-    recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
+    recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
+
     recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
     
@@ -960,7 +964,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
-             ignoreDeps = False, logBuild = False, callback = None):
+             ignoreDeps = False, logBuild = False, crossCompile = None,
+             callback = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1077,7 +1082,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 			    resume = resume, 
                             allowUnknownFlags = allowUnknownFlags,
                             allowMissingSource=False, ignoreDeps=ignoreDeps,
-                            logBuild=logBuild, callback=callback)
+                            logBuild=logBuild, 
+                            crossCompile=crossCompile, 
+                            callback=callback)
         if troves:
             built = (tuple(troves), changeSetFile)
     except errors.RepositoryError, e:
@@ -1116,7 +1123,8 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
-                ignoreDeps = False, profile = False, logBuild = True):
+                ignoreDeps = False, profile = False, logBuild = True,
+                crossCompile = None):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -1158,6 +1166,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
 				 emerge = emerge, resume = resume, 
                                  allowUnknownFlags = allowUnknownFlags, 
                                  ignoreDeps = ignoreDeps, logBuild = logBuild,
+                                 crossCompile = crossCompile,
                                  callback = CookCallback())
             except CookError, msg:
 		log.error(str(msg))

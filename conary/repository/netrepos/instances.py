@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from conary import sqlite3
 from conary.repository.netrepos import schema
@@ -23,7 +23,7 @@ class InstanceTable:
         self.db = db
         schema.createInstances(db)
         schema.createTroves(db)
-        
+
     def addId(self, itemId, versionId, flavorId, isRedirect, isPresent = True):
 	if isPresent:
 	    isPresent = 1

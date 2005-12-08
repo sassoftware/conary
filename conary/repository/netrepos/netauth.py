@@ -84,7 +84,7 @@ class NetworkAuthorization:
                     return True
 
         return False
-        
+
     def checkTrove(self, pattern, trove):
         if pattern=='ALL':
             return True
@@ -127,8 +127,8 @@ class NetworkAuthorization:
 
     def checkIsFullAdmin(self, user, password):
         cu = self.db.cursor()
-        cu.execute("""SELECT salt, password  
-                        FROM userPermissions 
+        cu.execute("""SELECT salt, password
+                        FROM userPermissions
                         WHERE User=? AND admin=1""", user)
 
         for (salt, cryptPassword) in cu:
@@ -183,13 +183,13 @@ class NetworkAuthorization:
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
             write, capped, admin):
-  
+
         cu = self.db.cursor()
 
         userGroupId = self.getGroupIdByName(userGroup)
 
         try:
-            cu.execute("""UPDATE Permissions SET 
+            cu.execute("""UPDATE Permissions SET
                               labelId = ?,
                               itemId = ?,
                               write = ?,
@@ -197,7 +197,7 @@ class NetworkAuthorization:
                               admin = ?
                             WHERE userGroupId=? AND
                                 labelId=? AND itemId=?
-                        """, labelId, troveId, write, capped, admin, 
+                        """, labelId, troveId, write, capped, admin,
                         userGroupId, oldLabelId, oldTroveId)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'columns userGroupId, labelId, itemId are not unique':
@@ -209,7 +209,7 @@ class NetworkAuthorization:
 
     def deleteAcl(self, userGroupId, labelId, itemId):
         cu = self.db.cursor()
-        
+
         stmt = """DELETE FROM Permissions
                   WHERE userGroupId=? AND
                         (labelId=? OR (labelId IS NULL AND ? IS NULL)) AND
@@ -246,7 +246,7 @@ class NetworkAuthorization:
 
     def addUser(self, user, password):
         salt = os.urandom(4)
-        
+
         m = md5.new()
         m.update(salt)
         m.update(password)
@@ -254,8 +254,8 @@ class NetworkAuthorization:
 
     def addUserByMD5(self, user, salt, password):
 
-        #Insert the UserGroup first, but since usergroups can be added 
-        #and deleted at will, and sqlite uses a MAX(id)+1 approach to 
+        #Insert the UserGroup first, but since usergroups can be added
+        #and deleted at will, and sqlite uses a MAX(id)+1 approach to
         #sequencing, use max(userId, userGroupId)+1 so that userId and
         #userGroupId can be in sync.  This will leave lots of holes, and
         #will probably need to be changed if conary moves to another db.
@@ -268,7 +268,7 @@ class NetworkAuthorization:
 
         try:
             # XXX: ahhh, how we miss real sequences...
-            cu.execute("""INSERT INTO UserGroups 
+            cu.execute("""INSERT INTO UserGroups
             SELECT MAX(
             (SELECT IFNULL(MAX(userId),0) FROM Users),
             (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
@@ -289,7 +289,7 @@ class NetworkAuthorization:
             raise
 
         userId = cu.lastrowid
-        cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
+        cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)",
                    userGroupId, userGroupId)
 
         self.db.commit()
@@ -330,7 +330,7 @@ class NetworkAuthorization:
             sql = "DELETE from UserGroupMembers WHERE userId=?"
             cu.execute(sql, userId)
 
-                
+
             #Then delete the UserGroup created with the name of that user
             try:
                 self.deleteGroup(user, False)
@@ -344,7 +344,7 @@ class NetworkAuthorization:
             sql = "DELETE from Users WHERE userId=?"
             cu.execute(sql, userId)
 
-            if commit: 
+            if commit:
                 self.db.commit()
         except Exception, e:
             if commit:
@@ -357,37 +357,37 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         salt = os.urandom(4)
-        
+
         m = md5.new()
         m.update(salt)
         m.update(newPassword)
         password = m.hexdigest()
 
-        cu.execute("UPDATE Users SET password=?, salt=? WHERE user=?", 
+        cu.execute("UPDATE Users SET password=?, salt=? WHERE user=?",
                    password, salt, user)
         self.db.commit()
 
     def getUserGroups(self, user):
         cu = self.db.cursor()
         cu.execute("""SELECT UserGroups.userGroup
-                      FROM UserGroups, Users, UserGroupMembers 
+                      FROM UserGroups, Users, UserGroupMembers
                       WHERE UserGroups.userGroupId = UserGroupMembers.userGroupId AND
                             UserGroupMembers.userId = Users.userId AND
                             Users.user = ?""", user)
-        
+
         return [row[0] for row in cu]
 
     def iterUsers(self):
         cu = self.db.cursor()
         cu.execute("SELECT userId, user FROM Users")
-        
+
         for row in cu:
             yield row
 
     def iterGroups(self):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId, userGroup FROM UserGroups")
-        
+
         for row in cu:
             yield row
 
@@ -490,7 +490,7 @@ class NetworkAuthorization:
     def updateGroupMembers(self, userGroupId, members):
         #Do this in a transaction
         cu = self.db.cursor()
-        
+
         #First drop all the current members
         cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
 
@@ -517,7 +517,7 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
 
-        #Note, there could be a user left behind with no associated group 
+        #Note, there could be a user left behind with no associated group
         #if the group being deleted was created with a user.  This user is not
         #deleted because it is possible for this user to be a member of
         #another group.
@@ -533,7 +533,7 @@ class NetworkAuthorization:
 
     def iterLabels(self):
         cu = self.db.cursor()
-       
+
         cu.execute("SELECT labelId, label FROM Labels")
         for row in cu:
             yield row

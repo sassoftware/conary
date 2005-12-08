@@ -28,7 +28,7 @@ from conary import versions
 def displayTroves(cfg, troveSpecs = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
                   info = False, tags = False, deps = False,
-                  showBuildReqs = False):
+                  showBuildReqs = False, digSigs = False):
     """
        Displays information about troves found in repositories
 
@@ -60,6 +60,8 @@ def displayTroves(cfg, troveSpecs = [], all = False, ls = False,
        @param showDiff: If true, display the difference between the local and
                         pristine versions of the trove
        @type showDiff: bool
+       @param digSigs: If true, list digital signatures for the troves
+       @type digSigs: bool
        @rtype: None
     """
 
@@ -70,9 +72,10 @@ def displayTroves(cfg, troveSpecs = [], all = False, ls = False,
                                                         all, leaves)
     iterChildren = not namesOnly
 
-    dcfg = display.DisplayConfig(repos, ls, ids, sha1s, cfg.fullVersions, tags, 
-                                 info, deps, showBuildReqs, cfg.fullFlavors,
-                                 iterChildren)
+    dcfg = display.DisplayConfig(repos, ls, ids, sha1s, digSigs,
+                                 cfg.fullVersions, tags, info, deps,
+                                 showBuildReqs, cfg.fullFlavors, iterChildren,
+                                 cfg.showComponents)
 
     if primary:
         dcfg.setPrimaryTroves(set(troveTups))
@@ -142,7 +145,7 @@ def getTrovesToDisplay(repos, cfg, troveSpecs, all, leaves):
                     if not hostList:
                         try:
                             ver = versions.VersionFromString(vS)
-                            host = ver.branch().label().getHost()
+                            host = ver.getHost()
                         except versions.ParseError:
                             pass
                 if not hostList:

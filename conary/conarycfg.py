@@ -78,17 +78,34 @@ class CfgLabel(CfgType):
             raise ParseError, e
 
 class CfgRepoMapEntry(CfgType):
-        
+
+    def parseString(self, str):
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', str)
+        if match is not None:
+            user, server = match.groups()
+            raise ParseError, ('repositoryMap entries should not contain '
+                               'user names and passwords; use '
+                               '"user %s %s <password>" instead' % 
+                               (server, user))
+
+        return CfgType.parseString(self, str)
+
     def format(self, val, displayOptions=None):
         if displayOptions.get('hidePasswords'):
             return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                         r'\1<user>:<password>@\2', val)
+                          r'\1<user>:<password>@\2', val)
         else:
             return val
 
+class RepoMap(dict):
+
+    def getNoPass(self, key):
+        return re.sub('(https?://)[^:]*:[^@]*@(.*)', r'\1\2', self[key])
+
 class CfgRepoMap(CfgDict):
     def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, default=default)
+        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
+                         default=default)
 
 class CfgFlavor(CfgType):
 
@@ -161,6 +178,7 @@ class ConaryContext(ConfigSection):
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
     repositoryMap         =  CfgRepoMap
+    root                  =  CfgPath
     signatureKey          =  CfgFingerPrint
     signatureKeyMap       =  CfgFingerPrintMap
     user                  =  CfgUserInfo
@@ -181,7 +199,7 @@ class ConaryConfiguration(SectionedConfigFile):
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
-    autoResolve           =  (CfgBool, False) 
+    autoResolve           =  (CfgBool, False)
     buildPath             =  '/var/tmp/conary/builds'
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
@@ -189,16 +207,18 @@ class ConaryConfiguration(SectionedConfigFile):
     debugRecipeExceptions =  CfgBool
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     fullVersions          =  CfgBool
-    fullFlavors           =  CfgBool 
+    fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
     interactive           =  (CfgBool, False)
-    logFile               =  (CfgPath, '/var/log/conary')
+    logFile               =  (CfgPathList, ('/var/log/conary',
+                                            '~/.conary/log',))
     lookaside             =  (CfgPath, '/var/cache/conary')
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
-    pubRing               =  (CfgPathList, ['/etc/conary/pubring.gpg'])
+    pubRing               =  (CfgPathList, ['~/.gnupg/pubring.gpg'])
     root                  =  (CfgPath, '/')
+    showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')
@@ -214,7 +234,8 @@ class ConaryConfiguration(SectionedConfigFile):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
-            self.addConfigOption(*info)
+            if info[0] not in self:
+                self.addConfigOption(*info)
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 

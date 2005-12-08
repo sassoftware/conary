@@ -62,6 +62,7 @@ INODE_STREAM_GROUP = 4
 
 SMALL = streams.SMALL
 LARGE = streams.LARGE
+DYNAMIC = streams.DYNAMIC
 
 FILE_TYPE_DIFF = '\x01'
 
@@ -254,8 +255,8 @@ class File(streams.StreamSet):
     streamDict = {
         FILE_STREAM_INODE    : (SMALL, InodeStream, "inode"),
         FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),
-        FILE_STREAM_PROVIDES : (SMALL, streams.DependenciesStream, 'provides'),
-        FILE_STREAM_REQUIRES : (SMALL, streams.DependenciesStream, 'requires'),
+        FILE_STREAM_PROVIDES : (DYNAMIC, streams.DependenciesStream, 'provides'),
+        FILE_STREAM_REQUIRES : (DYNAMIC, streams.DependenciesStream, 'requires'),
         FILE_STREAM_FLAVOR   : (SMALL, streams.DependenciesStream, 'flavor'),
         FILE_STREAM_TAGS     : (SMALL, streams.StringsStream, "tags")
         }
@@ -702,8 +703,9 @@ class UserGroupIdCache:
 
 	if root and root != '/':
 	    curDir = os.open(".", os.O_RDONLY)
-            # this doesn't chdir into the root to allow us to chroot
+            # chdir to the current root to allow us to chroot
             # back out again
+            os.chdir('/')
 	    os.chroot(root)
 	
 	try:

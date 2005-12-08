@@ -1,3 +1,11 @@
+Changes in 0.80.1:
+  o Client Changes:
+    * user names and passwords are no longer allowed in repository maps
+      (user configuration entries must be used instead)
+  o Building packages:
+    * Java dependency generation is now enabled; Java dependency enforcement
+      is still disabled.
+
 Changes in 0.80.0:
   o Client Changes:
     * The logic for defining updates across a hierarchy has been completely
@@ -20,11 +28,38 @@ Changes in 0.80.0:
       config file option should hold those instead (user *.rpath.org user pass)
     * If a user name is given without a password the password will be prompted
       for if the repository returns a permissions error
+    * added --components parameter to q and rq to not hide components
+    * conary update --full-versions --flavors now will work as expected
+    * fixed a bug with conary erase foo=/branchname
+    * When in multi-threaded mode, the download thread now checks to see
+      if the update thread wants to exit.  This fixes many of the
+      "timeout waiting for download thread to terminate" messages.
+    * Fixed bug where conary erase foo --no-deps wouldn't erase a component 
+      of foo if it was required by something else
   o Building packages:
     * Dependencies are now generated for Java .class and .jar files.
       They are not yet enforced, to give time to rebuild Java packages.
+    * Java dependency generation has been turned off until 0.80.1 in
+      order to wait until there is a deployed version of Conary with
+      long dependency handling; some .jar files have so many
+      dependencies that they overflowed dependency data structures.
     * CheckDesktopFiles now looks in /usr/share/icons for icons, and
       can find icon names without extensions specified.
+    * Build actions which take a subDir keyword argument now also can
+      take a skipMissingSubDir keyword argument which, if set to True,
+      causes the build action to be skipped if the specified subdirectory
+      does not exist.  By default, those build actions will now raise
+      an error if the directory does not exist, rather than running in
+      the wrong subdirectory as they did previously.
+    * You can now cook a recipe that has a superclass that is defined  
+      locally but a has supersuperclass that is in the repository.  Similarly,
+      if you have a superclass that is in the repository but a supersuperclass
+      locally, conary will find that as well 
+    * r.Replace with parameters in the wrong order will now behave correctly
+    * The automatic :config component for configuration files has been
+      disabled because Conary does not handle files moving between
+      troves, and config files were being re-initialized when packages
+      were updated.
   o Code structure:
     * queryrep, query, showchangeset, and update --info all use the same 
       code to determine how to display their data.  Display.py was changed
@@ -34,6 +69,11 @@ Changes in 0.80.0:
     * moved datastore.py into repository module
     * Stubs have been added for adding python and perl dependencies, and
       the stubs have been set to be initially ignored.
+    * The internal structure for conary configuration objects has changed
+    * A new DYNAMIC size has been added to the StreamSet object.  This will
+      cause StreamSet to use either a short or long int to store the size
+      of the frozen data that is included in a frozen StreamSet, depending
+      on the size of the data being stored.
 
 Changes in 0.71.2
   o Client Changes:

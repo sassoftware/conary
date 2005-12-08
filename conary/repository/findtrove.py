@@ -52,7 +52,7 @@ class Query:
                  acrossLabels, acrossFlavors, getLeaves, bestFlavor):
         self.map = {}
         self.defaultFlavorPath = defaultFlavorPath
-        if self.defaultFlavorPath is None:
+        if not self.defaultFlavorPath:
             self.query = [{}]
         else:
             self.query = [{} for x in defaultFlavorPath ]
@@ -114,7 +114,7 @@ class QueryByVersion(Query):
     def addQuery(self, troveTup, version, flavorList):
         name = troveTup[0]
         self.map[name] = troveTup
-        if flavorList is None:
+        if not flavorList:
             self.queryNoFlavor[name] = { version : None }
         else:
             for i, flavor in enumerate(flavorList):
@@ -195,7 +195,7 @@ class QueryByLabelPath(Query):
         self.map[name] = troveTup
 
         if self.acrossLabels:
-            if flavorList is None:
+            if not flavorList:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
                 # create one big query: {name : [{label  : [flavor1, flavor2],
@@ -221,7 +221,7 @@ class QueryByLabelPath(Query):
                         d[label] = [flavor]
         else:
             self.query[name] = []
-            if flavorList is None:
+            if not flavorList:
                 for label in labelPath:
                     self.query[name].append({label : None})
             elif self.acrossFlavors:
@@ -368,7 +368,7 @@ class QueryByBranch(Query):
 
     def addQuery(self, troveTup, branch, flavorList):
         name = troveTup[0]
-        if flavorList is None:
+        if not flavorList:
             self.queryNoFlavor[name] = { branch : None }
         else:
             for i, flavor in enumerate(flavorList):
@@ -396,12 +396,17 @@ class QueryByBranch(Query):
 
             self.addQuery(troveTup, branch, flavorList)
         else:
+            flavor = troveTup[2]
             for dummy, afVersion, afFlavor in affinityTroves:
                 if afVersion.isOnLocalHost():
                     self._addLocalTrove(troveTup)
                     continue
 
-                flavorList = self.overrideFlavors(afFlavor)
+                if flavor:
+                    flavorList = self.overrideFlavors(flavor)
+                else:
+                    flavorList = self.overrideFlavors(afFlavor)
+
                 self.addQuery(troveTup, afVersion.branch(), flavorList)
 
     def _addLocalTrove(self, troveTup):
@@ -463,11 +468,13 @@ class QueryByBranch(Query):
             self.addMissing(missing, name)
 
     def _findAllNoFlavor(self, troveSource, missing, finalMap):
+        if not self.queryNoFlavor:
+            return
         if self.getLeaves:
             res = troveSource.getTroveLeavesByBranch(self.queryNoFlavor, 
                                                      bestFlavor=False)
         else:
-            res = troveSource.getTroveVersionssByBranch(self.queryNoFlavor)
+            res = troveSource.getTroveVersionsByBranch(self.queryNoFlavor)
 
         for name in self.queryNoFlavor:
             if name not in res or not res[name]:
@@ -733,7 +740,7 @@ class TroveFinder:
 
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
-        if flavor is None and affinityTroves:
+        if affinityTroves:
             if self.query[QUERY_BY_BRANCH].hasName(name):
                 self.remaining.append(troveTup)
                 return

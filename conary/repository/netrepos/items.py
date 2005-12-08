@@ -10,19 +10,19 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from conary.dbstore import idtable
 
-class Items(idtable.IdTable):    
+class Items(idtable.IdTable):
     # we create the table as a "traditional" IdTable and then personalize it
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')       
+        idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')
     def initTable(self):
         cu = self.db.cursor()
         cu.execute(" ALTER TABLE Items ADD COLUMN "
                    " hasTrove INTEGER NOT NULL DEFAULT 0")
-        
+
     def setTroveFlag(self, itemId, val):
         cu = self.db.cursor()
         if val: val = 1
@@ -38,8 +38,8 @@ class Items(idtable.IdTable):
     def removeUnused(self):
 	cu = self.db.cursor()
 	cu.execute("""
-	    DELETE FROM Items WHERE Items.itemId IN 
+	    DELETE FROM Items WHERE Items.itemId IN
 		(SELECT items.itemId FROM items
-		 LEFT OUTER JOIN instances ON items.itemId = instances.itemId 
+		 LEFT OUTER JOIN instances ON items.itemId = instances.itemId
 		 WHERE instances.itemId is NULL)
 	""")

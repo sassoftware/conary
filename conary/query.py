@@ -28,7 +28,8 @@ from conary.lib import util
 def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   ls = False, ids = False, sha1s = False, 
                   tags = False, info = False, deps = False, 
-                  showBuildReqs = False, showDiff = False):
+                  showBuildReqs = False, showDiff = False,
+                  digSigs = False):
     """Displays troves after finding them on the local system
 
        @param db: Database instance to search for troves in
@@ -58,6 +59,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @param showDiff: If true, display the difference between the local and
        pristine versions of the trove
        @type showDiff: bool
+       @param digSigs: If true, display digital signatures for a trove.
+       @type digSigs: bool
        @rtype: None
     """
 
@@ -65,9 +68,9 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
 
     iterChildren = not namesOnly 
 
-    dcfg = LocalDisplayConfig(db, ls, ids, sha1s, cfg.fullVersions, tags, 
-                              info, deps, showBuildReqs, cfg.fullFlavors,
-                              iterChildren)
+    dcfg = LocalDisplayConfig(db, ls, ids, sha1s, digSigs, cfg.fullVersions,
+                              tags, info, deps, showBuildReqs, cfg.fullFlavors,
+                              iterChildren, cfg.showComponents)
     dcfg.setPrintDiff(showDiff)
 
     formatter = LocalTroveFormatter(dcfg)

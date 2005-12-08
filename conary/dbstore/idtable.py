@@ -23,7 +23,7 @@ class IdTable:
 	self.tableName = tableName
 	self.keyName = keyName
 	self.strName = strName
-        
+
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
@@ -31,7 +31,7 @@ class IdTable:
             cu.execute("CREATE TABLE %s (%s integer primary key, %s string)" %(
                 self.tableName, self.keyName, self.strName))
             cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
-                self.tableName, self.tableName, self.strName))               
+                self.tableName, self.tableName, self.strName))
 	    self.initTable()
 
     def initTable(self):
@@ -59,18 +59,18 @@ class IdTable:
             cu.execstmt(stmt, num, item)
 
         cu.execute('''INSERT INTO %(tableName)s (%(keyName)s, %(strName)s)
-                      SELECT DISTINCT 
-                         NULL, neededIds.%(strName)s FROM neededIds 
+                      SELECT DISTINCT
+                         NULL, neededIds.%(strName)s FROM neededIds
                          LEFT JOIN %(tableName)s AS existing USING(%(strName)s)
                          WHERE existing.%(keyName)s IS NULL
                    ''' % self.__dict__)
-        ids = [ x[0] for x in 
+        ids = [ x[0] for x in
                 cu.execute("""SELECT %s FROM neededIds JOIN %s USING(%s)
                               ORDER BY NUM"""
                            %(self.keyName, self.tableName, self.strName))]
         cu.execute('DROP TABLE neededIds')
         return ids
-           
+
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
@@ -189,7 +189,7 @@ class CachedIdTable(IdTable):
 
     def getItemDict(self, itemSeq):
 	raise NotImplementedError
-	
+
     def delId(self, theId):
 	raise NotImplementedError
 
@@ -207,28 +207,25 @@ class IdPairMapping:
 	self.tup2 = tup2
 	self.item = item
 	self.tableName = tableName
-        
+
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if self.tableName not in tables:
             cu.execute("CREATE TABLE %s(%s integer, "
 				       "%s integer, "
-				       "%s integer)" 
+				       "%s integer)"
 			% (tableName, tup1, tup2, item))
 
     def __setitem__(self, key, val):
 	(first, second) = key
-
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s VALUES (?, ?, ?)"
 		   % (self.tableName,), (first, second, val))
 
     def __getitem__(self, key):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
@@ -239,33 +236,27 @@ class IdPairMapping:
 
     def get(self, key, defValue):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
-	item = cu.fetchone()	
+	item = cu.fetchone()
 	if not item:
 	    return defValue
 	return item[0]
-	    
+
     def has_key(self, key):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
-	item = cu.fetchone()	
+	item = cu.fetchone()
 	return item != None
 
     def __delitem__(self, key):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("DELETE FROM %s WHERE %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2),
 		   (first, second))
@@ -279,13 +270,13 @@ class IdMapping:
 	self.key = key
 	self.item = item
 	self.tableName = tableName
-        
+
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if self.tableName not in tables:
             cu.execute("CREATE TABLE %s(%s integer, "
-				       "%s integer)" 
+				       "%s integer)"
 			% (tableName, key, item))
 
     def __setitem__(self, key, val):
@@ -296,7 +287,6 @@ class IdMapping:
 
     def __getitem__(self, key):
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
@@ -307,27 +297,24 @@ class IdMapping:
 
     def get(self, key, defValue):
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
-	item = cu.fetchone()	
+	item = cu.fetchone()
 	if not item:
 	    return defValue
 	return item[0]
 
     def has_key(self, key):
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
-	item = cu.fetchone()	
+	item = cu.fetchone()
 	return (item != None)
-	    
+
     def __delitem__(self, key):
         cu = self.db.cursor()
-	
         cu.execute("DELETE FROM %s WHERE %s=?"
                    % (self.tableName, self.key),
 		   key)
@@ -346,13 +333,10 @@ class IdPairSet(IdPairMapping):
 
     def __getitem__(self, key):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
-
 	first = cu.fetchone()
 	if not first:
 	    raise KeyError, key
@@ -360,13 +344,10 @@ class IdPairSet(IdPairMapping):
 
     def get(self, key, default):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
-
 	first = cu.fetchone()
 	if not first:
             return default
@@ -375,16 +356,14 @@ class IdPairSet(IdPairMapping):
 
     def getByFirst(self, first):
         cu = self.db.cursor()
-	
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.tup1),
 		   first)
-
 	first = cu.fetchone()
 	if not first:
 	    raise KeyError, first
 	return self._getitemgen(first, cu)
-    
+
     def __setitem__(self, key, value):
 	raise AttributeError
 
@@ -393,9 +372,7 @@ class IdPairSet(IdPairMapping):
 
     def delItem(self, key, val):
 	(first, second) = key
-
         cu = self.db.cursor()
-	
         cu.execute("DELETE FROM %s WHERE %s=? AND %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2, self.item),
 		   (first, second, val))

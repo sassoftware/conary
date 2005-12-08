@@ -12,7 +12,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 import base64
 import cgi
@@ -53,7 +53,7 @@ from conary.repository.netrepos.netserver import NetworkRepositoryServer
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
 class HttpRequests(SimpleHTTPRequestHandler):
-    
+
     outFiles = {}
     inFiles = {}
 
@@ -99,7 +99,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             base, queryString = base.split("?")
         else:
             queryString = ""
-        
+
         if base == 'changeset':
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
@@ -128,7 +128,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 size = os.stat(localName).st_size;
                 items = [ (localName, size) ]
                 totalSize = size
-    
+
             self.send_response(200)
             self.send_header("Content-type", "application/octet-stream")
             self.send_header("Content-Length", str(totalSize))
@@ -137,8 +137,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             for path, size in items:
                 if path.endswith('.ccs-out'):
                     cs = FileContainer(open(path))
-                    cs.dump(self.wfile.write, 
-                            lambda name, tag, size, f, sizeCb: 
+                    cs.dump(self.wfile.write,
+                            lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(self.wfile, name, tag, size, f,
                                                  sizeCb))
 
@@ -151,13 +151,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
                     os.unlink(path)
         else:
             self.send_error(501, "Not Implemented")
- 
+
     def do_POST(self):
         if self.headers.get('Content-Type', '') == 'text/xml':
             authToken = self.getAuth()
             if authToken is None:
                 return
-            
+
             return self.handleXml(authToken)
         else:
             self.send_error(501, "Not Implemented")
@@ -177,11 +177,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
         if authString.count(":") != 1:
             self.send_error(400)
             return None
-            
+
         authToken = authString.split(":")
 
         return authToken
-    
+
     def checkAuth(self):
  	if not self.headers.has_key('Authorization'):
             self.requestAuth()
@@ -190,20 +190,20 @@ class HttpRequests(SimpleHTTPRequestHandler):
             authToken = self.getAuth()
             if authToken is None:
                 return
-            
+
             # verify that the user/password actually exists in the database
             if not netRepos.auth.checkUserPass(authToken):
                 self.send_error(403)
                 return None
 
 	return authToken
-      
+
     def requestAuth(self):
         self.send_response(401)
         self.send_header("WWW-Authenticate", 'Basic realm="Conary Repository"')
         self.end_headers()
         return None
-      
+
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
         data = self.rfile.read(contentLength)
@@ -214,7 +214,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
-        
+
 	try:
 	    result = netRepos.callWrapper(None, None, method, authToken, params)
 	except errors.InsufficientPermission:
@@ -286,7 +286,7 @@ class ServerConfig(ConfigFile):
     repositoryMap       = CfgRepoMap
     requireSigs         = (CfgBool, False)
     tmpFilePath         = CfgPath, DEFAULT_FILE_PATH
- 
+
 
     def __init__(self, path="serverrc"):
 	ConfigFile.__init__(self)
@@ -352,7 +352,7 @@ if __name__ == '__main__':
     except options.OptionError, msg:
         print >> sys.stderr, msg
         sys.exit(1)
-        
+
 
     FILE_PATH = cfg.tmpFilePath
 
@@ -383,7 +383,7 @@ if __name__ == '__main__':
     # start the logging
     initLog(level=3, trace=1)
 
-    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
+    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH,
 			baseUrl, otherArgs[2], cfg.repositoryMap,
                         logFile = cfg.logFile, requireSigs = cfg.requireSigs)
 

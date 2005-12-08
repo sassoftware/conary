@@ -75,6 +75,7 @@ def usage(rc = 1):
     print "                 --flavors"
     print "                 --full-versions"
     print '                 --install-label <label>'
+    print "                 --pubring <path>"
     print "                 --root <root>"
     print "                 --context <context>"
     print ""
@@ -86,24 +87,23 @@ def usage(rc = 1):
     print "                 --ls"
     print "                 --path <file>"
     print "                 --sha1s"
+    print "                 --signatures"
     print "                 --tags"
     print ""
     print "repquery flags:  --all"
     print "                 --buildreqs"    
     print "                 --deps"    
-    print "                 --full-versions"
-    print "                 --flavors"
     print "                 --ids"
     print "                 --info"
     print "                 --leaves"
     print "                 --ls"
     print "                 --sha1s"
+    print "                 --signatures"
     print "                 --tags"
     print
     print "rollback flags:  --replace-files"
     print
-    print "showcs flags:    --full-versions"
-    print "                 --info"
+    print "showcs flags:    --info"
     print "                 --ls"
     print "                 --show-changes"
     print "                 --tags"
@@ -141,7 +141,6 @@ def realMain(cfg, argv=sys.argv):
 
     cfgMap["build-label"] = "buildLabel"
     cfgMap["exclude-troves"] = "excludeTroves"
-    cfgMap["root"] = "root"
     cfgMap["trust-threshold"] = "trustThreshold"
     cfgMap["pubring"] = "pubRing"
 
@@ -176,6 +175,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
+    argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
     argDef["sync"] = NO_PARAM
@@ -186,6 +186,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["version"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
+    argDef["signatures"] = NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
@@ -204,6 +205,9 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
+    if argSet.pop('components', False):
+        cfg.showComponents = True
+
     if argSet.pop('full-versions', False):
         cfg.fullVersions = True
 
@@ -219,8 +223,13 @@ def realMain(cfg, argv=sys.argv):
     context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
 
+
     if context:
         cfg.setContext(context)
+
+    root = argSet.pop('root', '')
+    if root:
+        cfg.root = root
 
     l = []
     for labelStr in argSet.get('install-label', []):
@@ -243,14 +252,16 @@ def realMain(cfg, argv=sys.argv):
 	del argSet['profile']
 
     keyCache = openpgpkey.getKeyCache()
-    keyCache.setPublicPath(cfg.pubRing)
+    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
+                                                   cfg.pubRing[-1])
+    keyCache.setCallback(keyCacheCallback)
 
     if (len(otherArgs) < 2):
 	return usage()
     elif (otherArgs[1] == "changeset"):
         kwargs = {}
         
-        callback = updatecmd.UpdateCallback()
+        callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):
@@ -325,14 +336,15 @@ def realMain(cfg, argv=sys.argv):
         updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
     elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
         paths = argSet.pop('path', [])
-	tags = argSet.pop('tags', False)
+        tags = argSet.pop('tags', False)
         info = argSet.pop('info', False)
-	ls = argSet.pop('ls', False)
-	deps = argSet.pop('deps', False)
-	showDiff = argSet.pop('diff', False)
-	ids = argSet.pop('ids', False)
-	sha1s = argSet.pop('sha1s', False)
-	showBuildReqs = argSet.pop('buildreqs', False)
+        ls = argSet.pop('ls', False)
+        deps = argSet.pop('deps', False)
+        showDiff = argSet.pop('diff', False)
+        ids = argSet.pop('ids', False)
+        sha1s = argSet.pop('sha1s', False)
+        digSigs = argSet.pop('signatures', False)
+        showBuildReqs = argSet.pop('buildreqs', False)
 
 	db = openDatabase(cfg.root, cfg.dbPath)
 
@@ -343,7 +355,7 @@ def realMain(cfg, argv=sys.argv):
                 query.displayTroves(db, cfg, otherArgs[2:], paths, ls, ids, 
                                     sha1s, tags, info=info, deps=deps, 
                                     showBuildReqs=showBuildReqs, 
-                                    showDiff=showDiff)
+                                    showDiff=showDiff, digSigs = digSigs)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1
@@ -351,21 +363,22 @@ def realMain(cfg, argv=sys.argv):
 	    return usage()
     elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq"):
         cfg.requireInstallLabelPath()
-	all = argSet.pop('all', False)
-	ls = argSet.pop('ls', False)
-	ids = argSet.pop('ids', False)
-	info = argSet.pop('info', False)
-	tags = argSet.pop('tags', False)
-	sha1s = argSet.pop('sha1s', False)
-	leaves = argSet.pop('leaves', False)
-	showDeps = argSet.pop('deps', False)
-	showBuildReqs = argSet.pop('buildreqs', False)
+        all = argSet.pop('all', False)
+        ls = argSet.pop('ls', False)
+        ids = argSet.pop('ids', False)
+        info = argSet.pop('info', False)
+        tags = argSet.pop('tags', False)
+        sha1s = argSet.pop('sha1s', False)
+        digSigs = argSet.pop('signatures', False)
+        leaves = argSet.pop('leaves', False)
+        showDeps = argSet.pop('deps', False)
+        showBuildReqs = argSet.pop('buildreqs', False)
 
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2:
 	    args = [cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    info, tags, showDeps, showBuildReqs ]
+                    info, tags, showDeps, showBuildReqs, digSigs ]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:
@@ -457,7 +470,7 @@ def realMain(cfg, argv=sys.argv):
         showchangeset.displayChangeSet(db, cs, component, cfg, ls, 
                                         tags, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
-                                        deps=showDeps)
+                                        deps=showDeps, info=info)
     elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
@@ -465,7 +478,7 @@ def realMain(cfg, argv=sys.argv):
         cfg.requireInstallLabelPath()
 	kwargs = {}
 
-        callback = updatecmd.UpdateCallback()
+        callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):

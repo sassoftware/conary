@@ -10,7 +10,7 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from conary import versions
 from conary.dbstore import idtable
@@ -21,7 +21,7 @@ class BranchTable(idtable.IdTable):
     def addId(self, branch):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Branches VALUES (NULL, ?)", 
+        cu.execute("INSERT INTO Branches VALUES (NULL, ?)",
 		   branch.asString())
 	return cu.lastrowid
 
@@ -51,13 +51,13 @@ class BranchTable(idtable.IdTable):
 	raise NotImplementedError
 
     # DBSTORE: dbstore should handle the case sensitive nature of this
-    # just fine, eliminating the need for overriding the __init__ call   
+    # just fine, eliminating the need for overriding the __init__ call
     def __init__(self, db):
         self.db = db
 	self.tableName = 'branches'
 	self.keyName = 'branchId'
 	self.strName = 'branch'
-        
+
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
@@ -108,15 +108,15 @@ class LatestTable:
 	(first, second, third) = key
 
         cu = self.db.cursor()
-	
+
         cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=?"
                             "AND flavorId=?",
 		   (first, second, third))
-	item = cu.fetchone()	
+	item = cu.fetchone()
 	if not item:
 	    return defValue
 	return item[0]
-	    
+
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
 	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
@@ -138,11 +138,11 @@ class Nodes:
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
 	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, ?)",
-		   itemId, branchId, versionId, 
+		   itemId, branchId, versionId,
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   '%.3f' %timeStamps[-1])
 	return cu.lastrowid
-		    
+
     def hasItemId(self, itemId):
         cu = self.db.cursor()
         cu.execute("SELECT itemId FROM Nodes WHERE itemId=?",
@@ -173,7 +173,7 @@ class SqlVersioning:
 	    SELECT versionId FROM Nodes WHERE
 		itemId=? AND branchId=? ORDER BY finalTimeStamp DESC
 	""", itemId, branchId)
-	
+
 	for (versionId,) in cu:
 	    yield versionId
 
@@ -234,14 +234,14 @@ class SqlVersioning:
 		if not currVer.isAfter(version):
 		    self.latest[(itemId, branchId, flavorId)] = versionId
 
-	nodeId = self.nodes.addRow(itemId, branchId, versionId, 
+	nodeId = self.nodes.addRow(itemId, branchId, versionId,
 				   version.timeStamps())
 
 	return (nodeId, versionId)
 
     def createBranch(self, itemId, branch):
 	"""
-	Creates a new branch for the given node. 
+	Creates a new branch for the given node.
 	"""
 	label = branch.label()
 	branchId = self.branchTable.get(branch, None)
@@ -276,7 +276,7 @@ class SqlVersionsError(Exception):
 class MissingBranchError(SqlVersionsError):
 
     def __str__(self):
-	return "node %d does not contain branch %s" % (self.itemId, 
+	return "node %d does not contain branch %s" % (self.itemId,
 						       self.branch.asString())
 
     def __init__(self, itemId, branch):
@@ -287,7 +287,7 @@ class MissingBranchError(SqlVersionsError):
 class DuplicateVersionError(SqlVersionsError):
 
     def __str__(self):
-	return "node %d already contains version %s" % (self.itemId, 
+	return "node %d already contains version %s" % (self.itemId,
 						        self.version.asString())
 
     def __init__(self, itemId, version):

@@ -10,10 +10,11 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
 from mod_python import apache
 from mod_python import util
+from mod_python.util import FieldStorage
 import os
 import traceback
 import xmlrpclib
@@ -54,7 +55,7 @@ def checkAuth(req, repos):
 
         if not repos.auth.checkUserPass(authToken):
             return None
-            
+
     return authToken
 
 def post(port, isSecure, repos, req):
@@ -64,7 +65,7 @@ def post(port, isSecure, repos, req):
 
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
-    
+
     if isSecure:
         protocol = "https"
     else:
@@ -79,7 +80,7 @@ def post(port, isSecure, repos, req):
         (params, method) = xmlrpclib.loads(data)
 
         try:
-            result = repos.callWrapper(protocol, port, method, authToken, 
+            result = repos.callWrapper(protocol, port, method, authToken,
                                        params)
         except errors.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
@@ -95,7 +96,7 @@ def post(port, isSecure, repos, req):
         return apache.OK
     else:
         from conary.server.http import HttpHandler
-        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port) 
+        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
         return httpHandler._methodHandler()
 
 def get(port, isSecure, repos, req):
@@ -114,12 +115,12 @@ def get(port, isSecure, repos, req):
     if uri.endswith('/'):
         uri = uri[:-1]
     cmd = os.path.basename(uri)
-    fields = util.FieldStorage(req)
+    fields = FieldStorage(req)
 
     authToken = getAuth(req)
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
-   
+
     if cmd == "changeset":
         if '/' in req.args:
             return apache.HTTP_FORBIDDEN
@@ -153,8 +154,8 @@ def get(port, isSecure, repos, req):
         for (path, size) in items:
             if path.endswith('.ccs-out'):
                 cs = FileContainer(open(path))
-                cs.dump(req.write, 
-                        lambda name, tag, size, f, sizeCb: 
+                cs.dump(req.write,
+                        lambda name, tag, size, f, sizeCb:
                             _writeNestedFile(req, name, tag, size, f,
                                              sizeCb))
 
@@ -219,7 +220,7 @@ def handler(req):
 
 	# and throw away any subdir portion
 	rest = req.uri[:-len(req.path_info)] + '/'
-        
+
 	urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
@@ -236,7 +237,7 @@ def handler(req):
             repositories[repName] = netserver.NetworkRepositoryServer(
                                     cfg.repositoryDir,
                                     cfg.tmpDir,
-                                    urlBase, 
+                                    urlBase,
                                     cfg.serverName,
                                     cfg.repositoryMap,
                                     commitAction = cfg.commitAction,
@@ -249,7 +250,7 @@ def handler(req):
 
     port = req.connection.local_addr[1]
     secure =  (port == 443)
-    
+
     repos = repositories[repName]
     method = req.method.upper()
 
