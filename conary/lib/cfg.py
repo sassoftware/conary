@@ -289,7 +289,7 @@ class SectionedConfigFile(ConfigFile):
         A SectionedConfigFile allows the definition of sections 
         using [foo] to delineate sections.
 
-        When a new section is discovered, a new sectionType of 
+        When a new section is discovered, a new section with type 
         self._sectionType is assigned.
     """
 
