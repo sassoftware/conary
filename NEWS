@@ -1,3 +1,8 @@
+Changes in 0.80.1:
+  o Building packages:
+    * Java dependency generation is now enabled; Java dependency enforcement
+      is still disabled.
+
 Changes in 0.80.0:
   o Client Changes:
     * The logic for defining updates across a hierarchy has been completely
