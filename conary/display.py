@@ -364,7 +364,7 @@ class TroveFormatter(TroveTupFormatter):
             except (errors.TroveMissing, KeyError):
                 pass
 
-        elif troveName.endswith(':source'):
+        elif n.endswith(':source'):
             sourceTrove = trove
 
         if trove.getBuildTime():
