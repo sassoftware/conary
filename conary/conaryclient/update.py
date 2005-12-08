@@ -240,7 +240,8 @@ class ClientUpdate:
                 lastCheck = depList
                 (depList, cannotResolve, changeSetList) = \
                             _checkDeps(jobSet, uJob.getTroveSource(),
-                                       findOrdering = split)
+                                       findOrdering = split, 
+                                       resolveDeps = resolveDeps)
                 if lastCheck != depList:
                     pathIdx = 0
             else:
