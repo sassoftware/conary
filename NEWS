@@ -1,3 +1,8 @@
+Changes in 0.80.1:
+  o Client Changes:
+    * user names and passwords are no longer allowed in repository maps
+      (user configuration entries must be used instead)
+
 Changes in 0.80.0:
   o Client Changes:
     * The logic for defining updates across a hierarchy has been completely

@@ -79,6 +79,17 @@ class CfgLabel(CfgType):
 
 class CfgRepoMapEntry(CfgType):
 
+    def parseString(self, str):
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', str)
+        if match is not None:
+            user, server = match.groups()
+            raise ParseError, ('repositoryMap entries should not contain '
+                               'user names and passwords; use '
+                               '"user %s %s <password>" instead' % 
+                               (server, user))
+
+        return CfgType.parseString(self, str)
+
     def format(self, val, displayOptions=None):
         if displayOptions.get('hidePasswords'):
             return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
