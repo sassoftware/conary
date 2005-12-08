@@ -795,8 +795,9 @@ class CfgRegExpList(CfgList):
         CfgList.__init__(self, CfgRegExp,  listType=RegularExpressionList, 
                          default=default)
 
-    def updateFromString(self, val, str):
-        val.extend(self.parseString(x) for x in val.split())
+    def updateFromString(self, val, newStr):
+        return self.listType(val +
+                     [self.valueType.parseString(x) for x in newStr.split()])
 
     def parseString(self, val):
         return self.listType(
