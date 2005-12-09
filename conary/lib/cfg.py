@@ -72,7 +72,7 @@ class _Config:
         for name, keyInfo in class_.__dict__.iteritems():
             if name.startswith('_'):
                 continue
-            params = ('type', 'default')
+            params = ('type', 'default', 'doc')
             kw = dict.fromkeys(params)
 
             if isinstance(keyInfo, (list,tuple)):
@@ -95,15 +95,12 @@ class _Config:
             yield [name] + [kw[x] for x in params]
 
 
-    def addConfigOption(self, key, type, default=None):
+    def addConfigOption(self, key, type, default=None, doc=None):
         """
         Defines a Configuration Item for this configuration.  
         This config item defines an available configuration setting.
         """
-        self._options[key] = ConfigOption(key, type, default)
-
-        # remove the default class documentation from this instance
-        self._options[key].__doc__ = None
+        self._options[key] = ConfigOption(key, type, default, doc)
 
         self._lowerCaseMap[key.lower()] = key
         self[key] = copy.deepcopy(self._options[key].default)
@@ -369,7 +366,7 @@ class ConfigOption:
         with it.
     """
 
-    def __init__(self, name, valueType, default=None):
+    def __init__(self, name, valueType, default=None, doc=None):
         self.name = name
 
         # CfgTypes must be instantiated to parse values, because they
@@ -380,7 +377,7 @@ class ConfigOption:
 
         self.valueType = valueType
         self.default = valueType.getDefault(default)
-
+        self.__doc__ = doc
         
         self.listeners = []
 
