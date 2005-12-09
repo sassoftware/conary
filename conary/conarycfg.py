@@ -227,7 +227,11 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
 
-    _sectionType          =  ConaryContext
+
+    # this allows a new section to be created on the fly with the type 
+    # ConaryContext
+    _allowNewSections     = True
+    _defaultSectionType   =  ConaryContext
 
     def __init__(self, readConfigFiles = True):
 	SectionedConfigFile.__init__(self)
