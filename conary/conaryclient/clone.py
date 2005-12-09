@@ -182,7 +182,13 @@ class ClientClone:
                 
             return infoList, buildVersion
 
-        def _needsRewrite(sourceBranch, targetBranch, verToCheck):
+        def _needsRewrite(sourceBranch, targetBranch, verToCheck, kind):
+            # if this version is for a referenced trove, we can be 
+            # sure that trove is being cloned as well, and so we always 
+            # need to rewrite its version.
+            if kind == V_REFTRV:
+                return True
+
             branchToCheck = verToCheck.branch()
 
             if sourceBranch == targetBranch:
@@ -238,7 +244,7 @@ class ClientClone:
         def _versionsNeeded(needDict, trv, sourceBranch, targetBranch,
                             rewriteTroveInfo):
             for (mark, src) in _iterAllVersions(trv, rewriteTroveInfo):
-                if _needsRewrite(sourceBranch, targetBranch, src[1]):
+                if _needsRewrite(sourceBranch, targetBranch, src[1], mark[0]):
                     l = needDict.setdefault(src, [])
                     l.append(mark)
 
@@ -336,24 +342,29 @@ class ClientClone:
             if newSourceVersion is None:
                 # we're not cloning the source at the same time; try and find
                 # the source version which was used when the source was cloned
-                try:
-                    currentVersionList = self.repos.getTroveVersionsByBranch(
-                      { srcTroveName : { targetBranch : None } } ) \
-                                [srcTroveName].keys()
-                except KeyError:
-                    print "No versions of %s exist on branch %s." \
-                                % (srcTroveName, targetBranch.asString()) 
-                    return False, None
-
-                trv = self.repos.getTrove(srcTroveName, currentVersionList[-1],
-                                     deps.DependencySet(), withFiles = False)
-                if trv.troveInfo.clonedFrom() == sourceVersion:
-                    newSourceVersion = trv.getVersion()
+                if targetBranch == sourceVersion.branch():
+                    newSourceVersion = sourceVersion
                 else:
-                    log.error("Cannot find cloned source for %s=%s" %
-                                (srcTroveName, sourceVersion.asString()))
-                    return False, None
-                del currentVersionList
+                    try:
+                        currentVersionList = \
+                            self.repos.getTroveVersionsByBranch(
+                              { srcTroveName : { targetBranch : None } } ) \
+                                        [srcTroveName].keys()
+                    except KeyError:
+                        print "No versions of %s exist on branch %s." \
+                                    % (srcTroveName, targetBranch.asString()) 
+                        return False, None
+
+                    trv = self.repos.getTrove(srcTroveName, 
+                                     currentVersionList[-1],
+                                     deps.DependencySet(), withFiles = False)
+                    if trv.troveInfo.clonedFrom() == sourceVersion:
+                        newSourceVersion = trv.getVersion()
+                    else:
+                        log.error("Cannot find cloned source for %s=%s" %
+                                    (srcTroveName, sourceVersion.asString()))
+                        return False, None
+                    del currentVersionList
 
             # we know newSourceVersion is right at this point. now find the new
             # binary version for each flavor
@@ -453,11 +464,11 @@ class ClientClone:
 
             needsNewVersions = []
             for (mark, src) in _iterAllVersions(trv, updateBuildInfo):
-                if _needsRewrite(sourceBranch, targetBranch, src[1]):
+                if _needsRewrite(sourceBranch, targetBranch, src[1], mark[0]):
                     _updateVersion(trv, mark, versionMap[src])
 
             for (pathId, path, fileId, version) in trv.iterFileList():
-                if _needsRewrite(sourceBranch, targetBranch, version):
+                if _needsRewrite(sourceBranch, targetBranch, version, None):
                     needsNewVersions.append((pathId, path, fileId))
 
             # need to be reversioned
