@@ -80,7 +80,10 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        groupIds = self.getAuthGroups(cu, authToken)
+        try:
+            groupIds = self.getAuthGroups(cu, authToken)
+        except errors.InsufficientPermission:
+            return False
 
         stmt = """
         select Items.item
