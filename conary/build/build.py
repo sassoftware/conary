@@ -192,7 +192,7 @@ class Automake(BuildCommand):
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
              macros.builddir, error=not self.skipMissingSubDir)
-        if not macros.actionDir:
+        if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
             return
 
@@ -268,7 +268,7 @@ class Configure(BuildCommand):
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
              macros.builddir, error=not self.skipMissingSubDir)
-        if not macros.actionDir:
+        if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
             return
 
@@ -383,7 +383,7 @@ class Make(BuildCommand):
 	    macros['overrides'] = ''
         macros.actionDir = action._expandOnePath(self.subDir, macros, 
              macros.builddir, error=not self.skipMissingSubDir)
-        if not macros.actionDir:
+        if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
             return
 

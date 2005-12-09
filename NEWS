@@ -7,6 +7,8 @@ Changes in 0.80.1:
   o Building packages:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
+    * The skipMissingSubDir keyword argument now actually works correctly
+      when the subdirectory is missing.
 
 Changes in 0.80.0:
   o Client Changes:
