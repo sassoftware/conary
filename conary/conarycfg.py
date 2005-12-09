@@ -332,6 +332,12 @@ def selectSignatureKey(cfg, label):
 def loadEntitlement(dirName, serverName):
     # XXX this should be replaced with a real xml parser
 
+    if not dirName:
+        # XXX
+        # this is a hack for the repository server which doesn't support
+        # entitlements, but needs to stop cross talking anyway
+        return None
+
     fullPath = os.path.join(dirName, serverName)
     if os.access(fullPath, os.X_OK):
         pipe = os.pipe()
