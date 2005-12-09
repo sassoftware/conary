@@ -198,7 +198,8 @@ class ServerCache:
         ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
 
         protocol, uri = urllib.splittype(url)
-        transporter = transport.Transport(https = (protocol == 'https'))
+        transporter = transport.Transport(https = (protocol == 'https'),
+                                          entitlement = ent)
 
         server = ServerProxy(url, transporter, self.pwPrompt)
         self.cache[serverName] = server

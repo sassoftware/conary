@@ -26,25 +26,71 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
+
+    def getAuthGroups(self, cu, authToken):
+        logMe(authToken[0], authToken[2], authToken[3])
+        # Find what group this user belongs to
+
+        # anonymous users should come through as anonymous, not None
+        assert(authToken[0])
+        cu.execute("""SELECT salt, password, userGroupId 
+                            FROM 
+                                Users, UserGroupMembers
+                            WHERE
+                                user = ? AND
+                                Users.userId = UserGroupMembers.userId""",
+                   authToken[0])
+
+        groupsFromUser = [ x for x in cu ]
+        
+        if groupsFromUser:
+            # each user can only appear once (by constraint), so we only
+            # need to validate the password once
+            if not self.checkPassword(groupsFromUser[0][0], 
+                                      groupsFromUser[0][1],
+                                      authToken[1]):
+                raise errors.InsufficientPermission
+
+            groupsFromUser = [ x[2] for x in groupsFromUser ]
+
+        if authToken[2] is not None:
+            # look up entitlements
+            cu.execute("""
+                  SELECT userGroupId 
+                        FROM EntitlementGroups, Entitlements 
+                  WHERE 
+                        entGroup=? AND 
+                        entitlement=? AND
+                        EntitlementGroups.entGroupId == Entitlements.entGroupId
+                """, authToken[2], authToken[3])
+            groupsFromUser += [ x[0] for x in cu ]
+
+        return groupsFromUser
+
     def check(self, authToken, write = False, admin = False, label = None, 
               trove = None):
-        logMe(2, authToken[0], write, admin, label, trove)
+        logMe(2, authToken[0], authToken[1], authToken[2], write, admin, 
+              label, trove)
+
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
 
         if not authToken[0]:
             return False
 
-        stmt = """
-        select Items.item, Users.salt, Users.password
-        from Users
-             join UserGroupMembers using (userId)
-             join Permissions using (userGroupId)
-             join Items using (itemId)
-        """
-        params = [ authToken[0] ]
+        cu = self.db.cursor()
 
-        where = ["Users.user = ?"]
+        groupIds = self.getAuthGroups(cu, authToken)
+
+        stmt = """
+        select Items.item
+        from Permissions join items using (itemId)
+        """
+
+        where = ["Permissions.userGroupId IN (%s)" % 
+                    ",".join("%d" % x for x in groupIds) ]
+        params = []
+
         if label:
             where.append("""
             (
@@ -64,24 +110,21 @@ class NetworkAuthorization:
         if where:
             stmt += "WHERE " + " AND ".join(where)
 
-        cu = self.db.cursor()
         cu.execute(stmt, params)
 
-        for (troveName, salt, password) in cu:
+        for (troveName,) in cu:
             if troveName=='ALL' or not trove:
                 regExp = None
             else:
+                import epdb
+                epdb.st()
                 regExp = self.reCache.get(troveName, None)
                 if regExp is None:
                     regExp = re.compile(troveName)
                     self.reCache[troveName] = regExp
 
             if not regExp or regExp.match(trove):
-                m = md5.new()
-                m.update(salt)
-                m.update(authToken[1])
-                if m.hexdigest() == password:
-                    return True
+                return True
 
         return False
 
