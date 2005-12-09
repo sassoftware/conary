@@ -28,11 +28,19 @@ class TroveInfoTable:
                                                                   data)""")
 
     def addInfo(self, cu, trove, idNum):
+        # c = True if the trove is a component
+        n = trove.getName()
+        c = ':' in n and not n.endswith(':source')
         for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
             if frz:
+                # FIXME: somehow we're getting buildReqs in the troveInfo
+                # table.  prevent this until the bug is found.
+                if c and tag == 4:
+                    raise RuntimeError('attempted to add build requires '
+                                       'trove info for a component: %s' %n)
                 cu.execute("INSERT INTO TroveInfo VALUES (?, ?, ?)",
-                           idNum, tag, frz)
+                           (idNum, tag, frz))
 
     def getInfo(self, cu, trove, idNum):
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?", 
