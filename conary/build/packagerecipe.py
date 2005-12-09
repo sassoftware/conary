@@ -93,6 +93,9 @@ baseMacros = {
     'target'		: '%(targetarch)s-unknown-linux',
     'host'		: '%(targetarch)s-unknown-linux',
     'build'		: '%(targetarch)s-unknown-linux',
+    'buildcc'           : '%(cc)s'
+    'buildcxx'          : '%(cxx)s'
+
 }
 
 crossMacros = {
