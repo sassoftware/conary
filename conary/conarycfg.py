@@ -205,6 +205,7 @@ class ConaryConfiguration(SectionedConfigFile):
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, True)
     debugRecipeExceptions =  CfgBool
+    entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
@@ -229,7 +230,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
     _sectionType          =  ConaryContext
 
-    def __init__(self, readConfigFiles = True):
+    def __init__(self, readConfigFiles=True):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
@@ -328,3 +329,79 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
+def loadEntitlement(dirName, serverName):
+    # XXX this should be replaced with a real xml parser
+
+    fullPath = os.path.join(dirName, serverName)
+    if os.access(fullPath, os.X_OK):
+        pipe = os.pipe()
+        childPid = os.fork()
+        if not childPid:
+            # double fork so we can wait immediately and not worry about
+            # it later on
+            if os.fork(): 
+                # there is probably a better way of exiting without
+                # cleaning things up?
+                os.kill(os.getpid(), 9)
+
+            os.dup2(pipe[1], 1)
+            os.close(0)
+            os.close(2)
+            os.close(pipe[0])
+            os.close(pipe[1])
+            os.execl(fullPath, fullPath, serverName)
+            os.kill(os.getpid(), 9)
+
+        os.close(pipe[1])
+        os.waitpid(childPid, 0)
+
+        f = os.fdopen(pipe[0])
+    elif os.access(fullPath, os.R_OK):
+        f = open(fullPath)
+    else:
+        return None
+
+    contents = "".join([ x[:-1] for x in f.readlines()])
+    key = None
+    keyGroup = None
+
+    tokens = []
+
+    while contents:
+        if contents[0] == '<':
+            i = contents.find('>')
+            tag = contents[1:i]
+            tag.strip()
+            contents = contents[i + 1:]
+            tokens.append(tag)
+        else:
+            i = contents.find('<')
+            if i == -1:
+                # okay by xml, not by us
+                raise SyntaxError
+            else:
+                tokens.append(contents[:i])
+                contents = contents[i:]
+
+    d = {}
+    while tokens:
+        openTag = tokens.pop(0)
+        contents = tokens.pop(0)
+        closeTag = tokens.pop(0)
+
+        if closeTag != '/' and closeTag[1:] != openTag:
+            raise SyntaxError
+
+        d[openTag] = contents
+
+    if not 'class' in d or not 'key' in d: 
+        raise SyntaxError
+
+    entServer = d.pop('server')
+    entClass = d.pop('class')
+    endKey = d.pop('key')
+
+    if d: raise SyntaxError
+    if entServer != serverName: raise SyntaxError
+
+    return (entClass, endKey)

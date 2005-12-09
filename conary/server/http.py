@@ -94,7 +94,7 @@ class HttpHandler(WebHandler):
         if type(auth) is int:
             raise apache.SERVER_ERROR, auth
 
-        cfg = conarycfg.ConaryConfiguration(readConfigFiles = False)
+        cfg = conarycfg.ConaryConfiguration()
         cfg.repositoryMap = self.repServer.map
         cfg.user.addServerGlob(self.repServer.name, auth[0], auth[1])
         self.repos = shimclient.ShimNetClient(

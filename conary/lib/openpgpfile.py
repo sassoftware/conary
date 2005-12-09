@@ -931,10 +931,10 @@ def readBlockSize(keyRing, packetType):
             sizeLen=1
             keyRing.seek(-1, SEEK_CUR)
         elif octet < 224:
-            dataSize = (octet - 192 ) * 256 + \
+            dataSize = (ord(keyRing.read(1)) - 192 ) * 256 + \
                        ord(keyRing.read(1)) + 192
         elif octet < 255:
-            dataSize = 1 << (octet & 0x1f)
+            dataSize = 1 << (ord(keyRing.read(1)) & 0x1f)
         else:
             sizeLen=4
     # if we have not already calculated datasize, calculate it now

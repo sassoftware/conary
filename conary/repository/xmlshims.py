@@ -93,3 +93,9 @@ class NetworkConvertors(object):
 
     def toDepSet(self, ds):
         return deps.deps.ThawDependencySet(ds)
+
+    def fromEntitlement(self, ent):
+        return base64.encodestring(ent)
+
+    def toEntitlement(self, ent):
+        return base64.decodestring(ent)

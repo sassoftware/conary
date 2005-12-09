@@ -24,6 +24,7 @@ import xml
 import xmlrpclib
 
 #conary
+from conary import conarycfg
 from conary import files
 from conary import metadata
 from conary import trove
@@ -193,6 +194,9 @@ class ServerCache:
             s[2] = '%s:%s@' % userInfo + s[2]
             url = '/'.join(s)
 
+        # check for an entitlement for this server
+        ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
+
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'))
 
@@ -232,11 +236,12 @@ class ServerCache:
 
 	return server
 
-    def __init__(self, repMap, userMap, pwPrompt):
+    def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
+        self.entitlementDir = entitlementDir
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
@@ -396,6 +401,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
+
+    def addEntitlement(self, serverName, entGroup, entitlement):
+        entitlement = self.fromEntitlement(entitlement)
+        return self.c[serverName].addEntitlement(entGroup, entitlement)
+
+    def addEntitlementGroup(self, serverName, entGroup, userGroup):
+        return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
+
+    def addEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
+        return self.c[serverName].addEntitlementOwnerAcl(userGroup, entGroup)
+
+    def listEntitlements(self, serverName, entGroup):
+        l = self.c[serverName].listEntitlements(entGroup)
+        return [ self.toEntitlement(x) for x in l ]
 
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
@@ -1328,14 +1347,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                      '%s (%s)' %(r.status, r.reason))
 
     def __init__(self, repMap, userMap, localRepository = None, 
-                 pwPrompt = None):
+                 pwPrompt = None, entitlementDir = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: None
 
-	self.c = ServerCache(repMap, userMap, pwPrompt)
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self)

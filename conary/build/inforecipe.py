@@ -25,9 +25,8 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
     _recipeType = RECIPE_TYPE_INFO
     ignore = 1
 
-    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
-                 crossCompile=None):
-        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros, crossCompile)
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
+        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
         self.destdirPolicy = []
         self.packagePolicy = []
         self.requires = []
