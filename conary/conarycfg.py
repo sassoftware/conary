@@ -230,7 +230,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
     _sectionType          =  ConaryContext
 
-    def __init__(self, readConfigFiles=True):
+    def __init__(self, readConfigFiles = True):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
