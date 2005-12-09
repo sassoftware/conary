@@ -354,6 +354,24 @@ def createUsers(db):
         )""")
         commit = True
 
+    if "EntitlementOwners" not in tables:
+        cu.execute("""
+        CREATE TABLE EntitlementOwners (
+            entGroupId      INTEGER,
+            ownerGroupId    INTEGER,
+            CONSTRAINT EntitlementOwners_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES 
+                                EntitlementGroups(entGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT EntitlementOwners_entOwnerId_fk
+                FOREIGN KEY (ownerGroupId) REFERENCES 
+                                userGroups(groupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT EntitlementOwners_entGroupId_ownerGroupId_uq
+                UNIQUE(entGroupId, ownerGroupId)
+        )""")
+        commit = True
+
     if "Entitlements" not in tables:
         cu.execute("""
         CREATE TABLE Entitlements (
