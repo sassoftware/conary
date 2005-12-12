@@ -12,6 +12,7 @@ Changes in 0.80.1:
       is run.
     * Environment variables are expanded in paths in conary configuration files.
     * localcs now allows the version and flavor to be specified for a trove
+    * conary scs --all now behaves the way it used to again
   o Building Changes:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
