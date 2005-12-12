@@ -226,6 +226,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
+    def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+        entitlement = self.toEntitlement(entitlement)
+        self.auth.addEntitlement(authToken, entGroup, entitlement)
+        return True
+
+    def addEntitlementGroup(self, authToken, clientVersion, entGroup, 
+                            userGroup):
+        self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
+        return True
+
+    def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup, 
+                               entGroup):
+        self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
+        return True
+
+    def listEntitlements(self, authToken, clientVersion, entGroup):
+        return [ self.fromEntitlement(x) for x in 
+                        self.auth.iterEntitlements(authToken, entGroup) ]
+
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):
@@ -348,7 +367,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                versionType == self._GTL_VERSION_TYPE_LABEL)
 
         # permission check first
-        if not self.auth.check(authToken):
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
             return {}
 
         if troveSpecs:
@@ -390,7 +410,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             getList.append('gtvlTbl.flavorId')
         else:
             getList.append('0')
-        argList = [ authToken[0] ]
+        argList = [ ]
 
         getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
                      'Nodes.finalTimestamp' ]
@@ -505,12 +525,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                    PerItems.item as permittedTrove,
                    Permissions._ROWID_ as aclId
                from
-                   Users
-                   join UserGroupMembers using (userId)
-                   join Permissions using (userGroupId)
+                   Permissions 
                    join Items as PerItems using (itemId)
                where
-                   Users.user = ?
+                   Permissions.userGroupId in (%s)
                ) as UP on
                    ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
             %s
@@ -521,10 +539,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         %s
         ORDER BY Items.item, Nodes.finalTimestamp
         """ % (", ".join(getList), troveNameClause, instanceClause,
+               ", ".join("%d" % x for x in userGroupIds),
                versionClause, labelClause, flavorClause, flavorScoringClause,
                grouping, flavorScoreCheck)
-        cu.execute(fullQuery, argList)
         logMe(3, "execute query", fullQuery, argList)
+        cu.execute(fullQuery, argList)
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
@@ -667,13 +686,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
-        # authenticate this user first
-        if not self.auth.check(authToken):
-            return {}
-        username = authToken[0]
+        
         cu = self.db.cursor()
+
+        groupIds = self.auth.getAuthGroups(cu, authToken)
+        if not groupIds:
+            return {}
+
         # now get them troves
-        args = [ username ]
+        args = [ ]
         query = """
         select distinct
             Items.Item as trove, UP.pattern as pattern
@@ -682,15 +703,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	        Permissions.labelId as labelId,
 	        PerItems.item as pattern
 	      from
-	             Users
-                join UserGroupMembers using (userId)
-                join Permissions using (userGroupId)
+                Permissions 
                 join Items as PerItems using (itemId)
 	      where
-	            Users.user = ?
+	            Permissions.userGroupId in (%s)
 	    ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Items using (itemId) """
+            join Items using (itemId) """ % \
+                (",".join("%d" % x for x in groupIds))
         where = [ "Items.hasTrove = 1" ]
         if labelStr:
             query = query + """
@@ -748,11 +768,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return self._getTroveList(authToken, clientVersion, troveFilter,
                                       latestFilter = self._GET_TROVE_VERY_LATEST,
                                       withFlavors = True)
+
+        cu = self.db.cursor()
+
         # faster version for the "get-all" case
         # authenticate this user first
-        if not self.auth.check(authToken):
+        groupIds = self.auth.getAuthGroups(cu, authToken)
+        if not groupIds:
             return {}
-        username = authToken[0]
+
         query = """
         select
             Items.item as trove,
@@ -765,12 +789,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Permissions.labelId as labelId,
                 PerItems.item as pattern
             from
-                Users
-                join UserGroupMembers using(userId)
-                join Permissions using(userGroupId)
+                Permissions using(userGroupId)
                 join Items as PerItems using (itemId)
             where
-                Users.user = ?
+                Permissions.userGroupId in (%s)
             ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
             join Latest using (itemId, branchId)
@@ -780,10 +802,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         where
                 Latest.flavorId = Flavors.flavorId
             and Latest.versionId = Versions.versionId
-            """
-        cu = self.db.cursor()
-        cu.execute(query, [username,])
-        logMe(3, "executing query", query, [username])
+            """ % ",".join("%d" % x for x in groupIds)
+        cu.execute(query)
+        logMe(3, "executing query", query)
         ret = {}
         for (trove, version, flavor, timeStamps, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):

@@ -20,7 +20,7 @@ from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
 
-VERSION = 13 #14
+VERSION = 14
 
 # Schema creation functions
 def createFlavors(db):
@@ -344,7 +344,7 @@ class MigrateTo_13(SchemaMigration):
             SELECT instanceId, ?, ? FROM Instances
             WHERE NOT (trovename LIKE '%:%' OR trovename LIKE 'fileset-%')
         """, trove._TROVEINFO_TAG_FLAGS, collectionStream)
-        
+
         self.cu.execute("""
         INSERT INTO TroveInfo
             SELECT instanceId, ?, ? FROM Instances
@@ -358,27 +358,37 @@ class MigrateTo_14(SchemaMigration):
         # we need to rerun the MigrateTo_10 migration since we missed
         # some trovefiles the first time around
         m10 = MigrateTo_10(self.db)
-        m10.migrate()       
+        m10.migrate()
+
+        # We need to make sure that loadedTroves and buildDeps troveinfo
+        # isn't included in any commponent's trove.
+        self.cu.execute("""
+        DELETE FROM TroveInfo
+        WHERE
+           infotype IN (4, 5)
+        AND instanceid IN (SELECT instanceid
+                           FROM Instances
+                           WHERE trovename LIKE '%:%')""")
         return self.Version
-    
+
 def checkVersion(db):
     global VERSION
     version = migration.getDatabaseVersion(db)
     if version == VERSION:
         return version
-    
-    # great candidate for some "smart" python foo...    
+
+    # great candidate for some "smart" python foo...
     if version in [2,3,4]:
         version = MigrateTo_5(db)()
     if version == 5: version = MigrateTo_6(db)()
-    if version == 6: version = MigrateTo_7(db)()        
+    if version == 6: version = MigrateTo_7(db)()
     if version == 7: version = MigrateTo_8(db)()
     if version == 8: version = MigrateTo_9(db)()
     if version == 9: version = MigrateTo_10(db)()
     if version == 10: version = MigrateTo_11(db)()
     if version == 11: version = MigrateTo_12(db)()
     if version == 12: version = MigrateTo_13(db)()
-    #if version == 13: version = MigrateTo_14(db)()
+    if version == 13: version = MigrateTo_14(db)()
 
     return version
 

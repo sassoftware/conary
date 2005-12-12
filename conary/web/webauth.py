@@ -20,7 +20,7 @@ class PermissionDenied(Exception):
 
 def getAuth(req):
     if not 'Authorization' in req.headers_in:
-        return ('anonymous', 'anonymous')
+        return ('anonymous', 'anonymous', None, None)
 
     info = req.headers_in['Authorization'].split()
     if len(info) != 2 or info[0] != "Basic":
@@ -36,7 +36,18 @@ def getAuth(req):
 
     authToken = authString.split(":")
 
-    return authToken
+    entitlement = req.headers_in.get('X-Conary-Entitlement', None)
+    if entitlement is not None:
+        try:
+            entitlement = entitlement.split()
+            entitlement[1] = base64.decodestring(entitlement[1])
+        except:
+            self.send_error(400)
+            return None
+    else:
+        entitlement = [ None, None ]
+
+    return authToken + entitlement
 
 class Authorization:
     def __init__(self, passwordOK=False, isInternal=False, userId=-1):

@@ -553,23 +553,28 @@ class ClientUpdate:
         # match something being installed absolute. Troves being removed
         # through a relative changeset aren't allowed to be removed by
         # something else.
-        installedTroves, referencedTroves = \
-                            self.db.db.getCompleteTroveSet(names)
+        (installedNotReferenced, installedAndReferenced, 
+         referencedNotInstalled) = self.db.db.getCompleteTroveSet(names)
+
+        installedTroves = installedNotReferenced | installedAndReferenced
+
         installedTroves.difference_update(ineligible)
         installedTroves.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
-        referencedTroves.difference_update(ineligible)
-        referencedTroves.difference_update(
+        referencedNotInstalled.difference_update(ineligible)
+        referencedNotInstalled.difference_update(
                 (job[0], job[1][0], job[1][1]) for job in relativeUpdateJobs)
+
 
         # The job between referencedTroves and installedTroves tells us
         # a lot about what the user has done to his system. 
         installedTrove = trove.Trove("@exists", versions.NewVersion(),
                                      deps.DependencySet(), None)
-        [ installedTrove.addTrove(*x) for x in installedTroves ]
+
+        [ installedTrove.addTrove(*x) for x in installedNotReferenced ]
         referencedTrove = trove.Trove("@exists", versions.NewVersion(),
                                       deps.DependencySet(), None)
-        [ referencedTrove.addTrove(*x) for x in referencedTroves ]
+        [ referencedTrove.addTrove(*x) for x in referencedNotInstalled ]
         localUpdates = installedTrove.diff(referencedTrove)[2]
         localUpdatesByPresent = \
                  dict( ((job[0], job[2][0], job[2][1]), job[1]) for
@@ -594,7 +599,7 @@ class ClientUpdate:
                      job[1][0].branch() == job[2][0].branch() and \
                      (job[0], job[1][0], job[1][1]) not in avail:
                 del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
-                referencedTroves.remove((job[0], job[1][0], job[1][1]))
+                referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
 
         del installedTrove, referencedTrove, localUpdates
 
@@ -602,19 +607,19 @@ class ClientUpdate:
         # installed or already referenced. This is purely for consistency
         # checking later on
         alreadyInstalled = installedTroves & avail
-        alreadyReferenced = referencedTroves & avail
+        alreadyReferenced = referencedNotInstalled & avail
 
         del avail
 
         # Remove the alreadyReferenced set from both the troves which are
         # already installed. This lets us get a good match for such troves
         # if we decide to install them later.
-        referencedTroves.difference_update(alreadyReferenced)
+        referencedNotInstalled.difference_update(alreadyReferenced)
 
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
         [ existsTrv.addTrove(*x) for x in installedTroves ]
-        [ existsTrv.addTrove(*x) for x in referencedTroves ]
+        [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
         jobList = availableTrove.diff(existsTrv)[2]
 
@@ -671,7 +676,7 @@ class ClientUpdate:
             replaced, pinned = jobByNew[newInfo]
             replacedInfo = (newInfo[0], replaced[0], replaced[1])
             if replaced[0] is not None:
-                if not isPrimary and replacedInfo in referencedTroves:
+                if not isPrimary and replacedInfo in referencedNotInstalled:
                     # Don't install this trove because it's predecessor was not
                     # installed
                     continue

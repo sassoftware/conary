@@ -26,25 +26,74 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
-    def check(self, authToken, write = False, admin = False, label = None,
-              trove = None, forcePassword = False):
-        logMe(2, authToken[0], write, admin, label, trove)
+
+    def getAuthGroups(self, cu, authToken):
+        logMe(authToken[0], authToken[2], authToken[3])
+        # Find what group this user belongs to
+
+        # anonymous users should come through as anonymous, not None
+        assert(authToken[0])
+        cu.execute("""SELECT salt, password, userGroupId 
+                            FROM 
+                                Users, UserGroupMembers
+                            WHERE
+                                user = ? AND
+                                Users.userId = UserGroupMembers.userId""",
+                   authToken[0])
+
+        groupsFromUser = [ x for x in cu ]
+        
+        if groupsFromUser:
+            # each user can only appear once (by constraint), so we only
+            # need to validate the password once
+            if not self.checkPassword(groupsFromUser[0][0], 
+                                      groupsFromUser[0][1],
+                                      authToken[1]):
+                raise errors.InsufficientPermission
+
+            groupsFromUser = [ x[2] for x in groupsFromUser ]
+
+        if authToken[2] is not None:
+            # look up entitlements
+            cu.execute("""
+                  SELECT userGroupId 
+                        FROM EntitlementGroups, Entitlements 
+                  WHERE 
+                        entGroup=? AND 
+                        entitlement=? AND
+                        EntitlementGroups.entGroupId == Entitlements.entGroupId
+                """, authToken[2], authToken[3])
+            groupsFromUser += [ x[0] for x in cu ]
+
+        return groupsFromUser
+
+    def check(self, authToken, write = False, admin = False, label = None, 
+              trove = None):
+        logMe(2, authToken[0], authToken[1], authToken[2], write, admin, 
+              label, trove)
+
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
 
         if not authToken[0]:
             return False
 
-        stmt = """
-        select Items.item, Users.salt, Users.password
-        from Users
-             join UserGroupMembers using (userId)
-             join Permissions using (userGroupId)
-             join Items using (itemId)
-        """
-        params = [ authToken[0] ]
+        cu = self.db.cursor()
 
-        where = ["Users.user = ?"]
+        try:
+            groupIds = self.getAuthGroups(cu, authToken)
+        except errors.InsufficientPermission:
+            return False
+
+        stmt = """
+        select Items.item
+        from Permissions join items using (itemId)
+        """
+
+        where = ["Permissions.userGroupId IN (%s)" % 
+                    ",".join("%d" % x for x in groupIds) ]
+        params = []
+
         if label:
             where.append("""
             (
@@ -64,24 +113,21 @@ class NetworkAuthorization:
         if where:
             stmt += "WHERE " + " AND ".join(where)
 
-        cu = self.db.cursor()
         cu.execute(stmt, params)
 
-        for (troveName, salt, password) in cu:
+        for (troveName,) in cu:
             if troveName=='ALL' or not trove:
                 regExp = None
             else:
+                import epdb
+                epdb.st()
                 regExp = self.reCache.get(troveName, None)
                 if regExp is None:
                     regExp = re.compile(troveName)
                     self.reCache[troveName] = regExp
 
             if not regExp or regExp.match(trove):
-                m = md5.new()
-                m.update(salt)
-                m.update(authToken[1])
-                if m.hexdigest() == password:
-                    return True
+                return True
 
         return False
 
@@ -535,29 +581,39 @@ class NetworkAuthorization:
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
-                SELECT entGroupAdmin
-                    FROM
-                        Users, UserGroupMembers, Permissions
+                SELECT entGroupId, admin
+                    FROM Users JOIN UserGroupMembers ON
+                        UserGroupMembers.userId = Users.userId 
+                    LEFT OUTER JOIN Permissions ON
+                        UserGroupMembers.userGroupId = Permissions.userGroupId 
+                    LEFT OUTER JOIN EntitlementOwners ON
+                        UserGroupMembers.userGroupId = \
+                                EntitlementOwners.ownerGroupId
                     WHERE
-                        Users.user = ? AND
-                        UserGroupMembers.userId = Users.userId AND
-                        UserGroupMembers.userGroupId = Permissions.userGroupId
-                        AND
-                          (Permissions.entGroupAdmin IS NOT NULL OR
+                        Users.user = ?
+                        AND 
+                          (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin == 1)
                 """, userName)
-        entGroupsEditable = set(x[0] for x in cu)
+
+        isAdmin = False
+        entGroupsEditable = []
+        for (entGroupId, rowIsAdmin) in cu:
+            if entGroupId is not None:
+                entGroupsEditable.append(entGroupId)
+            isAdmin = isAdmin or rowIsAdmin
 
         cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE "
                    "entGroup = ?", entGroup)
         entGroupIds = [ x[0] for x in cu ]
+
         if len(entGroupIds) == 1:
             entGroupId = entGroupIds[0]
         else:
             assert(not entGroupIds)
             entGroupId = -1
 
-        if None in entGroupsEditable:
+        if isAdmin:
             if not entGroupIds:
                 raise errors.UnknownEntitlementGroup
 
@@ -571,8 +627,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         # validate the password
-        if len(entitlement) > 64 or \
-                    not self.check(authToken, forcePassword = True):
+        if len(entitlement) > 64 or not self.checkUserPass(authToken):
             return errors.InsufficientPermission
 
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
@@ -594,7 +649,7 @@ class NetworkAuthorization:
     def addEntitlementGroup(self, authToken, entGroup, userGroup):
         cu = self.db.cursor()
 
-        if not self.check(authToken, forcePassword = True, admin = True):
+        if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
         # check for duplicate
@@ -622,26 +677,22 @@ class NetworkAuthorization:
         Gives the userGroup ownership permission for the entGroup entitlement
         set.
         """
-        if not self.check(authToken, forcePassword = True, admin = True):
+        if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
 
-        cu.execute("""INSERT INTO Permissions
-                            (userGroupId, labelId, itemId, write,
-                             capped, admin, entGroupAdmin)
-                       VALUES (
-                          (SELECT userGroupId FROM userGroups WHERE
-                                          userGroup = ?),
-                          0, 0, 0, 0, 0,
-                          (SELECT entGroupId FROM entitlementGroups WHERE
-                                          entGroup = ?)
-                        )
-                   """, userGroup, entGroup)
+        entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
+                                "WHERE entGroup = ?", entGroup).next()[0]
+        userGroupId = cu.execute("SELECT userGroupId FROM userGroups "
+                                 "WHERE userGroup = ?", userGroup).next()[0]
 
-    def listEntitlements(self, authToken, entGroup):
+        cu.execute("""INSERT INTO EntitlementOwners (entGroupId, ownerGroupId)
+                       VALUES (?, ?)""", entGroupId, userGroupId)
+
+    def iterEntitlements(self, authToken, entGroup):
         # validate the password
-        if not self.check(authToken, forcePassword = True):
+        if not self.checkUserPass(authToken):
             return errors.InsufficientPermission
 
         cu = self.db.cursor()

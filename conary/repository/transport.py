@@ -16,6 +16,7 @@
     Unfortunately, urllib needs some touching up to allow 
     XMLRPC commands to be sent, hence the XMLOpener class """
 
+import base64
 import xmlrpclib
 import urllib
 import zlib
@@ -123,9 +124,14 @@ class Transport(xmlrpclib.Transport):
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
-    def __init__(self, https=False):
+    def __init__(self, https = False, entitlement = None):
         self.https = https
         self.compress = False
+        if entitlement is not None:
+            self.entitlement = "%s %s" % (entitlement[0],
+                                  base64.encodestring(entitlement[1])[:-1])
+        else:
+            self.entitlement = None
 
     def setCompress(self, compress):
         self.compress = compress
@@ -154,6 +160,10 @@ class Transport(xmlrpclib.Transport):
 		extra_headers = extra_headers.items()
 	    for key, value in extra_headers:
 		opener.addheader(key,value)
+
+        if self.entitlement:
+            opener.addheader('X-Conary-Entitlement', self.entitlement)
+
 	opener.addheader('User-agent', self.user_agent)
 	response = opener.open(''.join([self._protocol(), '://', host, handler]), request_body)
         

@@ -14,6 +14,7 @@
 
 python_files=	    __init__.py		\
 		    cfg.py		\
+		    cfgtypes.py		\
 		    enum.py		\
 		    debugger.py		\
 		    erlcompleter.py	\

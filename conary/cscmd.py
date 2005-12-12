@@ -82,13 +82,12 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
                                callback = callback, 
                                excludeList = cfg.excludeTroves)
 
-def LocalChangeSetCommand(db, cfg, troveName, outFileName):
-    try:
-	troveList = db.trovesByName(troveName)
-        troveList = db.getTroves(troveList)
-    except errors.TroveNotFound, e:
-	log.error(e)
-	return
+def LocalChangeSetCommand(db, cfg, item, outFileName):
+    client = conaryclient.ConaryClient(cfg)
+
+    name, ver, flv = cmdline.parseTroveSpec(item)
+    troveList = client.db.findTrove(None, (name, ver, flv))
+    troveList = client.db.getTroves(troveList)
 
     list = []
     for outerTrove in troveList:
