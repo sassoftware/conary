@@ -97,12 +97,12 @@ class CfgPath(CfgType):
     """
 
     def parseString(self, str):
-        return os.path.expanduser(str)
+        return os.path.expanduser(os.path.expandvars(str))
 
     def getDefault(self, default=None):
         val = CfgType.getDefault(self, default)
         if val:
-            return os.path.expanduser(val)
+            return os.path.expanduser(os.path.expandvars(val))
         else:
             return val
 
