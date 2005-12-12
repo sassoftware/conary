@@ -43,7 +43,7 @@ def createInstances(db):
                    " Instances(itemId, versionId, flavorId) ")
         commit = True
 
-    if "InstancesView" not in db.tables:
+    if "InstancesView" not in db.views:
         cu.execute("""
         CREATE VIEW
             InstancesView AS
@@ -69,7 +69,7 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY,
-            flavor          STRING
+            flavor          STRING,
             CONSTRAINT Flavors_flavor_uq
                 UNIQUE(flavor)
         )""")
@@ -284,9 +284,9 @@ def createUsers(db):
         cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
 
-        if "Items" in tables:
+        if "Items" in db.tables:
             cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
-        if "Labels" in tables:
+        if "Labels" in db.tables:
             cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
         commit = True
 
@@ -335,7 +335,6 @@ def createUsers(db):
             CONSTRAINT EntitlementClasses_entitlement_uq
                 UNIQUE(entGroupId, entitlement)
         )""")
-
         commit = True
 
     if commit:
@@ -608,7 +607,7 @@ def checkVersion(db):
         if "DatabaseVersion" not in db.tables:
             # if DatabaseVersion does not exist, but any other tables do exist,
             # then the database version is too old to deal with it
-            if len(self.db.tables) > 0:
+            if len(db.tables) > 0:
                 raise sqlerrors.SchemaVersionError(
                     "Can not migrate from this schema version")
         # XXX: relocate the schema creation/initialization from trovestore to here

@@ -29,10 +29,10 @@ class BaseCursor:
 
     # map some attributes back to self._cursor
     def __getattr__(self, name):
-        if name in self.PASSTHROUGH and not hasattr(self, name):
+        if name in self.PASSTHROUGH:
             return getattr(self._cursor, name)
         raise AttributeError("'%s' attribute is invalid" % (name,))
-    
+
     # this will need to be provided by each separate driver
     def _getCursor(self):
         assert(self.dbh)
@@ -95,6 +95,15 @@ class BaseCursor:
             pass
         return None
 
+    def __iter__(self):
+        return self
+
+    def next(self):
+        item = self.fetchone()
+        if item is None:
+            raise StopIteration
+        else:
+            return item
 
 # A cursor class for the drivers that do not support bind
 # parameters. Instead of :name they use a Python-esque %(name)s

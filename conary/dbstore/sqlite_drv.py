@@ -44,7 +44,8 @@ class Database(BaseDatabase):
     type = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
-
+    basic_transaction = "begin immediate"
+    
     def connect(self, timeout=10000):
         assert(self.database)
         cdb = self._connectData()
@@ -88,8 +89,7 @@ class Database(BaseDatabase):
                 self.views.append(name)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
-        version = self.schemaVersion()
-        return version
+        return self.getVersion()
 
     def analyze(self):
         if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):

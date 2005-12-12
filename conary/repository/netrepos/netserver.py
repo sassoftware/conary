@@ -24,7 +24,6 @@ from conary.deps import deps
 from conary.lib import log, sha1helper, util
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, trovestore
-from conary.dbstore import idtable, sqlerrors
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from conary.lib.openpgpfile import TRUST_FULL
 from conary.lib.openpgpkey import getKeyCache
@@ -33,6 +32,8 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository import repository
 from conary.trove import DigitalSignature
 from conary.repository.netrepos import schema, cacheset
+from conary import dbstore
+from conary.dbstore import idtable, sqlerrors
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
@@ -1435,7 +1436,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         logMe(1)
         # XXX: don't hardcode the driver (requires config file update)
         self.db = dbstore.connect(self.sqlDbPath, driver = "sqlite")
-        schema.checkVersion()
+        schema.checkVersion(self.db)
 	self.troveStore = trovestore.TroveStore(self.db)
         self.repos = fsrepos.FilesystemRepository(
             self.name, self.troveStore, self.repPath, self.map,
@@ -1466,16 +1467,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.logFile = logFile
         self.requireSigs = requireSigs
 
-        logMe(1, path, basicUrl, name, sqlDbPath)
+        logMe(1, path, basicUrl, name, self.sqlDbPath)
 	try:
 	    util.mkdirChain(self.repPath)
 	except OSError, e:
 	    raise errors.OpenError(str(e))
 
         if cacheChangeSets:
-            self.cache = CacheSet(path + "/cache.sql", tmpPath)
+            self.cache = cacheset.CacheSet(path + "/cache.sql", tmpPath)
         else:
-            self.cache = NullCacheSet(tmpPath)
+            self.cache = cacheset.NullCacheSet(tmpPath)
 
         self.open()
 

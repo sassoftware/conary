@@ -57,9 +57,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveStore:
     def __init__(self, db):
 	self.db = db
-
         self.db.commit()
-        self.begin()
 
         # Order matters! Create the simple (leaf) tables first, and
         # then the ones that have foreign keys
@@ -789,16 +787,6 @@ class TroveStore:
 
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
-
-    def begin(self):
-	"""
-	Force the database to begin a transaction; this locks the database
-	so no one can touch it until a commit() or rollback().
-	"""
-	self.db._begin()
-
-    def rollback(self):
-	self.db.rollback()
 
     def commit(self):
 	if self.needsCleanup:
