@@ -44,16 +44,19 @@ class BaseCursor:
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
         self.description = None
-        # force dbi compliance here
-        if len(kw) == 0:
-            if len(args) == 0:
-                return self._cursor.execute(sql)
-            if len(args) == 1:
-                return self._cursor.execute(sql, args[0])
-            return self._cursor.execute(sql, *args)
+        # force dbi compliance here. we prefer args over the kw
+        if len(args) == 0:
+            return self._cursor.execute(sql, **kw)
         if len(args) == 1 and isinstance(args[0], dict):
             kw.update(args[0])
-        return self._cursor.execute(sql, **kw)
+            return self._cursor.execute(sql, **kw)
+        if len(kw):
+            raise sqlerrors.CursorError(
+                "Do not pass both positional and named bind arguments",
+                *args, **kw)
+        if len(args) == 1:
+            return self._cursor.execute(sql, args[0])
+        return self._cursor.execute(sql, *args)
 
     # return the column names of the current select
     def __rowDict(self, row):
@@ -119,7 +122,7 @@ class BindlessCursor(BaseCursor):
             keys.add(key)
             sql = re.sub(":" + key, "%("+key+")s", sql)
         sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql) 
+        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql)
         return (sql, keys)
 
     # we need to "fix" the sql code before calling out
