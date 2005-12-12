@@ -112,7 +112,7 @@ class CacheSet:
 
         # start a transaction now to avoid race conditions when getting
         # or adding IDs for versions and flavors
-        self.db._begin()
+        cu = self.db.transaction()
 
         if oldVersion:
             oldVersionId = self.versions.get(oldVersion, None)
@@ -133,9 +133,8 @@ class CacheSet:
         if newVersionId is None:
             newVersionId = self.versions.addId(newVersion)
 
-        cu = self.db.cursor()
         cu.execute("""
-            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?,
+        INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?,
                                              ?, ?, ?, ?, ?, NULL)
         """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId,
              absolute, recurse, withFiles, withFileContents,
@@ -160,9 +159,8 @@ class CacheSet:
             # this should not happen, but we'll handle it anyway
             return
 
-        cu = self.db.cursor()
         # start a transaction to retain a consistent state
-        self.db._begin()
+        cu = self.db.transaction()
         cu.execute("""
         SELECT row, returnValue, size
         FROM CacheContents
@@ -232,8 +230,6 @@ class CacheSet:
     def __init__(self, dbpath, tmpDir, schemaVersion):
 	self.tmpDir = tmpDir
         self.createSchema(dbpath, schemaVersion)
-        self.db._begin()
         self.flavors = sqldb.Flavors(self.db)
         self.versions = versiontable.VersionTable(self.db)
-        self.db.commit()
 

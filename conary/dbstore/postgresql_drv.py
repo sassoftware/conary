@@ -21,10 +21,11 @@ import sqlerrors
 class Cursor(BindlessCursor):
     def execute(self, sql, *params, **kw):
         try:
-            BindlessCursor.execute(self, sql, *params, **kw)
+            ret = BindlessCursor.execute(self, sql, *params, **kw)
         except pgdb.DatabaseError, e:
             raise sqlerrors.CursorError(e)
-
+        return ret
+    
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):

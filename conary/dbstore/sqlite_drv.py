@@ -24,7 +24,7 @@ class Cursor(BaseCursor):
             inAutoTrans = False
             if not self.dbh.inTransaction:
                 inAutoTrans = True
-            BaseCursor.execute(self, sql, *params, **kw)
+            ret = BaseCursor.execute(self, sql, *params, **kw)
             # commit any transactions which were opened automatically
             # by the sqlite3 bindings and left hanging:
             if inAutoTrans and self.dbh.inTransaction:
@@ -39,13 +39,14 @@ class Cursor(BaseCursor):
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             raise
+        return ret
 
 class Database(BaseDatabase):
     type = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
     basic_transaction = "begin immediate"
-    
+
     def connect(self, timeout=10000):
         assert(self.database)
         cdb = self._connectData()

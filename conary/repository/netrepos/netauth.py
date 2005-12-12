@@ -127,15 +127,17 @@ class NetworkAuthorization:
 
     def checkIsFullAdmin(self, user, password):
         cu = self.db.cursor()
-        cu.execute("""SELECT salt, password
-                        FROM userPermissions
-                        WHERE User=? AND admin=1""", user)
-
+        cu.execute("""
+        SELECT salt, password
+        FROM Users as U
+        JOIN UserGroupMembers as UGM USING(userId)
+        JOIN Permissions as P USING(userGroupId)
+        WHERE U.user = ? and P.admin = 1""",
+                   user)
         for (salt, cryptPassword) in cu:
             if not self.checkPassword(salt, cryptPassword, password):
                 return False
             return True
-
         return False
 
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):

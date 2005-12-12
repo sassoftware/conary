@@ -68,10 +68,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
-        def condRollback():
-            if self.db.inTransaction:
-                self.db.rollback()
-
 	self.reopen()
         self._port = port
         self._protocol = protocol
@@ -88,7 +84,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             r = method(authToken, *args)
             return (False, r)
 	except errors.TroveMissing, e:
-            condRollback()
+            self.db.rollback()
 	    if not e.troveName:
 		return (True, ("TroveMissing", "", ""))
 	    elif not e.version:
@@ -97,26 +93,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		return (True, ("TroveMissing", e.troveName,
 			self.fromVersion(e.version)))
         except errors.IntegrityError, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('IntegrityError', str(e)))
 	except trove.TroveIntegrityError, e:
-            condRollback()
+            self.db.rollback()
             return (True, ("TroveIntegrityError", str(e) +
                            # add a helpful error message for now
                         ' (you may need to update to conary 0.62.12 or later)'))
         except errors.FileContentsNotFound, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
         except errors.FileStreamNotFound, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
         except sqlerrors.DatabaseLocked:
-            condRollback()
+            self.db.rollback()
             return (True, ('RepositoryLocked'))
 	except Exception, e:
-            condRollback()
+            self.db.rollback()
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
                     return (True, (marshall, str(e)))
@@ -1287,7 +1283,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # verify the new signature is actually good
         trv.verifyDigitalSignatures(keyCache = keyCache)
 
-        cu = self.db.cursor()
+        cu = self.db.transaction()
         # get the instanceId that corresponds to this trove.
         # if this instance is unflavored, the magic value is 'none'
         flavorStr = flavor.freeze() or 'none'
@@ -1311,7 +1307,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         trvInfo = cu.fetchone()[0]
         # start a transaction now. ensures simultaneous signatures by separate
         # clients won't cause a race condition.
-        self.db._begin()
         try:
             # add the signature while it's protected, to ensure no collissions
             trv = self.repos.getTrove(name, version, flavor)

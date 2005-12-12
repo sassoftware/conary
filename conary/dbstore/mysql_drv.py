@@ -20,12 +20,13 @@ import sqlerrors
 class Cursor(BindlessCursor):
     def execute(self, sql, *params, **kw):
         try:
-            BindlessCursor.execute(self, sql, *params, **kw)
+            ret = BindlessCursor.execute(self, sql, *params, **kw)
         except mysql.IntegrityError, e:
             if e[1].startswith("Duplicate"):
                 raise sqlerrors.ColumnNotUnique(e)
             raise errors.CursorError(e)
-
+        return ret
+    
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):

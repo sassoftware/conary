@@ -44,10 +44,9 @@ class OpenPGPKeyTable:
         self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
-        cu = self.db.cursor()
         # start a transaction so that our SELECT is protected against
         # race conditions
-        self.db._begin()
+        cu = self.db.transaction()
         try:
             r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
             keyId = r.fetchone()[0]
