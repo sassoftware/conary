@@ -1,0 +1,9 @@
+- provide generic interface for start_transaction=False for sqlite
+  (and only sqlite has this issue, so maybe fixing the bindings would
+   be a better way)
+- implement cu = db.prepare(sql)
+- table TroveInfo has a "data" column that is of type BINARY. In MySQL
+  we have BLOB, MEDIUMBLOB and LARGEBLOB types. BLOB is upto
+  65,535. Migration of the data column to a MEDIUMBLOB type (16M max in
+  size) can have a negative impact on performance and storage
+  parameters.
