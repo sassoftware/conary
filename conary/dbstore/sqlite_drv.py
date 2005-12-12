@@ -15,11 +15,14 @@
 import os
 
 from conary import sqlite3
+from conary.lib.tracelog import logMe
+
 from base_drv import BaseDatabase, BaseCursor
 import sqlerrors
 
 class Cursor(BaseCursor):
     def execute(self, sql, *params, **kw):
+        logMe(3, "Executing SQL code", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:

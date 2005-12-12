@@ -61,6 +61,7 @@ def createInstances(db):
         commit = True
     if commit:
         db.commit()
+        db.loadSchema()
 
 def createFlavors(db):
     cu = db.cursor()
@@ -114,7 +115,8 @@ def createFlavors(db):
         commit = True
     if commit:
         db.commit()
-
+        db.loadSchema()
+        
 def createNodes(db):
     cu = db.cursor()
     commit = False
@@ -165,7 +167,8 @@ def createNodes(db):
         commit = True
     if commit:
         db.commit()
-
+        db.loadSchema()
+        
 def createLatest(db):
     cu = db.cursor()
     commit = False
@@ -215,7 +218,8 @@ def createLatest(db):
         commit = True
     if commit:
         db.commit()
-
+        db.loadSchema()
+        
 def createUsers(db):
     cu = db.cursor()
     commit = False
@@ -284,6 +288,7 @@ def createUsers(db):
         cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
 
+        logMe(1, "CREATE USERS...")
         if "Items" in db.tables:
             cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
         if "Labels" in db.tables:
@@ -339,7 +344,8 @@ def createUsers(db):
 
     if commit:
         db.commit()
-
+        db.loadSchema()
+        
 def createPGPKeys(db):
     cu = db.cursor()
     commit = False
@@ -369,7 +375,8 @@ def createPGPKeys(db):
         commit = True
     if commit:
         db.commit()
-
+        db.loadSchema()
+        
 def createTroves(db):
     cu = db.cursor()
     commit = False
@@ -429,6 +436,7 @@ def createTroves(db):
 
     if commit:
         db.commit()
+        db.loadSchema()
 
 def createInstructionSets(db):
     cu = db.cursor()
@@ -440,6 +448,7 @@ def createInstructionSets(db):
             flags           STRING
         )""")
         db.commit()
+        db.loadSchema()
 
 def createChangeLog(db):
     cu = db.cursor()
@@ -455,6 +464,7 @@ def createChangeLog(db):
         )""")
         cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
         db.commit()
+        db.loadSchema()
 
 # SCHEMA Migration
 class SchemaMigration(migration.SchemaMigration):

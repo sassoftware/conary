@@ -658,4 +658,3 @@ class NetworkAuthorization:
         self.db = db
         self.reCache = {}
         schema.createUsers(db)
-

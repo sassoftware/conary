@@ -29,6 +29,8 @@ class BaseCursor:
 
     # map some attributes back to self._cursor
     def __getattr__(self, name):
+        if name in self.__dict__.keys():
+            return self.__dict__[key]
         if name in self.PASSTHROUGH:
             return getattr(self._cursor, name)
         raise AttributeError("'%s' attribute is invalid" % (name,))

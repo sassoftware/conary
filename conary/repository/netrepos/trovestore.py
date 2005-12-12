@@ -788,6 +788,12 @@ class TroveStore:
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
 
+    def begin(self):
+        return self.db.transaction()
+
+    def rollback(self):
+        return self.db.rollback()
+    
     def commit(self):
 	if self.needsCleanup:
 	    assert(0)

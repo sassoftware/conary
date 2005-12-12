@@ -37,7 +37,6 @@ class InstanceTable:
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?, ?)",
                    (itemId, versionId, flavorId, isRedirect, isPresent))
-        # DBSTORE: this is SQLITE specific
 	return cu.lastrowid
 
     def getId(self, theId):
