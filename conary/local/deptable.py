@@ -30,7 +30,7 @@ def createDepTable(cu, name, isTemp):
                                   flag str
                                  )""" % (tmp, name),
                start_transaction = (not isTemp))
-    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" % 
+    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = (not tmp))
 
 def createRequiresTable(cu, name, isTemp):
@@ -236,18 +236,19 @@ class DependencyTables:
                     if last:
                         depSet.addDep(deps.dependencyClasses[last[0]],
                                       deps.Dependency(last[1], flags))
-                        
                     last = (classId, name)
                     flags = []
                     if flag != NO_FLAG_MAGIC:
                         flags.append((flag, deps.FLAG_SENSE_REQUIRED))
-                    
+
             if last:
                 depSet.addDep(deps.dependencyClasses[last[0]],
                               deps.Dependency(last[1], flags))
                 setFn(depSet)
 
     def add(self, cu, trove, troveId):
+        # FIXME: this is used by the server code as well and it is
+        # WAAAY too sqlite specific...
         assert(cu.con.inTransaction)
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
