@@ -12,12 +12,16 @@
 # full details.
 #
 
-class DBStoreError(Exception):
+class DatabaseError(Exception):
     def __init__(self, args):
-        self._args = args
+        self.args = args
 
     def __str__(self):
-        return str(args)
+        return str(self.args)
 
-class ColumnNotUnique(DBStoreError):
+class CursorError(DatabaseError):
     pass
+
+class ColumnNotUnique(CursorError):
+    pass
+

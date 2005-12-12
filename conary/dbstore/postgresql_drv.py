@@ -14,20 +14,25 @@
 
 import re
 import pgdb
+
 from base_drv import BaseDatabase, BindlessCursor, BaseCursor
+import sqlerrors
 
 class Cursor(BindlessCursor):
-    pass
+    def execute(self, sql, *params, **kw):
+        try:
+            BindlessCursor.execute(self, sql, *params, **kw)
+        except pgdb.DatabaseError, e:
+            raise sqlerrors.CursorError(e)
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
-    def __init__(self, db):
-        BaseDatabase.__init__(self, db)
-        self.type = "postgresql"
-        self.avail_check = "select count(*) from pg_tables"
-        self.cursorClass = Cursor
+    type = "postgresql"
+    avail_check = "select count(*) from pg_tables"
+    cursorClass = Cursor
 
+    # XXX: honor the timeout
     def connect(self, timeout=10000):
         assert(self.database)
         cdb = self._connectData()
@@ -37,11 +42,11 @@ class Database(BaseDatabase):
         cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
                                 cdb["user"], cdb["password"])
         self.dbh = pgdb.connect(cstr)
-        self._getSchema()
+        self.loadSchema()
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         # get tables
         c.execute("""
@@ -80,5 +85,5 @@ class Database(BaseDatabase):
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
         self.sequences = [x[0] for x in c.fetchall()]
-        self._getSchemaVersion()
-        return self.version
+        version = self.schemaVersion()
+        return version

@@ -15,7 +15,7 @@
 import re
 import MySQLdb as mysql
 from base_drv import BaseDatabase, BindlessCursor
-import sql_error
+import sqlerrors
 
 class Cursor(BindlessCursor):
     def execute(self, sql, *params, **kw):
@@ -23,9 +23,8 @@ class Cursor(BindlessCursor):
             BindlessCursor.execute(self, sql, *params, **kw)
         except mysql.IntegrityError, e:
             if e[1].startswith("Duplicate"):
-                raise sql_error.ColumnNotUnique(e)
-            else:
-                raise
+                raise sqlerrors.ColumnNotUnique(e)
+            raise errors.CursorError(e)
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
@@ -42,11 +41,11 @@ class Database(BaseDatabase):
             if cdb[x] is None:
                 del cdb[x]
         self.dbh = mysql.connect(**cdb)
-        self._getSchema()
+        self.loadSchema()
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         c.execute("select version()")
         version = c.fetchone()[0]
@@ -74,5 +73,5 @@ class Database(BaseDatabase):
         for t in self.tables:
             c.execute("show index from %s" % (t,))
             self.tables[t] = [ x[2] for x in c.fetchall() ]
-        self._getSchemaVersion()
-        return self.version
+        version = self.schemaVersion()
+        return version

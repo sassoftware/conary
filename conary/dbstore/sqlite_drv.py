@@ -14,7 +14,7 @@
 
 from conary import sqlite3
 from base_drv import BaseDatabase, BaseCursor
-import sql_error
+import sqlerrors
 
 class Cursor(BaseCursor):
     def execute(self, sql, *params, **kw):
@@ -31,9 +31,8 @@ class Cursor(BaseCursor):
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
-                raise sql_error.ColumnNotUnique(e)
-            else:
-                raise
+                raise sqlerrors.ColumnNotUnique(e)
+            raise sqlerrors.CursorError(e)
         except:
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
@@ -51,11 +50,11 @@ class Database(BaseDatabase):
         # FIXME: we should channel exceptions into generic exception
         # classes common to all backends
         self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
-        self._getSchema()
+        self.loadSchema()
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         c.execute("select type, name, tbl_name from sqlite_master")
         slist = c.fetchall()
@@ -71,8 +70,8 @@ class Database(BaseDatabase):
                 self.views.append(name)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
-        self._getSchemaVersion()
-        return self.version
+        version = self.schemaVersion()
+        return version
 
     def analyze(self):
         if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
@@ -93,5 +92,5 @@ class Database(BaseDatabase):
 
         if doAnalyze:
             cu.execute('ANALYZE')
-            self._getSchema()
+            self.loadSchema()
 

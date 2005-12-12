@@ -15,7 +15,7 @@
 import copy
 import itertools
 
-from conary import files, metadata, sqlite3, trove, versions, changelog
+from conary import files, metadata, trove, versions, changelog
 from conary.deps import deps
 from conary.lib import util
 from conary.lib.tracelog import logMe

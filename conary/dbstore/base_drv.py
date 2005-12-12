@@ -15,12 +15,7 @@
 import sys
 import re
 
-class DBStoreError(Exception):
-    pass
-
-class DBStoreCursorError(DBStoreError):
-    def __init__(self, msg, **kwargs):
-        DBStoreError.__init__(self, msg, **kwargs)
+import sqlerrors
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
@@ -56,7 +51,7 @@ class BaseCursor:
         if row is None:
             return None
         if len(row) != len(self._cursor.description):
-            raise DBStoreCursorError("Cursor description doew not match row data",
+            raise sqlerrors.CursorError("Cursor description doew not match row data",
                                      row = row, desc = self._cursor.description)
         if not self.description:
             self.description = [ x[0] for x in self._cursor.description ]
@@ -219,7 +214,7 @@ class BaseDatabase:
         return self.dbh.rollback()
 
     # easy access to the schema state
-    def _getSchema(self):
+    def loadSchema(self):
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = {}
@@ -228,14 +223,15 @@ class BaseDatabase:
         self.sequences = []
         self.version = 0
 
-    def _getSchemaVersion(self):
+    def schemaVersion(self):
         assert(self.dbh)
         c = self.cursor()
         if 'DatabaseVersion' not in self.tables:
             self.version = 0
-            return
+            return 0
         c.execute("select max(version) as version from DatabaseVersion")
         self.version = c.fetchone()[0]
+        return self.version
 
     # try to close it first nicely
     def __del__(self):
