@@ -1424,9 +1424,11 @@ order by
         return self.depTables.getLocalProvides(depSetList)
 
     def getCompleteTroveSet(self, names):
-        # returns two sets; one is all of the troves which are installed,
-        # the other is all of the troves which are referenced but not
-        # installed
+        # returns three sets; one is all of the troves which are installed,
+        # and are not included by any other installed troves, one is troves
+        # which are installed, and are included by some other trove that is
+        # installed, and the other is all of the troves which are referenced 
+        # but not installed
         cu = self.db.cursor()
 
         cu.execute("CREATE TEMPORARY TABLE gcts(troveName STRING)",
@@ -1437,22 +1439,26 @@ order by
 
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
-                       timeStamps FROM
+                       timeStamps, TroveTroves.inPristine FROM
                     gcts LEFT OUTER JOIN Instances 
                         USING (troveName)
                     JOIN Versions 
                         USING(versionId)
                     JOIN Flavors ON
                         Instances.flavorId = Flavors.flavorId
+                    LEFT JOIN TroveTroves ON 
+                        Instances.instanceId = TroveTroves.includedId
                 WHERE
                     Instances.troveName IS NOT NULL
             """)
 
         # it's much faster to build up lists and then turn them into
         # sets than build up the set one member at a time
-        installed = []
-        referenced = []
-        for (name, version, flavor, isPresent, timeStamps) in cu:
+        installedNotReferenced = []
+        referencedNotInstalled = []
+        installedAndReferenced = []
+
+        for (name, version, flavor, isPresent, timeStamps, hasParent) in cu:
             if flavor is None:
                 flavor = ""
 
@@ -1462,13 +1468,17 @@ order by
             info = (name, v, deps.deps.ThawDependencySet(flavor))
 
             if isPresent:
-                installed.append(info)
+                if hasParent:
+                    installedAndReferenced.append(info)
+                else:
+                    installedNotReferenced.append(info)
             else:
-                referenced.append(info)
+                referencedNotInstalled.append(info)
 
         cu.execute("DROP TABLE gcts", start_transaction = False)
 
-        return set(installed), set(referenced)
+        return (set(installedNotReferenced), set(installedAndReferenced), 
+                set(referencedNotInstalled))
 
     def close(self):
 	self.db.close()
