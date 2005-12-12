@@ -12,6 +12,8 @@
 # full details.
 #
 
+import os
+
 from conary import sqlite3
 from base_drv import BaseDatabase, BaseCursor
 import sqlerrors
@@ -49,9 +51,25 @@ class Database(BaseDatabase):
         assert(cdb["database"])
         # FIXME: we should channel exceptions into generic exception
         # classes common to all backends
-        self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
+        try:
+            self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
+        except sqlite3.InternalError, e:
+            if str(e) == 'database is locked':
+                raise sqlerrors.DatabaseLocked(e)
+            raise
         self.loadSchema()
+	sb = os.stat(self.database)
+        self.inode= (sb.st_dev, sb.st_ino)
         return True
+
+    def reopen(self):
+        sb = os.stat(self.database)
+        inode= (sb.st_dev, sb.st_ino)
+	if self.inode != inode:
+            self.dbh.close()
+            del self.dbh
+            return self.connect()
+        return False
 
     def loadSchema(self):
         BaseDatabase.loadSchema(self)
