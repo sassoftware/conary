@@ -22,7 +22,7 @@ import sqlerrors
 
 class Cursor(BaseCursor):
     def execute(self, sql, *params, **kw):
-        logMe(3, "Executing SQL code", sql, params, kw)
+        #logMe(3, "SQL:", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
