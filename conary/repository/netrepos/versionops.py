@@ -50,21 +50,8 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
-    # DBSTORE: dbstore should handle the case sensitive nature of this
-    # just fine, eliminating the need for overriding the __init__ call
     def __init__(self, db):
-        self.db = db
-	self.tableName = 'branches'
-	self.keyName = 'branchId'
-	self.strName = 'branch'
-
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'Branches' not in tables:
-            cu.execute("CREATE TABLE Branches(branchId integer primary key,"
-					     "branch str unique)")
-	    self.initTable()
+        idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
 
 class LabelTable(idtable.IdTable):
 
