@@ -12,19 +12,13 @@
 # full details.
 #
 
-from base_drv import DBStoreError, DBStoreCursorError
 from base_drv import BaseDatabase as Database
 from base_drv import BaseCursor as Cursor
 from migration import SchemaMigration
+from sqlerrors import InvalidBackend
 
 # default driver we want to use
 __DRIVER = "sqlite"
-
-class DBInvalidBackend(DBStoreError):
-    def __init__(self, msg, data):
-        self.msg = msg
-        self.data = data
-        DBStoreError.__init__(self, msg, data)
 
 def __get_driver(driver = __DRIVER):
     global __DRIVER
@@ -34,7 +28,7 @@ def __get_driver(driver = __DRIVER):
         try:
             from sqlite_drv import Database
         except ImportError:
-            raise DBInvalidBackend(
+            raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
                 driver)
         else:
@@ -44,7 +38,7 @@ def __get_driver(driver = __DRIVER):
         try:
             from postgresql_drv import Database
         except ImportError:
-            raise DBInvalidBackend(
+            raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
                 driver)
         else:
@@ -54,13 +48,13 @@ def __get_driver(driver = __DRIVER):
         try:
             from mysql_drv import Database
         except ImportError:
-            raise DBInvalidBackend(
+            raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
                 driver)
         else:
             return Database
 
-    raise DBInvalidBackend(
+    raise InvalidBackend(
         "Database backend '%s' is not supported" % (driver,),
         driver)
 

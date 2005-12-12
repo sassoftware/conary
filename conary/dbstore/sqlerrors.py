@@ -19,6 +19,12 @@ class DatabaseError(Exception):
     def __str__(self):
         return str(self.args)
 
+class InvalidBackend(DatabaseError):
+    def __init__(self, msg, data):
+        self.msg = msg
+        self.data = data
+        DatabaseError.__init__(self, msg, data)
+
 class DatabaseLocked(DatabaseError):
     pass
 

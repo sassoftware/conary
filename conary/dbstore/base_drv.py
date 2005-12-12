@@ -229,7 +229,7 @@ class BaseDatabase:
         self.sequences = []
         self.version = 0
 
-    def schemaVersion(self):
+    def getVersion(self):
         assert(self.dbh)
         c = self.cursor()
         if 'DatabaseVersion' not in self.tables:
@@ -238,6 +238,19 @@ class BaseDatabase:
         c.execute("select max(version) as version from DatabaseVersion")
         self.version = c.fetchone()[0]
         return self.version
+
+    def setVersion(self, version):
+        assert(self.dbh)
+        c = self.cursor()
+        assert (version >= self.getVersion())
+        if 'DatabaseVersion' not in self.tables:
+            c.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
+            c.execute("INSERT INTO DatabaseVersion (version) VALUES (0)")
+        c.execute("UPDATE DatabaseVersion set version = ?", version)
+        self.commit()
+        # usually a setVersion occurs after some schema modification...
+        self.loadSchema()
+        return version
 
     # try to close it first nicely
     def __del__(self):
