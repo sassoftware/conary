@@ -21,13 +21,40 @@ from base_drv import BaseDatabase, BaseCursor
 import sqlerrors
 
 class Cursor(BaseCursor):
+    type = "sqlite"
+
+    # this is basically the BaseCursor's execute with special handling
+    # for start_transaction
+    def _execute(self, sql, *args, **kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
+        self.description = None
+        # force dbi compliance here. we prefer args over the kw
+        if len(args) == 0:
+            return self._cursor.execute(sql, **kw)
+        if len(args) == 1 and isinstance(args[0], dict):
+            kw.update(args[0])
+            return self._cursor.execute(sql, **kw)
+        # special case the start_transaction parameter
+        st = kw.get("start_transaction", True)
+        if kw.has_key("start_transaction"):
+            del kw["start_transaction"]
+        if len(kw):
+            raise sqlerrors.CursorError(
+                "Do not pass both positional and named bind arguments",
+                *args, **kw)
+        if len(args) == 1:
+            return self._cursor.execute(sql, args[0], start_transaction = st)
+        kw["start_transaction"] = st
+        return self._cursor.execute(sql, *args, **kw)
+
     def execute(self, sql, *params, **kw):
         #logMe(3, "SQL:", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
                 inAutoTrans = True
-            ret = BaseCursor.execute(self, sql, *params, **kw)
+            ret = self._execute(sql, *params, **kw)
             # commit any transactions which were opened automatically
             # by the sqlite3 bindings and left hanging:
             if inAutoTrans and self.dbh.inTransaction:

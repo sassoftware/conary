@@ -128,28 +128,30 @@ class BindlessCursor(BaseCursor):
         return (sql, keys)
 
     # we need to "fix" the sql code before calling out
-    def execute(self, sql, *params, **kw):
+    def execute(self, sql, *args, **kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
         self.description = None
         sql, keys = self.__mungeSQL(sql)
-        # figure out possible invocations
-        if len(params) == 0:
+        # force dbi compliance here. we prefer args over the kw
+        if len(args) == 0:
             assert (sorted(kw.keys()) == sorted(keys))
-        elif len(params) == 1:
-            assert(isinstance(params, tuple))
-            if isinstance(params[0], tuple):
-                params = params[0]
-            p = params[0]
+        elif len(args) == 1:
+            assert(isinstance(args, tuple))
+            if isinstance(args[0], tuple):
+                args = args[0]
+            p = args[0]
             # if it is a dictionary, it must contain bind arguments
             if hasattr(p, 'keys'):
                 kw.update(p)
             else: # special case - single positional argument
                 assert(len(keys)==0 and len(kw)==0)
-                return self._cursor.execute(sql, params)
-        else: # many params, we don't mix in bind arguments
+                return self._cursor.execute(sql, args)
+        else: # many args, we don't mix in bind arguments
             assert(len(keys)==0 and len(kw)==0)
-            return self._cursor.execute(sql, params)
+            return self._cursor.execute(sql, args)
         # we have a dict of bind arguments
-        return self._cursor.execute(sql, kw)
+        return self._cursor.execute(sql, **kw)
 
 # A class to handle database operations
 class BaseDatabase:

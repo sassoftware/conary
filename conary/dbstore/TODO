@@ -1,6 +1,3 @@
-- provide generic interface for start_transaction=False for sqlite
-  (and only sqlite has this issue, so maybe fixing the bindings would
-   be a better way)
 - implement cu = db.prepare(sql)
 - table TroveInfo has a "data" column that is of type BINARY. In MySQL
   we have BLOB, MEDIUMBLOB and LARGEBLOB types. BLOB is upto

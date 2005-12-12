@@ -285,7 +285,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _setupFlavorFilter(self, cu, flavorSet):
         logMe(2, flavorSet)
-        # FIXME: avoid starting a transaction when using sqlite
         cu.execute("""
         CREATE TEMPORARY TABLE
         ffFlavor(
@@ -293,53 +292,51 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             base STRING,
             sense INTEGER,
             flag STRING)
-        """)
+        """, start_transaction = False)
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
-                    # FIXME: start_transaction = False for sqlite
                     cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, NULL)",
-                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED)
+                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED,
+                               start_transaction = False)
                     for (flag, sense) in dep.flags.iteritems():
-                        # FIXME: start_transaction = False for sqlite
                         cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
-                                   flavorId, dep.name, sense, flag)
+                                   flavorId, dep.name, sense, flag,
+                                   start_transaction = False)
         cu.execute("select count(*) from ffFlavor")
         entries = cu.next()[0]
         logMe(3, "created temporary table ffFlavor", entries)
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
         logMe(2)
-        # FIXME: start_transaction = False for sqlite
         cu.execute("""
         CREATE TEMPORARY TABLE
         gtvlTbl(
             item STRING,
             versionSpec STRING,
             flavorId INT)
-        """)
+        """, start_transaction = False)
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
                 versionDict = dict.fromkeys(versionDict, [ None ])
 
             for versionSpec, flavorList in versionDict.iteritems():
                 if flavorList is None:
-                    # FIXME: start_transaction = False for sqlite
                     cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, NULL)",
-                               troveName, versionSpec)
+                               troveName, versionSpec,
+                               start_transaction = False)
                 else:
                     for flavorSpec in flavorList:
                         if flavorSpec:
                             flavorId = flavorIndices[flavorSpec]
                         else:
                             flavorId = None
-                        # FIXME: start_transaction = False for sqlite
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
-                                   troveName, versionSpec, flavorId)
-        # FIXME: start_transaction = False for sqlite
-        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")
+                                   troveName, versionSpec, flavorId,
+                                   start_transaction = False)
+        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", start_transaction = False)
         cu.execute("select count(*) from gtvlTbl")
         entries = cu.next()[0]
         logMe(3, "created temporary table gtvlTbl", entries)
@@ -349,8 +346,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GTL_VERSION_TYPE_VERSION = 2
     _GTL_VERSION_TYPE_BRANCH = 3
 
-    # FIXME: this function gets always called withVersions = true. The code
-    # would simplify alot if we just assumed that instead of casing it
     def _getTroveList(self, authToken, clientVersion, troveSpecs,
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS,
@@ -647,11 +642,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 l.append(flavor)
         logMe(3, "extracted query results")
 
-        # FIXME: start_transaction = False for sqlite
         if dropTroveTable:
-            cu.execute("DROP TABLE gtvlTbl")
+            cu.execute("DROP TABLE gtvlTbl", start_transaction = False)
         if flavorIndices:
-            cu.execute("DROP TABLE ffFlavor")
+            cu.execute("DROP TABLE ffFlavor", start_transaction = False)
 
         if latestFilter == self._GET_TROVE_VERY_LATEST or \
                     flavorFilter == self._GET_TROVE_BEST_FLAVOR:

@@ -18,7 +18,10 @@ from base_drv import BaseDatabase, BindlessCursor
 import sqlerrors
 
 class Cursor(BindlessCursor):
+    type = "mysql"
     def execute(self, sql, *params, **kw):
+        if kw.has_key("start_transaction"):
+            del kw["start_transaction"]
         try:
             ret = BindlessCursor.execute(self, sql, *params, **kw)
         except mysql.IntegrityError, e:
@@ -26,7 +29,7 @@ class Cursor(BindlessCursor):
                 raise sqlerrors.ColumnNotUnique(e)
             raise errors.CursorError(e)
         return ret
-    
+
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
