@@ -335,7 +335,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
 	self.db = sqldb.Database(self.dbpath)
 
-        datastore.DataStoreRepository.__init__(self, path,
+        datastore.DataStoreRepository.__init__(self, 
                            dataStore = localrep.SqlDataStore(self.db.db))
         repository.AbstractRepository.__init__(self)
         trovesource.SearchableTroveSource.__init__(self)

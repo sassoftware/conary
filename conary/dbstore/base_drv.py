@@ -17,6 +17,8 @@ import re
 
 import sqlerrors, sqllib
 
+from conary.lib import cfg
+
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
@@ -288,3 +290,15 @@ class Callable:
         assert(self.call is not None)
         apply(self.call, args)
 
+# A class for configuration of a database driver
+class CfgDriver(cfg.CfgType):
+
+    def parseString(self, curVal, str):
+        s = str.split()
+        if len(s) != 2:
+            raise ParseError, "database driver and path expected"
+
+        return tuple(s)
+
+    def format(self, val, displayOptions = None):
+        return "%s %s" % val

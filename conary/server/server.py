@@ -263,16 +263,16 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     def reset(self, authToken, clientVersion):
         import shutil
         try:
-            shutil.rmtree(self.repPath + '/contents')
+            shutil.rmtree(self.contentsDir)
         except OSError, e:
             if e.errno != errno.ENOENT:
                 raise
-        os.mkdir(self.repPath + '/contents')
+        os.mkdir(self.contentsDir)
 
         # cheap trick. sqlite3 doesn't mind zero byte files; just replace
         # the file with a zero byte one (to change the inode) and reopen
-        open(self.repPath + '/sqldb.new', "w")
-        os.rename(self.repPath + '/sqldb.new', self.repPath + '/sqldb')
+        open(self.repDB[1] + '.new', "w")
+        os.rename(self.repDB[1] + '.new', self.repDB[1])
         self.reopen()
 
         return 0
@@ -318,7 +318,8 @@ def addUser(cfg, userName, otherArgs):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    cfg.repositoryDir = otherArgs[1]
+    cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
+    cfg.contentsDir = otherArgs[1] + '/contents'
 
     netRepos = ResetableNetworkRepositoryServer(cfg, '')
     netRepos.auth.addUser(userName, pw1)
@@ -377,7 +378,10 @@ if __name__ == '__main__':
     # start the logging
     initLog(level=3, trace=1)
 
-    cfg.repositoryDir = otherArgs[1]
+    util.mkdirChain(otherArgs[1])
+
+    cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
+    cfg.contentsDir = otherArgs[1] + '/contents'
     cfg.serverName = otherArgs[2]
 
     netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)

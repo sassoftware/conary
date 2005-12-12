@@ -14,6 +14,7 @@
 
 from base_drv import BaseDatabase as Database
 from base_drv import BaseCursor as Cursor
+from base_drv import CfgDriver
 from migration import SchemaMigration
 from sqlerrors import InvalidBackend
 

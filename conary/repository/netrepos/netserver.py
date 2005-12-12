@@ -1431,16 +1431,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, cacheset.CacheSet)
 
-    # XXX: database handle should be pushed into the global namespace
-    # to avoid connects/disconnects on every request processed.
     def open(self):
         logMe(1)
-        # XXX: don't hardcode the driver (requires config file update)
-        self.db = dbstore.connect(self.sqlDbPath, driver = "sqlite")
+        self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
         schema.checkVersion(self.db)
 	self.troveStore = trovestore.TroveStore(self.db)
         self.repos = fsrepos.FilesystemRepository(
-            self.name, self.troveStore, self.repPath, self.map,
+            self.name, self.troveStore, self.contentsDir, self.map,
             logFile = self.logFile, requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name)
 
@@ -1452,25 +1449,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             del self.repos
             self.open()
 
-    # FIXME - sqlite-ism: stop assuming databases live on pathnames...
     def __init__(self, cfg, basicUrl):
+        if cfg.repositoryDir:
+            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
+            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
+            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
+
 	self.map = cfg.repositoryMap
-	self.repPath = cfg.repositoryDir
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
 	self.name = cfg.serverName
 	self.commitAction = cfg.commitAction
-        # FIXME: sqlite-ism - database shouldn't be assumed a pathname
-        self.sqlDbPath = self.repPath + '/sqldb'
         self.troveStore = None
         self.logFile = cfg.logFile
         self.requireSigs = cfg.requireSigs
 
+        self.repDB = cfg.repositoryDB
+        self.contentsDir = cfg.contentsDir
+
         logMe(1, basicUrl)
-	try:
-	    util.mkdirChain(self.repPath)
-	except OSError, e:
-	    raise errors.OpenError(str(e))
 
         if cfg.cacheChangeSets:
             self.cache = cacheset.CacheSet(path + "/cache.sql", tmpPath)
@@ -1491,9 +1488,12 @@ class ServerConfig(ConfigFile):
     cacheChangeSets         = CfgBool
     closed                  = CfgString
     commitAction            = CfgString
+    contentsDir             = CfgPath
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    # XXX this is for backwards compatibility
     repositoryDir           = CfgString
+    repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgString
