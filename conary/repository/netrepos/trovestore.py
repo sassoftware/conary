@@ -24,6 +24,7 @@ from conary.local import troveinfo, versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
 from conary.repository.netrepos import versionops, cltable
+from conary.dbstore import sqlerrors
 
 class LocalRepVersionTable(versiontable.VersionTable):
 
@@ -88,7 +89,7 @@ class TroveStore:
     def __del__(self):
         try:
             self.db.close()
-        except sqlite3.ProgrammingError:
+        except sqlerrors.DatabaseError:
             pass
         del self.db
 

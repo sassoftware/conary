@@ -28,7 +28,6 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import repository, netclient
-from conary import sqlite3
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 

@@ -16,7 +16,10 @@ import os
 import tempfile
 import cPickle
 
+from conary import dbstore
 from conary.local import sqldb, versiontable
+
+CACHE_SCHEMA_VERSION = 17
 
 class NullCacheSet:
     def getEntry(self, item, recurse, withFiles, withFileContents,
@@ -182,35 +185,28 @@ class CacheSet:
         cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
         self.db.commit()
 
-    def createSchema(self, dbpath, schemaVersion):
-        self.db = 
-	self.db = sqlite3.connect(dbpath, timeout = 30000)
-        self.db._begin()
+    def __cleanCache(self):
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "CacheContents" in tables:
-            cu.execute("SELECT version FROM CacheVersion")
-            version = cu.next()[0]
-            if version != schemaVersion:
-                cu.execute("SELECT row from CacheContents")
-                for (row,) in cu:
-                    fn = self.filePattern % (self.tmpDir, row)
-                    if os.path.exists(fn):
-                        try:
-                            os.unlink(fn)
-                        except OSError:
-                            pass
-
-                self.db.close()
+        cu.execute("SELECT row from CacheContents")
+        for (row,) in cu:
+            fn = self.filePattern % (self.tmpDir, row)
+            if os.path.exists(fn):
                 try:
-                    os.unlink(dbpath)
+                    os.unlink(fn)
                 except OSError:
                     pass
-                self.db = sqlite3.connect(dbpath, timeout = 30000)
-                tables = []
 
-        if "CacheContents" not in tables:
+    def createSchema(self, dbpath, schemaVersion):
+        self.db = dbstore.connect(dbpath)
+        cu = self.db.cursor()
+        if "CacheContents" in self.db.tables:
+            if self.db.version != CACHE_SCHEMA_VERSION:
+                self.__cleanCache()
+                for t in self.db.tables:
+                    cu.execute("DROP TABLE %s" % (t,))
+                self.db.setVersion(CACHE_SCHEMA_VERSION)
+
+        if "CacheContents" not in self.db.tables:
             cu.execute("""
             CREATE TABLE CacheContents(
                row              INTEGER PRIMARY KEY,
@@ -229,12 +225,9 @@ class CacheSet:
             )""")
             cu.execute("""
             CREATE INDEX CacheContentsIdx ON
-                CacheContents(troveName, oldFlavorId, oldVersionId,
-                              newFlavorId, newVersionId)
+                CacheContents(troveName)
             """)
-            cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
-            cu.execute("INSERT INTO CacheVersion VALUES(?)", schemaVersion)
-        self.db.commit()
+            self.db.commit()
 
     def __init__(self, dbpath, tmpDir, schemaVersion):
 	self.tmpDir = tmpDir
