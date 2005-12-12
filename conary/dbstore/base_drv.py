@@ -20,11 +20,19 @@ import sqlerrors, sqllib
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
+    PASSTHROUGH = ["lastrowid"]
+
     def __init__(self, dbh=None):
         self.dbh = dbh
         self._cursor = self._getCursor()
         self.description = None
 
+    # map some attributes back to self._cursor
+    def __getattr__(self, name):
+        if name in self.PASSTHROUGH and not hasattr(self, name):
+            return getattr(self._cursor, name)
+        raise AttributeError("'%s' attribute is invalid" % (name,))
+    
     # this will need to be provided by each separate driver
     def _getCursor(self):
         assert(self.dbh)
