@@ -50,8 +50,6 @@ from conary.repository.netrepos import netauth
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 
-DEFAULT_FILE_PATH="/tmp/conary-server"
-
 class HttpRequests(SimpleHTTPRequestHandler):
 
     outFiles = {}
@@ -279,18 +277,19 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
         return 0
 
-class ServerConfig(ConfigFile):
+class ServerConfig(netserver.ServerConfig):
 
-    logFile		= CfgPath
     port		= (CfgInt,  8000)
-    repositoryMap       = CfgRepoMap
-    requireSigs         = (CfgBool, False)
-    tmpFilePath         = CfgPath, DEFAULT_FILE_PATH
-
 
     def __init__(self, path="serverrc"):
-	ConfigFile.__init__(self)
+	netserver.ServerConfig.__init__(self)
 	self.read(path)
+        assert(not self.cacheChangeSets)
+        assert(not self.closed)
+        assert(not self.commitAction)
+        assert(not self.forceSSL)
+        assert(not self.repositoryDir)
+        assert(not self.serverName)
 
 def usage():
     print "usage: %s repospath reposname" %sys.argv[0]
@@ -299,10 +298,10 @@ def usage():
     print "server flags: --config-file <path>"
     print '              --log-file <path>'
     print '              --map "<from> <to>"'
-    print "              --tmp-file-path <path>"
+    print "              --tmp-dir <path>"
     sys.exit(1)
 
-def addUser(userName, otherArgs):
+def addUser(cfg, userName, otherArgs):
     if len(otherArgs) != 2:
         usage()
 
@@ -319,13 +318,9 @@ def addUser(userName, otherArgs):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    from conary import sqlite3
-    authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
+    cfg.repositoryDir = otherArgs[1]
 
-    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,
-			                        None, {})
-
-
+    netRepos = ResetableNetworkRepositoryServer(cfg, '')
     netRepos.auth.addUser(userName, pw1)
     netRepos.auth.addAcl(userName, None, None, True, False, True)
 
@@ -335,7 +330,7 @@ if __name__ == '__main__':
 	'log-file'	: 'logFile',
 	'map'	        : 'repositoryMap',
 	'port'	        : 'port',
-	'tmp-file-path' : 'tmpFilePath',
+	'tmp-dir'       : 'tmpDir',
         'require-sigs'  : 'requireSigs'
     }
 
@@ -353,14 +348,13 @@ if __name__ == '__main__':
         print >> sys.stderr, msg
         sys.exit(1)
 
-
-    FILE_PATH = cfg.tmpFilePath
+    FILE_PATH = cfg.tmpDir
 
     if argSet.has_key('help'):
         usage()
 
     if argSet.has_key('add-user'):
-        sys.exit(addUser(argSet['add-user'], otherArgs))
+        sys.exit(addUser(cfg, argSet['add-user'], otherArgs))
 
     if not os.path.isdir(FILE_PATH):
 	print FILE_PATH + " needs to be a directory"
@@ -383,9 +377,10 @@ if __name__ == '__main__':
     # start the logging
     initLog(level=3, trace=1)
 
-    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH,
-			baseUrl, otherArgs[2], cfg.repositoryMap,
-                        logFile = cfg.logFile, requireSigs = cfg.requireSigs)
+    cfg.repositoryDir = otherArgs[1]
+    cfg.serverName = otherArgs[2]
+
+    netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)
 

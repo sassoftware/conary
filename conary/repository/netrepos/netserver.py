@@ -20,8 +20,10 @@ import tempfile
 import time
 
 from conary import files, trove, versions
+from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, sha1helper, util
+from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
@@ -1451,31 +1453,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open()
 
     # FIXME - sqlite-ism: stop assuming databases live on pathnames...
-    def __init__(self, path, tmpPath, basicUrl, name,
-		 repositoryMap, commitAction = None, cacheChangeSets = False,
-                 logFile = None, requireSigs = False):
-	self.map = repositoryMap
-	self.repPath = path
-	self.tmpPath = tmpPath
+    def __init__(self, cfg, basicUrl):
+	self.map = cfg.repositoryMap
+	self.repPath = cfg.repositoryDir
+	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
-	self.name = name
-	self.commitAction = commitAction
+	self.name = cfg.serverName
+	self.commitAction = cfg.commitAction
         # FIXME: sqlite-ism - database shouldn't be assumed a pathname
         self.sqlDbPath = self.repPath + '/sqldb'
         self.troveStore = None
-        self.logFile = logFile
-        self.requireSigs = requireSigs
+        self.logFile = cfg.logFile
+        self.requireSigs = cfg.requireSigs
 
-        logMe(1, path, basicUrl, name, self.sqlDbPath)
+        logMe(1, basicUrl)
 	try:
 	    util.mkdirChain(self.repPath)
 	except OSError, e:
 	    raise errors.OpenError(str(e))
 
-        if cacheChangeSets:
+        if cfg.cacheChangeSets:
             self.cache = cacheset.CacheSet(path + "/cache.sql", tmpPath)
         else:
-            self.cache = cacheset.NullCacheSet(tmpPath)
+            self.cache = cacheset.NullCacheSet(self.tmpPath)
 
         self.open()
 
@@ -1486,3 +1486,15 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
 
     def __init__(self, closedMessage):
         self.closedMessage = closedMessage
+
+class ServerConfig(ConfigFile):
+    cacheChangeSets         = CfgBool
+    closed                  = CfgString
+    commitAction            = CfgString
+    forceSSL                = CfgBool
+    logFile                 = CfgPath
+    repositoryDir           = CfgString
+    repositoryMap           = CfgRepoMap
+    requireSigs             = CfgBool
+    serverName              = CfgString
+    tmpDir                  = (CfgPath, '/var/tmp')
