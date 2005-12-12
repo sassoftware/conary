@@ -106,13 +106,15 @@ class LatestTable:
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
+        exists = 1
+        if "LabelMap" not in db.tables:
+            exists = 0
 	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
 		                       'itemId', 'labelId', 'branchId')
-	cu = db.cursor()
-        cu.execute("SELECT name FROM sqlite_master WHERE type='index'")
-        tables = [ x[0] for x in cu ]
-        if "LabelMapLabelIdx" not in tables:
-	    cu.execute("CREATE INDEX LabelMapLabelIdx on LabelMap(labelId)")
+        if not exists:
+            cu = db.cursor()
+	    cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(labelId)")
+	    cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
