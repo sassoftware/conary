@@ -4,9 +4,12 @@ Changes in 0.80.1:
       "user" configuration entries must be used instead.
     * The clone command now allows you to clone a binary onto the same
       branch, without having to reclone the source.
-    * The TroveInfo table on the client is getting corrupted with LoadedTrove
-      and BuildReq entries for components (which don't have either). Code
-      was added to fail when this happens to (hopefully) aid debugging
+    * The TroveInfo table on the client is getting corrupted with
+      LoadedTrove and BuildReq entries for components.  These entries
+      are only valid on packages.  Code was added to catch when this
+      happens to aid debugging.  Additionally, Conary will
+      automatically remove the invalid entries the first time 0.80.1
+      is run.
   o Building Changes:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
