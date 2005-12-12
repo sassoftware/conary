@@ -288,7 +288,6 @@ def createUsers(db):
         cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
 
-        logMe(1, "CREATE USERS...")
         if "Items" in db.tables:
             cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
         if "Labels" in db.tables:
