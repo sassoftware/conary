@@ -34,9 +34,10 @@ class TroveInfoTable:
         for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
             if frz:
-                # FIXME: somehow we're getting buildReqs in the troveInfo
-                # table.  prevent this until the bug is found.
-                if c and tag == 4:
+                # FIXME: somehow we're getting buildReqs and loadedTrovs in the
+                # troveInfo table for components.  prevent this until the bug
+                # is found.
+                if c and (tag == 4 or tag == 5):
                     raise RuntimeError('attempted to add build requires '
                                        'trove info for a component: %s' %n)
                 cu.execute("INSERT INTO TroveInfo VALUES (?, ?, ?)",
