@@ -15,20 +15,27 @@
 import sys
 import re
 
-class DBStoreError(Exception):
-    pass
+import sqlerrors, sqllib
 
-class DBStoreCursorError(DBStoreError):
-    def __init__(self, msg, **kwargs):
-        DBStoreError.__init__(self, msg, **kwargs)
+from conary.lib import cfg
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
+    PASSTHROUGH = ["lastrowid"]
+
     def __init__(self, dbh=None):
         self.dbh = dbh
         self._cursor = self._getCursor()
         self.description = None
+
+    # map some attributes back to self._cursor
+    def __getattr__(self, name):
+        if name in self.__dict__.keys():
+            return self.__dict__[key]
+        if name in self.PASSTHROUGH:
+            return getattr(self._cursor, name)
+        raise AttributeError("'%s' attribute is invalid" % (name,))
 
     # this will need to be provided by each separate driver
     def _getCursor(self):
@@ -39,16 +46,19 @@ class BaseCursor:
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
         self.description = None
-        # force dbi compliance here
-        if len(kw) == 0:
-            if len(args) == 0:
-                return self._cursor.execute(sql)
-            if len(args) == 1:
-                return self._cursor.execute(sql, args[0])
-            return self._cursor.execute(sql, *args)
+        # force dbi compliance here. we prefer args over the kw
+        if len(args) == 0:
+            return self._cursor.execute(sql, **kw)
         if len(args) == 1 and isinstance(args[0], dict):
             kw.update(args[0])
-        return self._cursor.execute(sql, **kw)
+            return self._cursor.execute(sql, **kw)
+        if len(kw):
+            raise sqlerrors.CursorError(
+                "Do not pass both positional and named bind arguments",
+                *args, **kw)
+        if len(args) == 1:
+            return self._cursor.execute(sql, args[0])
+        return self._cursor.execute(sql, *args)
 
     # return the column names of the current select
     def __rowDict(self, row):
@@ -56,7 +66,7 @@ class BaseCursor:
         if row is None:
             return None
         if len(row) != len(self._cursor.description):
-            raise DBStoreCursorError("Cursor description doew not match row data",
+            raise sqlerrors.CursorError("Cursor description doew not match row data",
                                      row = row, desc = self._cursor.description)
         if not self.description:
             self.description = [ x[0] for x in self._cursor.description ]
@@ -92,6 +102,15 @@ class BaseCursor:
             pass
         return None
 
+    def __iter__(self):
+        return self
+
+    def next(self):
+        item = self.fetchone()
+        if item is None:
+            raise StopIteration
+        else:
+            return item
 
 # A cursor class for the drivers that do not support bind
 # parameters. Instead of :name they use a Python-esque %(name)s
@@ -105,7 +124,7 @@ class BindlessCursor(BaseCursor):
             keys.add(key)
             sql = re.sub(":" + key, "%("+key+")s", sql)
         sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql) 
+        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql)
         return (sql, keys)
 
     # we need to "fix" the sql code before calling out
@@ -146,7 +165,6 @@ class BaseDatabase:
         self.dbh = None
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
-        self.__transaction = None
 
     # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
@@ -163,6 +181,12 @@ class BaseDatabase:
     def connect(self):
         assert(self.database)
         raise RuntimeError("This connect function has to be provided by the database driver")
+
+    # reopens the database backend, if required. Kind of specific t sqlite-type backends
+    def reopen(self):
+        """Returns True if the database backend was reopenedor a
+        reconnection was required"""
+        return False
 
     def close(self):
         if self.dbh:
@@ -195,7 +219,6 @@ class BaseDatabase:
 
     def commit(self):
         assert(self.dbh)
-        self.__transaction = 0
         return self.dbh.commit()
 
     # transaction support
@@ -206,36 +229,47 @@ class BaseDatabase:
         assert(self.dbh)
         c = self.cursor()
         c.execute(self.basic_transaction)
-        self.__transaction = 1
         return c
 
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
         assert(not name)
-        assert(self.__transaction)
         assert(self.dbh)
-        self.__transaction = 0
-        return self.dbh.rollback()
+        self.dbh.rollback()
 
     # easy access to the schema state
-    def _getSchema(self):
+    def loadSchema(self):
         assert(self.dbh)
         # keyed by table, values are indexes on the table
-        self.tables = {}
+        self.tables = sqllib.CaselessDict()
         self.views = []
         self.functions = []
         self.sequences = []
         self.version = 0
 
-    def _getSchemaVersion(self):
+    def getVersion(self):
         assert(self.dbh)
         c = self.cursor()
         if 'DatabaseVersion' not in self.tables:
             self.version = 0
-            return
+            return 0
         c.execute("select max(version) as version from DatabaseVersion")
         self.version = c.fetchone()[0]
+        return self.version
+
+    def setVersion(self, version):
+        assert(self.dbh)
+        c = self.cursor()
+        assert (version >= self.getVersion())
+        if 'DatabaseVersion' not in self.tables:
+            c.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
+            c.execute("INSERT INTO DatabaseVersion (version) VALUES (0)")
+        c.execute("UPDATE DatabaseVersion set version = ?", version)
+        self.commit()
+        # usually a setVersion occurs after some schema modification...
+        self.loadSchema()
+        return version
 
     # try to close it first nicely
     def __del__(self):
@@ -256,3 +290,15 @@ class Callable:
         assert(self.call is not None)
         apply(self.call, args)
 
+# A class for configuration of a database driver
+class CfgDriver(cfg.CfgType):
+
+    def parseString(self, curVal, str):
+        s = str.split()
+        if len(s) != 2:
+            raise ParseError, "database driver and path expected"
+
+        return tuple(s)
+
+    def format(self, val, displayOptions = None):
+        return "%s %s" % val

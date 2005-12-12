@@ -1,0 +1,7 @@
+- make the InstancesView, NodesView and LatestView views more useful by also including the *Id columns in the output
+- versionops/Branches is case sensitive on the table name
+- TroveTroves needs to have the unique index properly created
+- relocate the admin field from Permissions to the UserGroups table
+- move the schema creation/initialization code out of the TroveStore class
+- update testsuite for netrepo/cacheset.py
+

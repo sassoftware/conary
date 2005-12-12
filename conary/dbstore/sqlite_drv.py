@@ -12,17 +12,22 @@
 # full details.
 #
 
+import os
+
 from conary import sqlite3
+from conary.lib.tracelog import logMe
+
 from base_drv import BaseDatabase, BaseCursor
-import sql_error
+import sqlerrors
 
 class Cursor(BaseCursor):
     def execute(self, sql, *params, **kw):
+        #logMe(3, "SQL:", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
                 inAutoTrans = True
-            BaseCursor.execute(self, sql, *params, **kw)
+            ret = BaseCursor.execute(self, sql, *params, **kw)
             # commit any transactions which were opened automatically
             # by the sqlite3 bindings and left hanging:
             if inAutoTrans and self.dbh.inTransaction:
@@ -31,18 +36,19 @@ class Cursor(BaseCursor):
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
-                raise sql_error.ColumnNotUnique(e)
-            else:
-                raise
+                raise sqlerrors.ColumnNotUnique(e)
+            raise sqlerrors.CursorError(e)
         except:
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             raise
+        return ret
 
 class Database(BaseDatabase):
     type = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
+    basic_transaction = "begin immediate"
 
     def connect(self, timeout=10000):
         assert(self.database)
@@ -50,12 +56,28 @@ class Database(BaseDatabase):
         assert(cdb["database"])
         # FIXME: we should channel exceptions into generic exception
         # classes common to all backends
-        self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
-        self._getSchema()
+        try:
+            self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
+        except sqlite3.InternalError, e:
+            if str(e) == 'database is locked':
+                raise sqlerrors.DatabaseLocked(e)
+            raise
+        self.loadSchema()
+	sb = os.stat(self.database)
+        self.inode= (sb.st_dev, sb.st_ino)
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def reopen(self):
+        sb = os.stat(self.database)
+        inode= (sb.st_dev, sb.st_ino)
+	if self.inode != inode:
+            self.dbh.close()
+            del self.dbh
+            return self.connect()
+        return False
+
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         c.execute("select type, name, tbl_name from sqlite_master")
         slist = c.fetchall()
@@ -71,8 +93,7 @@ class Database(BaseDatabase):
                 self.views.append(name)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
-        self._getSchemaVersion()
-        return self.version
+        return self.getVersion()
 
     def analyze(self):
         if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
@@ -93,5 +114,5 @@ class Database(BaseDatabase):
 
         if doAnalyze:
             cu.execute('ANALYZE')
-            self._getSchema()
+            self.loadSchema()
 

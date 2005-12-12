@@ -15,7 +15,7 @@
 import copy
 import itertools
 
-from conary import files, metadata, sqlite3, trove, versions, changelog
+from conary import files, metadata, trove, versions, changelog
 from conary.deps import deps
 from conary.lib import util
 from conary.lib.tracelog import logMe
@@ -24,6 +24,7 @@ from conary.local import troveinfo, versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
 from conary.repository.netrepos import versionops, cltable
+from conary.dbstore import sqlerrors
 
 class LocalRepVersionTable(versiontable.VersionTable):
 
@@ -56,9 +57,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveStore:
     def __init__(self, db):
 	self.db = db
-
         self.db.commit()
-        self.begin()
 
         # Order matters! Create the simple (leaf) tables first, and
         # then the ones that have foreign keys
@@ -88,7 +87,7 @@ class TroveStore:
     def __del__(self):
         try:
             self.db.close()
-        except sqlite3.ProgrammingError:
+        except sqlerrors.DatabaseError:
             pass
         del self.db
 
@@ -176,10 +175,11 @@ class TroveStore:
 	outD = {}
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
+        # FIXME: start_transaction = False for sqlite
 	cu.execute("""
 	    CREATE TEMPORARY TABLE itf(item STRING, version STRING,
 				      fullVersion STRING)
-	""", start_transaction = False)
+	""")
         try:
             for troveName in troveDict.keys():
                 outD[troveName] = {}
@@ -187,10 +187,11 @@ class TroveStore:
                     outD[troveName][version] = []
                     versionStr = version.asString()
                     vMap[versionStr] = version
+                    # FIXME: start_transaction = False for sqlite
                     cu.execute("""
                         INSERT INTO itf VALUES (?, ?, ?)
                     """,
-                    (troveName, versionStr, versionStr), start_transaction = False)
+                    (troveName, versionStr, versionStr))
 
             cu.execute("""
                 SELECT aItem, fullVersion, Flavors.flavor FROM
@@ -212,7 +213,8 @@ class TroveStore:
                 ver = vMap[verString]
                 outD[item][ver].append(flavor)
         finally:
-            cu.execute("DROP TABLE itf", start_transaction = False)
+            # FIXME: start_transaction = False for sqlite
+            cu.execute("DROP TABLE itf")
 
 	return outD
 
@@ -540,19 +542,17 @@ class TroveStore:
 
     def iterTroves(self, troveInfoList, withFiles = True):
 	cu = self.db.cursor()
-
+        # FIXME: start_transaction = False for sqlite
         cu.execute("""CREATE TEMPORARY TABLE gtl(idx INTEGER PRIMARY KEY,
-                        name STRING, version STRING, flavor STRING)""",
-                   start_transaction = False)
+                        name STRING, version STRING, flavor STRING)""")
         for idx, info in enumerate(troveInfoList):
             if not info[2]:
                 flavorStr = "'none'"
             else:
                 flavorStr = "'%s'" % info[2].freeze()
-
+            # FIXME: start_transaction = False for sqlite
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)"
-                       % flavorStr, idx, info[0], info[1].asString(),
-                       start_transaction = False)
+                       % flavorStr, idx, info[0], info[1].asString())
 
         cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect,
                              Nodes.timeStamps, Changelogs.name,
@@ -576,14 +576,14 @@ class TroveStore:
 
         troveIdList = [ x for x in cu ]
 
-        cu.execute("DROP TABLE gtl", start_transaction = False)
-
+        # FIXME: start_transaction = False for sqlite
+        cu.execute("DROP TABLE gtl")
+        # FIXME: start_transaction = False for sqlite
         cu.execute("CREATE TEMPORARY TABLE gtlInst (idx INTEGER PRIMARY KEY, "
-                      "instanceId INTEGER)", start_transaction = False)
+                      "instanceId INTEGER)")
         for singleTroveIds in troveIdList:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
-                       singleTroveIds[0], singleTroveIds[1],
-                       start_transaction = False)
+                       singleTroveIds[0], singleTroveIds[1])
 
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
@@ -625,7 +625,8 @@ class TroveStore:
         if not troveIdList:
             # if there are no matches, drop this now (since we can't drop
             # it inside the while loop
-            cu.execute("DROP TABLE gtlInst", start_transaction = False)
+            # FIXME: start_transaction = False for sqlite
+            cu.execute("DROP TABLE gtlInst")
 
         neededIdx = 0
         while troveIdList:
@@ -690,7 +691,8 @@ class TroveStore:
             # if we're at the end, go ahead and free up the database in
             # case this iterator doesn't get fully drained
             if not troveIdList:
-                cu.execute("DROP TABLE gtlInst", start_transaction = False)
+                # FIXME: start_transaction = False for sqlite
+                cu.execute("DROP TABLE gtlInst")
 
             yield trv
 
@@ -790,14 +792,10 @@ class TroveStore:
         return self.depTables.resolve(label, depSetList)
 
     def begin(self):
-	"""
-	Force the database to begin a transaction; this locks the database
-	so no one can touch it until a commit() or rollback().
-	"""
-	self.db._begin()
+        return self.db.transaction()
 
     def rollback(self):
-	self.db.rollback()
+        return self.db.rollback()
 
     def commit(self):
 	if self.needsCleanup:
@@ -820,17 +818,19 @@ class FileRetriever:
 
     def __init__(self, db):
         self.cu = db.cursor()
+        # FIXME: start_transaction = False for sqlite
         self.cu.execute("""
             CREATE TEMPORARY TABLE getFilesTbl(rowId INTEGER PRIMARY KEY,
                                                fileId BINARY)
-        """, start_transaction = False)
+        """)
 
     def get(self, l):
         lookup = range(len(l) + 1)
         for tup in l:
             (pathId, fileId) = tup[:2]
+            # FIXME: start_transaction = False for sqlite
             self.cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
-                       fileId, start_transaction = False)
+                       fileId)
             lookup[self.cu.lastrowid] = (pathId, fileId)
 
         self.cu.execute("""
@@ -846,11 +846,12 @@ class FileRetriever:
             else:
                 f = None
             d[(pathId, fileId)] = f
-
-        self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
+        # FIXME: start_transaction = False for sqlite
+        self.cu.execute("DELETE FROM getFilesTbl")
 
         return d
 
     def __del__(self):
-        self.cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
+        # FIXME: start_transaction = False for sqlite
+        self.cu.execute("DROP TABLE getFilesTbl")
 

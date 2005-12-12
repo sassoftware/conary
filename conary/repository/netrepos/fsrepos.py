@@ -28,7 +28,6 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import repository, netclient
-from conary import sqlite3
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -408,9 +407,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, path, repositoryMap, logFile = None,
-                 requireSigs = False):
-	self.top = path
+    def __init__(self, name, troveStore, contentsDir, repositoryMap, 
+                 logFile = None, requireSigs = False):
 	self.name = name
 	map = dict(repositoryMap)
 	map[name] = self
@@ -421,13 +419,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	self.troveStore = troveStore
 
-	self.sqlDbPath = self.top + "/sqldb"
-
-        fullPath = path + "/contents"
         self.requireSigs = requireSigs
-        util.mkdirChain(fullPath)
-        store = DataStore(fullPath, logFile = logFile)
+        util.mkdirChain(contentsDir)
+        store = DataStore(contentsDir, logFile = logFile)
 
-	DataStoreRepository.__init__(self, path, logFile = logFile,
-                                     dataStore = store)
+	DataStoreRepository.__init__(self, dataStore = store)
 	AbstractRepository.__init__(self)

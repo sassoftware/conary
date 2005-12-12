@@ -16,10 +16,10 @@ import os
 import re
 import sys
 
-from conary import sqlite3
 from conary.repository import errors
 from conary.repository.netrepos import schema
 from conary.lib.tracelog import logMe
+from conary.dbstore import sqlerrors
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
@@ -173,15 +173,17 @@ class NetworkAuthorization:
 
     def checkIsFullAdmin(self, user, password):
         cu = self.db.cursor()
-        cu.execute("""SELECT salt, password
-                        FROM userPermissions
-                        WHERE User=? AND admin=1""", user)
-
+        cu.execute("""
+        SELECT salt, password
+        FROM Users as U
+        JOIN UserGroupMembers as UGM USING(userId)
+        JOIN Permissions as P USING(userGroupId)
+        WHERE U.user = ? and P.admin = 1""",
+                   user)
         for (salt, cryptPassword) in cu:
             if not self.checkPassword(salt, cryptPassword, password):
                 return False
             return True
-
         return False
 
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
@@ -219,11 +221,9 @@ class NetworkAuthorization:
                                 (SELECT userGroupId FROM userGroups WHERE
                                 userGroup=?)
                         """, labelId, itemId, write, capped, admin, userGroup)
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'columns userGroupId, labelId, itemId are not unique':
-                self.db.rollback()
-                raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-            raise
+        except sqlerrors.ColumnNotUnique:
+            self.db.rollback()
+            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
 
         self.db.commit()
 
@@ -245,11 +245,9 @@ class NetworkAuthorization:
                                 labelId=? AND itemId=?
                         """, labelId, troveId, write, capped, admin,
                         userGroupId, oldLabelId, oldTroveId)
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'columns userGroupId, labelId, itemId are not unique':
-                self.db.rollback()
-                raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-            raise
+        except sqlerrors.ColumnNotUnique:
+            self.db.rollback()
+            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
 
         self.db.commit()
 
@@ -319,20 +317,16 @@ class NetworkAuthorization:
             (SELECT IFNULL(MAX(userId),0) FROM Users),
             (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
             )+1, ? """, user)
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'column userGroup is not unique':
-                raise errors.GroupAlreadyExists, 'group: %s' % user
-            raise
+        except sqlerrors.ColumnNotUnique:
+            raise errors.GroupAlreadyExists, 'group: %s' % user
 
         userGroupId = cu.lastrowid
 
         try:
             cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
                        (userGroupId, user, salt, password))
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'column user is not unique':
-                raise errors.UserAlreadyExists, 'user: %s' % user
-            raise
+        except sqlerrors.ColumnNotUnique:
+            raise errors.UserAlreadyExists, 'user: %s' % user
 
         userId = cu.lastrowid
         cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)",
@@ -503,13 +497,11 @@ class NetworkAuthorization:
 
         try:
             cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
-        except sqlite3.ProgrammingError, e:
+        except sqlerrors.ColumnNotUnique:
             self.db.rollback()
-            if str(e) == 'column userGroup is not unique':
-                raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-            raise
-
+            raise errors.GroupAlreadyExists, "group: %s" % userGroupName
         self.db.commit()
+
         return cu.lastrowid
 
     def renameGroup(self, userGroupId, userGroupName):
@@ -525,11 +517,9 @@ class NetworkAuthorization:
 
             try:
                 cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
-            except sqlite3.ProgrammingError, e:
+            except sqlerrors.ColumnNotUnique:
                 self.db.rollback()
-                if str(e) == 'column userGroup is not unique':
-                    raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-                raise
+                raise errors.GroupAlreadyExists, "group: %s" % userGroupName
 
             self.db.commit()
 
@@ -719,4 +709,3 @@ class NetworkAuthorization:
         self.db = db
         self.reCache = {}
         schema.createUsers(db)
-

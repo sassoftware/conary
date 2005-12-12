@@ -20,9 +20,6 @@ import traceback
 import xmlrpclib
 import zlib
 
-from conary.lib.cfg import *
-from conary.conarycfg import CfgRepoMap
-
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
@@ -30,20 +27,6 @@ from conary.repository.netrepos import netserver
 from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
-
-class ServerConfig(ConfigFile):
-    commitAction            = CfgString
-    forceSSL                = CfgBool
-    logFile                 = CfgString
-    repositoryMap           = CfgRepoMap
-    repositoryDir           = CfgString
-    serverName              = CfgString
-    tmpDir                  = (CfgPath, '/var/tmp')
-    cacheChangeSets         = CfgBool
-    staticPath              = (CfgPath, '/conary-static')
-    closed                  = CfgString
-    requireSigs             = CfgBool
-
 
 def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
@@ -205,7 +188,7 @@ def writeTraceback(wfile, cfg):
 def handler(req):
     repName = req.filename
     if not repositories.has_key(repName):
-        cfg = ServerConfig()
+        cfg = netserver.ServerConfig()
         cfg.read(req.filename)
 
 	if os.path.basename(req.uri) == "changeset":
@@ -235,15 +218,7 @@ def handler(req):
             repositories[repName] = netserver.ClosedRepositoryServer(cfg.closed)
         else:
             repositories[repName] = netserver.NetworkRepositoryServer(
-                                    cfg.repositoryDir,
-                                    cfg.tmpDir,
-                                    urlBase,
-                                    cfg.serverName,
-                                    cfg.repositoryMap,
-                                    commitAction = cfg.commitAction,
-                                    cacheChangeSets = cfg.cacheChangeSets,
-                                    logFile = cfg.logFile,
-                                    requireSigs = cfg.requireSigs)
+                                                    cfg, urlBase)
 
             repositories[repName].forceSecure = cfg.forceSSL
             repositories[repName].cfg = cfg

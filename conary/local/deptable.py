@@ -30,7 +30,7 @@ def createDepTable(cu, name, isTemp):
                                   flag str
                                  )""" % (tmp, name),
                start_transaction = (not isTemp))
-    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" % 
+    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = (not tmp))
 
 def createRequiresTable(cu, name, isTemp):
@@ -110,6 +110,7 @@ class DependencyTables:
 
     def _populateTmpTable(self, cu, stmt, depList, troveNum, requires, 
                           provides, multiplier = 1):
+        assert(type(stmt) == type(""))
         allDeps = []
         if requires:
             allDeps += [ (False, x) for x in 
@@ -121,7 +122,7 @@ class DependencyTables:
         for (isProvides, (classId, depClass)) in allDeps:
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                    cu.execstmt(stmt,
+                    cu.execute(stmt,
                                    troveNum, multiplier * len(depList), 
                                     1 + len(flags), isProvides, classId, 
                                     depName, NO_FLAG_MAGIC)
@@ -131,7 +132,7 @@ class DependencyTables:
                             # prevents them from making it into any repository
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            cu.execstmt(stmt,
+                            cu.execute(stmt,
                                         troveNum, multiplier * len(depList), 
                                         1 + len(flags), isProvides, classId, 
                                         depName, flag)
@@ -236,27 +237,27 @@ class DependencyTables:
                     if last:
                         depSet.addDep(deps.dependencyClasses[last[0]],
                                       deps.Dependency(last[1], flags))
-                        
                     last = (classId, name)
                     flags = []
                     if flag != NO_FLAG_MAGIC:
                         flags.append((flag, deps.FLAG_SENSE_REQUIRED))
-                    
+
             if last:
                 depSet.addDep(deps.dependencyClasses[last[0]],
                               deps.Dependency(last[1], flags))
                 setFn(depSet)
 
     def add(self, cu, trove, troveId):
-        assert(cu.con.inTransaction)
+        # FIXME: this is used by the server code as well and it is
+        # WAAAY too sqlite specific...
+        #assert(cu.con.inTransaction)
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
         self._createTmpTable(cu, "NeededDeps")
 
-	stmt = cu.compile("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)")
-        self._populateTmpTable(cu, stmt, [], troveId, 
-                               requires, provides)
+	stmt = "INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)"
+        self._populateTmpTable(cu, stmt, [], troveId, requires, provides)
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
                             "Provides", ("Dependencies",))
 
@@ -732,10 +733,11 @@ class DependencyTables:
         oldTroves = []
         troveNames = []
 
-	stmt = cu.compile("""INSERT INTO DepCheck 
-                                    (troveId, depNum, flagCount, isProvides,
-                                     class, name, flag)
-                             VALUES(?, ?, ?, ?, ?, ?, ?)""")
+	stmt = """
+        INSERT INTO DepCheck
+        (troveId, depNum, flagCount, isProvides, class, name, flag)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+        """
 
         # We build up a graph to let us split the changeset into pieces.
         # Each node in the graph represents a remove/add pair. Note that
@@ -1069,7 +1071,7 @@ class DependencyTables:
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
-	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
+	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, stmt, depList, -i - 1, 
                                    depSet, None, multiplier = -1)
@@ -1174,7 +1176,7 @@ class DependencyTables:
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
-	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
+	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, stmt, depList, -i - 1, 
                                    depSet, None, multiplier = -1)
