@@ -19,6 +19,12 @@ class DatabaseError(Exception):
     def __str__(self):
         return str(self.args)
 
+class DatabaseLocked(DatabaseError):
+    pass
+
+class SchemaVersionError(DatabaseError):
+    pass
+
 class CursorError(DatabaseError):
     pass
 

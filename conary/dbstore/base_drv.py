@@ -15,7 +15,7 @@
 import sys
 import re
 
-import sqlerrors
+import sqlerrors, sqllib
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
@@ -159,6 +159,12 @@ class BaseDatabase:
         assert(self.database)
         raise RuntimeError("This connect function has to be provided by the database driver")
 
+    # reopens the database backend, if required. Kind of specific t sqlite-type backends
+    def reopen(self):
+        """Returns True if the database backend was reopenedor a
+        reconnection was required"""
+        return False
+
     def close(self):
         if self.dbh:
             self.dbh.close()
@@ -217,7 +223,7 @@ class BaseDatabase:
     def loadSchema(self):
         assert(self.dbh)
         # keyed by table, values are indexes on the table
-        self.tables = {}
+        self.tables = sqllib.CaselessDict()
         self.views = []
         self.functions = []
         self.sequences = []
