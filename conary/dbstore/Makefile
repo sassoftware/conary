@@ -21,6 +21,7 @@ python_files	= __init__.py \
 		  postgresql_drv.py \
 		  sqlite_drv.py	\
 		  migration.py \
+		  sqllib.py \
 		  sqlerrors.py
 
 extra_dist = Makefile
