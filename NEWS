@@ -4,11 +4,17 @@ Changes in 0.80.1:
       "user" configuration entries must be used instead.
     * The clone command now allows you to clone a binary onto the same
       branch, without having to reclone the source.
-  o Building packages:
+    * The TroveInfo table on the client is getting corrupted with LoadedTrove
+      and BuildReq entries for components (which don't have either). Code
+      was added to fail when this happens to (hopefully) aid debugging
+  o Building Changes:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
     * The skipMissingSubDir keyword argument now actually works correctly
       when the subdirectory is missing.
+  o Common Changes:
+    * Entitlement support has been added as an alternate method of 
+      authentication.
 
 Changes in 0.80.0:
   o Client Changes:
@@ -40,7 +46,7 @@ Changes in 0.80.0:
       "timeout waiting for download thread to terminate" messages.
     * Fixed bug where conary erase foo --no-deps wouldn't erase a component 
       of foo if it was required by something else
-  o Building packages:
+  o Building Changes:
     * Dependencies are now generated for Java .class and .jar files.
       They are not yet enforced, to give time to rebuild Java packages.
     * Java dependency generation has been turned off until 0.80.1 in

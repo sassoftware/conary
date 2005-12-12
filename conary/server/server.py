@@ -165,22 +165,34 @@ class HttpRequests(SimpleHTTPRequestHandler):
     def getAuth(self):
         info = self.headers.get('Authorization', None)
         if info is None:
-            return ('anonymous', 'anonymous')
-        info = info.split()
+            httpAuthToken = [ 'anonymous', 'anonymous' ]
+        else:
+            info = info.split()
 
-        try:
-            authString = base64.decodestring(info[1])
-        except:
-            self.send_error(400)
-            return None
+            try:
+                authString = base64.decodestring(info[1])
+            except:
+                self.send_error(400)
+                return None
 
-        if authString.count(":") != 1:
-            self.send_error(400)
-            return None
+            if authString.count(":") != 1:
+                self.send_error(400)
+                return None
+                
+            httpAuthToken = authString.split(":")
 
-        authToken = authString.split(":")
+        entitlement = self.headers.get('X-Conary-Entitlement', None)
+        if entitlement is not None:
+            try:
+                entitlement = entitlement.split()
+                entitlement[1] = base64.decodestring(entitlement[1])
+            except:
+                self.send_error(400)
+                return None
+        else:
+            entitlement = [ None, None ]
 
-        return authToken
+        return httpAuthToken + entitlement
 
     def checkAuth(self):
  	if not self.headers.has_key('Authorization'):
