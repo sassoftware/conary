@@ -13,17 +13,21 @@
 #
 
 class DatabaseError(Exception):
-    def __init__(self, args):
+    def __init__(self, msg, *args, **kw):
+        self.msg = msg
         self.args = args
+        self.kw = kw
 
     def __str__(self):
-        return str(self.args)
+        ret = self.msg
+        if len(self.args):
+            ret += " args: " + str(self.args)
+        if len(self.kw):
+            ret += " kw: " + str(self.kw)
+        return ret
 
 class InvalidBackend(DatabaseError):
-    def __init__(self, msg, data):
-        self.msg = msg
-        self.data = data
-        DatabaseError.__init__(self, msg, data)
+    pass
 
 class DatabaseLocked(DatabaseError):
     pass
