@@ -43,7 +43,7 @@ def usage(rc = 1):
     print "       conary config"
     print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname>[=<version>][[flavor]]+"
-    print "       conary localcs      <pkg> <outfile>"
+    print "       conary localcs      <pkgname>[=<version>][[flavor]] <outfile>"
     print "       conary localcommit  <changeset>"
     print "       conary pin          <pkgname>[=<version>][[flavor]]*"
     print "       conary query        <pkgname>[=<version>][[flavor]]*"
