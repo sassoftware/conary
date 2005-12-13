@@ -30,7 +30,7 @@ class VersionTable:
         cu.execute("""
         CREATE TABLE Versions(
         versionId       INTEGER PRIMARY KEY,
-        version         VARCHAR(2000)
+        version         VARCHAR(999)
         )""")
         cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "
                    "Versions(version)")

@@ -543,7 +543,7 @@ order by
 	    cu.execute("""
             CREATE TEMPORARY TABLE flavorsNeeded(
                 empty INTEGER,
-                flavor VARCHAR(2000)
+                flavor VARCHAR(999)
             )""")
 	    for flavor in self.flavorsNeeded.keys():
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",

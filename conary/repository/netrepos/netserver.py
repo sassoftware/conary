@@ -315,7 +315,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         CREATE TEMPORARY TABLE
         gtvlTbl(
             item                VARCHAR(254),
-            versionSpec         VARCHAR(2000),
+            versionSpec         VARCHAR(999),
             flavorId            INTEGER
         )""", start_transaction = False)
         for troveName, versionDict in troveSpecs.iteritems():

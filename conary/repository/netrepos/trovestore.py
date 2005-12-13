@@ -176,8 +176,8 @@ class TroveStore:
 	cu.execute("""
         CREATE TEMPORARY TABLE itf(
         item            VARCHAR(254),
-        version         VARCHAR(2000),
-        fullVersion     VARCHAR(2000)
+        version         VARCHAR(999),
+        fullVersion     VARCHAR(999)
         )""", start_transaction = False)
         try:
             for troveName in troveDict.keys():
@@ -232,7 +232,7 @@ class TroveStore:
             versionId INTEGER,
             fileId BINARY,
             stream BINARY,
-            path VARCHAR(2000)
+            path VARCHAR(999)
         )""")
 	self.fileVersionCache = {}
 	return (cu, trove)
@@ -541,8 +541,8 @@ class TroveStore:
         CREATE TEMPORARY TABLE gtl(
         idx             INTEGER PRIMARY KEY,
         name            VARCHAR(254),
-        version         VARCHAR(2000),
-        flavor          VARCHAR(2000)
+        version         VARCHAR(999),
+        flavor          VARCHAR(999)
         )""", start_transaction = False)
         for idx, info in enumerate(troveInfoList):
             if not info[2]:

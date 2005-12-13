@@ -748,8 +748,8 @@ class DependencyTables:
             cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroves(
                 name        VARCHAR(254),
-                version     VARCHAR(2000),
-                flavor      VARCHAR(2000),
+                version     VARCHAR(999),
+                flavor      VARCHAR(999),
                 nodeId      INTEGER
             )""", start_transaction = False)
             for (name, version, flavor), nodeIdx in oldTroves:

@@ -72,7 +72,7 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY,
-            flavor          VARCHAR(2000)
+            flavor          VARCHAR(999)
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
@@ -417,7 +417,7 @@ def createTroves(db):
             streamId        INTEGER,
             versionId       BINARY,
             pathId          BINARY,
-            path            VARCHAR(2000),
+            path            VARCHAR(999),
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
