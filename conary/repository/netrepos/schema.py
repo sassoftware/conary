@@ -660,7 +660,6 @@ def createSchema(db):
     versionops.LabelTable(db)
     versiontable.VersionTable(db)
 
-    createChangeLog(db)
     createLabelMap(db)
 
     createUsers(db)
@@ -669,6 +668,7 @@ def createSchema(db):
     createFlavors(db)
     createInstances(db)
     createNodes(db)
+    createChangeLog(db)
     createLatest(db)
     createInstructionSets(db)
 
