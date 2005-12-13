@@ -536,18 +536,25 @@ class ClientUpdate:
                                     presentOkay = True)
             names.add(job[0])
 
+        avail = set(availableTrove.iterTroveList())
+
         # Build the set of all relative install jobs (transitive closure)
         relativeUpdateJobs = set(job for job in transitiveClosure if
                                     job[2][0] is not None and not job[3])
         
         # Look for relative updates whose sources are not currently installed
-        relativeUpdates = [ ((x[0], x[1][0], x[1][1]), job)
+        relativeUpdates = [ ((x[0], x[1][0], x[1][1]), x)
                     for x in relativeUpdateJobs if x[1][0] is not None]
-        isPresent = self.db.hasTroves([ x[0] for x in relativeUpdates ])
+        isPresentList = self.db.hasTroves([ x[0] for x in relativeUpdates ])
+
         for (info, job), isPresent in itertools.izip(relativeUpdates,
-                                                      isPresent):
+                                                     isPresentList):
             if not isPresent:
                 relativeUpdateJobs.remove(job)
+                newTrove = job[0], job[2][0], job[2][1]
+
+                if newTrove not in avail:
+                    ineligible.add(newTrove)
 
         # Get all of the currently installed and referenced troves which
         # match something being installed absolute. Troves being removed
@@ -585,7 +592,6 @@ class ClientUpdate:
                         job in localUpdates if job[1][0] is not None and
                                                job[2][0] is not None)
 
-        avail = set(availableTrove.iterTroveList())
 
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
@@ -640,7 +646,7 @@ class ClientUpdate:
         # Relative jobs override pins and need to match up against the
         # right thing.
         jobByNew.update(
-                    dict( ((job[0], job[2][0], job[2][1]), (job[1], True)) for
+                    dict( ((job[0], job[2][0], job[2][1]), (job[1], False)) for
                         job in relativeUpdateJobs))
 
         # first True means its primary, second True means install this by 
