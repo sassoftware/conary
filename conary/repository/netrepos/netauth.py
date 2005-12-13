@@ -119,8 +119,6 @@ class NetworkAuthorization:
             if troveName=='ALL' or not trove:
                 regExp = None
             else:
-                import epdb
-                epdb.st()
                 regExp = self.reCache.get(troveName, None)
                 if regExp is None:
                     regExp = re.compile(troveName)
