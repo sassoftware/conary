@@ -28,6 +28,8 @@ class Cursor(BindlessCursor):
             if e[1].startswith("Duplicate"):
                 raise sqlerrors.ColumnNotUnique(e)
             raise errors.CursorError(e)
+        except mysql.OperationalError, e:
+            raise sqlerrors.DatabaseError(e.args[1], e.args)
         return ret
 
 # FIXME: we should channel exceptions into generic exception classes
