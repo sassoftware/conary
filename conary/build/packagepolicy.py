@@ -1981,6 +1981,17 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires(sonameSubtrees=['/list', '/of', '/dirs'])}
     These are B{not} regular expressions.  They will have macro
     expansion expansion done on them.
+
+    For (unusual) cases where Conary finds a false or misleading
+    dependency, or in which you need to override a true dependency,
+    you can specify
+    C{r.Requires(exceptDeps='I{regexp}')} to override all
+    dependencies matching a regular expression,
+    C{r.Requires(exceptDeps=('I{filterexp}', 'I{regexp}'))} to override
+    dependencies matching a regular expression only for files
+    matching C{I{filterexp}}, or
+    C{r.Requires(exceptDeps=(('I{filterexp}', 'I{regexp}'), ...))} to
+    specify multiple overrides.
     """
     invariantexceptions = (
 	'%(docdir)s/',
@@ -1991,6 +2002,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
         self.sonameSubtrees = set(destdirpolicy.librarydirs)
         self._privateDepMap = {}
         self.rpathFixup = []
+        self.exceptDeps = []
         policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2010,6 +2022,15 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 rpath = ('.*', rpath)
             assert(type(rpath) == tuple)
             self.rpathFixup.append(rpath)
+        exceptDeps = keywords.pop('exceptDeps', None)
+        if exceptDeps:
+            if type(exceptDeps) is str:
+                exceptDeps = ('.*', exceptDeps)
+            assert(type(exceptDeps) == tuple)
+            if type(exceptDeps[0]) is tuple:
+                self.exceptDeps.extend(exceptDeps)
+            else:
+                self.exceptDeps.append(exceptDeps)
         _addInfo.updateArgs(self, *args, **keywords)
 
     def preProcess(self):
@@ -2022,6 +2043,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
                                    for x in file('/etc/ld.so.conf').readlines())
         self.rpathFixup = [(filter.Filter(x, macros), y % macros)
                            for x, y in self.rpathFixup]
+        self.exceptDeps = [(filter.Filter(x, macros), re.compile(y % macros))
+                          for x, y in self.exceptDeps]
 
     def _ELFPathFixup(self, path, m, pkg):
         """
@@ -2171,6 +2194,21 @@ class Requires(_addInfo, _BuildPackagePolicy):
             for req in m.contents['requires']:
                 self._addRequirement(path, req, [], pkg,
                                      deps.JavaDependencies)
+
+        # remove intentionally discarded dependencies
+        if self.exceptDeps and path in pkg.requiresMap:
+            depSet = deps.DependencySet()
+            for depClass, dep in pkg.requiresMap[path].iterDeps():
+                for filt, exceptRe in self.exceptDeps:
+                    if filt.match(path):
+                        matchName = '%s: %s' %(depClass.tagName, str(dep))
+                        if exceptRe.match(matchName):
+                            # found one to not copy
+                            dep = None
+                            break
+                if dep is not None:
+                    depSet.addDep(depClass, dep)
+            pkg.requiresMap[path] = depSet
 
         # finally, package the dependencies up
         if path not in pkg.requiresMap:

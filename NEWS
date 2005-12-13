@@ -1,3 +1,9 @@
+Changes in 0.80.2:
+  o Build Changes:
+    * It is now possible for a recipe to request that specific individual
+      requirements be removed from files (it used to be all or nothing)
+      using the exceptDeps keyword argument to r.Requires().
+
 Changes in 0.80.1:
   o Client Changes:
     * User names and passwords are no longer allowed in repository maps;
@@ -13,7 +19,7 @@ Changes in 0.80.1:
     * Environment variables are expanded in paths in conary configuration files.
     * localcs now allows the version and flavor to be specified for a trove
     * conary scs --all now behaves the way it used to again
-  o Building Changes:
+  o Build Changes:
     * Java dependency generation is now enabled; Java dependency enforcement
       is still disabled.
     * The skipMissingSubDir keyword argument now actually works correctly
@@ -52,7 +58,7 @@ Changes in 0.80.0:
       "timeout waiting for download thread to terminate" messages.
     * Fixed bug where conary erase foo --no-deps wouldn't erase a component 
       of foo if it was required by something else
-  o Building Changes:
+  o Build Changes:
     * Dependencies are now generated for Java .class and .jar files.
       They are not yet enforced, to give time to rebuild Java packages.
     * Java dependency generation has been turned off until 0.80.1 in
