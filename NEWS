@@ -5,6 +5,8 @@ Changes in 0.80.2:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)
       using the exceptDeps keyword argument to r.Requires().
+    * r.Replace now takes a lines=<regexp> argument, to match a line based
+      on a regexp
 
 Changes in 0.80.1:
   o Client Changes:

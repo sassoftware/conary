@@ -950,7 +950,15 @@ class Replace(BuildAction):
     Note that C{Replace()} cannot do multi-line substitutions.  For more
     complicated replacements, sed is appropriate.  However, C{Replace()}
     performs error checking that sed does not; C{Replace()} assumes by
-    default that you meant for substitutions to take place..
+    default that you meant for substitutions to take place.
+
+    By default, Replace will raise an error if a file passed into Replace 
+    is not modified by any of the regular expressions given.  
+    The allowNoChange keyword can be used to turn off that behavior.
+
+    The lines matched by Replace can be restricted by the C{lines} keyword.
+    Lines may be a tuple I{(begin, end)} or a single integer I{line} or a 
+    regular expression of lines to match.  Lines are indexed starting with 1.
     
     Remember that python will interpret C{\1}-C{\7} as octal characters;
     you must either escape the backslash: C{\\1} or make the string
@@ -966,7 +974,8 @@ class Replace(BuildAction):
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword lines: Determines the lines to which the replacement applies
-        @type lines: tuple (start, end) or int (default: all)
+        @type lines: tuple (start, end) of lines to match or int, the single
+        line to match, or str, a regexp of lines to match. (default: all)
         @keyword allowNoChange: do not raise an error if C{I{pattern}} did
                                 not apply
         @type allowNoChange: bool (default: False)
@@ -1001,16 +1010,24 @@ class Replace(BuildAction):
 	    self.init_error(TypeError, 
                             'empty file path specified to Replace')
         
+        self.min = self.max = self.lineMatch = None
         if self.lines:
             if isinstance(self.lines, (list, tuple)):
                 self.min, self.max = (self.lines)
-            else:
+            elif isinstance(self.lines, int):
                 self.min = self.max = self.lines
-            if min(self.min, self.max, 1) != 1:
-                self.init_error(RuntimeError, 
-                                "Replace() line indices start at 1, like sed")
-        else:
-            self.min = self.max = None
+            elif isinstance(self.lines, str):
+                self.lineMatch = re.compile(self.lines)
+        if self.min is not None and min(self.min, self.max, 1) != 1:
+            self.init_error(RuntimeError, 
+                            "Replace() line indices start at 1, like sed")
+
+    def _lineMatches(self, index, line):
+        min, max, lineMatch = self.min, self.max, self.lineMatch
+        if ((not min or index >= min) and (not max or index <= max)
+             and (not lineMatch or lineMatch.search(line))):
+                return True
+        return False
 
     def do(self, macros):
         paths = action._expandPaths(self.paths, macros, error=True)
@@ -1030,11 +1047,11 @@ class Replace(BuildAction):
             regexps.append((re.compile(pattern % macros), sub % macros))
 
         unchanged = []
-        min, max = self.min, self.max
         for path in paths:
             if not util.isregular(path):
                 log.warning("%s is not a regular file, not applying Replace")
                 continue
+
             fd, tmppath = tempfile.mkstemp(suffix='rep', 
                                            prefix=os.path.basename(path), 
                                            dir=os.path.dirname(path))
@@ -1042,7 +1059,7 @@ class Replace(BuildAction):
                 foundMatch = False
                 index = 1
                 for line in open(path):
-                    if (not min or index >= min) and (not max or index <= max):
+                    if self._lineMatches(index, line):
                         for (regexp, sub) in regexps:
                             line, count = regexp.subn(sub, line)
                             if count: 
@@ -1050,10 +1067,12 @@ class Replace(BuildAction):
 
                     os.write(fd, line)
                     index += 1
+
                 if foundMatch:
                     mode = os.stat(path)[stat.ST_MODE]
                     os.rename(tmppath, path)
                     os.chmod(path, mode)
+
             finally:
                 if os.path.exists(tmppath):
                     os.remove(tmppath)
