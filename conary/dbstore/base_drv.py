@@ -16,7 +16,6 @@ import sys
 import re
 
 import sqlerrors, sqllib
-
 from conary.lib import cfg
 
 # base Cursor class. All backend drivers are expected to provide this

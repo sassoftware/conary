@@ -23,14 +23,14 @@ class Cursor(BindlessCursor):
         if kw.has_key("start_transaction"):
             del kw["start_transaction"]
         try:
-            ret = BindlessCursor.execute(self, sql, *params, **kw)
+            BindlessCursor.execute(self, sql, *params, **kw)
         except mysql.IntegrityError, e:
             if e[1].startswith("Duplicate"):
                 raise sqlerrors.ColumnNotUnique(e)
             raise errors.CursorError(e)
         except mysql.OperationalError, e:
             raise sqlerrors.DatabaseError(e.args[1], e.args)
-        return ret
+        return self
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
