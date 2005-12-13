@@ -10,121 +10,53 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-# 
+#
 
-from conary import sqlite3
+from conary import dbstore
 from conary import versions
 from conary.deps import deps
+from conary.local import schema
+from conary.lib.tracelog import logMe
 
 NO_FLAG_MAGIC = '-*none*-'
 
-def createDepTable(cu, name, isTemp):
-    if isTemp:
-        tmp = "TEMPORARY"
-    else:
-        tmp = ""
-
-    cu.execute("""CREATE %s TABLE %s(depId integer primary key,
-                                  class integer,
-                                  name str,
-                                  flag str
-                                 )""" % (tmp, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
-               (name, name), start_transaction = (not tmp))
-
-def createRequiresTable(cu, name, isTemp):
-    if isTemp:
-        tmp = "TEMPORARY"
-    else:
-        tmp = ""
-
-    cu.execute("""CREATE %s TABLE %s(instanceId integer,
-                                  depId integer,
-                                  depNum integer,
-                                  depCount integer
-                                 )""" % (tmp, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx3 ON %s(depNum)" % (name, name),
-               start_transaction = (not isTemp))
-
-def createProvidesTable(cu, name, isTemp):
-    if isTemp:
-        tmp = "TEMPORARY"
-    else:
-        tmp = ""
-
-    cu.execute("""CREATE %s TABLE %s(instanceId integer,
-                                  depId integer
-                                 )""" % (tmp, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
-               start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
-               start_transaction = (not isTemp))
-
-class DepTable:
-    def __init__(self, db, name):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'Dependencies' not in tables:
-            createDepTable(cu, name, False)
-
-class DepRequires:
-    def __init__(self, db, name):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if name not in tables:
-            createRequiresTable(cu, name, False)
-
-class DepProvides:
-    def __init__(self, db, name):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if name not in tables:
-            createProvidesTable(cu, name, False)
-
 class DependencyTables:
-
     def _createTmpTable(self, cu, name, makeTable = True, makeIndex = True):
+        logMe(2, name, makeTable, makeIndex)
 	if makeTable:
-	    cu.execute("""CREATE TEMPORARY TABLE %s(
-						  troveId INT,
-						  depNum INT,
-						  flagCount INT,
-						  isProvides BOOL,
-						  class INTEGER,
-						  name STRING,
-						  flag STRING)""" % name,
-		       start_transaction = False)
+	    cu.execute("""
+            CREATE TEMPORARY TABLE %s(
+                troveId         INTEGER,
+                depNum          INTEGER,
+                flagCount       INTEGER,
+                isProvides      BOOLEAN,
+                class           INTEGER,
+                name            STRING,
+                flag            STRING
+            )""" % name, start_transaction = False)
 	if makeIndex:
-	    cu.execute("CREATE INDEX %sIdx ON %s(troveId, class, name, flag)"
-			    % (name, name), start_transaction = False)
+	    cu.execute("""
+            CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
+            """ % (name, name), start_transaction = False)
 
-    def _populateTmpTable(self, cu, stmt, depList, troveNum, requires, 
+    def _populateTmpTable(self, cu, stmt, depList, troveNum, requires,
                           provides, multiplier = 1):
+        # FIXME: switch back to preparsed statments when dbstore supports it
         assert(type(stmt) == type(""))
         allDeps = []
         if requires:
-            allDeps += [ (False, x) for x in 
+            allDeps += [ (False, x) for x in
                             requires.getDepClasses().iteritems() ]
         if provides:
-            allDeps += [ (True,  x) for x in 
+            allDeps += [ (True,  x) for x in
                             provides.getDepClasses().iteritems() ]
 
         for (isProvides, (classId, depClass)) in allDeps:
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     cu.execute(stmt,
-                                   troveNum, multiplier * len(depList), 
-                                    1 + len(flags), isProvides, classId, 
+                                   troveNum, multiplier * len(depList),
+                                    1 + len(flags), isProvides, classId,
                                     depName, NO_FLAG_MAGIC)
                     if flags:
                         for (flag, sense) in flags:
@@ -133,8 +65,8 @@ class DependencyTables:
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
                             cu.execute(stmt,
-                                        troveNum, multiplier * len(depList), 
-                                        1 + len(flags), isProvides, classId, 
+                                        troveNum, multiplier * len(depList),
+                                        1 + len(flags), isProvides, classId,
                                         depName, flag)
 
                 if not isProvides:
@@ -147,7 +79,7 @@ class DependencyTables:
                       'reqTable'  : reqTable,
                       'provTable' : provTable }
 
-        cu.execute("""INSERT INTO %(depTable)s 
+        cu.execute("""INSERT INTO %(depTable)s
                         SELECT DISTINCT
                             NULL,
                             %(tmpName)s.class,
@@ -162,7 +94,7 @@ class DependencyTables:
                     """ % substDict, start_transaction = False)
 
         if multiplier != 1:
-            cu.execute("UPDATE %s SET depId=depId * %d"  
+            cu.execute("UPDATE %s SET depId=depId * %d"
                            % (depTable, multiplier), start_transaction = False)
 
         cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
@@ -192,11 +124,11 @@ class DependencyTables:
 
         repQuery = """\
                 INSERT INTO %(reqTable)s
-                    SELECT %(tmpName)s.troveId, 
+                    SELECT %(tmpName)s.troveId,
                            %(depId)s,
-                           %(baseReqNum)d + %(tmpName)s.depNum, 
-                           %(tmpName)s.flagCount 
-                        FROM %(tmpName)s 
+                           %(baseReqNum)d + %(tmpName)s.depNum,
+                           %(tmpName)s.flagCount
+                        FROM %(tmpName)s
 """ % substDict
         repQuery += selectClause
         repQuery += """\
@@ -204,14 +136,14 @@ class DependencyTables:
                             %(tmpName)s.isProvides == 0""" % substDict
         cu.execute(repQuery, start_transaction = False)
 
-        if provTable is None:   
+        if provTable is None:
             return
 
         repQuery = """\
                 INSERT INTO %(provTable)s
-                    SELECT %(tmpName)s.troveId, 
+                    SELECT %(tmpName)s.troveId,
                            %(depId)s
-                        FROM %(tmpName)s 
+                        FROM %(tmpName)s
 """ % substDict
         repQuery += selectClause
         repQuery += """\
@@ -258,7 +190,7 @@ class DependencyTables:
 
 	stmt = "INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)"
         self._populateTmpTable(cu, stmt, [], troveId, requires, provides)
-        self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
+        self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires",
                             "Provides", ("Dependencies",))
 
         cu.execute("DROP TABLE NeededDeps", start_transaction = False)
@@ -275,11 +207,11 @@ class DependencyTables:
                    "FROM suspectDepsOrig")
         cu.execute("DROP TABLE suspectDepsOrig")
 
-        cu.execute("""DELETE FROM Dependencies WHERE depId IN 
-                (SELECT DISTINCT suspectDeps.depId FROM suspectDeps 
-                 LEFT OUTER JOIN 
+        cu.execute("""DELETE FROM Dependencies WHERE depId IN
+                (SELECT DISTINCT suspectDeps.depId FROM suspectDeps
+                 LEFT OUTER JOIN
                     (SELECT depId AS depId1,
-                            instanceId AS instanceId1 FROM Requires UNION 
+                            instanceId AS instanceId1 FROM Requires UNION
                      SELECT depId AS depId1,
                             instanceId AS instanceId1 FROM Provides)
                     ON suspectDeps.depId = depId1
@@ -289,15 +221,15 @@ class DependencyTables:
 
     def _restrictResolveByLabel(self, label):
         """ Restrict resolution by label
-            We move this out so that other dependency algorithms 
+            We move this out so that other dependency algorithms
             can restrict resolution by other criteria.  Not exactly providing
-            a clean external interface but it avoids having to rewrite 
+            a clean external interface but it avoids having to rewrite
             dependency code to use different criterea
         """
         if not label:
             return "", ""
-            
-            
+
+
         restrictJoin = """\
                            INNER JOIN Instances ON
                               %(provides)s.instanceId = Instances.instanceId
@@ -309,15 +241,15 @@ class DependencyTables:
                               LabelMap.branchId = Nodes.branchId
                            INNER JOIN Labels ON
                               Labels.labelId = LabelMap.labelId
-""" 
+"""
         restrictWhere = """\
-                            WHERE 
+                            WHERE
                               Labels.label = '%s'
 """ % label
 
         return restrictJoin, restrictWhere
-        
-        
+
+
     def _resolveStmt(self, requiresTable, providesTableList, depTableList,
                      restrictBy = None, restrictor=None):
         subselect = ""
@@ -338,7 +270,7 @@ class DependencyTables:
 
             for name in ( 'class', 'name', 'flag' ):
                 if len(depTableList) > 1:
-                    s = "COALESCE(%s)" % ", ".join([ "%s.%s" % (x, name) 
+                    s = "COALESCE(%s)" % ", ".join([ "%s.%s" % (x, name)
                                                     for x in depTableList])
                 else:
                     s = "%s.%s" % (depTableList[0], name)
@@ -364,14 +296,14 @@ class DependencyTables:
             if restrictor:
                 joinRestrict, whereRestrict = restrictor(restrictBy)
                 subselect += joinRestrict % substTable
-       
+
 
             subselect += """\
 %(depClause)s""" % substTable
-            
+
             if restrictor:
                 subselect += whereRestrict % substTable
-                
+
 
         return """
                 SELECT Matched.reqDepId as depId,
@@ -453,9 +385,9 @@ class DependencyTables:
                            start_transaction = False)
 
             cu.execute("""
-                    SELECT DISTINCT troveName, version, flavor, class, 
-                                    name, flag, BrokenDeps.depNum FROM 
-                        BrokenDeps INNER JOIN Requires ON 
+                    SELECT DISTINCT troveName, version, flavor, class,
+                                    name, flag, BrokenDeps.depNum FROM
+                        BrokenDeps INNER JOIN Requires ON
                             BrokenDeps.depNum = Requires.DepNum
                         JOIN Dependencies ON
                             Requires.depId = Dependencies.depId
@@ -468,7 +400,7 @@ class DependencyTables:
                 """, start_transaction = False)
 
             failedSets = {}
-            for (troveName, troveVersion, troveFlavor, depClass, depName, 
+            for (troveName, troveVersion, troveFlavor, depClass, depName,
                             flag, depNum) in cu:
                 info = (troveName, versions.VersionFromString(troveVersion),
                         deps.ThawDependencySet(troveFlavor))
@@ -482,13 +414,13 @@ class DependencyTables:
                     flags = [ (flag, deps.FLAG_SENSE_REQUIRED) ]
 
                 failedSets[info][0].addDep(
-                        deps.dependencyClasses[depClass], 
+                        deps.dependencyClasses[depClass],
                         deps.Dependency(depName, flags))
                 failedSets[info][1].extend(wasIn[depNum])
 
             cu.execute("DROP TABLE BrokenDeps", start_transaction = False)
 
-            return [ (x[0], x[1][0], x[1][1]) 
+            return [ (x[0], x[1][0], x[1][1])
                                 for x in failedSets.iteritems() ]
 
         def _expandProvidedBy(cu, itemList):
@@ -496,7 +428,7 @@ class DependencyTables:
                 for instanceId in provideList:
                     assert(instanceId > 0)
                 cu.execute("""
-                        SELECT DISTINCT troveName, version, flavor FROM 
+                        SELECT DISTINCT troveName, version, flavor FROM
                             Instances JOIN Versions ON
                                 Instances.versionId = Versions.versionId
                             JOIN Flavors ON
@@ -509,7 +441,7 @@ class DependencyTables:
                 for name, version, flavor in cu:
                     if flavor is None:
                         flavor = ""
-                    provideList.append((name, 
+                    provideList.append((name,
                                         versions.VersionFromString(version),
                                         deps.ThawDependencySet(flavor)))
 
@@ -519,7 +451,7 @@ class DependencyTables:
             newNewEdges = set()
             newOldEdges = set()
 
-            for (depId, depNum, reqInstId, reqNodeIdx, 
+            for (depId, depNum, reqInstId, reqNodeIdx,
                  provInstId, provNodeIdx) in result:
                 if depNum < 0:
                     fromNodeId = -depList[-depNum][0]
@@ -541,7 +473,7 @@ class DependencyTables:
                         if fromNodeId == toNodeId:
                             continue
                         newNewEdges.add((fromNodeId, toNodeId, depId))
-                else: # dependency was provided by something before this 
+                else: # dependency was provided by something before this
                       # update occurred
                     if reqNodeIdx is not None:
                         fromNodeId = reqNodeIdx
@@ -560,7 +492,7 @@ class DependencyTables:
                             oldNewEdges.add((fromNodeId, toNodeId, depId))
                     else:
                         # trove with the requirement is not being removed.
-                        if provNodeIdx is None: 
+                        if provNodeIdx is None:
                             # the trove that provides this requirement is being
                             # installed.  We probably don't care.
                             continue
@@ -593,7 +525,7 @@ class DependencyTables:
 
         def _treeDFS(nodes, nodeIdx, seen, finishes, timeCount):
             seen[nodeIdx] = True
-            
+
             for nodeId in nodes[nodeIdx][1]:
                 if not seen[nodeId]:
                     timeCount = _treeDFS(nodes, nodeId, seen, finishes,
@@ -610,7 +542,7 @@ class DependencyTables:
             edges.reverse()
 
             compList.append(nodeIdx)
-            
+
             for finishTime, nodeId in edges:
                 if not seen[nodeId]:
                     _connectDFS(nodes, compList, nodeId, seen, finishes)
@@ -633,9 +565,9 @@ class DependencyTables:
             timeCount = 0
             while nextStart != len(nodes):
                 if not seen[nextStart]:
-                    timeCount = _treeDFS(nodes, nextStart, seen, finishes, 
+                    timeCount = _treeDFS(nodes, nextStart, seen, finishes,
                                          timeCount)
-                
+
                 nextStart += 1
 
             nodeOrders = [ (f, i) for i, f in enumerate(finishes) ]
@@ -660,7 +592,7 @@ class DependencyTables:
             componentMap = {}
             for i, nodeSet in enumerate(allSets):
                 componentMap.update(dict.fromkeys(nodeSet, i))
-                
+
             componentGraph = []
             for i, nodeSet in enumerate(allSets):
                 edges = {}
@@ -668,7 +600,7 @@ class DependencyTables:
                 for nodeId in nodeSet:
                     componentNodes.append(nodes[nodeId][0])
                     edges.update(dict.fromkeys(
-                            [ componentMap[targetId] 
+                            [ componentMap[targetId]
                                         for targetId in nodes[nodeId][1] ]
                                 ))
                 componentGraph.append((componentNodes, edges))
@@ -724,10 +656,10 @@ class DependencyTables:
 	cu.execute("BEGIN")
 
         self._createTmpTable(cu, "DepCheck", makeIndex = False)
-        createDepTable(cu, 'TmpDependencies', isTemp = True)
-        createProvidesTable(cu, 'TmpProvides', isTemp = True)
-        createRequiresTable(cu, 'TmpRequires', isTemp = True)
-    
+        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
+        schema.createProvidesTable(cu, 'TmpProvides', isTemp = True)
+        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
+
         # build the table of all the requirements we're looking for
         depList = [ None ]
         oldTroves = []
@@ -753,8 +685,8 @@ class DependencyTables:
         troveInfo = {}
 
 	# This sets up negative depNum entries for the requirements we're
-	# checking (multiplier = -1 makes them negative), with (-1 * depNum) 
-	# indexing depList. depList is a list of (troveNum, depClass, dep) 
+	# checking (multiplier = -1 makes them negative), with (-1 * depNum)
+	# indexing depList. depList is a list of (troveNum, depClass, dep)
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
         i = 0
@@ -765,13 +697,13 @@ class DependencyTables:
             newInfo = (job[0], job[2][0], job[2][1])
 
             trv = troveSource.getTrove(withFiles = False, *newInfo)
-            
+
             troveNum = -i - 1
             troveNames.append(newInfo)
-            self._populateTmpTable(cu, stmt, 
-                                   depList = depList, 
+            self._populateTmpTable(cu, stmt,
+                                   depList = depList,
                                    troveNum = troveNum,
-                                   requires = trv.getRequires(), 
+                                   requires = trv.getRequires(),
                                    provides = trv.getProvides(),
                                    multiplier = -1)
 
@@ -792,12 +724,12 @@ class DependencyTables:
 
         # merge everything into TmpDependencies, TmpRequires, and tmpProvides
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            "TmpProvides", 
-                            ("Dependencies", "TmpDependencies"), 
+                            "TmpProvides",
+                            ("Dependencies", "TmpDependencies"),
                             multiplier = -1)
 
         # now build a table of all the troves which are being erased
-        cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
+        cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds
                         (troveId INTEGER, nodeId INTEGER)""")
 	cu.execute("""CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)""")
 
@@ -810,7 +742,7 @@ class DependencyTables:
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
             # table exactly parallels the RemovedTroveIds we set up
-            cu.execute("""CREATE TEMPORARY TABLE RemovedTroves 
+            cu.execute("""CREATE TEMPORARY TABLE RemovedTroves
                             (name STRING, version STRING, flavor STRING,
                              nodeId INTEGER)""",
                        start_transaction = False)
@@ -823,9 +755,9 @@ class DependencyTables:
                 cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
                            (name, version.asString(), flavor, nodeIdx))
 
-            cu.execute("""INSERT INTO RemovedTroveIds 
-                            SELECT instanceId, nodeId FROM 
-                                RemovedTroves 
+            cu.execute("""INSERT INTO RemovedTroveIds
+                            SELECT instanceId, nodeId FROM
+                                RemovedTroves
                             INNER JOIN Versions ON
                                 RemovedTroves.version = Versions.version
                             INNER JOIN Flavors ON
@@ -845,11 +777,11 @@ class DependencyTables:
 	# tables (which define everything which needs to be checked) with
 	# a positive depNum which mathes the depNum from the Requires table.
         cu.execute("""
-                INSERT INTO TmpRequires SELECT 
-                    DISTINCT Requires.instanceId, Requires.depId, 
+                INSERT INTO TmpRequires SELECT
+                    DISTINCT Requires.instanceId, Requires.depId,
                              Requires.depNum, Requires.depCount
-                FROM 
-                    RemovedTroveIds 
+                FROM
+                    RemovedTroveIds
                 INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
                 INNER JOIN Requires ON
@@ -861,8 +793,8 @@ class DependencyTables:
                     Requires.instanceId, Requires.depNum,
                     Requires.DepCount, 0, Dependencies.class,
                     Dependencies.name, Dependencies.flag
-                FROM 
-		    RemovedTroveIds 
+                FROM
+		    RemovedTroveIds
 		INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
                 INNER JOIN Requires ON
@@ -880,7 +812,7 @@ class DependencyTables:
                 SELECT depId, depNum, reqInstanceId, Required.nodeId,
                        provInstanceId, Provided.nodeId
 		    FROM
-			(%s) 
+			(%s)
                     LEFT OUTER JOIN RemovedTroveIds AS Required ON
                         reqInstanceId == Required.troveId
                     LEFT OUTER JOIN RemovedTroveIds AS Provided ON
@@ -901,9 +833,9 @@ class DependencyTables:
         # depNum is the dependency number
         #    negative ones are for dependencies being added (and they index
         #    depList); positive ones are for dependencies broken by an
-        #    erase (and need to be looked up in the Requires table in the 
+        #    erase (and need to be looked up in the Requires table in the
         #    database to get a nice description)
-        # removedInstanceId != None means that the dependency was resolved by 
+        # removedInstanceId != None means that the dependency was resolved by
         #    something which is being removed. If it is None, the dependency
         #    was resolved by something which isn't disappearing. It could
         #    occur multiple times for the same dependency with both None
@@ -918,11 +850,11 @@ class DependencyTables:
         satisfied = { 0 : 0 }
         wasIn = {}
 
-        for (depId, depNum, reqInstanceId, 
+        for (depId, depNum, reqInstanceId,
              reqNodeIdx, provInstId, provNodeIdx) in result:
             if provNodeIdx is not None:
                 if reqNodeIdx is not None:
-                    # this is an old dependency and an old provide.  
+                    # this is an old dependency and an old provide.
                     # ignore it
                     continue
                 if depNum < 0:
@@ -961,7 +893,7 @@ class DependencyTables:
             i = 0
             for job in jobSet:
                 if job[2][0] is None: continue
-                trv = troveSource.getTrove(job[0], job[2][0], job[2][1], 
+                trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
                                            withFiles = False)
 
                 for name, version, flavor in trv.iterTroveList():
@@ -1035,7 +967,7 @@ class DependencyTables:
         brokenByErase.difference_update(satisfied)
 
         # sort things out of unresolveable which were resolved by something
-        # else. 
+        # else.
         unresolveable.difference_update(satisfied)
 
         # build a list of all of the depnums which need to be satisfied
@@ -1059,7 +991,7 @@ class DependencyTables:
 
         return (unsatisfiedList, unresolveableList, changeSetList)
 
-    def _resolve(self, depSetList, selectTemplate, restrictor=None, 
+    def _resolve(self, depSetList, selectTemplate, restrictor=None,
                  restrictBy=None):
 
         cu = self.db.cursor()
@@ -1067,24 +999,24 @@ class DependencyTables:
 	cu.execute("BEGIN")
 
         self._createTmpTable(cu, "DepCheck")
-        createDepTable(cu, 'TmpDependencies', isTemp = True)
-        createRequiresTable(cu, 'TmpRequires', isTemp = True)
+        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
+        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
 	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, stmt, depList, -i - 1, 
+            self._populateTmpTable(cu, stmt, depList, -i - 1,
                                    depSet, None, multiplier = -1)
 
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, ("Dependencies", "TmpDependencies"), 
+                            None, ("Dependencies", "TmpDependencies"),
                             multiplier = -1)
 
-        full = selectTemplate % self._resolveStmt( "TmpRequires", 
+        full = selectTemplate % self._resolveStmt( "TmpRequires",
                                 ("Provides",), ("Dependencies",),
                                 restrictBy = restrictBy, restrictor = restrictor)
-                    
+
         cu.execute(full,start_transaction = False)
 
         return depList, cu
@@ -1096,12 +1028,12 @@ class DependencyTables:
 
 
     def resolve(self, label, depSetList):
-        """ Determine troves that provide the given dependencies, 
-            restricting by label and limiting to latest version for 
+        """ Determine troves that provide the given dependencies,
+            restricting by label and limiting to latest version for
             each (name, flavor) pair.
         """
-        selectTemplate = """SELECT depNum, Items.item, Versions.version, 
-                             Nodes.timeStamps, flavor FROM 
+        selectTemplate = """SELECT depNum, Items.item, Versions.version,
+                             Nodes.timeStamps, flavor FROM
                             (%s)
                           INNER JOIN Instances ON
                             provInstanceId == Instances.instanceId
@@ -1116,9 +1048,9 @@ class DependencyTables:
                             Instances.versionId == Nodes.versionId
                           ORDER BY
                             Nodes.finalTimestamp DESC
-                        """ 
+                        """
         depList, cu = self._resolve(depSetList, selectTemplate,
-                                    restrictBy = label.asString(), 
+                                    restrictBy = label.asString(),
                                     restrictor = self._restrictResolveByLabel)
 
         depSolutions = [ {} for x in xrange(len(depList)) ]
@@ -1135,7 +1067,7 @@ class DependencyTables:
             if not troveSet:
                 continue
 
-            troveSet = [ (x[0][0], 
+            troveSet = [ (x[0][0],
                           versions.strToFrozen(x[1][0], x[1][1].split(":")),
                           x[0][1]) for x in troveSet.items() ]
             self._addResult(depId, troveSet, depList, depSetList, result)
@@ -1161,10 +1093,10 @@ class DependencyTables:
 
         self.db.rollback()
         return result
-        
+
     def resolveToIds(self, depSetList):
         return self._resolveToIds(depSetList)
-       
+
 
     def getLocalProvides(self, depSetList):
         cu = self.db.cursor()
@@ -1172,29 +1104,29 @@ class DependencyTables:
 	cu.execute("BEGIN")
 
         self._createTmpTable(cu, "DepCheck")
-        createDepTable(cu, 'TmpDependencies', isTemp = True)
-        createRequiresTable(cu, 'TmpRequires', isTemp = True)
+        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
+        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
 	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, stmt, depList, -i - 1, 
+            self._populateTmpTable(cu, stmt, depList, -i - 1,
                                    depSet, None, multiplier = -1)
 
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, ("Dependencies", "TmpDependencies"), 
+                            None, ("Dependencies", "TmpDependencies"),
                             multiplier = -1)
 
-        full = """SELECT depNum, troveName, Versions.version, 
-                         timeStamps, Flavors.flavor FROM 
+        full = """SELECT depNum, troveName, Versions.version,
+                         timeStamps, Flavors.flavor FROM
                         (%s)
                       INNER JOIN Instances ON
                         provInstanceId == Instances.instanceId
                       INNER JOIN Versions USING(versionId)
-                      INNER JOIN Flavors 
+                      INNER JOIN Flavors
                             ON (Instances.flavorId == Flavors.flavorId)
-                    """ % self._resolveStmt( "TmpRequires", 
+                    """ % self._resolveStmt( "TmpRequires",
                                 ("Provides",), ("Dependencies",))
 
         cu.execute(full,start_transaction = False)
@@ -1221,16 +1153,14 @@ class DependencyTables:
 
     def __init__(self, db):
         self.db = db
-        DepTable(db, "Dependencies")
-        DepProvides(db, 'Provides')
-        DepRequires(db, 'Requires')
+        schema.createDependencies(db)
 
 class DependencyDatabase(DependencyTables):
-    """ Creates a thin database (either on disk or in memory) 
+    """ Creates a thin database (either on disk or in memory)
         for managing dependencies
     """
-    def __init__(self, path=":memory:"):
-	db = sqlite3.connect(path, timeout=30000)
+    def __init__(self, path=":memory:", driver="sqlite"):
+	db = dbstore.connect(path, driver=driver, timeout=30000)
         DependencyTables.__init__(self, db)
 
     def add(self, troveId, provides, requires):

@@ -46,6 +46,7 @@ class Database(BaseDatabase):
                 del cdb[x]
         self.dbh = mysql.connect(**cdb)
         self.loadSchema()
+        self.closed = False
         return True
 
     def loadSchema(self):

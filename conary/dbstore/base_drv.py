@@ -167,6 +167,7 @@ class BaseDatabase:
         self.dbh = None
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
+        self.closed = True
 
     # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
@@ -193,7 +194,8 @@ class BaseDatabase:
     def close(self):
         if self.dbh:
             self.dbh.close()
-        self.dbh = self.database = None
+        self.dbh = None
+        self.closed = True
 
     def alive(self):
         assert(self.dbh)
@@ -281,7 +283,7 @@ class BaseDatabase:
             except:
                 pass
         self.dbh = self.database = None
-
+        self.closed = True
 
 # A class to handle calls to the SQL functions and procedures
 class Callable:

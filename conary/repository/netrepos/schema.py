@@ -630,7 +630,6 @@ def checkVersion(db):
     # figure out if we're initializing a brand new database
     if version == 0:
         # assume we are setting up a brand new one
-        cu = db.cursor()
         if "DatabaseVersion" not in db.tables:
             # if DatabaseVersion does not exist, but any other tables do exist,
             # then the database version is too old to deal with it

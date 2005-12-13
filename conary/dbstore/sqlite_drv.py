@@ -76,6 +76,7 @@ class Database(BaseDatabase):
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
     basic_transaction = "begin immediate"
+    VIRTUALS = [ ":memory:" ]
 
     def connect(self, timeout=10000):
         assert(self.database)
@@ -90,11 +91,18 @@ class Database(BaseDatabase):
                 raise sqlerrors.DatabaseLocked(e)
             raise
         self.loadSchema()
+        if self.database in self.VIRTUALS:
+            self.inode = (None, None)
+            self.closed = False
+            return True
 	sb = os.stat(self.database)
         self.inode= (sb.st_dev, sb.st_ino)
+        self.closed = False
         return True
 
     def reopen(self):
+        if self.database in self.VIRTUALS:
+            return False
         sb = os.stat(self.database)
         inode= (sb.st_dev, sb.st_ino)
 	if self.inode != inode:
@@ -142,4 +150,12 @@ class Database(BaseDatabase):
         if doAnalyze:
             cu.execute('ANALYZE')
             self.loadSchema()
+
+    def transaction(self, name = None):
+        try:
+            return BaseDatabase.transaction(self, name)
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase
+            raise
 

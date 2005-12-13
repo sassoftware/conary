@@ -14,8 +14,7 @@
 
 import sys
 import itertools
-from conary import trove, deps, files, sqlite3
-from conary.local import deptable
+from conary import trove, deps, files
 from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
@@ -24,84 +23,154 @@ VERSION = 14
 
 # Schema creation functions
 def createFlavors(db):
+    if "Flavors" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "Flavors" not in tables:
-        f = idtable.IdTable(db, "Flavors", "flavorId", "flavor")
-	cu.execute("SELECT FlavorID from Flavors")
-	if cu.fetchone() == None:
-	    # reserve flavor 0 for "no flavor information"
-	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
-        db.commit()
-        
-def createDBTroveFiles(db):
-    cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "DBTroveFiles" not in tables:
-        cu.execute("""CREATE TABLE DBTroveFiles(
-                                      streamId INTEGER PRIMARY KEY,
-                                      pathId BINARY,
-                                      versionId INTEGER,
-                                      path STRING,
-                                      fileId BINARY,
-                                      instanceId INTEGER,
-                                      isPresent INTEGER,
-                                      stream BINARY)
-                   """)
-        cu.execute("CREATE INDEX DBTroveFilesIdx ON "
-                   "DBTroveFiles(fileId)")
-        cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON "
-                   "DBTroveFiles(instanceId)")
-        cu.execute("CREATE INDEX DBTroveFilesPathIdx ON "
-                   "DBTroveFiles(path)")
+    f = idtable.IdTable(db, "Flavors", "flavorId", "flavor")
+    cu.execute("SELECT FlavorID from Flavors")
+    if cu.fetchone() == None:
+        # reserve flavor 0 for "no flavor information"
+        cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
+    db.commit()
+    db.loadSchema()
 
-        cu.execute("""CREATE TABLE DBFileTags(
-                                      streamId INT,
-                                      tagId INT)
-                   """)
-        db.commit()
+def createDBTroveFiles(db):
+    if "DBTroveFiles" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DBTroveFiles(
+        streamId            INTEGER PRIMARY KEY,
+        pathId              BINARY,
+        versionId           INTEGER,
+        path                STRING,
+        fileId              BINARY,
+        instanceId          INTEGER,
+        isPresent           INTEGER,
+        stream              BINARY
+    )""")
+    cu.execute("CREATE INDEX DBTroveFilesIdx ON DBTroveFiles(fileId)")
+    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
+    cu.execute("CREATE INDEX DBTroveFilesPathIdx ON DBTroveFiles(path)")
+
+    cu.execute("""
+    CREATE TABLE DBFileTags(
+        streamId            INTEGER,
+        tagId               INTEGER
+    )""")
+    db.commit()
+    db.loadSchema()
 
 def createInstances(db):
+    if "Instances" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "Instances" not in tables:
-        cu.execute("""CREATE TABLE Instances(
-                            instanceId INTEGER PRIMARY KEY, 
-                            troveName STRING, 
-                            versionId INTEGER, 
-                            flavorId INTEGER,
-                            timeStamps STRING,
-                            isPresent INTEGER,
-                            pinned BOOLEAN)""")
-        cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
-        cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
-                   "Instances(troveName, versionId, flavorId)")
-        db.commit()
-        
+    cu.execute("""
+    CREATE TABLE Instances(
+        instanceId      INTEGER PRIMARY KEY,
+        troveName       STRING,
+        versionId       INTEGER,
+        flavorId        INTEGER,
+        timeStamps      STRING,
+        isPresent       INTEGER,
+        pinned          BOOLEAN
+    )""")
+    cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
+    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
+               "Instances(troveName, versionId, flavorId)")
+    db.commit()
+    db.loadSchema()
+
 def createTroveTroves(db):
+    if "TroveTroves" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "TroveTroves" not in tables:
-        cu.execute("""CREATE TABLE TroveTroves(
-                        instanceId INTEGER, 
-                        includedId INTEGER,
-                        byDefault BOOLEAN,
-                        inPristine BOOLEAN)""")
-        cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
-                        "TroveTroves(instanceId)")
-        # this index is so we can quickly tell what troves are needed
-        # by another trove
-        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
-                        "TroveTroves(includedId)")
-        # XXX this index is used to enforce that TroveTroves only
-        # contains unique TroveTrove (instanceId, includedId) pairs.
-        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
-                        "TroveTroves(instanceId,includedId)")
+    # FIXME; add foreign keys
+    cu.execute("""
+    CREATE TABLE TroveTroves(
+        instanceId      INTEGER,
+        includedId      INTEGER,
+        byDefault       BOOLEAN,
+        inPristine      BOOLEAN
+    )""")
+    # FIXME: this index is redundant. The UNIQUE below index should suffice
+    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
+    # this index is so we can quickly tell what troves are needed by another trove
+    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+    # XXX this index is used to enforce that TroveTroves only
+    # contains unique TroveTrove (instanceId, includedId) pairs.
+    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
+               "TroveTroves(instanceId,includedId)")
+    db.commit()
+    db.loadSchema()
+
+def createDepTable(cu, name, isTemp):
+    if isTemp:
+        tmp = "TEMPORARY"
+    else:
+        tmp = ""
+
+    cu.execute("""
+    CREATE %s TABLE %s(
+        depId           INTEGER PRIMARY KEY,
+        class           INTEGER,
+        name            STRING,
+        flag            STRING
+    )""" % (tmp, name), start_transaction = (not isTemp))
+    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
+               (name, name), start_transaction = (not tmp))
+
+def createRequiresTable(cu, name, isTemp):
+    if isTemp:
+        tmp = "TEMPORARY"
+    else:
+        tmp = ""
+    # FIXME: add foreign keys
+    cu.execute("""
+    CREATE %s TABLE %s(
+        instanceId      INTEGER,
+        depId           INTEGER,
+        depNum          INTEGER,
+        depCount        INTEGER
+    )""" % (tmp, name), start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx3 ON %s(depNum)" % (name, name),
+               start_transaction = (not isTemp))
+
+def createProvidesTable(cu, name, isTemp):
+    if isTemp:
+        tmp = "TEMPORARY"
+    else:
+        tmp = ""
+    # FIXME: add foreign keys
+    cu.execute("""
+    CREATE %s TABLE %s(
+        instanceId          INTEGER,
+        depId               INTEGER
+    )""" % (tmp, name), start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+               start_transaction = (not isTemp))
+
+def createDependencies(db):
+    commit = False
+    cu = db.transaction()
+    if "Dependencies" not in db.tables:
+        createDepTable(cu, "Dependencies", False)
+        commit = True
+    if "Requires" not in db.tables:
+        createRequiresTable(cu, "Requires", False)
+        commit = True
+    if "Provides" not in db.tables:
+        createProvidesTable(cu, "Provides", False)
+        commit = True
+    if commit:
         db.commit()
+        db.loadSchema()
 
 # SCHEMA Migration
 
@@ -121,6 +190,7 @@ class MigrateTo_5(SchemaMigration):
         return self.version in [2,3,4]
 
     def migrate(self):
+        from conary.local import deptable
         class FakeTrove:
             def setRequires(self, req):
                 self.r = req
@@ -138,7 +208,7 @@ class MigrateTo_5(SchemaMigration):
             self.cu.execute(
                 "ALTER TABLE DBInstances ADD COLUMN pinned BOOLEAN")
 
-        instances = [ x[0] for x in 
+        instances = [ x[0] for x in
                       self.cu.execute("select instanceId from DBInstances") ]
         dtbl = deptable.DependencyTables(self.db)
         troves = []
@@ -154,7 +224,7 @@ class MigrateTo_5(SchemaMigration):
         for instanceId, trv in itertools.izip(instances, troves):
             dtbl.add(self.cu, trv, instanceId)
         return self.Version
-    
+
 class MigrateTo_6(SchemaMigration):
     Version = 6
     def migrate(self):
@@ -164,13 +234,13 @@ class MigrateTo_6(SchemaMigration):
         # erase unused versions
         self.message("Removing unused version strings...")
         self.cu.execute("""
-        DELETE FROM Versions WHERE versionId IN 
+        DELETE FROM Versions WHERE versionId IN
             ( SELECT versions.versionid
-              FROM versions LEFT OUTER JOIN 
+              FROM versions LEFT OUTER JOIN
               ( SELECT versionid AS usedversions FROM dbinstances
                 UNION
                 SELECT versionid AS usedversions FROM dbtrovefiles )
-              ON usedversions = versions.versionid 
+              ON usedversions = versions.versionid
               WHERE usedversions IS NULL )
          """)
         return self.Version
@@ -179,7 +249,7 @@ class MigrateTo_7(SchemaMigration):
     Version = 7
     def migrate(self):
         self.cu.execute("""
-        DELETE FROM TroveTroves 
+        DELETE FROM TroveTroves
         WHERE TroveTroves.ROWID in (
             SELECT Second.ROWID
             FROM TroveTroves AS First
@@ -189,7 +259,7 @@ class MigrateTo_7(SchemaMigration):
         self.cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
                         "TroveTroves(instanceId,includedId)")
         return self.Version
-    
+
 class MigrateTo_8(SchemaMigration):
     Version = 8
     def migrate(self):
@@ -205,7 +275,7 @@ class MigrateTo_8(SchemaMigration):
                         'WHERE flavor IS NOT NULL')
         self.cu.execute('DROP TABLE DBFlavors')
         return self.Version
-    
+
 class MigrateTo_9(SchemaMigration):
     Version = 9
     def migrate(self):
@@ -268,7 +338,7 @@ class MigrateTo_10(SchemaMigration):
 
         return self.Version
 
-        
+
 # convert contrib.rpath.com -> contrib.rpath.org
 class MigrateTo_11(SchemaMigration):
     Version = 11
@@ -371,11 +441,21 @@ class MigrateTo_14(SchemaMigration):
                            WHERE trovename LIKE '%:%')""")
         return self.Version
 
+
 def checkVersion(db):
     global VERSION
-    version = migration.getDatabaseVersion(db)
+    version = db.getVersion()
     if version == VERSION:
         return version
+
+    if version == 0:
+        # assume we're setting up a new environment
+        if "DatabaseVersion" not in db.tables:
+            # if DatabaseVersion does not exist, but any other tables do exist,
+            # then the database version is too old to deal with it
+            if len(db.tables) > 0:
+                raise OldDatabaseSchema
+        version = db.setVersion(VERSION)
 
     # great candidate for some "smart" python foo...
     if version in [2,3,4]:

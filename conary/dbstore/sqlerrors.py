@@ -32,6 +32,9 @@ class InvalidBackend(DatabaseError):
 class DatabaseLocked(DatabaseError):
     pass
 
+class ReadOnlyDatabase(DatabaseError):
+    pass
+
 class SchemaVersionError(DatabaseError):
     pass
 

@@ -47,6 +47,7 @@ class Database(BaseDatabase):
                                 cdb["user"], cdb["password"])
         self.dbh = pgdb.connect(cstr)
         self.loadSchema()
+        self.closed = False
         return True
 
     def loadSchema(self):
