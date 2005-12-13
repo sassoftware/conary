@@ -1,6 +1,7 @@
 Changes in 0.80.2:
   o Client Changes:
     * Fix bugs in conary update foo=<old>--<new> behavior
+    * cvc co foo=<label> will now work even if you don't have a buildLabel set
   o Build Changes:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)
