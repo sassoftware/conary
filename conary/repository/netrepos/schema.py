@@ -72,10 +72,10 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY,
-            flavor          STRING,
+            flavor          STRING
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
-        cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
+        cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
         commit = True
 
     if "FlavorMap" not in db.tables:
@@ -89,7 +89,7 @@ def createFlavors(db):
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
+        cu.execute("CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)")
         commit = True
 
     if "FlavorScores" not in db.tables:
@@ -488,13 +488,10 @@ def createChangeLog(db):
     db.commit()
     db.loadSchema()
 
-def createlabelMap(db):
+def createLabelMap(db):
     if "LabelMap" in db.tables:
         return
     cu = db.cursor()
-    idtable.IdPairMapping.__init__(self, db, 'LabelMap',
-                                   'itemId', 'labelId', 'branchId')
-
     cu.execute("""
     CREATE TABLE LabelMap(
         itemId          INTEGER NOT NULL,
@@ -502,13 +499,13 @@ def createlabelMap(db):
         branchId        INTEGER NOT NULL,
         CONSTRAINT LabelMap_itemId_fk
             FOREIGN KEY (itemId) REFERENCES Items(itemId)
-            ON DELETE CASACADE ON UPDATE CASCADE,
+            ON DELETE CASCADE ON UPDATE CASCADE,
         CONSTRAINT LabelMap_labelId_fk
             FOREIGN KEY (labelId) REFERENCES Labels(labelId)
-            ON DELETE CASACADE ON UPDATE CASCADE,
+            ON DELETE CASCADE ON UPDATE CASCADE,
         CONSTRAINT LabelMap_branchId_fk
             FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-            ON DELETE CASACADE ON UPDATE CASCADE
+            ON DELETE CASCADE ON UPDATE CASCADE
     )""")
     # FIXME: rename indexes accordingly
     cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(itemId)")

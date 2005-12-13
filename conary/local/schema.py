@@ -115,7 +115,7 @@ def createTroveInfo(db):
         data            BINARY,
         CONSTRAINT TroveInfo_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE CASCADE ON UPDATE CASACADE
+            ON DELETE CASCADE ON UPDATE CASCADE
     )""")
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
     cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
@@ -124,7 +124,7 @@ def createTroveInfo(db):
 
 def createMetadata(db):
     commit = False
-    cu = self.db.cursor()
+    cu = db.cursor()
     if 'Metadata' not in db.tables:
         cu.execute("""
         CREATE TABLE Metadata(
@@ -135,13 +135,13 @@ def createMetadata(db):
             timeStamp           INTEGER NOT NULL,
             CONSTRAINT Metadata_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE RESTRICT ON UPDATE CASACADE,
+                ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Metadata_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE RESTRICT ON UPDATE CASACADE,
+                ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Metadata_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-                ON DELETE RESTRICT ON UPDATE CASACADE
+                ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
         commit = True
     # FIXME: create an index here too
