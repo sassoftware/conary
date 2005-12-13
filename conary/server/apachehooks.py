@@ -207,8 +207,11 @@ def handler(req):
 	urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
-        if not cfg.repositoryDir:
-            print "error: repositoryDir is required in %s" % req.filename
+        if not cfg.repositoryDB:
+            print "error: repositoryDB is required in %s" % req.filename
+            return
+        elif not cfg.contentsDir:
+            print "error: contentsDir is required in %s" % req.filename
             return
         elif not cfg.serverName:
             print "error: serverName is required in %s" % req.filename

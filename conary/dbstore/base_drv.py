@@ -293,7 +293,7 @@ class Callable:
 # A class for configuration of a database driver
 class CfgDriver(cfg.CfgType):
 
-    def parseString(self, curVal, str):
+    def parseString(self, str):
         s = str.split()
         if len(s) != 2:
             raise ParseError, "database driver and path expected"

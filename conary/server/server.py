@@ -296,6 +296,8 @@ class ServerConfig(netserver.ServerConfig):
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
 	self.read(path)
+
+    def check(self):
         assert(not self.cacheChangeSets)
         assert(not self.closed)
         assert(not self.commitAction)
@@ -360,6 +362,8 @@ if __name__ == '__main__':
     except options.OptionError, msg:
         print >> sys.stderr, msg
         sys.exit(1)
+
+    cfg.check()
 
     FILE_PATH = cfg.tmpDir
 
