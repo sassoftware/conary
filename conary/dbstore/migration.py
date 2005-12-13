@@ -32,7 +32,6 @@ class SchemaMigration:
         self.db = db
         self.cu = db.cursor()
         self.msg = "Converting database schema to version %d..." % self.Version
-        # DBSTORE: a dbstore.Database would have this done automatically
         self.version = db.getVersion()
 
     # likely candidates for overrides
@@ -47,10 +46,10 @@ class SchemaMigration:
         if not self.check():
             return self.version
         self.__start()
-        ret = self.migrate()
-        if ret == self.Version:
+        self.version = self.migrate()
+        if self.version == self.Version:
             self.__end()
-        return ret
+        return self.version
 
     def __start(self):
         self.message()

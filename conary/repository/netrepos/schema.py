@@ -647,12 +647,22 @@ class MigrateTo_7(SchemaMigration):
 class MigrateTo_8(SchemaMigration):
     Version = 8
     def migrate(self):
-        # Permissions.write -> Permissions.canwrite
-        for idx in db.tables["Permissions"]:
+        # Permissions.write -> Permissions.canWrite
+        for idx in self.db.tables["Permissions"]:
             self.cu.execute("DROP INDEX %s" % (idx,))
         self.cu.execute("ALTER TABLE Permissions RENAME TO oldPermissions")
         createUsers(db)
-        self.cu.execute("")
+        self.cu.execute("""
+        INSERT INTO Permissions
+        (userGroupId, labelId, itemId, canWrite, admin)
+        SELECT userGroupId, labelId, itemId, write, admin
+        FROM oldPermissions
+        """)
+        self.cu.execute("DROP TABLE oldPermissions")
+        # drop oldLatest
+        if "oldLatest" in self.db.tables:
+            self.cu.execute("DROP TABLE oldLatest")
+        self.db.loadSchema()
         return self.Version
 
 # create the server repository schema
