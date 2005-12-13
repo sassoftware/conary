@@ -273,7 +273,7 @@ def createUsers(db):
             userGroupId     INTEGER,
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
-            canwrite        INTEGER NOT NULL DEFAULT 0,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
             capped          INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
@@ -284,7 +284,7 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
         cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
@@ -298,7 +298,7 @@ def createUsers(db):
             Users.user as user,
             Items.item as item,
             Labels.label as label,
-            Permissions.canwrite as W,
+            Permissions.canWrite as W,
             Permissions.admin as A,
             Permissions.capped as C
         FROM
@@ -346,7 +346,7 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Entitlements (
             entGroupId      INTEGER,
-            entitlement     BLOB,
+            entitlement     BINARY,
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES Flavors(entitlementGroups)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
