@@ -208,7 +208,7 @@ class CacheSet:
             cu.execute("""
             CREATE TABLE CacheContents(
                row              INTEGER PRIMARY KEY,
-               troveName        STRING,
+               troveName        VARCHAR(254),
                oldFlavorId      INTEGER,
                oldVersionId     INTEGER,
                newFlavorId      INTEGER,

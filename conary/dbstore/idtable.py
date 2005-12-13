@@ -30,7 +30,7 @@ class IdTable:
         cu.execute("""
         CREATE TABLE %s (
             %s INTEGER PRIMARY KEY,
-            %s STRING
+            %s VARCHAR(254)
         )""" %(self.tableName, self.keyName, self.strName))
         cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
             self.tableName, self.tableName, self.strName))

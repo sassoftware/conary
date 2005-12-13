@@ -30,8 +30,10 @@ class VersionTable:
         cu.execute("""
         CREATE TABLE Versions(
         versionId       INTEGER PRIMARY KEY,
-        version         STRING UNIQUE
+        version         VARCHAR(2000)
         )""")
+        cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "
+                   "Versions(version)")
         cu.execute("INSERT INTO Versions VALUES (?, NULL)",
                    self.noVersion)
         db.commit()

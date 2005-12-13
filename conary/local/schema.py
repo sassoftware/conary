@@ -150,8 +150,8 @@ def createMetadata(db):
         CREATE TABLE MetadataItems(
             metadataId      INTEGER NOT NULL,
             class           INTEGER,
-            data            STRING,
-            language        STRING
+            data            TEXT,
+            language        VARCHAR(254)
         )""")
         commit = True
     if commit:
@@ -177,14 +177,14 @@ def createDepTable(cu, name, isTemp):
         tmp = "TEMPORARY"
     else:
         tmp = ""
-
+    d =  {"tmp" : tmp, "name" : name}
     cu.execute("""
-    CREATE %s TABLE %s(
+    CREATE %(tmp)s TABLE %(name)s(
         depId           INTEGER PRIMARY KEY,
         class           INTEGER,
-        name            STRING,
-        flag            STRING
-    )""" % (tmp, name), start_transaction = (not isTemp))
+        name            VARCHAR(254),
+        flag            VARCHAR(254)
+    )""" % d, start_transaction = (not isTemp))
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = (not tmp))
 
@@ -193,19 +193,22 @@ def createRequiresTable(cu, name, isTemp):
         tmp = "TEMPORARY"
     else:
         tmp = ""
-    # FIXME: add foreign keys
+    d =  {"tmp" : tmp, "name" : name}
     cu.execute("""
-    CREATE %s TABLE %s(
+    CREATE %(tmp)s TABLE %(name)s(
         instanceId      INTEGER,
         depId           INTEGER,
         depNum          INTEGER,
-        depCount        INTEGER
-    )""" % (tmp, name), start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+        depCount        INTEGER,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+    )""" % d, start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+    cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx3 ON %s(depNum)" % (name, name),
+    cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = (not isTemp))
 
 def createProvidesTable(cu, name, isTemp):
@@ -213,15 +216,18 @@ def createProvidesTable(cu, name, isTemp):
         tmp = "TEMPORARY"
     else:
         tmp = ""
-    # FIXME: add foreign keys
+    d =  {"tmp" : tmp, "name" : name}
     cu.execute("""
-    CREATE %s TABLE %s(
+    CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER,
-        depId               INTEGER
-    )""" % (tmp, name), start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+        depId               INTEGER,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+    )""" % d, start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+    cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = (not isTemp))
 
 def createDependencies(db):

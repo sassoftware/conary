@@ -288,11 +288,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute("""
         CREATE TEMPORARY TABLE
         ffFlavor(
-            flavorId INTEGER,
-            base STRING,
-            sense INTEGER,
-            flag STRING)
-        """, start_transaction = False)
+            flavorId    INTEGER,
+            base        VARCHAR(254),
+            sense       INTEGER,
+            flag        VARCHAR(254)
+        )""", start_transaction = False)
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
@@ -314,10 +314,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute("""
         CREATE TEMPORARY TABLE
         gtvlTbl(
-            item STRING,
-            versionSpec STRING,
-            flavorId INT)
-        """, start_transaction = False)
+            item                VARCHAR(254),
+            versionSpec         VARCHAR(2000),
+            flavorId            INTEGER
+        )""", start_transaction = False)
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
                 versionDict = dict.fromkeys(versionDict, [ None ])

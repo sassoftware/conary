@@ -461,9 +461,12 @@ class Database:
 
     def trovesArePinned(self, troveList):
         cu = self.db.cursor()
-        cu.execute("CREATE TEMPORARY TABLE tlList (name STRING, "
-                                "version STRING, flavor STRING)",
-                   start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE tlList(
+            name        STRING,
+            version     STRING,
+            flavor      STRING
+        )""", start_transaction = False)
         # count the number of items we're inserting
         count = 0
         for name, version, flavor in troveList:
@@ -537,8 +540,11 @@ order by
 
 	if self.flavorsNeeded:
 	    # create all of the flavor id's we'll need
-	    cu.execute("CREATE TEMPORARY TABLE flavorsNeeded(empty INTEGER, "
-							    "flavor STRING)")
+	    cu.execute("""
+            CREATE TEMPORARY TABLE flavorsNeeded(
+                empty INTEGER,
+                flavor VARCHAR(2000)
+            )""")
 	    for flavor in self.flavorsNeeded.keys():
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
 			   None, flavor.freeze())

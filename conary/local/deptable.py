@@ -31,8 +31,8 @@ class DependencyTables:
                 flagCount       INTEGER,
                 isProvides      BOOLEAN,
                 class           INTEGER,
-                name            STRING,
-                flag            STRING
+                name            VARCHAR(254),
+                flag            VARCHAR(254)
             )""" % name, start_transaction = False)
 	if makeIndex:
 	    cu.execute("""
@@ -729,9 +729,12 @@ class DependencyTables:
                             multiplier = -1)
 
         # now build a table of all the troves which are being erased
-        cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds
-                        (troveId INTEGER, nodeId INTEGER)""")
-	cu.execute("""CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)""")
+        cu.execute("""
+        CREATE TEMPORARY TABLE RemovedTroveIds(
+            troveId INTEGER,
+            nodeId INTEGER
+        )""")
+	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)")
 
         for job in jobSet:
             if job[2][0] is not None: continue
@@ -742,10 +745,13 @@ class DependencyTables:
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
             # table exactly parallels the RemovedTroveIds we set up
-            cu.execute("""CREATE TEMPORARY TABLE RemovedTroves
-                            (name STRING, version STRING, flavor STRING,
-                             nodeId INTEGER)""",
-                       start_transaction = False)
+            cu.execute("""
+            CREATE TEMPORARY TABLE RemovedTroves(
+                name        VARCHAR(254),
+                version     VARCHAR(2000),
+                flavor      VARCHAR(2000),
+                nodeId      INTEGER
+            )""", start_transaction = False)
             for (name, version, flavor), nodeIdx in oldTroves:
                 if flavor:
                     flavor = flavor.freeze()

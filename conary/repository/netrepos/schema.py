@@ -72,7 +72,7 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY,
-            flavor          STRING
+            flavor          VARCHAR(2000)
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
@@ -82,9 +82,9 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE FlavorMap(
             flavorId        INTEGER,
-            base            STRING,
+            base            VARCHAR(254),
             sense           INTEGER,
-            flag            STRING,
+            flag            VARCHAR(254),
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -128,7 +128,7 @@ def createNodes(db):
             itemId          INTEGER,
             branchId        INTEGER,
             versionId       INTEGER,
-            timeStamps      STRING,
+            timeStamps      VARCHAR(1000),
             finalTimeStamp  FLOAT,
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -229,9 +229,9 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Users (
             userId          INTEGER PRIMARY KEY,
-            user            STRING,
+            user            VARCHAR(254),
             salt            BINARY,
-            password        STRING,
+            password        VARCHAR(254),
             CONSTRAINT Users_userId_uq
                 UNIQUE(user)
         )""")
@@ -241,7 +241,7 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE UserGroups (
             userGroupId     INTEGER PRIMARY KEY,
-            userGroup       STRING,
+            userGroup       VARCHAR(254),
             CONSTRAINT UserGroups_userGroup_uq
                 UNIQUE(userGroup)
         )""")
@@ -319,7 +319,7 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE EntitlementGroups (
             entGroupId      INTEGER PRIMARY KEY,
-            entGroup        STRING,
+            entGroup        VARCHAR(254),
             userGroupId     INTEGER,
             CONSTRAINT EntitlementClasses_entitlementGroup_uq
                 UNIQUE(entGroup),
@@ -372,7 +372,7 @@ def createPGPKeys(db):
         CREATE TABLE PGPKeys(
             keyId           INTEGER PRIMARY KEY,
             userId          INTEGER,
-            fingerprint     STRING(40),
+            fingerprint     CHAR(40),
             pgpKey          BINARY,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
@@ -385,7 +385,7 @@ def createPGPKeys(db):
         cu.execute("""
         CREATE TABLE PGPFingerprints(
             keyId           INTEGER,
-            fingerprint     STRING(40) PRIMARY KEY,
+            fingerprint     VARCHAR(40) PRIMARY KEY,
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -417,7 +417,7 @@ def createTroves(db):
             streamId        INTEGER,
             versionId       BINARY,
             pathId          BINARY,
-            path            STRING,
+            path            VARCHAR(2000),
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -462,8 +462,8 @@ def createInstructionSets(db):
         cu.execute("""
         CREATE TABLE InstructionSets(
             isnSetId        INTEGER PRIMARY KEY,
-            base            STRING,
-            flags           STRING
+            base            VARCHAR(254),
+            flags           VARCHAR(254)
         )""")
         db.commit()
         db.loadSchema()
@@ -475,9 +475,9 @@ def createChangeLog(db):
     cu.execute("""
         CREATE TABLE ChangeLogs(
             nodeId          INTEGER,
-            name            STRING,
-            contact         STRING,
-            message         STRING,
+            name            VARCHAR(254),
+            contact         VARCHAR(254),
+            message         TEXT,
             CONSTRAINT ChangeLogs_nodeId_fk
                 FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
                 ON DELETE CASCADE ON UPDATE CASCADE

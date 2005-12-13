@@ -175,9 +175,9 @@ class TroveStore:
 	# then using all of the and's in this join
 	cu.execute("""
         CREATE TEMPORARY TABLE itf(
-        item            STRING,
-        version         STRING,
-        fullVersion     STRING
+        item            VARCHAR(254),
+        version         VARCHAR(2000),
+        fullVersion     VARCHAR(2000)
         )""", start_transaction = False)
         try:
             for troveName in troveDict.keys():
@@ -227,15 +227,14 @@ class TroveStore:
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE NewFiles(pathId BINARY,
-					    versionId INTEGER,
-					    fileId BINARY,
-					    stream BINARY,
-					    path STRING)
-	""")
-
+        CREATE TEMPORARY TABLE NewFiles(
+            pathId BINARY,
+            versionId INTEGER,
+            fileId BINARY,
+            stream BINARY,
+            path VARCHAR(2000)
+        )""")
 	self.fileVersionCache = {}
-
 	return (cu, trove)
 
     def addTroveDone(self, troveInfo):
@@ -541,9 +540,9 @@ class TroveStore:
         cu.execute("""
         CREATE TEMPORARY TABLE gtl(
         idx             INTEGER PRIMARY KEY,
-        name            STRING,
-        version         STRING,
-        flavor          STRING
+        name            VARCHAR(254),
+        version         VARCHAR(2000),
+        flavor          VARCHAR(2000)
         )""", start_transaction = False)
         for idx, info in enumerate(troveInfoList):
             if not info[2]:
