@@ -658,7 +658,7 @@ def createSchema(db):
     items.Items(db)
     versionops.BranchTable(db)
     versionops.LabelTable(db)
-    versiontable.Versions(db)
+    versiontable.VersionTable(db)
 
     createChangeLog(db)
     createLabelMap(db)
@@ -666,11 +666,11 @@ def createSchema(db):
     createUsers(db)
     createPGPKeys(db)
 
+    createFlavors(db)
     createInstances(db)
     createNodes(db)
     createLatest(db)
     createInstructionSets(db)
-    createFlavors(db)
 
     createTroves(db)
 
@@ -695,7 +695,7 @@ def checkVersion(db):
             if len(db.tables) > 0:
                 raise sqlerrors.SchemaVersionError(
                     "Can not migrate from this schema version")
-        # XXX: relocate the schema creation/initialization from trovestore to here
+        createSchema(db)
         version = db.setVersion(VERSION)
 
     # surely there is a more better way of handling this...
