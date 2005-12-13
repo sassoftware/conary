@@ -21,7 +21,7 @@ from base_drv import BaseDatabase, BaseCursor
 import sqlerrors
 
 class Cursor(BaseCursor):
-    type = "sqlite"
+    driver = "sqlite"
 
     # this is basically the BaseCursor's execute with special handling
     # for start_transaction
@@ -51,6 +51,20 @@ class Cursor(BaseCursor):
     def execute(self, sql, *params, **kw):
         #logMe(3, "SQL:", sql, params, kw)
         try:
+            ret = self._execute(sql, *params, **kw)
+        except sqlite3.ProgrammingError, e:
+            #if self.dbh.inTransaction:
+            #    self.dbh.rollback()
+            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+                raise sqlerrors.ColumnNotUnique(e)
+            raise sqlerrors.CursorError(e.args[0], e)
+        else:
+            return ret
+
+    # deprecated - this breaks programs by commiting stuff before its due time
+    def executeWithCommit(self, sql, *params, **kw):
+        #logMe(3, "SQL:", sql, params, kw)
+        try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
                 inAutoTrans = True
@@ -72,20 +86,21 @@ class Cursor(BaseCursor):
         return ret
 
 class Database(BaseDatabase):
-    type = "sqlite"
+    driver = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
     basic_transaction = "begin immediate"
     VIRTUALS = [ ":memory:" ]
+    TIMEOUT = 10000
 
-    def connect(self, timeout=10000):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         assert(cdb["database"])
-        # FIXME: we should channel exceptions into generic exception
-        # classes common to all backends
+        kwargs.setdefault("timeout", self.TIMEOUT)
+        kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
         try:
-            self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
+            self.dbh = sqlite3.connect(cdb["database"], **kwargs)
         except sqlite3.InternalError, e:
             if str(e) == 'database is locked':
                 raise sqlerrors.DatabaseLocked(e)
@@ -158,4 +173,3 @@ class Database(BaseDatabase):
             if str(e) == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase
             raise
-

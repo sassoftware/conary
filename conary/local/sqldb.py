@@ -78,13 +78,13 @@ class DBTroveFiles:
             raise KeyError, fileId
 
     def addItem(self, cu, pathId, versionId, path, fileId, instanceId,
-                stream, tags, addItemStmt = None):
+                stream, tags, addItemSql = None):
         assert(len(pathId) == 16)
 
-        if not addItemStmt:
-            addItemStmt = cu.compile(self.addItemStmt)
+        if addItemSql is None:
+            addItemSql = self.addItemStmt
 
-        cu.execstmt(addItemStmt, pathId, versionId, path, fileId, instanceId,
+        cu.execute(addItemSql, pathId, versionId, path, fileId, instanceId,
                     1, stream)
 
 	streamId = cu.lastrowid
@@ -333,6 +333,7 @@ class Database:
             readOnly = True
         else:
             readOnly = False
+            self.db.commit()
         if readOnly and self.schemaVersion != schema.VERSION:
             raise OldDatabaseSchema(
                 "The Conary database on this system is too old.  It will be \n"
@@ -656,9 +657,7 @@ order by
 
         self._sanitizeTroveCollection(cu, troveInstanceId)
 
-        addFile = cu.compile(self.troveFiles.addItemStmt)
-
-	return (cu, troveInstanceId, addFile)
+	return (cu, troveInstanceId, self.troveFiles.addItemStmt)
 
     def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
         # examine the list of present, missing, and not inPristine troves
@@ -770,7 +769,7 @@ order by
                                     versionId, path,
                                     fileId, troveInstanceId,
                                     fileStream, fileObj.tags,
-                                    addItemStmt = addFileStmt)
+                                    addItemSql = addFileStmt)
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE

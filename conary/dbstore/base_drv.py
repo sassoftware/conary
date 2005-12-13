@@ -159,7 +159,7 @@ class BaseDatabase:
     alive_check = "select 1 where 1 = 1"
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
-    type = "base"
+    driver = "base"
 
     def __init__(self, db):
         assert(db)

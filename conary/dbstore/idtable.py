@@ -54,9 +54,8 @@ class IdTable:
     def getOrAddIds(self, items):
         cu = self.db.cursor()
         cu.execute('CREATE TEMPORARY TABLE neededIds (num INT, %s STR)' % self.strName)
-        stmt = cu.compile('INSERT INTO neededIds VALUES (?, ?)')
         for num, item in enumerate(items):
-            cu.execstmt(stmt, num, item)
+            cu.execute('INSERT INTO neededIds VALUES (?, ?)', num, item)
 
         cu.execute('''INSERT INTO %(tableName)s (%(keyName)s, %(strName)s)
                       SELECT DISTINCT

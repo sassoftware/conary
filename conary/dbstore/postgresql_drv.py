@@ -19,7 +19,7 @@ from base_drv import BaseDatabase, BindlessCursor, BaseCursor
 import sqlerrors
 
 class Cursor(BindlessCursor):
-    type = "postgresql"
+    driver = "postgresql"
     def execute(self, sql, *params, **kw):
         if kw.has_key("start_transaction"):
             del kw["start_transaction"]
@@ -32,12 +32,11 @@ class Cursor(BindlessCursor):
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
-    type = "postgresql"
+    driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
 
-    # XXX: honor the timeout
-    def connect(self, timeout=10000):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         for x in cdb.keys():
