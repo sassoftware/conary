@@ -8,6 +8,14 @@ Changes in 0.80.2:
       using the exceptDeps keyword argument to r.Requires().
     * r.Replace now takes a lines=<regexp> argument, to match a line based
       on a regexp
+    * Added the EnforceJavaBuildRequirements policy.  When you are
+      packaging precompiled Java software where you have .class/.jar files
+      but no .java files, you can use "del EnforceJavaBuildRequirements".
+    * Added the EnforceCILBuildRequirements policy.
+    * Enforce*BuildRequirements now warn when a package has requirements
+      which they don't fulfill themselves and which are not fulfilled by
+      the system database (for example, soname dependencies from linking
+      against libraries not packaged by Conary).
 
 Changes in 0.80.1:
   o Client Changes:

@@ -29,6 +29,7 @@ import stat
 from conary import files
 from conary.build import buildpackage, destdirpolicy, filter, policy
 from conary.build import tags, use
+from conary.build.use import Use
 from conary.deps import deps
 from conary.lib import elf, util, log
 from conary.local import database
@@ -2342,12 +2343,10 @@ class Flavor(_BuildPackagePolicy):
 
 
 
-class EnforceSonameBuildRequirements(policy.Policy):
+class _enforceBuildRequirements(policy.Policy):
     """
-    Test to make sure that each requires dependency in the package
-    is matched by a suitable element in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforceSonameBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    Pure virtual base class from which classes are derived that
+    enforce buildRequires population from runtime dependencies.
     """
     def preProcess(self):
         self.compExceptions = set()
@@ -2356,66 +2355,75 @@ class EnforceSonameBuildRequirements(policy.Policy):
                 self.compExceptions.add(exception % self.recipe.macros)
         self.exceptions = None
 
-    def do(self):
-        missingBuildRequires = set()
-        missingBuildRequiresChoices = []
         # right now we do not enforce branches.  This could be
         # done with more work.  There is no way I know of to
         # enforce flavors, so we just remove them from the spec.
-        truncatedBuildRequires = set(
+        self.truncatedBuildRequires = set(
             self.recipe.buildReqMap[spec].getName()
             for spec in self.recipe.buildRequires
             if spec in self.recipe.buildReqMap)
 
 	components = self.recipe.autopkg.components
-        pathMap = self.recipe.autopkg.pathMap
-        pathReqMap = {}
-
         reqDepSet = deps.DependencySet()
         provDepSet = deps.DependencySet()
         for pkg in components.values():
             reqDepSet.union(pkg.requires)
             provDepSet.union(pkg.provides)
-        depSet = deps.DependencySet()
-        depSet.union(reqDepSet - provDepSet)
+        self.depSet = deps.DependencySet()
+        self.depSet.union(reqDepSet - provDepSet)
 
-        sonameDeps = depSet.getDepClasses().get(deps.DEP_CLASS_SONAME, None)
-        if not sonameDeps:
-            return
+        self.setTalk()
+
+    def test(self):
+        localDeps = self.depSet.getDepClasses().get(self.depClassType, None)
+        if not localDeps:
+            return False
 
         depSetList = [ ]
-        for dep in sonameDeps.getDeps():
+        for dep in localDeps.getDeps():
             depSet = deps.DependencySet()
-            depSet.addDep(deps.SonameDependencies, dep)
+            depSet.addDep(self.depClass, dep)
             depSetList.append(depSet)
 
-        db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
-        localProvides = db.getTrovesWithProvides(depSetList)
+        cfg = self.recipe.cfg
+        self.db = database.Database(cfg.root, cfg.dbPath)
+        self.localProvides = self.db.getTrovesWithProvides(depSetList)
+        self.unprovided = [x for x in depSetList if x not in self.localProvides]
 
-        def providesNames(libname):
-            # Instead of requiring the :lib component that satisfies
-            # the dependency, our first choice, if possible, is to
-            # require :devel, because that would include header files;
-            # if it does not exist, then :devellib for a soname link;
-            # finally if neither of those exists, then :lib (though
-            # that is a degenerate case).
-            return [name.replace(':lib', ':devel'),
-                    name.replace(':lib', ':devellib'),
-                    name]
-            
-        for dep in localProvides:
-            provideNameList = [x[0] for x in localProvides[dep]]
+        return True
+
+    def postProcess(self):
+        del self.db
+
+    def setTalk(self):
+        # FIXME: remove "True or " when we are ready for errors
+        if (True or 'local@local' in self.recipe.macros.buildlabel
+            or Use.bootstrap._get()):
+            self.talk = self.warn
+        else:
+            self.talk = self.error
+
+    def do(self):
+        missingBuildRequires = set()
+        missingBuildRequiresChoices = []
+
+	components = self.recipe.autopkg.components
+        pathMap = self.recipe.autopkg.pathMap
+        pathReqMap = {}
+
+        for dep in self.localProvides:
+            provideNameList = [x[0] for x in self.localProvides[dep]]
             # normally, there is only one name in provideNameList
 
             foundCandidates = set()
             for name in provideNameList:
-                for candidate in providesNames(name):
-                    if db.hasTroveByName(candidate):
+                for candidate in self.providesNames(name):
+                    if self.db.hasTroveByName(candidate):
                         foundCandidates.add(candidate)
                         break
             foundCandidates -= self.compExceptions
 
-            missingCandidates = foundCandidates - truncatedBuildRequires
+            missingCandidates = foundCandidates - self.truncatedBuildRequires
             if missingCandidates == foundCandidates:
                 # None of the troves that provides this requirement is
                 # reflected in the buildRequires list.  Add candidates
@@ -2454,15 +2462,74 @@ class EnforceSonameBuildRequirements(policy.Policy):
                                sorted(list(set(pathReqMap[path])))]))
 
         if missingBuildRequires:
-            self.warn('add to buildRequires: %s',
+            self.talk('add to buildRequires: %s',
                        str(sorted(list(set(missingBuildRequires)))))
             # one special case:
             if list(missingBuildRequires) == [ 'glibc:devel' ]:
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
         if missingBuildRequiresChoices:
             for candidateSet in missingBuildRequiresChoices:
-                self.warn('add to buildRequires one of: %s',
+                self.talk('add to buildRequires one of: %s',
                            str(sorted(list(candidateSet))))
+        if self.unprovided:
+            self.talk('The following dependencies are not resolved'
+                      ' within the package or in the system database: %s',
+                      str(sorted([str(x) for x in self.unprovided])))
+
+    def providesNames(self, libname):
+        return [libname]
+
+
+class EnforceSonameBuildRequirements(_enforceBuildRequirements):
+    """
+    Test to ensure that each requires dependency in the package
+    is matched by a suitable element in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforceSonameBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    """
+
+    depClassType = deps.DEP_CLASS_SONAME
+    depClass = deps.SonameDependencies
+
+    def providesNames(self, libname):
+        # Instead of requiring the :lib component that satisfies
+        # the dependency, our first choice, if possible, is to
+        # require :devel, because that would include header files;
+        # if it does not exist, then :devellib for a soname link;
+        # finally if neither of those exists, then :lib (though
+        # that is a degenerate case).
+        return [libname.replace(':lib', ':devel'),
+                libname.replace(':lib', ':devellib'),
+                libname]
+
+
+
+class EnforceJavaBuildRequirements(_enforceBuildRequirements):
+    """
+    All Java runtime requirements should be met either by this package
+    or by components listed in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforceJavaBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    """
+
+    depClassType = deps.DEP_CLASS_JAVA
+    depClass = deps.JavaDependencies
+
+    # FIXME: remove this when we are ready to enforce Java dependencies
+    def setTalk(self):
+        self.talk = self.warn
+
+
+class EnforceCILBuildRequirements(_enforceBuildRequirements):
+    """
+    All CIL runtime requirements should be met either by this package
+    or by components listed in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforceCILBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    """
+
+    depClassType = deps.DEP_CLASS_CIL
+    depClass = deps.CILDependencies
 
 
 class EnforceConfigLogBuildRequirements(policy.Policy):
@@ -2659,6 +2726,8 @@ def DefaultPolicy(recipe):
 	Requires(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
+        EnforceJavaBuildRequirements(recipe),
+        EnforceCILBuildRequirements(recipe),
         EnforceConfigLogBuildRequirements(recipe),
 	reportErrors(recipe),
     ]
