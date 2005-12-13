@@ -649,8 +649,14 @@ class TroveFinder:
 
     def addQuery(self, troveTup):
         (name, versionStr, flavor) = troveTup
-        if not self.labelPath and (not versionStr or versionStr[0] != "/"):
-            if not self.allowNoLabel:
+        if not self.labelPath:
+            hasLabelPath = False
+
+            # need a branch or a full label
+            if versionStr and versionStr[0] == '/' or '@' in versionStr[1:]:
+                hasLabelPath = True
+
+            if not hasLabelPath and not self.allowNoLabel:
                 raise errors.TroveNotFound, \
                     "fully qualified version or label " + \
                     "expected instead of %s" % versionStr
