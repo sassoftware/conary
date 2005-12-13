@@ -4,3 +4,4 @@
   65,535. Migration of the data column to a MEDIUMBLOB type (16M max in
   size) can have a negative impact on performance and storage
   parameters.
+- migrate mysql and postgresql loadSchema to using INFORMATION_SCHEMA

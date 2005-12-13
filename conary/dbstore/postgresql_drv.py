@@ -89,5 +89,5 @@ class Database(BaseDatabase):
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
         self.sequences = [x[0] for x in c.fetchall()]
-        version = self.schemaVersion()
+        version = self.getVersion()
         return version

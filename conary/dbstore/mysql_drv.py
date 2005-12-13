@@ -40,10 +40,14 @@ class Database(BaseDatabase):
 
     def connect(self, **kwargs):
         assert(self.database)
-        cdb = self._connectData(["user", "passwd", "host", "db"])
+        cdb = self._connectData(["user", "passwd", "host", "port", "db"])
         for x in cdb.keys()[:]:
             if cdb[x] is None:
                 del cdb[x]
+        if kwargs.has_key("timeout"):
+            cdb["connect_time"] = kwargs["timeout"]
+            del kwargs["timeout"]
+        cdb.update(kwargs)
         self.dbh = mysql.connect(**cdb)
         self.loadSchema()
         self.closed = False
@@ -78,5 +82,5 @@ class Database(BaseDatabase):
         for t in self.tables:
             c.execute("show index from %s" % (t,))
             self.tables[t] = [ x[2] for x in c.fetchall() ]
-        version = self.schemaVersion()
+        version = self.getVersion()
         return version

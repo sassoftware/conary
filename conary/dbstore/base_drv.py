@@ -169,17 +169,20 @@ class BaseDatabase:
         self.stderr = sys.stderr
         self.closed = True
 
-    # the string syntax for database connection is [[user[:password]@]host/]database
-    def _connectData(self, names = ["user", "password", "host", "database"]):
+    # the string syntax for database connection is [[user[:password]@]host[:port]/]database
+    def _connectData(self, names = ["user", "password", "host", "port", "database"]):
         assert(self.database)
-        assert(len(tuple(names)) == 4)
+        assert(len(tuple(names)) == 5)
         # regexes are k001 and I am 1337 h@x0r
         regex = re.compile(
-            "^(((?P<%s>[^:]+)(:(?P<%s>[^@]+))?@)?(?P<%s>[^/]+)/)?(?P<%s>.+)$" % tuple(names)
+            "^(((?P<%s>[^:]+)(:(?P<%s>[^@]+))?@)?(?P<%s>[^/:]+)(:(?P<%s>[^/]+))?/)?(?P<%s>.+)$" % tuple(names)
             )
         m = regex.match(self.database.strip())
         assert(m)
-        return m.groupdict()
+        ret = m.groupdict()
+        if ret["port"] is not None:
+            ret["port"] = int(ret["port"])
+        return ret
 
     def connect(self):
         assert(self.database)
