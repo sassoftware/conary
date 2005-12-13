@@ -50,6 +50,11 @@ senseMap = { FLAG_SENSE_REQUIRED   : "",
              FLAG_SENSE_PREFERNOT  : "~!",
              FLAG_SENSE_DISALLOWED : "!" }
 
+toStrongMap = { FLAG_SENSE_REQUIRED    : FLAG_SENSE_REQUIRED,
+                FLAG_SENSE_PREFERRED   : FLAG_SENSE_REQUIRED,
+                FLAG_SENSE_PREFERNOT   : FLAG_SENSE_DISALLOWED,
+                FLAG_SENSE_DISALLOWED  : FLAG_SENSE_DISALLOWED }
+
 senseReverseMap = {}
 for key, val in senseMap.iteritems():
     senseReverseMap[val] = key
@@ -186,17 +191,25 @@ class Dependency(BaseDependency):
     def toStrongFlavor(self):
         newFlags = self.flags.copy()
         for (flag, sense) in self.flags.iteritems():
-            if sense == FLAG_SENSE_PREFERNOT:
-                newFlags[flag] = FLAG_SENSE_DISALLOWED
-            elif sense == FLAG_SENSE_PREFERRED:
-                newFlags[flag] = FLAG_SENSE_REQUIRED
+            newFlags[flag] = toStrongMap[sense]
         return Dependency(self.name, newFlags)
 
-    def intersection(self, other):
+    def intersection(self, other, strict=True):
+        """
+        Performs the intersection between the two dependencies, returning
+        a dependency with only those flags in both dependencies.
+
+        If strict is False, ignore the difference between ~foo and foo,
+        returning with the flag set as it is in self.
+        """
         intFlags = {}
         for (flag, sense) in other.flags.iteritems():
-            if flag in self.flags and self.flags[flag] == sense:
-                intFlags[flag] = sense
+            if flag in self.flags:
+                if strict:
+                    if self.flags[flag] == sense:
+                        intFlags[flag] = sense
+                elif toStrongMap[self.flags[flag]] == toStrongMap[sense]:
+                    intFlags[flag] = toStrongMap[sense]
         if not intFlags:
             if self.flags != other.flags:
                 return None
@@ -205,11 +218,22 @@ class Dependency(BaseDependency):
     def __and__(self, other):
         return self.intersection(other)
 
-    def difference(self, other):
+    def difference(self, other, strict=True):
+        """
+        Performs the difference between the two dependencies, returning
+        a dependency with only those flags in self but not in other. 
+        If strict is false, also remove flags that differ only in the 
+        strength of the sense, but not its direction (e.g. ~!foo and !foo).
+        """
+
         diffFlags = self.flags.copy()
-        for flag, value in other.flags.iteritems():
-            if flag in diffFlags and value == diffFlags[flag]:
-                del diffFlags[flag]
+        for flag, sense in other.flags.iteritems():
+            if flag in diffFlags:
+                if strict:
+                    if sense == diffFlags[flag]:
+                        del diffFlags[flag]
+                elif toStrongMap[sense] == toStrongMap[diffFlags[flag]]:
+                    del diffFlags[flag]
         if not diffFlags:
             return None
         else:
@@ -425,26 +449,27 @@ class DependencyClass(object):
     def __and__(self, other):
         return self.intersection(other)
 
-    def intersection(self, other):
+    def intersection(self, other, strict=True):
         newDepClass = self.__class__()
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
-                dep = dep.intersection(other.members[tag])
+                dep = dep.intersection(other.members[tag], strict=strict)
                 if dep is None:
-                    continue
-                newDepClass.addDep(dep)
+                    newDepClass.addDep(Dependency(tag))
+                else:
+                    newDepClass.addDep(dep)
                 found = True
         if found:
             return newDepClass
         return None
 
-    def difference(self, other):
+    def difference(self, other, strict=True):
         newDepClass = self.__class__()
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
-                diff = dep.difference(other.members[tag])
+                diff = dep.difference(other.members[tag], strict=strict)
                 if diff is None:
                     continue
                 newDepClass.addDep(diff)
@@ -750,11 +775,11 @@ class DependencySet(object):
 	    else:
 		self.members[tag] = copy.deepcopy(other.members[tag])
 
-    def intersection(self, other):
+    def intersection(self, other, strict=True):
         newDep = DependencySet()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
-                dep = depClass.intersection(other.members[tag])
+                dep = depClass.intersection(other.members[tag], strict=strict)
                 if dep is None:
                     continue
                 newDep.members[depClass.tag] = dep
@@ -763,11 +788,11 @@ class DependencySet(object):
     def __and__(self, other):
         return self.intersection(other)
 
-    def difference(self, other):
+    def difference(self, other, strict=True):
         newDep = DependencySet()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
-                dep = depClass.difference(other.members[tag])
+                dep = depClass.difference(other.members[tag], strict=strict)
                 if dep is not None:
                     newDep.members[tag] = dep
             else:
@@ -1058,21 +1083,27 @@ def parseDep(s):
         depSet.addDep(depClass, dep)
     return depSet
 
-def flavorDifferences(flavors):
+def flavorDifferences(flavors, strict=True):
     """ Takes a set of flavors, returns a dict of flavors such that 
         the value of a flavor's dict entry is a flavor that includes 
         only the information that differentiates that flavor from others
         in the set
+        
+        @param strict: if False, ignore differences between flags where the 
+                       difference is in strength of the flag, but not in 
+                       direction, e.g. ignore ~foo vs. foo, but not ~foo
+                       vs. ~!foo.
     """
     diffs = {}
+    flavors = list(flavors)
     base = flavors[0].copy()
     # the intersection of all the flavors will provide the largest common
     # flavor that is shared between all the flavors given
     for flavor in flavors[1:]:
-        base = base & flavor
+        base = base.intersection(flavor, strict=strict)
     # remove the common flavor bits
     for flavor in flavors:
-        diffs[flavor] = flavor - base
+        diffs[flavor] = flavor.difference(base, strict=strict)
     return diffs
 
 
