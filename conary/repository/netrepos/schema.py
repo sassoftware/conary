@@ -266,14 +266,16 @@ def createUsers(db):
         commit = True
 
     if "Permissions" not in db.tables:
+        assert("Items" in db.tables)
+        assert("Labels" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
             userGroupId     INTEGER,
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
-            write           INTEGER,
-            capped          INTEGER,
-            admin           INTEGER,
+            canwrite        INTEGER NOT NULL DEFAULT 0,
+            capped          INTEGER NOT NULL DEFAULT 0,
+            admin           INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -283,16 +285,9 @@ def createUsers(db):
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_ug_l_i_uq
-                UNIQUE(userGroupId, labelId, itemId)
         )""")
         cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                       ON Permissions(userGroupId, labelId, itemId)""")
-
-        if "Items" in db.tables:
-            cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
-        if "Labels" in db.tables:
-            cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
         commit = True
 
     if "UsersView" not in db.views:
@@ -303,7 +298,7 @@ def createUsers(db):
             Users.user as user,
             Items.item as item,
             Labels.label as label,
-            Permissions.write as W,
+            Permissions.canwrite as W,
             Permissions.admin as A,
             Permissions.capped as C
         FROM
@@ -647,6 +642,17 @@ class MigrateTo_7(SchemaMigration):
             FROM Items JOIN Instances USING(itemId)
             WHERE (item LIKE '%:%' OR item LIKE 'fileset-%')
             """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
+        return self.Version
+
+class MigrateTo_8(SchemaMigration):
+    Version = 8
+    def migrate(self):
+        # Permissions.write -> Permissions.canwrite
+        for idx in db.tables["Permissions"]:
+            self.cu.execute("DROP INDEX %s" % (idx,))
+        self.cu.execute("ALTER TABLE Permissions RENAME TO oldPermissions")
+        createUsers(db)
+        self.cu.execute("")
         return self.Version
 
 # create the server repository schema

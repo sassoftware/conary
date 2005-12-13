@@ -78,6 +78,8 @@ class LabelTable(idtable.IdTable):
 
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
+    def initTable(self, cu):
+        cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
 
 class LatestTable:
     def __init__(self, db):

@@ -105,7 +105,7 @@ class NetworkAuthorization:
             params.append(label.asString())
 
         if write:
-            where.append("Permissions.write=1")
+            where.append("Permissions.canwrite=1")
 
         if admin:
             where.append("Permissions.admin=1")
@@ -238,7 +238,7 @@ class NetworkAuthorization:
             cu.execute("""UPDATE Permissions SET
                               labelId = ?,
                               itemId = ?,
-                              write = ?,
+                              canwrite = ?,
                               capped = ?,
                               admin = ?
                             WHERE userGroupId=? AND
@@ -454,7 +454,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Permissions.labelId, Labels.label,
                              PerItems.itemId, PerItems.item,
-                             write, capped, admin
+                             canwrite, capped, admin
                       FROM Permissions
                       LEFT OUTER JOIN Items AS PerItems ON
                           PerItems.itemId = Permissions.itemId

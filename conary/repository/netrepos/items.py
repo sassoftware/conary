@@ -19,8 +19,9 @@ class Items(idtable.IdTable):
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')
     def initTable(self, cu):
-        cu.execute(" ALTER TABLE Items ADD COLUMN "
-                   " hasTrove INTEGER NOT NULL DEFAULT 0")
+        cu.execute("ALTER TABLE Items ADD COLUMN "
+                   "hasTrove INTEGER NOT NULL DEFAULT 0")
+        cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
 
     def setTroveFlag(self, itemId, val):
         cu = self.db.cursor()
