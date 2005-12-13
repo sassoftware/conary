@@ -158,7 +158,7 @@ def createProvidesTable(cu, name, isTemp):
 
 def createDependencies(db):
     commit = False
-    cu = db.transaction()
+    cu = db.cursor()
     if "Dependencies" not in db.tables:
         createDepTable(cu, "Dependencies", False)
         commit = True

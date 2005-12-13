@@ -38,7 +38,7 @@ class Database(BaseDatabase):
     cursorClass = Cursor
     type = "mysql"
 
-    def connect(self):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData(["user", "passwd", "host", "db"])
         for x in cdb.keys()[:]:

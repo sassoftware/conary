@@ -36,8 +36,7 @@ class Database(BaseDatabase):
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
 
-    # XXX: honor the timeout
-    def connect(self, timeout=10000):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         for x in cdb.keys():
