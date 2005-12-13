@@ -51,6 +51,7 @@ class Database(BaseDatabase):
             del kwargs["timeout"]
         cdb.update(kwargs)
         self.dbh = mysql.connect(**cdb)
+        self.db = cdb['db']
         self.loadSchema()
         self.closed = False
         return True
@@ -85,4 +86,10 @@ class Database(BaseDatabase):
             c.execute("show index from %s" % (t,))
             self.tables[t] = [ x[2] for x in c.fetchall() ]
         version = self.getVersion()
+
+        c.execute("select default_character_set_name from "
+                  "information_schema.schemata where schema_name=?", self.db)
+        self.characterSet = c.fetchone()[0]
+        c.execute("set character set %s" % self.characterSet)
+
         return version
