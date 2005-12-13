@@ -354,11 +354,6 @@ class Database:
         if not readOnly:
             self.db.analyze()
 
-        # schema creation does commits on its own every time a new table is created, so
-        # this is kind of redundant
-        #if self.db.inTransaction:
-        #    self.db.commit()
-
         self.needsCleanup = False
         self.addVersionCache = {}
         self.flavorsNeeded = {}

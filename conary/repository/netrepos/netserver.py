@@ -1041,8 +1041,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 except:
                     # something went wrong.  make sure that we roll
                     # back any pending change
-                    if self.cache.db.inTransaction:
-                        self.cache.db.rollback()
+                    self.cache.db.rollback()
                     raise
                 size = cs.writeToFile(path, withReferences = True)
                 self.cache.setEntrySize(key, size)
