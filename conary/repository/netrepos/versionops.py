@@ -106,15 +106,10 @@ class LatestTable:
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
-        exists = 1
         if "LabelMap" not in db.tables:
-            exists = 0
+            schema.createLabelMap(db)
 	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
 		                       'itemId', 'labelId', 'branchId')
-        if not exists:
-            cu = db.cursor()
-	    cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(labelId)")
-	    cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
@@ -259,26 +254,21 @@ class SqlVersioning:
 	self.db = db
 
 class SqlVersionsError(Exception):
-
     pass
 
 class MissingBranchError(SqlVersionsError):
-
     def __str__(self):
-	return "node %d does not contain branch %s" % (self.itemId,
-						       self.branch.asString())
-
+	return "node %d does not contain branch %s" % (
+            self.itemId, self.branch.asString())
     def __init__(self, itemId, branch):
 	SqlVersionsError.__init__(self)
 	self.branch = branch
 	self.itemId = itemId
 
 class DuplicateVersionError(SqlVersionsError):
-
     def __str__(self):
-	return "node %d already contains version %s" % (self.itemId,
-						        self.version.asString())
-
+	return "node %d already contains version %s" % (
+            self.itemId, self.version.asString())
     def __init__(self, itemId, version):
 	SqlVersionsError.__init__(self)
 	self.version = version

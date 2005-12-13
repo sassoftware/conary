@@ -18,8 +18,7 @@ class Items(idtable.IdTable):
     # we create the table as a "traditional" IdTable and then personalize it
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')
-    def initTable(self):
-        cu = self.db.cursor()
+    def initTable(self, cu):
         cu.execute(" ALTER TABLE Items ADD COLUMN "
                    " hasTrove INTEGER NOT NULL DEFAULT 0")
 

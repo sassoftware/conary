@@ -15,6 +15,8 @@
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
 
+from conary.local.schema import createDependencies, createTroveInfo, createMetadata
+
 VERSION = 7
 
 def createInstances(db):
@@ -71,9 +73,8 @@ def createFlavors(db):
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY,
             flavor          STRING,
-            CONSTRAINT Flavors_flavor_uq
-                UNIQUE(flavor)
         )""")
+        cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
         commit = True
 
@@ -116,7 +117,7 @@ def createFlavors(db):
     if commit:
         db.commit()
         db.loadSchema()
-        
+
 def createNodes(db):
     cu = db.cursor()
     commit = False
@@ -168,7 +169,7 @@ def createNodes(db):
     if commit:
         db.commit()
         db.loadSchema()
-        
+
 def createLatest(db):
     cu = db.cursor()
     commit = False
@@ -219,7 +220,7 @@ def createLatest(db):
     if commit:
         db.commit()
         db.loadSchema()
-        
+
 def createUsers(db):
     cu = db.cursor()
     commit = False
@@ -334,11 +335,11 @@ def createUsers(db):
             entGroupId      INTEGER,
             ownerGroupId    INTEGER,
             CONSTRAINT EntitlementOwners_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES 
+                FOREIGN KEY (entGroupId) REFERENCES
                                 EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT EntitlementOwners_entOwnerId_fk
-                FOREIGN KEY (ownerGroupId) REFERENCES 
+                FOREIGN KEY (ownerGroupId) REFERENCES
                                 userGroups(groupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT EntitlementOwners_entGroupId_ownerGroupId_uq
@@ -362,7 +363,7 @@ def createUsers(db):
     if commit:
         db.commit()
         db.loadSchema()
-        
+
 def createPGPKeys(db):
     cu = db.cursor()
     commit = False
@@ -393,7 +394,7 @@ def createPGPKeys(db):
     if commit:
         db.commit()
         db.loadSchema()
-        
+
 def createTroves(db):
     cu = db.cursor()
     commit = False
@@ -468,20 +469,52 @@ def createInstructionSets(db):
         db.loadSchema()
 
 def createChangeLog(db):
+    if "ChangeLogs" in db.tables:
+        return
     cu = db.cursor()
-    if "ChangeLogs" not in db.tables:
-        cu.execute("""
+    cu.execute("""
         CREATE TABLE ChangeLogs(
             nodeId          INTEGER,
             name            STRING,
             contact         STRING,
             message         STRING,
-            CONSTRAINT ChangeLogs_nodeId_uq
-                UNIQUE(nodeId)
+            CONSTRAINT ChangeLogs_nodeId_fk
+                FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
-        db.commit()
-        db.loadSchema()
+    cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
+               "ChangeLogs(nodeId)")
+    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
+    db.commit()
+    db.loadSchema()
+
+def createlabelMap(db):
+    if "LabelMap" in db.tables:
+        return
+    cu = db.cursor()
+    idtable.IdPairMapping.__init__(self, db, 'LabelMap',
+                                   'itemId', 'labelId', 'branchId')
+
+    cu.execute("""
+    CREATE TABLE LabelMap(
+        itemId          INTEGER NOT NULL,
+        labelId         INTEGER NOT NULL,
+        branchId        INTEGER NOT NULL,
+        CONSTRAINT LabelMap_itemId_fk
+            FOREIGN KEY (itemId) REFERENCES Items(itemId)
+            ON DELETE CASACADE ON UPDATE CASCADE,
+        CONSTRAINT LabelMap_labelId_fk
+            FOREIGN KEY (labelId) REFERENCES Labels(labelId)
+            ON DELETE CASACADE ON UPDATE CASCADE,
+        CONSTRAINT LabelMap_branchId_fk
+            FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+            ON DELETE CASACADE ON UPDATE CASCADE
+    )""")
+    # FIXME: rename indexes accordingly
+    cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(itemId)")
+    cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
+    db.commit()
+    db.loadSchema()
 
 # SCHEMA Migration
 class SchemaMigration(migration.SchemaMigration):
@@ -618,6 +651,35 @@ class MigrateTo_7(SchemaMigration):
             WHERE (item LIKE '%:%' OR item LIKE 'fileset-%')
             """, (trove._TROVEINFO_TAG_FLAGS, notCollectionStream))
         return self.Version
+
+# create the server repository schema
+def createSchema(db):
+    # FIXME: find a better way to create the tables made by the __init__
+    # methods of some of the classes used here
+    from conary.repository.netrepos import items, versionops
+    from conary.local import versiontable
+    items.Items(db)
+    versionops.BranchTable(db)
+    versionops.LabelTable(db)
+    versiontable.Versions(db)
+
+    createChangeLog(db)
+    createLabelMap(db)
+
+    createUsers(db)
+    createPGPKeys(db)
+
+    createInstances(db)
+    createNodes(db)
+    createLatest(db)
+    createInstructionSets(db)
+    createFlavors(db)
+
+    createTroves(db)
+
+    createDependencies(db)
+    createTroveInfo(db)
+    createMetadata(db)
 
 # schema creation/migration/maintenance entry point
 def checkVersion(db):

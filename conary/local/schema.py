@@ -85,7 +85,7 @@ def createTroveTroves(db):
     if "TroveTroves" in db.tables:
         return
     cu = db.cursor()
-    # FIXME; add foreign keys
+    # FIXME: add foreign keys
     cu.execute("""
     CREATE TABLE TroveTroves(
         instanceId      INTEGER,
@@ -101,6 +101,74 @@ def createTroveTroves(db):
     # contains unique TroveTrove (instanceId, includedId) pairs.
     cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
                "TroveTroves(instanceId,includedId)")
+    db.commit()
+    db.loadSchema()
+
+def createTroveInfo(db):
+    if "TroveInfo" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE TroveInfo(
+        instanceId      INTEGER NOT NULL,
+        infoType        INTEGER NOT NULL,
+        data            BINARY,
+        CONSTRAINT TroveInfo_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE CASCADE ON UPDATE CASACADE
+    )""")
+    cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
+    cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
+    db.commit()
+    db.loadSchema()
+
+def createMetadata(db):
+    commit = False
+    cu = self.db.cursor()
+    if 'Metadata' not in db.tables:
+        cu.execute("""
+        CREATE TABLE Metadata(
+            metadataId          INTEGER PRIMARY KEY,
+            itemId              INTEGER NOT NULL,
+            versionId           INTEGER NOT NULL,
+            branchId            INTEGER NOT NULL,
+            timeStamp           INTEGER NOT NULL,
+            CONSTRAINT Metadata_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASACADE,
+            CONSTRAINT Metadata_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASACADE,
+            CONSTRAINT Metadata_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASACADE
+        )""")
+        commit = True
+    # FIXME: create an index here too
+    if 'MetadataItems' not in db.tables:
+        cu.execute("""
+        CREATE TABLE MetadataItems(
+            metadataId      INTEGER NOT NULL,
+            class           INTEGER,
+            data            STRING,
+            language        STRING
+        )""")
+        commit = True
+    if commit:
+        db.commit()
+        db.loadSchema()
+
+def createDataStore(db):
+    if "DataStore" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DataStore(
+        hash    BINARY NOT NULL,
+        count   INTEGER,
+        data    BINARY
+    )""")
+    cu.execute("CREATE INDEX DataStoreIdx ON DataStore(hash)")
     db.commit()
     db.loadSchema()
 
