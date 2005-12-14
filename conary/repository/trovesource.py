@@ -84,6 +84,9 @@ class AbstractTroveSource:
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
 
+    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
+        raise NotImplementedError
+
     def walkTroveSet(self, trove, ignoreMissing = True,
                      withFiles=True):
 	"""
@@ -502,7 +505,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         return iter(troveNames)
 
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
-        cs = self.troveCsMap[n,v,f]
+        try:
+            cs = self.troveCsMap[n,v,f]
+        except KeyError:
+            raise errors.TroveMissing(n, v)
+
         trvCs = cs.getNewTroveVersion(n,v,f)
         fileList = trvCs.getNewFileList()
         if not fileList:    
@@ -934,6 +941,18 @@ class TroveSourceStack(SearchableTroveSource):
             except KeyError:
                 continue
         return None
+
+    def iterFilesInTrove(self, n, v, f, *args, **kw):
+        for source in self.sources:
+            try:
+                for value in source.iterFilesInTrove(n, v, f, *args, **kw):
+                    yield value
+                return
+            except NotImplementedError:
+                pass
+            except errors.TroveMissing:
+                pass
+        raise errors.TroveMissing(n,v)
 
 def stack(*sources):
     """ create a trove source that will search first source1, then source2 """
