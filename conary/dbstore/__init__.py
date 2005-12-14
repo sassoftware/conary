@@ -28,30 +28,30 @@ def __get_driver(driver = __DRIVER):
     if driver == "sqlite":
         try:
             from sqlite_drv import Database
-        except ImportError:
+        except ImportError, e:
             raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
-                driver)
+                e.args + (driver,))
         else:
             return Database
     # postgresl support
     if driver == "postgresql":
         try:
             from postgresql_drv import Database
-        except ImportError:
+        except ImportError, e:
             raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
-                driver)
+                e.args + (driver,))
         else:
             return Database
     # mysql support
     if driver == "mysql":
         try:
             from mysql_drv import Database
-        except ImportError:
+        except ImportError, e:
             raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),
-                driver)
+                e.args + (driver,))
         else:
             return Database
 
