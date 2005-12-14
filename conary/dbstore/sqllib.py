@@ -51,7 +51,7 @@ class CaselessDict:
         return self.__l(key) in self.dict
 
     def __repr__(self):
-        items = ", ".join([("%r: %r" % (k,v)) for k,v in self.iteritems()])
+        items = ", ".join([("%r: %r" % (k,v)) for k,v in self.dict.itervalues()])
         return "{%s}" % items
     def __str__(self):
         return repr(self)
