@@ -102,13 +102,16 @@ class Database(BaseDatabase):
             table_name as tname
         FROM information_schema.tables
         WHERE table_type in ('VIEW', 'BASE TABLE') AND table_schema = ?
-        UNION
+        """, self.dbName)
+        ret = cu.fetchall()
+        cu.execute("""
         SELECT DISTINCT
             'INDEX' as type, index_name as name, table_name as tname
         FROM INFORMATION_SCHEMA.STATISTICS
         WHERE table_schema = ?
-        """, self.dbName, self.dbName)
-        for (objType, name, tableName) in cu:
+        """, self.dbName)
+        ret += cu.fetchall()
+        for (objType, name, tableName) in ret:
             if objType == "BASE TABLE":
                 if tableName.endswith("_sequence"):
                     self.sequences.append(tableName[:-len("_sequence")])
