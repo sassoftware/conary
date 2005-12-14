@@ -1,7 +1,3 @@
 - implement cu = db.prepare(sql)
-- table TroveInfo has a "data" column that is of type BINARY. In MySQL
-  we have BLOB, MEDIUMBLOB and LARGEBLOB types. BLOB is upto
-  65,535. Migration of the data column to a MEDIUMBLOB type (16M max in
-  size) can have a negative impact on performance and storage
-  parameters.
-- migrate mysql and postgresql loadSchema to using INFORMATION_SCHEMA
+- migrate postgresql loadSchema to using INFORMATION_SCHEMA
+- implement Sequences for postgresql
