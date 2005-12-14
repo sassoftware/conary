@@ -1050,7 +1050,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 except:
                     # something went wrong.  make sure that we roll
                     # back any pending change
-                    if self.cache.db.inTransaction:
+                    if self.cache.db and self.cache.db.inTransaction:
                         self.cache.db.rollback()
                     raise
                 size = cs.writeToFile(path, withReferences = True)
@@ -1571,6 +1571,7 @@ class NullCacheSet:
 
     def __init__(self, tmpPath):
         self.tmpPath = tmpPath
+        self.db = None
 
 class CacheSet:
 
