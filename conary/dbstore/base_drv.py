@@ -174,7 +174,7 @@ class BaseDatabase:
         assert(len(tuple(names)) == 5)
         # regexes are k001 and I am 1337 h@x0r
         regex = re.compile(
-            "^(((?P<%s>[^:]+)(:(?P<%s>[^@]+))?@)?(?P<%s>[^/:]+)(:(?P<%s>[^/]+))?/)?(?P<%s>.+)$" % tuple(names)
+            "^(((?P<%s>[^:]+)(:(?P<%s>[^@]+)?)?@)?(?P<%s>[^/:]+)(:(?P<%s>[^/]+))?/)?(?P<%s>.+)$" % tuple(names)
             )
         m = regex.match(self.database.strip())
         assert(m)
