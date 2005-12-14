@@ -214,11 +214,11 @@ class NetworkAuthorization:
 
 
         try:
-            cu.execute("""INSERT INTO Permissions
-                            SELECT userGroupId, ?, ?, ?, ?, ? FROM
-                                (SELECT userGroupId FROM userGroups WHERE
-                                userGroup=?)
-                        """, labelId, itemId, write, capped, admin, userGroup)
+            cu.execute("""
+            INSERT INTO Permissions
+            SELECT userGroupId, ?, ?, ?, ?, ?
+            FROM UserGroups WHERE userGroup=?
+            """, labelId, itemId, write, capped, admin, userGroup)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -310,11 +310,14 @@ class NetworkAuthorization:
 
         try:
             # XXX: ahhh, how we miss real sequences...
-            cu.execute("""INSERT INTO UserGroups
-            SELECT MAX(
-            (SELECT IFNULL(MAX(userId),0) FROM Users),
-            (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
-            )+1, ? """, user)
+            cu.execute("""
+            INSERT INTO UserGroups
+            (userGroupId, userGroup)
+            SELECT MAX(maxId)+1, ? FROM
+                (SELECT IFNULL(MAX(userId),0) as maxId FROM Users
+                UNION
+                SELECT IFNULL(MAX(userGroupId),0) as maxId FROM UserGroups) as MaxList
+            """, user)
         except sqlerrors.ColumnNotUnique:
             raise errors.GroupAlreadyExists, 'group: %s' % user
 
