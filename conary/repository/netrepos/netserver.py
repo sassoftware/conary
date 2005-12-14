@@ -1378,7 +1378,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def changePGPKeyOwner(self, authToken, label, user, key):
-        if (not self.auth.checkIsFullAdmin(*authToken)):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
             raise errors.InsufficientPermission
         if user:
             uid = self.auth.getUserIdByName(user)
