@@ -1349,6 +1349,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
+        logMe(1, authToken, label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1358,6 +1359,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addNewPGPKey(self, authToken, label, user, encKeyData):
         import base64
+        logMe(1, authToken, label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1367,6 +1369,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def changePGPKeyOwner(self, authToken, label, user, key):
+        logMe(1, authToken, label, user, key)
         if (not self.auth.checkIsFullAdmin(*authToken)):
             raise errors.InsufficientPermission
         if user:
@@ -1409,7 +1412,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ## "default" : { "is: x86"    : "conary.x86.ccs",
             ##               "is: x86_64" : "conary.x86_64.ccs", }
             }
-        logMe(3, revStr, flavorStr)
+        logMe(1, revStr, flavorStr)
         rev = versions.Revision(revStr)
         revision = rev.getVersion()
         flavor = self.toFlavor(flavorStr)
