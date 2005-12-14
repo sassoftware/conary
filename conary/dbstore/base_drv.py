@@ -152,12 +152,39 @@ class BindlessCursor(BaseCursor):
         # we have a dict of bind arguments
         return self._cursor.execute(sql, **kw)
 
+
+# A class for working with sequences
+class BaseSequence:
+    def __init__(self, db, name):
+        assert(name)
+        self.db = db
+        self.name = name
+        self.seqName = "%s_sequence" % (name,)
+        self.__currval = None
+
+    # if we have not called nextval() yet, then currval should be
+    # undefined. To easily catch places where we might be doing that,
+    # we raise an exception
+    def currval(self):
+        if self.__currval is None:
+            raise sqlerrors.CursorError(
+                "Sequence has currval undefined until nextval() is called",
+                self.name)
+        return self.__currval
+    # this is meant to be provided by the drivers
+    def nextval(self):
+        pass
+    # Enforce garbage collection to avoid circular deps
+    def __del__(self):
+        self.db = self.cu = None
+
 # A class to handle database operations
 class BaseDatabase:
     # need to figure out a statement generic enough for all kinds of backends
     alive_check = "select 1 where 1 = 1"
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
+    sequenceClass = BaseSequence
     driver = "base"
 
     def __init__(self, db):
@@ -217,6 +244,10 @@ class BaseDatabase:
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
+
+    def sequence(self, name):
+        assert(self.dbh)
+        return self.sequenceClass(self, name)
 
     # perform the equivalent of a analyze on $self
     def analyze(self):

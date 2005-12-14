@@ -14,7 +14,7 @@
 
 import re
 import MySQLdb as mysql
-from base_drv import BaseDatabase, BindlessCursor
+from base_drv import BaseDatabase, BindlessCursor, BaseSequence
 import sqlerrors
 
 class Cursor(BindlessCursor):
@@ -32,12 +32,42 @@ class Cursor(BindlessCursor):
             raise sqlerrors.DatabaseError(e.args[1], e.args)
         return self
 
-# FIXME: we should channel exceptions into generic exception classes
-# common to all backends
+# Sequence implementation for sqlite
+class Sequence(BaseSequence):
+    def __init__(self, db, name, cu = None):
+        BaseSequence.__init__(self, db, name)
+        self.cu = cu
+        if cu is None:
+            self.cu = db.cursor()
+        if name in db.sequences:
+            return
+        self.cu.execute("""
+        CREATE TABLE %s (
+            val         INTEGER NOT NULL
+        )""" % self.seqName)
+        self.cu.execute("INSERT INTO %s VALUES(0)" % self.seqName)
+        # refresh schema
+        db.loadSchema()
+
+    def nextval(self):
+        self.cu.execute("UPDATE %s SET val=LAST_INSERT_ID(val+1)" % self.seqName)
+        self.cu.execute("SELECT LAST_INSERT_ID()")
+        self.__currval = self.cu.fetchone()[0]
+        return self.__currval
+
+    # Enforce garbage collection to avoid circular deps
+    def __del__(self):
+        # if we have used the sequence, make sure it is committed
+        if self.__currval is not None:
+            self.db.commit()
+        self.db = self.cu = None
+
+
 class Database(BaseDatabase):
     alive_check = "select version(), current_date()"
     basic_transaction = "begin"
     cursorClass = Cursor
+    sequenceClass = Sequence
     driver = "mysql"
 
     def connect(self, **kwargs):
@@ -51,45 +81,46 @@ class Database(BaseDatabase):
             del kwargs["timeout"]
         cdb.update(kwargs)
         self.dbh = mysql.connect(**cdb)
-        self.db = cdb['db']
-        self.loadSchema()
+        self.dbName = cdb['db']
+        cu = self.cursor()
+        cu.execute("SELECT default_character_set_name "
+                   "FROM INFORMATION_SCHEMA.SCHEMATA "
+                   "where schema_name=?", self.dbName)
+        self.characterSet = cu.fetchone()[0]
+        cu.execute("set character set %s" % self.characterSet)
+        self.loadSchema(cu)
         self.closed = False
         return True
 
-    def loadSchema(self):
+    def loadSchema(self, cu = None):
         BaseDatabase.loadSchema(self)
-        c = self.cursor()
-        c.execute("select version()")
-        version = c.fetchone()[0]
-        # Basically, mysql blows at giving the user any details about the schema.
-        if version < "5.0.2":
-            # these old versions can only list tables. that's kind of lame.
-            c.execute("show tables")
-            self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])
-            if version > "5":
-                # starting at version 5, tables and views are listed
-                # in one single output. how dumb is that?
-                self.views = self.tables.keys()
-        else:
-            # after 5.0.2, we have a new syntax and a two column output
-            c.execute("show full tables")
-            for (name, nametype) in c.fetchall():
-                if nametype == "BASE TABLE":
-                    self.tables.setdefault(name, [])
-                elif nametype == "VIEW":
-                    self.views.append(name)
+        if cu is None:
+            cu = self.cursor()
+        cu.execute("""
+        SELECT
+            table_type as type, table_name as name,
+            table_name as tname
+        FROM information_schema.tables
+        WHERE table_type in ('VIEW', 'BASE TABLE') AND table_schema = ?
+        UNION
+        SELECT DISTINCT
+            'INDEX' as type, index_name as name, table_name as tname
+        FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE table_schema = ?
+        """, self.dbName, self.dbName)
+        for (objType, name, tableName) in cu:
+            if objType == "BASE TABLE":
+                if tableName.endswith("_sequence"):
+                    self.sequences.append(tableName[:-len("_sequence")])
                 else:
-                    assert(nametype in ["BASE TABLE", "VIEW"])
+                    self.tables.setdefault(tableName, [])
+            elif objType == "VIEW":
+                self.views.append(tableName)
+            elif objType == "INDEX":
+                assert(self.tables.has_key(tableName))
+                self.tables.setdefault(tableName, []).append(name)
         if not len(self.tables):
             return self.version
-        for t in self.tables:
-            c.execute("show index from %s" % (t,))
-            self.tables[t] = [ x[2] for x in c.fetchall() ]
         version = self.getVersion()
-
-        c.execute("select default_character_set_name from "
-                  "information_schema.schemata where schema_name=?", self.db)
-        self.characterSet = c.fetchone()[0]
-        c.execute("set character set %s" % self.characterSet)
 
         return version

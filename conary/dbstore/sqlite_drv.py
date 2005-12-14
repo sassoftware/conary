@@ -17,7 +17,7 @@ import os
 from conary import sqlite3
 from conary.lib.tracelog import logMe
 
-from base_drv import BaseDatabase, BaseCursor
+from base_drv import BaseDatabase, BaseCursor, BaseSequence
 import sqlerrors
 
 class Cursor(BaseCursor):
@@ -85,10 +85,43 @@ class Cursor(BaseCursor):
             raise
         return ret
 
+# Sequence implementation for sqlite
+class Sequence(BaseSequence):
+    def __init__(self, db, name, cu = None):
+        BaseSequence.__init__(self, db, name)
+        self.cu = cu
+        if cu is None:
+            self.cu = db.cursor()
+        if name in db.sequences:
+            return
+        self.cu.execute("""
+        CREATE TABLE %s_sequence (
+            val         INTEGER PRIMARY KEY AUTOINCREMENT
+        )""" % (name,))
+        # refresh schema
+        db.loadSchema()
+
+    def nextval(self):
+        # We have to make sure we do this in a transaction
+        if not self.db.dbh.inTransaction:
+            self.db.transaction()
+        self.cu.execute("DELETE FROM %s" % self.seqName)
+        self.cu.execute("INSERT INTO %s VALUES(NULL)" % self.seqName)
+        self.cu.execute("SELECT val FROM %s" % self.seqName)
+        self.__currval = self.cu.fetchone()[0]
+        return self.__currval
+
+    # Enforce garbage collection to avoid circular deps
+    def __del__(self):
+        if self.db.dbh.inTransaction and self.__currval is not None:
+            self.db.commit()
+        self.db = self.cu = None
+
 class Database(BaseDatabase):
     driver = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
+    sequenceClass = Sequence
     basic_transaction = "begin immediate"
     VIRTUALS = [ ":memory:" ]
     TIMEOUT = 10000
@@ -173,3 +206,4 @@ class Database(BaseDatabase):
             if str(e) == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase
             raise
+
