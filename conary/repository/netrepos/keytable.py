@@ -49,7 +49,7 @@ class OpenPGPKeyTable:
         cu = self.db.transaction()
         try:
             # XXX: use sequences
-            r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
+            r = cu.execute('SELECT COALESCE(MAX(keyId),0) + 1 FROM PGPKeys')
             keyId = r.fetchone()[0]
             keyRing = StringIO.StringIO(pgpKeyData)
 

@@ -313,10 +313,11 @@ class NetworkAuthorization:
             cu.execute("""
             INSERT INTO UserGroups
             (userGroupId, userGroup)
-            SELECT MAX(maxId)+1, ? FROM
-                (SELECT IFNULL(MAX(userId),0) as maxId FROM Users
+            SELECT MAX(maxId)+1, ? FROM (
+                SELECT COALESCE(MAX(userId),0) as maxId FROM Users
                 UNION
-                SELECT IFNULL(MAX(userGroupId),0) as maxId FROM UserGroups) as MaxList
+                SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
+            ) as MaxList
             """, user)
         except sqlerrors.ColumnNotUnique:
             raise errors.GroupAlreadyExists, 'group: %s' % user
