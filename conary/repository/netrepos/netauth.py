@@ -301,41 +301,44 @@ class NetworkAuthorization:
         #sequencing, use max(userId, userGroupId)+1 so that userId and
         #userGroupId can be in sync.  This will leave lots of holes, and
         #will probably need to be changed if conary moves to another db.
-        cu = self.db.cursor()
+        cu = self.db.transaction()
 
         #Check to make sure the user is unique in both the user and UserGroup
         #tables
         self._uniqueUserGroup(cu, user)
         self._uniqueUser(cu, user)
 
+        # FIXME: race condition - fix it using sequences once they are
+        # provisioned
+        cu.execute("""
+        SELECT MAX(maxId)+1 FROM (
+            SELECT COALESCE(MAX(userId),0) as maxId FROM Users
+            UNION
+            SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
+        ) as MaxList
+        """)
+        ugid = cu.fetchone()[0]
+        # XXX: ahhh, how we miss real sequences...
         try:
-            # XXX: ahhh, how we miss real sequences...
             cu.execute("""
-            INSERT INTO UserGroups
-            (userGroupId, userGroup)
-            SELECT MAX(maxId)+1, ? FROM (
-                SELECT COALESCE(MAX(userId),0) as maxId FROM Users
-                UNION
-                SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
-            ) as MaxList
-            """, user)
+            INSERT INTO UserGroups (userGroupId, userGroup)
+            VALUES (?, ?)
+            """, ugid, user)
         except sqlerrors.ColumnNotUnique:
             raise errors.GroupAlreadyExists, 'group: %s' % user
-
-        userGroupId = cu.lastrowid
-
         try:
-            cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
-                       (userGroupId, user, salt, password))
+            cu.execute("""
+            INSERT INTO Users (userId, user, salt, password)
+            VALUES (?, ?, ?, ?)
+            """, (ugid, user, salt, password))
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
-
-        userId = cu.lastrowid
-        cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)",
-                   userGroupId, userGroupId)
-
+        cu.execute("""
+        INSERT INTO UserGroupMembers (userGroupId, userId)
+        VALUES (?, ?)
+        """, ugid, ugid)
         self.db.commit()
-        return userId
+        return ugid
 
     def deleteUserByName(self, user, commit = True):
         cu = self.db.cursor()
