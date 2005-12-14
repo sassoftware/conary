@@ -89,7 +89,10 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     interface without the overhead of XMLRPC.
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap):
-        server.getChangeSet = new.instancemethod(localGetChangeSet, server)
+        # this isn't safe because it modifies a server instance that might
+        # be user later:
+
+        # server.getChangeSet = new.instancemethod(localGetChangeSet, server)
 
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap)
         proxy = ShimServerProxy(server, protocol, port, authToken)
