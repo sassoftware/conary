@@ -77,7 +77,7 @@ class SysLog:
             except:
                 pass
         if not self.f:
-            raise IOError, 'could not open any of: %s', ', '.join(self.path)
+            raise IOError, 'could not open any of: ' + ', '.join(self.path)
 
 
     def __init__(self, root, path):
