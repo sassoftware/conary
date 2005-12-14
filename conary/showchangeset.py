@@ -50,7 +50,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
                      asJob=False):
 
     if all:
-        ls = deps = sha1s = ids = tags = True
+        ls = deps = tags = True
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -61,15 +61,20 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
 
 
         if not troveSpecs:
-            troveTups = cs.getPrimaryTroveList() 
+            troveTups = cs.getPrimaryTroveList()
             primary = True
             namesOnly = True
+            if not troveTups:
+                log.warning('No primary troves in changeset, listing all troves')
+                troveTups = [(x.getName(), x.getNewVersion(), x.getNewFlavor())\
+                                            for x in cs.iterNewTroveList()]
         else:
             troveTups, namesOnly, primary  = query.getTrovesToDisplay(
                                                          changeSetSource, 
                                                          troveSpecs)
+        querySource = trovesource.stack(changeSetSource, client.getRepos())
 
-        dcfg = display.DisplayConfig(changeSetSource, ls=ls, ids=ids, 
+        dcfg = display.DisplayConfig(querySource, ls=ls, ids=ids, 
                              sha1s=sha1s, fullVersions=cfg.fullVersions, 
                              tags=tags, deps=deps, info=info,
                              showFlavors=cfg.fullFlavors,
