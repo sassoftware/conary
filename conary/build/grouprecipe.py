@@ -565,6 +565,18 @@ class GroupRecipe(Recipe):
                     childGroups.append(childGroup)
         return allTroves
 
+    def getPrimaryGroupNames(self):
+        """ 
+        Return the list of groups in this GroupRecipe that are not included in 
+        any other groups.
+        """
+        unseen = set(self.getGroupNames())
+
+        for groupName in self.getGroupNames():
+            unseen.difference_update([x[0] for x in self.groups[groupName].getNewGroupList()])
+        return unseen
+
+
     def findAllTroves(self):
         if self.toFind is not None:
             # find all troves needed by all included groups together, at 

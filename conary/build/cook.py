@@ -477,6 +477,9 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
 
+    for primaryName in recipeObj.getPrimaryGroupNames():
+        changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
+
     built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) 
               for grp in groups.itervalues()]
 
