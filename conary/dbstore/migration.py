@@ -55,6 +55,6 @@ class SchemaMigration:
         self.message()
 
     def __end(self):
-        db.setVersion(self.Version)
+        self.db.setVersion(self.Version)
         self.message("")
 
