@@ -33,7 +33,6 @@ class DBTroveFiles:
     def __init__(self, db):
         self.db = db
 	self.tags = Tags(self.db)
-
         schema.createDBTroveFiles(db)
 
     def __getitem__(self, instanceId):
@@ -342,7 +341,8 @@ class Database:
                 "as root). \n")
         schema.checkVersion(self.db)
 
-        schema.createTroveTroves(self.db)
+        schema.createSchema(self.db)
+
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
 	self.versionTable = versiontable.VersionTable(self.db)
