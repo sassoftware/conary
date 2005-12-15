@@ -2171,7 +2171,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 gl = []
                 for item in l:
                     # prefer destdir elements
-                    paths = util.braceGlob(destdir + '/' + item)
+                    paths = util.braceGlob(destdir + item)
                     paths = [ os.path.normpath(x[dlen:]) for x in paths ]
                     appendUnique(gl, paths)
                     # then look on system
