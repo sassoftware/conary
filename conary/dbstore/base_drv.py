@@ -280,6 +280,7 @@ class BaseDatabase:
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = sqllib.CaselessDict()
+        self.tempTables = sqllib.CaselessDict()
         self.views = sqllib.CaselessDict()
         self.functions = sqllib.CaselessDict()
         self.sequences = sqllib.CaselessDict()

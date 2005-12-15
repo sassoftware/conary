@@ -21,28 +21,6 @@ from conary.lib.tracelog import logMe
 NO_FLAG_MAGIC = '-*none*-'
 
 class DependencyTables:
-    def _createTmpTable(self, cu, name, makeTable = True, makeIndex = True):
-        logMe(2, name, makeTable, makeIndex)
-	if makeTable:
-            try:
-                cu.execute("DROP TABLE %s" %name)
-            except:
-                pass
-	    cu.execute("""
-            CREATE TEMPORARY TABLE %s(
-                troveId         INTEGER,
-                depNum          INTEGER,
-                flagCount       INTEGER,
-                isProvides      BOOLEAN,
-                class           INTEGER,
-                name            VARCHAR(254),
-                flag            VARCHAR(254)
-            )""" % name, start_transaction = False)
-	if makeIndex:
-	    cu.execute("""
-            CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
-            """ % (name, name), start_transaction = False)
-
     def _populateTmpTable(self, cu, stmt, depList, troveNum, requires,
                           provides, multiplier = 1):
         # FIXME: switch back to preparsed statments when dbstore supports it
@@ -190,14 +168,12 @@ class DependencyTables:
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
-        self._createTmpTable(cu, "NeededDeps")
+        schema.createDepWorkTable(cu, "DepCheck")
 
-	stmt = "INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)"
+	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         self._populateTmpTable(cu, stmt, [], troveId, requires, provides)
-        self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires",
+        self._mergeTmpTable(cu, "DepCheck", "Dependencies", "Requires",
                             "Provides", ("Dependencies",))
-
-        cu.execute("DROP TABLE NeededDeps", start_transaction = False)
 
     def delete(self, cu, troveId):
         try:
@@ -661,6 +637,11 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
+        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
+        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
+        schema.createProvidesTable(cu, 'TmpProvides', isTemp = True)
+        schema.createDepWorkTable(cu, "DepCheck")
+
 	# this begins a transaction. we do this explicitly to keep from
 	# grabbing any exclusive locks (when the python binding autostarts
 	# a transaction, it uses "begin immediate" to grab an exclusive
@@ -669,11 +650,6 @@ class DependencyTables:
 	# the best we can do with sqlite and still get the performance benefits
 	# of being in a transaction)
 	cu.execute("BEGIN")
-
-        self._createTmpTable(cu, "DepCheck", makeIndex = False)
-        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
-        schema.createProvidesTable(cu, 'TmpProvides', isTemp = True)
-        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         # build the table of all the requirements we're looking for
         depList = [ None ]
@@ -733,9 +709,6 @@ class DependencyTables:
             nodes.append((job, set(), set()))
 
             i += 1
-
-        # create the index for DepCheck
-        self._createTmpTable(cu, "DepCheck", makeTable = False)
 
         # merge everything into TmpDependencies, TmpRequires, and tmpProvides
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
@@ -1025,11 +998,11 @@ class DependencyTables:
 
         cu = self.db.cursor()
 
-	cu.execute("BEGIN")
-
-        self._createTmpTable(cu, "DepCheck")
         schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
         schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
+        schema.createDepWorkTable(cu, "DepCheck")
+
+	cu.execute("BEGIN")
 
         depList = [ None ]
 	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
@@ -1135,11 +1108,11 @@ class DependencyTables:
     def getLocalProvides(self, depSetList):
         cu = self.db.cursor()
 
-	cu.execute("BEGIN")
-
-        self._createTmpTable(cu, "DepCheck")
         schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
         schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
+        schema.createDepWorkTable(cu, "DepCheck")
+
+	cu.execute("BEGIN")
 
         depList = [ None ]
 	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
