@@ -320,6 +320,21 @@ def createDependencies(db):
         db.commit()
         db.loadSchema()
 
+def createSchema(db):
+    # XXX
+    import versiontable
+    import sqldb
+
+    createInstances(db)
+    createTroveTroves(db)
+    createDBTroveFiles(db)
+    createInstances(db)
+    versiontable.VersionTable(db)
+    sqldb.DBFlavorMap(db)
+    createFlavors(db)
+    createDependencies(db)
+    createTroveInfo(db)
+
 # SCHEMA Migration
 
 # redefine to enable stdout messaging for the migration process
