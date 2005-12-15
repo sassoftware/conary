@@ -21,6 +21,13 @@ from conary.dbstore import idtable, migration
 
 VERSION = 14
 
+def resetTable(cu, name):
+    try:
+        cu.execute("DELETE FROM %s" % name, start_transaction = False)
+        return True
+    except:
+        return False
+
 # Schema creation functions
 def createFlavors(db):
     if "Flavors" in db.tables:
@@ -177,13 +184,10 @@ def createDepTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
-        d['tmp'] = 'TEMPORARY'
+        if resetTable(cu, name):
+            return False
 
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
-            return
-        except:
-            pass
+        d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
@@ -195,18 +199,17 @@ def createDepTable(cu, name, isTemp):
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
 
+    return True
+
 def createRequiresTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
 
     if isTemp:
-        d['tmp'] = 'TEMPORARY'
+        if resetTable(cu, name):
+            return False
 
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
-            return
-        except:
-            pass
+        d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
@@ -225,18 +228,17 @@ def createRequiresTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = startTrans)
 
+    return True
+
 def createProvidesTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
 
     if isTemp:
+        if resetTable(cu, name):
+            return False
         d['tmp'] = 'TEMPORARY'
 
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
-            return
-        except:
-            pass
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER,
@@ -250,12 +252,11 @@ def createProvidesTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = startTrans)
 
+    return True
+
 def createDepWorkTable(cu, name):
-    try:
-        cu.execute("DELETE FROM %s" % name, start_transaction = False)
-        return
-    except:
-        pass
+    if resetTable(cu, name):
+        return False
 
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
@@ -272,6 +273,8 @@ def createDepWorkTable(cu, name):
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
 
+    return True
+
 def createDependencies(db):
     commit = False
     cu = db.cursor()
@@ -283,6 +286,34 @@ def createDependencies(db):
         commit = True
     if "Provides" not in db.tables:
         createProvidesTable(cu, "Provides", False)
+        commit = True
+
+    # bitwise | doesn't get short circuited
+    commit = commit | createRequiresTable(cu, "TmpRequires", isTemp = True)
+    commit = commit | createProvidesTable(cu, "TmpProvides", isTemp = True)
+    commit = commit | createDepWorkTable(cu, "DepCheck")
+    commit = commit | createDepTable(cu, 'TmpDependencies', isTemp = True)
+
+    if not resetTable(cu, "SuspectDepsOrig"):
+        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
+        commit = True
+
+    if not resetTable(cu, "SuspectDeps"):
+        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
+        commit = True
+
+    if not resetTable(cu, "BrokenDeps"):
+        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
+        commit = True
+
+    if not resetTable(cu, "RemovedTroveIds"):
+        cu.execute("""
+        CREATE TEMPORARY TABLE RemovedTroveIds(
+            troveId INTEGER,
+            nodeId INTEGER
+        )""")
+	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
+                   "RemovedTroveIds(troveId)")
         commit = True
 
     if commit:

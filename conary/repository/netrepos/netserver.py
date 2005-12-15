@@ -285,14 +285,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _setupFlavorFilter(self, cu, flavorSet):
         logMe(2, flavorSet)
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        ffFlavor(
-            flavorId    INTEGER,
-            base        VARCHAR(254),
-            sense       INTEGER,
-            flag        VARCHAR(254)
-        )""", start_transaction = False)
+        schema.resetTable(cu, 'ffFlavor')
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
@@ -311,13 +304,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
         logMe(2)
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        gtvlTbl(
-            item                VARCHAR(254),
-            versionSpec         VARCHAR(999),
-            flavorId            INTEGER
-        )""", start_transaction = False)
+        schema.resetTable(cu, 'gtvlTbl')
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
                 versionDict = dict.fromkeys(versionDict, [ None ])
@@ -336,7 +323,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
-        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", start_transaction = False)
         cu.execute("select count(*) from gtvlTbl")
         entries = cu.next()[0]
         logMe(3, "created temporary table gtvlTbl", entries)
@@ -641,11 +627,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     d[version] = l
                 l.append(flavor)
         logMe(3, "extracted query results")
-
-        if dropTroveTable:
-            cu.execute("DROP TABLE gtvlTbl", start_transaction = False)
-        if flavorIndices:
-            cu.execute("DROP TABLE ffFlavor", start_transaction = False)
 
         if latestFilter == self._GET_TROVE_VERY_LATEST or \
                     flavorFilter == self._GET_TROVE_BEST_FLAVOR:

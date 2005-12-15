@@ -173,48 +173,38 @@ class TroveStore:
 	outD = {}
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
-        try:
-            cu.execute("DROP TABLE itf")
-        except:
-            pass
+
+        schema.resetTable(cu, 'itf')
+
+        for troveName in troveDict.keys():
+            outD[troveName] = {}
+            for version in troveDict[troveName]:
+                outD[troveName][version] = []
+                versionStr = version.asString()
+                vMap[versionStr] = version
+                cu.execute("""INSERT INTO itf VALUES (?, ?, ?) """,
+                           (troveName, versionStr, versionStr),
+                           start_transaction = False)
+
         cu.execute("""
-        CREATE TEMPORARY TABLE itf(
-        item            VARCHAR(254),
-        version         VARCHAR(999),
-        fullVersion     VARCHAR(999)
-        )""", start_transaction = False)
-        try:
-            for troveName in troveDict.keys():
-                outD[troveName] = {}
-                for version in troveDict[troveName]:
-                    outD[troveName][version] = []
-                    versionStr = version.asString()
-                    vMap[versionStr] = version
-                    cu.execute("""INSERT INTO itf VALUES (?, ?, ?) """,
-                               (troveName, versionStr, versionStr),
-                               start_transaction = False)
+            SELECT aItem, fullVersion, Flavors.flavor FROM
+                (SELECT Items.itemId AS aItemId,
+                        versions.versionId AS aVersionId,
+                        Items.item AS aItem,
+                        fullVersion FROM
+                    itf INNER JOIN Items ON itf.item = Items.item
+                        INNER JOIN versions ON itf.version = versions.version) as ItemVersions
+                INNER JOIN instances ON
+                    aItemId = instances.itemId AND
+                    aVersionId = instances.versionId
+                INNER JOIN flavors ON
+                    instances.flavorId = flavors.flavorId
+                ORDER BY aItem, fullVersion
+        """)
 
-            cu.execute("""
-                SELECT aItem, fullVersion, Flavors.flavor FROM
-                    (SELECT Items.itemId AS aItemId,
-                            versions.versionId AS aVersionId,
-                            Items.item AS aItem,
-                            fullVersion FROM
-                        itf INNER JOIN Items ON itf.item = Items.item
-                            INNER JOIN versions ON itf.version = versions.version) as ItemVersions
-                    INNER JOIN instances ON
-                        aItemId = instances.itemId AND
-                        aVersionId = instances.versionId
-                    INNER JOIN flavors ON
-                        instances.flavorId = flavors.flavorId
-                    ORDER BY aItem, fullVersion
-            """)
-
-            for (item, verString, flavor) in cu:
-                ver = vMap[verString]
-                outD[item][ver].append(flavor)
-        finally:
-            cu.execute("DROP TABLE itf", start_transaction = False)
+        for (item, verString, flavor) in cu:
+            ver = vMap[verString]
+            outD[item][ver].append(flavor)
 
 	return outD
 
@@ -230,7 +220,9 @@ class TroveStore:
     def addTrove(self, trove):
 	cu = self.db.cursor()
 
-        schema.createAddTroveTables(cu)
+        schema.resetTable(cu, 'NewFiles')
+        schema.resetTable(cu, 'NeededFlavors')
+
 	self.fileVersionCache = {}
 	return (cu, trove)
 
@@ -396,8 +388,6 @@ class TroveStore:
 		FROM NewFiles INNER JOIN FileStreams ON
                     NewFiles.fileId = FileStreams.fileId
                     """ % (troveInstanceId,))
-        cu.execute("DROP TABLE NewFiles")
-	cu.execute("DROP TABLE NeededFlavors")
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    itemId = self.getItemId(name)
@@ -547,13 +537,10 @@ class TroveStore:
 
     def iterTroves(self, troveInfoList, withFiles = True):
 	cu = self.db.cursor()
-        cu.execute("""
-        CREATE TEMPORARY TABLE gtl(
-        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
-        name            VARCHAR(254),
-        version         VARCHAR(999),
-        flavor          VARCHAR(999)
-        )""", start_transaction = False)
+
+        schema.resetTable(cu, 'gtl')
+        schema.resetTable(cu, 'gtlInst')
+
         for idx, info in enumerate(troveInfoList):
             if not info[2]:
                 flavorStr = "'none'"
@@ -585,12 +572,6 @@ class TroveStore:
 
         troveIdList = [ x for x in cu ]
 
-        cu.execute("DROP TABLE gtl", start_transaction = False)
-        cu.execute("""
-        CREATE TEMPORARY TABLE gtlInst(
-        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
-        instanceId      INTEGER
-        )""", start_transaction = False)
         for singleTroveIds in troveIdList:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
@@ -632,11 +613,6 @@ class TroveStore:
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
         else:
             troveFilesCursor = util.PeekIterator(iter(()))
-
-        if not troveIdList:
-            # if there are no matches, drop this now (since we can't drop
-            # it inside the while loop
-            cu.execute("DROP TABLE gtlInst", start_transaction = False)
 
         neededIdx = 0
         while troveIdList:
@@ -697,11 +673,6 @@ class TroveStore:
 
             self.depTables.get(cu, trv, troveInstanceId)
             self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
-
-            # if we're at the end, go ahead and free up the database in
-            # case this iterator doesn't get fully drained
-            if not troveIdList:
-                cu.execute("DROP TABLE gtlInst", start_transaction = False)
 
             yield trv
 
@@ -827,11 +798,7 @@ class FileRetriever:
 
     def __init__(self, db):
         self.cu = db.cursor()
-        self.cu.execute("""
-        CREATE TEMPORARY TABLE getFilesTbl(
-            itemId       INTEGER PRIMARY KEY,
-            fileId      BINARY(20)
-        )""", start_transaction = False)
+        schema.resetTable(self.cu, 'getFilesTbl')
 
     def get(self, l):
         lookup = range(len(l))
@@ -857,7 +824,3 @@ class FileRetriever:
         self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
 
         return d
-
-    def __del__(self):
-        self.cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
-
