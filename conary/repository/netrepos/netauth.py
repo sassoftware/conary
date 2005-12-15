@@ -602,7 +602,7 @@ class NetworkAuthorization:
                         Users.user = ?
                         AND 
                           (EntitlementOwners.ownerGroupId IS NOT NULL OR
-                           Permissions.admin == 1)
+                           Permissions.admin = 1)
                 """, userName)
 
         isAdmin = False
