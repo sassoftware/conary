@@ -92,10 +92,11 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
-    def reopen(self):
-        self.connect()
-        return True
-    
+##     def reopen(self):
+##         self.dbh.close()
+##         self.connect()
+##         return True
+
     def loadSchema(self, cu = None):
         BaseDatabase.loadSchema(self)
         if cu is None:
