@@ -12,7 +12,6 @@
 # full details.
 #
 
-from conary import sqlite3
 from conary.repository.netrepos import schema
 
 class InstanceTable:
@@ -38,7 +37,6 @@ class InstanceTable:
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?, ?)",
                    (itemId, versionId, flavorId, isRedirect, isPresent))
-        # XXX: sqlite-ism
 	return cu.lastrowid
 
     def getId(self, theId):

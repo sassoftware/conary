@@ -23,6 +23,7 @@ from conary import versions
 from conary.dbstore import idtable
 from conary.fmtroves import TroveCategories, LicenseCategories
 from conary.lib import log
+from conary.local import schema
 
 class MDClass:
     (SHORT_DESC, LONG_DESC,
@@ -49,24 +50,7 @@ class MDClass:
 class MetadataTable:
     def __init__(self, db):
         self.db = db
-
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'Metadata' not in tables:
-            cu.execute("""
-                CREATE TABLE Metadata(metadataId INTEGER PRIMARY KEY,
-                                      itemId INT,
-                                      versionId INT,
-                                      branchId INT,
-                                      timeStamp INT)""")
-
-        if 'MetadataItems' not in tables:
-            cu.execute("""
-                CREATE TABLE MetadataItems(metadataId INT,
-                                           class INT,
-                                           data STR,
-                                           language STR)""")
+        schema.createMetadata(db)
 
     def add(self, itemId, versionId, branchId, shortDesc, longDesc,
             urls, licenses, categories, source="", language="C"):
@@ -80,7 +64,7 @@ class MetadataTable:
         else:
             cu.execute("""
                 SELECT metadataId FROM Metadata
-                WHERE itemId=? AND versionId=? AND branchId=?""",
+                WHERE itemId=? AND versionId=? AND branchId=? ORDER BY timestamp DESC LIMIT 1""",
                 itemId, versionId, branchId)
             mdId = cu.fetchone()[0]
 
@@ -102,7 +86,7 @@ class MetadataTable:
     def get(self, itemId, versionId, branchId, language="C"):
         cu = self.db.cursor()
 
-        cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=?",
+        cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=? ORDER BY timestamp DESC LIMIT 1",
                    itemId, versionId, branchId)
         metadataId = cu.fetchone()
         if metadataId:

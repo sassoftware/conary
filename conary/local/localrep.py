@@ -19,6 +19,7 @@ from StringIO import StringIO
 
 from conary.lib import openpgpfile, openpgpkey
 from conary.repository import errors, repository
+from conary.local import schema
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -215,13 +216,5 @@ class SqlDataStore:
 	self.decrementCount(hash)
 
     def __init__(self, db):
-        cu = db.cursor()
         self.db = db
-        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
-                   "name = 'DataStore'")
-        if cu.next()[0] == 0:
-            cu.execute("""CREATE TABLE DataStore(hash BIN,
-                                                 count INT,
-                                                 data BIN)""")
-            cu.execute("CREATE INDEX DataStoreIdx ON DataStore(hash)")
-            self.db.commit()
+        schema.createDataStore(db)

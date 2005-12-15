@@ -15,11 +15,11 @@
 import StringIO
 import base64
 
-from conary import sqlite3
 from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
 from conary.repository.netrepos import schema
+from conary.dbstore import sqlerrors
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -44,12 +44,12 @@ class OpenPGPKeyTable:
         self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
-        cu = self.db.cursor()
         # start a transaction so that our SELECT is protected against
         # race conditions
-        self.db._begin()
+        cu = self.db.transaction()
         try:
-            r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
+            # XXX: use sequences
+            r = cu.execute('SELECT COALESCE(MAX(keyId),0) + 1 FROM PGPKeys')
             keyId = r.fetchone()[0]
             keyRing = StringIO.StringIO(pgpKeyData)
 
@@ -87,22 +87,17 @@ class OpenPGPKeyTable:
             try:
                 cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
                            (keyId, userId, mainFingerprint, pgpKeyData))
-            except sqlite3.ProgrammingError, e:
+            except sqlerrors.ColumnNotUnique:
                 # controlled replacement of OpenPGP Keys is allowed. do NOT
                 # disable assertReplaceKeyAllowed without disabling this
-                if e.args[0].startswith("column") and \
-                       e.args[0].endswith("is not unique"):
-                    cu.execute( \
-                        'UPDATE PGPKeys set pgpKey=? where fingerprint=?',
-                           (pgpKeyData, mainFingerprint))
-                else:
-                    raise
+                cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
+                           pgpKeyData, mainFingerprint)
             keyFingerprints = openpgpfile.getFingerprints(keyRing)
             for fingerprint in keyFingerprints:
                 try:
                     cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
                            (keyId, fingerprint))
-                except sqlite3.ProgrammingError:
+                except sqlerrors.ColumnNotUnique:
                     # ignore duplicate fingerprint errors.
                     pass
             self.db.commit()

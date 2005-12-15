@@ -12,20 +12,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary.local import schema
 
 class TroveInfoTable:
-
     def __init__(self, db):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'TroveInfo' not in tables:
-            cu.execute("""CREATE TABLE TroveInfo(instanceId INT,
-                                                 infoType INT,
-                                                 data BIN)""")
-            cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-            cu.execute("""CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, 
-                                                                  data)""")
+        self.db = db
+        schema.createTroveInfo(db)
 
     def addInfo(self, cu, trove, idNum):
         # c = True if the trove is a component
@@ -44,8 +36,12 @@ class TroveInfoTable:
                            (idNum, tag, frz))
 
     def getInfo(self, cu, trove, idNum):
+        from array import array
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?", 
                    idNum)
         for (tag, frz) in cu:
             name = trove.troveInfo.streamDict[tag][2]
+            # FIXME: check the return values for BLOBs
+            if isinstance(frz, array):
+                frz = frz.tostring()
             trove.troveInfo.__getattribute__(name).thaw(frz)

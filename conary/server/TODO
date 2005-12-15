@@ -1,0 +1,5 @@
+- standardize the ServerConfig classes between the two server types
+- use common ServerConfig classes between the stdalone and the apache servers
+- in general more code can be reused between the apachehooks and the stdalone
+- update NetworkrepositoryServer to take in one config class instead of a dozen arguments
+

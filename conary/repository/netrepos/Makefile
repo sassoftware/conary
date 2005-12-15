@@ -13,6 +13,7 @@
 #
 
 python_files = __init__.py	\
+		cacheset.py	\
 		cltable.py	\
 		flavors.py	\
 		fsrepos.py	\

@@ -13,34 +13,34 @@
 #
 
 import base64
-import cPickle
 import os
 import re
 import sys
 import tempfile
 import time
 
-from conary import files, trove, versions, sqlite3
+from conary import files, trove, versions
+from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, sha1helper, util
+from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, trovestore
-from conary.dbstore import idtable
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 from conary.lib.openpgpfile import TRUST_FULL
 from conary.lib.openpgpkey import getKeyCache
 from conary.lib.tracelog import logMe
-from conary.local import sqldb, versiontable
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository import repository
 from conary.trove import DigitalSignature
-from conary.repository.netrepos import schema
+from conary.repository.netrepos import schema, cacheset
+from conary import dbstore
+from conary.dbstore import idtable, sqlerrors
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
 SERVER_VERSIONS = [ 36, 37 ]
-CACHE_SCHEMA_VERSION = 17
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -70,11 +70,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
-        def condRollback():
-            if self.db.inTransaction:
-                self.db.rollback()
-
-	# reopens the sqlite db if it's changed
 	self.reopen()
         self._port = port
         self._protocol = protocol
@@ -91,7 +86,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             r = method(authToken, *args)
             return (False, r)
 	except errors.TroveMissing, e:
-            condRollback()
+            self.db.rollback()
 	    if not e.troveName:
 		return (True, ("TroveMissing", "", ""))
 	    elif not e.version:
@@ -100,43 +95,41 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		return (True, ("TroveMissing", e.troveName,
 			self.fromVersion(e.version)))
         except errors.IntegrityError, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('IntegrityError', str(e)))
 	except trove.TroveIntegrityError, e:
-            condRollback()
+            self.db.rollback()
             return (True, ("TroveIntegrityError", str(e) +
                            # add a helpful error message for now
                         ' (you may need to update to conary 0.62.12 or later)'))
         except errors.FileContentsNotFound, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
         except errors.FileStreamNotFound, e:
-            condRollback()
+            self.db.rollback()
             return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
-        except sqlite3.InternalError, e:
-            condRollback()
-            if str(e) == 'database is locked':
-                return (True, ('RepositoryLocked'))
-            raise
+        except sqlerrors.DatabaseLocked:
+            self.db.rollback()
+            return (True, ('RepositoryLocked'))
 	except Exception, e:
-            condRollback()
+            self.db.rollback()
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
                     return (True, (marshall, str(e)))
             raise
 	#    return (True, ("Unknown Exception", str(e)))
-	#except Exception:
-	#    import traceback, sys, string
-        #    import lib.debugger
-        #    lib.debugger.st()
-	#    excInfo = sys.exc_info()
-	#    lines = traceback.format_exception(*excInfo)
-	#    print string.joinfields(lines, "")
-	#    if sys.stdout.isatty() and sys.stdin.isatty():
-	#	lib.debugger.post_mortem(excInfo[2])
-	#    raise
+## 	except Exception:
+## 	   import traceback, sys, string
+##            from conary.lib import debugger
+##            debugger.st()
+## 	   excInfo = sys.exc_info()
+## 	   lines = traceback.format_exception(*excInfo)
+## 	   print string.joinfields(lines, "")
+## 	   if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+## 		debugger.post_mortem(excInfo[2])
+## 	   raise
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -292,14 +285,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _setupFlavorFilter(self, cu, flavorSet):
         logMe(2, flavorSet)
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        ffFlavor(
-            flavorId INTEGER,
-            base STRING,
-            sense INTEGER,
-            flag STRING)
-        """, start_transaction = False)
+        schema.resetTable(cu, 'ffFlavor')
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
@@ -312,17 +298,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
                                    flavorId, dep.name, sense, flag,
                                    start_transaction = False)
-        logMe(3, "created temporary table ffFlavor")
+        cu.execute("select count(*) from ffFlavor")
+        entries = cu.next()[0]
+        logMe(3, "created temporary table ffFlavor", entries)
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
         logMe(2)
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        gtvlTbl(
-            item STRING,
-            versionSpec STRING,
-            flavorId INT)
-        """, start_transaction = False)
+        schema.resetTable(cu, 'gtvlTbl')
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
                 versionDict = dict.fromkeys(versionDict, [ None ])
@@ -341,17 +323,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
-        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)",
-                   start_transaction = False)
-        logMe(3, "created temporary table gtvlTbl")
+        cu.execute("select count(*) from gtvlTbl")
+        entries = cu.next()[0]
+        logMe(3, "created temporary table gtvlTbl", entries)
 
     _GTL_VERSION_TYPE_NONE = 0
     _GTL_VERSION_TYPE_LABEL = 1
     _GTL_VERSION_TYPE_VERSION = 2
     _GTL_VERSION_TYPE_BRANCH = 3
 
-    # FIXME: this function gets always called withVersions = true. The code
-    # would simplify alot if we just assumed that instead of casing it
     def _getTroveList(self, authToken, clientVersion, troveSpecs,
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS,
@@ -483,14 +463,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 %s
                 ffFlavor.base = FlavorMap.base AND
                 (  ffFlavor.flag = FlavorMap.flag OR
-                   ( ffFlavor.flag is NULL AND
-                     FlavorMap.flag is NULL )
+                   ( ffFlavor.flag is NULL AND FlavorMap.flag is NULL )
                 )
             LEFT OUTER JOIN FlavorScores ON
                 FlavorScores.present = FlavorMap.sense AND
                 (    FlavorScores.request = ffFlavor.sense OR
-                     ( ffFlavor.sense is NULL AND
-                       FlavorScores.request = 0 )
+                     ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
                 )
             """ % extraJoin
                         #(FlavorScores.request = ffFlavor.sense OR
@@ -526,7 +504,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                select
                    Permissions.labelId as labelId,
                    PerItems.item as permittedTrove,
-                   Permissions._ROWID_ as aclId
+                   Permissions.permissionId as aclId
                from
                    Permissions 
                    join Items as PerItems using (itemId)
@@ -650,12 +628,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 l.append(flavor)
         logMe(3, "extracted query results")
 
-        if dropTroveTable:
-            cu.execute("DROP TABLE gtvlTbl", start_transaction = False)
-
-        if flavorIndices:
-            cu.execute("DROP TABLE ffFlavor", start_transaction = False)
-
         if latestFilter == self._GET_TROVE_VERY_LATEST or \
                     flavorFilter == self._GET_TROVE_BEST_FLAVOR:
             newTroveVersions = {}
@@ -689,7 +661,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
-        
         cu = self.db.cursor()
 
         groupIds = self.auth.getAuthGroups(cu, authToken)
@@ -723,8 +694,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         query = """%s
         where %s
         """ % (query, " AND ".join(where))
-        cu.execute(query, args)
         logMe(3, "query", query, args)
+        cu.execute(query, args)
         names = set()
         for (trove, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):
@@ -792,7 +763,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Permissions.labelId as labelId,
                 PerItems.item as pattern
             from
-                Permissions using(userGroupId)
+                Permissions
                 join Items as PerItems using (itemId)
             where
                 Permissions.userGroupId in (%s)
@@ -1077,7 +1048,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
         logMe(1)
-
 	if not self.auth.check(authToken, write = False,
 			       label = self.toLabel(label)):
 	    raise errors.InsufficientPermission
@@ -1188,7 +1158,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 INNER JOIN Branches using (branchId)
                 INNER JOIN TroveFiles ON
                     Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions using (versionId)
+                INNER JOIN Versions ON TroveFiles.versionId = Versions.versionId
                 INNER JOIN FileStreams ON
                     TroveFiles.streamId = FileStreams.streamId
                 WHERE
@@ -1313,7 +1283,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # verify the new signature is actually good
         trv.verifyDigitalSignatures(keyCache = keyCache)
 
-        cu = self.db.cursor()
+        cu = self.db.transaction()
         # get the instanceId that corresponds to this trove.
         # if this instance is unflavored, the magic value is 'none'
         flavorStr = flavor.freeze() or 'none'
@@ -1337,7 +1307,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         trvInfo = cu.fetchone()[0]
         # start a transaction now. ensures simultaneous signatures by separate
         # clients won't cause a race condition.
-        self.db._begin()
         try:
             # add the signature while it's protected, to ensure no collissions
             trv = self.repos.getTrove(name, version, flavor)
@@ -1360,6 +1329,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
+        logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1369,6 +1339,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addNewPGPKey(self, authToken, label, user, encKeyData):
         import base64
+        logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1378,6 +1349,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def changePGPKeyOwner(self, authToken, label, user, key):
+        logMe(1, authToken[0], label, user, key)
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
             raise errors.InsufficientPermission
         if user:
@@ -1420,7 +1392,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ## "default" : { "is: x86"    : "conary.x86.ccs",
             ##               "is: x86_64" : "conary.x86_64.ccs", }
             }
-        logMe(3, revStr, flavorStr)
+        logMe(1, revStr, flavorStr)
         rev = versions.Revision(revStr)
         revision = rev.getVersion()
         flavor = self.toFlavor(flavorStr)
@@ -1454,328 +1426,54 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return SERVER_VERSIONS
 
     def cacheChangeSets(self):
-        return isinstance(self.cache, CacheSet)
-
-    def versionCheck(self):
-        logMe(3)
-        cu = self.db.cursor()
-        count = cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
-                           "name='DatabaseVersion'").next()[0]
-        if count == 0:
-            # if DatabaseVersion does not exist, but any other tables do exist,
-            # then the database version is old
-            count = cu.execute("SELECT count(*) FROM sqlite_master").next()[0]
-            if count:
-                return False
-
-            cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)",
-		       start_transaction = False)
-            cu.execute("INSERT INTO DatabaseVersion VALUES (?)",
-                       schema.VERSION, start_transaction = False)
-            return True
-        self.schemaVersion = schema.checkVersion(self.db)
-        return self.schemaVersion == schema.VERSION
+        return isinstance(self.cache, cacheset.CacheSet)
 
     def open(self):
         logMe(1)
-	if self.troveStore is not None:
-	    self.close()
-
-        self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
-	if not self.versionCheck():
-	    raise SchemaVersion
-
+        self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
+        schema.checkVersion(self.db)
 	self.troveStore = trovestore.TroveStore(self.db)
-	sb = os.stat(self.sqlDbPath)
-	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
-
-        self.repos = fsrepos.FilesystemRepository(self.name, self.troveStore,
-                                                  self.repPath, self.map,
-                                                  logFile = self.logFile,
-                                                  requireSigs = self.requireSigs)
+        self.repos = fsrepos.FilesystemRepository(
+            self.name, self.troveStore, self.contentsDir, self.map,
+            logFile = self.logFile, requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name)
 
     def reopen(self):
         logMe(1)
-	sb = os.stat(self.sqlDbPath)
-
-	sqlDeviceInode = (sb.st_dev, sb.st_ino)
-	if self.sqlDeviceInode != sqlDeviceInode:
+        if self.db.reopen():
 	    del self.troveStore
             del self.auth
             del self.repos
-	    # self.db doesn't seem to be getting gc'd (and closed) properly
-	    # here, so close it explicitly
-	    self.db.close()
-            del self.db
+            self.open()
 
-            self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
-	    if not self.versionCheck():
-		raise SchemaVersion
-	    self.troveStore = trovestore.TroveStore(self.db)
+    def __init__(self, cfg, basicUrl):
+        logMe(1, cfg.items())
+        if cfg.repositoryDir:
+            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
+            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
+            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
 
-	    sb = os.stat(self.sqlDbPath)
-	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
-
-            self.repos = fsrepos.FilesystemRepository(self.name,
-                                                      self.troveStore,
-                                                      self.repPath, self.map,
-                                                      logFile = self.logFile)
-            self.auth = NetworkAuthorization(self.db, self.name)
-
-    def __init__(self, path, tmpPath, basicUrl, name,
-		 repositoryMap, commitAction = None, cacheChangeSets = False,
-                 logFile = None, requireSigs = False):
-	self.map = repositoryMap
-	self.repPath = path
-	self.tmpPath = tmpPath
+	self.map = cfg.repositoryMap
+	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
-	self.name = name
-	self.commitAction = commitAction
-        self.sqlDbPath = self.repPath + '/sqldb'
+	self.name = cfg.serverName
+	self.commitAction = cfg.commitAction
         self.troveStore = None
-        self.logFile = logFile
-        self.requireSigs = requireSigs
+        self.logFile = cfg.logFile
+        self.requireSigs = cfg.requireSigs
 
-        logMe(1, path, basicUrl, name)
-	try:
-	    util.mkdirChain(self.repPath)
-	except OSError, e:
-	    raise errors.OpenError(str(e))
+        self.repDB = cfg.repositoryDB
+        self.contentsDir = cfg.contentsDir
 
-        if cacheChangeSets:
-            self.cache = CacheSet(path + "/cache.sql", tmpPath,
-                                  CACHE_SCHEMA_VERSION)
+        logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
+              self.repDB, self.contentsDir)
+
+        if cfg.cacheDB:
+            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
         else:
-            self.cache = NullCacheSet(tmpPath)
+            self.cache = cacheset.NullCacheSet(self.tmpPath)
 
         self.open()
-
-class NullCacheSet:
-    def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
-        return None
-
-    def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal):
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                      suffix = '.ccs-out')
-        os.close(fd)
-        return None, path
-
-    def setEntrySize(self, row, size):
-        pass
-
-    def invalidateEntry(self, name, version, flavor):
-        pass
-
-    def __init__(self, tmpPath):
-        self.tmpPath = tmpPath
-        self.db = None
-
-class CacheSet:
-
-    filePattern = "%s/cache-%s.ccs-out"
-
-    def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
-        (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
-            item
-
-        oldVersionId = 0
-        oldFlavorId = 0
-        newFlavorId = 0
-
-        if oldVersion:
-            oldVersionId = self.versions.get(oldVersion, None)
-            if oldVersionId is None:
-                return None
-
-        if oldFlavor:
-            oldFlavorId = self.flavors.get(oldFlavor, None)
-            if oldFlavorId is None:
-                return None
-
-        if newFlavor:
-            newFlavorId = self.flavors.get(newFlavor, None)
-            if newFlavorId is None:
-                return None
-
-        newVersionId = self.versions.get(newVersion, None)
-        if newVersionId is None:
-            return None
-
-        cu = self.db.cursor()
-        cu.execute("""
-            SELECT row, returnValue, size FROM CacheContents WHERE
-                troveName=? AND
-                oldFlavorId=? AND oldVersionId=? AND
-                newFlavorId=? AND newVersionId=? AND
-                absolute=? AND recurse=? AND withFiles=?
-                AND withFileContents=? AND excludeAutoSource=?
-            """, (name, oldFlavorId, oldVersionId, newFlavorId,
-                  newVersionId, absolute, recurse, withFiles, withFileContents,
-                  excludeAutoSource))
-
-        # since we begin and commit a transaction inside the loop
-        # over the returned rows, we must use fetchall() here so that we
-        # release our read lock.
-        for (row, returnVal, size) in cu.fetchall():
-            path = self.filePattern % (self.tmpDir, row)
-            # if we have no size or we can't access the file, it's
-            # bad entry.  delete it.
-            if not size or not os.access(path, os.R_OK):
-                cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-                self.db.commit()
-                continue
-            return (path, cPickle.loads(returnVal), size)
-
-        return None
-
-    def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal):
-        (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
-            item
-
-        oldVersionId = 0
-        oldFlavorId = 0
-        newFlavorId = 0
-
-        # start a transaction now to avoid race conditions when getting
-        # or adding IDs for versions and flavors
-        self.db._begin()
-
-        if oldVersion:
-            oldVersionId = self.versions.get(oldVersion, None)
-            if oldVersionId is None:
-                oldVersionId = self.versions.addId(oldVersion)
-
-        if oldFlavor:
-            oldFlavorId = self.flavors.get(oldFlavor, None)
-            if oldFlavorId is None:
-                oldFlavorId = self.flavors.addId(oldFlavor)
-
-        if newFlavor:
-            newFlavorId = self.flavors.get(newFlavor, None)
-            if newFlavorId is None:
-                newFlavorId = self.flavors.addId(newFlavor)
-
-        newVersionId = self.versions.get(newVersion, None)
-        if newVersionId is None:
-            newVersionId = self.versions.addId(newVersion)
-
-        cu = self.db.cursor()
-        cu.execute("""
-            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?,
-                                             ?, ?, ?, ?, ?, NULL)
-        """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId,
-             absolute, recurse, withFiles, withFileContents,
-             excludeAutoSource, cPickle.dumps(returnVal, protocol = -1))
-
-        row = cu.lastrowid
-        path = self.filePattern % (self.tmpDir, row)
-
-        self.db.commit()
-
-        return (row, path)
-
-    def invalidateEntry(self, name, version, flavor):
-        """
-        invalidates (and deletes) any cached changeset that matches
-        the given name, version, flavor.
-        """
-        flavorId = self.flavors.get(flavor, None)
-        versionId = self.versions.get(version, None)
-
-        if flavorId is None or versionId is None:
-            # this should not happen, but we'll handle it anyway
-            return
-
-        cu = self.db.cursor()
-        # start a transaction to retain a consistent state
-        self.db._begin()
-        cu.execute("""
-        SELECT row, returnValue, size
-        FROM CacheContents
-        WHERE troveName=? AND newFlavorId=? AND newVersionId=?
-        """, (name, flavorId, versionId))
-
-        # delete all matching entries from the db and the file system
-        for (row, returnVal, size) in cu.fetchall():
-            cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-            path = self.filePattern % (self.tmpDir, row)
-            if os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
-        self.db.commit()
-
-    def setEntrySize(self, row, size):
-        cu = self.db.cursor()
-        cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
-        self.db.commit()
-
-    def createSchema(self, dbpath, schemaVersion):
-	self.db = sqlite3.connect(dbpath, timeout = 30000)
-        self.db._begin()
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "CacheContents" in tables:
-            cu.execute("SELECT version FROM CacheVersion")
-            version = cu.next()[0]
-            if version != schemaVersion:
-                cu.execute("SELECT row from CacheContents")
-                for (row,) in cu:
-                    fn = self.filePattern % (self.tmpDir, row)
-                    if os.path.exists(fn):
-                        try:
-                            os.unlink(fn)
-                        except OSError:
-                            pass
-
-                self.db.close()
-                try:
-                    os.unlink(dbpath)
-                except OSError:
-                    pass
-                self.db = sqlite3.connect(dbpath, timeout = 30000)
-                tables = []
-
-        if "CacheContents" not in tables:
-            cu.execute("""
-            CREATE TABLE CacheContents(
-               row              INTEGER PRIMARY KEY,
-               troveName        STRING,
-               oldFlavorId      INTEGER,
-               oldVersionId     INTEGER,
-               newFlavorId      INTEGER,
-               newVersionId     INTEGER,
-               absolute         BOOLEAN,
-               recurse          BOOLEAN,
-               withFiles        BOOLEAN,
-               withFileContents BOOLEAN,
-               excludeAutoSource BOOLEAN,
-               returnValue      BINARY,
-               size             INTEGER
-            )""")
-            cu.execute("""
-            CREATE INDEX CacheContentsIdx ON
-                CacheContents(troveName, oldFlavorId, oldVersionId,
-                              newFlavorId, newVersionId)
-            """)
-            cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
-            cu.execute("INSERT INTO CacheVersion VALUES(?)", schemaVersion)
-        self.db.commit()
-
-    def __init__(self, dbpath, tmpDir, schemaVersion):
-	self.tmpDir = tmpDir
-        self.createSchema(dbpath, schemaVersion)
-        self.db._begin()
-        self.flavors = sqldb.Flavors(self.db)
-        self.versions = versiontable.VersionTable(self.db)
-        self.db.commit()
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args):
@@ -1784,5 +1482,17 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, closedMessage):
         self.closedMessage = closedMessage
 
-class SchemaVersion(Exception):
-    pass
+class ServerConfig(ConfigFile):
+    cacheDB                 = dbstore.CfgDriver
+    closed                  = CfgString
+    commitAction            = CfgString
+    contentsDir             = CfgPath
+    forceSSL                = CfgBool
+    logFile                 = CfgPath
+    # XXX this is for backwards compatibility
+    repositoryDir           = CfgString
+    repositoryDB            = dbstore.CfgDriver
+    repositoryMap           = CfgRepoMap
+    requireSigs             = CfgBool
+    serverName              = CfgString
+    tmpDir                  = (CfgPath, '/var/tmp')
