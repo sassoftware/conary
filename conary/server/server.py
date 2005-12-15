@@ -298,7 +298,7 @@ class ServerConfig(netserver.ServerConfig):
 	self.read(path)
 
     def check(self):
-        assert(not self.cacheChangeSets)
+        assert(not self.cacheDB)
         assert(not self.closed)
         assert(not self.commitAction)
         assert(not self.forceSSL)

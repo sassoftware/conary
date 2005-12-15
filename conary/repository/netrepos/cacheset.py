@@ -194,8 +194,8 @@ class CacheSet:
                 except OSError:
                     pass
 
-    def createSchema(self, dbpath, schemaVersion):
-        self.db = dbstore.connect(dbpath)
+    def createSchema(self, dbInfo, schemaVersion):
+        self.db = dbstore.connect(dbInfo[1], driver = dbInfo[0])
         cu = self.db.cursor()
         if "CacheContents" in self.db.tables:
             if self.db.version != CACHE_SCHEMA_VERSION:
@@ -227,9 +227,9 @@ class CacheSet:
             """)
             self.db.commit()
 
-    def __init__(self, dbpath, tmpDir, schemaVersion):
+    def __init__(self, cacheDB, tmpDir):
 	self.tmpDir = tmpDir
-        self.createSchema(dbpath, schemaVersion)
+        self.createSchema(cacheDB, CACHE_SCHEMA_VERSION)
         self.flavors = sqldb.Flavors(self.db)
         self.versions = versiontable.VersionTable(self.db)
 

@@ -1468,8 +1468,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
               self.repDB, self.contentsDir)
 
-        if cfg.cacheChangeSets:
-            self.cache = cacheset.CacheSet(path + "/cache.sql", tmpPath)
+        if cfg.cacheDB:
+            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
         else:
             self.cache = cacheset.NullCacheSet(self.tmpPath)
 
@@ -1483,7 +1483,7 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
         self.closedMessage = closedMessage
 
 class ServerConfig(ConfigFile):
-    cacheChangeSets         = CfgBool
+    cacheDB                 = dbstore.CfgDriver
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
