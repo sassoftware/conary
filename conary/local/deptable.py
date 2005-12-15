@@ -168,7 +168,7 @@ class DependencyTables:
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
-        schema.createDepWorkTable(cu, "DepCheck")
+        schema.resetTable(cu, "DepCheck")
 
 	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         self._populateTmpTable(cu, stmt, [], troveId, requires, provides)
@@ -637,10 +637,10 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
-        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
-        schema.createProvidesTable(cu, 'TmpProvides', isTemp = True)
-        schema.createDepWorkTable(cu, "DepCheck")
+        schema.resetTable(cu, "TmpDependencies")
+        schema.resetTable(cu, "TmpRequires")
+        schema.resetTable(cu, "TmpProvides")
+        schema.resetTable(cu, "DepCheck")
 
 	# this begins a transaction. we do this explicitly to keep from
 	# grabbing any exclusive locks (when the python binding autostarts
@@ -998,9 +998,9 @@ class DependencyTables:
 
         cu = self.db.cursor()
 
-        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
-        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
-        schema.createDepWorkTable(cu, "DepCheck")
+        schema.resetTable(cu, "TmpDependencies")
+        schema.resetTable(cu, 'TmpRequires')
+        schema.resetTable(cu, "DepCheck")
 
 	cu.execute("BEGIN")
 
@@ -1108,9 +1108,9 @@ class DependencyTables:
     def getLocalProvides(self, depSetList):
         cu = self.db.cursor()
 
-        schema.createDepTable(cu, 'TmpDependencies', isTemp = True)
-        schema.createRequiresTable(cu, 'TmpRequires', isTemp = True)
-        schema.createDepWorkTable(cu, "DepCheck")
+        schema.resetTable(cu, "TmpDependencies")
+        schema.resetTable(cu, 'TmpRequires')
+        schema.resetTable(cu, "DepCheck")
 
 	cu.execute("BEGIN")
 
@@ -1119,7 +1119,6 @@ class DependencyTables:
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, stmt, depList, -i - 1,
                                    depSet, None, multiplier = -1)
-
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             None, ("Dependencies", "TmpDependencies"),

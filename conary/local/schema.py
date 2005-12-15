@@ -185,7 +185,7 @@ def createDepTable(cu, name, isTemp):
     startTrans = not isTemp
     if isTemp:
         if resetTable(cu, name):
-            return
+            return False
 
         d['tmp'] = 'TEMPORARY'
 
@@ -199,13 +199,15 @@ def createDepTable(cu, name, isTemp):
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
 
+    return True
+
 def createRequiresTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
 
     if isTemp:
         if resetTable(cu, name):
-            return
+            return False
 
         d['tmp'] = 'TEMPORARY'
 
@@ -226,13 +228,15 @@ def createRequiresTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = startTrans)
 
+    return True
+
 def createProvidesTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
 
     if isTemp:
         if resetTable(cu, name):
-            return
+            return False
         d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
@@ -248,9 +252,11 @@ def createProvidesTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = startTrans)
 
+    return True
+
 def createDepWorkTable(cu, name):
     if resetTable(cu, name):
-        return
+        return False
 
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
@@ -267,6 +273,8 @@ def createDepWorkTable(cu, name):
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
 
+    return True
+
 def createDependencies(db):
     commit = False
     cu = db.cursor()
@@ -279,6 +287,12 @@ def createDependencies(db):
     if "Provides" not in db.tables:
         createProvidesTable(cu, "Provides", False)
         commit = True
+
+    # bitwise | doesn't get short circuited
+    commit = commit | createRequiresTable(cu, "TmpRequires", isTemp = True)
+    commit = commit | createProvidesTable(cu, "TmpProvides", isTemp = True)
+    commit = commit | createDepWorkTable(cu, "DepCheck")
+    commit = commit | createDepTable(cu, 'TmpDependencies', isTemp = True)
 
     if commit:
         db.commit()
