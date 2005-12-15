@@ -25,7 +25,7 @@ def createInstances(db):
     if "Instances" not in db.tables:
         cu.execute("""
         CREATE TABLE Instances(
-            instanceId      INTEGER PRIMARY KEY,
+            instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
             itemId          INTEGER,
             versionId       INTEGER,
             flavorId        INTEGER,
@@ -71,7 +71,7 @@ def createFlavors(db):
     if "Flavors" not in db.tables:
         cu.execute("""
         CREATE TABLE Flavors(
-            flavorId        INTEGER PRIMARY KEY,
+            flavorId        INTEGER PRIMARY KEY AUTO_INCREMENT,
             flavor          VARCHAR(999)
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
@@ -124,12 +124,12 @@ def createNodes(db):
     if 'Nodes' not in db.tables:
         cu.execute("""
         CREATE TABLE Nodes(
-            nodeId          INTEGER PRIMARY KEY,
+            nodeId          INTEGER PRIMARY KEY AUTO_INCREMENT,
             itemId          INTEGER,
             branchId        INTEGER,
             versionId       INTEGER,
             timeStamps      VARCHAR(1000),
-            finalTimeStamp  FLOAT,
+            finalTimeStamp  NUMERIC(13,3),
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -228,9 +228,9 @@ def createUsers(db):
     if "Users" not in db.tables:
         cu.execute("""
         CREATE TABLE Users (
-            userId          INTEGER PRIMARY KEY,
+            userId          INTEGER PRIMARY KEY AUTO_INCREMENT,
             user            VARCHAR(254),
-            salt            BINARY,
+            salt            BINARY(4),
             password        VARCHAR(254),
             CONSTRAINT Users_userId_uq
                 UNIQUE(user)
@@ -240,7 +240,7 @@ def createUsers(db):
     if "UserGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE UserGroups (
-            userGroupId     INTEGER PRIMARY KEY,
+            userGroupId     INTEGER PRIMARY KEY AUTO_INCREMENT,
             userGroup       VARCHAR(254),
             CONSTRAINT UserGroups_userGroup_uq
                 UNIQUE(userGroup)
@@ -270,7 +270,8 @@ def createUsers(db):
         assert("Labels" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
-            userGroupId     INTEGER,
+            permissionId    INTEGER PRIMARY KEY AUTO_INCREMENT,
+            userGroupId     INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
@@ -313,7 +314,7 @@ def createUsers(db):
     if "EntitlementGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE EntitlementGroups (
-            entGroupId      INTEGER PRIMARY KEY,
+            entGroupId      INTEGER PRIMARY KEY AUTO_INCREMENT,
             entGroup        VARCHAR(254),
             userGroupId     INTEGER,
             CONSTRAINT EntitlementClasses_entitlementGroup_uq
@@ -346,13 +347,14 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Entitlements (
             entGroupId      INTEGER,
-            entitlement     BINARY,
+            entitlement     BLOB,
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES Flavors(entitlementGroups)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT EntitlementClasses_entitlement_uq
-                UNIQUE(entGroupId, entitlement)
+                ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
+        #CONSTRAINT EntitlementClasses_entitlement_uq
+        #        UNIQUE(entGroupId, entitlement)
+
         commit = True
 
     if commit:
@@ -365,10 +367,10 @@ def createPGPKeys(db):
     if "PGPKeys" not in db.tables:
         cu.execute("""
         CREATE TABLE PGPKeys(
-            keyId           INTEGER PRIMARY KEY,
+            keyId           INTEGER PRIMARY KEY AUTO_INCREMENT,
             userId          INTEGER,
             fingerprint     CHAR(40),
-            pgpKey          BINARY,
+            pgpKey          BLOB,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -380,7 +382,7 @@ def createPGPKeys(db):
         cu.execute("""
         CREATE TABLE PGPFingerprints(
             keyId           INTEGER,
-            fingerprint     VARCHAR(40) PRIMARY KEY,
+            fingerprint     CHAR(40) PRIMARY KEY,
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -396,9 +398,9 @@ def createTroves(db):
     if 'FileStreams' not in db.tables:
         cu.execute("""
         CREATE TABLE FileStreams(
-            streamId    INTEGER PRIMARY KEY,
-            fileId      BINARY,
-            stream      BINARY
+            streamId    INTEGER PRIMARY KEY AUTO_INCREMENT,
+            fileId      BINARY(20),
+            stream      BLOB
         )""")
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
@@ -408,16 +410,19 @@ def createTroves(db):
     if "TroveFiles" not in db.tables:
         cu.execute("""
         CREATE TABLE TroveFiles(
-            instanceId      INTEGER,
-            streamId        INTEGER,
-            versionId       BINARY,
-            pathId          BINARY,
+            instanceId      INTEGER NOT NULL,
+            streamId        INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
+            pathId          BINARY(16),
             path            VARCHAR(999),
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT TroveFiles_streamId_fk
                 FOREIGN KEY (streamId) REFERENCES FileStreams(streamId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveFiles_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
@@ -456,7 +461,7 @@ def createInstructionSets(db):
     if 'InstructionSets' not in db.tables:
         cu.execute("""
         CREATE TABLE InstructionSets(
-            isnSetId        INTEGER PRIMARY KEY,
+            isnSetId        INTEGER PRIMARY KEY AUTO_INCREMENT,
             base            VARCHAR(254),
             flags           VARCHAR(254)
         )""")

@@ -29,7 +29,7 @@ class VersionTable:
         cu = db.cursor()
         cu.execute("""
         CREATE TABLE Versions(
-        versionId       INTEGER PRIMARY KEY,
+        versionId       INTEGER PRIMARY KEY AUTO_INCREMENT,
         version         VARCHAR(999)
         )""")
         cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "

@@ -64,7 +64,7 @@ class MetadataTable:
         else:
             cu.execute("""
                 SELECT metadataId FROM Metadata
-                WHERE itemId=? AND versionId=? AND branchId=?""",
+                WHERE itemId=? AND versionId=? AND branchId=? ORDER BY timestamp DESC LIMIT 1""",
                 itemId, versionId, branchId)
             mdId = cu.fetchone()[0]
 
@@ -86,7 +86,7 @@ class MetadataTable:
     def get(self, itemId, versionId, branchId, language="C"):
         cu = self.db.cursor()
 
-        cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=?",
+        cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=? ORDER BY timestamp DESC LIMIT 1",
                    itemId, versionId, branchId)
         metadataId = cu.fetchone()
         if metadataId:

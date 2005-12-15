@@ -28,9 +28,8 @@ GroupAlreadyExists = errors.GroupAlreadyExists
 class NetworkAuthorization:
 
     def getAuthGroups(self, cu, authToken):
-        logMe(authToken[0], authToken[2], authToken[3])
+        logMe(3, authToken[0], authToken[2], authToken[3])
         # Find what group this user belongs to
-
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
         cu.execute("""SELECT salt, password, userGroupId 
@@ -105,7 +104,7 @@ class NetworkAuthorization:
             params.append(label.asString())
 
         if write:
-            where.append("Permissions.canwrite=1")
+            where.append("Permissions.canWrite=1")
 
         if admin:
             where.append("Permissions.admin=1")
@@ -113,6 +112,7 @@ class NetworkAuthorization:
         if where:
             stmt += "WHERE " + " AND ".join(where)
 
+        logMe(3, stmt, params)
         cu.execute(stmt, params)
 
         for (troveName,) in cu:
@@ -170,14 +170,15 @@ class NetworkAuthorization:
         return False
 
     def checkIsFullAdmin(self, user, password):
+        logMe(3, user)
         cu = self.db.cursor()
         cu.execute("""
         SELECT salt, password
         FROM Users as U
         JOIN UserGroupMembers as UGM USING(userId)
         JOIN Permissions as P USING(userGroupId)
-        WHERE U.user = ? and P.admin = 1""",
-                   user)
+        WHERE U.user = ? and P.admin = 1
+        """, user)
         for (salt, cryptPassword) in cu:
             if not self.checkPassword(salt, cryptPassword, password):
                 return False
@@ -214,11 +215,12 @@ class NetworkAuthorization:
 
 
         try:
+            # FIXME: insert values
             cu.execute("""
             INSERT INTO Permissions
-            SELECT userGroupId, ?, ?, ?, ?, ?
+            SELECT NULL, userGroupId, ?, ?, ?, ?, ?
             FROM UserGroups WHERE userGroup=?
-            """, labelId, itemId, write, capped, admin, userGroup)
+            """, (labelId, itemId, write, capped, admin, userGroup))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -333,6 +335,8 @@ class NetworkAuthorization:
             """, (ugid, user, salt, password))
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
+        logMe(3, "salt", salt, len(salt),
+              "dbsalt", cu.execute("select salt from Users where userId = ?", ugid).fetchone()[0])
         cu.execute("""
         INSERT INTO UserGroupMembers (userGroupId, userId)
         VALUES (?, ?)

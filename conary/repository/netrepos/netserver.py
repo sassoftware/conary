@@ -120,16 +120,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     return (True, (marshall, str(e)))
             raise
 	#    return (True, ("Unknown Exception", str(e)))
-	#except Exception:
-	#    import traceback, sys, string
-        #    import lib.debugger
-        #    lib.debugger.st()
-	#    excInfo = sys.exc_info()
-	#    lines = traceback.format_exception(*excInfo)
-	#    print string.joinfields(lines, "")
-	#    if sys.stdout.isatty() and sys.stdin.isatty():
-	#	lib.debugger.post_mortem(excInfo[2])
-	#    raise
+## 	except Exception:
+## 	   import traceback, sys, string
+##            from conary.lib import debugger
+##            debugger.st()
+## 	   excInfo = sys.exc_info()
+## 	   lines = traceback.format_exception(*excInfo)
+## 	   print string.joinfields(lines, "")
+## 	   if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+## 		debugger.post_mortem(excInfo[2])
+## 	   raise
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -518,7 +518,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                select
                    Permissions.labelId as labelId,
                    PerItems.item as permittedTrove,
-                   Permissions._ROWID_ as aclId
+                   Permissions.permissionId as aclId
                from
                    Permissions 
                    join Items as PerItems using (itemId)
@@ -680,7 +680,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def troveNames(self, authToken, clientVersion, labelStr):
         logMe(1, labelStr)
-        
         cu = self.db.cursor()
 
         groupIds = self.auth.getAuthGroups(cu, authToken)
@@ -714,8 +713,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         query = """%s
         where %s
         """ % (query, " AND ".join(where))
-        cu.execute(query, args)
         logMe(3, "query", query, args)
+        cu.execute(query, args)
         names = set()
         for (trove, pattern) in cu:
             if not self.auth.checkTrove(pattern, trove):
@@ -783,7 +782,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Permissions.labelId as labelId,
                 PerItems.item as pattern
             from
-                Permissions using(userGroupId)
+                Permissions
                 join Items as PerItems using (itemId)
             where
                 Permissions.userGroupId in (%s)
@@ -1067,7 +1066,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
         logMe(1)
-
 	if not self.auth.check(authToken, write = False,
 			       label = self.toLabel(label)):
 	    raise errors.InsufficientPermission
@@ -1178,7 +1176,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 INNER JOIN Branches using (branchId)
                 INNER JOIN TroveFiles ON
                     Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions using (versionId)
+                INNER JOIN Versions ON TroveFiles.versionId = Versions.versionId
                 INNER JOIN FileStreams ON
                     TroveFiles.streamId = FileStreams.streamId
                 WHERE
@@ -1349,7 +1347,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
-        logMe(1, authToken, label, user)
+        logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1359,7 +1357,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addNewPGPKey(self, authToken, label, user, encKeyData):
         import base64
-        logMe(1, authToken, label, user)
+        logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
             raise errors.InsufficientPermission
@@ -1369,7 +1367,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def changePGPKeyOwner(self, authToken, label, user, key):
-        logMe(1, authToken, label, user, key)
+        logMe(1, authToken[0], label, user, key)
         if (not self.auth.checkIsFullAdmin(*authToken)):
             raise errors.InsufficientPermission
         if user:
@@ -1467,6 +1465,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open()
 
     def __init__(self, cfg, basicUrl):
+        logMe(1, cfg.items())
         if cfg.repositoryDir:
             log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
             cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
@@ -1484,7 +1483,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.repDB = cfg.repositoryDB
         self.contentsDir = cfg.contentsDir
 
-        logMe(1, basicUrl)
+        logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
+              self.repDB, self.contentsDir)
 
         if cfg.cacheChangeSets:
             self.cache = cacheset.CacheSet(path + "/cache.sql", tmpPath)

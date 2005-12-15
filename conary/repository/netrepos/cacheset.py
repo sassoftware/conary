@@ -207,7 +207,7 @@ class CacheSet:
         if "CacheContents" not in self.db.tables:
             cu.execute("""
             CREATE TABLE CacheContents(
-               row              INTEGER PRIMARY KEY,
+               row              INTEGER PRIMARY KEY AUTO_INCREMENT,
                troveName        VARCHAR(254),
                oldFlavorId      INTEGER,
                oldVersionId     INTEGER,

@@ -40,14 +40,14 @@ def createDBTroveFiles(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE DBTroveFiles(
-        streamId            INTEGER PRIMARY KEY,
-        pathId              BINARY,
+        streamId            INTEGER PRIMARY KEY AUTO_INCREMENT,
+        pathId              BINARY(16),
         versionId           INTEGER,
         path                STRING,
-        fileId              BINARY,
+        fileId              BINARY(20),
         instanceId          INTEGER,
         isPresent           INTEGER,
-        stream              BINARY
+        stream              BLOB
     )""")
     cu.execute("CREATE INDEX DBTroveFilesIdx ON DBTroveFiles(fileId)")
     cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
@@ -67,7 +67,7 @@ def createInstances(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE Instances(
-        instanceId      INTEGER PRIMARY KEY,
+        instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
         troveName       STRING,
         versionId       INTEGER,
         flavorId        INTEGER,
@@ -112,13 +112,14 @@ def createTroveInfo(db):
     CREATE TABLE TroveInfo(
         instanceId      INTEGER NOT NULL,
         infoType        INTEGER NOT NULL,
-        data            BINARY,
+        data            BLOB,
         CONSTRAINT TroveInfo_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
             ON DELETE CASCADE ON UPDATE CASCADE
     )""")
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-    cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
+    # FIXME: kill it in the schema migration as well
+    #cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
     db.commit()
     db.loadSchema()
 
@@ -128,11 +129,11 @@ def createMetadata(db):
     if 'Metadata' not in db.tables:
         cu.execute("""
         CREATE TABLE Metadata(
-            metadataId          INTEGER PRIMARY KEY,
+            metadataId          INTEGER PRIMARY KEY AUTO_INCREMENT,
             itemId              INTEGER NOT NULL,
             versionId           INTEGER NOT NULL,
             branchId            INTEGER NOT NULL,
-            timeStamp           INTEGER NOT NULL,
+            timeStamp           NUMERIC(13,3) NOT NULL,
             CONSTRAINT Metadata_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -164,9 +165,9 @@ def createDataStore(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE DataStore(
-        hash    BINARY NOT NULL,
+        hash    BINARY(20) NOT NULL,
         count   INTEGER,
-        data    BINARY
+        data    BLOB
     )""")
     cu.execute("CREATE INDEX DataStoreIdx ON DataStore(hash)")
     db.commit()
@@ -178,9 +179,14 @@ def createDepTable(cu, name, isTemp):
     else:
         tmp = ""
     d =  {"tmp" : tmp, "name" : name}
+    if isTemp:
+        try:
+            cu.execute("DROP TABLE %s" %name)
+        except:
+            pass
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
-        depId           INTEGER PRIMARY KEY,
+        depId           INTEGER PRIMARY KEY AUTO_INCREMENT,
         class           INTEGER,
         name            VARCHAR(254),
         flag            VARCHAR(254)
@@ -194,6 +200,11 @@ def createRequiresTable(cu, name, isTemp):
     else:
         tmp = ""
     d =  {"tmp" : tmp, "name" : name}
+    if isTemp:
+        try:
+            cu.execute("DROP TABLE %s" %name)
+        except:
+            pass
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId      INTEGER,
@@ -217,6 +228,11 @@ def createProvidesTable(cu, name, isTemp):
     else:
         tmp = ""
     d =  {"tmp" : tmp, "name" : name}
+    if isTemp:
+        try:
+            cu.execute("DROP TABLE %s" %name)
+        except:
+            pass
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER,

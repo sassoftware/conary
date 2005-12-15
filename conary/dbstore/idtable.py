@@ -29,7 +29,7 @@ class IdTable:
         cu = self.db.cursor()
         cu.execute("""
         CREATE TABLE %s (
-            %s INTEGER PRIMARY KEY,
+            %s INTEGER PRIMARY KEY AUTO_INCREMENT,
             %s VARCHAR(254)
         )""" %(self.tableName, self.keyName, self.strName))
         cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(

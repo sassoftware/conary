@@ -173,7 +173,11 @@ class TroveStore:
 	outD = {}
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
-	cu.execute("""
+        try:
+            cu.execute("DROP TABLE itf")
+        except:
+            pass
+        cu.execute("""
         CREATE TEMPORARY TABLE itf(
         item            VARCHAR(254),
         version         VARCHAR(999),
@@ -197,7 +201,7 @@ class TroveStore:
                             Items.item AS aItem,
                             fullVersion FROM
                         itf INNER JOIN Items ON itf.item = Items.item
-                            INNER JOIN versions ON itf.version = versions.version)
+                            INNER JOIN versions ON itf.version = versions.version) as ItemVersions
                     INNER JOIN instances ON
                         aItemId = instances.itemId AND
                         aVersionId = instances.versionId
@@ -228,11 +232,11 @@ class TroveStore:
 
 	cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
-            pathId BINARY,
-            versionId INTEGER,
-            fileId BINARY,
-            stream BINARY,
-            path VARCHAR(999)
+            pathId      BINARY(16),
+            versionId   INTEGER,
+            fileId      BINARY(20),
+            stream      BLOB,
+            path        VARCHAR(999)
         )""")
 	self.fileVersionCache = {}
 	return (cu, trove)
@@ -271,7 +275,7 @@ class TroveStore:
 		flavorsNeeded[flavor] = True
 
 	flavorIndex = {}
-	cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor STR)")
+	cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(999))")
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
 	    cu.execute("INSERT INTO NeededFlavors VALUES(?)",
@@ -339,7 +343,7 @@ class TroveStore:
                        "AND flavorId=?", troveBranchId, troveItemId,
                        troveFlavorId)
             cu.execute("""INSERT INTO Latest
-                            SELECT ?, ?, ?, Instances.versionId
+                            SELECT %d, %d, %d, Instances.versionId
                                 FROM Instances INNER JOIN Nodes ON
                                     Instances.itemId = Nodes.itemId AND
                                     Instances.versionId = Nodes.versionId
@@ -350,8 +354,8 @@ class TroveStore:
                                 ORDER BY
                                     finalTimestamp DESC
                                 LIMIT 1
-                       """, troveItemId, troveBranchId, troveFlavorId,
-                       troveItemId, troveFlavorId, troveBranchId)
+                       """ %(troveItemId, troveBranchId, troveFlavorId),
+                       (troveItemId, troveFlavorId, troveBranchId))
 
         self.depTables.add(cu, trove, troveInstanceId)
 
@@ -364,29 +368,41 @@ class TroveStore:
 		WHERE FileStreams.streamId is NULL
                 """)
 
-        # this update the streamId for streams where streamId is NULL
+        # this updates the stream for streams where stream is NULL
         # (because they were originally added from a distributed branch)
         # for items whose stream is present in NewFiles
+
+        # FIXME: make this SQL-compliantly fast
         cu.execute("""
-            INSERT OR REPLACE INTO FileStreams
-                SELECT FileStreams.streamId, FileStreams.fileId,
-                       NewFiles.stream
-                FROM NewFiles INNER JOIN FileStreams ON
-                    NewFiles.fileId = FileStreams.FileId
-                WHERE
-                    FileStreams.stream IS NULL AND
-                    NewFiles.stream IS NOT NULL
+        UPDATE FileStreams
+        SET stream = (SELECT NewFiles.stream FROM NewFiles WHERE
+                          FileStreams.fileId = NewFiles.fileId)
+        WHERE
+            FileStreams.stream IS NULL
+        -- AND FileStreams.fileId in (SELECT nf.fileId from NewFiles as nf)
         """)
 
+## this is the old, sqlite3 specific way we used to update file streams
+##         cu.execute("""
+##             INSERT OR REPLACE INTO FileStreams
+##                 SELECT FileStreams.streamId, FileStreams.fileId,
+##                        NewFiles.stream
+##                 FROM NewFiles INNER JOIN FileStreams ON
+##                     NewFiles.fileId = FileStreams.FileId
+##                 WHERE
+##                     FileStreams.stream IS NULL AND
+##                     NewFiles.stream IS NOT NULL
+##         """)
+
         cu.execute("""
-	    INSERT INTO TroveFiles SELECT ?,
+	    INSERT INTO TroveFiles SELECT %d,
 					  FileStreams.streamId,
 					  NewFiles.versionId,
 					  NewFiles.pathId,
 					  NewFiles.path
 		FROM NewFiles INNER JOIN FileStreams ON
-                    NewFiles.fileId == FileStreams.fileId
-                    """, troveInstanceId)
+                    NewFiles.fileId = FileStreams.fileId
+                    """ % (troveInstanceId,))
         cu.execute("DROP TABLE NewFiles")
 
 	for (name, version, flavor) in trove.iterTroveList():
@@ -539,7 +555,7 @@ class TroveStore:
 	cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE gtl(
-        idx             INTEGER PRIMARY KEY,
+        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
         name            VARCHAR(254),
         version         VARCHAR(999),
         flavor          VARCHAR(999)
@@ -578,7 +594,7 @@ class TroveStore:
         cu.execute("DROP TABLE gtl", start_transaction = False)
         cu.execute("""
         CREATE TEMPORARY TABLE gtlInst(
-        idx             INTEGER PRIMARY KEY,
+        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
         instanceId      INTEGER
         )""", start_transaction = False)
         for singleTroveIds in troveIdList:
@@ -819,8 +835,8 @@ class FileRetriever:
         self.cu = db.cursor()
         self.cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
-            rowId       INTEGER PRIMARY KEY,
-            fileId      BINARY
+            rowId       INTEGER PRIMARY KEY AUTO_INCREMENT,
+            fileId      BINARY(20)
         )""", start_transaction = False)
 
     def get(self, l):

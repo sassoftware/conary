@@ -86,21 +86,27 @@ class LatestTable:
         self.db = db
         schema.createLatest(db)
 
-    def __setitem__(self, key, val):
-	(first, second, third) = key
+    def __setitem__(self, key, versionId):
+	(itemId, branchId, flavorId) = key
 
         cu = self.db.cursor()
-        cu.execute("INSERT OR REPLACE INTO Latest VALUES (?, ?, ?, ?)",
-                   (first, second, third, val))
+
+        cu.execute("""
+        DELETE FROM Latest
+        WHERE itemId = ?
+        AND   branchId = ?
+        AND   flavorId = ?
+        """, (itemId, branchId, flavorId))
+        cu.execute("INSERT INTO Latest VALUES (?, ?, ?, ?)",
+                   (itemId, branchId, flavorId, versionId))
 
     def get(self, key, defValue):
 	(first, second, third) = key
 
         cu = self.db.cursor()
 
-        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=?"
-                            "AND flavorId=?",
-		   (first, second, third))
+        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=? "
+                   "AND flavorId=?", (first, second, third))
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -110,8 +116,7 @@ class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
         if "LabelMap" not in db.tables:
             schema.createLabelMap(db)
-	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
-		                       'itemId', 'labelId', 'branchId')
+	idtable.IdPairMapping.__init__(self, db, 'LabelMap', 'itemId', 'labelId', 'branchId')
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
