@@ -57,6 +57,8 @@ class Cursor(BaseCursor):
             #    self.dbh.rollback()
             if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
                 raise sqlerrors.ColumnNotUnique(e)
+            elif e.args[0] == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
         else:
             return ret
@@ -204,6 +206,6 @@ class Database(BaseDatabase):
             return BaseDatabase.transaction(self, name)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'attempt to write a readonly database':
-                raise sqlerrors.ReadOnlyDatabase
+                raise sqlerrors.ReadOnlyDatabase(str(e))
             raise
 
