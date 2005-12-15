@@ -12,12 +12,35 @@
 # full details.
 #
 
-class DBStoreError(Exception):
-    def __init__(self, args):
-        self._args = args
+class DatabaseError(Exception):
+    def __init__(self, msg, *args, **kw):
+        self.msg = msg
+        self.args = args
+        self.kw = kw
 
     def __str__(self):
-        return str(args)
+        ret = self.msg
+        if len(self.args):
+            ret += " args: " + str(self.args)
+        if len(self.kw):
+            ret += " kw: " + str(self.kw)
+        return ret
 
-class ColumnNotUnique(DBStoreError):
+class InvalidBackend(DatabaseError):
     pass
+
+class DatabaseLocked(DatabaseError):
+    pass
+
+class ReadOnlyDatabase(DatabaseError):
+    pass
+
+class SchemaVersionError(DatabaseError):
+    pass
+
+class CursorError(DatabaseError):
+    pass
+
+class ColumnNotUnique(CursorError):
+    pass
+

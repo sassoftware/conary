@@ -50,21 +50,8 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
-    # DBSTORE: dbstore should handle the case sensitive nature of this
-    # just fine, eliminating the need for overriding the __init__ call
     def __init__(self, db):
-        self.db = db
-	self.tableName = 'branches'
-	self.keyName = 'branchId'
-	self.strName = 'branch'
-
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'Branches' not in tables:
-            cu.execute("CREATE TABLE Branches(branchId integer primary key,"
-					     "branch str unique)")
-	    self.initTable()
+        idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
 
 class LabelTable(idtable.IdTable):
 
@@ -91,27 +78,35 @@ class LabelTable(idtable.IdTable):
 
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
+    def initTable(self, cu):
+        cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
 
 class LatestTable:
     def __init__(self, db):
         self.db = db
         schema.createLatest(db)
 
-    def __setitem__(self, key, val):
-	(first, second, third) = key
+    def __setitem__(self, key, versionId):
+	(itemId, branchId, flavorId) = key
 
         cu = self.db.cursor()
-        cu.execute("INSERT OR REPLACE INTO Latest VALUES (?, ?, ?, ?)",
-                   (first, second, third, val))
+
+        cu.execute("""
+        DELETE FROM Latest
+        WHERE itemId = ?
+        AND   branchId = ?
+        AND   flavorId = ?
+        """, (itemId, branchId, flavorId))
+        cu.execute("INSERT INTO Latest VALUES (?, ?, ?, ?)",
+                   (itemId, branchId, flavorId, versionId))
 
     def get(self, key, defValue):
 	(first, second, third) = key
 
         cu = self.db.cursor()
 
-        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=?"
-                            "AND flavorId=?",
-		   (first, second, third))
+        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=? "
+                   "AND flavorId=?", (first, second, third))
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -119,13 +114,9 @@ class LatestTable:
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
-	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
-		                       'itemId', 'labelId', 'branchId')
-	cu = db.cursor()
-        cu.execute("SELECT name FROM sqlite_master WHERE type='index'")
-        tables = [ x[0] for x in cu ]
-        if "LabelMapLabelIdx" not in tables:
-	    cu.execute("CREATE INDEX LabelMapLabelIdx on LabelMap(labelId)")
+        if "LabelMap" not in db.tables:
+            schema.createLabelMap(db)
+	idtable.IdPairMapping.__init__(self, db, 'LabelMap', 'itemId', 'labelId', 'branchId')
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
@@ -270,26 +261,21 @@ class SqlVersioning:
 	self.db = db
 
 class SqlVersionsError(Exception):
-
     pass
 
 class MissingBranchError(SqlVersionsError):
-
     def __str__(self):
-	return "node %d does not contain branch %s" % (self.itemId,
-						       self.branch.asString())
-
+	return "node %d does not contain branch %s" % (
+            self.itemId, self.branch.asString())
     def __init__(self, itemId, branch):
 	SqlVersionsError.__init__(self)
 	self.branch = branch
 	self.itemId = itemId
 
 class DuplicateVersionError(SqlVersionsError):
-
     def __str__(self):
-	return "node %d already contains version %s" % (self.itemId,
-						        self.version.asString())
-
+	return "node %d already contains version %s" % (
+            self.itemId, self.version.asString())
     def __init__(self, itemId, version):
 	SqlVersionsError.__init__(self)
 	self.version = version
