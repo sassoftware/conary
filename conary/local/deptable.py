@@ -176,24 +176,16 @@ class DependencyTables:
                             "Provides", ("Dependencies",))
 
     def delete(self, cu, troveId):
-        try:
-            cu.execute("DROP TABLE suspectDepsOrig")
-        except:
-            pass
-        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
+        schema.resetTable(cu, "suspectDepsOrig")
+        schema.resetTable(cu, "suspectDeps")
+
         for tbl in ('Requires', 'Provides'):
             cu.execute("INSERT INTO suspectDepsOrig SELECT depId "
                        "FROM %s WHERE instanceId=%d" % (tbl, troveId))
             cu.execute("DELETE FROM %s WHERE instanceId=%d" % (tbl, troveId))
 
-        try:
-            cu.execute("DROP TABLE suspectDeps")
-        except:
-            pass
-        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
         cu.execute("INSERT INTO suspectDeps SELECT DISTINCT depId "
                    "FROM suspectDepsOrig")
-        cu.execute("DROP TABLE suspectDepsOrig")
 
         cu.execute("""DELETE FROM Dependencies WHERE depId IN
                 (SELECT DISTINCT suspectDeps.depId FROM suspectDeps
@@ -204,8 +196,6 @@ class DependencyTables:
                             instanceId AS instanceId1 FROM Provides)
                     ON suspectDeps.depId = depId1
                  WHERE instanceId1 IS NULL)""")
-
-        cu.execute("DROP TABLE suspectDeps")
 
     def _restrictResolveByLabel(self, label):
         """ Restrict resolution by label
@@ -365,12 +355,8 @@ class DependencyTables:
         def _brokenItemsToSet(cu, depIdSet, wasIn):
             # this only works for databases (not repositories)
             if not depIdSet: return []
-            try:
-                cu.execute("DROP TABLE BrokenDeps")
-            except:
-                pass
-            cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
-                       start_transaction = False)
+
+            schema.resetTable(cu, 'BrokenDeps')
             for depNum in depIdSet:
                 cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
                            start_transaction = False)
@@ -408,8 +394,6 @@ class DependencyTables:
                         deps.dependencyClasses[depClass],
                         deps.Dependency(depName, flags))
                 failedSets[info][1].extend(wasIn[depNum])
-
-            cu.execute("DROP TABLE BrokenDeps", start_transaction = False)
 
             return [ (x[0], x[1][0], x[1][1])
                                 for x in failedSets.iteritems() ]
@@ -717,16 +701,7 @@ class DependencyTables:
                             multiplier = -1)
 
         # now build a table of all the troves which are being erased
-        try:
-            cu.execute("DROP TABLE RemovedTroveIds")
-        except:
-            pass
-        cu.execute("""
-        CREATE TEMPORARY TABLE RemovedTroveIds(
-            troveId INTEGER,
-            nodeId INTEGER
-        )""")
-	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)")
+        schema.resetTable(cu, "RemovedTroveIds")
 
         for job in jobSet:
             if job[2][0] is not None: continue
@@ -737,10 +712,6 @@ class DependencyTables:
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
             # table exactly parallels the RemovedTroveIds we set up
-            try:
-                cu.execute("DROP TABLE RemovedTroves")
-            except:
-                pass
             cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroves(
                 name        VARCHAR(254),

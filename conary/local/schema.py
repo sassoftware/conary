@@ -294,6 +294,28 @@ def createDependencies(db):
     commit = commit | createDepWorkTable(cu, "DepCheck")
     commit = commit | createDepTable(cu, 'TmpDependencies', isTemp = True)
 
+    if not resetTable(cu, "SuspectDepsOrig"):
+        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
+        commit = True
+
+    if not resetTable(cu, "SuspectDeps"):
+        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
+        commit = True
+
+    if not resetTable(cu, "BrokenDeps"):
+        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
+        commit = True
+
+    if not resetTable(cu, "RemovedTroveIds"):
+        cu.execute("""
+        CREATE TEMPORARY TABLE RemovedTroveIds(
+            troveId INTEGER,
+            nodeId INTEGER
+        )""")
+	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
+                   "RemovedTroveIds(troveId)")
+        commit = True
+
     if commit:
         db.commit()
         db.loadSchema()
