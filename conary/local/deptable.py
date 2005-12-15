@@ -24,6 +24,10 @@ class DependencyTables:
     def _createTmpTable(self, cu, name, makeTable = True, makeIndex = True):
         logMe(2, name, makeTable, makeIndex)
 	if makeTable:
+            try:
+                cu.execute("DROP TABLE %s" %name)
+            except:
+                pass
 	    cu.execute("""
             CREATE TEMPORARY TABLE %s(
                 troveId         INTEGER,
@@ -86,9 +90,9 @@ class DependencyTables:
                             %(tmpName)s.name,
                             %(tmpName)s.flag
                         FROM %(tmpName)s LEFT OUTER JOIN Dependencies ON
-                            %(tmpName)s.class == Dependencies.class AND
-                            %(tmpName)s.name == Dependencies.name AND
-                            %(tmpName)s.flag == Dependencies.flag
+                            %(tmpName)s.class = Dependencies.class AND
+                            %(tmpName)s.name = Dependencies.name AND
+                            %(tmpName)s.flag = Dependencies.flag
                         WHERE
                             Dependencies.depId is NULL
                     """ % substDict, start_transaction = False)
@@ -117,9 +121,9 @@ class DependencyTables:
                   'depTable' : depTable }
             selectClause += """\
                         LEFT OUTER JOIN %(depTable)s ON
-                            %(tmpName)s.class == %(depTable)s.class AND
-                            %(tmpName)s.name == %(depTable)s.name AND
-                            %(tmpName)s.flag == %(depTable)s.flag
+                            %(tmpName)s.class = %(depTable)s.class AND
+                            %(tmpName)s.name = %(depTable)s.name AND
+                            %(tmpName)s.flag = %(depTable)s.flag
 """ % d
 
         repQuery = """\
@@ -133,7 +137,7 @@ class DependencyTables:
         repQuery += selectClause
         repQuery += """\
                         WHERE
-                            %(tmpName)s.isProvides == 0""" % substDict
+                            %(tmpName)s.isProvides = 0""" % substDict
         cu.execute(repQuery, start_transaction = False)
 
         if provTable is None:
@@ -148,7 +152,7 @@ class DependencyTables:
         repQuery += selectClause
         repQuery += """\
                         WHERE
-                            %(tmpName)s.isProvides == 1""" % substDict
+                            %(tmpName)s.isProvides = 1""" % substDict
         cu.execute(repQuery, start_transaction = False)
 
     def get(self, cu, trv, troveId):
@@ -196,12 +200,20 @@ class DependencyTables:
         cu.execute("DROP TABLE NeededDeps", start_transaction = False)
 
     def delete(self, cu, troveId):
+        try:
+            cu.execute("DROP TABLE suspectDepsOrig")
+        except:
+            pass
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
         for tbl in ('Requires', 'Provides'):
             cu.execute("INSERT INTO suspectDepsOrig SELECT depId "
                        "FROM %s WHERE instanceId=%d" % (tbl, troveId))
             cu.execute("DELETE FROM %s WHERE instanceId=%d" % (tbl, troveId))
 
+        try:
+            cu.execute("DROP TABLE suspectDeps")
+        except:
+            pass
         cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
         cu.execute("INSERT INTO suspectDeps SELECT DISTINCT depId "
                    "FROM suspectDepsOrig")
@@ -256,16 +268,16 @@ class DependencyTables:
 
         depTableClause = ""
         for depTable in depTableList:
-            substTable = { 'requires' : "%-15s" % requiresTable,
-                           'deptable' : "%-15s" % depTable }
+            substTable = { 'requires' : requiresTable,
+                           'deptable' : depTable }
 
             depTableClause += """\
                          LEFT OUTER JOIN %(deptable)s ON
                               %(requires)s.depId = %(deptable)s.depId\n""" % substTable
 
         for provTable in providesTableList:
-            substTable = { 'provides' : "%-15s" % provTable,
-                           'requires' : "%-15s" % requiresTable,
+            substTable = { 'provides' : provTable,
+                           'requires' : requiresTable,
                            'depClause': depTableClause }
 
             for name in ( 'class', 'name', 'flag' ):
@@ -309,21 +321,21 @@ class DependencyTables:
                 SELECT Matched.reqDepId as depId,
                        depCheck.depNum as depNum,
                        Matched.reqInstId as reqInstanceId,
-                       Matched.provInstId as provInstanceId
-                    FROM (
-%s                       ) AS Matched
+                       Matched.provInstId as provInstanceId,
+                       DepCheck.flagCount as flagCount
+                    FROM ( %s ) AS Matched
                     INNER JOIN DepCheck ON
-                        Matched.reqInstId == DepCheck.troveId AND
-                        Matched.class == DepCheck.class AND
-                        Matched.name == DepCheck.name AND
-                        Matched.flag == DepCheck.flag
+                        Matched.reqInstId = DepCheck.troveId AND
+                        Matched.class = DepCheck.class AND
+                        Matched.name = DepCheck.name AND
+                        Matched.flag = DepCheck.flag
                     WHERE
                         NOT DepCheck.isProvides
                     GROUP BY
                         DepCheck.depNum,
                         Matched.provInstId
                     HAVING
-                        COUNT(DepCheck.troveId) == DepCheck.flagCount
+                        COUNT(DepCheck.troveId) = DepCheck.flagCount
                 """ % subselect
 
     def check(self, jobSet, troveSource, findOrdering = False):
@@ -377,7 +389,10 @@ class DependencyTables:
         def _brokenItemsToSet(cu, depIdSet, wasIn):
             # this only works for databases (not repositories)
             if not depIdSet: return []
-
+            try:
+                cu.execute("DROP TABLE BrokenDeps")
+            except:
+                pass
             cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
                        start_transaction = False)
             for depNum in depIdSet:
@@ -729,6 +744,10 @@ class DependencyTables:
                             multiplier = -1)
 
         # now build a table of all the troves which are being erased
+        try:
+            cu.execute("DROP TABLE RemovedTroveIds")
+        except:
+            pass
         cu.execute("""
         CREATE TEMPORARY TABLE RemovedTroveIds(
             troveId INTEGER,
@@ -745,6 +764,10 @@ class DependencyTables:
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
             # table exactly parallels the RemovedTroveIds we set up
+            try:
+                cu.execute("DROP TABLE RemovedTroves")
+            except:
+                pass
             cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroves(
                 name        VARCHAR(254),
@@ -789,7 +812,7 @@ class DependencyTables:
                 FROM
                     RemovedTroveIds
                 INNER JOIN Provides ON
-                    RemovedTroveIds.troveId == Provides.instanceId
+                    RemovedTroveIds.troveId = Provides.instanceId
                 INNER JOIN Requires ON
                     Provides.depId = Requires.depId
         """)
@@ -802,11 +825,11 @@ class DependencyTables:
                 FROM
 		    RemovedTroveIds
 		INNER JOIN Provides ON
-                    RemovedTroveIds.troveId == Provides.instanceId
+                    RemovedTroveIds.troveId = Provides.instanceId
                 INNER JOIN Requires ON
                     Provides.depId = Requires.depId
                 INNER JOIN Dependencies ON
-                    Dependencies.depId == Requires.depId
+                    Dependencies.depId = Requires.depId
         """)
 
         # dependencies which could have been resolved by something in
@@ -818,11 +841,11 @@ class DependencyTables:
                 SELECT depId, depNum, reqInstanceId, Required.nodeId,
                        provInstanceId, Provided.nodeId
 		    FROM
-			(%s)
+			(%s) AS Resolved
                     LEFT OUTER JOIN RemovedTroveIds AS Required ON
-                        reqInstanceId == Required.troveId
+                        reqInstanceId = Required.troveId
                     LEFT OUTER JOIN RemovedTroveIds AS Provided ON
-                        provInstanceId == Provided.troveId
+                        provInstanceId = Provided.troveId
                 """ % self._resolveStmt("TmpRequires",
                                         ("Provides", "TmpProvides"),
                                         ("Dependencies", "TmpDependencies")))
@@ -1023,7 +1046,12 @@ class DependencyTables:
                                 ("Provides",), ("Dependencies",),
                                 restrictBy = restrictBy, restrictor = restrictor)
 
-        cu.execute(full,start_transaction = False)
+        # FIXME: SICK HACK, MySQL doesn't seem to be ready the first time we
+        # execute this query.  The first time we get no rows, but then we
+        # execute it again and we get what we're looking for.
+        # I'm very sorry - msw
+        cu.execute(full).fetchall()
+        cu.execute(full, start_transaction = False)
 
         return depList, cu
 
@@ -1040,18 +1068,18 @@ class DependencyTables:
         """
         selectTemplate = """SELECT depNum, Items.item, Versions.version,
                              Nodes.timeStamps, flavor FROM
-                            (%s)
+                            (%s) as DepsSelect
                           INNER JOIN Instances ON
-                            provInstanceId == Instances.instanceId
+                            provInstanceId = Instances.instanceId
                           INNER JOIN Items ON
-                            Instances.itemId == Items.itemId
+                            Instances.itemId = Items.itemId
                           INNER JOIN Versions ON
-                            Instances.versionId == Versions.versionId
+                            Instances.versionId = Versions.versionId
                           INNER JOIN Flavors ON
-                            Instances.flavorId == Flavors.flavorId
+                            Instances.flavorId = Flavors.flavorId
                           INNER JOIN Nodes ON
-                            Instances.itemId == Nodes.itemId AND
-                            Instances.versionId == Nodes.versionId
+                            Instances.itemId = Nodes.itemId AND
+                            Instances.versionId = Nodes.versionId
                           ORDER BY
                             Nodes.finalTimestamp DESC
                         """
@@ -1126,12 +1154,12 @@ class DependencyTables:
 
         full = """SELECT depNum, troveName, Versions.version,
                          timeStamps, Flavors.flavor FROM
-                        (%s)
+                        (%s) as Resolved
                       INNER JOIN Instances ON
-                        provInstanceId == Instances.instanceId
+                        provInstanceId = Instances.instanceId
                       INNER JOIN Versions USING(versionId)
                       INNER JOIN Flavors
-                            ON (Instances.flavorId == Flavors.flavorId)
+                            ON (Instances.flavorId = Flavors.flavorId)
                     """ % self._resolveStmt( "TmpRequires",
                                 ("Provides",), ("Dependencies",))
 
