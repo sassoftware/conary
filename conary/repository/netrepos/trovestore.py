@@ -375,8 +375,10 @@ class TroveStore:
         # FIXME: make this SQL-compliantly fast
         cu.execute("""
         UPDATE FileStreams
-        SET stream = (SELECT NewFiles.stream FROM NewFiles WHERE
-                          FileStreams.fileId = NewFiles.fileId)
+        SET stream = (SELECT NewFiles.stream FROM NewFiles
+                      WHERE
+                          FileStreams.fileId = NewFiles.fileId
+                      AND NewFiles.stream IS NOT NULL)
         WHERE
             FileStreams.stream IS NULL
         -- AND FileStreams.fileId in (SELECT nf.fileId from NewFiles as nf)
