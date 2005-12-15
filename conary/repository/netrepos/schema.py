@@ -114,6 +114,18 @@ def createFlavors(db):
             cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)",
                        request, present, value)
         commit = True
+
+    if not resetTable(cu, 'ffFlavor'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        ffFlavor(
+            flavorId    INTEGER,
+            base        VARCHAR(254),
+            sense       INTEGER,
+            flag        VARCHAR(254)
+        )""")
+        commit = True
+
     if commit:
         db.commit()
         db.loadSchema()
@@ -499,7 +511,18 @@ def createTroves(db):
         item            VARCHAR(254),
         version         VARCHAR(999),
         fullVersion     VARCHAR(999)
-        )""", start_transaction = False)
+        )""")
+        commit = True
+
+    if not resetTable(cu, 'gtvlTbl'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        gtvlTbl(
+            item                VARCHAR(254),
+            versionSpec         VARCHAR(999),
+            flavorId            INTEGER
+        )""")
+        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")
         commit = True
 
     if commit:
