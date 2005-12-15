@@ -271,7 +271,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_response(200, 'OK')
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
-
     def reset(self, authToken, clientVersion):
         import shutil
         try:
@@ -281,6 +280,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
                 raise
         os.mkdir(self.contentsDir)
 
+        logMe(1, "resetting NetworkRepositoryServer", self.repDB)
         # cheap trick. sqlite3 doesn't mind zero byte files; just replace
         # the file with a zero byte one (to change the inode) and reopen
         open(self.repDB[1] + '.new', "w")
@@ -396,9 +396,12 @@ if __name__ == '__main__':
 
     util.mkdirChain(otherArgs[1])
 
-    cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
-    cfg.contentsDir = otherArgs[1] + '/contents'
-    cfg.serverName = otherArgs[2]
+    if not cfg.repositoryDB:
+        cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
+    if not cfg.contentsDir:
+        cfg.contentsDir = otherArgs[1] + '/contents'
+    if not cfg.serverName:
+        cfg.serverName = otherArgs[2]
 
     netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
