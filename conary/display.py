@@ -356,8 +356,12 @@ class TroveFormatter(TroveTupFormatter):
 
         if sourceName:
             try:
+                sourceVer = v.getSourceVersion()
+                if sourceVer.isOnLocalHost():
+                    sourceVer = sourceVer.parentVersion()
+
                 sourceTrove = troveSource.getTrove(sourceName, 
-                                v.getSourceVersion(), deps.DependencySet(),
+                                sourceVer, deps.DependencySet(),
                                 withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
                 # on failed getTrove calls 
