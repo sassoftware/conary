@@ -2413,8 +2413,6 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if depClass == deps.FileDependencies:
             pathMap = self.recipe.autopkg.pathMap
             componentMap = self.recipe.autopkg.componentMap
-            # FIXME: this is order-dependent; this checking needs to
-            # be put into a list and deferred to postProcessing
             if info in pathMap and info not in componentMap[info].providesMap:
                 # if a package requires a file, includes that file,
                 # and does not provide that file, it should error out
