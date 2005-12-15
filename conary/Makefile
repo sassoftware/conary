@@ -15,7 +15,7 @@
 all: subdirs constants.py
 
 SUBDIRS=build local repository server lib pysqlite3 deps web \
-        conaryclient dbstore
+        conaryclient dbstore ScanDeps
 
 python_files = __init__.py	\
 	branch.py		\

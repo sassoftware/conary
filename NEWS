@@ -18,6 +18,13 @@ Changes in 0.80.2:
       which they don't fulfill themselves and which are not fulfilled by
       the system database (for example, soname dependencies from linking
       against libraries not packaged by Conary).
+    * Added Perl dependencies, both provides and requires.  They are not
+      yet enforced, in order to give time to adapt while perl packages are
+      being re-built.
+    * Added the EnforcePerlBuildRequirements policy.  Failures found by
+      this policy may be caused by packages on the system not having been
+      rebuilt yet with Perl dependencies, but may also show bugs in the
+      Perl dependency code.
 
 Changes in 0.80.1:
   o Client Changes:

@@ -20,10 +20,12 @@ export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
 export bindir = $(prefix)/bin
 export libdir = $(prefix)/lib
+export libexecdir = $(prefix)/libexec
 export mandir = $(prefix)/share/man
 export sitedir = $(libdir)/python$(PYVERSION)/site-packages/
 export conarydir = $(sitedir)/conary
 export conarylibdir = $(libdir)/conary
+export conarylibexecdir = $(libexecdir)/conary
 
 SUBDIRS=commands conary config man scripts
 

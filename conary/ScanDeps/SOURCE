@@ -1,0 +1,7 @@
+With the exception of this file and Makefile, this directory and its
+contents are a subset of the contents of Module-ScanDeps-0.51.tar.gz,
+and are merely aggregated with Conary in order to be available to
+bootstrap perl dependencies, using the perldeps.pl script.
+
+Use of all the other files in this directory is governed by the license
+terms mentioned in the README file.

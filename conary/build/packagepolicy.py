@@ -25,6 +25,7 @@ import itertools
 import os
 import re
 import stat
+import sys
 
 from conary import files
 from conary.build import buildpackage, destdirpolicy, filter, policy
@@ -1714,6 +1715,58 @@ def _getmonodis(macros, recipe, path):
     return None
 
 
+def _getperlincpath(perl):
+    """
+    Fetch the perl @INC path
+    , and sort longest first for removing
+    prefixes from perl files that are provided.
+    """
+    p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
+    perlIncPath = p.readlines()
+    # make sure that the command completed successfully
+    rc = p.close()
+    perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
+    return perlIncPath
+
+def _getperl(macros, recipe):
+    """
+    Find the preferred instance of perl to use, including setting
+    any environment variables necessary to use that perl.
+    Returns string for running it, and a separate string, if necessary,
+    for adding to @INC.
+    """
+    perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
+    perlPath = '%(bindir)s/perl' %macros
+
+    def _perlDestInc(destdir, perlDestInc):
+        return ' '.join(['-I' + destdir + x for x in perlDestInc])
+
+    if os.access(perlDestPath, os.X_OK):
+        # must use packaged perl if it exists
+        m = recipe.magic[perlPath]
+        if m and 'RPATH' in m.contents and m.contents['RPATH']:
+            # we need to prepend the destdir to each element of the RPATH
+            # in order to run perl in the destdir
+            perl = ''.join((
+                'export LD_LIBRARY_PATH=',
+                ':'.join([macros.destdir+x
+                          for x in m.contents['RPATH'].split(':')]),
+                ';',
+                perlDestPath
+            ))
+            perlDestInc = _getperlincpath(perl)
+            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+            return [perl, perlDestInc]
+        else:
+            # perl that does not need rpath?
+            perlDestInc = _getperlincpath(perlDestPath)
+            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+            return [perlDestPath, perlDestInc]
+    elif os.access(perlPath, os.X_OK):
+        # system perl if no packaged perl, needs no @INC mangling
+        return [perlPath, '']
+
+
 class Provides(_BuildPackagePolicy):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
@@ -1732,11 +1785,12 @@ class Provides(_BuildPackagePolicy):
     invariantexceptions = (
 	'%(docdir)s/',
     )
-    monodisPath = None
 
     def __init__(self, *args, **keywords):
 	self.provisions = []
         self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        self.monodisPath = None
+        self.perlIncPath = None
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -1764,9 +1818,19 @@ class Provides(_BuildPackagePolicy):
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
 
+    def _fetchPerlIncPath(self):
+        """
+        Cache the perl @INC path, sorted longest first
+        """
+        if self.perlIncPath is not None:
+            return
+
+        perl = _getperl(self.recipe.macros, self.recipe)[0]
+        self.perlIncPath = _getperlincpath(perl)
+        self.perlIncPath.sort(key=len, reverse=True)
+
     def _ELFPathProvide(self, path, m, pkg):
         basedir = os.path.dirname(path)
-        # thanks to _ELFNonProvide, we know that this is a reasonable library
         if basedir not in self.sonameSubtrees and path in pkg.providesMap:
             # path needs to be in the dependency, since the
             # provides is too broad otherwise, so add it.
@@ -1823,6 +1887,35 @@ class Provides(_BuildPackagePolicy):
             pkg.providesMap[path].addDep(deps.JavaDependencies,
                 deps.Dependency(prov, []))
 
+    def _addPerlDeps(self, path, m, pkg):
+        # do not call perl to get @INC unless we have something to do for perl
+        self._fetchPerlIncPath()
+
+        # It is possible that we'll want to allow user-specified
+        # additions to the perl search path, but if so, we need
+        # to path-encode those files, so we can't just prepend
+        # those elements to perlIncPath.  We would need to end up
+        # with something like "perl: /path/to/foo::bar" because
+        # for perl scripts that don't modify @INC, they could not
+        # find those scripts.  It is not clear that we need this
+        # at all, because most if not all of those cases would be
+        # intra-package dependencies that we do not want to export.
+
+        depPath = None
+        for pathPrefix in self.perlIncPath:
+            if path.startswith(pathPrefix):
+                depPath = path[len(pathPrefix)+1:]
+                break
+        if depPath is None:
+            return
+
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        # foo/bar/baz.pm -> foo::bar::baz
+        prov = '::'.join(depPath.split('/')).rsplit('.', 1)[0]
+        pkg.providesMap[path].addDep(deps.PerlDependencies,
+            deps.Dependency(prov, []))
+
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
@@ -1860,7 +1953,9 @@ class Provides(_BuildPackagePolicy):
             if (m and (m.name == 'java' or m.name == 'jar')
                 and m.contents['provides']):
                 self._addJavaDeps(path, m, pkg)
-
+            if path.endswith('.pm') or path.endswith('.pl'):
+                # Keep the extension list in sync with Requires.
+                self._addPerlDeps(path, m, pkg)
 
         if path not in pkg.providesMap:
             return
@@ -1900,8 +1995,6 @@ class Provides(_BuildPackagePolicy):
                 # allow symlinks to provide sonames if necessary and if
                 # they point to real files; paths encoded in sonames might
                 # require the symlink path
-                # FIXME: this requires changes elsewhere to allow
-                # symlinks to carry deps
                 contents = os.readlink(fullpath)
                 if contents.startswith('/'):
                     m = self.recipe.magic[os.path.normpath(contents)]
@@ -1997,13 +2090,16 @@ class Requires(_addInfo, _BuildPackagePolicy):
     invariantexceptions = (
 	'%(docdir)s/',
     )
-    monodisPath = None
 
     def __init__(self, *args, **keywords):
         self.sonameSubtrees = set(destdirpolicy.librarydirs)
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
+        self.monodisPath = None
+        self.perlReqs = None
+        self.perlPath = None
+        self.perlIncPath = None
         policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2135,6 +2231,52 @@ class Requires(_addInfo, _BuildPackagePolicy):
             depSet.addDep(depClass, dep)
         pkg.requiresMap[path] = depSet
 
+    def _fetchPerl(self):
+        """
+        Cache the perl path and @INC path with %(destdir)s prepended to
+        each element if necessary
+        """
+        if self.perlPath is not None:
+            return
+
+        macros = self.recipe.macros
+        self.perlPath, self.perlIncPath = _getperl(macros, self.recipe)
+
+    def _getPerlReqs(self, path, fullpath):
+        if self.perlReqs is None:
+            self._fetchPerl()
+            assert(self.perlPath)
+            basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-3])
+            localcopy = '/'.join((basedir, 'conary/ScanDeps'))
+            if os.path.exists(localcopy):
+                scandeps = localcopy
+                perlreqs = '%s/scripts/perlreqs.pl' % basedir
+            else:
+                # not %(libdir)s
+                scandeps = '/usr/lib/conary/ScanDeps'
+                perlreqs = '/usr/libexec/conary/perlreqs.pl'
+            self.perlReqs = '%s -I%s %s %s' %(
+                self.perlPath, scandeps, self.perlIncPath, perlreqs)
+
+        p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        reqlist = [x.strip().split('//') for x in p.readlines()]
+        # make sure that the command completed successfully
+        rc = p.close()
+        if rc:
+            # make sure that perl didn't blow up
+            assert(os.WIFEXITED(rc))
+            # Apparantly ScanDeps could not handle this input
+            return []
+
+        # we care only about modules right now
+        # throwing away the filenames for now, but we might choose
+        # to change that later
+        reqlist = [x[2] for x in reqlist if x[0] == 'module']
+        # foo/bar/baz.pm -> foo::bar::baz
+        reqlist = ['::'.join(x.split('/')).rsplit('.', 1)[0] for x in reqlist]
+
+        return reqlist
+
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
@@ -2143,6 +2285,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
 	f = pkg.getFile(path)
         macros = self.recipe.macros
         m = self.recipe.magic[path]
+        fullpath = macros.destdir + path
 
         # we may have some dependencies that need converting
         if (m and m.name == 'ELF'
@@ -2174,7 +2317,6 @@ class Requires(_addInfo, _BuildPackagePolicy):
                                      deps.FileDependencies)
 
         if m and m.name == 'CIL':
-            fullpath = macros.destdir + path
             if not self.monodisPath:
                 self.monodisPath = _getmonodis(macros, self, path)
                 if not self.monodisPath:
@@ -2195,6 +2337,13 @@ class Requires(_addInfo, _BuildPackagePolicy):
             for req in m.contents['requires']:
                 self._addRequirement(path, req, [], pkg,
                                      deps.JavaDependencies)
+
+        if (path.endswith('.pl') or path.endswith('.pm') or
+            (f.inode.perms() & 0111 and m and m.name == 'script'
+             and '/bin/perl' in m.contents['interpreter'])):
+            for req in self._getPerlReqs(path, fullpath):
+                self._addRequirement(path, req, [], pkg,
+                                     deps.PerlDependencies)
 
         # remove intentionally discarded dependencies
         if self.exceptDeps and path in pkg.requiresMap:
@@ -2264,6 +2413,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if depClass == deps.FileDependencies:
             pathMap = self.recipe.autopkg.pathMap
             componentMap = self.recipe.autopkg.componentMap
+            # FIXME: this is order-dependent; this checking needs to
+            # be put into a list and deferred to postProcessing
             if info in pathMap and info not in componentMap[info].providesMap:
                 # if a package requires a file, includes that file,
                 # and does not provide that file, it should error out
@@ -2532,6 +2683,22 @@ class EnforceCILBuildRequirements(_enforceBuildRequirements):
     depClass = deps.CILDependencies
 
 
+class EnforcePerlBuildRequirements(_enforceBuildRequirements):
+    """
+    All Perl runtime requirements should be met either by this package
+    or by components listed in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforcePerlBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    """
+
+    depClassType = deps.DEP_CLASS_PERL
+    depClass = deps.PerlDependencies
+
+    # FIXME: remove this when we are ready to enforce Perl dependencies
+    def setTalk(self):
+        self.talk = self.warn
+
+
 class EnforceConfigLogBuildRequirements(policy.Policy):
     """
     This class looks through the builddir for config.log files, and looks
@@ -2728,6 +2895,7 @@ def DefaultPolicy(recipe):
         EnforceSonameBuildRequirements(recipe),
         EnforceJavaBuildRequirements(recipe),
         EnforceCILBuildRequirements(recipe),
+        EnforcePerlBuildRequirements(recipe),
         EnforceConfigLogBuildRequirements(recipe),
 	reportErrors(recipe),
     ]

@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio convertcontents changemail changemail.py commitaction conary-debug
+extra_dist = Makefile rpm2cpio convertcontents changemail changemail.py commitaction conary-debug perlreqs.pl
 
 dist_files = $(python_files) $(extra_dist)
 
@@ -30,6 +30,7 @@ install:
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
 	install -m 755 changemail $(DESTDIR)$(conarydir)
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
+        install -d -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
 dist: default-dist
 
