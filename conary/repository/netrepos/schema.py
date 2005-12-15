@@ -456,6 +456,24 @@ def createTroves(db):
         db.commit()
         db.loadSchema()
 
+def createAddTroveTables(cu):
+    try:
+        cu.execute("DELETE FROM NewFiles")
+    except:
+        cu.execute("""
+        CREATE TEMPORARY TABLE NewFiles(
+            pathId      BINARY(16),
+            versionId   INTEGER,
+            fileId      BINARY(20),
+            stream      BLOB,
+            path        VARCHAR(999)
+        )""")
+
+    try:
+        cu.execute("DELETE FROM NeededFlavors")
+    except:
+        cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(999))")
+
 def createInstructionSets(db):
     cu = db.cursor()
     if 'InstructionSets' not in db.tables:

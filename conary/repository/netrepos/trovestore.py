@@ -23,7 +23,7 @@ from conary.local import deptable
 from conary.local import troveinfo, versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
-from conary.repository.netrepos import versionops, cltable
+from conary.repository.netrepos import versionops, cltable, schema
 from conary.dbstore import sqlerrors
 
 class LocalRepVersionTable(versiontable.VersionTable):
@@ -230,14 +230,7 @@ class TroveStore:
     def addTrove(self, trove):
 	cu = self.db.cursor()
 
-	cu.execute("""
-        CREATE TEMPORARY TABLE NewFiles(
-            pathId      BINARY(16),
-            versionId   INTEGER,
-            fileId      BINARY(20),
-            stream      BLOB,
-            path        VARCHAR(999)
-        )""")
+        schema.createAddTroveTables(cu)
 	self.fileVersionCache = {}
 	return (cu, trove)
 
@@ -275,7 +268,6 @@ class TroveStore:
 		flavorsNeeded[flavor] = True
 
 	flavorIndex = {}
-	cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(999))")
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
 	    cu.execute("INSERT INTO NeededFlavors VALUES(?)",
@@ -307,7 +299,6 @@ class TroveStore:
 	    flavors[flavorIndex[flavorStr]] = flavorId
 
 	del flavorIndex
-	cu.execute("DROP TABLE NeededFlavors")
 
 	if troveFlavor:
 	    troveFlavorId = flavors[troveFlavor]
@@ -406,6 +397,7 @@ class TroveStore:
                     NewFiles.fileId = FileStreams.fileId
                     """ % (troveInstanceId,))
         cu.execute("DROP TABLE NewFiles")
+	cu.execute("DROP TABLE NeededFlavors")
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    itemId = self.getItemId(name)
@@ -837,26 +829,26 @@ class FileRetriever:
         self.cu = db.cursor()
         self.cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
-            rowId       INTEGER PRIMARY KEY AUTO_INCREMENT,
+            itemId       INTEGER PRIMARY KEY,
             fileId      BINARY(20)
         )""", start_transaction = False)
 
     def get(self, l):
-        lookup = range(len(l) + 1)
-        for tup in l:
+        lookup = range(len(l))
+        for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
-            self.cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
-                            fileId, start_transaction = False)
-            lookup[self.cu.lastrowid] = (pathId, fileId)
+            self.cu.execute("INSERT INTO getFilesTbl VALUES(?, ?)",
+                            itemId, fileId, start_transaction = False)
+            lookup[itemId] = (pathId, fileId)
 
         self.cu.execute("""
-            SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
+            SELECT itemId, stream FROM getFilesTbl INNER JOIN FileStreams ON
                     getFilesTbl.fileId = FileStreams.fileId
         """)
 
         d = {}
-        for rowId, stream in self.cu:
-            pathId, fileId = lookup[rowId]
+        for itemId, stream in self.cu:
+            pathId, fileId = lookup[itemId]
             if stream is not None:
                 f = files.ThawFile(stream, pathId)
             else:
