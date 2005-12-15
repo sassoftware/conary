@@ -233,7 +233,7 @@ class ClientUpdate:
                                           keepExisting = False,
                                           recurse = False,
                                           ineligible = beingRemoved,
-                                          ignorePrimaryPins = False)
+                                          checkPrimaryPins = False)
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
@@ -338,7 +338,8 @@ class ClientUpdate:
 
     def _mergeGroupChanges(self, uJob, primaryJobList, transitiveClosure,
                            redirectHack, recurse, ineligible, 
-                           ignorePrimaryPins):
+                           checkPrimaryPins):
+
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse):
 	    # each node is a ((name, version, flavor), state, edgeList
@@ -362,7 +363,7 @@ class ClientUpdate:
             # which are explicit (since arriving there implicitly gets
             # ignored). Handling updates from newJob first prevents duplicates
             # from primaryErases
-            for job, ignorePins in itertools.chain(
+            for job, isPrimary in itertools.chain(
                         itertools.izip(newJob, itertools.repeat(False)),
                         itertools.izip(primaryErases, itertools.repeat(True)), 
                         jobQueue):
@@ -385,20 +386,22 @@ class ClientUpdate:
                 # XXX this needs to be batched
                 pinned = self.db.trovesArePinned([ oldInfo ])[0]
 
-                # primary erasures and erasures which are part of an
+                # erasures which are part of an
                 # update are guaranteed to occur
-                if job in primaryErases:
-                    assert(not job[2][0])
-                    state = ERASE
-                    fromUpdate = False
-                elif job in newJob:
+                if job in newJob:
                     assert(job[2][0])
                     state = ERASE
                     fromUpdate = True
                 else:
                     # If it's pinned, we keep it.
-                    if not ignorePins and pinned:
+                    if pinned:
                         state = KEEP
+                        if isPrimary and checkPrimaryPins:
+                            raise UpdatePinnedTroveError(oldInfo)
+                    elif isPrimary:
+                        # primary updates are guaranteed to occur (if the
+                        # trove is not pinned).
+                        state = ERASE
                     else:
                         state = UNKNOWN
 
@@ -410,13 +413,13 @@ class ClientUpdate:
 
                 if not recurse: continue
 
+                if not trove.troveIsCollection(oldInfo[0]): continue
                 trv = self.db.getTrove(withFiles = False, pristine = False,
                                        *oldInfo)
-                if not trv.isCollection(): continue
 
                 for inclInfo in trv.iterTroveList():
                     jobQueue.add(((inclInfo[0], inclInfo[1:], (None, None), 
-                                  False), pinned and ignorePins))
+                                  False), False))
 
             # For nodes which we haven't decided to erase, we need to track
             # down all of the collections which include those troves.
@@ -496,8 +499,8 @@ class ClientUpdate:
                 if item in fullSet: continue
                 fullSet.add(item)
 
+                if trove.troveIsCollection(item[0]): continue
                 trv = db.getTrove(withFiles = False, pristine = False, *item)
-                if not trv.isCollection(): continue
 
                 for x in trv.iterTroveList():
                     itemQueue.add(x)
@@ -654,15 +657,14 @@ class ClientUpdate:
 
         # Primaries always followLocalChanges. It will be reset for children
         # of primaries with no local changes to follow.
-        newTroves = [ ((x[0], x[2][0], x[2][1]), True, ignorePrimaryPins, 
-                        True, True, True) 
+        newTroves = [ ((x[0], x[2][0], x[2][1]), True, True, True, True) 
                             for x in itertools.chain(absolutePrimaries, 
                                                      relativePrimaries) ]
 
         newJob = set()
 
         while newTroves:
-            newInfo, isPrimary, ignorePins, byDefault, \
+            newInfo, isPrimary, byDefault, \
                     respectBranchAffinity, followLocalChanges = newTroves.pop(0)
 
             if newInfo in alreadyInstalled:
@@ -785,6 +787,7 @@ class ClientUpdate:
 
             if pinned:
                 if replaced[0] is not None:
+
                     # try and install the two troves next to each other
                     assert(replacedInfo[1] is not None)
                     oldTrv = self.db.getTrove(withFiles = False, 
@@ -796,9 +799,22 @@ class ClientUpdate:
 
                     if newHashes.compatibleWith(oldHashes):
                         replaced = (None, None)
+                        if isPrimary and checkPrimaryPins:
+                            name = replacedInfo[0]
+                            log.warning(
+"""
+Not removing old %s as part of update - it is pinned.
+Installing new version of %s side-by-side instead.
 
-                if replaced[0] is not None and not ignorePins:
-                    continue
+To remove the old %s, run:
+conary unpin '%s=%s%s'
+conary erase '%s=%s%s'
+""" % ((name, name, name) + replacedInfo + replacedInfo))
+                    else:
+                        if isPrimary and checkPrimaryPins:
+                            raise UpdatePinnedTroveError(replacedInfo, newInfo)
+
+                        continue
 
             newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), False))
 
@@ -816,7 +832,7 @@ class ClientUpdate:
                 if info in ineligible:
                     continue
 
-                newTroves.append((info, False, pinned and ignorePins, 
+                newTroves.append((info, False, 
                                   trv.includeTroveByDefault(*info),
                                   respectBranchAffinity,
                                   childrenFollowLocalChanges))
@@ -835,7 +851,7 @@ class ClientUpdate:
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
-                         useAffinity = True, ignorePrimaryPins = True,
+                         useAffinity = True, checkPrimaryPins = True,
                          forceJobClosure = False, ineligible = set()):
         """
         Updates a trove on the local system to the latest version 
@@ -1075,7 +1091,7 @@ class ClientUpdate:
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
                                          redirectHack, recurse, 
                                          oldItems | ineligible, 
-                                         ignorePrimaryPins)
+                                         checkPrimaryPins)
         if not newJob:
             raise NoNewTrovesError
 
@@ -1126,7 +1142,7 @@ class ClientUpdate:
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
-                        checkPathConflicts = True, ignorePrimaryPins = True,
+                        checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True):
         """
         Creates a changeset to update the system based on a set of trove update
@@ -1168,8 +1184,10 @@ class ClientUpdate:
         @param fromChangesets: When specified, these changesets are used
         as the source of troves instead of the repository.
         @type fromChangesets: list of changeset.ChangeSetFromFile
-        @param ignorePrimaryPins: If True, pins on primary troves are
-        ignored otherwise they are treated normally.
+        @param checkPrimaryPins: If True, pins on primary troves raise a 
+        warning if an update can be made while leaving the old trove in place,
+        or an error, if the update/erase cannot be made without removing the 
+        old trove.
         @param resolveRepos: If True, search the repository for resolution
         troves.
         @rtype: tuple
@@ -1216,7 +1234,7 @@ class ClientUpdate:
                                        recurse = recurse,
                                        updateMode = updateByDefault,
                                        useAffinity = useAffinity,
-                                       ignorePrimaryPins = ignorePrimaryPins,
+                                       checkPrimaryPins = checkPrimaryPins,
                                        forceJobClosure = forceJobClosure)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
@@ -1479,6 +1497,34 @@ class UpdateError(ClientError):
     """Base class for update errors"""
     def display(self):
         return str(self)
+
+class UpdatePinnedTroveError(UpdateError):
+    """An attempt to update/erase a pinned trove."""
+    def __init__(self, pinnedTrove, newVersion=None):
+        self.pinnedTrove = pinnedTrove
+        self.newVersion = newVersion
+        
+    def __str__(self):
+        name = self.pinnedTrove[0]
+        if self.newVersion:
+            return """\
+Not removing old %s as part of update - it is pinned.
+Therefore, the new version cannot be installed.
+
+To upgrade %s, run:
+conary unpin '%s=%s[%s]'
+and then repeat your update command
+""" % ((name, name) + self.pinnedTrove)
+        else:
+            return """\
+Not erasing %s - it is pinned.
+
+To erase this %s, run:
+conary unpin '%s=%s[%s]'
+conary erase '%s=%s[%s]'
+""" % ((name, name) + self.pinnedTrove + self.pinnedTrove)
+
+            
 
 class NoNewTrovesError(UpdateError):
     def __str__(self):

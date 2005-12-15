@@ -711,7 +711,6 @@ class Transient(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             recipe = self.recipe
             f = recipe.autopkg.pathMap[filename]
-            self.dbg(filename)
 	    f.flags.isTransient(True)
             if f.flags.isConfig() or f.flags.isInitialContents():
                 self.error(
@@ -2171,7 +2170,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 gl = []
                 for item in l:
                     # prefer destdir elements
-                    paths = util.braceGlob(destdir + '/' + item)
+                    paths = util.braceGlob(destdir + item)
                     paths = [ os.path.normpath(x[dlen:]) for x in paths ]
                     appendUnique(gl, paths)
                     # then look on system
