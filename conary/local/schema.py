@@ -21,6 +21,13 @@ from conary.dbstore import idtable, migration
 
 VERSION = 14
 
+def resetTable(cu, name):
+    try:
+        cu.execute("DELETE FROM %s" % name, start_transaction = False)
+        return True
+    except:
+        return False
+
 # Schema creation functions
 def createFlavors(db):
     if "Flavors" in db.tables:
@@ -177,13 +184,10 @@ def createDepTable(cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
-        d['tmp'] = 'TEMPORARY'
-
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
+        if resetTable(cu, name):
             return
-        except:
-            pass
+
+        d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
@@ -200,13 +204,10 @@ def createRequiresTable(cu, name, isTemp):
     startTrans = not isTemp
 
     if isTemp:
-        d['tmp'] = 'TEMPORARY'
-
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
+        if resetTable(cu, name):
             return
-        except:
-            pass
+
+        d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
@@ -230,13 +231,10 @@ def createProvidesTable(cu, name, isTemp):
     startTrans = not isTemp
 
     if isTemp:
+        if resetTable(cu, name):
+            return
         d['tmp'] = 'TEMPORARY'
 
-        try:
-            cu.execute("DELETE FROM %s" % name, start_transaction = startTrans)
-            return
-        except:
-            pass
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER,
@@ -251,11 +249,8 @@ def createProvidesTable(cu, name, isTemp):
                start_transaction = startTrans)
 
 def createDepWorkTable(cu, name):
-    try:
-        cu.execute("DELETE FROM %s" % name, start_transaction = False)
+    if resetTable(cu, name):
         return
-    except:
-        pass
 
     cu.execute("""
     CREATE TEMPORARY TABLE %s(

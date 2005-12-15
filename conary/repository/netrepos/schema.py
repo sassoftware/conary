@@ -15,7 +15,7 @@
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
 
-from conary.local.schema import createDependencies, createTroveInfo, createMetadata
+from conary.local.schema import createDependencies, createTroveInfo, createMetadata, resetTable
 
 VERSION = 7
 
@@ -452,14 +452,7 @@ def createTroves(db):
         cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
         commit = True
 
-    if commit:
-        db.commit()
-        db.loadSchema()
-
-def createAddTroveTables(cu):
-    try:
-        cu.execute("DELETE FROM NewFiles")
-    except:
+    if not resetTable(cu, 'NewFiles'):
         cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
             pathId      BINARY(16),
@@ -468,11 +461,50 @@ def createAddTroveTables(cu):
             stream      BLOB,
             path        VARCHAR(999)
         )""")
+        commit = True
 
-    try:
-        cu.execute("DELETE FROM NeededFlavors")
-    except:
+    if not resetTable(cu, 'NeededFlavors'):
         cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(999))")
+        commit = True
+
+    if not resetTable(cu, 'gtl'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtl(
+        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
+        name            VARCHAR(254),
+        version         VARCHAR(999),
+        flavor          VARCHAR(999)
+        )""")
+        commit = True
+
+    if not resetTable(cu, 'gtlInst'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtlInst(
+        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
+        instanceId      INTEGER
+        )""")
+        commit = True
+
+    if not resetTable(cu, 'getFilesTbl'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE getFilesTbl(
+            itemId       INTEGER PRIMARY KEY,
+            fileId      BINARY(20)
+        )""")
+        commit = True
+
+    if not resetTable(cu, 'itf'):
+        cu.execute("""
+        CREATE TEMPORARY TABLE itf(
+        item            VARCHAR(254),
+        version         VARCHAR(999),
+        fullVersion     VARCHAR(999)
+        )""", start_transaction = False)
+        commit = True
+
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 def createInstructionSets(db):
     cu = db.cursor()
