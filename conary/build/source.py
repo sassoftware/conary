@@ -238,6 +238,7 @@ class Archive(_Source):
                 candidate = difference.pop()
                 if os.path.isdir('%s/%s' %(self.builddir, candidate)):
                     self.recipe.mainDir(candidate)
+                    os.rmdir('/'.join((self.builddir, oldMainDir)))
                 else:
                     self.recipe.mainDir(oldMainDir)
             else:
