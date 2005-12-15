@@ -169,11 +169,11 @@ class Database(BaseDatabase):
         for (type, name, tbl_name) in slist:
             if type == "table":
                 if name.endswith("_sequence"):
-                    self.sequences.append(name[:-len("_sequence")])
+                    self.sequences.setdefault(name[:-len("_sequence")], None)
                 else:
                     self.tables.setdefault(name, [])
             elif type == "view":
-                self.views.append(name)
+                self.views.setdefault(name, None)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
         return self.getVersion()

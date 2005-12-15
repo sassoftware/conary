@@ -59,7 +59,7 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])
+        self.tables.update(dict.fromkeys(x[0] for x in c.fetchall(), []))
         if not len(self.tables):
             return self.version
         # views
@@ -69,7 +69,7 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.views = [ x[0] for x in c.fetchall() ]
+        self.views = dict.fromkeys(x[0] for x in c.fetchall())
         # indexes
         c.execute("""
         select indexname as name, tablename as table
@@ -88,6 +88,6 @@ class Database(BaseDatabase):
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
-        self.sequences = [x[0] for x in c.fetchall()]
+        self.sequences = dict.fromkeys(x[0] for x in c.fetchall())
         version = self.getVersion()
         return version

@@ -114,11 +114,11 @@ class Database(BaseDatabase):
         for (objType, name, tableName) in ret:
             if objType == "BASE TABLE":
                 if tableName.endswith("_sequence"):
-                    self.sequences.append(tableName[:-len("_sequence")])
+                    self.sequences.setdefault(tableName[:-len("_sequence")], None)
                 else:
                     self.tables.setdefault(tableName, [])
             elif objType == "VIEW":
-                self.views.append(tableName)
+                self.views.setdefault(tableName, None)
             elif objType == "INDEX":
                 assert(self.tables.has_key(tableName))
                 self.tables.setdefault(tableName, []).append(name)

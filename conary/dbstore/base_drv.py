@@ -119,9 +119,9 @@ class BindlessCursor(BaseCursor):
         regex = re.compile(':(\w+)')
         # edit the input query
         keys = set()
-        for key in regex.findall(sql):
-            keys.add(key)
-            sql = re.sub(":" + key, "%("+key+")s", sql)
+##         for key in regex.findall(sql):
+##             keys.add(key)
+##             sql = re.sub(":" + key, "%("+key+")s", sql)
         sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
         sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql)
         return (sql, keys)
@@ -133,12 +133,12 @@ class BindlessCursor(BaseCursor):
         self.description = None
         sql, keys = self.__mungeSQL(sql)
         # force dbi compliance here. we prefer args over the kw
+        if len(args) == 1:
+            if isinstance(args[0], (tuple, list)):
+                args = args[0]
         if len(args) == 0:
             assert (sorted(kw.keys()) == sorted(keys))
         elif len(args) == 1:
-            assert(isinstance(args, tuple))
-            if isinstance(args[0], tuple):
-                args = args[0]
             p = args[0]
             # if it is a dictionary, it must contain bind arguments
             if hasattr(p, 'keys'):
@@ -280,9 +280,9 @@ class BaseDatabase:
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = sqllib.CaselessDict()
-        self.views = []
-        self.functions = []
-        self.sequences = []
+        self.views = sqllib.CaselessDict()
+        self.functions = sqllib.CaselessDict()
+        self.sequences = sqllib.CaselessDict()
         self.version = 0
 
     def getVersion(self):
