@@ -50,6 +50,9 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
+    def initTable(self, cu):
+        cu.execute("INSERT INTO Branches VALUES (0, NULL)")
+
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
 
@@ -78,6 +81,7 @@ class LabelTable(idtable.IdTable):
 
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
+
     def initTable(self, cu):
         cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
 

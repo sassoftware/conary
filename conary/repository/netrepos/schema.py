@@ -72,7 +72,7 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        INTEGER PRIMARY KEY AUTO_INCREMENT,
-            flavor          VARCHAR(999)
+            flavor          VARCHAR(767)
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
@@ -98,13 +98,7 @@ def createFlavors(db):
         CREATE TABLE FlavorScores(
             request         INTEGER,
             present         INTEGER,
-            value           INTEGER NOT NULL DEFAULT -1000000,
-            CONSTRAINT FlavorScores_request_fk
-                    FOREIGN KEY (request) REFERENCES Flavors(flavorId)
-                    ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT FlavorScores_present_fk
-                    FOREIGN KEY (request) REFERENCES Flavors(flavorId)
-                    ON DELETE CASCADE ON UPDATE CASCADE
+            value           INTEGER NOT NULL DEFAULT -1000000
         )""")
         cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON
                           FlavorScores(request, present)""")
@@ -154,6 +148,7 @@ def createNodes(db):
             CONSTRAINT Nodes_item_branch_version_uq
                 UNIQUE(itemId, branchId, versionId)
         )""")
+        cu.execute("""INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)""")
         cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
                            ON Nodes(itemId, branchId, versionId)""")
         cu.execute("""CREATE INDEX NodesItemVersionIdx
@@ -346,10 +341,12 @@ def createUsers(db):
                 FOREIGN KEY (entGroupId) REFERENCES
                                 EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
+            INDEX (ownerGroupId),
             CONSTRAINT EntitlementOwners_entOwnerId_fk
                 FOREIGN KEY (ownerGroupId) REFERENCES
-                                userGroups(groupId)
+                                userGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
+            INDEX (entGroupId, ownerGroupId),
             CONSTRAINT EntitlementOwners_entGroupId_ownerGroupId_uq
                 UNIQUE(entGroupId, ownerGroupId)
         )""")
@@ -361,7 +358,8 @@ def createUsers(db):
             entGroupId      INTEGER,
             entitlement     BLOB,
             CONSTRAINT Entitlements_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES Flavors(entitlementGroups)
+                FOREIGN KEY (entGroupId) REFERENCES
+                                EntitlementOwners(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
         #CONSTRAINT EntitlementClasses_entitlement_uq
@@ -426,7 +424,7 @@ def createTroves(db):
             streamId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             pathId          BINARY(16),
-            path            VARCHAR(999),
+            path            VARCHAR(767),
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -471,12 +469,12 @@ def createTroves(db):
             versionId   INTEGER,
             fileId      BINARY(20),
             stream      BLOB,
-            path        VARCHAR(999)
+            path        VARCHAR(767)
         )""")
         commit = True
 
     if not resetTable(cu, 'NeededFlavors'):
-        cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(999))")
+        cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
         commit = True
 
     if not resetTable(cu, 'gtl'):
@@ -484,8 +482,8 @@ def createTroves(db):
         CREATE TEMPORARY TABLE gtl(
         idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
         name            VARCHAR(254),
-        version         VARCHAR(999),
-        flavor          VARCHAR(999)
+        version         VARCHAR(767),
+        flavor          VARCHAR(767)
         )""")
         commit = True
 
@@ -509,8 +507,8 @@ def createTroves(db):
         cu.execute("""
         CREATE TEMPORARY TABLE itf(
         item            VARCHAR(254),
-        version         VARCHAR(999),
-        fullVersion     VARCHAR(999)
+        version         VARCHAR(767),
+        fullVersion     VARCHAR(767)
         )""")
         commit = True
 
@@ -519,7 +517,7 @@ def createTroves(db):
         CREATE TEMPORARY TABLE
         gtvlTbl(
             item                VARCHAR(254),
-            versionSpec         VARCHAR(999),
+            versionSpec         VARCHAR(767),
             flavorId            INTEGER
         )""")
         cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")

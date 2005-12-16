@@ -119,7 +119,7 @@ def createTroveInfo(db):
     CREATE TABLE TroveInfo(
         instanceId      INTEGER NOT NULL,
         infoType        INTEGER NOT NULL,
-        data            BLOB,
+        data            MEDIUMBLOB,
         CONSTRAINT TroveInfo_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
             ON DELETE CASCADE ON UPDATE CASCADE
@@ -202,7 +202,9 @@ def createDepTable(cu, name, isTemp):
     return True
 
 def createRequiresTable(cu, name, isTemp):
-    d =  {"tmp" : "", "name" : name}
+    d = { "tmp" : "",
+          "name" : name,
+          "constraint" : "" }
     startTrans = not isTemp
 
     if isTemp:
@@ -210,16 +212,18 @@ def createRequiresTable(cu, name, isTemp):
             return False
 
         d['tmp'] = 'TEMPORARY'
+    else:
+        d['constraint'] = """,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE""" %d
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId      INTEGER,
         depId           INTEGER,
         depNum          INTEGER,
-        depCount        INTEGER,
-        CONSTRAINT %(name)s_instanceId_fk
-            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE RESTRICT ON UPDATE CASCADE
+        depCount        INTEGER %(constraint)s
     )""" % d, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
@@ -231,21 +235,24 @@ def createRequiresTable(cu, name, isTemp):
     return True
 
 def createProvidesTable(cu, name, isTemp):
-    d =  {"tmp" : "", "name" : name}
+    d = { "tmp" : "",
+          "name" : name,
+          "constraint" : "" }
     startTrans = not isTemp
 
     if isTemp:
         if resetTable(cu, name):
             return False
         d['tmp'] = 'TEMPORARY'
-
+    else:
+        d['constraint'] = """,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE""" %d
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER,
-        depId               INTEGER,
-        CONSTRAINT %(name)s_instanceId_fk
-            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE RESTRICT ON UPDATE CASCADE
+        depId               INTEGER %(constraint)s
     )""" % d, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
