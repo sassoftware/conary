@@ -138,6 +138,12 @@ class LocalDisplayConfig(display.DisplayConfig):
     def printDiff(self):
         return self.showDiff
 
+    def getPristine(self):
+        return not self.showComponents
+
+    def iterTroves(self):
+        return (self.primaryTroves and self.showComponents) or display.DisplayConfig.iterTroves(self)
+
     def needTroves(self):
         return self.showDiff or display.DisplayConfig.needTroves(self)
 

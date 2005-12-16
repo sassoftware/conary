@@ -5,6 +5,9 @@ Changes in 0.80.2:
     * conary scs will now work more nicely with group changesets
     * conary scs --all no longer shows ids and sha1s
     * We now never erase pinned items until they are explicity unpinned.
+    * conary verify and conary q --diff now work again
+    * conary q tmpwatch --components will display the components installed
+      for a package.
   o Build Changes:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)

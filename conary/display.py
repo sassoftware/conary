@@ -55,7 +55,8 @@ def displayTroves(dcfg, formatter, troveTups):
                          walkTroves=dcfg.walkTroves(),
                          iterTroves=dcfg.iterTroves(),
                          needTroves = dcfg.needTroves(),
-                         needFiles = dcfg.needFiles())
+                         needFiles = dcfg.needFiles(),
+                         getPristine = dcfg.getPristine())
     if dcfg.hideComponents():
         iter = skipComponents(iter, dcfg.getPrimaryTroves())
 
@@ -80,7 +81,7 @@ def skipComponents(tupList, primaryTroves=[]):
 
 def iterTroveList(troveSource, troveTups, walkTroves=False, 
                   iterTroves=False, needTroves=False, 
-                  needFiles=False):
+                  needFiles=False, getPristine=True):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
@@ -101,7 +102,13 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
     assert(not (walkTroves and iterTroves))
 
     if needTroves or walkTroves or iterTroves:
-        troves = troveSource.getTroves(troveTups, withFiles=needFiles)
+
+        if not getPristine:
+            kw = {'pristine' : False}
+        else:
+            kw = {}
+
+        troves = troveSource.getTroves(troveTups, withFiles=needFiles, **kw)
     else:
         troves = [None] * len(troveTups)
     
@@ -236,6 +243,9 @@ class DisplayConfig:
 
     def needFileObjects(self):
         return self.needFiles() and self.isVerbose()
+
+    def getPristine(self):
+        return True
 
     #### Recursion
     #### Whether to recursively descend into child troves, iterate
