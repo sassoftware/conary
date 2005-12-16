@@ -14,7 +14,6 @@
 from conary.repository import netclient
 from conary.repository.netrepos import netserver
 
-import new
 import os
 import tempfile
 
