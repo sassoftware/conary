@@ -153,8 +153,14 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
             applyList.append((troveName, (oldVersion, oldFlavor), 
                               (newVersion, newFlavor), False))
 
-    # dedup
-    return set(applyList)
+    # dedup, but keep ordering - this is a little slower but can be handy 
+    # for lining up input -> output (if input is deduped)
+    finalList = []
+    for item in applyList:
+        if item not in finalList:
+            finalList.append(item)
+
+    return finalList
 
 def toTroveSpec(name, versionStr, flavor):
     disp = [name]
