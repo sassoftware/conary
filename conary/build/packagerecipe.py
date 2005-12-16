@@ -583,7 +583,7 @@ class _AbstractPackageRecipe(Recipe):
             buildReqs.update(getattr(base, 'buildRequires', []))
         self.buildRequires = list(buildReqs)
 
-    def setCrossCompile(self, (crossHost, crossTarget, crossTool)):
+    def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
             cross-compiler toolchain.
 
@@ -591,11 +591,11 @@ class _AbstractPackageRecipe(Recipe):
 
             @param crossHost: the architecture of the machine the built binary 
                  should run on.  Can be either <arch> or <arch>-<vendor>-<os>.
-                 If None, determine crossHost based on crossTool value.
+                 If None, determine crossHost based on isCrossTool value.
             @param crossTarget: the architecture of the machine the built
                  binary should be targeted for.
                  Can be either <arch> or <arch>-<vendor>-<os>.
-            @param crossTool: If true, we are building a cross-compiler for
+            @param isCrossTool: If true, we are building a cross-compiler for
                  use on this system.  We set values so that the resulting 
                  binaries from this build should be runnable on the build 
                  architecture.
@@ -657,7 +657,7 @@ class _AbstractPackageRecipe(Recipe):
         _setTargetMacros(crossTarget, macros)
 
         if crossHost is None:
-            if crossTool:
+            if isCrossTool:
                 # we want the resulting binaries to run on 
                 # this machine.
                 macros['hostarch'] = macros['buildarch']
@@ -682,33 +682,33 @@ class _AbstractPackageRecipe(Recipe):
         if (macros['host'] % macros) == (macros['build'] % macros):
             macros['buildvendor'] += '_build'
                 
-        if crossTool:
+        if isCrossTool:
             # we want the resulting binaries to run on our machine
             # but be targeted for %(target)s
-            macros['compile'] = origBuild
+            compileTarget = origBuild
         else:
             # we're expecting the resulting binaries to run on 
             # target
-            macros['compile'] = '%(target)s'
+            compileTarget = '%(target)s'
 
-        macros['cc'] = '%(compile)s-gcc'
-        macros['cxx'] = '%(compile)s-g++'
-        macros['strip'] = '%(compile)s-strip'
-        macros['strip-archive'] = '%(compile)s-strip -g'
+        macros['cc'] = '%s-gcc' % compileTarget
+        macros['cxx'] = '%s-g++' % compileTarget
+        macros['strip'] = '%s-strip' % compileTarget
+        macros['strip-archive'] = '%s-strip -g' % compileTarget
 
         macros['crossdir'] = 'cross-target-%(target)s'
-
-        if macros['cc'] % macros == macros['buildcc'] % macros:
-            # if necessary, specify the path for the system 
-            # compiler.  Otherwise, if target == build,  attempts to compile 
-            # for the build system may use the target compiler.
-            macros['buildcc'] == '%(bindir)s/' + macros['buildcc']
-            macros['buildcxx'] == '%(bindir)s/' + macros['buildcxx']
 
 	self.macros.update(use.Arch._getMacros())
         self.macros.update(macros)
         newPath = '%(crossprefix)s/bin:' % self.macros
         os.environ['PATH'] = newPath + os.environ['PATH']
+
+        if not isCrossTool and self.macros.cc == self.macros.buildcc:
+            # if necessary, specify the path for the system 
+            # compiler.  Otherwise, if target == build,  attempts to compile 
+            # for the build system may use the target compiler.
+            self.macros.buildcc = '%(bindir)s/' + self.macros.buildcc
+            self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
 
         # set the bootstrap flag
         # FIXME: this should probably be a cross flag instead.
