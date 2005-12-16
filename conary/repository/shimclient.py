@@ -12,6 +12,7 @@
 # full details.
 #
 from conary.repository import netclient
+from conary.repository.netrepos import netserver
 
 import new
 import os
@@ -26,60 +27,61 @@ class FakeServerCache:
     def __getitem__(self, item):
         return self._server
 
-def localGetChangeSet(self, authToken, clientVersion, chgSetList, recurse,
-                 withFiles, withFileContents, excludeAutoSource):
-    paths = []
-    csList = []
-    def _cvtTroveList(l):
-        new = []
-        for (name, (oldV, oldF), (newV, newF), absolute) in l:
-            if oldV:
-                oldV = self.fromVersion(oldV)
-                oldF = self.fromFlavor(oldF)
+class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
+    def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
+                     withFiles, withFileContents, excludeAutoSource):
+        paths = []
+        csList = []
+        def _cvtTroveList(l):
+            new = []
+            for (name, (oldV, oldF), (newV, newF), absolute) in l:
+                if oldV:
+                    oldV = self.fromVersion(oldV)
+                    oldF = self.fromFlavor(oldF)
+                else:
+                    oldV = 0
+                    oldF = 0
+
+                if newV:
+                    newV = self.fromVersion(newV)
+                    newF = self.fromFlavor(newF)
+                else:
+                    # this happens when a distributed group has a trove
+                    # on a remote repository disappear
+                    newV = 0
+                    newF = 0
+
+                new.append((name, (oldV, oldF), (newV, newF), absolute))
+
+            return new
+
+        for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
+            newVer = self.toVersion(new)
+            if old == 0:
+                l = (name, (None, None),
+                           (self.toVersion(new), self.toFlavor(newFlavor)),
+                           absolute)
             else:
-                oldV = 0
-                oldF = 0
+                l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
+                           (self.toVersion(new), self.toFlavor(newFlavor)),
+                           absolute)
+            csList.append(l)
 
-            if newV:
-                newV = self.fromVersion(newV)
-                newF = self.fromFlavor(newF)
-            else:
-                # this happens when a distributed group has a trove
-                # on a remote repository disappear
-                newV = 0
-                newF = 0
+        ret = self.repos.createChangeSet(csList,
+                                recurse = recurse,
+                                withFiles = withFiles,
+                                withFileContents = withFileContents,
+                                excludeAutoSource = excludeAutoSource)
 
-            new.append((name, (oldV, oldF), (newV, newF), absolute))
+        (cs, trovesNeeded, filesNeeded) = ret
+        assert(not filesNeeded)
 
-        return new
-
-    for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
-        newVer = self.toVersion(new)
-        if old == 0:
-            l = (name, (None, None),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        else:
-            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        csList.append(l)
-
-    ret = self.repos.createChangeSet(csList,
-                            recurse = recurse,
-                            withFiles = withFiles,
-                            withFileContents = withFileContents,
-                            excludeAutoSource = excludeAutoSource)
-
-    (cs, trovesNeeded, filesNeeded) = ret
-    assert(not filesNeeded)
-
-    # FIXME: we need a way to remove these temporary
-    # files when we're done with them.
-    tmpFile = tempfile.mktemp(suffix = '.ccs')
-    cs.writeToFile(tmpFile)
-    size = os.stat(tmpFile).st_size
-    return (tmpFile, [size], [], [])
+        # FIXME: we need a way to remove these temporary
+        # files when we're done with them.
+        tmpFile = tempfile.mktemp(suffix = '.ccs')
+        cs.writeToFile(tmpFile)
+        size = os.stat(tmpFile).st_size
+        return (tmpFile, [size], [], [])
 
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
@@ -87,13 +89,11 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     A subclass of NetworkRepositoryClient which can take a shimclient.NetworkRepositoryServer
     instance (plus a few other pieces of information) and expose the netclient
     interface without the overhead of XMLRPC.
+
+    If 'server' is a regular netserver.NetworkRepositoryServer instance, the shim won't be
+    able to return changesets. If 'server' is a shimclient.NetworkRepositoryServer, it will.
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap):
-        # this isn't safe because it modifies a server instance that might
-        # be user later:
-
-        # server.getChangeSet = new.instancemethod(localGetChangeSet, server)
-
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap)
         proxy = ShimServerProxy(server, protocol, port, authToken)
         self.c = FakeServerCache(proxy)
