@@ -414,6 +414,8 @@ if __name__ == '__main__':
     for fd in fds.iterkeys():
         p.register(fd, select.POLLIN)
 
+    print "listening"
+
     while True:
         try:
             events = p.poll()

@@ -4,10 +4,12 @@ import sys
 import os
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
+    sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
 
 from conary import dbstore
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
+from printSchema import getTables, getIndexes
 
 if len(sys.argv) != 3:
     print "Usage: migrate <sqlite_path> <mysql_spec>"
@@ -17,7 +19,11 @@ cs = sqlite.cursor()
 mysql = dbstore.connect(sys.argv[2], driver = "mysql")
 cm = mysql.cursor()
 
-schema.createSchema(mysql)
+# create the tables, avoid the indexes
+for stmt in getTables():
+    cm.execute(stmt)
+    print stmt
+mysql.loadSchema()
 
 for t in sqlite.tables.keys():
     if t in mysql.tables:
@@ -30,16 +36,18 @@ for t in mysql.tables.keys():
 
 tList = [
     'Branches',
-    'Versions',
     'Items',
+    'Versions',
     'Labels',
     'LabelMap',
     'Flavors',
     'FlavorMap',
     'FlavorScores',
-    'UserGroups',
     'Users',
+    'UserGroups',
     'UserGroupMembers',
+    'EntitlementGroups',
+    'Entitlements',
     'Permissions',
     'Instances',
     'Dependencies',
@@ -52,21 +60,19 @@ tList = [
     'PGPFingerprints',
     'Provides',
     'Requires',
-    'FileStreams',
-    'TroveFiles',
     'TroveInfo',
     'TroveTroves',
-    'EntitlementGroups',
-    'Entitlements',
+    'FileStreams',
+    'TroveFiles',
     ]
 
 for t in tList:
     print
     print "Converting", t
-    count = cs.execute("select count(*) from %s" % t).fetchone()[0]
+    count = cs.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     i = 0
-    cs.execute("select * from %s" % t)
-    cm.execute('alter table %s disable keys' % t)
+    cs.execute("SELECT * FROM %s" % t)
+    cm.execute("LOCK TABLES %s WRITE" % t)
     while True:
         row = cs.fetchone_dict()
         if row is None:
@@ -77,7 +83,7 @@ for t in tList:
             if 'entGroupEdmin' in row:
                 del row["entGroupAdmin"]
         row = row.items()
-        sql = "insert into %s (%s) values (%s)" % (
+        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
             t, ", ".join(x[0] for x in row),
             ", ".join(["?"] * len(row)))
         i += 1
@@ -94,7 +100,12 @@ for t in tList:
                 sys.stdout.flush()
             if i % 50000 == 0:
                 mysql.commit()
-    cm.execute('alter table %s enable keys' % t)
     print "\r%s: %d/%d 100%%" % (t, i, count)
     mysql.commit()
 
+# and now create the indexes
+for stmt in getIndexes():
+    cm.execute(stmt)
+    print stmt
+mysql.setVersion(schema.VERSION)
+mysql.commit()

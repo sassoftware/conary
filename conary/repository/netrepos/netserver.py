@@ -921,7 +921,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
 
-        logMe(1)
         def _cvtTroveList(l):
             new = []
             for (name, (oldV, oldF), (newV, newF), absolute) in l:
@@ -976,6 +975,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pathList = []
         newChgSetList = []
         allFilesNeeded = []
+
+        logMe(1, chgSetList, "recurse", recurse, "withFiles", withFiles, "withFileContents", withFileContents)
 
         # XXX all of these cache lookups should be a single operation through a
         # temporary table

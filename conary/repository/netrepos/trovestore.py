@@ -535,7 +535,7 @@ class TroveStore:
 
         return trv
 
-    def iterTroves(self, troveInfoList, withFiles = True):
+    def iterTroves(self, troveInfoList, withFiles = True, withFileStreams = False):
 	cu = self.db.cursor()
 
         schema.resetTable(cu, 'gtl')
@@ -598,9 +598,22 @@ class TroveStore:
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
         troveFilesCursor = self.db.cursor()
-        if withFiles:
+	if withFileStreams:
             troveFilesCursor.execute("""
-                        SELECT idx, pathId, path, version, fileId
+                        SELECT idx, pathId, path, version, fileId, stream
+                        FROM
+                            gtlInst, TroveFiles, Versions, FileStreams
+                        WHERE
+                            gtlInst.instanceId = TroveFiles.instanceId AND
+                            TroveFiles.versionId = versions.versionId AND
+                            TroveFiles.streamId = FileStreams.streamId
+                        ORDER BY
+                            gtlInst.idx
+                       """)
+            troveFilesCursor = util.PeekIterator(troveFilesCursor)
+        elif withFiles:
+            troveFilesCursor.execute("""
+                        SELECT idx, pathId, path, version, fileId, NULL
                         FROM
                             gtlInst, TroveFiles, Versions, FileStreams
                         WHERE
@@ -661,12 +674,15 @@ class TroveStore:
                 # we're at the end; that's okay
                 pass
 
+	    fileContents = {}
             try:
                 while troveFilesCursor.peek()[0] == idx:
-                    idxA, pathId, path, versionId, fileId = \
+                    idxA, pathId, path, versionId, fileId, stream = \
                             troveFilesCursor.next()
                     version = versions.VersionFromString(versionId)
                     trv.addFile(pathId, path, version, fileId)
+		    if stream is not None:
+			fileContents[fileId] = stream
             except StopIteration:
                 # we're at the end; that's okay
                 pass
@@ -674,7 +690,10 @@ class TroveStore:
             self.depTables.get(cu, trv, troveInstanceId)
             self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
-            yield trv
+	    if withFileStreams:
+		yield trv, fileContents
+	    else:
+		yield trv
 
         # yield None for anything not found at the end
         while neededIdx < len(troveInfoList):
@@ -801,6 +820,7 @@ class FileRetriever:
         schema.resetTable(self.cu, 'getFilesTbl')
 
     def get(self, l):
+	logMe(3, "start FileRetriever inserts")
         lookup = range(len(l))
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
@@ -808,6 +828,7 @@ class FileRetriever:
                             itemId, fileId, start_transaction = False)
             lookup[itemId] = (pathId, fileId)
 
+	logMe(3, "start FileRetriever select")
         self.cu.execute("""
             SELECT itemId, stream FROM getFilesTbl INNER JOIN FileStreams ON
                     getFilesTbl.fileId = FileStreams.fileId
@@ -822,5 +843,7 @@ class FileRetriever:
                 f = None
             d[(pathId, fileId)] = f
         self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
+
+	logMe(3, "stop FileRetriever")
 
         return d
