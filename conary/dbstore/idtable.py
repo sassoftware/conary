@@ -24,17 +24,21 @@ class IdTable:
 	self.keyName = keyName
 	self.strName = strName
 
+        if  tableName in db.tables:
+            return
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if tableName not in tables:
-            cu.execute("CREATE TABLE %s (%s integer primary key, %s string)" %(
-                self.tableName, self.keyName, self.strName))
-            cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
-                self.tableName, self.tableName, self.strName))
-	    self.initTable()
+        cu.execute("""
+        CREATE TABLE %s (
+            %s INTEGER PRIMARY KEY AUTO_INCREMENT,
+            %s VARCHAR(254)
+        )""" %(self.tableName, self.keyName, self.strName))
+        cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
+            self.tableName, self.tableName, self.strName))
+        self.initTable(cu)
+        db.commit()
+        db.loadSchema()
 
-    def initTable(self):
+    def initTable(self, cu):
 	pass
 
     def getOrAddId(self, item):
@@ -54,9 +58,8 @@ class IdTable:
     def getOrAddIds(self, items):
         cu = self.db.cursor()
         cu.execute('CREATE TEMPORARY TABLE neededIds (num INT, %s STR)' % self.strName)
-        stmt = cu.compile('INSERT INTO neededIds VALUES (?, ?)')
         for num, item in enumerate(items):
-            cu.execstmt(stmt, num, item)
+            cu.execute('INSERT INTO neededIds VALUES (?, ?)', num, item)
 
         cu.execute('''INSERT INTO %(tableName)s (%(keyName)s, %(strName)s)
                       SELECT DISTINCT
@@ -208,14 +211,21 @@ class IdPairMapping:
 	self.item = item
 	self.tableName = tableName
 
+        if self.tableName in db.tables:
+            return
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if self.tableName not in tables:
-            cu.execute("CREATE TABLE %s(%s integer, "
-				       "%s integer, "
-				       "%s integer)"
-			% (tableName, tup1, tup2, item))
+        cu.execute("""
+        CREATE TABLE %s(
+            %s INTEGER,
+            %s INTEGER,
+            %s INTEGER
+        )""" % (tableName, tup1, tup2, item))
+        self.initTable(cu)
+        db.commit()
+        db.loadSchema()
+
+    def initTable(self, cu):
+        pass
 
     def __setitem__(self, key, val):
 	(first, second) = key
@@ -271,13 +281,21 @@ class IdMapping:
 	self.item = item
 	self.tableName = tableName
 
+        if self.tableName in db.tables:
+            return
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if self.tableName not in tables:
-            cu.execute("CREATE TABLE %s(%s integer, "
-				       "%s integer)"
-			% (tableName, key, item))
+        cu.execute("""
+        CREATE TABLE %s(
+            %s INTEGER,
+            %s INTEGER
+        )""" % (tableName, key, item))
+        self.initTable(cu)
+        db.commit()
+        db.loadSchema()
+
+
+    def initTable(self, cu):
+        pass
 
     def __setitem__(self, key, val):
         cu = self.db.cursor()
