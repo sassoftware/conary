@@ -221,8 +221,9 @@ class _ChildLogger:
                 else:
                     logFile.write(output)
 
-                # always read all of directWrite before reading anything else
-                continue
+                if output:
+                    # always read all of directWrite before reading anything else
+                    continue
 
             if ptyFd in read:
                 # read output from pseudo terminal stdout/stderr, and pass to 
