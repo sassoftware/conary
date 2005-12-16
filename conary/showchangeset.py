@@ -94,7 +94,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
                                         ls=ls, ids=ids, sha1s=sha1s, 
                                         info=info, tags=tags, deps=deps,
                                         showChanges=showChanges,
-                                        iterChildren=not namesOnly)
+                                        iterChildren=not namesOnly,
+                                        compressJobs=not cfg.showComponents)
 
         formatter = display.JobFormatter(dcfg)
         display.displayJobs(dcfg, formatter, jobs)
