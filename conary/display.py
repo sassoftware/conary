@@ -55,7 +55,6 @@ def displayTroves(dcfg, formatter, troveTups):
                          walkTroves=dcfg.walkTroves(),
                          iterTroves=dcfg.iterTroves(),
                          needTroves = dcfg.needTroves(),
-                         needFiles = dcfg.needFiles(),
                          getPristine = dcfg.getPristine())
     if dcfg.hideComponents():
         iter = skipComponents(iter, dcfg.getPrimaryTroves())
@@ -80,8 +79,7 @@ def skipComponents(tupList, primaryTroves=[]):
 
 
 def iterTroveList(troveSource, troveTups, walkTroves=False, 
-                  iterTroves=False, needTroves=False, 
-                  needFiles=False, getPristine=True):
+                  iterTroves=False, needTroves=False, getPristine=True):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
@@ -108,7 +106,7 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
         else:
             kw = {}
 
-        troves = troveSource.getTroves(troveTups, withFiles=needFiles, **kw)
+        troves = troveSource.getTroves(troveTups, **kw)
     else:
         troves = [None] * len(troveTups)
     
@@ -118,8 +116,7 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
         if walkTroves:
             # walk troveSet yields troves that are children of these troves
             # and the trove itself.
-            iter = troveSource.walkTroveSet(trv, ignoreMissing=True,
-                                            withFiles = needFiles)
+            iter = troveSource.walkTroveSet(trv, ignoreMissing=True)
             newTroves = sorted(iter, key=lambda y: y.getName())
 
             for trv in newTroves:
