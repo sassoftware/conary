@@ -133,7 +133,7 @@ class Database(BaseDatabase):
         cdb = self._connectData()
         assert(cdb["database"])
         kwargs.setdefault("timeout", self.TIMEOUT)
-        kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
+        #kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
         try:
             self.dbh = sqlite3.connect(cdb["database"], **kwargs)
         except sqlite3.InternalError, e:
