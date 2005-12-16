@@ -151,7 +151,7 @@ class LocalTroveFormatter(display.TroveFormatter):
             for ln in self.formatDiff(trove, n, v, f, indent):
                 yield ln
         else:
-            for ln in display.TroveFormatter.printTroveHeader(self, trove, 
+            for ln in display.TroveFormatter.formatTroveHeader(self, trove, 
                                                               n, v, f, indent):
                 yield ln
         
