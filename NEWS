@@ -30,6 +30,7 @@ Changes in 0.80.2:
       dependencies, they are not yet enforced.
     * Added the EnforcePythonBuildRequirements policy, with the same
       caveats as EnforcePerlBuildRequirements.
+    * Log more information about the build environment when cooking
 
 Changes in 0.80.1:
   o Client Changes:
