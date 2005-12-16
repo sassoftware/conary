@@ -1338,7 +1338,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addNewPGPKey(self, authToken, label, user, encKeyData):
-        import base64
         logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
             and user != authToken[0]):
@@ -1357,6 +1356,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             uid = None
         self.repos.troveStore.keyTable.updateOwner(uid, key)
+        return True
 
     def getAsciiOpenPGPKey(self, authToken, label, keyId):
         # don't check auth. this is a public function
