@@ -989,12 +989,6 @@ class DependencyTables:
         full = selectTemplate % self._resolveStmt( "TmpRequires",
                                 ("Provides",), ("Dependencies",),
                                 restrictBy = restrictBy, restrictor = restrictor)
-
-        # FIXME: SICK HACK, MySQL doesn't seem to be ready the first time we
-        # execute this query.  The first time we get no rows, but then we
-        # execute it again and we get what we're looking for.
-        # I'm very sorry - msw
-        cu.execute(full).fetchall()
         cu.execute(full, start_transaction = False)
 
         return depList, cu
