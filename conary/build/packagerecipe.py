@@ -679,13 +679,6 @@ class _AbstractPackageRecipe(Recipe):
         macros['buildcc'] = '%s-gcc' % (origBuild)
         macros['buildcxx'] = '%s-g++' % (origBuild)
 
-        if macros['cc'] % macros == macros['buildcc'] % macros:
-            # if necessary, specify the path for the system 
-            # compiler.  Otherwise, if target == build,  attempts to compile 
-            # for the build system may use the target compiler.
-            macros['buildcc'] == '%(bindir)s/' + macros['buildcc']
-            macros['buildcxx'] == '%(bindir)s/' + macros['buildcxx']
-
         if (macros['host'] % macros) == (macros['build'] % macros):
             macros['buildvendor'] += '_build'
                 
@@ -704,7 +697,14 @@ class _AbstractPackageRecipe(Recipe):
         macros['strip-archive'] = '%(compile)s-strip -g'
 
         macros['crossdir'] = 'cross-target-%(target)s'
-            
+
+        if macros['cc'] % macros == macros['buildcc'] % macros:
+            # if necessary, specify the path for the system 
+            # compiler.  Otherwise, if target == build,  attempts to compile 
+            # for the build system may use the target compiler.
+            macros['buildcc'] == '%(bindir)s/' + macros['buildcc']
+            macros['buildcxx'] == '%(bindir)s/' + macros['buildcxx']
+
 	self.macros.update(use.Arch._getMacros())
         self.macros.update(macros)
         newPath = '%(crossprefix)s/bin:' % self.macros
