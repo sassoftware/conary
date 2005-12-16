@@ -541,6 +541,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             fileObj = files.ThawFile(change, pathId)
             yield pathId, path, fileId, version, fileObj
 
+    def getFileVersion(self, pathId, fildId, version):
+        # TODO: implement getFileVersion for changeset source
+        raise KeyError
+
     def getTroves(self, troveList, withFiles = True):
         assert(not self.invalidated)
         retList = []
@@ -598,7 +602,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         else:
             info = (name, oldVer, oldFla)
             return self.erasuresMap[info]
-            
+
     def resolveDependencies(self, label, depList):
         suggMap = self.depDb.resolve(label, depList)
         for depSet, solListList in suggMap.iteritems():
@@ -774,15 +778,15 @@ class TroveSourceStack(SearchableTroveSource):
                 self.addSource(source)
 
     def addSource(self, source):
-        if source is not None and source not in self.sources:
+        if source is not None and source not in self:
             self.sources.append(source)
 
     def insertSource(self, source, idx=0):
-        if source is not None and source not in self.sources:
+        if source is not None and source not in self:
             self.sources.insert(idx, source)
         
     def hasSource(self, source):
-        return source in self.sources
+        return source in self
 
     def hasTroves(self, troveList):
         results = [False] * len(troveList)
@@ -811,6 +815,13 @@ class TroveSourceStack(SearchableTroveSource):
 
     def __repr__(self):
         return 'TroveSourceStack(%s)' % (', '.join(repr(x) for x in self.sources))
+
+    def __contains__(self, newSource):
+        # don't use == because some sources may define ==
+        for source in self.sources:
+            if source is newSource:
+                return True
+        return False
 
     def trovesByName(self, name):
         return list(chain(*(x.trovesByName(name) for x in self.sources)))
@@ -1118,8 +1129,9 @@ class JobSource(AbstractJobSource):
             
 class ChangeSetJobSource(JobSource):
     def __init__(self, newTroveSource, oldTroveSource):
-        JobSource.__init__(self, newTroveSource, oldTroveSource)
         self.csSource = ChangesetFilesTroveSource(oldTroveSource)
+        JobSource.__init__(self, stack(self.csSource, newTroveSource), 
+                                 stack(self.csSource, oldTroveSource))
 
     def addChangeSet(self, cs):
         self.csSource.addChangeSet(cs)

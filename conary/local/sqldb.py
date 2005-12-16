@@ -225,10 +225,10 @@ class DBInstanceTable:
 
 	return val[0]
 
-    def setPresent(self, theId, val):
+    def setPresent(self, theId, val, pinned):
         cu = self.db.cursor()
-	cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=%d"
-			% theId, val)
+	cu.execute("UPDATE Instances SET isPresent=?, pinned=? WHERE instanceId=%d" 
+			% theId, val, pinned)
 
     def has_key(self, item):
         cu = self.db.cursor()
@@ -585,7 +585,7 @@ order by
 	troveInstanceId = self.instances.get((troveName, troveVersionId,
 				    troveFlavorId), None, justPresent = False)
 	if troveInstanceId:
-	    self.instances.setPresent(troveInstanceId, 1)
+	    self.instances.setPresent(troveInstanceId, 1, pinned=pin)
 	else:
 	    assert(min(troveVersion.timeStamps()) > 0)
 	    troveInstanceId = self.instances.addId(troveName, troveVersionId,
@@ -1018,7 +1018,7 @@ order by
         self.depTables.delete(self.db.cursor(), troveInstanceId)
 
 	# mark this trove as not present
-	self.instances.setPresent(troveInstanceId, 0)
+	self.instances.setPresent(troveInstanceId, 0, False)
 
         for x, in wasIn:
             self._sanitizeTroveCollection(cu, x, nameHint = troveName)

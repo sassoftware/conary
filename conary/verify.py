@@ -80,18 +80,26 @@ def verifyTrove(trove, db, cfg):
         if not result: return
         cs = result[0]
 
-        cs.addPrimaryTrove(trove.getName(), 
-                           trove.getVersion().createBranch(versions.LocalLabel(),
-                                    withVerRel = 1),
-                           trove.getFlavor())
+        troveSpecs = []
+	for item in l:
+            trove = item[0]
+            ver = trove.getVersion().createBranch(versions.LocalLabel(), 
+                                                  withVerRel=1)
+                  
+            trvCs = cs.getNewTroveVersion(trove.getName(), 
+                                          ver, trove.getFlavor())
+            if trvCs.hasChangedFiles():
+                troveSpecs.append('%s=%s[%s]' % (trove.getName(), ver, 
+                                                 trove.getFlavor()))
 
         for (changed, fsTrove) in result[1]:
             if changed:
                 break
         if not changed:
             return
-        showchangeset.displayChangeSet(db, cs, [], cfg, ls=True, 
-                                       showChanges=True)
+        showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True, 
+                                       showChanges=True, asJob=True)
+                                       
     except OSError, err:
         if err.errno == 13:
             log.warning("Permission denied creating local changeset for"

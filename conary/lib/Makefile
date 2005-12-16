@@ -27,6 +27,7 @@ python_files=	    __init__.py		\
 		    openpgpkey.py	\
 		    options.py		\
 		    patch.py		\
+		    pydeps.py           \
 		    sha1helper.py	\
 		    stackutil.py	\
 		    tracelog.py		\

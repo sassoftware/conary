@@ -86,7 +86,7 @@ class Flag(dict):
                                                 + '.' + self._name)
 
     def _reverseParents(self):
-        if self._parent:
+        if self._parent is not None:
             for parent in self._parent._reverseParents():
                 yield parent
             yield self._parent

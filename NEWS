@@ -5,6 +5,11 @@ Changes in 0.80.2:
     * conary scs will now work more nicely with group changesets
     * conary scs --all no longer shows ids and sha1s
     * We now never erase pinned items until they are explicity unpinned.
+    * conary verify and conary q --diff now work again
+    * conary q tmpwatch --components will display the components installed
+      for a package.
+    * Fix bug in pinTroves config item behavior - now consistently pins 
+      all troves that match a pinTrove line
   o Build Changes:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)
@@ -26,6 +31,11 @@ Changes in 0.80.2:
       this policy may be caused by packages on the system not having been
       rebuilt yet with Perl dependencies, but may also show bugs in the
       Perl dependency code.
+    * Added Python dependencies, both provides and requires.  Like Perl
+      dependencies, they are not yet enforced.
+    * Added the EnforcePythonBuildRequirements policy, with the same
+      caveats as EnforcePerlBuildRequirements.
+    * Log more information about the build environment when cooking
 
 Changes in 0.80.1:
   o Client Changes:
