@@ -1737,7 +1737,9 @@ def _getperl(macros, recipe):
     for adding to @INC.
     """
     perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
-    perlPath = '%(bindir)s/perl' %macros
+    # not %(bindir)s so that package modifications do not affect
+    # the search for system perl
+    perlPath = '/usr/bin/perl' %macros
 
     def _perlDestInc(destdir, perlDestInc):
         return ' '.join(['-I' + destdir + x for x in perlDestInc])
