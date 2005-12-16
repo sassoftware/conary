@@ -106,7 +106,7 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
         else:
             kw = {}
 
-        troves = troveSource.getTroves(troveTups, **kw)
+        troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
     else:
         troves = [None] * len(troveTups)
     
@@ -130,7 +130,7 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
                 newTroveTups = sorted(trv.iterTroveList())
                 if needTroves:
                     newTroves = troveSource.getTroves(newTroveTups, 
-                                                      withFiles=needFiles)
+                                                      withFiles=False)
                 else:
                     newTroves = [None] * len(newTroveTups)
 
