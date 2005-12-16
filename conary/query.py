@@ -146,15 +146,17 @@ class LocalDisplayConfig(display.DisplayConfig):
 
 class LocalTroveFormatter(display.TroveFormatter):
 
-    def printTroveHeader(self, trove, n, v, f, indent):
+    def formatTroveHeader(self, trove, n, v, f, indent):
         if self.dcfg.printDiff():
-            self.printDiff(trove, n, v, f, indent)
+            for ln in self.formatDiff(trove, n, v, f, indent):
+                yield ln
         else:
-            display.TroveFormatter.printTroveHeader(self, trove, n, v, f, 
-                                                    indent)
+            for ln in display.TroveFormatter.printTroveHeader(self, trove, 
+                                                              n, v, f, indent):
+                yield ln
         
 
-    def printDiff(self, trv, n, v, f, indent):
+    def formatDiff(self, trv, n, v, f, indent):
         troveSource = self.dcfg.getTroveSource()
 
         localTrv = troveSource.getTrove(n,v,f, pristine=False)
@@ -168,19 +170,19 @@ class LocalTroveFormatter(display.TroveFormatter):
             if change: 
                 newVer, newFla = change[2]
 
-            self.printNVF(troveName, ver, fla)
+            yield self.formatNVF(troveName, ver, fla)
 
             if change: 
                 if newVer is None:
                     tups = troveSource.trovesByName(troveName)
                     if not tups:
-                        print '  --> (Deleted or Not Installed)'
+                        yield '  --> (Deleted or Not Installed)'
                     else:
-                        print ('  --> Not linked to parent trove - potential'
+                        yield ('  --> Not linked to parent trove - potential'
                                ' replacements:')
                         for (dummy, newVer, newFla) in tups:
-                            self.printNVF(troveName, newVer, newFla,
-                                          format=display._chgFormat)
+                            yield self.formatNVF(troveName, newVer, newFla,
+                                                 format=display._chgFormat)
                 else:
-                    self.printNVF(troveName, newVer, newFla, 
-                                  format=display._chgFormat)
+                    yield self.formatNVF(troveName, newVer, newFla, 
+                                         format=display._chgFormat)
