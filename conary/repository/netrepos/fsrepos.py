@@ -195,7 +195,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         old = None
 			oldStreams = {}
                     else:
-                        old, oldStreams = self.trvIterator.next()
+			if self.withFiles:
+			    old, oldStreams = self.trvIterator.next()
+			else:
+			    old = self.trvIterator.next()
+			    oldStreams = {}
+
                         if old is None:
                             [ x for x in self.trvIterator ]
                             raise errors.TroveMissing(job[0], job[1][0])
@@ -204,7 +209,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if job[2][0] is None:
                         new = None
                     else:
-                        new, newStreams = self.trvIterator.next()
+			if self.withFiles:
+			    new, newStreams = self.trvIterator.next()
+			else:
+			    new = self.trvIterator.next()
+			    newStreams = {}
+
                         if new is None:
                             [ x for x in self.trvIterator ]
                             raise errors.TroveMissing(job[0], job[2][0])
