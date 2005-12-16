@@ -144,15 +144,12 @@ def createNodes(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Nodes_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Nodes_item_branch_version_uq
-                UNIQUE(itemId, branchId, versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
-        cu.execute("""INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)""")
-        cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
-                           ON Nodes(itemId, branchId, versionId)""")
-        cu.execute("""CREATE INDEX NodesItemVersionIdx
-                           ON Nodes(itemId, versionId)""")
+        cu.execute("INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)")
+        cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx "
+                   "ON Nodes(itemId, branchId, versionId)")
+        cu.execute("CREATE INDEX NodesItemVersionIdx ON Nodes(itemId, versionId)")
         commit = True
 
     if 'NodesView' not in db.views:
@@ -198,9 +195,7 @@ def createLatest(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Latest_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Latest_item_branch_flavor_uq
-                UNIQUE(itemId, branchId, flavorId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
         cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
@@ -236,22 +231,21 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Users (
             userId          INTEGER PRIMARY KEY AUTO_INCREMENT,
-            user            VARCHAR(254),
-            salt            BINARY(4),
-            password        VARCHAR(254),
-            CONSTRAINT Users_userId_uq
-                UNIQUE(user)
+            user            VARCHAR(254) NOT NULL,
+            salt            BINARY(4) NOT NULL,
+            password        VARCHAR(254)
         )""")
+        cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
         commit = True
 
     if "UserGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE UserGroups (
             userGroupId     INTEGER PRIMARY KEY AUTO_INCREMENT,
-            userGroup       VARCHAR(254),
-            CONSTRAINT UserGroups_userGroup_uq
-                UNIQUE(userGroup)
+            userGroup       VARCHAR(254)
         )""")
+        cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
+                   "UserGroups(userGroup)")
         commit = True
 
     if "UserGroupMembers" not in db.tables:
@@ -324,12 +318,12 @@ def createUsers(db):
             entGroupId      INTEGER PRIMARY KEY AUTO_INCREMENT,
             entGroup        VARCHAR(254),
             userGroupId     INTEGER,
-            CONSTRAINT EntitlementClasses_entitlementGroup_uq
-                UNIQUE(entGroup),
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
+        cu.execute("CREATE UNIQUE INDEX EntitlementGroupsEntGroupIdx ON "
+                   "EntitlementGroups(entGroup)")
         commit = True
 
     if "EntitlementOwners" not in db.tables:
@@ -338,33 +332,29 @@ def createUsers(db):
             entGroupId      INTEGER,
             ownerGroupId    INTEGER,
             CONSTRAINT EntitlementOwners_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES
-                                EntitlementGroups(entGroupId)
+                FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
-            INDEX (ownerGroupId),
             CONSTRAINT EntitlementOwners_entOwnerId_fk
-                FOREIGN KEY (ownerGroupId) REFERENCES
-                                userGroups(userGroupId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            INDEX (entGroupId, ownerGroupId),
-            CONSTRAINT EntitlementOwners_entGroupId_ownerGroupId_uq
-                UNIQUE(entGroupId, ownerGroupId)
+                FOREIGN KEY (ownerGroupId) REFERENCES userGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        cu.execute("CREATE UNIQUE INDEX EntitlementOwnersEntOwnerIdx ON "
+                   "EntitlementOwners(entGroupId, ownerGroupId)")
+        cu.execute("CREATE INDEX EntitlementOwnersOwnerIdx ON "
+                   "EntitlementOwners(ownerGroupId)")
         commit = True
 
     if "Entitlements" not in db.tables:
         cu.execute("""
         CREATE TABLE Entitlements (
             entGroupId      INTEGER,
-            entitlement     BLOB,
+            entitlement     BINARY(255),
             CONSTRAINT Entitlements_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES
-                                EntitlementOwners(entGroupId)
+                FOREIGN KEY (entGroupId) REFERENCES EntitlementOwners(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
-        #CONSTRAINT EntitlementClasses_entitlement_uq
-        #        UNIQUE(entGroupId, entitlement)
-
+        cu.execute("CREATE UNIQUE INDEX EntitlementsEntGroupEntitlementIdx ON "
+                   "Entitlements(entGroupId, entitlement)")
         commit = True
 
     if commit:
@@ -383,10 +373,10 @@ def createPGPKeys(db):
             pgpKey          BLOB,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT PGPKeys_fingerprint_uq
-                UNIQUE(fingerprint)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
+                   "PGPKeys(fingerprint)")
         commit = True
     if "PGPFingerprints" not in db.tables:
         cu.execute("""
@@ -555,7 +545,7 @@ def createChangeLog(db):
         )""")
     cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
                "ChangeLogs(nodeId)")
-    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
+    cu.execute("INSERT INTO ChangeLogs VALUES(0, NULL, NULL, NULL)")
     db.commit()
     db.loadSchema()
 
