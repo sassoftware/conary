@@ -26,6 +26,10 @@ Changes in 0.80.2:
       this policy may be caused by packages on the system not having been
       rebuilt yet with Perl dependencies, but may also show bugs in the
       Perl dependency code.
+    * Added Python dependencies, both provides and requires.  Like Perl
+      dependencies, they are not yet enforced.
+    * Added the EnforcePythonBuildRequirements policy, with the same
+      caveats as EnforcePerlBuildRequirements.
 
 Changes in 0.80.1:
   o Client Changes:

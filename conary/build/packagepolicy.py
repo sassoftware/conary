@@ -32,7 +32,7 @@ from conary.build import buildpackage, destdirpolicy, filter, policy
 from conary.build import tags, use
 from conary.build.use import Use
 from conary.deps import deps
-from conary.lib import elf, util, log
+from conary.lib import elf, util, log, pydeps
 from conary.local import database
 
 class NonBinariesInBindirs(policy.Policy):
@@ -1720,6 +1720,8 @@ def _getperlincpath(perl):
     , and sort longest first for removing
     prefixes from perl files that are provided.
     """
+    if not perl:
+        return []
     p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
     perlIncPath = p.readlines()
     # make sure that the command completed successfully
@@ -1765,6 +1767,9 @@ def _getperl(macros, recipe):
         # system perl if no packaged perl, needs no @INC mangling
         return [perlPath, '']
 
+    # must be no perl at all
+    return ['', '']
+
 
 class Provides(_BuildPackagePolicy):
     """
@@ -1788,6 +1793,7 @@ class Provides(_BuildPackagePolicy):
     def __init__(self, *args, **keywords):
 	self.provisions = []
         self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        self.sysPath = None
         self.monodisPath = None
         self.perlIncPath = None
 	policy.Policy.__init__(self, *args, **keywords)
@@ -1851,7 +1857,39 @@ class Provides(_BuildPackagePolicy):
                 depSet.addDep(depClass, dep)
             pkg.providesMap[path] = depSet
 
-    def _addCILDeps(self, path, m, pkg, macros):
+    def _addPythonProvides(self, path, m, pkg, macros):
+
+        if self.sysPath is None:
+            self.sysPath = [x for x in sys.path if x and os.path.exists(x) ]
+            # we will need to truncate paths using longest path first
+            self.sysPath.sort(key=len, reverse=True)
+
+        if not (path.endswith('.py') or path.endswith('.so')):
+            return
+
+        depPath = None
+        for sysPathEntry in self.sysPath:
+            if path.startswith(sysPathEntry):
+                depPath = path[len(sysPathEntry)+1:]
+                break
+
+        if not depPath:
+            return
+
+        depPath = depPath[:-3]
+        if depPath.endswith('/__init__'):
+            depPath = depPath.replace('/__init__', '')
+        depPath = depPath.replace('/', '.')
+        if depPath == '__future__':
+            return
+        
+        dep = deps.Dependency(depPath)
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        pkg.providesMap[path].addDep(deps.PythonDependencies, dep)
+
+
+    def _addCILProvides(self, path, m, pkg, macros):
         if not m or m.name != 'CIL':
             return
         fullpath = macros.destdir + path
@@ -1877,7 +1915,7 @@ class Provides(_BuildPackagePolicy):
         pkg.providesMap[path].addDep(deps.CILDependencies,
                 deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
 
-    def _addJavaDeps(self, path, m, pkg):
+    def _addJavaProvides(self, path, m, pkg):
         if not m.contents['provides']:
             return
         if path not in pkg.providesMap:
@@ -1886,7 +1924,7 @@ class Provides(_BuildPackagePolicy):
             pkg.providesMap[path].addDep(deps.JavaDependencies,
                 deps.Dependency(prov, []))
 
-    def _addPerlDeps(self, path, m, pkg):
+    def _addPerlProvides(self, path, m, pkg):
         # do not call perl to get @INC unless we have something to do for perl
         self._fetchPerlIncPath()
 
@@ -1947,14 +1985,20 @@ class Provides(_BuildPackagePolicy):
         if os.path.exists(fullpath):
             if m and m.name == 'ELF':
                 self._ELFPathProvide(path, m, pkg)
-            if m and m.name == 'CIL':
-                self._addCILDeps(path, m, pkg, macros)
-            if (m and (m.name == 'java' or m.name == 'jar')
+
+            if path.endswith('.so') or path.endswith('.py'):
+                self._addPythonProvides(path, m, pkg, macros)
+
+            elif m and m.name == 'CIL':
+                self._addCILProvides(path, m, pkg, macros)
+
+            elif (m and (m.name == 'java' or m.name == 'jar')
                 and m.contents['provides']):
-                self._addJavaDeps(path, m, pkg)
-            if path.endswith('.pm') or path.endswith('.pl'):
+                self._addJavaProvides(path, m, pkg)
+
+            elif path.endswith('.pm') or path.endswith('.pl'):
                 # Keep the extension list in sync with Requires.
-                self._addPerlDeps(path, m, pkg)
+                self._addPerlProvides(path, m, pkg)
 
         if path not in pkg.providesMap:
             return
@@ -2095,6 +2139,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
+        self.sysPath = None
         self.monodisPath = None
         self.perlReqs = None
         self.perlPath = None
@@ -2230,6 +2275,56 @@ class Requires(_addInfo, _BuildPackagePolicy):
             depSet.addDep(depClass, dep)
         pkg.requiresMap[path] = depSet
 
+    def _addPythonRequirements(self, path, fullpath, pkg, script=False):
+        # FIXME: we really should check for python in destdir and shell
+        # out to use that python to discover the dependencies if it exists.
+        destdir = self.recipe.macros.destdir
+        if self.sysPath is None:
+            sysPath = [x for x in sys.path if x and os.path.exists(x)]
+            self.sysPath = [x for x in itertools.chain(
+                                [destdir+y for y in sysPath], sysPath)]
+            self.pythonModuleFinder = pydeps.DirBasedModuleFinder(
+                destdir, list(self.sysPath))
+            # now we will need to truncate paths using longest path first
+            self.sysPath.sort(key=len, reverse=True)
+
+        try:
+            if script:
+                self.pythonModuleFinder.run_script(fullpath)
+            else:
+                self.pythonModuleFinder.load_file(fullpath)
+        except:
+            # not a valid python file
+            self.dbg('File %s is not a valid python file', path)
+            return
+
+        for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
+            for sysPathEntry in self.sysPath:
+                if depPath.startswith(sysPathEntry):
+                    depPath = depPath[len(sysPathEntry)+1:]
+                    break
+
+            if depPath.startswith('/'):
+                # a python file not found in sys.path will not have been
+                # provided, so we must not depend on it either
+                return
+            if depPath.endswith('.py') or depPath.endswith('.so'):
+                depPath = depPath[:-3]
+            else:
+                # FIXME: not sure if this makes sense or not?
+                assert(False)
+                # not something we recognize, drop it and go on
+                continue
+
+            depPath = depPath.replace('/', '.')
+            depPath = depPath.replace('.__init__', '')
+
+            if depPath == '__future__':
+                continue
+
+            self._addRequirement(path, depPath, [], pkg,
+                                 deps.PythonDependencies)
+
     def _fetchPerl(self):
         """
         Cache the perl path and @INC path with %(destdir)s prepended to
@@ -2244,7 +2339,11 @@ class Requires(_addInfo, _BuildPackagePolicy):
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
             self._fetchPerl()
-            assert(self.perlPath)
+            if not self.perlPath:
+                # no perl == bootstrap, but print warning
+                self.dbg('Unable to find perl interpreter, disabling perl: requirements')
+                self.perlReqs = False
+                return
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-3])
             localcopy = '/'.join((basedir, 'conary/ScanDeps'))
             if os.path.exists(localcopy):
@@ -2256,6 +2355,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 perlreqs = '/usr/libexec/conary/perlreqs.pl'
             self.perlReqs = '%s -I%s %s %s' %(
                 self.perlPath, scandeps, self.perlIncPath, perlreqs)
+        if self.perlReqs is False:
+            return
 
         p = os.popen('%s %s' %(self.perlReqs, fullpath))
         reqlist = [x.strip().split('//') for x in p.readlines()]
@@ -2314,6 +2415,12 @@ class Requires(_addInfo, _BuildPackagePolicy):
                     # real dependency on the env binary
                 self._addRequirement(path, interp, [], pkg,
                                      deps.FileDependencies)
+
+        if (f.inode.perms() & 0111 and m and m.name == 'script' and
+            os.path.basename(m.contents['interpreter']).startswith('python')):
+            self._addPythonRequirements(path, fullpath, pkg, script=True)
+        elif path.endswith('.py'):
+            self._addPythonRequirements(path, fullpath, pkg, script=False)
 
         if m and m.name == 'CIL':
             if not self.monodisPath:
@@ -2651,6 +2758,21 @@ class EnforceSonameBuildRequirements(_enforceBuildRequirements):
                 libname]
 
 
+class EnforcePythonBuildRequirements(_enforceBuildRequirements):
+    """
+    All Python runtime requirements should be met either by this package
+    or by components listed in the C{buildRequires} list;
+    any trove names wrongly suggested can be eliminated from the
+    list with C{r.EnforcePythonBuildRequirements(exceptions='I{pkg}:I{comp}')}.
+    """
+
+    depClassType = deps.DEP_CLASS_PYTHON
+    depClass = deps.PythonDependencies
+
+    # FIXME: remove this when we are ready to enforce Python dependencies
+    def setTalk(self):
+        self.talk = self.warn
+
 
 class EnforceJavaBuildRequirements(_enforceBuildRequirements):
     """
@@ -2890,6 +3012,7 @@ def DefaultPolicy(recipe):
 	Requires(recipe),
 	Flavor(recipe),
         EnforceSonameBuildRequirements(recipe),
+        EnforcePythonBuildRequirements(recipe),
         EnforceJavaBuildRequirements(recipe),
         EnforceCILBuildRequirements(recipe),
         EnforcePerlBuildRequirements(recipe),
