@@ -659,6 +659,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                          ignoreDeps=ignoreDeps)
     except builderrors.RecipeDependencyError:
         return
+
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
 
@@ -708,6 +709,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
+        logBuildEnvironment(logFile, sourceVersion, recipeObj.macros, cfg)
     try:
         bldInfo.begin()
         bldInfo.destdir = destdir
@@ -884,6 +886,53 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         signAbsoluteChangeset(changeSet, signatureKey)
 
     return changeSet, built
+
+def logBuildEnvironment(out, sourceVersion, macros, cfg):
+    write = out.write
+
+    write('Building %s %s\n' % (macros.name, sourceVersion))
+
+    write('*' * 60 + '\n')
+    write("Environment:\n")
+    for key, value in sorted(os.environ.items()):
+        write("%s=%s\n" % (key, value))
+
+    write('*' * 60 + '\n')
+
+    write("Use flags:\n")
+    for flag in sorted(use.Use.keys()):
+        write("%s\n" % (use.Use[flag]))
+
+    write("*"*60 + '\n')
+
+    write("Local flags:" + '\n')
+    for flag in use.LocalFlags.keys():
+        write("%s\n" % (use.LocalFlags[flag]))
+
+    write("*"*60 +'\n')
+    
+    write("Arch flags:\n")
+    for majarch in sorted(use.Arch.keys()):
+        write("%s\n" % (use.Arch[majarch]))
+        for subarch in sorted(use.Arch[majarch].keys()):
+            write("%s\n" % (use.Arch[majarch][subarch]))
+
+    write("*"*60 + '\n')
+
+    write("Macros:" + '\n')
+    for macro in sorted(macros.keys()):
+        write("%s: %s\n" % (macro, macros[macro]))
+
+    write("*"*60 + '\n')
+
+    write("Config:\n")
+    cfg.setDisplayOptions(hidePasswords=True)
+    for key in ('buildFlavor', 'buildLabel', 'contact', 'name', 'repositoryMap'):
+        cfg.displayKey(key, out)
+    write("*"*60 + '\n')
+
+    write('START OF BUILD:\n\n')
+
 
 
 def guessSourceVersion(repos, name, versionStr, buildLabel, 

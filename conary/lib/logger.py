@@ -204,6 +204,26 @@ class _ChildLogger:
                 if msg.args[0] != 4:
                     raise
                 read = []
+            if directRd in read:
+                # read output from pseudo terminal stdout/stderr, and pass to 
+                # terminal and log
+                try:
+                    output = os.read(directRd, BUFFER)
+                except OSError, msg:
+                    if msg.errno == errno.EIO: 
+                        # input/output error - pipe closed
+                        # shut down logger
+                        break
+                    elif msg.errno != errno.EINTR:
+                        # EINTR is due to an interrupted read - that could be
+                        # due to a SIGWINCH signal.  Raise any other error
+                        raise
+                else:
+                    logFile.write(output)
+
+                # always read all of directWrite before reading anything else
+                continue
+
             if ptyFd in read:
                 # read output from pseudo terminal stdout/stderr, and pass to 
                 # terminal and log
@@ -220,22 +240,6 @@ class _ChildLogger:
                         raise
                 else:
                     os.write(stdout, output)
-                    logFile.write(output)
-            if directRd in read:
-                # read output from pseudo terminal stdout/stderr, and pass to 
-                # terminal and log
-                try:
-                    output = os.read(directRd, BUFFER)
-                except OSError, msg:
-                    if msg.errno == errno.EIO: 
-                        # input/output error - pipe closed
-                        # shut down logger
-                        break
-                    elif msg.errno != errno.EINTR:
-                        # EINTR is due to an interrupted read - that could be
-                        # due to a SIGWINCH signal.  Raise any other error
-                        raise
-                else:
                     logFile.write(output)
             if stdin in read:
                 # read input from stdin, and pass to 
