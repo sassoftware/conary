@@ -13,12 +13,18 @@
 #
 
 import os
+import re
 
 from conary import sqlite3
 from conary.lib.tracelog import logMe
 
 from base_drv import BaseDatabase, BaseCursor, BaseSequence
 import sqlerrors
+
+# implement the regexp function for sqlite
+def _regexp(pattern, item):
+    regexp = re.compile(pattern)
+    return regexp.match(item) is not None
 
 class Cursor(BaseCursor):
     driver = "sqlite"
@@ -140,6 +146,8 @@ class Database(BaseDatabase):
             if str(e) == 'database is locked':
                 raise sqlerrors.DatabaseLocked(e)
             raise
+        # add a regexp funtion to enable SELECT FROM bar WHERE bar REGEXP .*
+        self.dbh.create_function('regexp', 2, _regexp)
         self.loadSchema()
         if self.database in self.VIRTUALS:
             self.inode = (None, None)
