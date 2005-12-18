@@ -112,6 +112,7 @@ class ClientUpdate:
                 return scoredList[-1][-1]
 
         def _checkDeps(jobSet, trvSrc, findOrdering, resolveDeps):
+            keepList = []
 
             while True:
                 (depList, cannotResolve, changeSetList) = \
@@ -119,7 +120,7 @@ class ClientUpdate:
                                                  findOrdering = findOrdering)
 
                 if not cannotResolve or not resolveDeps:
-                    return (depList, cannotResolve, changeSetList)
+                    return (depList, cannotResolve, changeSetList, keepList)
 
                 oldIdx = {}
                 for job in jobSet:
@@ -129,6 +130,8 @@ class ClientUpdate:
                 restoreSet = set()
                     
                 for (reqInfo, depSet, provInfoList) in cannotResolve:
+                    # Modify/remove non-primary jobs that cause
+                    # irreconcilable dependency problems.
                     for provInfo in provInfoList:
                         if provInfo not in oldIdx: continue
 
@@ -145,6 +148,7 @@ class ClientUpdate:
                         if job[2][0] is None:
                             # this was an erasure implied by package changes;
                             # leaving it in place won't hurt anything
+                            keepList.append((job, depSet, reqInfo))
                             restoreSet.add(job)
                             break
 
@@ -155,10 +159,11 @@ class ClientUpdate:
                             
                         if oldTrv.compatibleWith(newTrv):
                             restoreSet.add(job)
+                            keepList.append((job, depSet, reqInfo))
                             break
 
                 if not restoreSet:
-                    return (depList, cannotResolve, changeSetList)
+                    return (depList, cannotResolve, changeSetList, keepList)
 
                 for job in restoreSet:
                     jobSet.remove(job)
@@ -171,7 +176,7 @@ class ClientUpdate:
         # def _resolveDependencies() begins here
 
         pathIdx = 0
-        (depList, cannotResolve, changeSetList) = \
+        (depList, cannotResolve, changeSetList, keepList) = \
                     _checkDeps(jobSet, uJob.getTroveSource(),
                                findOrdering = split, 
                                resolveDeps = resolveDeps)
@@ -238,10 +243,11 @@ class ClientUpdate:
                 jobSet.update(newJob)
 
                 lastCheck = depList
-                (depList, cannotResolve, changeSetList) = \
+                (depList, cannotResolve, changeSetList, newKeepList) = \
                             _checkDeps(jobSet, uJob.getTroveSource(),
                                        findOrdering = split, 
                                        resolveDeps = resolveDeps)
+                keepList.extend(newKeepList)
                 if lastCheck != depList:
                     pathIdx = 0
             else:
@@ -249,7 +255,7 @@ class ClientUpdate:
                 # in the search path
                 pathIdx += 1
 
-        return (depList, suggMap, cannotResolve, changeSetList)
+        return (depList, suggMap, cannotResolve, changeSetList, keepList)
 
     def _processRedirects(self, uJob, jobSet, recurse):
         """
@@ -1252,10 +1258,15 @@ conary erase '%s=%s%s'
 
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
-        (depList, suggMap, cannotResolve, splitJob) = \
+        (depList, suggMap, cannotResolve, splitJob, keepList) = \
             self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
                                       useRepos = resolveRepos)
+
+        if keepList:
+            callback.done()
+            for job, depSet, reqInfo in sorted(keepList):
+                log.warning('keeping %s - required by at least %s' % (job[0], reqInfo[0]))
 
         if depList:
             raise DepResolutionFailure(depList)
