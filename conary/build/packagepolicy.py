@@ -2449,9 +2449,11 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if (path.endswith('.pl') or path.endswith('.pm') or
             (f.inode.perms() & 0111 and m and m.name == 'script'
              and '/bin/perl' in m.contents['interpreter'])):
-            for req in self._getPerlReqs(path, fullpath):
-                self._addRequirement(path, req, [], pkg,
-                                     deps.PerlDependencies)
+            perlReqs = self._getPerlReqs(path, fullpath)
+            if perlReqs is not None:
+                for req in perlReqs:
+                    self._addRequirement(path, req, [], pkg,
+                                         deps.PerlDependencies)
 
         # remove intentionally discarded dependencies
         if self.exceptDeps and path in pkg.requiresMap:
