@@ -2345,7 +2345,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
                 # no perl == bootstrap, but print warning
                 self.dbg('Unable to find perl interpreter, disabling perl: requirements')
                 self.perlReqs = False
-                return
+                return []
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-3])
             localcopy = '/'.join((basedir, 'conary/ScanDeps'))
             if os.path.exists(localcopy):
@@ -2358,7 +2358,7 @@ class Requires(_addInfo, _BuildPackagePolicy):
             self.perlReqs = '%s -I%s %s %s' %(
                 self.perlPath, scandeps, self.perlIncPath, perlreqs)
         if self.perlReqs is False:
-            return
+            return []
 
         p = os.popen('%s %s' %(self.perlReqs, fullpath))
         reqlist = [x.strip().split('//') for x in p.readlines()]
@@ -2450,10 +2450,9 @@ class Requires(_addInfo, _BuildPackagePolicy):
             (f.inode.perms() & 0111 and m and m.name == 'script'
              and '/bin/perl' in m.contents['interpreter'])):
             perlReqs = self._getPerlReqs(path, fullpath)
-            if perlReqs is not None:
-                for req in perlReqs:
-                    self._addRequirement(path, req, [], pkg,
-                                         deps.PerlDependencies)
+            for req in perlReqs:
+                self._addRequirement(path, req, [], pkg,
+                                     deps.PerlDependencies)
 
         # remove intentionally discarded dependencies
         if self.exceptDeps and path in pkg.requiresMap:
