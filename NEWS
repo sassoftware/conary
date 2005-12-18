@@ -8,10 +8,10 @@ Changes in 0.80.2:
     * conary verify and conary q --diff now work again
     * conary q tmpwatch --components will display the components installed
       for a package.
-    * Fix bug in pinTroves config item behavior - now consistently pins 
-      all troves that match a pinTrove line
-    * When a trove is left of the system because of dependency resolution,
-      a warning is logged
+    * The pinTroves config item behavior has been fixed.  It now 
+      consistently pins all troves that match a pinTrove line.
+    * When a trove is left on the system because of dependency resolution
+      during an update, a warning is logged.
   o Build Changes:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)
