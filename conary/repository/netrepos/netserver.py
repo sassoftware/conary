@@ -70,6 +70,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
+        """
+        Returns a tuple of (AsAnonymous, Exception, result). AsAnonymous
+        is a Boolean stating whether the operation was performed as the
+        anonymous user (due to a failure w/ the passed authToken). Exception
+        is a Boolean stating whether an error occured.
+        """
         def condRollback():
             if self.db.inTransaction:
                 self.db.rollback()
@@ -83,48 +89,53 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # try and get the method to see if it exists
             method = self.__getattribute__(methodname)
         except AttributeError:
-            return (True, ("MethodNotSupported", methodname, ""))
+            return (False, True, ("MethodNotSupported", methodname, ""))
 
         logMe(2, "calling", methodname)
         try:
             # the first argument is a version number
             r = method(authToken, *args)
-            return (False, r)
-	except errors.TroveMissing, e:
-            condRollback()
+            return (False, False, r)
+        except Exception, e:
+            pass
+
+        if isinstance(e, errors.InsufficientPermission) and \
+                                    authToken[0] is not None:
+            # When we get InsufficientPermission w/ a user/password, retry
+            # the operation as anonymous
+            try:
+                r = method(('anonymous', 'anonymous', None, None), *args)
+                return (True, False, r)
+            except Exception, e:
+                pass
+
+        # if there is no exception, we've returned before now
+        condRollback()
+
+        if isinstance(e, errors.TroveMissing):
 	    if not e.troveName:
-		return (True, ("TroveMissing", "", ""))
+		return (False, True, ("TroveMissing", "", ""))
 	    elif not e.version:
-		return (True, ("TroveMissing", e.troveName, ""))
+		return (False, True, ("TroveMissing", e.troveName, ""))
 	    else:
-		return (True, ("TroveMissing", e.troveName,
+		return (False, True, ("TroveMissing", e.troveName,
 			self.fromVersion(e.version)))
-        except errors.IntegrityError, e:
-            condRollback()
-            return (True, ('IntegrityError', str(e)))
-	except trove.TroveIntegrityError, e:
-            condRollback()
-            return (True, ("TroveIntegrityError", str(e) +
-                           # add a helpful error message for now
-                        ' (you may need to update to conary 0.62.12 or later)'))
-        except errors.FileContentsNotFound, e:
-            condRollback()
-            return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
+        elif isinstance(e, errors.FileContentsNotFound):
+            return (False, True, ('FileContentsNotFound', 
+                           self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
-        except errors.FileStreamNotFound, e:
-            condRollback()
-            return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
+        elif isinstance(e, errors.FileStreamNotFound):
+            return (False, True, ('FileStreamNotFound', 
+                           self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
-        except sqlite3.InternalError, e:
-            condRollback()
+        elif isinstance(e, sqlite3.InternalError):
             if str(e) == 'database is locked':
-                return (True, ('RepositoryLocked'))
-            raise
-	except Exception, e:
-            condRollback()
+                return (False, True, ('RepositoryLocked'))
+            raise e
+	else:
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
-                    return (True, (marshall, str(e)))
+                    return (False, True, (marshall, str(e)))
             raise
 	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:

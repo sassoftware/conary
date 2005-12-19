@@ -164,6 +164,7 @@ simpleExceptions = (
     (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
     (GroupAlreadyExists,         'GroupAlreadyExists'),
     (IncompatibleKey,            'IncompatibleKey'),
+    (IntegrityError,             'IntegrityError'),
     (InvalidClientVersion,       'InvalidClientVersion'),
     (KeyNotFound,                'KeyNotFound'),
     (UserAlreadyExists,          'UserAlreadyExists'),

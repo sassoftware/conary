@@ -85,6 +85,9 @@ def post(port, isSecure, repos, req):
         except errors.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
 
+        asAnonymous = result[0]
+        result = result[1:]
+
         resp = xmlrpclib.dumps((result,), methodresponse=1)
         req.content_type = "text/xml"
         encoding = req.headers_in.get('Accept-encoding', '')
@@ -92,6 +95,8 @@ def post(port, isSecure, repos, req):
             req.headers_out['Content-encoding'] = 'deflate'
             resp = zlib.compress(resp, 5)
         req.headers_out['Content-length'] = '%d' % len(resp)
+        if asAnonymous:
+            req.headers_out["X-Conary-AsAnonymous"] = "1"
         req.write(resp)
         return apache.OK
     else:
