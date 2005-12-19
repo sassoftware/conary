@@ -30,11 +30,12 @@ def _getBranchType(binaryOnly, sourceOnly):
         raise OptionsError, ('Can only specify one of --binary-only and'
                              ' --source-only')
     if binaryOnly:
-        return conaryclient.ConaryClient.BRANCH_BINARY_ONLY
+        return conaryclient.ConaryClient.BRANCH_BINARY
     elif sourceOnly:
-        return conaryclient.ConaryClient.BRANCH_SOURCE_ONLY
+        return conaryclient.ConaryClient.BRANCH_SOURCE
     else:
-        return conaryclient.ConaryClient.BRANCH_ALL
+        return conaryclient.ConaryClient.BRANCH_BINARY |        \
+               conaryclient.ConaryClient.BRANCH_SOURCE
 
 def displayBranchJob(cs, shadow=False):
     if shadow:
