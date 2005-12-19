@@ -111,7 +111,7 @@ class _ShimMethod(netclient._Method):
 
     def __call__(self, *args):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
-        isException, result = self._server.callWrapper(
+        asAnonymous, isException, result = self._server.callWrapper(
             self._protocol, self._port,
             self._name, self._authToken, args)
 
