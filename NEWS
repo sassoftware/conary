@@ -1,3 +1,8 @@
+Changes in 0.80.3:
+  o Build Changes:
+    * Java dependencies now properly ignore array elements in all cases,
+      removing false Java dependencies like "[[I" and "[[B".
+
 Changes in 0.80.2:
   o Client Changes:
     * Bugs in "conary update foo=<old>--<new>" behavior have been

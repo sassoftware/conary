@@ -92,10 +92,12 @@ def getDeps(contents):
         if referencedClassID not in symbolTable.stringList:
             continue
         refString = symbolTable.stringList[referencedClassID]
-        if refString.startswith('[') and 'L' in refString:
-            refString = refString[refString.index('L'):]
-            # pull out all the references in this array
-            reqSet.update(_parseRefs(refString))
+        if refString.startswith('['):
+            if 'L' in refString:
+                refString = refString[refString.index('L'):]
+                # pull out all the references in this array
+                reqSet.update(_parseRefs(refString))
+            # else ignore the array, nothing here for us to record
         else:
             reqSet.add('.'.join(refString.split('/')))
 
