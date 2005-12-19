@@ -234,7 +234,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	    return None
         logMe(3, "returned from", method)
 
-        asAnonymous = result[0]
+        usedAnonymous = result[0]
         result = result[1:]
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
@@ -247,8 +247,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header('Content-encoding', 'deflate')
 	self.send_header("Content-type", "text/xml")
 	self.send_header("Content-length", str(len(resp)))
-        if asAnonymous:
-            self.send_header("X-Conary-AsAnonymous", '1')
+        if usedAnonymous:
+            self.send_header("X-Conary-UsedAnonymous", '1')
 
 	self.end_headers()
 	self.wfile.write(resp)
