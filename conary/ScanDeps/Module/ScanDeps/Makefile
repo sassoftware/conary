@@ -19,11 +19,12 @@ dist_files = $(extra_dist)
 all: default-all
 
 install:
-	install -d -m 644 DataFeed.pm $(DESTDIR)$(prefix)/lib/conary/ScanDeps/Module/ScanDeps/
+	mkdir -p $(DESTDIR)$(prefix)/lib/conary/ScanDeps/Module/ScanDeps/
+	install -m 644 DataFeed.pm $(DESTDIR)$(prefix)/lib/conary/ScanDeps/Module/ScanDeps
 
 dist: default-dist
 
 clean: default-clean
 
-include ../../../Make.rules
+include ../../../../Make.rules
 

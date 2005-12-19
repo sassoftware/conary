@@ -30,7 +30,8 @@ install:
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
 	install -m 755 changemail $(DESTDIR)$(conarydir)
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
-	install -d -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
+	mkdir -p $(DESTDIR)$(conarylibexecdir)
+	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
 dist: default-dist
 
