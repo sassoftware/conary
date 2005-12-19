@@ -96,6 +96,7 @@ def usage(rc = 1):
     print '               --config "<item> <value>"'
     print '               --context <context>'
     print '               --install-label <label>'
+    print '               --interactive'
     print "               --root <root>"
     print '               --signature-key "<fingerprint>"'
     print '               --trust-threshold <int>'

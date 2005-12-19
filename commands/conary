@@ -75,6 +75,7 @@ def usage(rc = 1):
     print "                 --flavors"
     print "                 --full-versions"
     print '                 --install-label <label>'
+    print '                 --interactive'
     print "                 --pubring <path>"
     print "                 --root <root>"
     print "                 --context <context>"
