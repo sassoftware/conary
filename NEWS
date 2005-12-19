@@ -4,8 +4,8 @@ Changes in 0.80.2:
       fixed.
     * "cvc co foo=<label>" will now work even if you don't have a
       buildLabel set
-    * "conary scs" will now work more nicely with group changesets.
-    * "conary scs --all" no longer shows ids and sha1s.
+    * "conary showcs" will now work more nicely with group changesets.
+    * "conary showcs --all" no longer shows ids and sha1s.
     * We now never erase pinned items until they are explicitly unpinned.
     * "conary verify" and "conary q --diff" work again.
     * "conary q tmpwatch --components" will display the components
@@ -17,6 +17,12 @@ Changes in 0.80.2:
     * Command line configuration, such as --config 
       'buildLabel conary.rpath.com@rpl:devel', now overrides context 
       configuration.
+
+  o Server Changes:
+    * The repository server now retries a request as an anonymous user
+      if the provided user authentication information does not allow
+      a client request to succeed.
+
   o Build Changes:
     * It is now possible for a recipe to request that specific
       individual requirements be removed from files using the
@@ -47,8 +53,8 @@ Changes in 0.80.2:
       enforced.
     * The EnforcePythonBuildRequirements policy has been added, with
       the same caveats as EnforcePerlBuildRequirements.
-    * Conary now logs more information about the build environment
-      when cooking.
+    * Conary now writes more information about the build environment
+      to the build log when cooking.
     * A bug that caused r.Requires('file:runtime') to create a file
       dependency on 'runtime' instead of trove dependency on
       'file:runtime' has been fixed.
