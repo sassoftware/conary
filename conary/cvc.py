@@ -126,14 +126,16 @@ def realMain(cfg, argv=sys.argv):
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
-    cfgMap["build-label"] = "buildLabel"
-    cfgMap["signature-key"] = "signatureKey"
-    cfgMap["trust-threshold"] = "trustThreshold"
-    cfgMap["pubring"] = "pubRing"
-    cfgMap["root"] = "root"
+    cfgMap["build-label"] = "buildLabel", ONE_PARAM
+    cfgMap["signature-key"] = "signatureKey", ONE_PARAM
+    cfgMap["trust-threshold"] = "trustThreshold", ONE_PARAM
+    cfgMap["pubring"] = "pubRing", ONE_PARAM
+    cfgMap["root"] = "root", ONE_PARAM
 
-    for name in cfgMap:
-        argDef[name] = ONE_PARAM
+    cfgMap['interactive'] = 'interactive', NO_PARAM
+
+    for name, (cfgName, paramType) in cfgMap.items():
+        argDef[name] = paramType
 
     argDef["ask"] = NO_PARAM
     argDef["binary-only"] = NO_PARAM
@@ -193,7 +195,7 @@ def realMain(cfg, argv=sys.argv):
         cfg.setContext(context)
 
     # command line configuration overrides contexts.
-    for (arg, name) in cfgMap.items():
+    for (arg, (name, paramType)) in cfgMap.items():
 	if arg in argSet:
 	    cfg.configLine("%s %s" % (name, argSet[arg]))
 	    del argSet[arg]
