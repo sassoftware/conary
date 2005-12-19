@@ -139,13 +139,21 @@ def realMain(cfg, argv=sys.argv):
     argDef = {}
     cfgMap = {}
 
+    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
+    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+
     cfgMap["build-label"] = "buildLabel"
     cfgMap["exclude-troves"] = "excludeTroves"
     cfgMap["trust-threshold"] = "trustThreshold"
     cfgMap["pubring"] = "pubRing"
+    cfgMap["root"] = "root"
+    cfgMap['full-versions'] = 'fullVersions'
+    cfgMap['flavors'] = 'fullFlavors'
+    cfgMap['components'] = 'showComponents'
 
-    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
-    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+
+    for name in cfgMap:
+        argDef[name] = ONE_PARAM
 
     argDef["all"] = NO_PARAM
     argDef["buildreqs"] = NO_PARAM
@@ -156,8 +164,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["deps"] = NO_PARAM
     argDef["diff"] = NO_PARAM
     argDef["from-file"] = MULT_PARAM
-    argDef["flavors"] = NO_PARAM
-    argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
     argDef["install-label"] = MULT_PARAM
@@ -189,7 +195,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["signatures"] = NO_PARAM
 
     try:
-        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+        argSet, otherArgs = options.processArgs(argDef, {}, cfg, usage,
                                                 argv=argv)
     except options.OptionError, e:
         print >> sys.stderr, e
@@ -205,15 +211,6 @@ def realMain(cfg, argv=sys.argv):
         print constants.version
         sys.exit(0)
 
-    if argSet.pop('components', False):
-        cfg.showComponents = True
-
-    if argSet.pop('full-versions', False):
-        cfg.fullVersions = True
-
-    if argSet.pop('flavors', False):
-        cfg.fullFlavors = True
-
     context = cfg.context
     if os.path.exists('CONARY'):
         state = checkin.ConaryStateFromFile('CONARY')
@@ -227,9 +224,15 @@ def realMain(cfg, argv=sys.argv):
     if context:
         cfg.setContext(context)
 
-    root = argSet.pop('root', '')
-    if root:
-        cfg.root = root
+
+    # command line configuration overrides contexts.
+    for (arg, name) in cfgMap.items():
+	if arg in argSet:
+	    cfg.configLine("%s %s" % (name, argSet[arg]))
+	    del argSet[arg]
+
+    for line in argSet.pop('config', []):
+        cfg.configLine(line)
 
     l = []
     for labelStr in argSet.get('install-label', []):

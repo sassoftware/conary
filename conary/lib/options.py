@@ -123,12 +123,6 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
             raise OptionError(msg)
 	del argSet['config-file']
 	
-    if argSet.has_key('config'):
-	for param in argSet['config']:
-	    cfg.configLine(param)
-
-	del argSet['config']
-
     for (arg, name) in cfgMap.items():
 	if argSet.has_key(arg):
 	    cfg.configLine("%s %s" % (name, argSet[arg]))

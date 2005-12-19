@@ -123,13 +123,17 @@ def realMain(cfg, argv=sys.argv):
     argDef = {}
     cfgMap = {}
 
+    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
+    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+
     cfgMap["build-label"] = "buildLabel"
     cfgMap["signature-key"] = "signatureKey"
     cfgMap["trust-threshold"] = "trustThreshold"
     cfgMap["pubring"] = "pubRing"
+    cfgMap["root"] = "root"
 
-    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
-    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+    for name in cfgMap:
+        argDef[name] = ONE_PARAM
 
     argDef["ask"] = NO_PARAM
     argDef["binary-only"] = NO_PARAM
@@ -152,7 +156,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
-    argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
@@ -165,7 +168,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["version"] = NO_PARAM
 
     try:
-        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+        argSet, otherArgs = options.processArgs(argDef, {}, cfg, usage,
                                                 argv=argv)
     except options.OptionError, e:
         sys.exit(e.val)
@@ -188,6 +191,15 @@ def realMain(cfg, argv=sys.argv):
 
     if context:
         cfg.setContext(context)
+
+    # command line configuration overrides contexts.
+    for (arg, name) in cfgMap.items():
+	if arg in argSet:
+	    cfg.configLine("%s %s" % (name, argSet[arg]))
+	    del argSet[arg]
+
+    for line in argSet.pop('config', []):
+        cfg.configLine(line)
 
     cfg.initializeFlavors()
     # set the build flavor here, just to set architecture information 
