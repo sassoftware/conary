@@ -320,7 +320,7 @@ def usage():
     print "              --tmp-file-path <path>"
     sys.exit(1)
 
-def addUser(userName, otherArgs):
+def addUser(userName, otherArgs, admin=False):
     if len(otherArgs) != 2:
         usage()
 
@@ -337,15 +337,13 @@ def addUser(userName, otherArgs):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    from conary import sqlite3
-    authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
-
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,
 			                        None, {})
 
 
     netRepos.auth.addUser(userName, pw1)
-    netRepos.auth.addAcl(userName, None, None, True, False, True)
+    # user/group, trovePattern, label, write, capped, admin
+    netRepos.auth.addAcl(userName, None, None, True, False, admin)
 
 if __name__ == '__main__':
     argDef = {}
@@ -363,6 +361,7 @@ if __name__ == '__main__':
     # magically handled by processArgs
     argDef["config-file"] = options.ONE_PARAM
     argDef['add-user'] = options.ONE_PARAM
+    argDef['admin'] = options.NO_PARAM
     argDef['help'] = options.ONE_PARAM
 
     try:
@@ -378,7 +377,8 @@ if __name__ == '__main__':
         usage()
 
     if argSet.has_key('add-user'):
-        sys.exit(addUser(argSet['add-user'], otherArgs))
+        admin = 'admin' in argSet
+        sys.exit(addUser(argSet['add-user'], otherArgs, admin=admin))
 
     if not os.path.isdir(FILE_PATH):
 	print FILE_PATH + " needs to be a directory"
