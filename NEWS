@@ -12,6 +12,8 @@ Changes in 0.80.2:
       all troves that match a pinTrove line
     * When a trove is left of the system because of dependency resolution,
       a warning is logged
+    * Fix bug in where r.Requires('file:runtime') was showing up as a file
+      dependency on 'runtime', not as a trove dependency on 'file:runtime'. 
   o Build Changes:
     * It is now possible for a recipe to request that specific individual
       requirements be removed from files (it used to be all or nothing)
