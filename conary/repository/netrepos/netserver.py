@@ -71,7 +71,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
         """
-        Returns a tuple of (AsAnonymous, Exception, result). AsAnonymous
+        Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
         is a Boolean stating whether the operation was performed as the
         anonymous user (due to a failure w/ the passed authToken). Exception
         is a Boolean stating whether an error occured.
@@ -99,14 +99,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except Exception, e:
             pass
 
-        if isinstance(e, errors.InsufficientPermission) and \
-                                    authToken[0] is not None:
+        if (isinstance(e, errors.InsufficientPermission)
+            and authToken[0] is not None):
             # When we get InsufficientPermission w/ a user/password, retry
             # the operation as anonymous
             try:
                 r = method(('anonymous', 'anonymous', None, None), *args)
                 return (True, False, r)
             except Exception, e:
+                # failed once more, handle the exception below
                 pass
 
         # if there is no exception, we've returned before now

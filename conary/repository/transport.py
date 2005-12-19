@@ -102,13 +102,13 @@ class XMLOpener(urllib.FancyURLopener):
         errcode, errmsg, headers = h.getreply()
         if errcode == 200:
             fp = h.getfile()
-            asAnonymous = 'X-Conary-AsAnonymous' in headers
+            asAnonymous = 'X-Conary-UsedAnonymous' in headers
 
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
                 fp = StringIO(zlib.decompress(fp.read()))
 
-            return asAnonymous, urllib.addinfourl(fp, headers, fullUrl)
+            return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
