@@ -25,7 +25,8 @@ Changes in 0.80.2:
     * When using "server.py --add-user" to add a user to a repository
       server, the user will only be given admin privileges if --admin
       is added to the command line.  Previously, all users added with
-      server.py had admin privileges.
+      server.py had admin privileges.  Additionally, if the username
+      being added is "anonymous", write access is not granted.
 
   o Build Changes:
     * It is now possible for a recipe to request that specific
