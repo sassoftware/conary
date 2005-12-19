@@ -339,11 +339,11 @@ def addUser(userName, otherArgs, admin=False):
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,
 			                        None, {})
-
-
+    # never give anonymous write access by default
+    write = userName != 'anonymous'
     netRepos.auth.addUser(userName, pw1)
     # user/group, trovePattern, label, write, capped, admin
-    netRepos.auth.addAcl(userName, None, None, True, False, admin)
+    netRepos.auth.addAcl(userName, None, None, write, False, admin)
 
 if __name__ == '__main__':
     argDef = {}
