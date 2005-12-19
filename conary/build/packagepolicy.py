@@ -2496,8 +2496,8 @@ class Requires(_addInfo, _BuildPackagePolicy):
         if self._checkInclusion(info, path):
             if info[0] == '/':
                 depClass = deps.FileDependencies
-            elif info.startswith('file:'):
-                info = info.split('file:', 1)[1].strip()
+            elif info.startswith('file:') and info[5:].strip()[0] == '/':
+                info = info[5:].strip()
                 depClass = deps.FileDependencies
             elif info.startswith('soname:'):
                 if not m or m.name != 'ELF':
