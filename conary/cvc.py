@@ -136,6 +136,11 @@ def realMain(cfg, argv=sys.argv):
     cfgMap['interactive'] = 'interactive', NO_PARAM
 
     for name, (cfgName, paramType) in cfgMap.items():
+        # if it's a NO_PARAM
+        if paramType == NO_PARAM:
+            negName = 'no-' + name
+            argDef[negName] = paramType
+            cfgMap[negName] = (cfgName, paramType)
         argDef[name] = paramType
 
     argDef["ask"] = NO_PARAM
@@ -197,9 +202,11 @@ def realMain(cfg, argv=sys.argv):
 
     # command line configuration overrides contexts.
     for (arg, (name, paramType)) in cfgMap.items():
-	if arg in argSet:
-	    cfg.configLine("%s %s" % (name, argSet[arg]))
-	    del argSet[arg]
+        value = argSet.pop(arg, None)
+        if value is not None:
+            if arg.startswith('no-'):
+                value = not value
+            cfg.configLine('%s %s' % (name, value))
 
     for line in argSet.pop('config', []):
         cfg.configLine(line)
