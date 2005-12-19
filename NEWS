@@ -6,7 +6,7 @@ Changes in 0.80.2:
       buildLabel set
     * "conary scs" will now work more nicely with group changesets.
     * "conary scs --all" no longer shows ids and sha1s.
-    * We now never erase pinned items until they are explicity unpinned.
+    * We now never erase pinned items until they are explicitly unpinned.
     * "conary verify" and "conary q --diff" work again.
     * "conary q tmpwatch --components" will display the components
       installed for a package.
