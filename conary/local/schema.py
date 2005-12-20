@@ -20,6 +20,9 @@ from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
 
+TROVE_TROVES_BYDEFAULT = 1 << 0
+TROVE_TROVES_WEAKREF   = 1 << 1
+
 VERSION = 14
 
 # Schema creation functions
@@ -89,7 +92,7 @@ def createTroveTroves(db):
         cu.execute("""CREATE TABLE TroveTroves(
                         instanceId INTEGER, 
                         includedId INTEGER,
-                        byDefault BOOLEAN,
+                        flags INTEGER,
                         inPristine BOOLEAN)""")
         cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
                         "TroveTroves(instanceId)")

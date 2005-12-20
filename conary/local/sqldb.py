@@ -16,6 +16,8 @@ from conary import deps, files, sqlite3, trove, versions
 from conary.dbstore import idtable, migration
 from conary.local import deptable, troveinfo, versiontable, schema
 
+import itertools
+
 OldDatabaseSchema = schema.OldDatabaseSchema
 
 class Tags(idtable.CachedIdTable):
@@ -622,19 +624,30 @@ order by
                                 versionId INT,
                                 flavorId INT,
                                 timeStamps STRING,
-                                byDefault BOOLEAN)
+                                flags INT)
                    """)
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor), weakFlag in itertools.chain(
+                itertools.izip(trove.iterTroveList(strongRefs = True, 
+                                                   weakRefs = False),
+                               itertools.repeat(0)),
+                itertools.izip(trove.iterTroveList(strongRefs = False, 
+                                                   weakRefs = True),
+                               itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
 	    versionId = self.getVersionId(version, self.addVersionCache)
 	    if flavor:
 		flavorId = flavorMap[flavor.freeze()]
 	    else:
 		flavorId = 0
+
+            flags = weakFlag
+            if trove.includeTroveByDefault(name, version, flavor):
+                flags |= schema.TROVE_TROVES_BYDEFAULT;
+
             cu.execute("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
                        name, versionId, flavorId, 
                         ":".join([ "%.3f" % x for x in version.timeStamps()]), 
-                       trove.includeTroveByDefault(name, version, flavor))
+                       flags)
 
         # make sure every trove we include has an instanceid
         cu.execute("""
@@ -652,7 +665,7 @@ order by
 
         # now include the troves in this one
         cu.execute("""
-            INSERT INTO TroveTroves SELECT ?, instanceId, byDefault, ?
+            INSERT INTO TroveTroves SELECT ?, instanceId, flags, ?
                 FROM IncludedTroves JOIN Instances ON
                     IncludedTroves.troveName == Instances.troveName AND
                     IncludedTroves.versionId == Instances.versionId AND
@@ -758,8 +771,8 @@ order by
             if newVersion is None: continue
 
             oldIncludedId = instanceDict[(name, oldVersion, oldFlavor)]
-            byDefault = cu.execute("""
-                    SELECT byDefault FROM TroveTroves WHERE
+            flags = cu.execute("""
+                    SELECT flags FROM TroveTroves WHERE
                         instanceId=? and includedId=?""",
                     instanceId, oldIncludedId).next()[0]
 
@@ -778,7 +791,7 @@ order by
                         troveName = ? AND
                         version = ? AND
                         flavor %s
-                """ % flavorStr, instanceId, byDefault, name,
+                """ % flavorStr, instanceId, flags, name,
                         newVersion.asString())
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
@@ -960,7 +973,7 @@ order by
             pristineClause = "Instances.isPresent = 1"
 
 	cu.execute("""
-	    SELECT troveName, versionId, byDefault, timeStamps, 
+	    SELECT troveName, versionId, flags, timeStamps, 
                    Flavors.flavorId, flavor FROM 
 		TroveTroves INNER JOIN Instances INNER JOIN Flavors ON 
 		    TroveTroves.includedId = Instances.instanceId AND
@@ -970,7 +983,7 @@ order by
 	""" % pristineClause, troveInstanceId)
 
 	versionCache = {}
-	for (name, versionId, byDefault, timeStamps, flavorId, flavorStr) in cu:
+	for (name, versionId, flags, timeStamps, flavorId, flavorStr) in cu:
 	    version = self.versionTable.getBareId(versionId)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
@@ -982,7 +995,11 @@ order by
 		    flavor = deps.deps.ThawDependencySet(flavorStr)
 		    flavorCache[flavorId] = flavor
 
-	    trv.addTrove(name, version, flavor, byDefault = byDefault)
+            byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
+            weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
+
+	    trv.addTrove(name, version, flavor, byDefault = byDefault,
+                         weakRef = weakRef)
 
         cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
                    "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
@@ -1210,7 +1227,7 @@ order by
         # now add link collections to these troves
         cu.execute("""INSERT INTO TroveTroves 
                         SELECT TroveTroves.instanceId, pinnedInst.instanceId,
-                               TroveTroves.byDefault, 0 FROM
+                               TroveTroves.flags, 0 FROM
                             mlt JOIN Flavors AS pinFlv ON
                                 pinnedFlavor == pinFlv.flavor OR
                                 pinnedFlavor IS NULL and pinFlv.flavor IS NULL
