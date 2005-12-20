@@ -444,8 +444,7 @@ class TroveStore:
                 flags |= schema.TROVE_TROVES_BYDEFAULT
 
             cu.execute("INSERT INTO TroveTroves VALUES(?, ?, ?)",
-	               troveInstanceId, instanceId,
-                       trove.includeTroveByDefault(name, version, flavor))
+	               troveInstanceId, instanceId, flags)
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
