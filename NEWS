@@ -9,6 +9,8 @@ Changes in 0.80.3:
   o Build Changes:
     * Files in subdirectories named "tmp" are no longer automatically
       excluded from packaging, except for /tmp and /var/tmp.
+    * DanglingSymlinks now traverses intermediate symlinks; a symlink
+      to a symlink to a symlink will no longer confuse it.
 
 Changes in 0.80.2:
   o Client Changes:
