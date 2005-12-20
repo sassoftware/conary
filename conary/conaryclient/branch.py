@@ -16,9 +16,9 @@ from conary.repository import changeset
 from conary import versions
 
 class ClientBranch:
-    BRANCH_ALL         = 0
-    BRANCH_SOURCE_ONLY = 1
-    BRANCH_BINARY_ONLY = 2
+    BRANCH_SOURCE = 1 << 0
+    BRANCH_BINARY = 1 << 1
+    BRANCH_ALL = BRANCH_SOURCE | BRANCH_BINARY
 
     def createBranchChangeSet(self, newLabel, 
                               troveList = [], branchType=BRANCH_ALL):
@@ -56,10 +56,10 @@ class ClientBranch:
                 troveName = trove.getName()
 
                 if troveName.endswith(':source'):
-                    if branchType == self.BRANCH_BINARY_ONLY:
+                    if not(branchType & self.BRANCH_SOURCE):
                         continue
 
-                elif branchType != self.BRANCH_BINARY_ONLY:
+                elif branchType & self.BRANCH_SOURCE:
                     # name doesn't end in :source - if we want 
                     # to shadow the listed troves' sources, do so now
 
@@ -78,7 +78,7 @@ class ClientBranch:
                         troveList.add(key)
                         seen.add(key)
 
-                    if branchType == self.BRANCH_SOURCE_ONLY:
+                    if not(branchType & self.BRANCH_BINARY):
                         continue
 
                 if shadow:
