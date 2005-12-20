@@ -15,6 +15,9 @@
 from conary.dbstore import migration
 from conary.lib.tracelog import logMe
 
+TROVE_TROVES_BYDEFAULT = 1 << 0
+TROVE_TROVES_WEAKREF   = 1 << 1
+
 VERSION = 7
 
 def createInstances(db):
@@ -462,7 +465,7 @@ def createTroves(db):
         CREATE TABLE TroveTroves(
             instanceId      INTEGER,
             includedId      INTEGER,
-            byDefault       BOOLEAN,
+            flags           INTEGER,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
