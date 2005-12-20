@@ -55,7 +55,8 @@ def displayBranchJob(cs, shadow=False):
                                        
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
-           sourceOnly = False, binaryOnly = False, info = False):
+           sourceOnly = False, binaryOnly = False, info = False,
+           forceBinary = False):
     branchType = _getBranchType(binaryOnly, sourceOnly)
 
     client = conaryclient.ConaryClient(cfg)
@@ -104,7 +105,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
                              default=False)
         if not okay: 
             return
-    elif hasBinary and branchType & client.BRANCH_BINARY:
+    elif (not forceBinary) and hasBinary and branchType & client.BRANCH_BINARY:
         print 'Creating binary %s is only allowed in interactive mode. ' \
               'Rerun cvc\nwith --interactive.' % branchOps
         return 1
