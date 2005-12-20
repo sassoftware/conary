@@ -140,10 +140,10 @@ def checkout(repos, cfg, workDir, name, callback=None):
         log.warning(
 """ Checking out %s (%s)
 
-The following source branches were matched by your
-checkout command but not modified last.  To check 
-them out use cvc co %s=<branch> for the following 
-branches:
+Multiple branches were matched by your checkout command.  
+Conary defaults to checking out the most recently modified
+version.  To check out other versions of this source trove, 
+use cvc co %s=<branch> for the following branches:
 
 %s
 
