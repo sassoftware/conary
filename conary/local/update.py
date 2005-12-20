@@ -1039,7 +1039,9 @@ class FilesystemJob:
             self._singleTrove(db, troveCs, changeSet, baseTrove,
                                       newFsTrove, root, removeHints, flags)
 
-            newFsTrove.mergeTroveListChanges(troveCs.iterChangedTroves(),
+            newFsTrove.mergeTroveListChanges(
+                troveCs.iterChangedTroves(strongRefs = True, weakRefs = False),
+                troveCs.iterChangedTroves(strongRefs = False, weakRefs = True),
                                            redundantOkay = True)
 
         pkgList = [ x[1] for x in pkgList ]
