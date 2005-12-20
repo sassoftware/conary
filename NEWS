@@ -1,5 +1,7 @@
 Changes in 0.80.3:
   o Client Changes:
+    * The warning message printed when multiple branches match a cvc checkout 
+      command has been improved.
     * Only interactive mode can create binary shadows and branches, and
       a warning is displayed before they are created (since source branches
       are normally the right thing to use).
