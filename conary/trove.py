@@ -690,7 +690,7 @@ class Trove(streams.StreamSet):
 
         troveGroup[(name, version, flavor)] = byDefault
 
-    def delTrove(self, name, version, flavor, missingOkay):
+    def delTrove(self, name, version, flavor, missingOkay, weakRef = False):
 	"""
 	Removes a single version of a trove.
 
@@ -705,10 +705,10 @@ class Trove(streams.StreamSet):
 	@type missingOkay: boolean
 	"""
         key = (name, version, flavor)
-	if key in self.strongTroves:
+        if weakRef and key in self.weakTroves:
+	    del self.weakTroves[key]
+	elif not weakRef and key in self.strongTroves:
 	    del self.strongTroves[key]
-	elif key in self.weakTroves:
-	    del self.troves[key]
 	elif missingOkay:
 	    pass
 	else:
@@ -843,7 +843,8 @@ class Trove(streams.StreamSet):
 
                     elif oper == "-":
                         self.delTrove(name, version, flavor,
-                                               missingOkay = redundantOkay)
+                                               missingOkay = redundantOkay,
+                                               weakRef = weakRef)
                     elif oper == "~":
                         troveDict[(name, version, flavor)] = byDefault
                     else:
@@ -1109,10 +1110,10 @@ class Trove(streams.StreamSet):
 	# now handle the troves we include
         if them:
             troveSetDiff(self.strongTroves, them.strongTroves, False)
-            troveSetDiff(self.weakTroves, them.weakTroves, False)
+            troveSetDiff(self.weakTroves, them.weakTroves, True)
         else:
             troveSetDiff(self.strongTroves, None, False)
-            troveSetDiff(self.weakTroves, None, False)
+            troveSetDiff(self.weakTroves, None, True)
 
 	added = {}
 	removed = {}
