@@ -83,13 +83,19 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     else:
         branchOps = 'branches'
 
+    hasBinary = False
+    for trvCs in cs.iterNewTroveList():
+        if not trvCs.getName().endswith(':source'):
+            hasBinary = True
+            break
+
     if cfg.interactive or info:
         print 'The following %s will be created:' % branchOps
         displayBranchJob(cs, shadow=makeShadow)
 
     if cfg.interactive:
         print
-        if branchType & client.BRANCH_BINARY:
+        if hasBinary and branchType & client.BRANCH_BINARY:
             print 'WARNING: You have chosen to create binary %s. ' \
                   'This is not recommended\nwith this version of cvc.' \
                     % branchOps
@@ -98,7 +104,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
                              default=False)
         if not okay: 
             return
-    elif branchType & client.BRANCH_BINARY:
+    elif hasBinary and branchType & client.BRANCH_BINARY:
         print 'Creating binary %s is only allowed in interactive mode. ' \
               'Rerun cvc\nwith --interactive.' % branchOps
         return 1
