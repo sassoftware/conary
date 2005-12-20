@@ -6,6 +6,9 @@ Changes in 0.80.3:
     * Only interactive mode can create binary shadows and branches, and
       a warning is displayed before they are created (since source branches
       are normally the right thing to use).
+  o Build Changes:
+    * Files in subdirectories named "tmp" are no longer automatically
+      excluded from packaging, except for /tmp and /var/tmp.
 
 Changes in 0.80.2:
   o Client Changes:
