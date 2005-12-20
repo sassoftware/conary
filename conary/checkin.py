@@ -134,12 +134,20 @@ def checkout(repos, cfg, workDir, name, callback=None):
     if len(trvList) > 1:
         trvList.sort()
 
-        notSelected = [ '%s=%s' % (name, x[1].branch()) for x in trvList[1:]]
-        log.warning('The following source branches were matched by your'
-                    ' checkout command but not chosen.  To check them out'
-                    ' use cvc co %s=<branch> for the following branches:\n\n'
-                    ' %s\n' % (name, '\n'.join(notSelected)))
+        notSelected = [ '%s=%s' % (name, x[1].branch()) for x in trvList[:-1]]
         trvInfo = trvList[-1]
+        
+        log.warning(
+""" Checking out %s (%s)
+
+The following source branches were matched by your
+checkout command but not modified last.  To check 
+them out use cvc co %s=<branch> for the following 
+branches:
+
+%s
+
+""" % (name, trvInfo[1].branch(), name, '\n'.join(notSelected)))
     else:
         trvInfo = trvList[0]
 	
