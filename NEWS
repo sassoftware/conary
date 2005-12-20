@@ -1,5 +1,6 @@
 Changes in 0.80.3:
   o Client Changes:
+    * Internal branch source and branch binary flags were changed to a bitmask
     * The warning message printed when multiple branches match a cvc checkout 
       command has been improved.
     * Only interactive mode can create binary shadows and branches, and
