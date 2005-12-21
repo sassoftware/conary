@@ -52,6 +52,7 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset> <trove>[=<version>]*"
+    print "       conary sync         <pkgname>[=<version>][[flavor]]*"
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
@@ -109,7 +110,7 @@ def usage(rc = 1):
     print "                 --show-changes"
     print "                 --tags"
     print ""
-    print "update/erase flags:"
+    print "update/erase/sync flags:"
     print "                 --exclude-troves <patterns>"
     print "                 --from-file <file.ccs>"
     print "                 --info"
@@ -174,6 +175,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["from-file"] = MULT_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
+    argDef["install"] = NO_PARAM
     argDef["install-label"] = MULT_PARAM
     argDef["items"] = NO_PARAM
     argDef["just-db"] = NO_PARAM
@@ -488,7 +490,7 @@ def realMain(cfg, argv=sys.argv):
     elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
-    elif otherArgs[1] in ["update", "erase"]:
+    elif otherArgs[1] in ["update", "erase", "sync"]:
         cfg.requireInstallLabelPath()
 	kwargs = {}
 
@@ -520,13 +522,15 @@ def realMain(cfg, argv=sys.argv):
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync', False)
-        kwargs['updateByDefault'] = (otherArgs[1] == "update")
+        kwargs['updateByDefault'] = (otherArgs[1] in ("update", "sync"))
+        kwargs['syncChildren'] = otherArgs[1] == 'sync'
 
         if kwargs['sync'] and kwargs['fromFiles']:
             log.error("Only one of --sync and --from-file may be used")
             return 1
 
 	if argSet: return usage()
+
 	if len(otherArgs) >=3:
 	    updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
 	else:

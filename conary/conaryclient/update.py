@@ -193,7 +193,7 @@ class ClientUpdate:
             resolveSource = trovesource.stack(resolveSource, self.repos)
             
 
-        while depList and pathIdx < len(self.cfg.installLabelPath):
+        while depList and self.cfg.installLabelPath and pathIdx < len(self.cfg.installLabelPath):
             nextCheck = [ x[1] for x in depList ]
             sugg = resolveSource.resolveDependencies(
                             self.cfg.installLabelPath[pathIdx], 
@@ -343,8 +343,11 @@ class ClientUpdate:
         return redirectHack
 
     def _mergeGroupChanges(self, uJob, primaryJobList, transitiveClosure,
-                           redirectHack, recurse, ineligible, 
-                           checkPrimaryPins):
+                           redirectHack, recurse, ineligible, checkPrimaryPins,
+                           alwaysRecurse, installedPrimaries, 
+                           installMissingRefs=False, 
+                           updateOnly=False, respectBranchAffinity=True,
+                           alwaysFollowLocalChanges=False):
 
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse):
@@ -619,9 +622,8 @@ class ClientUpdate:
         del installedTrove, referencedTrove, localUpdates
 
         # Build the set of the incoming troves which are either already
-        # installed or already referenced. This is purely for consistency
-        # checking later on
-        alreadyInstalled = installedTroves & avail
+        # installed or already referenced. 
+        alreadyInstalled = (installedTroves & avail) | installedPrimaries
         alreadyReferenced = referencedNotInstalled & avail
 
         del avail
@@ -658,156 +660,176 @@ class ClientUpdate:
                     dict( ((job[0], job[2][0], job[2][1]), (job[1], False)) for
                         job in relativeUpdateJobs))
 
-        # first True means its primary, second True means install this by 
-        # default (after all, these are all primaries)
+        # first True means its primary, 
 
         # Primaries always followLocalChanges. It will be reset for children
         # of primaries with no local changes to follow.
-        newTroves = [ ((x[0], x[2][0], x[2][1]), True, True, True, True) 
+        newTroves = [ ((x[0], x[2][0], x[2][1]), 
+                        True, {}, respectBranchAffinity, True) 
                             for x in itertools.chain(absolutePrimaries, 
                                                      relativePrimaries) ]
 
         newJob = set()
 
         while newTroves:
-            newInfo, isPrimary, byDefault, \
-                    respectBranchAffinity, followLocalChanges = newTroves.pop(0)
+            (newInfo, isPrimary, byDefaultDict,
+               respectBranchAffinity, followLocalChanges) = newTroves.pop(0)
 
-            if newInfo in alreadyInstalled:
-                # No need to install it twice
-                continue
-            elif newInfo in alreadyReferenced:
-                # meaning: this trove is referenced by something installed, 
-                # but is not installed itself.
+            byDefault = isPrimary or byDefaultDict[newInfo]
 
-                if isPrimary:
-                    # They really want it installed this time. We removed
-                    # this entry from the already-installed @update trove
-                    # so byJob already tells us the best match for it.
-                    pass
-                else:
-                    # We already know about this trove, and decided we
-                    # don't want it. We do want to keep the item which
-                    # replaced it though.
-                    if newInfo in localUpdatesByMissing:
-                        info = (newInfo[0],) + localUpdatesByMissing[newInfo]
-                        alreadyInstalled.add(info)
-                    continue
+            trv = None
+            jobAdded = False
+            replaced = (None, None)
+            childrenFollowLocalChanges = alwaysFollowLocalChanges
 
-            replaced, pinned = jobByNew[newInfo]
-            replacedInfo = (newInfo[0], replaced[0], replaced[1])
+            while True:
+                # this loop should only be called once - it's basically a 
+                # way to create a quick GOTO structure, without needing 
+                # to call another function (which would be expensive in 
+                # this loop).
+                if newInfo in alreadyInstalled:
+                    # No need to install it twice
+                    break
+                elif newInfo in ineligible:
+                    break
+                elif newInfo in alreadyReferenced:
+                    # meaning: this trove is referenced by something 
+                    # installed, but is not installed itself.
 
-            childrenFollowLocalChanges = False
-            if replaced[0] is not None:
-                if replacedInfo in referencedNotInstalled:
-                    # the trove on the local system is one that's referenced
-                    # but not installed, so, normally we would not install
-                    # this trove.
-                    # BUT if this is a primary, we always want to have the
-                    # update happen.  In the case of a primary trove, 
-                    # if the referenced trove is replaced by another trove 
-                    # on the the system (by a localUpdate) then we remove 
-                    # that trove instead.  If not, we just install this 
-                    # trove as a fresh update. 
+                    if isPrimary or installMissingRefs:
+                        # They really want it installed this time. We removed
+                        # this entry from the already-installed @update trove
+                        # so byJob already tells us the best match for it.
+                        pass
+                    else:
+                        # We already know about this trove, and decided we
+                        # don't want it. We do want to keep the item which
+                        # replaced it though.
+                        if newInfo in localUpdatesByMissing:
+                            info = ((newInfo[0],) 
+                                     + localUpdatesByMissing[newInfo])
+                            alreadyInstalled.add(info)
+                        break
 
-                    # If we're not a primary, we need to check 
-                    # followLocalChanges (which means that the parent trove 
-                    # followed a local change). If followLocalChanges
-                    # is False, we don't want to install the new version
-                    # of this trove. If it is set, we will install the
-                    # new trove (replacing any locally changed trove).
+                replaced, pinned = jobByNew[newInfo]
+                replacedInfo = (newInfo[0], replaced[0], replaced[1])
 
-                    if not followLocalChanges:
-                        continue
+                childrenFollowLocalChanges = False
+                if replaced[0] is not None:
+                    if replacedInfo in referencedNotInstalled:
+                        # the trove on the local system is one that's referenced
+                        # but not installed, so, normally we would not install
+                        # this trove.
+                        # BUT if this is a primary, we always want to have the
+                        # update happen.  In the case of a primary trove, 
+                        # if the referenced trove is replaced by another trove 
+                        # on the the system (by a localUpdate) then we remove 
+                        # that trove instead.  If not, we just install this 
+                        # trove as a fresh update. 
 
-                    replaced = localUpdatesByMissing.get(replacedInfo, 
-                                                         (None, None))
+                        # If we're not a primary, we need to check 
+                        # followLocalChanges (which means that the parent trove 
+                        # followed a local change). If followLocalChanges
+                        # is False, we don't want to install the new version
+                        # of this trove. If it is set, we will install the
+                        # new trove (replacing any locally changed trove).
 
-                    if replaced[0] is None and not isPrimary:
-                        # we can't find a trove that's actually installed that
-                        # matches this referenced trove to change the update
-                        # into.
-                        continue
+                        if not followLocalChanges:
+                            break
 
-                    childrenFollowLocalChanges = True
-                        
-                    replacedInfo = (replacedInfo[0], replaced[0], replaced[1])
+                        replaced = localUpdatesByMissing.get(replacedInfo, 
+                                                             (None, None))
 
+                        if replaced[0] is None and not isPrimary:
+                            # we can't find a trove that's actually installed 
+                            # that matches this referenced trove to change 
+                            # the update into.
+                            break
+
+                        childrenFollowLocalChanges = True
+                            
+                        replacedInfo = (replacedInfo[0], replaced[0], 
+                                        replaced[1])
+
+                    elif (not isPrimary 
+                            and not redirectHack.get(newInfo, (None,))):
+                        # an empty list in redirectHack means the trove we're
+                        # redirecting from wasn't installed, so we shouldn't 
+                        # install this trove either
+                        break
+                    
+                    if (respectBranchAffinity 
+                        and replacedInfo in localUpdatesByPresent 
+                        and replacedInfo in installedNotReferenced):
+                        # meaning of if statement above:
+                        # 1. we are trying to preserve branch affinity 
+                        #    (this is turned off if we have a primary above us
+                        #     that switched branches, see below)
+                        # 2. the update is removing a version that is seen as a 
+                        #    local change to the system (the diff between
+                        #    referencedNotInstalled and installedTroves matched
+                        #    this trove up with something not installed). 
+                        # 3. The update is removing a version that is not 
+                        #    referenced by anything that's installed on the 
+                        #    system.
+
+                        notInstalledBranch = replacedInfo[1].branch()
+                        localUpdateBranch = \
+                                localUpdatesByPresent[replacedInfo][0].branch()
+                        newBranch = newInfo[1].branch()
+                    
+                        # The trove being removed was explicitly updated to the
+                        # trove on localUpdateBranch. We don't want to replace 
+                        # that trove if it was switched to a different branch, 
+                        # unless the branch it was switched to is the same 
+                        # as the branch for the newer version.
+                        if (notInstalledBranch != localUpdateBranch and
+                            notInstalledBranch != newBranch):
+                            if isPrimary:
+                                # Exception: if the trove that switched branches
+                                # was listed on the command line, then the user
+                                # is explicitly choosing to switch this trove 
+                                # to a third branch.  For this trove at least, 
+                                # they are overriding branch affinity.  We 
+                                # make sure child troves ignore branch 
+                                # affinity.
+                                respectBranchAffinity = False
+                            else:
+                                break
+                elif not byDefault:
+                    # This trove is being newly installed, but it's not 
+                    # supposed to be installed by default
+                    break
+                elif updateOnly:
+                    break
+                elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
+                    # New trove matches excludeTroves
+                    break
                 elif not isPrimary and not redirectHack.get(newInfo, (None,)):
                     # an empty list in redirectHack means the trove we're
-                    # redirecting from wasn't installed, so we shouldn't install
-                    # this trove either
-                    continue
-                
-                if (respectBranchAffinity 
-                    and replacedInfo in localUpdatesByPresent 
-                    and replacedInfo in installedNotReferenced):
-                    # meaning of if statement above:
-                    # 1. we are trying to preserve branch affinity 
-                    #    (this is turned off if we have a primary above us
-                    #     that switched branches, see below)
-                    # 2. the update is removing a version that is seen as a 
-                    #    local change to the system (the diff between
-                    #    referencedNotInstalled and installedTroves matched
-                    #    this trove up with something not installed). 
-                    # 3. The update is removing a version that is not 
-                    #    referenced by anything that's installed on the 
-                    #    system.
+                    # redirecting from wasn't installed, so we shouldn't 
+                    # install this trove either
+                    break
 
-                    notInstalledBranch = replacedInfo[1].branch()
-                    localUpdateBranch = \
-                            localUpdatesByPresent[replacedInfo][0].branch()
-                    newBranch = newInfo[1].branch()
-                
-                    # The trove being removed was explicitly updated to the
-                    # trove on localUpdateBranch. We don't want to replace 
-                    # that trove if it was switched to a different branch, 
-                    # unless the branch it was switched to is the same 
-                    # as the branch for the newer version.
-                    if (notInstalledBranch != localUpdateBranch and
-                        notInstalledBranch != newBranch):
-                        if isPrimary:
-                            # Exception: if the trove that switched branches
-                            # was listed on the command line, then the user
-                            # is explicitly choosing to switch this trove to a 
-                            # third branch.  For this trove at least, they 
-                            # are overriding branch affinity.  We make sure
-                            # child troves ignore branch affinity.
-                            respectBranchAffinity = False
-                        else:
-                            continue
-            elif not byDefault:
-                # This trove is being newly installed, but it's not supposed
-                # to be installed by default
-                continue
-            elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
-                # New trove matches excludeTroves
-                continue
-            elif not isPrimary and not redirectHack.get(newInfo, (None,)):
-                # an empty list in redirectHack means the trove we're
-                # redirecting from wasn't installed, so we shouldn't install
-                # this trove either
-                continue
+                if pinned:
+                    if replaced[0] is not None:
 
-            trv = troveSource.getTrove(withFiles = False, *newInfo)
+                        trv = troveSource.getTrove(withFiles = False, *newInfo)
+                        # try and install the two troves next to each other
+                        assert(replacedInfo[1] is not None)
+                        oldTrv = self.db.getTrove(withFiles = False, 
+                                                  pristine = False, 
+                                                  *replacedInfo)
+                        oldHashes = _getPathHashes(troveSource, self.db, 
+                                                   oldTrv, inDb = True)
+                        newHashes = _getPathHashes(uJob.getTroveSource(), 
+                                                   self.db, trv, inDb = False)
 
-            if pinned:
-                if replaced[0] is not None:
-
-                    # try and install the two troves next to each other
-                    assert(replacedInfo[1] is not None)
-                    oldTrv = self.db.getTrove(withFiles = False, 
-                                              pristine = False, *replacedInfo)
-                    oldHashes = _getPathHashes(troveSource, self.db, oldTrv, 
-                                               inDb = True)
-                    newHashes = _getPathHashes(uJob.getTroveSource(), self.db,
-                                               trv, inDb = False)
-
-                    if newHashes.compatibleWith(oldHashes):
-                        replaced = (None, None)
-                        if isPrimary and checkPrimaryPins:
-                            name = replacedInfo[0]
-                            log.warning(
+                        if newHashes.compatibleWith(oldHashes):
+                            replaced = (None, None)
+                            if isPrimary and checkPrimaryPins:
+                                name = replacedInfo[0]
+                                log.warning(
 """
 Not removing old %s as part of update - it is pinned.
 Installing new version of %s side-by-side instead.
@@ -816,16 +838,22 @@ To remove the old %s, run:
 conary unpin '%s=%s%s'
 conary erase '%s=%s%s'
 """ % ((name, name, name) + replacedInfo + replacedInfo))
-                    else:
-                        if isPrimary and checkPrimaryPins:
-                            raise UpdatePinnedTroveError(replacedInfo, newInfo)
+                        else:
+                            if isPrimary and checkPrimaryPins:
+                                raise UpdatePinnedTroveError(replacedInfo, 
+                                                             newInfo)
 
-                        continue
+                            break
 
-            newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), False))
+                newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), 
+                           False))
+                jobAdded = True
+                break
 
-            if not trv.isCollection(): continue
+
+            if not jobAdded and not alwaysRecurse: continue
             if not recurse: continue
+            if not trove.troveIsCollection(newInfo[0]): continue
 
             if replaced[0] and replaced[0].branch() == newInfo[1].branch():
                 # if this trove didn't switch branches, then we respect branch
@@ -834,12 +862,36 @@ conary erase '%s=%s%s'
                 # trove to the desired branch by hand already.
                 respectBranchAffinity = True
 
-            for info in trv.iterTroveList():
-                if info in ineligible:
+            if trv is None:
+                trv = troveSource.getTrove(withFiles = False, *newInfo)
+
+
+            if isPrimary:
+                # byDefault status of troves is determined by the primary
+                # trove.  
+                byDefaultDict = dict((x, trv.includeTroveByDefault(*x)) 
+                                     for x in trv.iterTroveList(
+                                                            strongRefs=True, 
+                                                            weakRefs=True))
+
+            for info in trv.iterTroveList(strongRefs=True):
+
+                if info in ineligible and not alwaysRecurse:
                     continue
 
+                if not isPrimary:
+                    if not jobAdded and info not in byDefaultDict:
+                        continue
+                    
+                    # support old-style collections.  _If_ this trove was not
+                    # mentioned in its parent trove, then set its default
+                    # value here. 
+                    childByDefault = (trv.includeTroveByDefault(*info) 
+                                      and jobAdded)
+                    byDefaultDict.setdefault(info, childByDefault)
+
                 newTroves.append((info, False, 
-                                  trv.includeTroveByDefault(*info),
+                                  byDefaultDict,
                                   respectBranchAffinity,
                                   childrenFollowLocalChanges))
 
@@ -858,7 +910,8 @@ conary erase '%s=%s%s'
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, checkPrimaryPins = True,
-                         forceJobClosure = False, ineligible = set()):
+                         forceJobClosure = False, ineligible = set(),
+                         syncChildren=False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1004,20 +1057,24 @@ conary erase '%s=%s%s'
         results = {}
         searchSource = uJob.getSearchSource()
 
+        if searchSource.requiresLabelPath():
+            installLabelPath = self.cfg.installLabelPath
+        else:
+            installLabelPath = None
+
         if not useAffinity:
-            results.update(searchSource.findTroves(self.cfg.installLabelPath,
-                                                   toFind))
+            results.update(searchSource.findTroves(installLabelPath, toFind))
         else:
             if toFind:
                 log.debug("looking up troves w/ database affinity")
                 results.update(searchSource.findTroves(
-                                        self.cfg.installLabelPath, toFind, 
+                                        installLabelPath, toFind, 
                                         self.cfg.flavor,
                                         affinityDatabase=self.db))
             if toFindNoDb:
                 log.debug("looking up troves w/o database affinity")
                 results.update(searchSource.findTroves(
-                                           self.cfg.installLabelPath, 
+                                           installLabelPath, 
                                            toFindNoDb, self.cfg.flavor))
 
         for troveSpec, (oldTroveInfo, isAbsolute) in \
@@ -1036,7 +1093,11 @@ conary erase '%s=%s%s'
         # Items which are already installed shouldn't be installed again. We
         # want to track them though to ensure they aren't removed by some
         # other action.
-        jobSet, oldItems = _separateInstalledItems(newJob)
+        if not syncChildren:
+            jobSet, oldItems = _separateInstalledItems(newJob)
+        else:
+            jobSet, oldItems = newJob, _separateInstalledItems(newJob)[1]
+            
         log.debug("items already installed: %s", oldItems)
 
         jobSet.update(removeJob)
@@ -1096,8 +1157,15 @@ conary erase '%s=%s%s'
 
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
                                          redirectHack, recurse, 
-                                         oldItems | ineligible, 
-                                         checkPrimaryPins)
+                                         ineligible | oldItems, 
+                                         checkPrimaryPins, 
+                                         alwaysRecurse=True,
+                                         installedPrimaries=oldItems, 
+                                         installMissingRefs=syncChildren,
+                                         updateOnly=False,
+                                         respectBranchAffinity=not syncChildren,
+                                         alwaysFollowLocalChanges=syncChildren)
+
         if not newJob:
             raise NoNewTrovesError
 
@@ -1144,12 +1212,13 @@ conary erase '%s=%s%s'
 
         return updateItems
 
+
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
-                        resolveRepos = True):
+                        resolveRepos = True, syncChildren = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1231,6 +1300,8 @@ conary erase '%s=%s%s'
             splittable = False
         elif sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
+        elif syncChildren:
+            uJob.setSearchSource(self.db)
         else:
             uJob.setSearchSource(self.repos)
             useAffinity = True
@@ -1241,7 +1312,8 @@ conary erase '%s=%s%s'
                                        updateMode = updateByDefault,
                                        useAffinity = useAffinity,
                                        checkPrimaryPins = checkPrimaryPins,
-                                       forceJobClosure = forceJobClosure)
+                                       forceJobClosure = forceJobClosure,
+                                       syncChildren = syncChildren)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
