@@ -27,14 +27,17 @@ from conary import versions
 class SingleGroup:
 
     def add(self, name, versionStr = None, flavor = None, source = None,
-            byDefault = None, ref = None):
+            byDefault = None, ref = None, components=None):
         self.addTroveList.append((name, versionStr, flavor, source, 
-				  byDefault, ref)) 
+				  byDefault, ref, components)) 
     # maintain addTrove for backwards compat.
     addTrove = add
     
     def remove(self, name, versionStr = None, flavor = None):
         self.removeTroveList.append((name, versionStr, flavor))
+
+    def removeComponents(self, componentList):
+        self.removeComponentList.update(componentList)
 
     def addAll(self, reference, byDefault = None):
         self.addReferenceList.append((reference, byDefault))
@@ -46,40 +49,36 @@ class SingleGroup:
         assert(isinstance(byDefault, bool))
 	self.byDefault = byDefault
 
-    def _foundTrove(self, troveTup, size, byDefault, isRedirect):
-        self.troves[troveTup] = (size, byDefault)
-        if isRedirect:
-            # we check later to ensure that all redirects added 
-            # by addTrove lines (or other means) are removed
-            # by removeTrove lines later.
-            self.redirects.add(troveTup)
-
-    def findTroves(self, troveMap, repos):
+    def findTroves(self, troveMap, repos, childGroups):
         self._findTroves(troveMap)
         self._removeTroves(repos)
+        self._addImplicitTroves(childGroups)
+        self._removeImplicitTroves(repos)
         self._checkForRedirects(repos)
 
-    def autoResolveDeps(self, cfg, repos, labelPath, includedTroves):
+    def autoResolveDeps(self, cfg, repos, labelPath):
         if self.autoResolve:
-            self._resolveDependencies(cfg, repos, labelPath, includedTroves)
+            self._resolveDependencies(cfg, repos, labelPath)
 
-    def checkDependencies(self, cfg, includedTroves):
+    def checkDependencies(self, cfg):
         if self.depCheck:
-            failedDeps = self._checkDependencies(cfg, includedTroves)
+            failedDeps = self._checkDependencies(cfg)
             if failedDeps:
                 return failedDeps
 
     def calcSize(self):
         self.size = 0
         validSize = True
-        for (n,v,f), (size, byDefault) in self.troves.iteritems():
+        for (n,v,f), (explicit, size, byDefault) in self.troves.iteritems():
+            l = self.troveVersionFlavors.setdefault(n,[])
+            l.append((v,f,byDefault,explicit))
+            if not explicit:
+                continue
             if size is None:
                 validSize = False
                 self.size = None
             if validSize:
                 self.size += size
-            l = self.troveVersionFlavors.setdefault(n,[])
-            l.append((v,f,byDefault))
 
     def _findTroves(self, troveMap):
         """ given a trove map which already contains a dict for all queries
@@ -87,36 +86,85 @@ class SingleGroup:
             are relevant to this group.
         """
         validSize = True
-        self.troves = {}
 
-        for (name, versionStr, flavor, source, byDefault, refSource) \
-                                                    in self.addTroveList:
+        for (name, versionStr, flavor, source, 
+                byDefault, refSource, components) in self.addTroveList:
             troveList = troveMap[refSource][name, versionStr, flavor]
 
             if byDefault is None:
                 byDefault = self.byDefault
             
-            for (troveTup, size, isRedirect) in troveList:
-                self._foundTrove(troveTup, size, byDefault, isRedirect)
+            for (troveTup, size, isRedirect, childTroves) in troveList:
+                self._foundTrove(troveTup, True, byDefault, isRedirect, size,
+                                 components, childTroves)
+
+
+        def _getChildTroves(trv):
+            if trv.isRedirect():
+                return []
+            return 
 
         # these are references which were used in addAll() commands
         for refSource, byDefault in self.addReferenceList:
-            troveList = refSource.getSourceTroves()
+            srcTroveList = refSource.getSourceTroves()
+
+            # get byDefault dict for troves 
+            byDefaultDict = []
+            for sourceTrove in srcTroveList:
+                byDefaultDict += [ x for x in 
+                                   sourceTrove.iterTroveList(strongRefs=True,
+                                                             weakRefs=True)
+                                   if sourceTrove.includeTroveByDefault(*x) ]
+
             troveTups = [ x for x in chain(
-                                *[x.iterTroveList() for x in troveList])]
+                                *[x.iterTroveList() for x in srcTroveList])]
             troveList = refSource.getTroves(troveTups, withFiles=False)
+
+            byDefaultDict = set(byDefaultDict)
 
             if byDefault is None:
                 byDefault = self.byDefault
 
             for (troveTup, trv) in izip(troveTups, troveList):
-                self._foundTrove(troveTup, trv.getSize(), byDefault, 
-                                 trv.isRedirect())
+                childTroves = _getChildTroves(trv)
+                if trv.isRedirect():
+                    childTroves = []
+                else:
+                    childTroves = [ (x, x in byDefaultDict)
+                                     for x in trv.iterTroveList(weakRefs=True, 
+                                                            strongRefs=True) ]  
+                self._foundTrove(troveTup, True, trv.getSize(), byDefault, 
+                                 trv.isRedirect(), trv.getSize(),
+                                 [], childTroves)
+
+
+
+    def _foundTrove(self, troveTup, explicit, byDefault, 
+                    isRedirect=False, size=None, components=None, 
+                    childTroves=None):
+        if explicit:
+            if isRedirect:
+                # we check later to ensure that all redirects added 
+                # by addTrove lines (or other means) are removed
+                # by removeTrove lines later.
+                self.redirects.add(troveTup)
+            
+        info =  self.troves.get(troveTup, None)
+        if info:
+            self.troves[troveTup] = (info[0] or explicit, 
+                                     info[1] or size, info[2] or byDefault)
+            if childTroves is not None:
+                # FIXME: childTrove byDefault information should be merged
+                self.childTroves[troveTup] = (components, childTroves)
+        else:
+            self.troves[troveTup] = (explicit, size, byDefault)
+            if childTroves is not None:
+                self.childTroves[troveTup] = (components, childTroves)
 
     def getDefaultTroves(self):
-        return [ x[0] for x in self.troves.iteritems() if x[1][1] ]
+        return [ x[0] for x in self.troves.iteritems() if x[1][2] ]
 
-    def _resolveDependencies(self, cfg, repos, labelPath, includedTroves):
+    def _resolveDependencies(self, cfg, repos, labelPath):
         """ adds the troves needed to to resolve all open dependencies 
             in this group.  Will raise an error if not all dependencies
             can be resolved.  
@@ -142,9 +190,9 @@ class SingleGroup:
         client = conaryclient.ConaryClient(cfg)
 
         if self.checkOnlyByDefaultDeps:
-            troveList = self.getDefaultTroves() + includedTroves
+            troveList = self.getDefaultTroves()
         else:
-            troveList = list(self.troves) + includedTroves
+            troveList = list(self.troves) 
         
         # build a list of the troves that we're checking so far
         troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
@@ -174,16 +222,14 @@ class SingleGroup:
         neededTups = set(chain(*suggMap.itervalues()))
         troves = repos.getTroves(neededTups, withFiles=False)
         for troveTup, trv in izip(neededTups, troves):
-            self._foundTrove(troveTup, trv.getSize(), self.byDefault,
+            self._foundTrove(troveTup, True, trv.getSize(), self.byDefault,
                              trv.isRedirect())
 
-    def _checkDependencies(self, cfg, includedTroves):
+    def _checkDependencies(self, cfg):
         if self.checkOnlyByDefaultDeps:
             troveList = self.getDefaultTroves()
         else:
             troveList = list(self.troves)
-
-        troveList += includedTroves
 
         jobSet = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
 
@@ -209,13 +255,60 @@ class SingleGroup:
         return failedDeps
 
     def _removeTroves(self, source):
+        if not self.removeTroveList:
+            return
         groupSource = trovesource.GroupRecipeSource(source, self)
         groupSource.searchAsDatabase()
-        results = groupSource.findTroves(None, self.removeTroveList)
+        results = groupSource.findTroves(None, self.removeTroveList,
+                                         allowMissing=True)
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
             del self.troves[troveTup]
             self.redirects.discard(troveTup)
+            del self.childTroves[troveTup]
+
+    def _addImplicitTroves(self, childGroups):
+        componentsToRemove = self.removeComponentList
+
+        for childGroup, byDefault in childGroups:
+            for trove, info in childGroup.troves.iteritems():
+                childByDefault = byDefault and info[-1]
+                if childByDefault and componentsToRemove:
+                    parts = trove[0].split(':', 1)
+                    if len(parts) != 1:
+                        if parts[1] in componentsToRemove:
+                            childByDefault = False
+                    
+                self._foundTrove(trove, False, childByDefault)
+        
+        for components, childTroves in self.childTroves.itervalues():
+            for (childTrove, byDefault) in childTroves:
+                
+                if componentsToRemove:
+                    parts = childTrove[0].split(':', 1)
+                    if len(parts) != 1:
+                        if parts[1] in componentsToRemove:
+                            byDefault = False
+                        
+                if components:
+                    if childTrove in components:    
+                        byDefault = True
+                    else:
+                        byDefault = False
+
+                self._foundTrove(childTrove, False, byDefault)
+
+    def _removeImplicitTroves(self, source):
+        if not self.removeTroveList:
+            return
+        groupSource = trovesource.GroupRecipeSource(source, self)
+        groupSource.searchAsDatabase()
+        results = groupSource.findTroves(None, self.removeTroveList, 
+                                         allowMissing=True)
+        troveTups = chain(*results.itervalues())
+        for troveTup in troveTups:
+            info = self.troves[troveTup]
+            self.troves[troveTup] = (info[0], info[1], False)
 
     def _checkForRedirects(self, repos):
         if self.redirects:
@@ -257,7 +350,6 @@ The following troves are missing targets:
 %s
 """ % '\n'.join(errmsg))
 
-
     def getRequires(self):
         return self.requires
 
@@ -273,13 +365,16 @@ The following troves are missing targets:
     def __init__(self, depCheck, autoResolve, checkOnlyByDefaultDeps,
                  byDefault = True):
 
+        self.troves = {}
         self.redirects = set()
         self.addTroveList = []
         self.addReferenceList = []
         self.removeTroveList = []
+        self.removeComponentList = set()
         self.newGroupList = []
         self.requires = deps.DependencySet()
 	self.troveVersionFlavors = {}
+        self.childTroves = {}
 
         self.depCheck = depCheck
         self.autoResolve = autoResolve
@@ -381,7 +476,7 @@ class GroupRecipe(Recipe):
     # maintain addTrove for backwards compatability
     addTrove = add
 
-    def setByDefault(self, byDefault=True, groupName=None):
+    def setGroupByDefault(self, byDefault=True, groupName=None):
         """ Set whether troves added to this group are installed by default 
             or not.  (This default value can be overridden by the byDefault
             parameter to individual addTrove commands).  If you set the 
@@ -390,7 +485,15 @@ class GroupRecipe(Recipe):
         """
         groupNames = self._parseGroupNames(groupName)
         for groupName in groupNames:
-            self.groups[groupName].setByDefault(byDefault)
+            self.groups[groupName].setGroupByDefault(byDefault)
+
+    def removeComponents(self, componentNames, groupName=None):
+        if isinstance(componentNames, str):
+            componentNames = [componentNames]
+
+        groupNames = self._parseGroupNames(groupName)
+        for groupName in groupNames:
+            self.groups[groupName].removeComponents(componentNames)
 
     def addAll(self, reference, groupName=None):
         """ Add all of the troves directly contained in the given 
@@ -539,32 +642,6 @@ class GroupRecipe(Recipe):
         groupsByLastSeen = ( (seen[x][FINISH], x) for x in groupNames)
         return [x[1] for x in sorted(groupsByLastSeen)]
 
-    def _getIncludedTroves(self, groupName, checkOnlyByDefaultDeps):
-        """ 
-            Returns the troves in all subGroups included by this trove.
-            If checkOnlyByDefaultDeps is False, exclude troves that are 
-            not included by default.
-        """
-        allTroves = []
-        childGroups = []
-        for childGroup, byDefault in self.groups[groupName].getNewGroupList(): 
-            if byDefault or not checkOnlyByDefaultDeps:
-                childGroups.append(childGroup)
-
-        while childGroups:
-            childGroup = childGroups.pop()
-            groupObj = self.groups[childGroup]
-
-            if checkOnlyByDefaultDeps:
-                allTroves.extend(groupObj.getDefaultTroves())
-            else:
-                allTroves.extend(groupObj.troves)
-
-            for childGroup, byDft in self.groups[childGroup].getNewGroupList(): 
-                if byDft or not checkOnlyByDefaultDeps:
-                    childGroups.append(childGroup)
-        return allTroves
-
     def getPrimaryGroupNames(self):
         """ 
         Return the list of groups in this GroupRecipe that are not included in 
@@ -576,6 +653,9 @@ class GroupRecipe(Recipe):
             unseen.difference_update([x[0] for x in self.groups[groupName].getNewGroupList()])
         return unseen
 
+    def getChildGroups(self, groupName):
+        return [ (self.groups[x[0]], x[1]) \
+                  for x in self.groups[groupName].getNewGroupList() ]
 
     def findAllTroves(self):
         if self.toFind is not None:
@@ -591,20 +671,16 @@ class GroupRecipe(Recipe):
         for groupName in groupNames:
             groupObj = self.groups[groupName]
 
-            # assign troves to this group
-            groupObj.findTroves(self.troveSpecMap, self.repos)
 
-            # if ordering is right, we now should be able to recurse through
-            # the groups included by this group and get all recursively
-            # included troves
-            includedTroves = self._getIncludedTroves(groupName, 
-                                             groupObj.checkOnlyByDefaultDeps)
+            childGroups = self.getChildGroups(groupName)
+            # assign troves to this group
+            groupObj.findTroves(self.troveSpecMap, self.repos, childGroups)
+
 
             # include those troves when doing dependency resolution/checking
-            groupObj.autoResolveDeps(self.cfg, self.repos, self.labelPath, 
-                                                           includedTroves)
+            groupObj.autoResolveDeps(self.cfg, self.repos, self.labelPath)
 
-            failedDeps = groupObj.checkDependencies(self.cfg, includedTroves)
+            failedDeps = groupObj.checkDependencies(self.cfg)
             if failedDeps:
                 return groupName, failedDeps
 
@@ -646,10 +722,33 @@ class GroupRecipe(Recipe):
             for result in results.itervalues():
                 troveTups.update(chain(*result.itervalues()))
 
-        troveTups = list(troveTups)
-        troves = repos.getTroves(troveTups, withFiles=False)
+        troveTupList = list(troveTups)
 
-        foundTroves = dict(izip(troveTups, troves))
+        troves = repos.getTroves(troveTupList, withFiles=False)
+
+        foundTroves = dict(izip(troveTupList, troves))
+
+        implicitOn = []
+        implicitOff = []
+        for trv in troves:
+            for info in trv.iterTroveList(weakRefs=True,    
+                                          strongRefs=True):
+                byDefault = trv.includeTroveByDefault(*info)
+                if byDefault:
+                    implicitOn.append(info)
+                else:
+                    implicitOff.append(info)
+
+        implicitTrv = dict.fromkeys(implicitOn, True)
+        for info in implicitOff:
+            implicitTrv.setdefault(info, False)
+
+        def _getChildTroves(trv):
+            if trv.isRedirect():
+                return []
+            return [ (x, trv.includeTroveByDefault(*x))
+                     for x in trv.iterTroveList(weakRefs=True, 
+                                                strongRefs=True) ] 
 
         troveSpecMap = {}
         # store the pertinent information in troveSpecMap
@@ -663,7 +762,8 @@ class GroupRecipe(Recipe):
             for troveSpec in toFind:
                 d[troveSpec] = [ (x,
                                   foundTroves[x].getSize(), 
-                                  foundTroves[x].isRedirect()) 
+                                  foundTroves[x].isRedirect(),
+                                  _getChildTroves(foundTroves[x]))
                                     for x in results[troveSource][troveSpec] ]
             troveSpecMap[troveSource] = d
         self.troveSpecMap = troveSpecMap

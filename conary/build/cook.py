@@ -438,7 +438,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     for groupName in groupNames:
         for (name, versionFlavorList) in recipeObj.getTroveList(
                                             groupName = groupName).iteritems():
-            for (version, flavor, byDefault) in versionFlavorList:
+            for (version, flavor, byDefault, explicit) in versionFlavorList:
                 grpFlavor.union(flavor,
                             mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
@@ -460,8 +460,9 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         groups[groupName] = grp
 
         for (name, versionFlavorList) in recipeObj.getTroveList(groupName = groupName).iteritems():
-            for (version, flavor, byDefault) in versionFlavorList:
-                grp.addTrove(name, version, flavor, byDefault = byDefault)
+            for (version, flavor, byDefault, explicit) in versionFlavorList:
+                grp.addTrove(name, version, flavor, byDefault = byDefault,
+                             weakRef=not explicit)
 
 	# add groups which were newly created by this group. also build
 	# the graph we need for cycle detection
