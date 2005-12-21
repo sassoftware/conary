@@ -21,12 +21,11 @@ from conary.lib import cfg
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
-    PASSTHROUGH = ["lastrowid"]
+    PASSTHROUGH = ["lastrowid", "description"]
 
     def __init__(self, dbh=None):
         self.dbh = dbh
         self._cursor = self._getCursor()
-        self.description = None
 
     # map some attributes back to self._cursor
     def __getattr__(self, name):
@@ -44,7 +43,6 @@ class BaseCursor:
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
-        self.description = None
         # force dbi compliance here. we prefer args over the kw
         if len(args) == 0:
             return self._cursor.execute(sql, **kw)
@@ -59,17 +57,22 @@ class BaseCursor:
             return self._cursor.execute(sql, args[0])
         return self._cursor.execute(sql, *args)
 
+    # return a list of the field names for the last select (if any)
+    def fields(self):
+        if not self._cursor.description:
+            return None
+        return [ x[0] for x in self._cursor.description ]
+
     # return the column names of the current select
     def __rowDict(self, row):
-        assert(self._cursor and self._cursor.description)
+        assert(self._cursor)
         if row is None:
             return None
         if len(row) != len(self._cursor.description):
             raise sqlerrors.CursorError("Cursor description doew not match row data",
                                      row = row, desc = self._cursor.description)
-        if not self.description:
-            self.description = [ x[0] for x in self._cursor.description ]
-        return dict(zip(self.description, row))
+        description = self.fields()
+        return dict(zip(self.fields(), row))
 
     # (a,b)
     def fetchone(self):
@@ -130,7 +133,6 @@ class BindlessCursor(BaseCursor):
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
-        self.description = None
         sql, keys = self.__mungeSQL(sql)
         # force dbi compliance here. we prefer args over the kw
         if len(args) == 1:

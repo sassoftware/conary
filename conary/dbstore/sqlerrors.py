@@ -44,3 +44,5 @@ class CursorError(DatabaseError):
 class ColumnNotUnique(CursorError):
     pass
 
+class ConstraintViolation(CursorError):
+    pass

@@ -25,10 +25,12 @@ class Cursor(BindlessCursor):
         try:
             BindlessCursor.execute(self, sql, *params, **kw)
         except mysql.IntegrityError, e:
-            if e[1].startswith("Duplicate"):
+            if e[0] in (1062,):
                 raise sqlerrors.ColumnNotUnique(e)
             raise errors.CursorError(e)
         except mysql.OperationalError, e:
+            if e[0] in (1216, 1217, 1451, 1452):
+                raise sqlerrors.ConstraintViolation(e.args[1], e.args)
             raise sqlerrors.DatabaseError(e.args[1], e.args)
         return self
 
