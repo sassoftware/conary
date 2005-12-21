@@ -71,7 +71,6 @@ class BaseCursor:
         if len(row) != len(self._cursor.description):
             raise sqlerrors.CursorError("Cursor description doew not match row data",
                                      row = row, desc = self._cursor.description)
-        description = self.fields()
         return dict(zip(self.fields(), row))
 
     # (a,b)
