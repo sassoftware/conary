@@ -14,21 +14,29 @@
 
 import re
 import pgdb
+
 from base_drv import BaseDatabase, BindlessCursor, BaseCursor
+import sqlerrors
 
 class Cursor(BindlessCursor):
-    pass
+    driver = "postgresql"
+    def execute(self, sql, *params, **kw):
+        if kw.has_key("start_transaction"):
+            del kw["start_transaction"]
+        try:
+            ret = BindlessCursor.execute(self, sql, *params, **kw)
+        except pgdb.DatabaseError, e:
+            raise sqlerrors.CursorError(e)
+        return ret
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Database(BaseDatabase):
-    def __init__(self, db):
-        BaseDatabase.__init__(self, db)
-        self.type = "postgresql"
-        self.avail_check = "select count(*) from pg_tables"
-        self.cursorClass = Cursor
+    driver = "postgresql"
+    avail_check = "select count(*) from pg_tables"
+    cursorClass = Cursor
 
-    def connect(self, timeout=10000):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         for x in cdb.keys():
@@ -37,11 +45,12 @@ class Database(BaseDatabase):
         cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
                                 cdb["user"], cdb["password"])
         self.dbh = pgdb.connect(cstr)
-        self._getSchema()
+        self.loadSchema()
+        self.closed = False
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         # get tables
         c.execute("""
@@ -50,7 +59,7 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])
+        self.tables.update(dict.fromkeys(x[0] for x in c.fetchall(), []))
         if not len(self.tables):
             return self.version
         # views
@@ -60,7 +69,7 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.views = [ x[0] for x in c.fetchall() ]
+        self.views = dict.fromkeys(x[0] for x in c.fetchall())
         # indexes
         c.execute("""
         select indexname as name, tablename as table
@@ -79,6 +88,6 @@ class Database(BaseDatabase):
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
-        self.sequences = [x[0] for x in c.fetchall()]
-        self._getSchemaVersion()
-        return self.version
+        self.sequences = dict.fromkeys(x[0] for x in c.fetchall())
+        version = self.getVersion()
+        return version
