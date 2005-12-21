@@ -34,6 +34,9 @@ class AbstractTroveSource:
         self._bestFlavor = False
         self._getLeavesOnly = False
 
+    def requiresLabelPath(self):
+        return not self._allowNoLabel
+
     def getTroveLeavesByLabel(self, query, bestFlavor=True):
         raise NotImplementedError
 
@@ -51,6 +54,9 @@ class AbstractTroveSource:
 
     def getTroves(self, troveList, withFiles = True):
         raise NotImplementedError
+
+    def resolveDependencies(self, label, depList):
+        return {}
 
     def hasTroves(self, troveList):
         return [False] * len(troveList)
@@ -776,6 +782,12 @@ class TroveSourceStack(SearchableTroveSource):
                     self.addSource(source)
             else:
                 self.addSource(source)
+
+    def requiresLabelPath(self):
+        for source in self.iterSources():
+            if source.requiresLabelPath():
+                return True
+        return False
 
     def addSource(self, source):
         if source is not None and source not in self:
