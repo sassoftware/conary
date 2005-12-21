@@ -6,6 +6,9 @@ if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
 
+import time
+import types
+
 from conary import dbstore
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
@@ -60,50 +63,104 @@ tList = [
     'PGPFingerprints',
     'Provides',
     'Requires',
-    'TroveInfo',
     'TroveTroves',
+    'TroveInfo',
     'FileStreams',
     'TroveFiles',
     ]
 
+BATCH=400
+TICK=10
+
+def hexstr(s):
+    return "".join("%02x" % ord(c) for c in s)
+
+def sqlstr(val):
+    if isinstance(val, (types.IntType, types.FloatType)):
+        return str(val)
+    elif isinstance(val, types.StringType):
+        return "x'%s'" % hexstr(val)
+    elif val is None:
+        return "NULL"
+    elif isinstance(val, tuple):
+        return "(" + ",".join([sqlstr(x) for x in val]) + ")"
+    # ugly sqlite hack - why does sqlite makes it so hard to get a
+    # real tuple out of a row without peeking inside the instance
+    # structure?!
+    elif hasattr(val, "data"):
+        return sqlstr(val.data)
+    else:
+        raise AttributeError("We're not handling a value correctly", val, type(val))
+
+
+def timings(current, total, tstart):
+    tnow = time.time()
+    tpassed = max(tnow-tstart,1)
+    speed = max(current/tpassed,1)
+    tremaining=(total-current)/speed
+    return "%d/%d %02d%% (%d rec/sec, %d:%02d passed, %d:%02d remaining)" % (
+        current, total, (current*100)/max(total,1),
+        speed,
+        tpassed/60, tpassed % 60,
+        tremaining/60, tremaining % 60)
+
+def slow_insert(t, fields, rows):
+    global mysql, cm
+    for row in rows:
+        assert(len(fields) == len(row))
+        sql = "INSERT INTO %s (%s) VALUES %s" % (
+            t, ", ".join(fields), sqlstr(row))
+        try:
+            cm.execute(sql)
+        except sqlerrors.ConstraintViolation, e:
+            print "\r%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
+            print e.msg
+            pass
+    mysql.commit()
+
 for t in tList:
-    print
-    print "Converting", t
     count = cs.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
-    cm.execute("LOCK TABLES %s WRITE" % t)
+    t1 = time.time()
     while True:
-        row = cs.fetchone_dict()
-        if row is None:
+        rows = cs.fetchmany(BATCH)
+        if not len(rows):
             break
-        if t == "Permissions":
-            row["canWrite"] = row["write"]
-            del row["write"]
-            if 'entGroupEdmin' in row:
-                del row["entGroupAdmin"]
-        row = row.items()
-        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
-            t, ", ".join(x[0] for x in row),
-            ", ".join(["?"] * len(row)))
-        i += 1
+        fields = cs.fields()
+        if t.lower() == "permissions":
+            if "write" in fields:
+                fields[fields.index("write")] = "canWrite"
+        if t.lower() == "trovefiles":
+            # versionId was declared as a binary string in sqlite instead of integer
+            rows = [list(row) for row in rows]
+            for row in rows:
+                row[2] = int(row[2])
+            rows = [tuple(row) for row in rows]
+        sql = "INSERT INTO %s (%s) VALUES" % (t, ", ".join(fields))
+        sql += ", ".join([sqlstr(row) for row in rows])
+        i += len(rows)
         try:
-            cm.execute(sql, [x[1] for x in row])
+            cm.execute(sql)
         except sqlerrors.ColumnNotUnique:
             print "\r%s: SKIPPING" % t, row
+        except sqlerrors.ConstraintViolation:
+            slow_insert(t, fields, rows)
         except:
-            print "ERROR - SQL", sql, "ARGS:", [x[1] for x in row]
+            print "ERROR - SQL", sql
             raise
         else:
-            if i % 1000 == 0:
-                sys.stdout.write("\r%s: %d/%d %d%%" % (t, i, count, i*100/count))
+            if i % (BATCH*TICK) == 0:
+                t2 = time.time()
+                sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
                 sys.stdout.flush()
-            if i % 50000 == 0:
+            if i % (BATCH*TICK*5) == 0:
                 mysql.commit()
-    print "\r%s: %d/%d 100%%" % (t, i, count)
+    print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
     mysql.commit()
 
 # and now create the indexes
+cm.execute("LOCK TABLES %s WRITE" % ", ".join(tList))
 for stmt in getIndexes():
     cm.execute(stmt)
     print stmt
