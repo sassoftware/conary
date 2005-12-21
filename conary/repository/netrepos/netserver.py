@@ -131,18 +131,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
                     return (False, True, (marshall, str(e)))
+            # comment out the next line to fall into the debugger
             raise
-	#    return (True, ("Unknown Exception", str(e)))
-## 	except Exception:
-## 	   import traceback, sys, string
-##            from conary.lib import debugger
-##            debugger.st()
-## 	   excInfo = sys.exc_info()
-## 	   lines = traceback.format_exception(*excInfo)
-## 	   print string.joinfields(lines, "")
-## 	   if 1 or sys.stdout.isatty() and sys.stdin.isatty():
-## 		debugger.post_mortem(excInfo[2])
-## 	   raise
+
+            # uncomment the next line to translate exceptions into
+            # nicer errors for the client.
+            #return (True, ("Unknown Exception", str(e)))
+
+            # fall-through to debug this exception - this code should
+            # not run on production servers
+            import traceback, sys, string
+            from conary.lib import debugger
+            debugger.st()
+            excInfo = sys.exc_info()
+            lines = traceback.format_exception(*excInfo)
+            print string.joinfields(lines, "")
+            if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+		debugger.post_mortem(excInfo[2])
+            raise
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
