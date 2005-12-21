@@ -131,7 +131,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
                     return (False, True, (marshall, str(e)))
-            # comment out the next line to fall into the debugger
+            # this exception is not marshalled back to the client.
+            # re-raise it now.  comment the next line out to fall into
+            # the debugger
             raise
 
             # uncomment the next line to translate exceptions into
