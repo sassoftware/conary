@@ -133,9 +133,8 @@ class SingleGroup:
                     childTroves = [ (x, x in byDefaultDict)
                                      for x in trv.iterTroveList(weakRefs=True, 
                                                             strongRefs=True) ]  
-                self._foundTrove(troveTup, True, trv.getSize(), byDefault, 
-                                 trv.isRedirect(), trv.getSize(),
-                                 [], childTroves)
+                self._foundTrove(troveTup, True, byDefault, trv.isRedirect(),
+                                 trv.getSize(), [], childTroves)
 
 
 
