@@ -52,6 +52,7 @@ tList = [
     'UserGroupMembers',
     'EntitlementGroups',
     'Entitlements',
+    'EntitlementOwners',
     'Permissions',
     'Instances',
     'Dependencies',
@@ -121,7 +122,7 @@ def slow_insert(t, fields, rows):
     mysql.commit()
 
 for t in tList:
-    count = cs.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
+    count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
     t1 = time.time()
@@ -168,6 +169,10 @@ for stmt in getIndexes():
     # in MySQL, tables need to be locked every time we create an index
     cm.execute(sql)
     print stmt
-    cm.execute(stmt)
+    try:
+        cm.execute(stmt)
+    except sqlerrors.DatabaseError, e:
+        print e.msg
+cm.execute("UNLOCK TABLES")
 mysql.setVersion(schema.VERSION)
 mysql.commit()
