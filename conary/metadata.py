@@ -37,16 +37,16 @@ class MDClass:
                  LICENSE:    "license",
                  CATEGORY:   "category",
                  SOURCE:     "source"}
-    
+
     (STRING, LIST) = range(2)
-    
+
     types = {SHORT_DESC:    STRING,
              LONG_DESC:     STRING,
              URL:           LIST,
              LICENSE:       LIST,
              CATEGORY:      LIST,
              SOURCE:        STRING}
-    
+
 class MetadataTable:
     def __init__(self, db):
         self.db = db
@@ -93,7 +93,7 @@ class MetadataTable:
             metadataId = metadataId[0]
         else:
             return None
-           
+
         # URL, LICENSE, and CATEGORY are not translated
         cu.execute("""SELECT class, data FROM MetadataItems
                       WHERE metadataId=? and (language=?
@@ -104,22 +104,22 @@ class MetadataTable:
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-                 
+
         items = {}
         for mdClass, className in MDClass.className.items():
             classType = MDClass.types[mdClass]
-            
+
             if classType == MDClass.STRING:
                 items[className] = ""
             elif classType == MDClass.LIST:
                 items[className] = []
             else:
                 items[className] = None
-        
+
         for mdClass, data in cu:
             className = MDClass.className[mdClass]
             classType = MDClass.types[mdClass]
-            
+
             if classType == MDClass.STRING:
                 items[className] = data
             elif classType == MDClass.LIST:
@@ -207,13 +207,13 @@ class Metadata:
 
     def getCategories(self):
         return self.categories
-    
+
     def getVersion(self):
         return self.version
 
     def getSource(self):
         return self.source
-        
+
     def getLanguage(self):
         return self.language
 
@@ -226,7 +226,7 @@ def fetchFreshmeat(troveName):
     try:
         doc = xml.dom.minidom.parse(url)
         metadata = {}
-        
+
         shortDesc = doc.getElementsByTagName("desc_short")[0]
         if shortDesc.childNodes:
             metadata["shortDesc"] = shortDesc.childNodes[0].data
@@ -234,13 +234,13 @@ def fetchFreshmeat(troveName):
         longDesc = doc.getElementsByTagName("desc_full")[0]
         if longDesc.childNodes:
             metadata["longDesc"] = longDesc.childNodes[0].data
-        
+
         metadata["url"] = []
         urlHomepage = doc.getElementsByTagName("url_homepage")[0]
         if urlHomepage.childNodes:
             metadata["url"].append(resolveUrl(urlHomepage.childNodes[0].data))
         metadata["url"].append("http://freshmeat.net/projects/%s/" % troveName)
-        
+
         metadata["license"] = []
         metadata["category"] = []
 
@@ -270,16 +270,16 @@ def formatDetails(repos, cfg, troveName, branch, sourceTrove):
 
         if branch.getHost() != lastHost:
             md = repos.getMetadata([troveName, branch], branch.label())
-    
+
     # check source trove for metadata
     if not md and sourceTrove:
         troveName = sourceTrove.getName()
         md = repos.getMetadata([troveName, sourceTrove.getVersion().branch()],
                                sourceTrove.getVersion().branch().label())
-   
+
     if troveName in md:
         md = md[troveName]
-        
+
         wrapper = textwrap.TextWrapper(initial_indent='    ',
                                        subsequent_indent='    ')
         wrapped = wrapper.wrap(md.getLongDesc())

@@ -26,9 +26,9 @@ def createInstances(db):
         cu.execute("""
         CREATE TABLE Instances(
             instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
-            itemId          INTEGER,
-            versionId       INTEGER,
-            flavorId        INTEGER,
+            itemId          INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
+            flavorId        INTEGER NOT NULL,
             isRedirect      INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
@@ -81,7 +81,7 @@ def createFlavors(db):
     if "FlavorMap" not in db.tables:
         cu.execute("""
         CREATE TABLE FlavorMap(
-            flavorId        INTEGER,
+            flavorId        INTEGER NOT NULL,
             base            VARCHAR(254),
             sense           INTEGER,
             flag            VARCHAR(254),
@@ -100,8 +100,8 @@ def createFlavors(db):
             present         INTEGER,
             value           INTEGER NOT NULL DEFAULT -1000000
         )""")
-        cu.execute("""CREATE UNIQUE INDEX FlavorScoresIdx ON
-                          FlavorScores(request, present)""")
+        cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
+                   "FlavorScores(request, present)")
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
@@ -131,11 +131,11 @@ def createNodes(db):
         cu.execute("""
         CREATE TABLE Nodes(
             nodeId          INTEGER PRIMARY KEY AUTO_INCREMENT,
-            itemId          INTEGER,
-            branchId        INTEGER,
-            versionId       INTEGER,
-            timeStamps      VARCHAR(1000),
-            finalTimeStamp  NUMERIC(13,3),
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
+            timeStamps      VARCHAR(1000) NOT NULL,
+            finalTimeStamp  NUMERIC(13,3) NOT NULL,
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -180,10 +180,10 @@ def createLatest(db):
     if 'Latest' not in db.tables:
         cu.execute("""
         CREATE TABLE Latest(
-            itemId          INTEGER,
-            branchId        INTEGER,
-            flavorId        INTEGER,
-            versionId       INTEGER,
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            flavorId        INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -242,7 +242,7 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE UserGroups (
             userGroupId     INTEGER PRIMARY KEY AUTO_INCREMENT,
-            userGroup       VARCHAR(254)
+            userGroup       VARCHAR(254) NOT NULL
         )""")
         cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
                    "UserGroups(userGroup)")
@@ -251,8 +251,8 @@ def createUsers(db):
     if "UserGroupMembers" not in db.tables:
         cu.execute("""
         CREATE TABLE UserGroupMembers (
-            userGroupId     INTEGER,
-            userId          INTEGER,
+            userGroupId     INTEGER NOT NULL,
+            userId          INTEGER NOT NULL,
             CONSTRAINT UserGroupMembers_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -260,10 +260,10 @@ def createUsers(db):
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("""CREATE INDEX UserGroupMembersIdx ON
-                                        UserGroupMembers(userGroupId)""")
-        cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
-                                        UserGroupMembers(userId)""")
+        cu.execute("CREATE INDEX UserGroupMembersIdx ON "
+                   "UserGroupMembers(userGroupId)")
+        cu.execute("CREATE INDEX UserGroupMembersIdx2 ON "
+                   "UserGroupMembers(userId)")
         commit = True
 
     if "Permissions" not in db.tables:
@@ -288,8 +288,8 @@ def createUsers(db):
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
-                      ON Permissions(userGroupId, labelId, itemId)""")
+        cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
+                   "Permissions(userGroupId, labelId, itemId)")
         commit = True
 
     if "UsersView" not in db.views:
@@ -316,8 +316,8 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE EntitlementGroups (
             entGroupId      INTEGER PRIMARY KEY AUTO_INCREMENT,
-            entGroup        VARCHAR(254),
-            userGroupId     INTEGER,
+            entGroup        VARCHAR(254) NOT NULL,
+            userGroupId     INTEGER NOT NULL,
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
@@ -329,8 +329,8 @@ def createUsers(db):
     if "EntitlementOwners" not in db.tables:
         cu.execute("""
         CREATE TABLE EntitlementOwners (
-            entGroupId      INTEGER,
-            ownerGroupId    INTEGER,
+            entGroupId      INTEGER NOT NULL,
+            ownerGroupId    INTEGER NOT NULL,
             CONSTRAINT EntitlementOwners_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -347,8 +347,8 @@ def createUsers(db):
     if "Entitlements" not in db.tables:
         cu.execute("""
         CREATE TABLE Entitlements (
-            entGroupId      INTEGER,
-            entitlement     BINARY(255),
+            entGroupId      INTEGER NOT NULL,
+            entitlement     BINARY(255) NOT NULL,
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementOwners(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
@@ -368,9 +368,9 @@ def createPGPKeys(db):
         cu.execute("""
         CREATE TABLE PGPKeys(
             keyId           INTEGER PRIMARY KEY AUTO_INCREMENT,
-            userId          INTEGER,
-            fingerprint     CHAR(40),
-            pgpKey          BLOB,
+            userId          INTEGER NOT NULL,
+            fingerprint     CHAR(40) NOT NULL,
+            pgpKey          BLOB NOT NULL,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -381,7 +381,7 @@ def createPGPKeys(db):
     if "PGPFingerprints" not in db.tables:
         cu.execute("""
         CREATE TABLE PGPFingerprints(
-            keyId           INTEGER,
+            keyId           INTEGER NOT NULL,
             fingerprint     CHAR(40) PRIMARY KEY,
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
@@ -404,7 +404,7 @@ def createTroves(db):
         )""")
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
-        cu.execute("""CREATE INDEX FileStreamsIdx ON FileStreams(fileId)""")
+        cu.execute("CREATE INDEX FileStreamsIdx ON FileStreams(fileId)")
         commit = True
 
     if "TroveFiles" not in db.tables:
@@ -432,9 +432,9 @@ def createTroves(db):
     if "TroveTroves" not in db.tables:
         cu.execute("""
         CREATE TABLE TroveTroves(
-            instanceId      INTEGER,
-            includedId      INTEGER,
-            byDefault       BOOLEAN,
+            instanceId      INTEGER NOT NULL,
+            includedId      INTEGER NOT NULL,
+            byDefault       BOOLEAN NOT NULL DEFAULT 0,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -535,7 +535,7 @@ def createChangeLog(db):
     cu = db.cursor()
     cu.execute("""
         CREATE TABLE ChangeLogs(
-            nodeId          INTEGER,
+            nodeId          INTEGER NOT NULL,
             name            VARCHAR(254),
             contact         VARCHAR(254),
             message         TEXT,
@@ -606,8 +606,8 @@ class MigrateTo_2(SchemaMigration):
 
         ## Finally fix the index
         cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON
-            Permissions(userGroupId, labelId, itemId)""")
+        cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
+                   "Permissions(userGroupId, labelId, itemId)")
         return self.Version
 
 # add a smaller index for the Latest table
@@ -633,15 +633,15 @@ class MigrateTo_5(SchemaMigration):
     def migrate(self):
         # FlavorScoresIdx was not unique
         self.cu.execute("DROP INDEX FlavorScoresIdx")
-        self.cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx "
-                   "    on FlavorScores(request, present)")
+        self.cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
+                        "FlavorScores(request, present)")
         # remove redundancy/rename
         self.cu.execute("DROP INDEX NodesIdx")
         self.cu.execute("DROP INDEX NodesIdx2")
-        self.cu.execute("""CREATE UNIQUE INDEX NodesItemBranchVersionIdx
-                          ON Nodes(itemId, branchId, versionId)""")
-        self.cu.execute("""CREATE INDEX NodesItemVersionIdx
-                          ON Nodes(itemId, versionId)""")
+        self.cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx ON "
+                        "Nodes(itemId, branchId, versionId)")
+        self.cu.execute("CREATE INDEX NodesItemVersionIdx ON "
+                        "Nodes(itemId, versionId)")
         # the views are added by the __init__ methods of their
         # respective classes
         return self.Version
