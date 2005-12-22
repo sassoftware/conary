@@ -119,11 +119,11 @@ def createTroveInfo(db):
     CREATE TABLE TroveInfo(
         instanceId      INTEGER NOT NULL,
         infoType        INTEGER NOT NULL,
-        data            MEDIUMBLOB,
+        data            %(MEDIUMBLOB)s,
         CONSTRAINT TroveInfo_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
             ON DELETE CASCADE ON UPDATE CASCADE
-    )""")
+    )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
     # FIXME: kill it in the schema migration as well
     #cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
@@ -136,7 +136,7 @@ def createMetadata(db):
     if 'Metadata' not in db.tables:
         cu.execute("""
         CREATE TABLE Metadata(
-            metadataId          INTEGER PRIMARY KEY AUTO_INCREMENT,
+            metadataId          %(PRIMARYKEY)s,
             itemId              INTEGER NOT NULL,
             versionId           INTEGER NOT NULL,
             branchId            INTEGER NOT NULL,
@@ -150,7 +150,7 @@ def createMetadata(db):
             CONSTRAINT Metadata_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         commit = True
     # FIXME: create an index here too
     if 'MetadataItems' not in db.tables:
@@ -183,28 +183,29 @@ def createDataStore(db):
     db.commit()
     db.loadSchema()
 
-def createDepTable(cu, name, isTemp):
+def createDepTable(db, cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
         if resetTable(cu, name):
             return False
+        db.commit()
 
         d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
-        depId           INTEGER PRIMARY KEY AUTO_INCREMENT,
+        depId           %%(PRIMARYKEY)s,
         class           INTEGER NOT NULL,
         name            VARCHAR(254) NOT NULL,
         flag            VARCHAR(254) NOT NULL
-    )""" % d, start_transaction = (not isTemp))
+    )""" % d % db.keywords, start_transaction = (not isTemp))
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
 
     return True
 
-def createRequiresTable(cu, name, isTemp):
+def createRequiresTable(db, cu, name, isTemp):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "" }
@@ -213,6 +214,7 @@ def createRequiresTable(cu, name, isTemp):
     if isTemp:
         if resetTable(cu, name):
             return False
+        db.commit()
 
         d['tmp'] = 'TEMPORARY'
     else:
@@ -241,7 +243,7 @@ def createRequiresTable(cu, name, isTemp):
 
     return True
 
-def createProvidesTable(cu, name, isTemp):
+def createProvidesTable(db, cu, name, isTemp):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "" }
@@ -250,6 +252,7 @@ def createProvidesTable(cu, name, isTemp):
     if isTemp:
         if resetTable(cu, name):
             return False
+        db.commit()
         d['tmp'] = 'TEMPORARY'
     else:
         d['constraint'] = """,
@@ -272,9 +275,10 @@ def createProvidesTable(cu, name, isTemp):
 
     return True
 
-def createDepWorkTable(cu, name):
+def createDepWorkTable(db, cu, name):
     if resetTable(cu, name):
         return False
+    db.commit()
 
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
@@ -297,34 +301,38 @@ def createDependencies(db):
     commit = False
     cu = db.cursor()
     if "Dependencies" not in db.tables:
-        createDepTable(cu, "Dependencies", False)
+        createDepTable(db, cu, "Dependencies", False)
         commit = True
     if "Requires" not in db.tables:
-        createRequiresTable(cu, "Requires", False)
+        createRequiresTable(db, cu, "Requires", False)
         commit = True
     if "Provides" not in db.tables:
-        createProvidesTable(cu, "Provides", False)
+        createProvidesTable(db, cu, "Provides", False)
         commit = True
 
     # bitwise | doesn't get short circuited
-    commit = commit | createRequiresTable(cu, "TmpRequires", isTemp = True)
-    commit = commit | createProvidesTable(cu, "TmpProvides", isTemp = True)
-    commit = commit | createDepWorkTable(cu, "DepCheck")
-    commit = commit | createDepTable(cu, 'TmpDependencies', isTemp = True)
+    commit = commit | createRequiresTable(db, cu, "TmpRequires", isTemp = True)
+    commit = commit | createProvidesTable(db, cu, "TmpProvides", isTemp = True)
+    commit = commit | createDepWorkTable(db, cu, "DepCheck")
+    commit = commit | createDepTable(db, cu, 'TmpDependencies', isTemp = True)
 
     if not resetTable(cu, "SuspectDepsOrig"):
+        db.commit()
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
         commit = True
 
     if not resetTable(cu, "SuspectDeps"):
+        db.commit()
         cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
         commit = True
 
     if not resetTable(cu, "BrokenDeps"):
+        db.commit()
         cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
         commit = True
 
     if not resetTable(cu, "RemovedTroveIds"):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE RemovedTroveIds(
             troveId INTEGER,

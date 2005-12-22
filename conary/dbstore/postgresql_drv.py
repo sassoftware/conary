@@ -17,6 +17,7 @@ import pgdb
 
 from base_drv import BaseDatabase, BindlessCursor, BaseCursor
 import sqlerrors
+import sqllib
 
 class Cursor(BindlessCursor):
     driver = "postgresql"
@@ -27,7 +28,7 @@ class Cursor(BindlessCursor):
             ret = BindlessCursor.execute(self, sql, *params, **kw)
         except pgdb.DatabaseError, e:
             raise sqlerrors.CursorError(e)
-        return ret
+        return self
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
@@ -35,6 +36,11 @@ class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
+    keywords = BaseDatabase.keywords
+    keywords['BINARY'] = 'VARCHAR'
+    keywords['BLOB'] = 'BYTEA'
+    keywords['MEDIUMBLOB'] = 'BYTEA'
+    keywords['PRIMARYKEY'] = 'SERIAL PRIMARY KEY'
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -44,7 +50,10 @@ class Database(BaseDatabase):
                 cdb[x] = ""
         cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
                                 cdb["user"], cdb["password"])
-        self.dbh = pgdb.connect(cstr)
+        host = cdb["host"]
+        if cdb["port"]:
+            host ="%s:%s" % (cdb["host"], cdb["port"])
+        self.dbh = pgdb.connect(cstr, host = host)
         self.loadSchema()
         self.closed = False
         return True
@@ -59,7 +68,9 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.tables.update(dict.fromkeys(x[0] for x in c.fetchall(), []))
+        for table, in c.fetchall():
+            self.tables.setdefault(table, [])
+
         if not len(self.tables):
             return self.version
         # views
@@ -69,7 +80,9 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.views = dict.fromkeys(x[0] for x in c.fetchall())
+        self.views = sqllib.CaselessDict()
+        for x in c.fetchall():
+            self.views[x[0]] = True
         # indexes
         c.execute("""
         select indexname as name, tablename as table

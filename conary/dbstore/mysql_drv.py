@@ -72,6 +72,9 @@ class Database(BaseDatabase):
     sequenceClass = Sequence
     driver = "mysql"
 
+    keywords = BaseDatabase.keywords
+    keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+
     def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData(["user", "passwd", "host", "port", "db"])

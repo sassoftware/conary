@@ -25,7 +25,7 @@ def createInstances(db):
     if "Instances" not in db.tables:
         cu.execute("""
         CREATE TABLE Instances(
-            instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
+            instanceId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
@@ -40,7 +40,7 @@ def createInstances(db):
             CONSTRAINT Instances_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
                    " Instances(itemId, versionId, flavorId) ")
         commit = True
@@ -71,9 +71,9 @@ def createFlavors(db):
     if "Flavors" not in db.tables:
         cu.execute("""
         CREATE TABLE Flavors(
-            flavorId        INTEGER PRIMARY KEY AUTO_INCREMENT,
+            flavorId        %(PRIMARYKEY)s,
             flavor          VARCHAR(767)
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
         commit = True
@@ -102,14 +102,19 @@ def createFlavors(db):
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
                    "FlavorScores(request, present)")
+
+        # don't mix schema changes w/ table population
+        db.commit()
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
             cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)",
                        request, present, value)
-        commit = True
+        db.commit()
+        commit = False
 
     if not resetTable(cu, 'ffFlavor'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE
         ffFlavor(
@@ -130,12 +135,12 @@ def createNodes(db):
     if 'Nodes' not in db.tables:
         cu.execute("""
         CREATE TABLE Nodes(
-            nodeId          INTEGER PRIMARY KEY AUTO_INCREMENT,
+            nodeId          %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
-            timeStamps      VARCHAR(1000) NOT NULL,
-            finalTimeStamp  NUMERIC(13,3) NOT NULL,
+            timeStamps      VARCHAR(1000),
+            finalTimeStamp  NUMERIC(13,3),
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -145,7 +150,7 @@ def createNodes(db):
             CONSTRAINT Nodes_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)")
         cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx "
                    "ON Nodes(itemId, branchId, versionId)")
@@ -230,20 +235,20 @@ def createUsers(db):
     if "Users" not in db.tables:
         cu.execute("""
         CREATE TABLE Users (
-            userId          INTEGER PRIMARY KEY AUTO_INCREMENT,
-            user            VARCHAR(254) NOT NULL,
-            salt            BINARY(4) NOT NULL,
+            userId          %(PRIMARYKEY)s,
+            userName        VARCHAR(254) NOT NULL,
+            salt            %(BINARY)s(4) NOT NULL,
             password        VARCHAR(254)
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
         commit = True
 
     if "UserGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE UserGroups (
-            userGroupId     INTEGER PRIMARY KEY AUTO_INCREMENT,
+            userGroupId     %(PRIMARYKEY)s,
             userGroup       VARCHAR(254) NOT NULL
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
                    "UserGroups(userGroup)")
         commit = True
@@ -271,7 +276,7 @@ def createUsers(db):
         assert("Labels" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
-            permissionId    INTEGER PRIMARY KEY AUTO_INCREMENT,
+            permissionId    %(PRIMARYKEY)s,
             userGroupId     INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
@@ -287,7 +292,7 @@ def createUsers(db):
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
                    "Permissions(userGroupId, labelId, itemId)")
         commit = True
@@ -297,7 +302,7 @@ def createUsers(db):
         CREATE VIEW
             UsersView AS
         SELECT
-            Users.user as user,
+            Users.userName as userName,
             Items.item as item,
             Labels.label as label,
             Permissions.canWrite as W,
@@ -315,13 +320,13 @@ def createUsers(db):
     if "EntitlementGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE EntitlementGroups (
-            entGroupId      INTEGER PRIMARY KEY AUTO_INCREMENT,
+            entGroupId      %(PRIMARYKEY)s,
             entGroup        VARCHAR(254) NOT NULL,
             userGroupId     INTEGER NOT NULL,
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX EntitlementGroupsEntGroupIdx ON "
                    "EntitlementGroups(entGroup)")
         commit = True
@@ -348,11 +353,11 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Entitlements (
             entGroupId      INTEGER NOT NULL,
-            entitlement     BINARY(255) NOT NULL,
+            entitlement     %(BINARY)s(255) NOT NULL,
             CONSTRAINT Entitlements_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES EntitlementOwners(entGroupId)
+                FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX EntitlementsEntGroupEntitlementIdx ON "
                    "Entitlements(entGroupId, entitlement)")
         commit = True
@@ -367,14 +372,14 @@ def createPGPKeys(db):
     if "PGPKeys" not in db.tables:
         cu.execute("""
         CREATE TABLE PGPKeys(
-            keyId           INTEGER PRIMARY KEY AUTO_INCREMENT,
+            keyId           %(PRIMARYKEY)s,
             userId          INTEGER NOT NULL,
             fingerprint     CHAR(40) NOT NULL,
-            pgpKey          BLOB NOT NULL,
+            pgpKey          %(BLOB)s NOT NULL,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
         commit = True
@@ -386,7 +391,7 @@ def createPGPKeys(db):
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         commit = True
     if commit:
         db.commit()
@@ -398,10 +403,10 @@ def createTroves(db):
     if 'FileStreams' not in db.tables:
         cu.execute("""
         CREATE TABLE FileStreams(
-            streamId    INTEGER PRIMARY KEY AUTO_INCREMENT,
-            fileId      BINARY(20),
-            stream      BLOB
-        )""")
+            streamId    %(PRIMARYKEY)s,
+            fileId      %(BINARY)s(20),
+            stream      %(BLOB)s
+        )""" % db.keywords)
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
         cu.execute("CREATE INDEX FileStreamsIdx ON FileStreams(fileId)")
@@ -413,7 +418,7 @@ def createTroves(db):
             instanceId      INTEGER NOT NULL,
             streamId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
-            pathId          BINARY(16),
+            pathId          %(BINARY)s(16),
             path            VARCHAR(767),
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
@@ -424,7 +429,7 @@ def createTroves(db):
             CONSTRAINT TroveFiles_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        )""" % db.keywords)
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
         cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
         commit = True
@@ -434,7 +439,7 @@ def createTroves(db):
         CREATE TABLE TroveTroves(
             instanceId      INTEGER NOT NULL,
             includedId      INTEGER NOT NULL,
-            byDefault       BOOLEAN NOT NULL DEFAULT 0,
+            byDefault       INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -453,47 +458,53 @@ def createTroves(db):
         commit = True
 
     if not resetTable(cu, 'NewFiles'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
-            pathId      BINARY(16),
+            pathId      %(BINARY)s(16),
             versionId   INTEGER,
-            fileId      BINARY(20),
-            stream      BLOB,
+            fileId      %(BINARY)s(20),
+            stream      %(BLOB)s,
             path        VARCHAR(767)
-        )""")
+        )""" % db.keywords)
         commit = True
 
     if not resetTable(cu, 'NeededFlavors'):
+        db.commit()
         cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
         commit = True
 
     if not resetTable(cu, 'gtl'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE gtl(
-        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
+        idx             %(PRIMARYKEY)s,
         name            VARCHAR(254),
         version         VARCHAR(767),
         flavor          VARCHAR(767)
-        )""")
+        )""" % db.keywords)
         commit = True
 
     if not resetTable(cu, 'gtlInst'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE gtlInst(
-        idx             INTEGER PRIMARY KEY AUTO_INCREMENT,
+        idx             %(PRIMARYKEY)s,
         instanceId      INTEGER
-        )""")
+        )""" % db.keywords)
         commit = True
 
     if not resetTable(cu, 'getFilesTbl'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
             itemId       INTEGER PRIMARY KEY,
-            fileId      BINARY(20)
-        )""")
+            fileId      %(BINARY)s(20)
+        )""" % db.keywords)
         commit = True
 
     if not resetTable(cu, 'itf'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE itf(
         item            VARCHAR(254),
@@ -503,6 +514,7 @@ def createTroves(db):
         commit = True
 
     if not resetTable(cu, 'gtvlTbl'):
+        db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE
         gtvlTbl(
@@ -522,10 +534,10 @@ def createInstructionSets(db):
     if 'InstructionSets' not in db.tables:
         cu.execute("""
         CREATE TABLE InstructionSets(
-            isnSetId        INTEGER PRIMARY KEY AUTO_INCREMENT,
+            isnSetId        %(PRIMARYKEY)s,
             base            VARCHAR(254),
             flags           VARCHAR(254)
-        )""")
+        )""" % db.keywords)
         db.commit()
         db.loadSchema()
 

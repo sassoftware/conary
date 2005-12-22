@@ -133,6 +133,8 @@ class Database(BaseDatabase):
     basic_transaction = "begin immediate"
     VIRTUALS = [ ":memory:" ]
     TIMEOUT = 10000
+    keywords = BaseDatabase.keywords
+    keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
 
     def connect(self, **kwargs):
         assert(self.database)

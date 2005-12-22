@@ -187,6 +187,10 @@ class BaseDatabase:
     cursorClass = BaseCursor
     sequenceClass = BaseSequence
     driver = "base"
+    keywords = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
+                 'BINARY'     : 'BINARY',
+                 'BLOB'       : 'BLOB',
+                 'MEDIUMBLOB' : 'BLOB' }
 
     def __init__(self, db):
         assert(db)

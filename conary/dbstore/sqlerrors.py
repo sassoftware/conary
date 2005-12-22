@@ -14,7 +14,7 @@
 
 class DatabaseError(Exception):
     def __init__(self, msg, *args, **kw):
-        self.msg = msg
+        self.msg = str(msg)
         self.args = args
         self.kw = kw
 

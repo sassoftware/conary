@@ -36,7 +36,7 @@ class NetworkAuthorization:
                             FROM 
                                 Users, UserGroupMembers
                             WHERE
-                                user = ? AND
+                                userName = ? AND
                                 Users.userId = UserGroupMembers.userId""",
                    authToken[0])
 
@@ -157,7 +157,7 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        stmt = "SELECT salt, password FROM Users WHERE user=?"
+        stmt = "SELECT salt, password FROM Users WHERE userName=?"
         cu.execute(stmt, authToken[0])
 
         for (salt, password) in cu:
@@ -177,7 +177,7 @@ class NetworkAuthorization:
         FROM Users as U
         JOIN UserGroupMembers as UGM USING(userId)
         JOIN Permissions as P USING(userGroupId)
-        WHERE U.user = ? and P.admin = 1
+        WHERE U.userName = ? and P.admin = 1
         """, user)
         for (salt, cryptPassword) in cu:
             if not self.checkPassword(salt, cryptPassword, password):
@@ -187,6 +187,21 @@ class NetworkAuthorization:
 
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
         cu = self.db.cursor()
+
+        if write:
+            write = 1
+        else:
+            write = 0
+
+        if capped:
+            capped = 1
+        else:
+            capped = 0
+
+        if admin:
+            admin = 1
+        else:
+            admin = 0
 
         # XXX This functionality is available in the TroveStore class
         #     refactor so that the code is not in two places
@@ -213,14 +228,17 @@ class NetworkAuthorization:
         else:
             labelId = 0
 
+        cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
+                   userGroup)
+        userGroupId = cu.next()[0]
 
         try:
             # FIXME: insert values
             cu.execute("""
-            INSERT INTO Permissions
-            SELECT NULL, userGroupId, ?, ?, ?, ?, ?
-            FROM UserGroups WHERE userGroup=?
-            """, (labelId, itemId, write, capped, admin, userGroup))
+            INSERT INTO Permissions (userGroupId, labelId, itemId, canWrite,
+                                     capped, admin)
+                        VALUES (?, ?, ?, ?, ?, ?)
+            """, (userGroupId, labelId, itemId, write, capped, admin))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -233,6 +251,21 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         userGroupId = self.getGroupIdByName(userGroup)
+
+        if write:
+            write = 1
+        else:
+            write = 0
+
+        if capped:
+            capped = 1
+        else:
+            capped = 0
+
+        if admin:
+            admin = 1
+        else:
+            admin = 0
 
         try:
             cu.execute("""UPDATE Permissions SET
@@ -269,7 +302,7 @@ class NetworkAuthorization:
         """
         cu.execute("""
             SELECT COUNT(userId)
-            FROM Users WHERE LOWER(User)=LOWER(?)
+            FROM Users WHERE LOWER(userName)=LOWER(?)
         """, user)
         if cu.next()[0]:
             raise errors.UserAlreadyExists, 'user: %s' % user
@@ -330,7 +363,7 @@ class NetworkAuthorization:
             raise errors.GroupAlreadyExists, 'group: %s' % user
         try:
             cu.execute("""
-            INSERT INTO Users (userId, user, salt, password)
+            INSERT INTO Users (userId, userName, salt, password)
             VALUES (?, ?, ?, ?)
             """, (ugid, user, salt, password))
         except sqlerrors.ColumnNotUnique:
@@ -347,7 +380,7 @@ class NetworkAuthorization:
     def deleteUserByName(self, user, commit = True):
         cu = self.db.cursor()
 
-        sql = "SELECT userId FROM Users WHERE user=?"
+        sql = "SELECT userId FROM Users WHERE userName=?"
         cu.execute(sql, user)
         try:
             userId = cu.next()[0]
@@ -359,7 +392,7 @@ class NetworkAuthorization:
     def deleteUserById(self, userId, commit = True):
         cu = self.db.cursor()
 
-        sql = "SELECT user FROM Users WHERE userId=?"
+        sql = "SELECT userName FROM Users WHERE userId=?"
         cu.execute(sql, userId)
         try:
             user = cu.next()[0]
@@ -412,7 +445,7 @@ class NetworkAuthorization:
         m.update(newPassword)
         password = m.hexdigest()
 
-        cu.execute("UPDATE Users SET password=?, salt=? WHERE user=?",
+        cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    password, salt, user)
         self.db.commit()
 
@@ -422,13 +455,13 @@ class NetworkAuthorization:
                       FROM UserGroups, Users, UserGroupMembers
                       WHERE UserGroups.userGroupId = UserGroupMembers.userGroupId AND
                             UserGroupMembers.userId = Users.userId AND
-                            Users.user = ?""", user)
+                            Users.userName = ?""", user)
 
         return [row[0] for row in cu]
 
     def iterUsers(self):
         cu = self.db.cursor()
-        cu.execute("SELECT userId, user FROM Users")
+        cu.execute("SELECT userId, userName FROM Users")
 
         for row in cu:
             yield row
@@ -452,7 +485,7 @@ class NetworkAuthorization:
 
     def iterGroupMembers(self, userGroupId):
         cu = self.db.cursor()
-        cu.execute("""SELECT Users.user FROM UserGroupMembers, Users
+        cu.execute("""SELECT Users.userName FROM UserGroupMembers, Users
                       WHERE Users.userId = UserGroupMembers.userId AND
                       UserGroupMembers.userGroupId=?""", userGroupId)
 
@@ -493,7 +526,7 @@ class NetworkAuthorization:
     def getUserIdByName(self, userName):
         cu = self.db.cursor()
 
-        cu.execute("SELECT userId FROM Users WHERE user=?",
+        cu.execute("SELECT userId FROM Users WHERE userName=?",
                    userName)
 
         return cu.next()[0]
@@ -599,7 +632,7 @@ class NetworkAuthorization:
                         UserGroupMembers.userGroupId = \
                                 EntitlementOwners.ownerGroupId
                     WHERE
-                        Users.user = ?
+                        Users.userName = ?
                         AND 
                           (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin = 1)

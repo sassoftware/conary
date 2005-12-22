@@ -47,6 +47,10 @@ class CaselessDict:
     def setdefault(self, key, val):
         return self.dict.setdefault(self.__l(key), (key, val))[1]
 
+    def update(self, other):
+        for item in other.iteritems():
+            self.__setitem__(self, *item)
+
     def __contains__(self, key):
         return self.__l(key) in self.dict
 
