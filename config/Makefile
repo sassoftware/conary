@@ -19,7 +19,7 @@ dist_files = Makefile
 all: default-subdirs
 
 install: install-subdirs
-    install --mode=644 pubring.gpg trustdb.gpg /etc/conary
+	install --mode=644 pubring.gpg trustdb.gpg $(DESTDIR)/etc/conary
 
 dist: default-dist
 
