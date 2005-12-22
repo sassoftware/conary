@@ -118,11 +118,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		return (False, True, ("TroveMissing", e.troveName,
 			self.fromVersion(e.version)))
         elif isinstance(e, errors.FileContentsNotFound):
-            return (False, True, ('FileContentsNotFound', 
+            return (False, True, ('FileContentsNotFound',
                            self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
         elif isinstance(e, errors.FileStreamNotFound):
-            return (False, True, ('FileStreamNotFound', 
+            return (False, True, ('FileStreamNotFound',
                            self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
         elif isinstance(e, sqlerrors.DatabaseLocked):
@@ -252,18 +252,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.addEntitlement(authToken, entGroup, entitlement)
         return True
 
-    def addEntitlementGroup(self, authToken, clientVersion, entGroup, 
+    def addEntitlementGroup(self, authToken, clientVersion, entGroup,
                             userGroup):
         self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
         return True
 
-    def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup, 
+    def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,
                                entGroup):
         self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
         return True
 
     def listEntitlements(self, authToken, clientVersion, entGroup):
-        return [ self.fromEntitlement(x) for x in 
+        return [ self.fromEntitlement(x) for x in
                         self.auth.iterEntitlements(authToken, entGroup) ]
 
     def updateMetadata(self, authToken, clientVersion,
@@ -527,7 +527,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                    PerItems.item as permittedTrove,
                    Permissions.permissionId as aclId
                from
-                   Permissions 
+                   Permissions
                    join Items as PerItems using (itemId)
                where
                    Permissions.userGroupId in (%s)
@@ -698,7 +698,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	        Permissions.labelId as labelId,
 	        PerItems.item as pattern
 	      from
-                Permissions 
+                Permissions
                 join Items as PerItems using (itemId)
 	      where
 	            Permissions.userGroupId in (%s)
@@ -1340,7 +1340,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            (trv.troveInfo.sigs.freeze(), instanceId))
             else:
                 # otherwise we need to create a new row with the signatures
-                cu.execute('INSERT INTO TroveInfo VALUES(?, 9, ?)',
+                cu.execute("INSERT INTO TroveInfo "
+                           "(instanceId, infoType, data) "
+                           "VALUES(?, 9, ?)",
                            (instanceId, trv.troveInfo.sigs.freeze()))
             self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
                                        trv.getFlavor())

@@ -325,31 +325,30 @@ class TroveStore:
             cu.execute("DELETE FROM Latest WHERE branchId=? AND itemId=? "
                        "AND flavorId=?", troveBranchId, troveItemId,
                        troveFlavorId)
-            cu.execute("""INSERT INTO Latest
-                            SELECT %d, %d, %d, Instances.versionId
-                                FROM Instances INNER JOIN Nodes ON
-                                    Instances.itemId = Nodes.itemId AND
-                                    Instances.versionId = Nodes.versionId
-                                WHERE
-                                    Instances.itemId=? AND
-                                    Instances.flavorId=? AND
-                                    Nodes.branchId=?
-                                ORDER BY
-                                    finalTimestamp DESC
-                                LIMIT 1
-                       """ %(troveItemId, troveBranchId, troveFlavorId),
+            cu.execute("""
+            INSERT INTO Latest
+                (itemId, branchId, flavorId, versionId)
+            SELECT %d, %d, %d, Instances.versionId
+            FROM
+                Instances JOIN Nodes USING(itemId, versionId)
+            WHERE
+                Instances.itemId=?
+            AND Instances.flavorId=?
+            AND Nodes.branchId=?
+            ORDER BY finalTimestamp DESC
+            LIMIT 1
+            """ %(troveItemId, troveBranchId, troveFlavorId),
                        (troveItemId, troveFlavorId, troveBranchId))
 
         self.depTables.add(cu, trove, troveInstanceId)
 
         cu.execute("""
-	    INSERT INTO FileStreams SELECT DISTINCT NULL,
-					   NewFiles.fileId,
-					   NewFiles.stream
-		FROM NewFiles LEFT OUTER JOIN FileStreams ON
-		    NewFiles.fileId = FileStreams.fileId
-		WHERE FileStreams.streamId is NULL
-                """)
+        INSERT INTO FileStreams
+            (streamId, fileId, stream)
+        SELECT DISTINCT NULL, NewFiles.fileId, NewFiles.stream
+        FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
+        WHERE FileStreams.streamId is NULL
+        """)
 
         # this updates the stream for streams where stream is NULL
         # (because they were originally added from a distributed branch)
@@ -364,7 +363,6 @@ class TroveStore:
                       AND NewFiles.stream IS NOT NULL)
         WHERE
             FileStreams.stream IS NULL
-        -- AND FileStreams.fileId in (SELECT nf.fileId from NewFiles as nf)
         """)
 
 ## this is the old, sqlite3 specific way we used to update file streams
@@ -380,14 +378,12 @@ class TroveStore:
 ##         """)
 
         cu.execute("""
-	    INSERT INTO TroveFiles SELECT %d,
-					  FileStreams.streamId,
-					  NewFiles.versionId,
-					  NewFiles.pathId,
-					  NewFiles.path
-		FROM NewFiles INNER JOIN FileStreams ON
-                    NewFiles.fileId = FileStreams.fileId
-                    """ % (troveInstanceId,))
+        INSERT INTO TroveFiles
+            (instanceId, streamId, versionId, pathId, path)
+        SELECT %d, FS.streamId, NF.versionId, NF.pathId, NF.path
+        FROM NewFiles as NF
+        JOIN FileStreams as FS USING(fileId)
+        """ % (troveInstanceId,))
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    itemId = self.getItemId(name)
@@ -426,8 +422,11 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
                                             isPresent = False)
-            cu.execute("INSERT INTO TroveTroves VALUES(?, ?, ?)",
-	               troveInstanceId, instanceId,
+            cu.execute("""
+            INSERT INTO TroveTroves
+                (instanceId, includedId, byDefault)
+            VALUES(?, ?, ?)""",
+                       troveInstanceId, instanceId,
                        trove.includeTroveByDefault(name, version, flavor))
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)

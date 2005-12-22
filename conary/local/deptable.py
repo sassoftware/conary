@@ -61,19 +61,15 @@ class DependencyTables:
                       'reqTable'  : reqTable,
                       'provTable' : provTable }
 
-        cu.execute("""INSERT INTO %(depTable)s
-                        SELECT DISTINCT
-                            NULL,
-                            %(tmpName)s.class,
-                            %(tmpName)s.name,
-                            %(tmpName)s.flag
-                        FROM %(tmpName)s LEFT OUTER JOIN Dependencies ON
-                            %(tmpName)s.class = Dependencies.class AND
-                            %(tmpName)s.name = Dependencies.name AND
-                            %(tmpName)s.flag = Dependencies.flag
-                        WHERE
-                            Dependencies.depId is NULL
-                    """ % substDict, start_transaction = False)
+        cu.execute("""
+        INSERT INTO %(depTable)s
+            (depId, class, name, flag)
+        SELECT DISTINCT
+            NULL, %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
+        FROM %(tmpName)s
+        LEFT OUTER JOIN Dependencies USING (class, name, flag)
+        WHERE Dependencies.depId is NULL
+        """ % substDict, start_transaction = False)
 
         if multiplier != 1:
             cu.execute("UPDATE %s SET depId=depId * %d"
@@ -106,6 +102,7 @@ class DependencyTables:
 
         repQuery = """\
                 INSERT INTO %(reqTable)s
+                    (instanceId, depId, depNum, depCount)
                     SELECT %(tmpName)s.troveId,
                            %(depId)s,
                            %(baseReqNum)d + %(tmpName)s.depNum,

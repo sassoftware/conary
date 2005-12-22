@@ -75,7 +75,7 @@ def createFlavors(db):
             flavor          VARCHAR(767)
         )""")
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
-        cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
+        cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, 'none')")
         commit = True
 
     if "FlavorMap" not in db.tables:
@@ -105,7 +105,7 @@ def createFlavors(db):
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
-            cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)",
+            cu.execute("INSERT INTO FlavorScores (request, present, value) VALUES (?,?,?)",
                        request, present, value)
         commit = True
 
@@ -134,7 +134,7 @@ def createNodes(db):
             itemId          INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
-            timeStamps      VARCHAR(1000) NOT NULL,
+            timeStamps      VARCHAR(1000),
             finalTimeStamp  NUMERIC(13,3) NOT NULL,
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -146,7 +146,9 @@ def createNodes(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
-        cu.execute("INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)")
+        cu.execute("""INSERT INTO Nodes
+        (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
+        VALUES (0, 0, 0, 0, NULL, 0.0)""")
         cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx "
                    "ON Nodes(itemId, branchId, versionId)")
         cu.execute("CREATE INDEX NodesItemVersionIdx ON Nodes(itemId, versionId)")
@@ -545,7 +547,8 @@ def createChangeLog(db):
         )""")
     cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
                "ChangeLogs(nodeId)")
-    cu.execute("INSERT INTO ChangeLogs VALUES(0, NULL, NULL, NULL)")
+    cu.execute("INSERT INTO ChangeLogs (nodeId, name, contact, message) "
+               "VALUES(0, NULL, NULL, NULL)")
     db.commit()
     db.loadSchema()
 
@@ -590,8 +593,8 @@ class MigrateTo_2(SchemaMigration):
     Version = 2
     def migrate(self):
         ## First insert the new Item and Label keys
-        self.cu.execute("INSERT INTO Items VALUES(0, 'ALL')")
-        self.cu.execute("INSERT INTO Labels VALUES(0, 'ALL')")
+        self.cu.execute("INSERT INTO Items (itemId, item) VALUES(0, 'ALL')")
+        self.cu.execute("INSERT INTO Labels (labelId, label) VALUES(0, 'ALL')")
 
         ## Now replace all Nulls in the following tables with '0'
         itemTables =   ('Permissions', 'Instances', 'Latest',
@@ -659,9 +662,9 @@ class MigrateTo_6(SchemaMigration):
                 instanceId):
                 ph.addPath(path)
             self.cu.execute("""
-            insert into troveinfo(instanceId, infoType, data)
-            values(?, ?, ?)""", instanceId,
-                       trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
+            INSERT INTO TroveInfo(instanceId, infoType, data)
+            VALUES (?, ?, ?)""", instanceId,
+                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
 
         # add a hasTrove flag to the Items table for various
         # optimizations update the Items table

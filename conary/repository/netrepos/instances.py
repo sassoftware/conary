@@ -35,7 +35,9 @@ class InstanceTable:
 	    isRedirect = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?, ?)",
+        cu.execute("INSERT INTO Instances "
+                   "(instanceId, itemId, versionId, flavorId, isRedirect, isPresent) "
+                   "VALUES (NULL, ?, ?, ?, ?, ?)",
                    (itemId, versionId, flavorId, isRedirect, isPresent))
 	return cu.lastrowid
 

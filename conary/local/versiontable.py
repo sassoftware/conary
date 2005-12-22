@@ -34,14 +34,14 @@ class VersionTable:
         )""")
         cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "
                    "Versions(version)")
-        cu.execute("INSERT INTO Versions VALUES (?, NULL)",
+        cu.execute("INSERT INTO Versions (versionId, version) VALUES (?, NULL)",
                    self.noVersion)
         db.commit()
         db.loadSchema()
 
     def addId(self, version):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions VALUES (NULL, ?)",
+        cu.execute("INSERT INTO Versions (versionId, version) VALUES (NULL, ?)",
 		   version.asString())
 	return cu.lastrowid
 

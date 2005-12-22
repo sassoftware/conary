@@ -134,11 +134,16 @@ class CacheSet:
             newVersionId = self.versions.addId(newVersion)
 
         cu.execute("""
-        INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?,
-                                             ?, ?, ?, ?, ?, NULL)
-        """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId,
-             absolute, recurse, withFiles, withFileContents,
-             excludeAutoSource, cPickle.dumps(returnVal, protocol = -1))
+        INSERT INTO CacheContents
+        (row, troveName,
+        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
+        absolute, recurse, withFiles, withFileContents,
+        excludeAutoSource, returnValue, size)
+        VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,NULL)""",
+                   (name,
+                   oldFlavorId, oldVersionId, newFlavorId, newVersionId,
+                   absolute, recurse, withFiles, withFileContents,
+                   excludeAutoSource, cPickle.dumps(returnVal, protocol = -1)))
 
         row = cu.lastrowid
         path = self.filePattern % (self.tmpDir, row)

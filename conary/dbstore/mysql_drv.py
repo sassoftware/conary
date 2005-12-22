@@ -47,7 +47,7 @@ class Sequence(BaseSequence):
         CREATE TABLE %s (
             val         INTEGER NOT NULL
         )""" % self.seqName)
-        self.cu.execute("INSERT INTO %s VALUES(0)" % self.seqName)
+        self.cu.execute("INSERT INTO %s (val) VALUES(0)" % self.seqName)
         # refresh schema
         db.loadSchema()
 
