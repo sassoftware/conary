@@ -195,29 +195,33 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         old = None
 			oldStreams = {}
                     else:
-			if self.withFiles:
-			    old, oldStreams = self.trvIterator.next()
-			else:
-			    old = self.trvIterator.next()
-			    oldStreams = {}
-
+                        old = self.trvIterator.next()
                         if old is None:
-                            [ x for x in self.trvIterator ]
+                            # drain the iterator, in order to complete
+                            # the sql queries
+                            for x in self.trvIterator: pass
                             raise errors.TroveMissing(job[0], job[1][0])
 
-                    # Does it have an new job
+			if self.withFiles:
+			    old, oldStreams = old
+			else:
+			    oldStreams = {}
+
+                    # Does it have a new job
                     if job[2][0] is None:
                         new = None
+                        newStreams = {}
                     else:
-			if self.withFiles:
-			    new, newStreams = self.trvIterator.next()
-			else:
-			    new = self.trvIterator.next()
-			    newStreams = {}
-
+                        new = self.trvIterator.next()
                         if new is None:
-                            [ x for x in self.trvIterator ]
+                            # drain the SQL query
+                            for x in self.trvIterator: pass
                             raise errors.TroveMissing(job[0], job[2][0])
+
+                        if self.withFiles:
+                            new, newStreams = new
+			else:
+			    newStreams = {}
 
 		    newStreams.update(oldStreams)
                     return job, old, new, newStreams
