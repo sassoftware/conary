@@ -1,3 +1,8 @@
+Changes in 0.80.4:
+  o Build Changes:
+    * PackageRecipe has been changed to follow our change to split
+    conary into three packages.
+
 Changes in 0.80.3:
   o Client Changes:
     * The internal branch source and branch binary flags were changed
