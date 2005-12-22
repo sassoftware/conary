@@ -14,7 +14,7 @@
 
 SUBDIRS=arch use
 
-dist_files = Makefile
+dist_files = Makefile pubring.gpg trustdb.gpg
 
 all: default-subdirs
 
