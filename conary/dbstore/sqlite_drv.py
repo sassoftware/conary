@@ -211,6 +211,8 @@ class Database(BaseDatabase):
                 self.views.setdefault(name, None)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
+            elif type == "trigger":
+                self.triggers.setdefault(name, tbl_name)
         return self.getVersion()
 
     def analyze(self):

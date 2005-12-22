@@ -310,6 +310,7 @@ class BaseDatabase:
         self.views = sqllib.CaselessDict()
         self.functions = sqllib.CaselessDict()
         self.sequences = sqllib.CaselessDict()
+        self.triggers = sqllib.CaselessDict()
         self.version = 0
 
     def getVersion(self):
