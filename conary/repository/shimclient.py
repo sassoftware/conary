@@ -77,7 +77,8 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
 
         # FIXME: we need a way to remove these temporary
         # files when we're done with them.
-        tmpFile = tempfile.mktemp(suffix = '.ccs')
+        fd, tmpFile = tempfile.mkstemp(suffix = '.ccs')
+        os.close(fd)
         cs.writeToFile(tmpFile)
         size = os.stat(tmpFile).st_size
         return (tmpFile, [size], [], [])
@@ -111,7 +112,7 @@ class _ShimMethod(netclient._Method):
 
     def __call__(self, *args):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
-        asAnonymous, isException, result = self._server.callWrapper(
+        usedAnonymous, isException, result = self._server.callWrapper(
             self._protocol, self._port,
             self._name, self._authToken, args)
 

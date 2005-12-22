@@ -41,7 +41,9 @@ class Database(BaseDatabase):
         for x in cdb.keys()[:]:
             if cdb[x] is None:
                 del cdb[x]
+        cdb['use_unicode'] = True
         self.dbh = mysql.connect(**cdb)
+        self.dbh.charset = 'utf8'
         self._getSchema()
         return True
 
