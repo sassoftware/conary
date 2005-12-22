@@ -14,6 +14,7 @@
 
 import os
 import re
+import time
 
 from conary import sqlite3
 from conary.lib.tracelog import logMe
@@ -25,6 +26,9 @@ import sqlerrors
 def _regexp(pattern, item):
     regexp = re.compile(pattern)
     return regexp.match(item) is not None
+# a timestamp function compatible with other backends
+def _timestamp():
+    return int(time.strftime("%Y%m%d%H%M%S"))
 
 class Cursor(BaseCursor):
     driver = "sqlite"
@@ -150,6 +154,8 @@ class Database(BaseDatabase):
             raise
         # add a regexp funtion to enable SELECT FROM bar WHERE bar REGEXP .*
         self.dbh.create_function('regexp', 2, _regexp)
+        # add the serialized timestampt function
+        self.dbh.create_function("unix_timestamp", 0, _timestamp)
         self.loadSchema()
         if self.database in self.VIRTUALS:
             self.inode = (None, None)
