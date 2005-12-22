@@ -114,7 +114,7 @@ class Sequence(BaseSequence):
         if not self.db.dbh.inTransaction:
             self.db.transaction()
         self.cu.execute("DELETE FROM %s" % self.seqName)
-        self.cu.execute("INSERT INTO %s VALUES(NULL)" % self.seqName)
+        self.cu.execute("INSERT INTO %s (val) VALUES(NULL)" % self.seqName)
         self.cu.execute("SELECT val FROM %s" % self.seqName)
         self.__currval = self.cu.fetchone()[0]
         return self.__currval
