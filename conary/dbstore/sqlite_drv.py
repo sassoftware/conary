@@ -67,6 +67,8 @@ class Cursor(BaseCursor):
                 raise sqlerrors.ReadOnlyDatabase(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
         else:
+            if ret == self._cursor:
+                return self
             return ret
 
     # deprecated - this breaks programs by commiting stuff before its due time
