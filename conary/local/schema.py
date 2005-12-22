@@ -157,9 +157,12 @@ def createMetadata(db):
         cu.execute("""
         CREATE TABLE MetadataItems(
             metadataId      INTEGER NOT NULL,
-            class           INTEGER,
-            data            TEXT,
-            language        VARCHAR(254)
+            class           INTEGER NOT NULL,
+            data            TEXT NOT NULL,
+            language        VARCHAR(254) NOT NULL DEFAULT 'C',
+            CONSTRAINT MetadataItems_metadataId_fk
+                FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""")
         commit = True
     if commit:
@@ -192,9 +195,9 @@ def createDepTable(cu, name, isTemp):
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
         depId           INTEGER PRIMARY KEY AUTO_INCREMENT,
-        class           INTEGER,
-        name            VARCHAR(254),
-        flag            VARCHAR(254)
+        class           INTEGER NOT NULL,
+        name            VARCHAR(254) NOT NULL,
+        flag            VARCHAR(254) NOT NULL
     )""" % d, start_transaction = (not isTemp))
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
@@ -216,12 +219,16 @@ def createRequiresTable(cu, name, isTemp):
         d['constraint'] = """,
         CONSTRAINT %(name)s_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE RESTRICT ON UPDATE CASCADE""" %d
+            ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT %(name)s_depId_fk
+            FOREIGN KEY (depId) REFERENCES Dependencies(depId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+        """ %d
 
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
-        instanceId      INTEGER,
-        depId           INTEGER,
+        instanceId      INTEGER NOT NULL,
+        depId           INTEGER NOT NULL,
         depNum          INTEGER,
         depCount        INTEGER %(constraint)s
     )""" % d, start_transaction = startTrans)
@@ -248,11 +255,15 @@ def createProvidesTable(cu, name, isTemp):
         d['constraint'] = """,
         CONSTRAINT %(name)s_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE RESTRICT ON UPDATE CASCADE""" %d
+            ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT %(name)s_depId_fk
+            FOREIGN KEY (depId) REFERENCES Dependencies(depId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+        """ %d
     cu.execute("""
     CREATE %(tmp)s TABLE %(name)s(
-        instanceId          INTEGER,
-        depId               INTEGER %(constraint)s
+        instanceId          INTEGER NOT NULL,
+        depId               INTEGER NOT NULL %(constraint)s
     )""" % d, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
