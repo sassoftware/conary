@@ -44,7 +44,10 @@ class Database(BaseDatabase):
                 cdb[x] = ""
         cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
                                 cdb["user"], cdb["password"])
-        self.dbh = pgdb.connect(cstr)
+        host = cdb["host"]
+        if cdb["port"]:
+            host ="%s:%s" % (cdb["host"], cdb["port"])
+        self.dbh = pgdb.connect(cstr, host = host)
         self.loadSchema()
         self.closed = False
         return True

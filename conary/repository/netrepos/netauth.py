@@ -644,7 +644,7 @@ class NetworkAuthorization:
         if count:
             raise UserAlreadyExists
 
-        cu.execute("INSERT INTO Entitlements (entGroupId, ownerGroupId) VALUES (?, ?)",
+        cu.execute("INSERT INTO Entitlements (entGroupId, entitlement) VALUES (?, ?)",
                    (entGroupId, entitlement))
 
         self.db.commit()

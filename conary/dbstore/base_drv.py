@@ -179,26 +179,6 @@ class BaseSequence:
     def __del__(self):
         self.db = self.cu = None
 
-# A placeholder class for creating triggers
-class BaseTrigger:
-    def __init__(self, db):
-        self.db = db
-        self.sql = None
-
-    def create(self, table, when, onAction, sql):
-        name = "%s_%s" % (table, onAction)
-        if name in db.triggers:
-            return False
-        sql = """
-        CREATE TRIGGER %s %s %s ON %s
-        FOR EACH ROW BEGIN
-        %s
-        END
-        """ % (name, when.upper(), onAction.upper(), table, sql)
-        cu = self.db.cursor()
-        cu.execute(sql)
-        return True
-
 # A class to handle database operations
 class BaseDatabase:
     # need to figure out a statement generic enough for all kinds of backends
@@ -206,7 +186,6 @@ class BaseDatabase:
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
     sequenceClass = BaseSequence
-    triggerClass = BaseTrigger
     driver = "base"
 
     def __init__(self, db):
@@ -271,10 +250,6 @@ class BaseDatabase:
         assert(self.dbh)
         return self.sequenceClass(self, name)
 
-    def trigger(self):
-        assert(self.dbh)
-        return self.triggerClass(self.dbh)
-
     # perform the equivalent of a analyze on $self
     def analyze(self):
         assert(self.database)
@@ -283,7 +258,6 @@ class BaseDatabase:
     def commit(self):
         assert(self.dbh)
         return self.dbh.commit()
-
     # transaction support
     def transaction(self, name = None):
         "start transaction [ named point ]"
@@ -293,13 +267,26 @@ class BaseDatabase:
         c = self.cursor()
         c.execute(self.basic_transaction)
         return c
-
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
         self.dbh.rollback()
+
+    def trigger(self, table, when, onAction, sql):
+        name = "%s_%s" % (table, onAction)
+        if name in self.triggers:
+            return False
+        sql = """
+        CREATE TRIGGER %s %s %s ON %s
+        FOR EACH ROW BEGIN
+        %s
+        END
+        """ % (name, when.upper(), onAction.upper(), table, sql)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
 
     # easy access to the schema state
     def loadSchema(self):

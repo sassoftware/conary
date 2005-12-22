@@ -120,6 +120,7 @@ def createTroveInfo(db):
         instanceId      INTEGER NOT NULL,
         infoType        INTEGER NOT NULL,
         data            MEDIUMBLOB,
+        changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
         CONSTRAINT TroveInfo_instanceId_fk
             FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
             ON DELETE CASCADE ON UPDATE CASCADE
@@ -141,6 +142,7 @@ def createMetadata(db):
             versionId           INTEGER NOT NULL,
             branchId            INTEGER NOT NULL,
             timeStamp           NUMERIC(13,3) NOT NULL,
+            changed             NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Metadata_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -160,6 +162,7 @@ def createMetadata(db):
             class           INTEGER NOT NULL,
             data            TEXT NOT NULL,
             language        VARCHAR(254) NOT NULL DEFAULT 'C',
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT MetadataItems_metadataId_fk
                 FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
                 ON DELETE CASCADE ON UPDATE CASCADE

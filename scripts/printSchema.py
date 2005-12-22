@@ -16,12 +16,13 @@ from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
 
 class PrintDatabase:
-    def __init__(self, showTables = True):
+    def __init__(self, showTables = True, driver="sqlite"):
         self.tables = self.views = self.sequences = []
         self.tempTables = []
         self.version = 0
         self.showTables = showTables
         self.statements = []
+        self.driver = driver
     def connect(self, *args, **kwargs):
         pass
     def commit(self):
@@ -56,6 +57,11 @@ class PrintDatabase:
             if skipAll or d["table"] in self.tempTables:
                 return True
         return False
+    def __skip_Triggers(self, sql, skipAll = False):
+        tmptrg = re.compile("(?i)CREATE\s+TRIGGER")
+        if tmptrg.match(sql):
+            return skipAll
+        return False
     def __skip_Tables(self, sql, skipAll = False):
         tbl = re.compile(
             "^(?i)(CREATE|ALTER)\s+(TABLE\s+(?P<table>[^(]+)|VIEW\s+(?P<view>[^( ]+))\s*([(]|ADD|AS).*"
@@ -79,6 +85,8 @@ class PrintDatabase:
             return
         if self.__skip_Indexes(sql, self.showTables):
             return
+        if self.__skip_Triggers(sql, self.showTables):
+            return
         if self.__skip_Tables(sql, not self.showTables):
             return
         into = re.compile("^(?i)(INSERT INTO).*")
@@ -87,18 +95,46 @@ class PrintDatabase:
             return
         self.statements.append(sql)
 
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        name = "%s_%s" % (table, onAction)
+        assert(onAction in ["insert", "update"])
+        if self.driver == "sqlite":
+            # prepare the sql and the trigger name and pass it to the
+            # BaseTrigger for creation
+            when = "AFTER"
+            if onAction == "insert":
+                when = "BEFORE"
+            sql = ("UPDATE %s SET %s = unix_timestamp() WHERE id = NEW.id ; "
+                   "%s " % (table, column, sql))
+        elif self.driver == "mysql":
+            when = "BEFORE"
+            # force the current_timestamp into a numeric context
+            sql = "SET NEW.%s = current_timestamp() + 0 ; %s" % (column, sql)
+        elif self.driver == "postgresql":
+            pass
+        else:
+            raise NotImplementedError
+        sql = """
+        CREATE TRIGGER %s %s %s ON %s
+        FOR EACH ROW BEGIN
+        %s
+        END
+        """ % (name, when.upper(), onAction.upper(), table, sql)
+        self.execute(sql)
+
     def setVersion(self, version):
         self.version = version
     def getVersion(self):
         return self.version
 
-def getTables():
-    pd = PrintDatabase(True)
+def getTables(driver = "mysql"):
+    pd = PrintDatabase(True, driver)
     schema.checkVersion(pd)
     return pd.statements
 
-def getIndexes():
-    pd = PrintDatabase(False)
+def getIndexes(driver = "mysql"):
+    pd = PrintDatabase(False, driver)
     schema.checkVersion(pd)
     return pd.statements
 
