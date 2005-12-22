@@ -1,16 +1,19 @@
 Changes in 0.80.3:
   o Client Changes:
-    * Internal branch source and branch binary flags were changed to a bitmask
-    * The warning message printed when multiple branches match a cvc checkout 
-      command has been improved.
+    * The internal branch source and branch binary flags were changed
+      to a bitmask.
+    * The warning message printed when multiple branches match a cvc
+      checkout command has been improved.
     * Only interactive mode can create binary shadows and branches, and
       a warning is displayed before they are created (since source branches
       are normally the right thing to use).
+
   o Build Changes:
     * Files in subdirectories named "tmp" are no longer automatically
       excluded from packaging, except for /tmp and /var/tmp.
     * DanglingSymlinks now traverses intermediate symlinks; a symlink
       to a symlink to a symlink will no longer confuse it.
+
 
 Changes in 0.80.2:
   o Client Changes:
