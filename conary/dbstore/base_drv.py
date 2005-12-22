@@ -179,6 +179,26 @@ class BaseSequence:
     def __del__(self):
         self.db = self.cu = None
 
+# A placeholder class for creating triggers
+class BaseTrigger:
+    def __init__(self, db):
+        self.db = db
+        self.sql = None
+
+    def create(self, table, when, onAction, sql):
+        name = "%s_%s" % (table, onAction)
+        if name in db.triggers:
+            return False
+        sql = """
+        CREATE TRIGGER %s %s %s ON %s
+        FOR EACH ROW BEGIN
+        %s
+        END
+        """ % (name, when.upper(), onAction.upper(), table, sql)
+        cu = self.db.cursor()
+        cu.execute(sql)
+        return True
+
 # A class to handle database operations
 class BaseDatabase:
     # need to figure out a statement generic enough for all kinds of backends
@@ -186,6 +206,7 @@ class BaseDatabase:
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
     sequenceClass = BaseSequence
+    triggerClass = BaseTrigger
     driver = "base"
 
     def __init__(self, db):
@@ -249,6 +270,10 @@ class BaseDatabase:
     def sequence(self, name):
         assert(self.dbh)
         return self.sequenceClass(self, name)
+
+    def trigger(self):
+        assert(self.dbh)
+        return self.triggerClass(self.dbh)
 
     # perform the equivalent of a analyze on $self
     def analyze(self):

@@ -14,8 +14,24 @@
 
 import re
 import MySQLdb as mysql
-from base_drv import BaseDatabase, BindlessCursor, BaseSequence
+from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseTrigger
 import sqlerrors
+
+# A trigger that updates the changed column on a table
+class ChangedTrigger(BaseTrigger):
+    def create(self, table, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # prepare the sql and the trigger name and pass it to the
+        # BaseTrigger for creation
+        when = "BEFORE"
+        # force the current_timestamp into a numeric context
+        sql = """
+        SET changed = current_timestamp() + 0 ;
+        %s
+        """
+        return BaseTrigger.create(self, table, when, onAction, sql)
+
 
 class Cursor(BindlessCursor):
     driver = "mysql"
@@ -70,6 +86,7 @@ class Database(BaseDatabase):
     basic_transaction = "begin"
     cursorClass = Cursor
     sequenceClass = Sequence
+    triggerClass = ChangedTrigger
     driver = "mysql"
 
     def connect(self, **kwargs):

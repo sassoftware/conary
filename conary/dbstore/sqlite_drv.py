@@ -19,7 +19,7 @@ import time
 from conary import sqlite3
 from conary.lib.tracelog import logMe
 
-from base_drv import BaseDatabase, BaseCursor, BaseSequence
+from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseTrigger
 import sqlerrors
 
 # implement the regexp function for sqlite
@@ -29,6 +29,22 @@ def _regexp(pattern, item):
 # a timestamp function compatible with other backends
 def _timestamp():
     return int(time.strftime("%Y%m%d%H%M%S"))
+
+# A trigger that updates the changed column on a table
+class ChangedTrigger(BaseTrigger):
+    def create(self, table, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # prepare the sql and the trigger name and pass it to the
+        # BaseTrigger for creation
+        when = "AFTER"
+        if onAction == "insert":
+            when = "BEFORE"
+        sql = """
+        UPDATE %s SET changed = unix_timestamp() WHERE id = NEW.id ;
+        %s
+        """
+        return BaseTrigger.create(self, table, when, onAction, sql)
 
 class Cursor(BaseCursor):
     driver = "sqlite"
@@ -136,6 +152,7 @@ class Database(BaseDatabase):
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
     sequenceClass = Sequence
+    triggerClass = ChangedTrigger
     basic_transaction = "begin immediate"
     VIRTUALS = [ ":memory:" ]
     TIMEOUT = 10000
