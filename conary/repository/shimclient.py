@@ -80,7 +80,7 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
         tmpFile = tempfile.mktemp(suffix = '.ccs')
         cs.writeToFile(tmpFile)
         size = os.stat(tmpFile).st_size
-        return (tmpFile, [size], [], [])
+        return (tmpFile, [size], _cvtTroveList(trovesNeeded), [])
 
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
