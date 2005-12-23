@@ -15,7 +15,16 @@
 import re
 import MySQLdb as mysql
 from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
+from base_drv import BaseKeywordDict
 import sqlerrors
+
+class KeywordDict(BaseKeywordDict):
+
+    keys = BaseKeywordDict.keys
+    keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+
+    def binaryVal(self, len):
+        return "VARBINARY(%d)" % len
 
 class Cursor(BindlessCursor):
     driver = "mysql"
@@ -73,8 +82,7 @@ class Database(BaseDatabase):
     sequenceClass = Sequence
     driver = "mysql"
 
-    keywords = BaseDatabase.keywords
-    keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+    keywords = KeywordDict()
 
     def connect(self, **kwargs):
         assert(self.database)
