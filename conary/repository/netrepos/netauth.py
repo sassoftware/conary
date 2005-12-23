@@ -43,7 +43,7 @@ class NetworkAuthorization:
         if groupsFromUser:
             # each user can only appear once (by constraint), so we only
             # need to validate the password once
-            if not self.checkPassword(groupsFromUser[0][0],
+            if not self.checkPassword(cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
                                       authToken[1]):
                 raise errors.InsufficientPermission
@@ -354,7 +354,7 @@ class NetworkAuthorization:
         try:
             cu.execute("INSERT INTO Users (userId, userName, salt, password) "
                        "VALUES (?, ?, ?, ?)",
-                       (ugid, user, salt, password))
+                       (ugid, user, cu.binary(salt), cu.binary(password)))
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
         logMe(3, "salt", salt, len(salt),
@@ -434,7 +434,7 @@ class NetworkAuthorization:
         password = m.hexdigest()
 
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
-                   password, salt, user)
+                   cu.binary(password), cu.binary(salt), user)
         self.db.commit()
 
     def getUserGroups(self, user):

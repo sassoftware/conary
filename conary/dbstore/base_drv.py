@@ -29,6 +29,24 @@ class BaseBinary:
     def __repr__(self):
         return s
 
+class BaseKeywordDict(dict):
+
+    keys = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
+             'BLOB'       : 'BLOB',
+             'MEDIUMBLOB' : 'BLOB'                  }
+
+    def binaryVal(self, binLen):
+        return "BINARY(%d)" % binLen
+
+    def __getitem__(self, val):
+        if val.startswith('BINARY'):
+            binLen = val[6:]
+            return self.binaryVal(int(binLen))
+
+        return dict.__getitem__(self, val)
+
+    def __init__(self):
+        dict.__init__(self, self.keys)
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
@@ -202,10 +220,7 @@ class BaseDatabase:
     cursorClass = BaseCursor
     sequenceClass = BaseSequence
     driver = "base"
-    keywords = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
-                 'BINARY'     : 'BINARY',
-                 'BLOB'       : 'BLOB',
-                 'MEDIUMBLOB' : 'BLOB' }
+    keywords = BaseKeywordDict()
 
     def __init__(self, db):
         assert(db)
