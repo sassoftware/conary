@@ -134,6 +134,9 @@ for t in tList:
         if t.lower() == "permissions":
             if "write" in fields:
                 fields[fields.index("write")] = "canWrite"
+        if t.lower() == "users":
+            if "user" in fields:
+                fields[fields.index("user")] = "userName"
         if t.lower() == "trovefiles":
             # versionId was declared as a binary string in sqlite instead of integer
             rows = [list(row) for row in rows]

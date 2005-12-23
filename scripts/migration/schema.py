@@ -16,6 +16,12 @@ from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
 
 class PrintDatabase:
+    keywords = {
+        'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
+        'BINARY'     : 'BINARY',
+        'BLOB'       : 'BLOB',
+        'MEDIUMBLOB' : 'BLOB',
+        }
     def __init__(self, showTables = True, driver="sqlite"):
         self.tables = self.views = self.sequences = []
         self.tempTables = []
@@ -23,6 +29,16 @@ class PrintDatabase:
         self.showTables = showTables
         self.statements = []
         self.driver = driver
+        if self.driver == "sqlite":
+            self.keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+        elif driver =="mysql":
+            self.keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+        elif driver == "postgresql":
+            self.keywords['BINARY'] = 'VARCHAR'
+            self.keywords['BLOB'] = 'BYTEA'
+            self.keywords['MEDIUMBLOB'] = 'BYTEA'
+            self.keywords['PRIMARYKEY'] = 'SERIAL PRIMARY KEY'
+
     def connect(self, *args, **kwargs):
         pass
     def commit(self):
