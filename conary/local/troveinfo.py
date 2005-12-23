@@ -33,7 +33,7 @@ class TroveInfoTable:
                     raise RuntimeError('attempted to add build requires '
                                        'trove info for a component: %s' %n)
                 cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
-                           "VALUES (?, ?, ?)", (idNum, tag, frz))
+                           "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
 
     def getInfo(self, cu, trove, idNum):
         from array import array
@@ -44,4 +44,4 @@ class TroveInfoTable:
             # FIXME: check the return values for BLOBs
             if isinstance(frz, array):
                 frz = frz.tostring()
-            trove.troveInfo.__getattribute__(name).thaw(frz)
+            trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))
