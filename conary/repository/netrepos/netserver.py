@@ -1174,7 +1174,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
 
         query = """
-            SELECT DISTINCT pathId, path, version, fileId FROM
+            SELECT DISTINCT pathId, path, version, fileId, 
+                            Nodes.finalTimestamp FROM
                 TroveInfo JOIN Instances using (instanceId)
                 INNER JOIN Nodes using (itemId, versionId)
                 INNER JOIN Branches using (branchId)
@@ -1195,7 +1196,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         logMe(3, "execute query", query, args)
 
         ids = {}
-        for (pathId, path, version, fileId) in cu:
+        for (pathId, path, version, fileId, timeStamp) in cu:
             encodedPath = self.fromPath(path)
             if not encodedPath in ids:
                 ids[encodedPath] = (self.fromPathId(pathId),
