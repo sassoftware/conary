@@ -2,14 +2,10 @@
 
 import os
 import sys
-fullPath = os.path.dirname(sys.argv[0])
-if fullPath in [ "", "."]:
-    fullPath = os.getcwd()
-else:
-    if fullPath[0] != "/":
-        fullPath = os.getcwd() + "/" + fullPath
 
-sys.path.insert(0, os.path.dirname(fullPath))
+if 'CONARY_PATH' in os.environ:
+    sys.path.insert(0, os.environ['CONARY_PATH'])
+    sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
 
 import re
 from conary.dbstore import sqlerrors
@@ -74,7 +70,7 @@ class PrintDatabase:
                 return True
         return False
     def __skip_Triggers(self, sql, skipAll = False):
-        tmptrg = re.compile("(?i)CREATE\s+TRIGGER")
+        tmptrg = re.compile("(?i)CREATE\s+(OR\s+REPLACE\s+)?(TRIGGER|FUNCTION)")
         if tmptrg.match(sql):
             return skipAll
         return False
@@ -115,6 +111,26 @@ class PrintDatabase:
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
         assert(onAction in ["insert", "update"])
+
+        if self.driver == "postgresql":
+            funcName = "%s_func" % name
+            self.execute("""
+            CREATE OR REPLACE FUNCTION %s()
+            RETURNS trigger
+            AS $$
+            BEGIN
+                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS')) ;
+                RETURN NEW;
+            END ; $$ LANGUAGE 'plpgsql';
+            """ % (funcName, column))
+            # now create the trigger based on the above function
+            self.execute("""
+            CREATE TRIGGER %s
+            BEFORE %s ON %s
+            FOR EACH ROW
+            EXECUTE PROCEDURE %s()
+            """ % (name, onAction, table, funcName))
+            return
         if self.driver == "sqlite":
             # prepare the sql and the trigger name and pass it to the
             # BaseTrigger for creation
@@ -127,8 +143,9 @@ class PrintDatabase:
             when = "BEFORE"
             # force the current_timestamp into a numeric context
             sql = "SET NEW.%s = current_timestamp() + 0 ; %s" % (column, sql)
-        elif self.driver == "postgresql":
-            pass
+
+            when = "BEFORE"
+            sql = ""
         else:
             raise NotImplementedError
         sql = """
@@ -144,16 +161,18 @@ class PrintDatabase:
     def getVersion(self):
         return self.version
 
-def getTables(driver = "mysql"):
+def getTables(driver = "sqlite"):
     pd = PrintDatabase(True, driver)
     schema.checkVersion(pd)
     return pd.statements
 
-def getIndexes(driver = "mysql"):
+def getIndexes(driver = "sqlite"):
     pd = PrintDatabase(False, driver)
     schema.checkVersion(pd)
     return pd.statements
 
 if __name__ == '__main__':
-    for x in getTables(): print x
-    for x in getIndexes(): print x
+    driver = os.environ.get("CONARY_DRIVER", "sqlite")
+    assert(driver in ["sqlite", "mysql", "postgresql"])
+    for x in getTables(driver): print x
+    for x in getIndexes(driver): print x
