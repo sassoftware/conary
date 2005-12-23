@@ -1,4 +1,4 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 #
 # Copyright (c) 2005 rPath, Inc.
 #
@@ -32,12 +32,12 @@ class TroveInfoTable:
                 if c and (tag == 4 or tag == 5):
                     raise RuntimeError('attempted to add build requires '
                                        'trove info for a component: %s' %n)
-                cu.execute("INSERT INTO TroveInfo VALUES (?, ?, ?)",
-                           (idNum, tag, frz))
+                cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
+                           "VALUES (?, ?, ?)", (idNum, tag, frz))
 
     def getInfo(self, cu, trove, idNum):
         from array import array
-        cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?", 
+        cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?",
                    idNum)
         for (tag, frz) in cu:
             name = trove.troveInfo.streamDict[tag][2]

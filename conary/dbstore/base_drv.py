@@ -262,7 +262,6 @@ class BaseDatabase:
     def commit(self):
         assert(self.dbh)
         return self.dbh.commit()
-
     # transaction support
     def transaction(self, name = None):
         "start transaction [ named point ]"
@@ -272,13 +271,26 @@ class BaseDatabase:
         c = self.cursor()
         c.execute(self.basic_transaction)
         return c
-
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
         self.dbh.rollback()
+
+    def trigger(self, table, when, onAction, sql):
+        name = "%s_%s" % (table, onAction)
+        if name in self.triggers:
+            return False
+        sql = """
+        CREATE TRIGGER %s %s %s ON %s
+        FOR EACH ROW BEGIN
+        %s
+        END
+        """ % (name, when.upper(), onAction.upper(), table, sql)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
 
     # easy access to the schema state
     def loadSchema(self):
@@ -289,6 +301,7 @@ class BaseDatabase:
         self.views = sqllib.CaselessDict()
         self.functions = sqllib.CaselessDict()
         self.sequences = sqllib.CaselessDict()
+        self.triggers = sqllib.CaselessDict()
         self.version = 0
 
     def getVersion(self):

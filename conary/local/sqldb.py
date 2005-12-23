@@ -175,8 +175,8 @@ class DBInstanceTable:
 	    isPresent = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, "
-						   "?, ?, ?)",
+        cu.execute("INSERT INTO Instances "
+                   "VALUES (NULL, ?, ?, ?,?, ?, ?)",
                    (troveName, versionId, flavorId,
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
                     pinned))
@@ -205,8 +205,8 @@ class DBInstanceTable:
     def isPresent(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM Instances WHERE "
-			"troveName=? AND versionId=? AND "
-			"flavorId=?", item)
+                   "troveName=? AND versionId=? AND flavorId=?",
+                   item)
 
 	val = cu.fetchone()
 	if not val:
@@ -233,15 +233,15 @@ class DBInstanceTable:
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"troveName=? AND versionId=? AND "
-			"flavorId=?", item)
+                   "troveName=? AND versionId=? AND flavorId=?",
+                   item)
 	return not(cu.fetchone() == None)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"troveName=? AND versionId=? AND "
-			"flavorId=?", item)
+                   "troveName=? AND versionId=? AND flavorId=?",
+                   item)
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -313,7 +313,7 @@ class Flavors(idtable.IdTable):
 	cu.execute("SELECT FlavorID from Flavors")
 	if cu.fetchone() == None:
 	    # reserve flavor 0 for "no flavor information"
-	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
+	    cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, NULL)")
 
 class DBFlavorMap(idtable.IdMapping):
     def __init__(self, db):
@@ -548,12 +548,12 @@ order by
 	    for flavor in self.flavorsNeeded.keys():
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
 			   None, flavor.freeze())
-	    cu.execute("""INSERT INTO Flavors
-			  SELECT flavorsNeeded.empty, flavorsNeeded.flavor
-			  FROM flavorsNeeded LEFT OUTER JOIN Flavors
-			      ON flavorsNeeded.flavor = Flavors.flavor
-			      WHERE Flavors.flavorId is NULL
-		       """)
+	    cu.execute("""
+            INSERT INTO Flavors
+            SELECT flavorsNeeded.empty, flavorsNeeded.flavor
+            FROM flavorsNeeded LEFT OUTER JOIN Flavors USING(flavor)
+            WHERE Flavors.flavorId is NULL
+            """)
 	    cu.execute("DROP TABLE flavorsNeeded")
 	    self.flavorsNeeded = {}
 

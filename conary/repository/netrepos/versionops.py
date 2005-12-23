@@ -21,7 +21,7 @@ class BranchTable(idtable.IdTable):
     def addId(self, branch):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Branches VALUES (NULL, ?)",
+        cu.execute("INSERT INTO Branches (branchId, branch) VALUES (NULL, ?)",
 		   branch.asString())
 	return cu.lastrowid
 
@@ -51,7 +51,7 @@ class BranchTable(idtable.IdTable):
 	raise NotImplementedError
 
     def initTable(self, cu):
-        cu.execute("INSERT INTO Branches VALUES (0, NULL)")
+        cu.execute("INSERT INTO Branches (branchId, branch) VALUES (0, NULL)")
 
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
@@ -83,7 +83,7 @@ class LabelTable(idtable.IdTable):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
     def initTable(self, cu):
-        cu.execute("INSERT INTO Labels VALUES (0, 'ALL')")
+        cu.execute("INSERT INTO Labels (labelId, label) VALUES (0, 'ALL')")
 
 class LatestTable:
     def __init__(self, db):
@@ -101,7 +101,8 @@ class LatestTable:
         AND   branchId = ?
         AND   flavorId = ?
         """, (itemId, branchId, flavorId))
-        cu.execute("INSERT INTO Latest VALUES (?, ?, ?, ?)",
+        cu.execute("INSERT INTO Latest (itemId, branchId, flavorId, versionId) "
+                   "VALUES (?, ?, ?, ?)",
                    (itemId, branchId, flavorId, versionId))
 
     def get(self, key, defValue):
@@ -132,7 +133,10 @@ class Nodes:
 
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
-	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, ?)",
+	cu.execute("""
+        INSERT INTO Nodes
+        (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
+        VALUES (NULL, ?, ?, ?, ?, ?)""",
 		   itemId, branchId, versionId,
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   '%.3f' %timeStamps[-1])

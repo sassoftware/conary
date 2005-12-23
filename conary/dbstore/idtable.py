@@ -230,8 +230,10 @@ class IdPairMapping:
     def __setitem__(self, key, val):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (?, ?, ?)"
-		   % (self.tableName,), (first, second, val))
+        cu.execute("INSERT INTO %s (%s, %s, %s) "
+                   "VALUES (?, ?, ?)"
+                   % (self.tableName, self.tup1, self.tup2, self.item),
+                   (first, second, val))
 
     def __getitem__(self, key):
 	(first, second) = key
@@ -299,8 +301,9 @@ class IdMapping:
 
     def __setitem__(self, key, val):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (?, ?)"
-		   % (self.tableName),
+        cu.execute("INSERT INTO %s (%s, %s) "
+                   "VALUES (?, ?)"
+		   % (self.tableName, self.key. self.item),
                    (key, val))
 
     def __getitem__(self, key):

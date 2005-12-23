@@ -32,8 +32,8 @@ class NetworkAuthorization:
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
-        cu.execute("""SELECT salt, password, userGroupId 
-                            FROM 
+        cu.execute("""SELECT salt, password, userGroupId
+                            FROM
                                 Users, UserGroupMembers
                             WHERE
                                 userName = ? AND
@@ -41,11 +41,11 @@ class NetworkAuthorization:
                    authToken[0])
 
         groupsFromUser = [ x for x in cu ]
-        
+
         if groupsFromUser:
             # each user can only appear once (by constraint), so we only
             # need to validate the password once
-            if not self.checkPassword(groupsFromUser[0][0], 
+            if not self.checkPassword(groupsFromUser[0][0],
                                       groupsFromUser[0][1],
                                       authToken[1]):
                 raise errors.InsufficientPermission
@@ -55,10 +55,10 @@ class NetworkAuthorization:
         if authToken[2] is not None:
             # look up entitlements
             cu.execute("""
-                  SELECT userGroupId 
-                        FROM EntitlementGroups, Entitlements 
-                  WHERE 
-                        entGroup=? AND 
+                  SELECT userGroupId
+                        FROM EntitlementGroups, Entitlements
+                  WHERE
+                        entGroup=? AND
                         entitlement=? AND
                         EntitlementGroups.entGroupId == Entitlements.entGroupId
                 """, authToken[2], authToken[3])
@@ -66,9 +66,9 @@ class NetworkAuthorization:
 
         return groupsFromUser
 
-    def check(self, authToken, write = False, admin = False, label = None, 
+    def check(self, authToken, write = False, admin = False, label = None,
               trove = None):
-        logMe(2, authToken[0], authToken[1], authToken[2], write, admin, 
+        logMe(2, authToken[0], authToken[1], authToken[2], write, admin,
               label, trove)
 
         if label and label.getHost() != self.name:
@@ -89,7 +89,7 @@ class NetworkAuthorization:
         from Permissions join items using (itemId)
         """
 
-        where = ["Permissions.userGroupId IN (%s)" % 
+        where = ["Permissions.userGroupId IN (%s)" %
                     ",".join("%d" % x for x in groupIds) ]
         params = []
 
@@ -223,7 +223,7 @@ class NetworkAuthorization:
             if labelId:
                 labelId = labelId[0]
             else:
-                cu.execute("INSERT INTO Labels VALUES(NULL, ?)", label)
+                cu.execute("INSERT INTO Labels (labelId, label) VALUES(NULL, ?)", label)
                 labelId = cu.lastrowid
         else:
             labelId = 0
@@ -233,11 +233,10 @@ class NetworkAuthorization:
         userGroupId = cu.next()[0]
 
         try:
-            # FIXME: insert values
             cu.execute("""
-            INSERT INTO Permissions (userGroupId, labelId, itemId, canWrite,
-                                     capped, admin)
-                        VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Permissions
+                (userGroupId, labelId, itemId, canWrite, capped, admin)
+            VALUES (?, ?, ?, ?, ?, ?)
             """, (userGroupId, labelId, itemId, write, capped, admin))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -268,16 +267,12 @@ class NetworkAuthorization:
             admin = 0
 
         try:
-            cu.execute("""UPDATE Permissions SET
-                              labelId = ?,
-                              itemId = ?,
-                              canwrite = ?,
-                              capped = ?,
-                              admin = ?
-                            WHERE userGroupId=? AND
-                                labelId=? AND itemId=?
-                        """, labelId, troveId, write, capped, admin,
-                        userGroupId, oldLabelId, oldTroveId)
+            cu.execute("""
+            UPDATE Permissions
+            SET labelId = ?, itemId = ?, canWrite = ?, capped = ?, admin = ?
+            WHERE userGroupId=? AND labelId=? AND itemId=?""",
+                       labelId, troveId, write, capped, admin,
+                       userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -355,25 +350,22 @@ class NetworkAuthorization:
         ugid = cu.fetchone()[0]
         # XXX: ahhh, how we miss real sequences...
         try:
-            cu.execute("""
-            INSERT INTO UserGroups (userGroupId, userGroup)
-            VALUES (?, ?)
-            """, ugid, user)
+            cu.execute("INSERT INTO UserGroups (userGroupId, userGroup) "
+                       "VALUES (?, ?)",
+                       (ugid, user))
         except sqlerrors.ColumnNotUnique:
             raise errors.GroupAlreadyExists, 'group: %s' % user
         try:
-            cu.execute("""
-            INSERT INTO Users (userId, userName, salt, password)
-            VALUES (?, ?, ?, ?)
-            """, (ugid, user, salt, password))
+            cu.execute("INSERT INTO Users (userId, userName, salt, password) "
+                       "VALUES (?, ?, ?, ?)",
+                       (ugid, user, salt, password))
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
         logMe(3, "salt", salt, len(salt),
               "dbsalt", cu.execute("select salt from Users where userId = ?", ugid).fetchone()[0])
-        cu.execute("""
-        INSERT INTO UserGroupMembers (userGroupId, userId)
-        VALUES (?, ?)
-        """, ugid, ugid)
+        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
+                   "VALUES (?, ?)",
+                   (ugid, ugid))
         self.db.commit()
         return ugid
 
@@ -581,8 +573,8 @@ class NetworkAuthorization:
     def addGroupMember(self, userGroupId, userId, commit = True):
         cu = self.db.cursor()
 
-        cu.execute("INSERT INTO UserGroupMembers VALUES(?, ?)",
-                   userGroupId, userId)
+        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) VALUES(?, ?)",
+                   (userGroupId, userId))
         if commit:
             self.db.commit()
 
@@ -625,15 +617,15 @@ class NetworkAuthorization:
         cu.execute("""
                 SELECT entGroupId, admin
                     FROM Users JOIN UserGroupMembers ON
-                        UserGroupMembers.userId = Users.userId 
+                        UserGroupMembers.userId = Users.userId
                     LEFT OUTER JOIN Permissions ON
-                        UserGroupMembers.userGroupId = Permissions.userGroupId 
+                        UserGroupMembers.userGroupId = Permissions.userGroupId
                     LEFT OUTER JOIN EntitlementOwners ON
                         UserGroupMembers.userGroupId = \
                                 EntitlementOwners.ownerGroupId
                     WHERE
                         Users.userName = ?
-                        AND 
+                        AND
                           (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin = 1)
                 """, userName)
@@ -683,8 +675,8 @@ class NetworkAuthorization:
         if count:
             raise UserAlreadyExists
 
-        cu.execute("INSERT INTO Entitlements VALUES (?, ?)",
-                   entGroupId, entitlement)
+        cu.execute("INSERT INTO Entitlements (entGroupId, entitlement) VALUES (?, ?)",
+                   (entGroupId, entitlement))
 
         self.db.commit()
 
@@ -709,8 +701,9 @@ class NetworkAuthorization:
         assert(len(l) == 1)
         userGroupId = l[0][0]
 
-        cu.execute("INSERT INTO EntitlementGroups VALUES "
-                   "(NULL, ?, ?)", entGroup, userGroupId)
+        cu.execute("INSERT INTO EntitlementGroups (entGroupId, entGroup, userGroupId) "
+                   "VALUES (NULL, ?, ?)",
+                   (entGroup, userGroupId))
 
         self.db.commit()
 
@@ -729,8 +722,9 @@ class NetworkAuthorization:
         userGroupId = cu.execute("SELECT userGroupId FROM userGroups "
                                  "WHERE userGroup = ?", userGroup).next()[0]
 
-        cu.execute("""INSERT INTO EntitlementOwners (entGroupId, ownerGroupId)
-                       VALUES (?, ?)""", entGroupId, userGroupId)
+        cu.execute("INSERT INTO EntitlementOwners (entGroupId, ownerGroupId) "
+                   "VALUES (?, ?)",
+                   (entGroupId, userGroupId))
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password

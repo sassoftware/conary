@@ -14,6 +14,7 @@
 
 import os
 import re
+import time
 
 from conary import sqlite3
 from conary.lib.tracelog import logMe
@@ -25,6 +26,9 @@ import sqlerrors
 def _regexp(pattern, item):
     regexp = re.compile(pattern)
     return regexp.match(item) is not None
+# a timestamp function compatible with other backends
+def _timestamp():
+    return int(time.strftime("%Y%m%d%H%M%S"))
 
 class Cursor(BaseCursor):
     driver = "sqlite"
@@ -67,6 +71,8 @@ class Cursor(BaseCursor):
                 raise sqlerrors.ReadOnlyDatabase(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
         else:
+            if ret == self._cursor:
+                return self
             return ret
 
     # deprecated - this breaks programs by commiting stuff before its due time
@@ -114,7 +120,7 @@ class Sequence(BaseSequence):
         if not self.db.dbh.inTransaction:
             self.db.transaction()
         self.cu.execute("DELETE FROM %s" % self.seqName)
-        self.cu.execute("INSERT INTO %s VALUES(NULL)" % self.seqName)
+        self.cu.execute("INSERT INTO %s (val) VALUES(NULL)" % self.seqName)
         self.cu.execute("SELECT val FROM %s" % self.seqName)
         self.__currval = self.cu.fetchone()[0]
         return self.__currval
@@ -150,6 +156,8 @@ class Database(BaseDatabase):
             raise
         # add a regexp funtion to enable SELECT FROM bar WHERE bar REGEXP .*
         self.dbh.create_function('regexp', 2, _regexp)
+        # add the serialized timestampt function
+        self.dbh.create_function("unix_timestamp", 0, _timestamp)
         self.loadSchema()
         if self.database in self.VIRTUALS:
             self.inode = (None, None)
@@ -188,6 +196,8 @@ class Database(BaseDatabase):
                 self.views.setdefault(name, None)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
+            elif type == "trigger":
+                self.triggers.setdefault(name, tbl_name)
         return self.getVersion()
 
     def analyze(self):
@@ -218,4 +228,19 @@ class Database(BaseDatabase):
             if str(e) == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase(str(e))
             raise
+
+    # A trigger that syncs up the changed column
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # prepare the sql and the trigger name and pass it to the
+        # BaseTrigger for creation
+        when = "AFTER"
+        if onAction == "insert":
+            when = "BEFORE"
+        sql = """
+        UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
+        %s
+        """ % (table, column, sql)
+        return BaseDatabase.trigger(self, table, when, onAction, sql)
 

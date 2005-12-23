@@ -47,7 +47,7 @@ class Sequence(BaseSequence):
         CREATE TABLE %s (
             val         INTEGER NOT NULL
         )""" % self.seqName)
-        self.cu.execute("INSERT INTO %s VALUES(0)" % self.seqName)
+        self.cu.execute("INSERT INTO %s (val) VALUES(0)" % self.seqName)
         # refresh schema
         db.loadSchema()
 
@@ -111,16 +111,23 @@ class Database(BaseDatabase):
             table_type as type, table_name as name,
             table_name as tname
         FROM information_schema.tables
-        WHERE table_type in ('VIEW', 'BASE TABLE') AND table_schema = ?
+        WHERE table_type in ('VIEW', 'BASE TABLE')
+        AND table_schema = ?
         """, self.dbName)
         ret = cu.fetchall()
         cu.execute("""
         SELECT DISTINCT
             'INDEX' as type, index_name as name, table_name as tname
-        FROM INFORMATION_SCHEMA.STATISTICS
+        FROM information_schema.statistics
         WHERE table_schema = ?
         """, self.dbName)
         ret += cu.fetchall()
+        cu.execute("""
+        SELECT
+            'TRIGGER' as type, trigger_name as name, event_object_table as tname
+        FROM information_schema.triggers
+        WHERE event_object_schema = ?
+        """, self.dbName)
         for (objType, name, tableName) in ret:
             if objType == "BASE TABLE":
                 if tableName.endswith("_sequence"):
@@ -132,8 +139,24 @@ class Database(BaseDatabase):
             elif objType == "INDEX":
                 assert(self.tables.has_key(tableName))
                 self.tables.setdefault(tableName, []).append(name)
+            elif objType == "TRIGGER":
+                self.triggers.setdefault(name, tableName)
         if not len(self.tables):
             return self.version
         version = self.getVersion()
 
         return version
+
+    # A trigger that syncs up a column to the timestamp
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # prepare the sql and the trigger name and pass it to the
+        # BaseTrigger for creation
+        when = "BEFORE"
+        # force the current_timestamp into a numeric context
+        sql = """
+        SET NEW.%s = current_timestamp() + 0 ;
+        %s
+        """ % (column, sql)
+        return BaseDatabase.trigger(self, table, when, onAction, sql)

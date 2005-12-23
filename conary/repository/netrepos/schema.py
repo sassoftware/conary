@@ -19,6 +19,11 @@ from conary.local.schema import createDependencies, createTroveInfo, createMetad
 
 VERSION = 7
 
+def createTrigger(db, table, column = "changed"):
+    retInsert = db.trigger(table, column, "INSERT")
+    retUpdate = db.trigger(table, column, "UPDATE")
+    return retInsert or retUpdate
+
 def createInstances(db):
     cu = db.cursor()
     commit = False
@@ -31,6 +36,7 @@ def createInstances(db):
             flavorId        INTEGER NOT NULL,
             isRedirect      INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -43,6 +49,9 @@ def createInstances(db):
         )""" % db.keywords)
         cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
                    " Instances(itemId, versionId, flavorId) ")
+        commit = True
+
+    if createTrigger(db, "Instances"):
         commit = True
 
     if "InstancesView" not in db.views:
@@ -75,7 +84,7 @@ def createFlavors(db):
             flavor          VARCHAR(767)
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
-        cu.execute("INSERT INTO Flavors VALUES (0, 'none')")
+        cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, 'none')")
         commit = True
 
     if "FlavorMap" not in db.tables:
@@ -108,7 +117,7 @@ def createFlavors(db):
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
-            cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)",
+            cu.execute("INSERT INTO FlavorScores (request, present, value) VALUES (?,?,?)",
                        request, present, value)
         db.commit()
         commit = False
@@ -140,7 +149,8 @@ def createNodes(db):
             branchId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             timeStamps      VARCHAR(1000),
-            finalTimeStamp  NUMERIC(13,3),
+            finalTimeStamp  NUMERIC(13,3) NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Nodes_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -151,10 +161,15 @@ def createNodes(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
-        cu.execute("INSERT INTO Nodes VALUES (0, 0, 0, 0, NULL, 0.0)")
+        cu.execute("""INSERT INTO Nodes
+        (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
+        VALUES (0, 0, 0, 0, NULL, 0.0)""")
         cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx "
                    "ON Nodes(itemId, branchId, versionId)")
         cu.execute("CREATE INDEX NodesItemVersionIdx ON Nodes(itemId, versionId)")
+        commit = True
+
+    if createTrigger(db, "Nodes"):
         commit = True
 
     if 'NodesView' not in db.views:
@@ -189,6 +204,7 @@ def createLatest(db):
             branchId        INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -205,6 +221,9 @@ def createLatest(db):
         cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
                    "Latest(itemId, branchId, flavorId)")
+        commit = True
+
+    if createTrigger(db, "Latest"):
         commit = True
 
     if 'LatestView' not in db.views:
@@ -238,19 +257,27 @@ def createUsers(db):
             userId          %(PRIMARYKEY)s,
             userName        VARCHAR(254) NOT NULL,
             salt            %(BINARY)s(4) NOT NULL,
-            password        VARCHAR(254)
+            password        VARCHAR(254),
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
+        commit = True
+
+    if createTrigger(db, "Users"):
         commit = True
 
     if "UserGroups" not in db.tables:
         cu.execute("""
         CREATE TABLE UserGroups (
             userGroupId     %(PRIMARYKEY)s,
-            userGroup       VARCHAR(254) NOT NULL
+            userGroup       VARCHAR(254) NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
                    "UserGroups(userGroup)")
+        commit = True
+
+    if createTrigger(db, "UserGroups"):
         commit = True
 
     if "UserGroupMembers" not in db.tables:
@@ -283,6 +310,7 @@ def createUsers(db):
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capped          INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -295,6 +323,9 @@ def createUsers(db):
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
                    "Permissions(userGroupId, labelId, itemId)")
+        commit = True
+
+    if createTrigger(db, "Permissions"):
         commit = True
 
     if "UsersView" not in db.views:
@@ -323,12 +354,16 @@ def createUsers(db):
             entGroupId      %(PRIMARYKEY)s,
             entGroup        VARCHAR(254) NOT NULL,
             userGroupId     INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX EntitlementGroupsEntGroupIdx ON "
                    "EntitlementGroups(entGroup)")
+        commit = True
+
+    if createTrigger(db, "EntitlementGroups"):
         commit = True
 
     if "EntitlementOwners" not in db.tables:
@@ -354,12 +389,16 @@ def createUsers(db):
         CREATE TABLE Entitlements (
             entGroupId      INTEGER NOT NULL,
             entitlement     %(BINARY)s(255) NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX EntitlementsEntGroupEntitlementIdx ON "
                    "Entitlements(entGroupId, entitlement)")
+        commit = True
+
+    if createTrigger(db, "Entitlements"):
         commit = True
 
     if commit:
@@ -376,6 +415,7 @@ def createPGPKeys(db):
             userId          INTEGER NOT NULL,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -383,16 +423,23 @@ def createPGPKeys(db):
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
         commit = True
+    if createTrigger(db, "PGPKeys"):
+        commit = True
+
     if "PGPFingerprints" not in db.tables:
         cu.execute("""
         CREATE TABLE PGPFingerprints(
             keyId           INTEGER NOT NULL,
             fingerprint     CHAR(40) PRIMARY KEY,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
         commit = True
+    if createTrigger(db, "PGPFingerprints"):
+        commit = True
+
     if commit:
         db.commit()
         db.loadSchema()
@@ -405,11 +452,14 @@ def createTroves(db):
         CREATE TABLE FileStreams(
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY)s(20),
-            stream      %(BLOB)s
+            stream      %(BLOB)s,
+            changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
         cu.execute("CREATE INDEX FileStreamsIdx ON FileStreams(fileId)")
+        commit = True
+    if createTrigger(db, "FileStreams"):
         commit = True
 
     if "TroveFiles" not in db.tables:
@@ -420,6 +470,7 @@ def createTroves(db):
             versionId       INTEGER NOT NULL,
             pathId          %(BINARY)s(16),
             path            VARCHAR(767),
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -433,6 +484,8 @@ def createTroves(db):
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
         cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
         commit = True
+    if createTrigger(db, "TroveFiles"):
+        commit = True
 
     if "TroveTroves" not in db.tables:
         cu.execute("""
@@ -440,6 +493,7 @@ def createTroves(db):
             instanceId      INTEGER NOT NULL,
             includedId      INTEGER NOT NULL,
             byDefault       INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -455,6 +509,8 @@ def createTroves(db):
         # this index is so we can quickly tell what troves are needed
         # by another trove
         cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+        commit = True
+    if createTrigger(db, "TroveTroves"):
         commit = True
 
     if not resetTable(cu, 'NewFiles'):
@@ -542,24 +598,30 @@ def createInstructionSets(db):
         db.loadSchema()
 
 def createChangeLog(db):
-    if "ChangeLogs" in db.tables:
-        return
+    commit = False
     cu = db.cursor()
-    cu.execute("""
-        CREATE TABLE ChangeLogs(
-            nodeId          INTEGER NOT NULL,
-            name            VARCHAR(254),
-            contact         VARCHAR(254),
-            message         TEXT,
-            CONSTRAINT ChangeLogs_nodeId_fk
-                FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
-                ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
-    cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
-               "ChangeLogs(nodeId)")
-    cu.execute("INSERT INTO ChangeLogs VALUES(0, NULL, NULL, NULL)")
-    db.commit()
-    db.loadSchema()
+    if "ChangeLogs" not in db.tables:
+        cu.execute("""
+            CREATE TABLE ChangeLogs(
+                nodeId          INTEGER NOT NULL,
+                name            VARCHAR(254),
+                contact         VARCHAR(254),
+                message         TEXT,
+                changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+                CONSTRAINT ChangeLogs_nodeId_fk
+                    FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
+                    ON DELETE CASCADE ON UPDATE CASCADE
+            )""")
+        cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
+                   "ChangeLogs(nodeId)")
+        cu.execute("INSERT INTO ChangeLogs (nodeId, name, contact, message) "
+                   "VALUES(0, NULL, NULL, NULL)")
+        commit = True
+    if createTrigger(db, "ChangeLogs"):
+        commit = True
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 def createLabelMap(db):
     if "LabelMap" in db.tables:
@@ -602,8 +664,8 @@ class MigrateTo_2(SchemaMigration):
     Version = 2
     def migrate(self):
         ## First insert the new Item and Label keys
-        self.cu.execute("INSERT INTO Items VALUES(0, 'ALL')")
-        self.cu.execute("INSERT INTO Labels VALUES(0, 'ALL')")
+        self.cu.execute("INSERT INTO Items (itemId, item) VALUES(0, 'ALL')")
+        self.cu.execute("INSERT INTO Labels (labelId, label) VALUES(0, 'ALL')")
 
         ## Now replace all Nulls in the following tables with '0'
         itemTables =   ('Permissions', 'Instances', 'Latest',
@@ -671,9 +733,9 @@ class MigrateTo_6(SchemaMigration):
                 instanceId):
                 ph.addPath(path)
             self.cu.execute("""
-            insert into troveinfo(instanceId, infoType, data)
-            values(?, ?, ?)""", instanceId,
-                       trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
+            INSERT INTO TroveInfo(instanceId, infoType, data)
+            VALUES (?, ?, ?)""", instanceId,
+                            trove._TROVEINFO_TAG_PATH_HASHES, ph.freeze())
 
         # add a hasTrove flag to the Items table for various
         # optimizations update the Items table
@@ -740,6 +802,16 @@ class MigrateTo_8(SchemaMigration):
         # drop oldLatest
         if "oldLatest" in self.db.tables:
             self.cu.execute("DROP TABLE oldLatest")
+        # add the changed columns to the important tables
+        for table in ["Instances", "Nodes", "ChangeLogs", "Latest",
+                      "Users", "UserGroups", "Permissions",
+                      "EntitlementGroups", "Entitlements",
+                      "PGPKeys", "PGPFingerprints",
+                      "TroveFiles", "TroveTroves",
+                      "TroveInfo", "Metadata", "MetadataItems"]:
+            self.cu.execute("ALTER TABLE %s ADD COLUMN "
+                            "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
+            createTrigger(self.db, table)
         self.db.loadSchema()
         return self.Version
 
@@ -770,7 +842,10 @@ def createSchema(db):
 
     createDependencies(db)
     createTroveInfo(db)
+    createTrigger(db, "TroveInfo")
     createMetadata(db)
+    createTrigger(db, "Metadata")
+    createTrigger(db, "MetadataItems")
 
 # schema creation/migration/maintenance entry point
 def checkVersion(db):
