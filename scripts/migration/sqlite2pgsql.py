@@ -70,9 +70,6 @@ tList = [
     'TroveFiles',
     ]
 
-BATCH=400
-TICK=10
-
 def hexstr(s):
     return "".join("%02x" % ord(c) for c in s)
 
@@ -105,9 +102,7 @@ def timings(current, total, tstart):
         tpassed/60, tpassed % 60,
         tremaining/60, tremaining % 60)
 
-
 for t in tList:
-    break
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
