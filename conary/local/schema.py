@@ -192,7 +192,7 @@ def createDepTable(db, cu, name, isTemp):
     if isTemp:
         if resetTable(cu, name):
             return False
-        db.commit()
+        db.rollback()
 
         d['tmp'] = 'TEMPORARY'
 
@@ -206,6 +206,7 @@ def createDepTable(db, cu, name, isTemp):
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
 
+    db.commit()
     return True
 
 def createRequiresTable(db, cu, name, isTemp):
@@ -217,7 +218,7 @@ def createRequiresTable(db, cu, name, isTemp):
     if isTemp:
         if resetTable(cu, name):
             return False
-        db.commit()
+        db.rollback()
 
         d['tmp'] = 'TEMPORARY'
     else:
@@ -244,6 +245,7 @@ def createRequiresTable(db, cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = startTrans)
 
+    db.commit()
     return True
 
 def createProvidesTable(db, cu, name, isTemp):
@@ -255,7 +257,7 @@ def createProvidesTable(db, cu, name, isTemp):
     if isTemp:
         if resetTable(cu, name):
             return False
-        db.commit()
+        db.rollback()
         d['tmp'] = 'TEMPORARY'
     else:
         d['constraint'] = """,
@@ -276,19 +278,20 @@ def createProvidesTable(db, cu, name, isTemp):
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = startTrans)
 
+    db.commit()
     return True
 
 def createDepWorkTable(db, cu, name):
     if resetTable(cu, name):
         return False
-    db.commit()
+    db.rollback()
 
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
         troveId         INTEGER,
         depNum          INTEGER,
         flagCount       INTEGER,
-        isProvides      BOOLEAN,
+        isProvides      INTEGER,
         class           INTEGER,
         name            VARCHAR(254),
         flag            VARCHAR(254)
@@ -298,6 +301,7 @@ def createDepWorkTable(db, cu, name):
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
 
+    db.commit()
     return True
 
 def createDependencies(db):
@@ -313,29 +317,31 @@ def createDependencies(db):
         createProvidesTable(db, cu, "Provides", False)
         commit = True
 
-    # bitwise | doesn't get short circuited
-    commit = commit | createRequiresTable(db, cu, "TmpRequires", isTemp = True)
-    commit = commit | createProvidesTable(db, cu, "TmpProvides", isTemp = True)
-    commit = commit | createDepWorkTable(db, cu, "DepCheck")
-    commit = commit | createDepTable(db, cu, 'TmpDependencies', isTemp = True)
+    if commit:
+        db.commit()
+
+    createRequiresTable(db, cu, "TmpRequires", isTemp = True)
+    createProvidesTable(db, cu, "TmpProvides", isTemp = True)
+    createDepWorkTable(db, cu, "DepCheck")
+    createDepTable(db, cu, 'TmpDependencies', isTemp = True)
 
     if not resetTable(cu, "SuspectDepsOrig"):
-        db.commit()
+        db.rollback()
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
-        commit = True
+        db.commit()
 
     if not resetTable(cu, "SuspectDeps"):
-        db.commit()
+        db.rollback()
         cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
-        commit = True
+        db.commit()
 
     if not resetTable(cu, "BrokenDeps"):
-        db.commit()
+        db.rollback()
         cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
-        commit = True
+        db.commit()
 
     if not resetTable(cu, "RemovedTroveIds"):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE RemovedTroveIds(
             troveId INTEGER,
@@ -343,11 +349,9 @@ def createDependencies(db):
         )""")
 	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
                    "RemovedTroveIds(troveId)")
-        commit = True
-
-    if commit:
         db.commit()
-        db.loadSchema()
+
+    db.loadSchema()
 
 def createSchema(db):
     # XXX

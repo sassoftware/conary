@@ -41,7 +41,7 @@ class VersionTable:
 
     def addId(self, version):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions (versionId, version) VALUES (NULL, ?)",
+        cu.execute("INSERT INTO Versions (version) VALUES (?)",
 		   version.asString())
 	return cu.lastrowid
 

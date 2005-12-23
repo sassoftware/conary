@@ -51,8 +51,8 @@ class IdTable:
     # DBSTORE: use dbstore sequences
     def addId(self, item):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s (%s, %s) VALUES (NULL, ?)" %(
-            self.tableName, self.keyName, self.strName), (item,))
+        cu.execute("INSERT INTO %s (%s) VALUES (?)" %(
+            self.tableName, self.strName), (item,))
         return cu.lastrowid
 
     def getOrAddIds(self, items):

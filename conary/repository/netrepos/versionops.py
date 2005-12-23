@@ -21,7 +21,7 @@ class BranchTable(idtable.IdTable):
     def addId(self, branch):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Branches (branchId, branch) VALUES (NULL, ?)",
+        cu.execute("INSERT INTO Branches (branch) VALUES (?)",
 		   branch.asString())
 	return cu.lastrowid
 
@@ -135,8 +135,8 @@ class Nodes:
         cu = self.db.cursor()
 	cu.execute("""
         INSERT INTO Nodes
-        (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
-        VALUES (NULL, ?, ?, ?, ?, ?)""",
+        (itemId, branchId, versionId, timeStamps, finalTimeStamp)
+        VALUES (?, ?, ?, ?, ?)""",
 		   itemId, branchId, versionId,
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   '%.3f' %timeStamps[-1])

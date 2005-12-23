@@ -23,7 +23,7 @@ class Flavors:
 
     def createFlavor(self, flavor):
 	cu = self.db.cursor()
-	cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (NULL, ?)",
+	cu.execute("INSERT INTO Flavors (flavor) VALUES (?)",
                    flavor.freeze())
 	flavorId = cu.lastrowid
 

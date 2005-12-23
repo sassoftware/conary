@@ -27,10 +27,10 @@ class DependencyTables:
         assert(type(stmt) == type(""))
         allDeps = []
         if requires:
-            allDeps += [ (False, x) for x in
+            allDeps += [ (0, x) for x in
                             requires.getDepClasses().iteritems() ]
         if provides:
-            allDeps += [ (True,  x) for x in
+            allDeps += [ (1,  x) for x in
                             provides.getDepClasses().iteritems() ]
 
         for (isProvides, (classId, depClass)) in allDeps:
@@ -63,9 +63,9 @@ class DependencyTables:
 
         cu.execute("""
         INSERT INTO %(depTable)s
-            (depId, class, name, flag)
+            (class, name, flag)
         SELECT DISTINCT
-            NULL, %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
+            %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
         FROM %(tmpName)s
         LEFT OUTER JOIN Dependencies USING (class, name, flag)
         WHERE Dependencies.depId is NULL
