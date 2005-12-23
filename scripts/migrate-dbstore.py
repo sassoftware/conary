@@ -27,7 +27,6 @@ for stmt in getTables():
     cm.execute(stmt)
     print stmt
 mysql.loadSchema()
-cm.execute("SET SESSION AUTOCOMMIT = 0")
 
 for t in sqlite.tables.keys():
     if t in mysql.tables:
@@ -121,7 +120,8 @@ def slow_insert(t, fields, rows):
             print
     mysql.commit()
 
-for t in [] :#tList:
+cm.execute("SET SESSION AUTOCOMMIT = 0")
+for t in tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
@@ -167,12 +167,15 @@ wtList = ["%s WRITE" % x for x in tList]
 sql = "LOCK TABLES %s" % ", ".join(wtList)
 for stmt in getIndexes():
     # in MySQL, tables need to be locked every time we create an index
-    cm.execute(sql)
+    if stmt.lower().startswith("create trigger"):
+        cm.execute("UNLOCK TABLES")
+    else:
+        cm.execute(sql)
     print stmt
     try:
         cm.execute(stmt)
     except sqlerrors.DatabaseError, e:
         print e.msg
-cm.execute("UNLOCK TABLES")
+    cm.execute("UNLOCK TABLES")
 mysql.setVersion(schema.VERSION)
 mysql.commit()
