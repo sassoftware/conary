@@ -25,9 +25,9 @@ class BaseBinary:
         assert(isinstance(s, types.StringType))
         self.s = s
     def __str__(self):
-        return s
+        return self.s
     def __repr__(self):
-        return s
+        return self.s
 
 class BaseKeywordDict(dict):
 
@@ -72,6 +72,9 @@ class BaseCursor:
 
     def binary(self, s):
         return self.binaryClass(s)
+
+    def frombinary(self, s):
+        return s
 
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
