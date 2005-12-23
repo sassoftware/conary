@@ -21,9 +21,8 @@ import sqlerrors
 import sqllib
 
 class KeywordDict(BaseKeywordDict):
-
     keys = BaseKeywordDict.keys
-    keys.update( { 'BLOB' : 'BYTEA', 
+    keys.update( { 'BLOB' : 'BYTEA',
                    'MEDIUMBLOB' : 'BYTEA',
                    'PRIMARYKEY' : 'SERIAL PRIMARY KEY' } )
 
@@ -55,6 +54,14 @@ class Cursor(BindlessCursor):
                 raise sqlerrors.ConstraintViolation(msg)
             raise sqlerrors.CursorError(msg)
         return self
+
+    # postgresql can not report back the last value from a SERIAL
+    # PRIMARY KEY column insert, so we have to look it up ourselves
+    def lastid(self):
+        ret = self.execute("select lastval()").fetchone()
+        if ret is None:
+            return 0
+        return ret[0]
 
 class Database(BaseDatabase):
     driver = "postgresql"

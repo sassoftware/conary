@@ -51,7 +51,7 @@ class BaseKeywordDict(dict):
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
-    PASSTHROUGH = ["lastrowid", "description"]
+    PASSTHROUGH = ["description"]
     binaryClass = BaseBinary
     def __init__(self, dbh=None):
         self.dbh = dbh
@@ -64,6 +64,12 @@ class BaseCursor:
         if name in self.PASSTHROUGH:
             return getattr(self._cursor, name)
         raise AttributeError("'%s' attribute is invalid" % (name,))
+
+    def lastid(self):
+        # wrapper for the lastrowid attribute.
+        if hasattr(self._cursor, "lastrowid"):
+            return self._cursor.lastrowid
+        raise AttributeError("This driver does not know about `lastrowid`")
 
     # this will need to be provided by each separate driver
     def _getCursor(self):
