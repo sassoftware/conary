@@ -1,7 +1,9 @@
 Changes in 0.80.4:
   o Build Changes:
     * PackageRecipe has been changed to follow our change to split
-    conary into three packages.
+      conary into three packages.
+    * x86_64 packaging elimintated the conary:lib component to follow x86
+      (those files now belong in conary-build:lib)
 
 Changes in 0.80.3:
   o Client Changes:
