@@ -59,3 +59,7 @@ class CaselessDict:
         return "{%s}" % items
     def __str__(self):
         return repr(self)
+
+    def __iter__(self):
+        for k in self.dict.keys():
+            yield k
