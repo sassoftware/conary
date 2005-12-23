@@ -25,7 +25,7 @@ def resetTable(cu, name):
     try:
         cu.execute("DELETE FROM %s" % name, start_transaction = False)
         return True
-    except:
+    except Exception, e:
         return False
 
 # Schema creation functions
