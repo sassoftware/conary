@@ -11,8 +11,8 @@ import types
 
 from conary import dbstore
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos import schema
-from printSchema import getTables, getIndexes
+from conary.repository.netrepos.schema import VERSION
+from schema import getTables, getIndexes
 
 if len(sys.argv) != 3:
     print "Usage: migrate <sqlite_path> <mysql_spec>"
@@ -177,5 +177,5 @@ for stmt in getIndexes():
     except sqlerrors.DatabaseError, e:
         print e.msg
     cm.execute("UNLOCK TABLES")
-mysql.setVersion(schema.VERSION)
+mysql.setVersion(VERSION)
 mysql.commit()
