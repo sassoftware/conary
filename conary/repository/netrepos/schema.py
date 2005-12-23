@@ -256,8 +256,8 @@ def createUsers(db):
         CREATE TABLE Users (
             userId          %(PRIMARYKEY)s,
             userName        VARCHAR(254) NOT NULL,
-            salt            %(BINARY)s(4) NOT NULL,
-            password        VARCHAR(254),
+            salt            %(BINARY4)s NOT NULL,
+            password        %(BINARY254)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
@@ -388,7 +388,7 @@ def createUsers(db):
         cu.execute("""
         CREATE TABLE Entitlements (
             entGroupId      INTEGER NOT NULL,
-            entitlement     %(BINARY)s(255) NOT NULL,
+            entitlement     %(BINARY255)s NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
@@ -451,7 +451,7 @@ def createTroves(db):
         cu.execute("""
         CREATE TABLE FileStreams(
             streamId    %(PRIMARYKEY)s,
-            fileId      %(BINARY)s(20),
+            fileId      %(BINARY20)s,
             stream      %(BLOB)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
@@ -468,7 +468,7 @@ def createTroves(db):
             instanceId      INTEGER NOT NULL,
             streamId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
-            pathId          %(BINARY)s(16),
+            pathId          %(BINARY16)s,
             path            VARCHAR(767),
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveFiles_instanceId_fk
@@ -517,9 +517,9 @@ def createTroves(db):
         db.commit()
         cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
-            pathId      %(BINARY)s(16),
+            pathId      %(BINARY16)s,
             versionId   INTEGER,
-            fileId      %(BINARY)s(20),
+            fileId      %(BINARY20)s,
             stream      %(BLOB)s,
             path        VARCHAR(767)
         )""" % db.keywords)
@@ -555,7 +555,7 @@ def createTroves(db):
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
             itemId       INTEGER PRIMARY KEY,
-            fileId      %(BINARY)s(20)
+            fileId      %(BINARY20)s
         )""" % db.keywords)
         commit = True
 

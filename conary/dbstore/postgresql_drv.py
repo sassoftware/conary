@@ -16,8 +16,19 @@ import re
 import pgdb
 
 from base_drv import BaseDatabase, BindlessCursor, BaseCursor, BaseBinary
+from base_drv import BaseKeywordDict
 import sqlerrors
 import sqllib
+
+class KeywordDict(BaseKeywordDict):
+
+    keys = BaseKeywordDict.keys
+    keys.update( { 'BLOB' : 'BYTEA', 
+                   'MEDIUMBLOB' : 'BYTEA',
+                   'PRIMARYKEY' : 'SERIAL PRIMARY KEY' } )
+
+    def binaryVal(self, len):
+        return "BYTEA"
 
 # class for encapsulating binary strings for dumb drivers
 class Binary(BaseBinary):
@@ -29,6 +40,10 @@ class Binary(BaseBinary):
 class Cursor(BindlessCursor):
     binaryClass = Binary
     driver = "postgresql"
+
+    def frombinary(self, s):
+        return s.decode("string_escape")
+
     def execute(self, sql, *params, **kw):
         if kw.has_key("start_transaction"):
             del kw["start_transaction"]
@@ -45,11 +60,7 @@ class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
-    keywords = BaseDatabase.keywords
-    keywords['BINARY'] = 'VARCHAR'
-    keywords['BLOB'] = 'BYTEA'
-    keywords['MEDIUMBLOB'] = 'BYTEA'
-    keywords['PRIMARYKEY'] = 'SERIAL PRIMARY KEY'
+    keywords = KeywordDict()
 
     def connect(self, **kwargs):
         assert(self.database)
