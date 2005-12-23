@@ -91,19 +91,18 @@ class OpenPGPKeyTable:
                 keyCache.reset()
             try:
                 cu.execute('INSERT INTO PGPKeys (keyId, userId, fingerprint, pgpKey) '
-                           'VALUES(?, ?, ?, ?)',
-                           (keyId, userId, mainFingerprint, pgpKeyData))
+                           'VALUES (?, ?, ?, ?)',
+                           (keyId, userId, mainFingerprint, cu.binary(pgpKeyData)))
             except sqlerrors.ColumnNotUnique:
                 # controlled replacement of OpenPGP Keys is allowed. do NOT
                 # disable assertReplaceKeyAllowed without disabling this
                 cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
-                           pgpKeyData, mainFingerprint)
+                           cu.binary(pgpKeyData), mainFingerprint)
             keyFingerprints = openpgpfile.getFingerprints(keyRing)
             for fingerprint in keyFingerprints:
                 try:
                     cu.execute('INSERT INTO PGPFingerprints (keyId, fingerprint) '
-                               'VALUES(?, ?)',
-                               (keyId, fingerprint))
+                               'VALUES(?, ?)', (keyId, fingerprint))
                 except sqlerrors.ColumnNotUnique:
                     # ignore duplicate fingerprint errors.
                     pass

@@ -58,6 +58,10 @@ class Cursor(BaseCursor):
         kw["start_transaction"] = st
         return self._cursor.execute(sql, *args, **kw)
 
+    # sqlite is smart - this is only a noop
+    def binary(self, s):
+        return s
+
     def execute(self, sql, *params, **kw):
         #logMe(3, "SQL:", sql, params, kw)
         try:

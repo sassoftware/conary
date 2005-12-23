@@ -14,11 +14,17 @@
 
 import re
 import MySQLdb as mysql
-from base_drv import BaseDatabase, BindlessCursor, BaseSequence
+from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
 import sqlerrors
+
+class Binary(BaseBinary):
+    def __str__(self):
+        return "x'%s'" % "".join("%02x" % ord(c) for c in self.s)
+    __repr__ = __str__
 
 class Cursor(BindlessCursor):
     driver = "mysql"
+    binaryClass = Binary
     def execute(self, sql, *params, **kw):
         if kw.has_key("start_transaction"):
             del kw["start_transaction"]

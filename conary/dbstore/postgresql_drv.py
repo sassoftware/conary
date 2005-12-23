@@ -15,13 +15,19 @@
 import re
 import pgdb
 
-from base_drv import BaseDatabase, BindlessCursor, BaseCursor
+from base_drv import BaseDatabase, BindlessCursor, BaseCursor, BaseBinary
 import sqlerrors
 import sqllib
+
+# class for encapsulating binary strings for dumb drivers
+class Binary(BaseBinary):
+    def __pg_repr__(self):
+        return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
 class Cursor(BindlessCursor):
+    binaryClass = Binary
     driver = "postgresql"
     def execute(self, sql, *params, **kw):
         if kw.has_key("start_transaction"):

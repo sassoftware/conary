@@ -14,15 +14,27 @@
 
 import sys
 import re
+import types
 
 import sqlerrors, sqllib
 from conary.lib import cfg
+
+# class for encapsulating binary strings for dumb drivers
+class BaseBinary:
+    def __init__(self, s):
+        assert(isinstance(s, types.StringType))
+        self.s = s
+    def __str__(self):
+        return s
+    def __repr__(self):
+        return s
+
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
     PASSTHROUGH = ["lastrowid", "description"]
-
+    binaryClass = BaseBinary
     def __init__(self, dbh=None):
         self.dbh = dbh
         self._cursor = self._getCursor()
@@ -39,6 +51,9 @@ class BaseCursor:
     def _getCursor(self):
         assert(self.dbh)
         return self.dbh.cursor()
+
+    def binary(self, s):
+        return self.binaryClass(s)
 
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
