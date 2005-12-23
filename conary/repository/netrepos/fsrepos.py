@@ -154,9 +154,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	"""
 	cs = changeset.ChangeSet()
 
-        import epdb
-        epdb.st()
-
         externalTroveList = []
         externalFileList = []
 
