@@ -19,6 +19,8 @@ from base_drv import BaseDatabase, BindlessCursor, BaseCursor
 import sqlerrors
 import sqllib
 
+# FIXME: we should channel exceptions into generic exception classes
+# common to all backends
 class Cursor(BindlessCursor):
     driver = "postgresql"
     def execute(self, sql, *params, **kw):
@@ -27,11 +29,12 @@ class Cursor(BindlessCursor):
         try:
             ret = BindlessCursor.execute(self, sql, *params, **kw)
         except pgdb.DatabaseError, e:
-            raise sqlerrors.CursorError(e)
+            msg = e.args[0]
+            if msg.find("violates foreign key constraint") > 0:
+                raise sqlerrors.ConstraintViolation(msg)
+            raise sqlerrors.CursorError(msg)
         return self
 
-# FIXME: we should channel exceptions into generic exception classes
-# common to all backends
 class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
@@ -69,8 +72,7 @@ class Database(BaseDatabase):
                                  'information_schema')
         """)
         for table, in c.fetchall():
-            self.tables.setdefault(table, [])
-
+            self.tables[table] = []
         if not len(self.tables):
             return self.version
         # views
@@ -80,9 +82,8 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.views = sqllib.CaselessDict()
-        for x in c.fetchall():
-            self.views[x[0]] = True
+        for name, in c.fetchall():
+            self.views[name] = True
         # indexes
         c.execute("""
         select indexname as name, tablename as table
@@ -101,6 +102,45 @@ class Database(BaseDatabase):
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
-        self.sequences = dict.fromkeys(x[0] for x in c.fetchall())
+        for name, in c.fetchall():
+            self.sequences[name] = True
+        # triggers
+        c.execute("""
+        SELECT t.tgname, c.relname
+        FROM pg_catalog.pg_trigger t, pg_class c, pg_namespace n
+        WHERE t.tgrelid = c.oid AND c.relnamespace = n.oid
+        AND NOT tgisconstraint
+        AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+        """)
+        for (name, table) in c.fetchall():
+            self.triggers[name] = table
         version = self.getVersion()
         return version
+
+    # Postgresql's trigegr syntax kind of sucks because we have to
+    # create a function first and then call that function from the
+    # trigger
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # first create the trigger function
+        cu = self.dbh.cursor()
+        triggerName = "%s_%s" % (table, onAction)
+        funcName = "%s_func" % triggerName
+        cu.execute("""
+        CREATE OR REPLACE FUNCTION %s()
+        RETURNS trigger
+        AS $$
+        BEGIN
+            NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS')) ;
+            RETURN NEW;
+        END ; $$ LANGUAGE 'plpgsql';
+        """ % (funcName, column))
+        # now create the trigger based on the above function
+        cu.execute("""
+        CREATE TRIGGER %s
+        BEFORE %s ON %s
+        FOR EACH ROW
+        EXECUTE PROCEDURE %s()
+        """ % (triggerName, onAction, table, funcName))
+        return True
