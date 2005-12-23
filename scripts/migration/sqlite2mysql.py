@@ -23,9 +23,9 @@ mysql = dbstore.connect(sys.argv[2], driver = "mysql")
 cm = mysql.cursor()
 
 # create the tables, avoid the indexes
-for stmt in getTables():
-    cm.execute(stmt)
+for stmt in getTables("mysql"):
     print stmt
+    cm.execute(stmt)
 mysql.loadSchema()
 
 for t in sqlite.tables.keys():
@@ -168,7 +168,7 @@ for t in tList:
 # and now create the indexes
 wtList = ["%s WRITE" % x for x in tList]
 sql = "LOCK TABLES %s" % ", ".join(wtList)
-for stmt in getIndexes():
+for stmt in getIndexes("mysql"):
     # in MySQL, tables need to be locked every time we create an index
     if stmt.lower().startswith("create trigger"):
         cm.execute("UNLOCK TABLES")
