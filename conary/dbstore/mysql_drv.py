@@ -128,6 +128,7 @@ class Database(BaseDatabase):
         FROM information_schema.triggers
         WHERE event_object_schema = ?
         """, self.dbName)
+        ret += cu.fetchall()
         for (objType, name, tableName) in ret:
             if objType == "BASE TABLE":
                 if tableName.endswith("_sequence"):
@@ -135,12 +136,12 @@ class Database(BaseDatabase):
                 else:
                     self.tables.setdefault(tableName, [])
             elif objType == "VIEW":
-                self.views.setdefault(tableName, None)
+                self.views[name] = True
             elif objType == "INDEX":
                 assert(self.tables.has_key(tableName))
                 self.tables.setdefault(tableName, []).append(name)
             elif objType == "TRIGGER":
-                self.triggers.setdefault(name, tableName)
+                self.triggers[name] = tableName
         if not len(self.tables):
             return self.version
         version = self.getVersion()
