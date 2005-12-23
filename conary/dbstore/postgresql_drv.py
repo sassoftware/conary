@@ -55,6 +55,12 @@ class Cursor(BindlessCursor):
             raise sqlerrors.CursorError(msg)
         return self
 
+    # we have "our own" lastrowid
+    def __getattr__(self, name):
+        if name == "lastrowid":
+            return self.lastid()
+        return BindlessCursor.__getattr__(self, name)
+
     # postgresql can not report back the last value from a SERIAL
     # PRIMARY KEY column insert, so we have to look it up ourselves
     def lastid(self):

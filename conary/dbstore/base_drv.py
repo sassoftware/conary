@@ -51,7 +51,7 @@ class BaseKeywordDict(dict):
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
-    PASSTHROUGH = ["description"]
+    PASSTHROUGH = ["description", "lastrowid"]
     binaryClass = BaseBinary
     def __init__(self, dbh=None):
         self.dbh = dbh
