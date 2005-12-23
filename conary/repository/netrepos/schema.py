@@ -513,8 +513,11 @@ def createTroves(db):
     if createTrigger(db, "TroveTroves"):
         commit = True
 
-    if not resetTable(cu, 'NewFiles'):
+    if commit:
         db.commit()
+
+    if not resetTable(cu, 'NewFiles'):
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
             pathId      %(BINARY16)s,
@@ -523,15 +526,15 @@ def createTroves(db):
             stream      %(BLOB)s,
             path        VARCHAR(767)
         )""" % db.keywords)
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'NeededFlavors'):
-        db.commit()
+        db.rollback()
         cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'gtl'):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE gtl(
         idx             %(PRIMARYKEY)s,
@@ -539,38 +542,38 @@ def createTroves(db):
         version         VARCHAR(767),
         flavor          VARCHAR(767)
         )""" % db.keywords)
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'gtlInst'):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE gtlInst(
         idx             %(PRIMARYKEY)s,
         instanceId      INTEGER
         )""" % db.keywords)
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'getFilesTbl'):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
             itemId       INTEGER PRIMARY KEY,
             fileId      %(BINARY20)s
         )""" % db.keywords)
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'itf'):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE itf(
         item            VARCHAR(254),
         version         VARCHAR(767),
         fullVersion     VARCHAR(767)
         )""")
-        commit = True
+        db.commit()
 
     if not resetTable(cu, 'gtvlTbl'):
-        db.commit()
+        db.rollback()
         cu.execute("""
         CREATE TEMPORARY TABLE
         gtvlTbl(
@@ -579,11 +582,9 @@ def createTroves(db):
             flavorId            INTEGER
         )""")
         cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")
-        commit = True
-
-    if commit:
         db.commit()
-        db.loadSchema()
+
+    db.loadSchema()
 
 def createInstructionSets(db):
     cu = db.cursor()
