@@ -32,13 +32,11 @@ class NetworkAuthorization:
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
-        cu.execute("""SELECT salt, password, userGroupId
-                            FROM
-                                Users, UserGroupMembers
-                            WHERE
-                                userName = ? AND
-                                Users.userId = UserGroupMembers.userId""",
-                   authToken[0])
+        cu.execute("""
+        SELECT salt, password, userGroupId
+        FROM Users JOIN UserGroupMembers USING(userId)
+        WHERE userName = ?
+        """, authToken[0])
 
         groupsFromUser = [ x for x in cu ]
 
@@ -55,13 +53,11 @@ class NetworkAuthorization:
         if authToken[2] is not None:
             # look up entitlements
             cu.execute("""
-                  SELECT userGroupId
-                        FROM EntitlementGroups, Entitlements
-                  WHERE
-                        entGroup=? AND
-                        entitlement=? AND
-                        EntitlementGroups.entGroupId == Entitlements.entGroupId
-                """, authToken[2], authToken[3])
+            SELECT userGroupId
+            FROM EntitlementGroups JOIN Entitlements USING(entGroupId)
+            WHERE
+            entGroup=? AND entitlement=?
+            """, authToken[2], authToken[3])
             groupsFromUser += [ x[0] for x in cu ]
 
         return groupsFromUser
@@ -88,11 +84,11 @@ class NetworkAuthorization:
         select Items.item
         from Permissions join items using (itemId)
         """
-
-        where = ["Permissions.userGroupId IN (%s)" %
-                    ",".join("%d" % x for x in groupIds) ]
         params = []
-
+        where = []
+        if len(groupIds):
+            where.append("Permissions.userGroupId IN (%s)" %
+                     ",".join("%d" % x for x in groupIds))
         if label:
             where.append("""
             (
