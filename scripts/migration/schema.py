@@ -119,7 +119,7 @@ class PrintDatabase:
             RETURNS trigger
             AS $$
             BEGIN
-                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS')) ;
+                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
                 RETURN NEW;
             END ; $$ LANGUAGE 'plpgsql';
             """ % (funcName, column))
