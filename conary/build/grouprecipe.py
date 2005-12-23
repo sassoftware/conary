@@ -52,6 +52,7 @@ class SingleGroup:
     def findTroves(self, troveMap, repos, childGroups):
         self._findTroves(troveMap)
         self._removeTroves(repos)
+        self._addPackagesForComponents(repos)
         self._addImplicitTroves(childGroups)
         self._removeImplicitTroves(repos)
         self._checkForRedirects(repos)
@@ -99,11 +100,6 @@ class SingleGroup:
                                  components, childTroves)
 
 
-        def _getChildTroves(trv):
-            if trv.isRedirect():
-                return []
-            return 
-
         # these are references which were used in addAll() commands
         for refSource, byDefault in self.addReferenceList:
             srcTroveList = refSource.getSourceTroves()
@@ -132,7 +128,7 @@ class SingleGroup:
                 else:
                     childTroves = [ (x, x in byDefaultDict)
                                      for x in trv.iterTroveList(weakRefs=True, 
-                                                            strongRefs=True) ]  
+                                                            strongRefs=True) ]
                 self._foundTrove(troveTup, True, byDefault, trv.isRedirect(),
                                  trv.getSize(), [], childTroves)
 
@@ -265,6 +261,51 @@ class SingleGroup:
             del self.troves[troveTup]
             self.redirects.discard(troveTup)
             del self.childTroves[troveTup]
+
+
+    def _addPackagesForComponents(self, troveSource):
+        packages = {}
+        for (n,v,f), info in self.troves.iteritems():
+            if ':' in n:
+                pkg = n.split(':', 1)[0]
+                byDefault = info[-1]
+                packages.setdefault((pkg, v, f), {})[n] = byDefault
+
+        # if the user mentions both foo and foo:runtime, don't remove
+        # direct link to foo:runtime
+        troveTups = [ x for x in packages if x not in self.troves ]
+
+        if not troveTups:
+            return
+
+        # XXX we need a hasTroves method
+        # it's possible the package does not exist on the same branch as 
+        # the child, in that case, don't switch to using parent.
+        troves = []
+        for troveTup in troveTups:
+            try:
+                trv = troveSource.getTrove(withFiles=False, *troveTup) 
+                troves.append((troveTup, trv))
+            except errors.TroveMissing:
+                pass
+                
+        for troveTup, trv in troves:
+            compNames = packages[troveTup]
+            for compName in compNames:
+                del self.troves[compName, troveTup[1], troveTup[2]]
+
+            # child trove is byDefault True only if it was added explicitly
+            # and was added byDefault=True 
+            childTroves = [ (x, x[0] in compNames and compNames[x[0]])
+                             for x in trv.iterTroveList(strongRefs=True) ]
+
+            # parent trove is byDefault True if at least one of its 
+            # components is.
+            byDefault = bool([ x for x in childTroves if x[1]])
+
+            self._foundTrove(troveTup, True, byDefault, False, trv.getSize(),
+                             [], childTroves)
+
 
     def _addImplicitTroves(self, childGroups):
         componentsToRemove = self.removeComponentList
