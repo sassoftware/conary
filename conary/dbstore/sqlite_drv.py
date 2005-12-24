@@ -95,3 +95,11 @@ class Database(BaseDatabase):
             cu.execute('ANALYZE')
             self._getSchema()
 
+    # sqlite is more peculiar when it comes to firing off transactions
+    def transaction(self, name = None):
+        assert(self.dbh)
+        cu = self.cursor()
+        if self.dbh.inTransaction:
+            return cu
+        self.dbh._begin()
+        return cu
