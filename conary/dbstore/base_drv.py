@@ -146,7 +146,6 @@ class BaseDatabase:
         self.dbh = None
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
-        self.__transaction = None
 
     # the string syntax for database connection is [[user[:password]@]host/]database
     def _connectData(self, names = ["user", "password", "host", "database"]):
@@ -195,7 +194,6 @@ class BaseDatabase:
 
     def commit(self):
         assert(self.dbh)
-        self.__transaction = 0
         return self.dbh.commit()
 
     # transaction support
@@ -206,16 +204,13 @@ class BaseDatabase:
         assert(self.dbh)
         c = self.cursor()
         c.execute(self.basic_transaction)
-        self.__transaction = 1
         return c
 
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
         assert(not name)
-        assert(self.__transaction)
         assert(self.dbh)
-        self.__transaction = 0
         return self.dbh.rollback()
 
     # easy access to the schema state
