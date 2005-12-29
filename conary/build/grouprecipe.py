@@ -52,7 +52,6 @@ class SingleGroup:
     def findTroves(self, troveMap, repos, childGroups):
         self._findTroves(troveMap)
         self._removeTroves(repos)
-        self._addPackagesForComponents(repos)
         self._addImplicitTroves(childGroups)
         self._removeImplicitTroves(repos)
         self._checkForRedirects(repos)
@@ -122,7 +121,6 @@ class SingleGroup:
                 byDefault = self.byDefault
 
             for (troveTup, trv) in izip(troveTups, troveList):
-                childTroves = _getChildTroves(trv)
                 if trv.isRedirect():
                     childTroves = []
                 else:
@@ -217,16 +215,16 @@ class SingleGroup:
         neededTups = set(chain(*suggMap.itervalues()))
         troves = repos.getTroves(neededTups, withFiles=False)
         for troveTup, trv in izip(neededTups, troves):
-            self._foundTrove(troveTup, True, trv.getSize(), self.byDefault,
-                             trv.isRedirect())
-
+            self._foundTrove(troveTup, True, self.byDefault,
+                             trv.isRedirect(), trv.getSize(), [], [])
+            
     def _checkDependencies(self, cfg):
         if self.checkOnlyByDefaultDeps:
             troveList = self.getDefaultTroves()
         else:
             troveList = list(self.troves)
 
-        jobSet = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
+        jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList]
 
         oldDbPath = cfg.dbPath
         cfg.setValue('dbPath', ':memory:')
@@ -263,12 +261,13 @@ class SingleGroup:
             del self.childTroves[troveTup]
 
 
-    def _addPackagesForComponents(self, troveSource):
+    def addPackagesForComponents(self, troveSource):
         packages = {}
-        for (n,v,f), info in self.troves.iteritems():
+        for (n,v,f), (explicit, size, byDefault) in self.troves.iteritems():
+            if not explicit:
+                continue
             if ':' in n:
                 pkg = n.split(':', 1)[0]
-                byDefault = info[-1]
                 packages.setdefault((pkg, v, f), {})[n] = byDefault
 
         # if the user mentions both foo and foo:runtime, don't remove
@@ -303,8 +302,11 @@ class SingleGroup:
             # components is.
             byDefault = bool([ x for x in childTroves if x[1]])
 
-            self._foundTrove(troveTup, True, byDefault, False, trv.getSize(),
-                             [], childTroves)
+            self._foundTrove(troveTup, True, byDefault, False, trv.getSize())
+            for childTup, childByDefault in childTroves:
+                self._foundTrove(childTup, False, childByDefault and byDefault, 
+                                 False, trv.getSize())
+            
 
 
     def _addImplicitTroves(self, childGroups):
@@ -720,9 +722,12 @@ class GroupRecipe(Recipe):
             # include those troves when doing dependency resolution/checking
             groupObj.autoResolveDeps(self.cfg, self.repos, self.labelPath)
 
+
             failedDeps = groupObj.checkDependencies(self.cfg)
             if failedDeps:
                 return groupName, failedDeps
+
+            groupObj.addPackagesForComponents(self.repos)
 
             groupObj.calcSize()
 
