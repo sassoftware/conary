@@ -30,8 +30,7 @@ import tempfile
 import traceback
 import weakref
 
-from conary.build import fixedglob
-from conary.lib import log
+from conary.lib import fixedglob, log
 
 # Simple ease-of-use extensions to python libraries
 

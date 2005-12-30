@@ -1081,6 +1081,7 @@ class DanglingSymlinks(policy.Policy):
 
     def doFile(self, path):
 	d = self.macros.destdir
+        l = len(d)
 	f = util.joinPaths(d, path)
         recipe = self.recipe
 	if os.path.islink(f):
@@ -1090,6 +1091,8 @@ class DanglingSymlinks(policy.Policy):
                           ' should probably be relative', path, contents)
 		return
 	    abscontents = util.joinPaths(os.path.dirname(path), contents)
+            # now resolve any intermediate symlinks
+            abscontents = os.path.realpath(d+abscontents)[l:]
 	    if abscontents in recipe.autopkg.pathMap:
 		componentMap = recipe.autopkg.componentMap
 		if componentMap[abscontents] != componentMap[path] and \

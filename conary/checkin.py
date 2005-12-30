@@ -30,7 +30,7 @@ from conary import trove
 from conary import updatecmd
 from conary import versions
 import build.errors
-from conary.build import cook, recipe
+from conary.build import recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.conarycfg import selectSignatureKey

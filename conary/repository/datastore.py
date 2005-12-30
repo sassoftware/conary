@@ -23,6 +23,7 @@ keys are assumed to be unique.
 import errno
 import fcntl
 import gzip
+import itertools
 import os
 import sha
 
@@ -31,7 +32,27 @@ from conary.lib import util
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents
 
-class DataStore:
+class AbstractDataStore:
+
+    def hasFile(self, hash):
+        raise NotImplementedError
+
+    def addFile(self, f, hash, precompressed = False):
+        raise NotImplementedError
+
+    def addFileReference(self, hash):
+        raise NotImplementedError
+
+    def openFile(self, hash, mode = "r"):
+        raise NotImplementedError
+
+    def openRawFile(self, hash):
+        raise NotImplementedError
+
+    def removeFile(self, hash):
+        raise NotImplementedError
+
+class DataStore(AbstractDataStore):
 
     def hashToPath(self, hash):
 	if (len(hash) < 5):
@@ -217,6 +238,41 @@ class DataStore:
 
 	if (not os.path.isdir(self.top)):
 	    raise IOError, ("path is not a directory: %s" % topPath)
+
+class DataStoreSet:
+
+    """
+    Duplicates data across multiple content stores.
+    """
+
+    def hasFile(self, hash):
+        return self.stores[0].hasFile(hash)
+
+    def addFile(self, f, hash, precompressed = False):
+        for store in self.stores:
+            store.addFile(f, hash, precompressed = precompressed)
+            f.seek(0)
+
+    def addFileReference(self, hash):
+        for store in self.stores:
+            store.addFileReference(hash)
+            f.seek(0)
+
+    def openFile(self, hash, mode = "r"):
+        store = self.storeIter.next()
+        return store.openFile(hash, mode = mode)
+
+    def openRawFile(self, hash):
+        store = self.storeIter.next()
+        return store.openRawFile(hash)
+
+    def removeFile(self, hash):
+        for store in self.stores:
+            store.removeFile(hash)
+
+    def __init__(self, *storeList):
+        self.stores = storeList
+        self.storeIter = itertools.cycle(self.stores)
 
 class DataStoreRepository:
 

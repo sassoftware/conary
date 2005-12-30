@@ -38,8 +38,8 @@ import tempfile
 import textwrap
 
 #conary imports
-from conary.build import action, fixedglob
-from conary.lib import log, util
+from conary.build import action
+from conary.lib import fixedglob, log, util
 from conary.build.use import Use
 
 # make sure that the decimal value really is unreasonable before

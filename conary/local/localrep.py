@@ -18,7 +18,7 @@ import zlib
 from StringIO import StringIO
 
 from conary.lib import openpgpfile, openpgpkey
-from conary.repository import errors, repository
+from conary.repository import errors, repository, datastore
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -135,7 +135,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	    if fileObj.hasContents and fileObj.flags.isConfig():
 		self.repos._removeFileContents(fileObj.contents.sha1())
 
-class SqlDataStore:
+class SqlDataStore(datastore.AbstractDataStore):
 
     """
     Implements a DataStore interface on a sql database. File contents are
