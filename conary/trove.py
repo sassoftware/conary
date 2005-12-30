@@ -1716,15 +1716,15 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type old: versions.VersionString
 	@param new: version to add to the changed list
 	@type new: versions.VersionString
-        @param weakRef: is this a weak references?
-        @type weakRef: boolean
+        @param weakRefs: True if we are switching a weakRef
+        @type weakRefs: boolean
 	"""
-        if weakRefs:
+        if weakRef:
             chgGroup = self.weakTroves
         else:
             chgGroup = self.strongTroves
 
-	for (theName, l) in self.chgGroup.iteritems():
+	for (theName, l) in chgGroup.iteritems():
 	    if theName != name: continue
 	    for (i, (change, ver, flavor, byDefault)) in enumerate(l):
 		if ver == old:
@@ -1743,7 +1743,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type version: versions.Version
 	@param flavor: old flavor
 	@type flavor: deps.deps.DependencySet
-        @param weakRef: is this a weak references?
+        @param weakRef: is this a weak reference?
         @type weakRef: boolean
 	"""
 
@@ -1766,7 +1766,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type flavor: deps.deps.DependencySet
         @param byDefault: New value of byDefault
         @type byDefault: boolean
-        @param weakRef: is this a weak references?
+        @param weakRef: is this a weak reference?
         @type weakRef: boolean
 	"""
         if weakRef:
