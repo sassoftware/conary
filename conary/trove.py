@@ -715,13 +715,14 @@ class Trove(streams.StreamSet):
 	    # FIXME, we should have better text here
 	    raise TroveError
 
-    def iterTroveList(self, strongRefs = True, weakRefs = False):
+    def iterTroveList(self, strongRefs = False, weakRefs = False):
 	"""
 	Returns a generator for (name, version, flavor) ordered pairs, 
 	listing all of the trove in the group, along with their versions. 
 
 	@rtype: list
 	"""
+        assert(strongRefs or weakRefs)
         if strongRefs:
             for key in self.strongTroves.iterkeys():
                 yield key
@@ -729,6 +730,26 @@ class Trove(streams.StreamSet):
         if weakRefs:
             for key in self.weakTroves.iterkeys():
                 yield key
+
+    def iterTroveListInfo(self):
+	"""
+	Returns a generator for (name, version, flavor), byDefault, isStrong
+
+	@rtype: list
+	"""
+
+        for item, byDefault in self.strongTroves.iteritems():
+            yield item, byDefault, True
+
+        for item, byDefault in self.weakTroves.iteritems():
+            yield item, byDefault, False
+
+    def isStrongReference(self, name, version, flavor):
+        key = (name, version, flavor)
+        rc = self.strongTroves.get(key, None)
+        if rc is None:
+            return False
+        return True
 
     def includeTroveByDefault(self, name, version, flavor):
         key = (name, version, flavor)

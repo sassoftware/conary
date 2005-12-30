@@ -219,7 +219,8 @@ class ClientClone:
                            (troveTuple.name(), troveTuple.version(),
                             troveTuple.flavor()))
 
-            for troveInfo in [ x for x in trv.iterTroveList() ]:
+            for troveInfo in [ x for x in trv.iterTroveList(strongRefs=True,
+                                                            weakRefs=True) ]:
                 yield ((V_REFTRV, troveInfo), troveInfo)
 
         def _updateVersion(trv, mark, newVersion):
@@ -236,8 +237,11 @@ class ClientClone:
             elif kind == V_REFTRV:
                 (name, oldVersion, flavor) = mark[1]
                 byDefault = trv.includeTroveByDefault(name, oldVersion, flavor)
-                trv.delTrove(name, oldVersion, flavor, False)
-                trv.addTrove(name, newVersion, flavor, byDefault = byDefault)
+                isStrong = trv.isStrongReference(name, oldVersion, flavor)
+                trv.delTrove(name, oldVersion, flavor, False, 
+                                                       weakRef = not isStrong)
+                trv.addTrove(name, newVersion, flavor, byDefault = byDefault,
+                                                       weakRef = not isStrong)
             else:
                 assert(0)
 
@@ -271,7 +275,8 @@ class ClientClone:
             troves = self.repos.getTroves(needed, withFiles = False)
             allTroves.update(x for x in itertools.izip(needed, troves))
             cloneSources = [ x for x in itertools.chain(
-                                *(t.iterTroveList() for t in troves)) ]
+                        *(t.iterTroveList(weakRefs=True,
+                                          strongRefs=True) for t in troves)) ]
 
         # make sure there are no zeroed timeStamps - targetBranch may be
         # a user-supplied string

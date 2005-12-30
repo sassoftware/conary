@@ -1328,7 +1328,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
         return (changeSet, returnList)
 
     for i, (curTrove, srcTrove, newVersion, flags) in enumerate(pkgList):
-        inclusions = [ x for x in curTrove.iterTroveList() ]
+        inclusions = [ x for x in curTrove.iterTroveList(strongRefs=True) ]
         if not inclusions: continue
         assert(curTrove == srcTrove)
         assert(srcTrove.emptyFileList() and curTrove.emptyFileList())

@@ -233,7 +233,7 @@ class HttpHandler(WebHandler):
 
         # non-source group troves only show contained troves
         if t.startswith('group-') and not t.endswith(':source'):
-            troves = sorted(parentTrove.iterTroveList())
+            troves = sorted(parentTrove.iterTroveList(strongRefs=True))
             return self._write("group_contents", troveName = t, troves = troves)
         else: # source troves and non-group troves
             fileIters = []

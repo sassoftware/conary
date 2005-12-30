@@ -561,7 +561,8 @@ order by
 	if troveFlavor:
 	    self.flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+                                                           weakRefs=True):
 	    if flavor:
 		self.flavorsNeeded[flavor] = True
 
@@ -591,7 +592,8 @@ order by
 	if troveFlavor:
 	    flavors[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+                                                           weakRefs=True):
 	    if flavor:
 		flavors[flavor] = True
 
@@ -627,21 +629,18 @@ order by
                                 flags INT)
                    """)
 
-	for (name, version, flavor), weakFlag in itertools.chain(
-                itertools.izip(trove.iterTroveList(strongRefs = True, 
-                                                   weakRefs = False),
-                               itertools.repeat(0)),
-                itertools.izip(trove.iterTroveList(strongRefs = False, 
-                                                   weakRefs = True),
-                               itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
+	for (name, version, flavor), byDefault, isStrong \
+                                                in trove.iterTroveListInfo():
 	    versionId = self.getVersionId(version, self.addVersionCache)
 	    if flavor:
 		flavorId = flavorMap[flavor.freeze()]
 	    else:
 		flavorId = 0
 
-            flags = weakFlag
-            if trove.includeTroveByDefault(name, version, flavor):
+            flags = 0
+            if not isStrong:
+                flags |= schema.TROVE_TROVES_WEAKREF
+            if byDefault:
                 flags |= schema.TROVE_TROVES_BYDEFAULT;
 
             cu.execute("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",

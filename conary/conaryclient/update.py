@@ -235,6 +235,8 @@ class ClientUpdate:
                 # removed again.
                 beingRemoved = set((x[0], x[1][0], x[1][1]) for x in
                                     jobSet if x[1][0] is not None )
+                beingInstalled = set((x[0], x[2][0], x[2][1]) for x in
+                                      jobSet if x[2][0] is not None )
 
                 
                 # add in foo if we are adding foo:lib.  That way 'conary
@@ -243,14 +245,15 @@ class ClientUpdate:
                 for job in troves:
                     if ':' in job[0]:
                         pkgName = job[0].split(':', 1)[0]
+                        pkgInfo = (pkgName, job[2][0], job[2][1])
+                        if pkgInfo in beingInstalled:
+                            continue
                         try:
-                            troveSource.getTrove(pkgName, withFiles=False, *job[2])
+                            troveSource.getTrove(withFiles=False, *pkgInfo)
                         except errors.TroveMissing:
                             continue
-                    pkgInfo = (pkgName, job[1], job[2], False) 
-                    if pkgInfo in jobSet:
-                        continue
-                    packages.append(pkgInfo)
+                        
+                        packages.append((pkgName, job[1], job[2], True))
                 troves.update(packages)
 
                 newJob = self._updateChangeSet(troves, uJob,
@@ -318,7 +321,7 @@ class ClientUpdate:
                 jobSet.remove(job)
 
             targets = []
-            allTargets = list(trv.iterTroveList())
+            allTargets = list(trv.iterTroveList(strongRefs=True))
             # three possibilities:
             #   1. no targets -- make sure a simple erase occurs
             #   2. target is the primary target of this redirect (this is 
@@ -444,7 +447,8 @@ class ClientUpdate:
                 trv = self.db.getTrove(withFiles = False, pristine = False,
                                        *oldInfo)
 
-                for inclInfo in trv.iterTroveList():
+                for inclInfo in trv.iterTroveList(strongRefs=True):
+                    # we only use strong references when erasing.
                     jobQueue.add(((inclInfo[0], inclInfo[1:], (None, None), 
                                   False), False))
 
@@ -502,7 +506,8 @@ class ClientUpdate:
             if not trv.isCollection(): return trv.getPathHashes()
 
             ph = None
-            for info in trv.iterTroveList():
+            for info in trv.iterTroveList(strongRefs=True):
+                # FIXME: should this include weak references?
                 if inDb:
                     otherTrv = db.getTrove(withFiles = False, *info)
                 else:
@@ -529,7 +534,7 @@ class ClientUpdate:
                 if not trove.troveIsCollection(item[0]): continue
                 trv = db.getTrove(withFiles = False, pristine = False, *item)
 
-                for x in trv.iterTroveList():
+                for x in trv.iterTroveList(strongRefs=True, weakRefs=True):
                     itemQueue.add(x)
 
             return fullSet
@@ -566,7 +571,7 @@ class ClientUpdate:
                                     presentOkay = True)
             names.add(job[0])
 
-        avail = set(availableTrove.iterTroveList())
+        avail = set(availableTrove.iterTroveList(strongRefs=True))
 
         # Build the set of all relative install jobs (transitive closure)
         relativeUpdateJobs = set(job for job in transitiveClosure if
@@ -971,10 +976,8 @@ conary erase '%s=%s%s'
             if isPrimary:
                 # byDefault status of troves is determined by the primary
                 # trove.  
-                byDefaultDict = dict((x, trv.includeTroveByDefault(*x)) 
-                                     for x in trv.iterTroveList(
-                                                            strongRefs=True, 
-                                                            weakRefs=True))
+                byDefaultDict = dict((x[0], x[1]) \
+                                            for x in trv.iterTroveListInfo())
 
             for info in trv.iterTroveList(strongRefs=True):
 

@@ -103,7 +103,7 @@ class AbstractTroveSource:
 	seen = { trove.getName() : [ (trove.getVersion(),
 				      trove.getFlavor()) ] }
 
-	troveList = [x for x in trove.iterTroveList()]
+	troveList = [x for x in trove.iterTroveList(strongRefs=True)]
 
 	while troveList:
 	    (name, version, flavor) = troveList[0]
@@ -126,7 +126,7 @@ class AbstractTroveSource:
 
                 yield trv
 
-                troveList += [ x for x in trv.iterTroveList() ]
+                troveList += [ x for x in trv.iterTroveList(strongRefs=True) ]
 	    except errors.TroveMissing:
 		if not ignoreMissing:
 		    raise
@@ -384,7 +384,8 @@ class TroveListTroveSource(SimpleTroveSource):
             foundTups.update(newTroves)
             troveTups = []
             for newTrove in newTroves:
-                for tup in newTrove.iterTroveList():
+                for tup in newTrove.iterTroveList(strongRefs=True,
+                                                  weakRefs=True):
                     self._trovesByName.setdefault(tup[0], set()).add(tup)
                     if tup not in foundTups:
                         troveTups.append(tup)

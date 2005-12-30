@@ -112,7 +112,7 @@ class SingleGroup:
                                    if sourceTrove.includeTroveByDefault(*x) ]
 
             troveTups = [ x for x in chain(
-                                *[x.iterTroveList() for x in srcTroveList])]
+                    *[x.iterTroveList(strongRefs=True) for x in srcTroveList])]
             troveList = refSource.getTroves(troveTups, withFiles=False)
 
             byDefaultDict = set(byDefaultDict)
@@ -361,7 +361,7 @@ class SingleGroup:
                 name = trv.getName()
                 # see processRedirectHack
                 # we ignore non-primaries
-                for (subName, subVersion, subFlavor) in trv.iterTroveList():
+                for (subName, subVersion, subFlavor) in trv.iterTroveList(strongRefs=True):
                     if (":" not in subName and ":" not in name) or \
                        (":"     in subName and ":"     in name):
                        targets.append((subName, subVersion, subFlavor))
