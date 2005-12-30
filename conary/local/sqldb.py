@@ -1456,7 +1456,8 @@ order by
 
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
-                       timeStamps, TroveTroves.inPristine FROM
+                       timeStamps, TroveTroves.flags, TroveTroves.inPristine 
+                    FROM
                     gcts LEFT OUTER JOIN Instances 
                         USING (troveName)
                     JOIN Versions 
@@ -1472,10 +1473,12 @@ order by
         # it's much faster to build up lists and then turn them into
         # sets than build up the set one member at a time
         installedNotReferenced = []
-        referencedNotInstalled = []
         installedAndReferenced = []
+        referencedStrong = []
+        referencedWeak = []
 
-        for (name, version, flavor, isPresent, timeStamps, hasParent) in cu:
+        for (name, version, flavor, isPresent, timeStamps, 
+                                               flags, hasParent) in cu:
             if flavor is None:
                 flavor = ""
 
@@ -1489,13 +1492,15 @@ order by
                     installedAndReferenced.append(info)
                 else:
                     installedNotReferenced.append(info)
+            elif flags & schema.TROVE_TROVES_WEAKREF:
+                referencedWeak.append(info)
             else:
-                referencedNotInstalled.append(info)
+                referencedStrong.append(info)
 
         cu.execute("DROP TABLE gcts", start_transaction = False)
 
         return (set(installedNotReferenced), set(installedAndReferenced), 
-                set(referencedNotInstalled))
+                set(referencedStrong), set(referencedWeak))
 
     def close(self):
 	self.db.close()
