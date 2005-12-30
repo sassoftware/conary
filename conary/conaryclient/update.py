@@ -242,12 +242,15 @@ class ClientUpdate:
                 packages = []
                 for job in troves:
                     if ':' in job[0]:
-                        pkg = job[0].split(':', 1)[0]
+                        pkgName = job[0].split(':', 1)[0]
                         try:
-                            troveSource.getTrove(pkg, withFiles=False, *job[2])
+                            troveSource.getTrove(pkgName, withFiles=False, *job[2])
                         except errors.TroveMissing:
                             continue
-                    packages.append((pkg, job[1], job[2], False))
+                    pkgInfo = (pkgName, job[1], job[2], False) 
+                    if pkgInfo in jobSet:
+                        continue
+                    packages.append(pkgInfo)
                 troves.update(packages)
 
                 newJob = self._updateChangeSet(troves, uJob,
@@ -315,7 +318,7 @@ class ClientUpdate:
                 jobSet.remove(job)
 
             targets = []
-            allTargets = trv.iterTroveList()
+            allTargets = list(trv.iterTroveList())
             # three possibilities:
             #   1. no targets -- make sure a simple erase occurs
             #   2. target is the primary target of this redirect (this is 
@@ -893,7 +896,14 @@ class ClientUpdate:
                 if pinned:
                     if replaced[0] is not None:
 
-                        trv = troveSource.getTrove(withFiles = False, *newInfo)
+                        try:
+                            trv = troveSource.getTrove(withFiles = False, *newInfo)
+                        except errors.TroveMissing:
+                            # we don't even actually have this trove available, making
+                            # it difficult to install.
+                            recurseThis = False
+                            break
+                            
                         # try and install the two troves next to each other
                         assert(replacedInfo[1] is not None)
                         oldTrv = self.db.getTrove(withFiles = False, 
@@ -945,8 +955,18 @@ conary erase '%s=%s%s'
                 branchHint = (replaced[0].branch(), newInfo[1].branch())
 
             if trv is None:
-                trv = troveSource.getTrove(withFiles = False, *newInfo)
-
+                try:
+                    trv = troveSource.getTrove(withFiles = False, *newInfo)
+                except errors.TroveMissing:
+                    # it's possible that the trove source we're using
+                    # contains references to troves that it does not 
+                    # actually contain.  That's okay as long as the
+                    # excluded trove is not actually trying to be
+                    # installed.
+                    if jobAdded:
+                        raise
+                    else:
+                        continue
 
             if isPrimary:
                 # byDefault status of troves is determined by the primary
