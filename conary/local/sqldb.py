@@ -1499,8 +1499,13 @@ order by
 
         cu.execute("DROP TABLE gcts", start_transaction = False)
 
-        return (set(installedNotReferenced), set(installedAndReferenced), 
-                set(referencedStrong), set(referencedWeak))
+        referencedStrong = set(referencedStrong)
+        installedAndReferenced = set(installedAndReferenced)
+
+        return (set(installedNotReferenced) - installedAndReferenced, 
+                installedAndReferenced, 
+                referencedStrong, 
+                set(referencedWeak) - referencedStrong)
 
     def close(self):
 	self.db.close()
