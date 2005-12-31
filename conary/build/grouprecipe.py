@@ -328,12 +328,12 @@ class SingleGroup:
                 
                 if componentsToRemove:
                     parts = childTrove[0].split(':', 1)
-                    if len(parts) != 1:
-                        if parts[1] in componentsToRemove:
-                            byDefault = False
+                    if len(parts) == 2 and parts[1] in componentsToRemove:
+                        byDefault = False
                         
                 if components:
-                    if childTrove in components:    
+                    parts = childTrove[0].split(':', 1)
+                    if len(parts) == 2 and parts[1] in components:
                         byDefault = True
                     else:
                         byDefault = False
@@ -500,7 +500,7 @@ class GroupRecipe(Recipe):
             return groupName
 
     def add(self, name, versionStr = None, flavor = None, source = None,
-            byDefault = None, groupName = None, ref=None):
+            byDefault = None, groupName = None, ref = None, components = None):
         groupNames = self._parseGroupNames(groupName)
         flavor = self._parseFlavor(flavor)
         # track this trove in the GroupRecipe so that it can be found
@@ -511,10 +511,9 @@ class GroupRecipe(Recipe):
 
         for groupName in groupNames:
             self.groups[groupName].add(name, versionStr = versionStr,
-                                                flavor = flavor,
-                                                source = source,
-                                                byDefault = byDefault, 
-                                                ref = ref)
+                                       flavor = flavor, source = source,
+                                       byDefault = byDefault, ref = ref, 
+                                       components = components)
     # maintain addTrove for backwards compatability
     addTrove = add
 
