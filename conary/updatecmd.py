@@ -213,7 +213,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                recurse = True, info = False, 
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
-                               checkPathConflicts = True, syncChildren = False):
+                               checkPathConflicts = True, syncChildren = False,
+                               updateOnly = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -255,7 +256,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                       split = split, sync = sync,
                       fromChangesets = fromChangesets,
                       checkPathConflicts = checkPathConflicts,
-                      syncChildren = syncChildren)
+                      syncChildren = syncChildren,
+                      updateOnly = updateOnly)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -279,7 +281,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   fromChangesets = [],
                                   checkPathConflicts = True, 
                                   checkPrimaryPins = True, 
-                                  syncChildren = False):
+                                  syncChildren = False, updateOnly = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -296,7 +298,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                sync = sync, fromChangesets = fromChangesets,
                                checkPathConflicts = checkPathConflicts,
                                checkPrimaryPins = checkPrimaryPins,
-                               syncChildren = syncChildren)
+                               syncChildren = syncChildren,
+                               updateOnly = updateOnly)
     except:
         callback.done()
         raise

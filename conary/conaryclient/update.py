@@ -785,6 +785,8 @@ class ClientUpdate:
                                             replaced[1])
                             if replaced[0]:
                                 childrenFollowLocalChanges = True
+                            elif not byDefault or updateOnly:
+                                break
                     elif replacedInfo in referencedNotInstalled:
                         # the trove on the local system is one that's referenced
                         # but not installed, so, normally we would not install
@@ -1013,7 +1015,7 @@ conary erase '%s=%s%s'
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, checkPrimaryPins = True,
                          forceJobClosure = False, ineligible = set(),
-                         syncChildren=False):
+                         syncChildren=False, updateOnly=False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1257,13 +1259,18 @@ conary erase '%s=%s%s'
             transitiveClosure = jobSet
         # else we trust the transitiveClosure which was passed in
 
+        if not syncChildren:
+            # we know that all the troves in jobSet are already installed
+            # (i.e. in oldItems) when syncing.  We don't want to exclude 
+            # their children from syncing
+            ineligible = ineligible | oldItems
+
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
-                                         redirectHack, recurse, 
-                                         ineligible | oldItems, 
+                                         redirectHack, recurse, ineligible, 
                                          checkPrimaryPins, 
                                          installedPrimaries=oldItems, 
                                          installMissingRefs=syncChildren,
-                                         updateOnly=False,
+                                         updateOnly=updateOnly,
                                          respectBranchAffinity=not syncChildren,
                                          alwaysFollowLocalChanges=syncChildren)
 
@@ -1319,7 +1326,8 @@ conary erase '%s=%s%s'
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
-                        resolveRepos = True, syncChildren = False):
+                        resolveRepos = True, syncChildren = False, 
+                        updateOnly = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1366,6 +1374,10 @@ conary erase '%s=%s%s'
         old trove.
         @param resolveRepos: If True, search the repository for resolution
         troves.
+        @param syncChildren: If True, sync child troves so that they match
+        the references in the specified troves.
+        @param updateOnly: If True, do not install missing troves, just
+        update installed troves.
         @rtype: tuple
         """
         callback.preparingChangeSet()
@@ -1414,7 +1426,8 @@ conary erase '%s=%s%s'
                                        useAffinity = useAffinity,
                                        checkPrimaryPins = checkPrimaryPins,
                                        forceJobClosure = forceJobClosure,
-                                       syncChildren = syncChildren)
+                                       syncChildren = syncChildren,
+                                       updateOnly = updateOnly)
         split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 

@@ -52,7 +52,7 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset> <trove>[=<version>]*"
-    print "       conary sync         <pkgname>[=<version>][[flavor]]*"
+    print "       conary syncchildren <pkgname>[=<version>][[flavor]]*"
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
@@ -109,8 +109,11 @@ def usage(rc = 1):
     print "                 --ls"
     print "                 --show-changes"
     print "                 --tags"
+    print
+    print "syncchildren flags:"
+    print "                 --update-only"
     print ""
-    print "update/erase/sync flags:"
+    print "update/erase/syncchildren flags:"
     print "                 --exclude-troves <patterns>"
     print "                 --from-file <file.ccs>"
     print "                 --info"
@@ -123,7 +126,7 @@ def usage(rc = 1):
     print "                 --quiet"
     print "                 --replace-files"
     print "                 --resolve"
-    print "                 --sync"
+    print "                 --sync-to-parents"
     print "                 --test"
     print "updateall flags:"
     print "                 --exclude-troves <patterns>"
@@ -194,11 +197,12 @@ def realMain(cfg, argv=sys.argv):
     argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
-    argDef["sync"] = NO_PARAM
+    argDef["sync-to-parents"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
     argDef["test"] = NO_PARAM
+    argDef["update-only"] = NO_PARAM
     argDef["version"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
@@ -490,7 +494,7 @@ def realMain(cfg, argv=sys.argv):
     elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
-    elif otherArgs[1] in ["update", "erase", "sync"]:
+    elif otherArgs[1] in ["update", "erase", "sync", "syncchildren"]:
         cfg.requireInstallLabelPath()
 	kwargs = {}
 
@@ -521,9 +525,11 @@ def realMain(cfg, argv=sys.argv):
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
-        kwargs['sync'] = argSet.pop('sync', False)
-        kwargs['updateByDefault'] = (otherArgs[1] in ("update", "sync"))
-        kwargs['syncChildren'] = otherArgs[1] == 'sync'
+        kwargs['sync'] = argSet.pop('sync-to-parents', False)
+        kwargs['updateOnly'] = argSet.pop('update-only', False)
+        kwargs['updateByDefault'] = (otherArgs[1] in ("update", "sync",
+                                                      "syncchildren"))
+        kwargs['syncChildren'] = otherArgs[1] in ('sync', 'syncchildren')
 
         if kwargs['sync'] and kwargs['fromFiles']:
             log.error("Only one of --sync and --from-file may be used")
