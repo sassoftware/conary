@@ -241,20 +241,21 @@ class ClientUpdate:
                 
                 # add in foo if we are adding foo:lib.  That way 'conary
                 # erase foo' will work as expected.
-                packages = []
-                for job in troves:
-                    if ':' in job[0]:
-                        pkgName = job[0].split(':', 1)[0]
-                        pkgInfo = (pkgName, job[2][0], job[2][1])
-                        if pkgInfo in beingInstalled:
-                            continue
-                        try:
-                            troveSource.getTrove(withFiles=False, *pkgInfo)
-                        except errors.TroveMissing:
-                            continue
-                        
-                        packages.append((pkgName, job[1], job[2], True))
-                troves.update(packages)
+                if self.cfg.autoResolvePackages:
+                    packages = []
+                    for job in troves:
+                        if ':' in job[0]:
+                            pkgName = job[0].split(':', 1)[0]
+                            pkgInfo = (pkgName, job[2][0], job[2][1])
+                            if pkgInfo in beingInstalled:
+                                continue
+                            try:
+                                troveSource.getTrove(withFiles=False, *pkgInfo)
+                            except errors.TroveMissing:
+                                continue
+                            
+                            packages.append((pkgName, job[1], job[2], True))
+                    troves.update(packages)
 
                 newJob = self._updateChangeSet(troves, uJob,
                                           keepExisting = False,
