@@ -439,7 +439,7 @@ class RemoveNonPackageFiles(policy.Policy):
 	'~$',
         r'.*/\.#.*',
         '/(var/)?tmp/',
-        r'.*/fonts.(cache.*|dir|Scale)$',
+        r'.*/fonts.(cache.*|dir|scale)$',
     ]
 
     def doFile(self, path):
