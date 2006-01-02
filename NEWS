@@ -3,6 +3,9 @@ Changes in @NEW@:
     * Build logs now contain unexpanded macros, since not all macros
       may be defined when the build log is initially created.
     * The emerge command can now accept version strings.
+    * The RemoveNonPackageFiles policy now removes fonts.cache*,
+      fonts.dir, and fonts.scale files, since they are always
+      handled by tag handlers.
 
 Changes in 0.80.4:
   o Build Changes:
