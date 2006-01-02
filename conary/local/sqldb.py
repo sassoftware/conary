@@ -325,6 +325,7 @@ class Database:
     def __init__(self, path):
         self.db = dbstore.connect(path, driver = "sqlite", timeout=30000)
         self.schemaVersion = self.db.getVersion()
+        self.db.dbh._BEGIN = "BEGIN"
 
         try:
             # dbstore? what's dbstore

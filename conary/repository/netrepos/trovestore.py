@@ -344,8 +344,8 @@ class TroveStore:
 
         cu.execute("""
         INSERT INTO FileStreams
-            (streamId, fileId, stream)
-        SELECT DISTINCT NULL, NewFiles.fileId, NewFiles.stream
+            (fileId, stream)
+        SELECT DISTINCT NewFiles.fileId, NewFiles.stream
         FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
         WHERE FileStreams.streamId is NULL
         """)
@@ -422,12 +422,16 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
                                             isPresent = False)
+            if trove.includeTroveByDefault(name, version, flavor):
+                byDefault = 1
+            else:
+                byDefault = 0
+
             cu.execute("""
             INSERT INTO TroveTroves
                 (instanceId, includedId, byDefault)
             VALUES(?, ?, ?)""",
-                       troveInstanceId, instanceId,
-                       trove.includeTroveByDefault(name, version, flavor))
+                       troveInstanceId, instanceId, byDefault)
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
@@ -679,7 +683,8 @@ class TroveStore:
                     idxA, pathId, path, versionId, fileId, stream = \
                             troveFilesCursor.next()
                     version = versions.VersionFromString(versionId)
-                    trv.addFile(pathId, path, version, fileId)
+                    trv.addFile(cu.frombinary(pathId), path, version, 
+                                cu.frombinary(fileId))
 		    if stream is not None:
 			fileContents[fileId] = stream
             except StopIteration:
@@ -711,7 +716,7 @@ class TroveStore:
             # isn't a unique constraint on fileId.
             if stream is None:
                 continue
-            return files.ThawFile(stream, fileId)
+            return files.ThawFile(cu.frombinary(stream), cu.frombinary(fileId))
 
         return None
 
@@ -743,12 +748,15 @@ class TroveStore:
 		versionCache[versionId] = version
 
             if stream:
-                fObj = files.ThawFile(stream, fileId)
+                fObj = files.ThawFile(cu.frombinary(stream), 
+                                      cu.frombinary(fileId))
 
 	    if withFiles:
-		yield (pathId, path, fileId, version, stream)
+		yield (cu.frombinary(pathId), path, cu.frombinary(fileId), 
+                       version, cu.frombinary(stream))
 	    else:
-		yield (pathId, path, fileId, version)
+		yield (cu.frombinary(pathId), path, cu.frombinary(fileId), 
+                       version)
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None):
@@ -759,10 +767,11 @@ class TroveStore:
             if fileStream is None:
                 fileStream = fileObj.freeze()
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
-		       (pathId, versionId, fileId, fileStream, path))
+		       (cu.binary(pathId), versionId, cu.binary(fileId), 
+                        cu.binary(fileStream), path))
 	else:
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)",
-		       (pathId, versionId, fileId, path))
+		       (cu.binary(pathId), versionId, cu.binary(fileId), path))
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
@@ -773,7 +782,8 @@ class TroveStore:
             raise KeyError, (pathId, fileId)
 
         if stream is not None:
-            return files.ThawFile(stream, pathId)
+            return files.ThawFile(cu.frombinary(stream), 
+                                  cu.frombinary(pathId))
         else:
             return None
 
@@ -824,7 +834,8 @@ class FileRetriever:
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
             self.cu.execute("INSERT INTO getFilesTbl VALUES(?, ?)",
-                            itemId, fileId, start_transaction = False)
+                            cu.binary(itemId), cu.binary(fileId), 
+                            start_transaction = False)
             lookup[itemId] = (pathId, fileId)
 
 	logMe(3, "start FileRetriever select")
@@ -837,7 +848,7 @@ class FileRetriever:
         for itemId, stream in self.cu:
             pathId, fileId = lookup[itemId]
             if stream is not None:
-                f = files.ThawFile(stream, pathId)
+                f = files.ThawFile(cu.frombinary(stream), pathId)
             else:
                 f = None
             d[(pathId, fileId)] = f
