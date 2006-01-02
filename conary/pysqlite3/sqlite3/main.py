@@ -137,6 +137,7 @@ class Cursor:
 	self.current_row = stmt.step()
 
     def execute(self, SQL, *parms, **kwargs):
+        SQL= SQL.replace('AUTO_INCREMENT', '')
         # kwargs we won't attempt to bind to the query
         _nobind = ['start_transaction']
         start_transaction = kwargs.get('start_transaction', True)

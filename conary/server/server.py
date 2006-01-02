@@ -50,8 +50,6 @@ from conary.repository.netrepos import netauth
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 
-DEFAULT_FILE_PATH="/tmp/conary-server"
-
 class HttpRequests(SimpleHTTPRequestHandler):
 
     outFiles = {}
@@ -279,36 +277,39 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_response(200, 'OK')
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
-
     def reset(self, authToken, clientVersion):
         import shutil
         try:
-            shutil.rmtree(self.repPath + '/contents')
+            shutil.rmtree(self.contentsDir)
         except OSError, e:
             if e.errno != errno.ENOENT:
                 raise
-        os.mkdir(self.repPath + '/contents')
+        os.mkdir(self.contentsDir)
 
+        logMe(1, "resetting NetworkRepositoryServer", self.repDB)
         # cheap trick. sqlite3 doesn't mind zero byte files; just replace
         # the file with a zero byte one (to change the inode) and reopen
-        open(self.repPath + '/sqldb.new', "w")
-        os.rename(self.repPath + '/sqldb.new', self.repPath + '/sqldb')
+        open(self.repDB[1] + '.new', "w")
+        os.rename(self.repDB[1] + '.new', self.repDB[1])
         self.reopen()
 
         return 0
 
-class ServerConfig(ConfigFile):
+class ServerConfig(netserver.ServerConfig):
 
-    logFile		= CfgPath
     port		= (CfgInt,  8000)
-    repositoryMap       = CfgRepoMap
-    requireSigs         = (CfgBool, False)
-    tmpFilePath         = CfgPath, DEFAULT_FILE_PATH
-
 
     def __init__(self, path="serverrc"):
-	ConfigFile.__init__(self)
+	netserver.ServerConfig.__init__(self)
 	self.read(path)
+
+    def check(self):
+        assert(not self.cacheDB)
+        assert(not self.closed)
+        assert(not self.commitAction)
+        assert(not self.forceSSL)
+        assert(not self.repositoryDir)
+        assert(not self.serverName)
 
 def usage():
     print "usage: %s repospath reposname" %sys.argv[0]
@@ -317,10 +318,10 @@ def usage():
     print "server flags: --config-file <path>"
     print '              --log-file <path>'
     print '              --map "<from> <to>"'
-    print "              --tmp-file-path <path>"
+    print "              --tmp-dir <path>"
     sys.exit(1)
 
-def addUser(userName, otherArgs, admin=False):
+def addUser(cfg, userName, otherArgs, admin=False):
     if len(otherArgs) != 2:
         usage()
 
@@ -337,8 +338,11 @@ def addUser(userName, otherArgs, admin=False):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,
-			                        None, {})
+    cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
+    cfg.contentsDir = otherArgs[1] + '/contents'
+
+    netRepos = ResetableNetworkRepositoryServer(cfg, '')
+
     # never give anonymous write access by default
     write = userName != 'anonymous'
     netRepos.auth.addUser(userName, pw1)
@@ -351,7 +355,7 @@ if __name__ == '__main__':
 	'log-file'	: 'logFile',
 	'map'	        : 'repositoryMap',
 	'port'	        : 'port',
-	'tmp-file-path' : 'tmpFilePath',
+	'tmp-dir'       : 'tmpDir',
         'require-sigs'  : 'requireSigs'
     }
 
@@ -370,15 +374,16 @@ if __name__ == '__main__':
         print >> sys.stderr, msg
         sys.exit(1)
 
+    cfg.check()
 
-    FILE_PATH = cfg.tmpFilePath
+    FILE_PATH = cfg.tmpDir
 
     if argSet.has_key('help'):
         usage()
 
     if argSet.has_key('add-user'):
         admin = 'admin' in argSet
-        sys.exit(addUser(argSet['add-user'], otherArgs, admin=admin))
+        sys.exit(addUser(cfg, argSet['add-user'], otherArgs, admin=admin))
 
     if not os.path.isdir(FILE_PATH):
 	print FILE_PATH + " needs to be a directory"
@@ -401,9 +406,16 @@ if __name__ == '__main__':
     # start the logging
     initLog(level=3, trace=1)
 
-    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH,
-			baseUrl, otherArgs[2], cfg.repositoryMap,
-                        logFile = cfg.logFile, requireSigs = cfg.requireSigs)
+    util.mkdirChain(otherArgs[1])
+
+    if not cfg.repositoryDB:
+        cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
+    if not cfg.contentsDir:
+        cfg.contentsDir = otherArgs[1] + '/contents'
+    if not cfg.serverName:
+        cfg.serverName = otherArgs[2]
+
+    netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)
 
@@ -413,6 +425,8 @@ if __name__ == '__main__':
     p = select.poll()
     for fd in fds.iterkeys():
         p.register(fd, select.POLLIN)
+
+    print "listening"
 
     while True:
         try:

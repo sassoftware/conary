@@ -13,7 +13,9 @@
 #
 
 from conary import versions
+from conary.local import schema
 
+# XXX: this looks awfully similar to an idtable...
 class VersionTable:
     """
     Maps a version to an id and timestamp pair.
@@ -22,19 +24,24 @@ class VersionTable:
 
     def __init__(self, db):
         self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'Versions' not in tables:
-            cu.execute("CREATE TABLE Versions(versionId INTEGER PRIMARY KEY,"
-		       "version STR UNIQUE)")
-	    cu.execute("INSERT INTO Versions VALUES (?, NULL)", 
-			self.noVersion)
+        if "Versions" in db.tables:
+            return
+        cu = db.cursor()
+        cu.execute("""
+        CREATE TABLE Versions(
+        versionId       %(PRIMARYKEY)s,
+        version         VARCHAR(767)
+        )""" % db.keywords)
+        cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "
+                   "Versions(version)")
+        cu.execute("INSERT INTO Versions (versionId, version) VALUES (?, NULL)",
+                   self.noVersion)
+        db.commit()
+        db.loadSchema()
 
     def addId(self, version):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions VALUES (NULL, ?)",
+        cu.execute("INSERT INTO Versions (version) VALUES (?)",
 		   version.asString())
 	return cu.lastrowid
 

@@ -12,17 +12,81 @@
 # full details.
 #
 
+import os
+import re
+import time
+
 from conary import sqlite3
-from base_drv import BaseDatabase, BaseCursor
-import sql_error
+from conary.lib.tracelog import logMe
+
+from base_drv import BaseDatabase, BaseCursor, BaseSequence
+import sqlerrors
+
+# implement the regexp function for sqlite
+def _regexp(pattern, item):
+    regexp = re.compile(pattern)
+    return regexp.match(item) is not None
+# a timestamp function compatible with other backends
+def _timestamp():
+    return int(time.strftime("%Y%m%d%H%M%S"))
 
 class Cursor(BaseCursor):
+    driver = "sqlite"
+
+    # this is basically the BaseCursor's execute with special handling
+    # for start_transaction
+    def _execute(self, sql, *args, **kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
+        self.description = None
+        # force dbi compliance here. we prefer args over the kw
+        if len(args) == 0:
+            return self._cursor.execute(sql, **kw)
+        if len(args) == 1 and isinstance(args[0], dict):
+            kw.update(args[0])
+            return self._cursor.execute(sql, **kw)
+        # special case the start_transaction parameter
+        st = kw.get("start_transaction", True)
+        if kw.has_key("start_transaction"):
+            del kw["start_transaction"]
+        if len(kw):
+            raise sqlerrors.CursorError(
+                "Do not pass both positional and named bind arguments",
+                *args, **kw)
+        if len(args) == 1:
+            return self._cursor.execute(sql, args[0], start_transaction = st)
+        kw["start_transaction"] = st
+        return self._cursor.execute(sql, *args, **kw)
+
+    # sqlite is smart - this is only a noop
+    def binary(self, s):
+        return s
+
     def execute(self, sql, *params, **kw):
+        #logMe(3, "SQL:", sql, params, kw)
+        try:
+            ret = self._execute(sql, *params, **kw)
+        except sqlite3.ProgrammingError, e:
+            #if self.dbh.inTransaction:
+            #    self.dbh.rollback()
+            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+                raise sqlerrors.ColumnNotUnique(e)
+            elif e.args[0] == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase(str(e))
+            raise sqlerrors.CursorError(e.args[0], e)
+        else:
+            if ret == self._cursor:
+                return self
+            return ret
+
+    # deprecated - this breaks programs by commiting stuff before its due time
+    def executeWithCommit(self, sql, *params, **kw):
+        #logMe(3, "SQL:", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
                 inAutoTrans = True
-            BaseCursor.execute(self, sql, *params, **kw)
+            ret = self._execute(sql, *params, **kw)
             # commit any transactions which were opened automatically
             # by the sqlite3 bindings and left hanging:
             if inAutoTrans and self.dbh.inTransaction:
@@ -31,31 +95,96 @@ class Cursor(BaseCursor):
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
-                raise sql_error.ColumnNotUnique(e)
-            else:
-                raise
+                raise sqlerrors.ColumnNotUnique(e)
+            raise sqlerrors.CursorError(e)
         except:
             if inAutoTrans and self.dbh.inTransaction:
                 self.dbh.rollback()
             raise
+        return ret
+
+# Sequence implementation for sqlite
+class Sequence(BaseSequence):
+    def __init__(self, db, name, cu = None):
+        BaseSequence.__init__(self, db, name)
+        self.cu = cu
+        if cu is None:
+            self.cu = db.cursor()
+        if name in db.sequences:
+            return
+        self.cu.execute("""
+        CREATE TABLE %s_sequence (
+            val         INTEGER PRIMARY KEY AUTOINCREMENT
+        )""" % (name,))
+        # refresh schema
+        db.loadSchema()
+
+    def nextval(self):
+        # We have to make sure we do this in a transaction
+        if not self.db.dbh.inTransaction:
+            self.db.transaction()
+        self.cu.execute("DELETE FROM %s" % self.seqName)
+        self.cu.execute("INSERT INTO %s (val) VALUES(NULL)" % self.seqName)
+        self.cu.execute("SELECT val FROM %s" % self.seqName)
+        self.__currval = self.cu.fetchone()[0]
+        return self.__currval
+
+    # Enforce garbage collection to avoid circular deps
+    def __del__(self):
+        if self.db.dbh.inTransaction and self.__currval is not None:
+            self.db.commit()
+        self.db = self.cu = None
 
 class Database(BaseDatabase):
-    type = "sqlite"
+    driver = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
+    sequenceClass = Sequence
+    basic_transaction = "begin immediate"
+    VIRTUALS = [ ":memory:" ]
+    TIMEOUT = 10000
+    keywords = BaseDatabase.keywords
+    keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
 
-    def connect(self, timeout=10000):
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         assert(cdb["database"])
-        # FIXME: we should channel exceptions into generic exception
-        # classes common to all backends
-        self.dbh = sqlite3.connect(cdb["database"], timeout=timeout)
-        self._getSchema()
+        kwargs.setdefault("timeout", self.TIMEOUT)
+        #kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
+        try:
+            self.dbh = sqlite3.connect(cdb["database"], **kwargs)
+        except sqlite3.InternalError, e:
+            if str(e) == 'database is locked':
+                raise sqlerrors.DatabaseLocked(e)
+            raise
+        # add a regexp funtion to enable SELECT FROM bar WHERE bar REGEXP .*
+        self.dbh.create_function('regexp', 2, _regexp)
+        # add the serialized timestampt function
+        self.dbh.create_function("unix_timestamp", 0, _timestamp)
+        self.loadSchema()
+        if self.database in self.VIRTUALS:
+            self.inode = (None, None)
+            self.closed = False
+            return True
+	sb = os.stat(self.database)
+        self.inode= (sb.st_dev, sb.st_ino)
+        self.closed = False
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def reopen(self):
+        if self.database in self.VIRTUALS:
+            return False
+        sb = os.stat(self.database)
+        inode= (sb.st_dev, sb.st_ino)
+	if self.inode != inode:
+            self.dbh.close()
+            del self.dbh
+            return self.connect()
+        return False
+
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         c.execute("select type, name, tbl_name from sqlite_master")
         slist = c.fetchall()
@@ -64,15 +193,16 @@ class Database(BaseDatabase):
         for (type, name, tbl_name) in slist:
             if type == "table":
                 if name.endswith("_sequence"):
-                    self.sequences.append(name[:-len("_sequence")])
+                    self.sequences.setdefault(name[:-len("_sequence")], None)
                 else:
                     self.tables.setdefault(name, [])
             elif type == "view":
-                self.views.append(name)
+                self.views.setdefault(name, None)
             elif type == "index":
                 self.tables.setdefault(tbl_name, []).append(name)
-        self._getSchemaVersion()
-        return self.version
+            elif type == "trigger":
+                self.triggers.setdefault(name, tbl_name)
+        return self.getVersion()
 
     def analyze(self):
         if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
@@ -93,7 +223,30 @@ class Database(BaseDatabase):
 
         if doAnalyze:
             cu.execute('ANALYZE')
-            self._getSchema()
+            self.loadSchema()
+
+    def transaction(self, name = None):
+        try:
+            return BaseDatabase.transaction(self, name)
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase(str(e))
+            raise
+
+    # A trigger that syncs up the changed column
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # prepare the sql and the trigger name and pass it to the
+        # BaseTrigger for creation
+        when = "AFTER"
+        if onAction == "insert":
+            when = "BEFORE"
+        sql = """
+        UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
+        %s
+        """ % (table, column, sql)
+        return BaseDatabase.trigger(self, table, when, onAction, sql)
 
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):

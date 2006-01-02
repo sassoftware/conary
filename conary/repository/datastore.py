@@ -327,6 +327,6 @@ class DataStoreRepository:
 
         return contentList
 
-    def __init__(self, path, logFile = None, dataStore = None):
+    def __init__(self, dataStore = None):
 	self.contentsStore = dataStore
 

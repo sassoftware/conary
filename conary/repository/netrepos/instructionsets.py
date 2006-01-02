@@ -45,7 +45,8 @@ class InstructionSets:
         cu = self.db.cursor()
         assert(isinstance(isd, deps.Dependency))
         base, flags = self._freezeIsd(isd)
-        cu.execute("INSERT INTO InstructionSets VALUES (NULL, ?, ?)",
+        cu.execute("INSERT INTO InstructionSets (isnSetId, base, flags) "
+                   "VALUES (NULL, ?, ?)",
                    (base, flags))
 
     def delId(self, theId):

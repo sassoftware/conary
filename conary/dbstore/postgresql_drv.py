@@ -14,21 +14,68 @@
 
 import re
 import pgdb
-from base_drv import BaseDatabase, BindlessCursor, BaseCursor
 
-class Cursor(BindlessCursor):
-    pass
+from base_drv import BaseDatabase, BindlessCursor, BaseCursor, BaseBinary
+from base_drv import BaseKeywordDict
+import sqlerrors
+import sqllib
+
+class KeywordDict(BaseKeywordDict):
+    keys = BaseKeywordDict.keys
+    keys.update( { 'BLOB' : 'BYTEA',
+                   'MEDIUMBLOB' : 'BYTEA',
+                   'PRIMARYKEY' : 'SERIAL PRIMARY KEY' } )
+
+    def binaryVal(self, len):
+        return "BYTEA"
+
+# class for encapsulating binary strings for dumb drivers
+class Binary(BaseBinary):
+    def __pg_repr__(self):
+        return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
 # FIXME: we should channel exceptions into generic exception classes
 # common to all backends
-class Database(BaseDatabase):
-    def __init__(self, db):
-        BaseDatabase.__init__(self, db)
-        self.type = "postgresql"
-        self.avail_check = "select count(*) from pg_tables"
-        self.cursorClass = Cursor
+class Cursor(BindlessCursor):
+    binaryClass = Binary
+    driver = "postgresql"
 
-    def connect(self, timeout=10000):
+    def frombinary(self, s):
+        return s.decode("string_escape")
+
+    def execute(self, sql, *params, **kw):
+        if kw.has_key("start_transaction"):
+            del kw["start_transaction"]
+        try:
+            ret = BindlessCursor.execute(self, sql, *params, **kw)
+        except pgdb.DatabaseError, e:
+            msg = e.args[0]
+            if msg.find("violates foreign key constraint") > 0:
+                raise sqlerrors.ConstraintViolation(msg)
+            raise sqlerrors.CursorError(msg)
+        return self
+
+    # we have "our own" lastrowid
+    def __getattr__(self, name):
+        if name == "lastrowid":
+            return self.lastid()
+        return BindlessCursor.__getattr__(self, name)
+
+    # postgresql can not report back the last value from a SERIAL
+    # PRIMARY KEY column insert, so we have to look it up ourselves
+    def lastid(self):
+        ret = self.execute("select lastval()").fetchone()
+        if ret is None:
+            return 0
+        return ret[0]
+
+class Database(BaseDatabase):
+    driver = "postgresql"
+    avail_check = "select count(*) from pg_tables"
+    cursorClass = Cursor
+    keywords = KeywordDict()
+
+    def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         for x in cdb.keys():
@@ -36,12 +83,16 @@ class Database(BaseDatabase):
                 cdb[x] = ""
         cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
                                 cdb["user"], cdb["password"])
-        self.dbh = pgdb.connect(cstr)
-        self._getSchema()
+        host = cdb["host"]
+        if cdb["port"]:
+            host ="%s:%s" % (cdb["host"], cdb["port"])
+        self.dbh = pgdb.connect(cstr, host = host)
+        self.loadSchema()
+        self.closed = False
         return True
 
-    def _getSchema(self):
-        BaseDatabase._getSchema(self)
+    def loadSchema(self):
+        BaseDatabase.loadSchema(self)
         c = self.cursor()
         # get tables
         c.execute("""
@@ -50,7 +101,8 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.tables = {}.fromkeys([x[0] for x in c.fetchall()], [])
+        for table, in c.fetchall():
+            self.tables[table] = []
         if not len(self.tables):
             return self.version
         # views
@@ -60,7 +112,8 @@ class Database(BaseDatabase):
         where schemaname not in ('pg_catalog', 'pg_toast',
                                  'information_schema')
         """)
-        self.views = [ x[0] for x in c.fetchall() ]
+        for name, in c.fetchall():
+            self.views[name] = True
         # indexes
         c.execute("""
         select indexname as name, tablename as table
@@ -79,6 +132,47 @@ class Database(BaseDatabase):
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
         AND pg_catalog.pg_table_is_visible(c.oid)
         """)
-        self.sequences = [x[0] for x in c.fetchall()]
-        self._getSchemaVersion()
-        return self.version
+        for name, in c.fetchall():
+            self.sequences[name] = True
+        # triggers
+        c.execute("""
+        SELECT t.tgname, c.relname
+        FROM pg_catalog.pg_trigger t, pg_class c, pg_namespace n
+        WHERE t.tgrelid = c.oid AND c.relnamespace = n.oid
+        AND NOT tgisconstraint
+        AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+        """)
+        for (name, table) in c.fetchall():
+            self.triggers[name] = table
+        version = self.getVersion()
+        return version
+
+    # Postgresql's trigegr syntax kind of sucks because we have to
+    # create a function first and then call that function from the
+    # trigger
+    def trigger(self, table, column, onAction, sql = ""):
+        onAction = onAction.lower()
+        assert(onAction in ["insert", "update"])
+        # first create the trigger function
+        cu = self.dbh.cursor()
+        triggerName = "%s_%s" % (table, onAction)
+        if triggerName in self.triggers:
+            return False
+        funcName = "%s_func" % triggerName
+        cu.execute("""
+        CREATE OR REPLACE FUNCTION %s()
+        RETURNS trigger
+        AS $$
+        BEGIN
+            NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
+            RETURN NEW;
+        END ; $$ LANGUAGE 'plpgsql';
+        """ % (funcName, column))
+        # now create the trigger based on the above function
+        cu.execute("""
+        CREATE TRIGGER %s
+        BEFORE %s ON %s
+        FOR EACH ROW
+        EXECUTE PROCEDURE %s()
+        """ % (triggerName, onAction, table, funcName))
+        return True

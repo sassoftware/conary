@@ -18,7 +18,9 @@ extra_dist = Makefile rpm2cpio convertcontents changemail changemail.py commitac
 
 dist_files = $(python_files) $(extra_dist)
 
-all: default-all
+SUBDIRS	= migration
+
+all: default-subdirs default-all
 
 install:
 	# see conary-wrapper symlink in ../Makefile to make scripts
