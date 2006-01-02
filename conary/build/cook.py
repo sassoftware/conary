@@ -1120,7 +1120,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         recipeClass = loader.getRecipe()
 
 	if emerge:
-	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % item)
+	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
 	    os.close(fd)
 	    targetLabel = versions.EmergeLabel()
 
