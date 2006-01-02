@@ -248,3 +248,11 @@ class Database(BaseDatabase):
         """ % (table, column, sql)
         return BaseDatabase.trigger(self, table, when, onAction, sql)
 
+    # sqlite is more peculiar when it comes to firing off transactions
+    def transaction(self, name = None):
+        assert(self.dbh)
+        cu = self.cursor()
+        if self.dbh.inTransaction:
+            return cu
+        self.dbh._begin()
+        return cu

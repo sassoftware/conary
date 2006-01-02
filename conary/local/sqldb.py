@@ -328,12 +328,14 @@ class Database:
         self.db.dbh._BEGIN = "BEGIN"
 
         try:
-            self.db.transaction()
+            # dbstore? what's dbstore
+            cu = self.db.cursor()
+            cu.execute("BEGIN IMMEDIATE")
         except sqlerrors.ReadOnlyDatabase:
             readOnly = True
         else:
             readOnly = False
-            self.db.commit()
+            self.db.rollback()
         if readOnly and self.schemaVersion != schema.VERSION:
             raise OldDatabaseSchema(
                 "The Conary database on this system is too old.  It will be \n"

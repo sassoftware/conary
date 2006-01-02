@@ -464,8 +464,12 @@ class MigrateTo_8(SchemaMigration):
         self.cu.execute('DROP INDEX InstancesNameIdx')
         self.cu.execute('DROP INDEX InstancesIdx')
         createInstances(self.db)
-        self.cu.execute('INSERT INTO Instances SELECT * FROM DBInstances')
-        self.cu.execute('DROP TABLE DBInstances')
+        self.cu.execute("""INSERT INTO Instances 
+                            (instanceId, troveName, versionId, flavorId,
+                             timeStamps, isPresent, pinned)
+                           SELECT instanceId, troveName, versionId, flavorId,
+                                  timeStamps, isPresent, 0 FROM DBInstances
+                        """)
         createFlavors(self.db)
         self.cu.execute('INSERT INTO Flavors SELECT * FROM DBFlavors '
                         'WHERE flavor IS NOT NULL')

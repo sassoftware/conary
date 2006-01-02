@@ -736,7 +736,7 @@ class TroveStore:
 	versionCache = {}
 
 	cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
-		   "TroveFiles NATURAL JOIN FileStreams "
+		   "TroveFiles JOIN FileStreams USING (streamId)"
 		   "WHERE instanceId = ? %s" %sort,
 		   troveInstanceId)
 

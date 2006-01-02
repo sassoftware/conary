@@ -315,7 +315,7 @@ class BaseDatabase:
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
-        self.dbh.rollback()
+        return self.dbh.rollback()
 
     def trigger(self, table, when, onAction, sql):
         name = "%s_%s" % (table, onAction)

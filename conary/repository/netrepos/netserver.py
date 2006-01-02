@@ -1447,7 +1447,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.conary.com/ConaryConversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
-
         return SERVER_VERSIONS
 
     def cacheChangeSets(self):

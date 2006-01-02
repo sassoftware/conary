@@ -22,7 +22,6 @@ python_files = __init__.py	\
 	errors.py	        \
 	filter.py 		\
 	filesetrecipe.py	\
-	fixedglob.py		\
 	grouprecipe.py		\
 	inforecipe.py		\
 	loadrecipe.py		\
