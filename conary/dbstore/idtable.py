@@ -303,7 +303,7 @@ class IdMapping:
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s (%s, %s) "
                    "VALUES (?, ?)"
-		   % (self.tableName, self.key. self.item),
+		   % (self.tableName, self.key, self.item),
                    (key, val))
 
     def __getitem__(self, key):
