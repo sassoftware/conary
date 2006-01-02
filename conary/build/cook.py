@@ -921,7 +921,9 @@ def logBuildEnvironment(out, sourceVersion, macros, cfg):
 
     write("Macros:" + '\n')
     for macro in sorted(macros.keys()):
-        write("%s: %s\n" % (macro, macros[macro]))
+        # important for this to be unexpanded, because at this point,
+        # not some macros may not have an expansion
+        write("%s: %s\n" % (macro, macros._get(macro)))
 
     write("*"*60 + '\n')
 

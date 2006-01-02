@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Build Changes:
+    * Build logs now contain unexpanded macros, since not all macros
+      may be defined when the build log is initially created.
+    * The emerge command can now accept version strings.
+
 Changes in 0.80.4:
   o Build Changes:
     * PackageRecipe has been changed to follow our change to split
