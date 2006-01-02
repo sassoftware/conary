@@ -1487,7 +1487,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.requireSigs = cfg.requireSigs
 
         self.repDB = cfg.repositoryDB
-        self.contentsDir = cfg.contentsDir
+        self.contentsDir = cfg.contentsDir.split(" ")
 
         logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
               self.repDB, self.contentsDir)

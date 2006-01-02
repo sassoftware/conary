@@ -23,6 +23,7 @@ from conary.lib import util, stackutil, log, openpgpfile
 from conary.repository import changeset, errors, filecontents
 from conary.repository.netrepos import trovestore
 from conary.repository.datastore import DataStoreRepository, DataStore
+from conary.repository.datastore import DataStoreSet
 from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository
@@ -441,8 +442,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.troveStore = troveStore
 
         self.requireSigs = requireSigs
-        util.mkdirChain(contentsDir)
-        store = DataStore(contentsDir, logFile = logFile)
+        for dir in contentsDir:
+            util.mkdirChain(dir)
+
+        if len(contentsDir) == 1:
+            store = DataStore(contentsDir[0], logFile = logFile)
+        else:
+            assert(not logFile)
+            storeList = []
+            for dir in contentsDir:
+                storeList.append(DataStore(dir))
+                
+            store = DataStoreSet(storeList)
 
 	DataStoreRepository.__init__(self, dataStore = store)
 	AbstractRepository.__init__(self)
