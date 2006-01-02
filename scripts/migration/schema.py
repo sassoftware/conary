@@ -12,12 +12,6 @@ from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
 
 class PrintDatabase:
-    keywords = {
-        'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
-        'BINARY'     : 'BINARY',
-        'BLOB'       : 'BLOB',
-        'MEDIUMBLOB' : 'BLOB',
-        }
     def __init__(self, showTables = True, driver="sqlite"):
         self.tables = self.views = self.sequences = []
         self.tempTables = []
@@ -26,18 +20,20 @@ class PrintDatabase:
         self.statements = []
         self.driver = driver
         if self.driver == "sqlite":
-            self.keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+            from conary.dbstore import sqlite_drv
+            self.keywords = sqlite_drv.KeywordDict()
         elif driver =="mysql":
-            self.keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+            from conary.dbstore import mysql_drv
+            self.keywords = mysql_drv.KeywordDict()
         elif driver == "postgresql":
-            self.keywords['BINARY'] = 'VARCHAR'
-            self.keywords['BLOB'] = 'BYTEA'
-            self.keywords['MEDIUMBLOB'] = 'BYTEA'
-            self.keywords['PRIMARYKEY'] = 'SERIAL PRIMARY KEY'
+            from conary.dbstore import postgresql_drv
+            self.keywords = postgresql_drv.KeywordDict()
 
     def connect(self, *args, **kwargs):
         pass
     def commit(self):
+        pass
+    def rollback(self):
         pass
     def cursor(self):
         return self
