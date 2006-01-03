@@ -14,8 +14,7 @@
 
 import sys
 import itertools
-from conary import trove, deps, files, sqlite3
-from conary.local import deptable
+from conary import trove, deps, files
 from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
@@ -25,86 +24,353 @@ TROVE_TROVES_WEAKREF   = 1 << 1
 
 VERSION = 14
 
+def resetTable(cu, name):
+    try:
+        cu.execute("DELETE FROM %s" % name, start_transaction = False)
+        return True
+    except Exception, e:
+        return False
+
 # Schema creation functions
 def createFlavors(db):
+    if "Flavors" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "Flavors" not in tables:
-        f = idtable.IdTable(db, "Flavors", "flavorId", "flavor")
-	cu.execute("SELECT FlavorID from Flavors")
-	if cu.fetchone() == None:
-	    # reserve flavor 0 for "no flavor information"
-	    cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
-        db.commit()
-        
-def createDBTroveFiles(db):
-    cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "DBTroveFiles" not in tables:
-        cu.execute("""CREATE TABLE DBTroveFiles(
-                                      streamId INTEGER PRIMARY KEY,
-                                      pathId BINARY,
-                                      versionId INTEGER,
-                                      path STRING,
-                                      fileId BINARY,
-                                      instanceId INTEGER,
-                                      isPresent INTEGER,
-                                      stream BINARY)
-                   """)
-        cu.execute("CREATE INDEX DBTroveFilesIdx ON "
-                   "DBTroveFiles(fileId)")
-        cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON "
-                   "DBTroveFiles(instanceId)")
-        cu.execute("CREATE INDEX DBTroveFilesPathIdx ON "
-                   "DBTroveFiles(path)")
+    f = idtable.IdTable(db, "Flavors", "flavorId", "flavor")
+    cu.execute("SELECT FlavorID from Flavors")
+    if cu.fetchone() == None:
+        # reserve flavor 0 for "no flavor information"
+        cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
+    db.commit()
+    db.loadSchema()
 
-        cu.execute("""CREATE TABLE DBFileTags(
-                                      streamId INT,
-                                      tagId INT)
-                   """)
-        db.commit()
+def createDBTroveFiles(db):
+    if "DBTroveFiles" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DBTroveFiles(
+        streamId            INTEGER PRIMARY KEY AUTO_INCREMENT,
+        pathId              BINARY(16),
+        versionId           INTEGER,
+        path                STRING,
+        fileId              BINARY(20),
+        instanceId          INTEGER,
+        isPresent           INTEGER,
+        stream              BLOB
+    )""")
+    cu.execute("CREATE INDEX DBTroveFilesIdx ON DBTroveFiles(fileId)")
+    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
+    cu.execute("CREATE INDEX DBTroveFilesPathIdx ON DBTroveFiles(path)")
+
+    cu.execute("""
+    CREATE TABLE DBFileTags(
+        streamId            INTEGER,
+        tagId               INTEGER
+    )""")
+    db.commit()
+    db.loadSchema()
 
 def createInstances(db):
+    if "Instances" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "Instances" not in tables:
-        cu.execute("""CREATE TABLE Instances(
-                            instanceId INTEGER PRIMARY KEY, 
-                            troveName STRING, 
-                            versionId INTEGER, 
-                            flavorId INTEGER,
-                            timeStamps STRING,
-                            isPresent INTEGER,
-                            pinned BOOLEAN)""")
-        cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
-        cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
-                   "Instances(troveName, versionId, flavorId)")
-        db.commit()
-        
+    cu.execute("""
+    CREATE TABLE Instances(
+        instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
+        troveName       STRING,
+        versionId       INTEGER,
+        flavorId        INTEGER,
+        timeStamps      STRING,
+        isPresent       INTEGER,
+        pinned          BOOLEAN
+    )""")
+    cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
+    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
+               "Instances(troveName, versionId, flavorId)")
+    db.commit()
+    db.loadSchema()
+
 def createTroveTroves(db):
+    if "TroveTroves" in db.tables:
+        return
     cu = db.cursor()
-    cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-    tables = [ x[0] for x in cu ]
-    if "TroveTroves" not in tables:
-        cu.execute("""CREATE TABLE TroveTroves(
-                        instanceId INTEGER, 
-                        includedId INTEGER,
-                        flags INTEGER,
-                        inPristine BOOLEAN)""")
-        cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
-                        "TroveTroves(instanceId)")
-        # this index is so we can quickly tell what troves are needed
-        # by another trove
-        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
-                        "TroveTroves(includedId)")
-        # XXX this index is used to enforce that TroveTroves only
-        # contains unique TroveTrove (instanceId, includedId) pairs.
-        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
-                        "TroveTroves(instanceId,includedId)")
+    # FIXME: add foreign keys
+    cu.execute("""
+    CREATE TABLE TroveTroves(
+        instanceId      INTEGER,
+        includedId      INTEGER,
+        flags           INTEGER,
+        inPristine      BOOLEAN
+    )""")
+    # FIXME: this index is redundant. The UNIQUE below index should suffice
+    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
+    # this index is so we can quickly tell what troves are needed by another trove
+    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+    # XXX this index is used to enforce that TroveTroves only
+    # contains unique TroveTrove (instanceId, includedId) pairs.
+    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
+               "TroveTroves(instanceId,includedId)")
+    db.commit()
+    db.loadSchema()
+
+def createTroveInfo(db):
+    if "TroveInfo" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE TroveInfo(
+        instanceId      INTEGER NOT NULL,
+        infoType        INTEGER NOT NULL,
+        data            %(MEDIUMBLOB)s,
+        changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+        CONSTRAINT TroveInfo_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE CASCADE ON UPDATE CASCADE
+    )""" % db.keywords)
+    cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
+    # FIXME: kill it in the schema migration as well
+    #cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
+    db.commit()
+    db.loadSchema()
+
+def createMetadata(db):
+    commit = False
+    cu = db.cursor()
+    if 'Metadata' not in db.tables:
+        cu.execute("""
+        CREATE TABLE Metadata(
+            metadataId          %(PRIMARYKEY)s,
+            itemId              INTEGER NOT NULL,
+            versionId           INTEGER NOT NULL,
+            branchId            INTEGER NOT NULL,
+            timeStamp           NUMERIC(13,3) NOT NULL,
+            changed             NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT Metadata_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Metadata_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Metadata_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""" % db.keywords)
+        commit = True
+    # FIXME: create an index here too
+    if 'MetadataItems' not in db.tables:
+        cu.execute("""
+        CREATE TABLE MetadataItems(
+            metadataId      INTEGER NOT NULL,
+            class           INTEGER NOT NULL,
+            data            TEXT NOT NULL,
+            language        VARCHAR(254) NOT NULL DEFAULT 'C',
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT MetadataItems_metadataId_fk
+                FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+        commit = True
+    if commit:
         db.commit()
+        db.loadSchema()
+
+def createDataStore(db):
+    if "DataStore" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DataStore(
+        hash    BINARY(20) NOT NULL,
+        count   INTEGER,
+        data    BLOB
+    )""")
+    cu.execute("CREATE INDEX DataStoreIdx ON DataStore(hash)")
+    db.commit()
+    db.loadSchema()
+
+def createDepTable(db, cu, name, isTemp):
+    d =  {"tmp" : "", "name" : name}
+    startTrans = not isTemp
+    if isTemp:
+        if resetTable(cu, name):
+            return False
+        db.rollback()
+
+        d['tmp'] = 'TEMPORARY'
+
+    cu.execute("""
+    CREATE %(tmp)s TABLE %(name)s(
+        depId           %%(PRIMARYKEY)s,
+        class           INTEGER NOT NULL,
+        name            VARCHAR(254) NOT NULL,
+        flag            VARCHAR(254) NOT NULL
+    )""" % d % db.keywords, start_transaction = (not isTemp))
+    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
+               (name, name), start_transaction = startTrans)
+
+    db.commit()
+    return True
+
+def createRequiresTable(db, cu, name, isTemp):
+    d = { "tmp" : "",
+          "name" : name,
+          "constraint" : "" }
+    startTrans = not isTemp
+
+    if isTemp:
+        if resetTable(cu, name):
+            return False
+        db.rollback()
+
+        d['tmp'] = 'TEMPORARY'
+    else:
+        d['constraint'] = """,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT %(name)s_depId_fk
+            FOREIGN KEY (depId) REFERENCES Dependencies(depId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+        """ %d
+
+    cu.execute("""
+    CREATE %(tmp)s TABLE %(name)s(
+        instanceId      INTEGER NOT NULL,
+        depId           INTEGER NOT NULL,
+        depNum          INTEGER,
+        depCount        INTEGER %(constraint)s
+    )""" % d, start_transaction = startTrans)
+    cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
+               start_transaction = startTrans)
+    cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
+               start_transaction = startTrans)
+    cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
+               start_transaction = startTrans)
+
+    db.commit()
+    return True
+
+def createProvidesTable(db, cu, name, isTemp):
+    d = { "tmp" : "",
+          "name" : name,
+          "constraint" : "" }
+    startTrans = not isTemp
+
+    if isTemp:
+        if resetTable(cu, name):
+            return False
+        db.rollback()
+        d['tmp'] = 'TEMPORARY'
+    else:
+        d['constraint'] = """,
+        CONSTRAINT %(name)s_instanceId_fk
+            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+            ON DELETE RESTRICT ON UPDATE CASCADE,
+        CONSTRAINT %(name)s_depId_fk
+            FOREIGN KEY (depId) REFERENCES Dependencies(depId)
+            ON DELETE RESTRICT ON UPDATE CASCADE
+        """ %d
+    cu.execute("""
+    CREATE %(tmp)s TABLE %(name)s(
+        instanceId          INTEGER NOT NULL,
+        depId               INTEGER NOT NULL %(constraint)s
+    )""" % d, start_transaction = startTrans)
+    cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
+               start_transaction = startTrans)
+    cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
+               start_transaction = startTrans)
+
+    db.commit()
+    return True
+
+def createDepWorkTable(db, cu, name):
+    if resetTable(cu, name):
+        return False
+    db.rollback()
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE %s(
+        troveId         INTEGER,
+        depNum          INTEGER,
+        flagCount       INTEGER,
+        isProvides      INTEGER,
+        class           INTEGER,
+        name            VARCHAR(254),
+        flag            VARCHAR(254)
+    )""" % name, start_transaction = False)
+
+    cu.execute("""
+    CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
+    """ % (name, name), start_transaction = False)
+
+    db.commit()
+    return True
+
+def createDependencies(db):
+    commit = False
+    cu = db.cursor()
+
+    if "Dependencies" not in db.tables:
+        createDepTable(db, cu, "Dependencies", False)
+        commit = True
+    if "Requires" not in db.tables:
+        createRequiresTable(db, cu, "Requires", False)
+        commit = True
+    if "Provides" not in db.tables:
+        createProvidesTable(db, cu, "Provides", False)
+        commit = True
+
+    if commit:
+        db.commit()
+
+    createRequiresTable(db, cu, "TmpRequires", isTemp = True)
+    createProvidesTable(db, cu, "TmpProvides", isTemp = True)
+    createDepWorkTable(db, cu, "DepCheck")
+    createDepTable(db, cu, 'TmpDependencies', isTemp = True)
+
+    if not resetTable(cu, "SuspectDepsOrig"):
+        db.rollback()
+        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
+        db.commit()
+
+    if not resetTable(cu, "SuspectDeps"):
+        db.rollback()
+        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
+        db.commit()
+
+    if not resetTable(cu, "BrokenDeps"):
+        db.rollback()
+        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
+        db.commit()
+
+    if not resetTable(cu, "RemovedTroveIds"):
+        db.rollback()
+        cu.execute("""
+        CREATE TEMPORARY TABLE RemovedTroveIds(
+            troveId INTEGER,
+            nodeId INTEGER
+        )""")
+	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
+                   "RemovedTroveIds(troveId)")
+        db.commit()
+
+    db.loadSchema()
+
+def createSchema(db):
+    # XXX
+    import versiontable
+    import sqldb
+
+    createInstances(db)
+    createTroveTroves(db)
+    createDBTroveFiles(db)
+    createInstances(db)
+    versiontable.VersionTable(db)
+    sqldb.DBFlavorMap(db)
+    createFlavors(db)
+    createDependencies(db)
+    createTroveInfo(db)
 
 # SCHEMA Migration
 
@@ -124,6 +390,7 @@ class MigrateTo_5(SchemaMigration):
         return self.version in [2,3,4]
 
     def migrate(self):
+        from conary.local import deptable
         class FakeTrove:
             def setRequires(self, req):
                 self.r = req
@@ -141,7 +408,7 @@ class MigrateTo_5(SchemaMigration):
             self.cu.execute(
                 "ALTER TABLE DBInstances ADD COLUMN pinned BOOLEAN")
 
-        instances = [ x[0] for x in 
+        instances = [ x[0] for x in
                       self.cu.execute("select instanceId from DBInstances") ]
         dtbl = deptable.DependencyTables(self.db)
         troves = []
@@ -157,7 +424,7 @@ class MigrateTo_5(SchemaMigration):
         for instanceId, trv in itertools.izip(instances, troves):
             dtbl.add(self.cu, trv, instanceId)
         return self.Version
-    
+
 class MigrateTo_6(SchemaMigration):
     Version = 6
     def migrate(self):
@@ -167,13 +434,13 @@ class MigrateTo_6(SchemaMigration):
         # erase unused versions
         self.message("Removing unused version strings...")
         self.cu.execute("""
-        DELETE FROM Versions WHERE versionId IN 
+        DELETE FROM Versions WHERE versionId IN
             ( SELECT versions.versionid
-              FROM versions LEFT OUTER JOIN 
+              FROM versions LEFT OUTER JOIN
               ( SELECT versionid AS usedversions FROM dbinstances
                 UNION
                 SELECT versionid AS usedversions FROM dbtrovefiles )
-              ON usedversions = versions.versionid 
+              ON usedversions = versions.versionid
               WHERE usedversions IS NULL )
          """)
         return self.Version
@@ -182,7 +449,7 @@ class MigrateTo_7(SchemaMigration):
     Version = 7
     def migrate(self):
         self.cu.execute("""
-        DELETE FROM TroveTroves 
+        DELETE FROM TroveTroves
         WHERE TroveTroves.ROWID in (
             SELECT Second.ROWID
             FROM TroveTroves AS First
@@ -192,7 +459,7 @@ class MigrateTo_7(SchemaMigration):
         self.cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
                         "TroveTroves(instanceId,includedId)")
         return self.Version
-    
+
 class MigrateTo_8(SchemaMigration):
     Version = 8
     def migrate(self):
@@ -201,14 +468,18 @@ class MigrateTo_8(SchemaMigration):
         self.cu.execute('DROP INDEX InstancesNameIdx')
         self.cu.execute('DROP INDEX InstancesIdx')
         createInstances(self.db)
-        self.cu.execute('INSERT INTO Instances SELECT * FROM DBInstances')
-        self.cu.execute('DROP TABLE DBInstances')
+        self.cu.execute("""INSERT INTO Instances 
+                            (instanceId, troveName, versionId, flavorId,
+                             timeStamps, isPresent, pinned)
+                           SELECT instanceId, troveName, versionId, flavorId,
+                                  timeStamps, isPresent, 0 FROM DBInstances
+                        """)
         createFlavors(self.db)
         self.cu.execute('INSERT INTO Flavors SELECT * FROM DBFlavors '
                         'WHERE flavor IS NOT NULL')
         self.cu.execute('DROP TABLE DBFlavors')
         return self.Version
-    
+
 class MigrateTo_9(SchemaMigration):
     Version = 9
     def migrate(self):
@@ -271,7 +542,7 @@ class MigrateTo_10(SchemaMigration):
 
         return self.Version
 
-        
+
 # convert contrib.rpath.com -> contrib.rpath.org
 class MigrateTo_11(SchemaMigration):
     Version = 11
@@ -374,11 +645,21 @@ class MigrateTo_14(SchemaMigration):
                            WHERE trovename LIKE '%:%')""")
         return self.Version
 
+
 def checkVersion(db):
     global VERSION
-    version = migration.getDatabaseVersion(db)
+    version = db.getVersion()
     if version == VERSION:
         return version
+
+    if version == 0:
+        # assume we're setting up a new environment
+        if "DatabaseVersion" not in db.tables:
+            # if DatabaseVersion does not exist, but any other tables do exist,
+            # then the database version is too old to deal with it
+            if len(db.tables) > 0:
+                raise OldDatabaseSchema
+        version = db.setVersion(VERSION)
 
     # great candidate for some "smart" python foo...
     if version in [2,3,4]:

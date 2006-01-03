@@ -1,0 +1,6 @@
+- implement cu = db.prepare(sql)
+- migrate postgresql loadSchema to using INFORMATION_SCHEMA
+- implement Sequences for postgresql
+- turn back on bind parameter support for queries
+- handle AUTO_INCREMENT specifications
+- handle MySQL's BLOBs as strings

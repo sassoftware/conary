@@ -1,4 +1,4 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 #
 # Copyright (c) 2005 rPath, Inc.
 #
@@ -12,20 +12,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary.local import schema
 
 class TroveInfoTable:
-
     def __init__(self, db):
-        cu = db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if 'TroveInfo' not in tables:
-            cu.execute("""CREATE TABLE TroveInfo(instanceId INT,
-                                                 infoType INT,
-                                                 data BIN)""")
-            cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-            cu.execute("""CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, 
-                                                                  data)""")
+        self.db = db
+        schema.createTroveInfo(db)
 
     def addInfo(self, cu, trove, idNum):
         # c = True if the trove is a component
@@ -40,12 +32,16 @@ class TroveInfoTable:
                 if c and (tag == 4 or tag == 5):
                     raise RuntimeError('attempted to add build requires '
                                        'trove info for a component: %s' %n)
-                cu.execute("INSERT INTO TroveInfo VALUES (?, ?, ?)",
-                           (idNum, tag, frz))
+                cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
+                           "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
 
     def getInfo(self, cu, trove, idNum):
-        cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?", 
+        from array import array
+        cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?",
                    idNum)
         for (tag, frz) in cu:
             name = trove.troveInfo.streamDict[tag][2]
-            trove.troveInfo.__getattribute__(name).thaw(frz)
+            # FIXME: check the return values for BLOBs
+            if isinstance(frz, array):
+                frz = frz.tostring()
+            trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))

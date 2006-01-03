@@ -15,11 +15,11 @@
 import StringIO
 import base64
 
-from conary import sqlite3
 from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
 from conary.repository.netrepos import schema
+from conary.dbstore import sqlerrors
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -44,12 +44,12 @@ class OpenPGPKeyTable:
         self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
-        cu = self.db.cursor()
         # start a transaction so that our SELECT is protected against
         # race conditions
-        self.db._begin()
+        cu = self.db.transaction()
         try:
-            r = cu.execute('SELECT IFNULL(MAX(keyId),0) + 1 FROM PGPKeys')
+            # XXX: use sequences
+            r = cu.execute('SELECT COALESCE(MAX(keyId),0) + 1 FROM PGPKeys')
             keyId = r.fetchone()[0]
             keyRing = StringIO.StringIO(pgpKeyData)
 
@@ -78,31 +78,32 @@ class OpenPGPKeyTable:
                            mainFingerprint)
             origKey = cu.fetchone()
             if origKey:
+                origKey = origKey[0]
+                # FIXME: remove this whend dbstore handles mysql BLOBs
+                from array import array
+                if isinstance(origKey, array):
+                    origKey = origKey.tostring()
                 # ensure new key is a superset of old key. we can't allow the
                 # repo to let go of subkeys or revocations.
-                openpgpfile.assertReplaceKeyAllowed(origKey[0], pgpKeyData)
+                openpgpfile.assertReplaceKeyAllowed(origKey, pgpKeyData)
                 #reset the key cache so the changed key shows up
                 keyCache = openpgpkey.getKeyCache()
                 keyCache.reset()
             try:
-                cu.execute('INSERT INTO PGPKeys VALUES(?, ?, ?, ?)',
-                           (keyId, userId, mainFingerprint, pgpKeyData))
-            except sqlite3.ProgrammingError, e:
+                cu.execute('INSERT INTO PGPKeys (keyId, userId, fingerprint, pgpKey) '
+                           'VALUES (?, ?, ?, ?)',
+                           (keyId, userId, mainFingerprint, cu.binary(pgpKeyData)))
+            except sqlerrors.ColumnNotUnique:
                 # controlled replacement of OpenPGP Keys is allowed. do NOT
                 # disable assertReplaceKeyAllowed without disabling this
-                if e.args[0].startswith("column") and \
-                       e.args[0].endswith("is not unique"):
-                    cu.execute( \
-                        'UPDATE PGPKeys set pgpKey=? where fingerprint=?',
-                           (pgpKeyData, mainFingerprint))
-                else:
-                    raise
+                cu.execute('UPDATE PGPKeys set pgpKey=? where fingerprint=?',
+                           cu.binary(pgpKeyData), mainFingerprint)
             keyFingerprints = openpgpfile.getFingerprints(keyRing)
             for fingerprint in keyFingerprints:
                 try:
-                    cu.execute('INSERT INTO PGPFingerprints VALUES(?, ?)',
-                           (keyId, fingerprint))
-                except sqlite3.ProgrammingError:
+                    cu.execute('INSERT INTO PGPFingerprints (keyId, fingerprint) '
+                               'VALUES(?, ?)', (keyId, fingerprint))
+                except sqlerrors.ColumnNotUnique:
                     # ignore duplicate fingerprint errors.
                     pass
             self.db.commit()
@@ -143,7 +144,14 @@ class OpenPGPKeyTable:
         keys = cu.fetchall()
         if (len(keys) != 1):
             raise openpgpkey.KeyNotFound(keyId)
-        return keys[0][0]
+
+        # FIXME: remove this whend dbstore handles mysql BLOBs
+        from array import array
+        data = keys[0][0]
+        if isinstance(data, array):
+            data = data.tostring()
+
+        return data
 
     def getAsciiPGPKeyData(self, keyId):
         # don't trap exceptions--that way we can assume we found a key.

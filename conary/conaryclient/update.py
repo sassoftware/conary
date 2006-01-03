@@ -1565,10 +1565,8 @@ conary erase '%s=%s%s'
                     # remove it altogether, unless we're about to try again
                     if (rb.getCount() == 0):
                         self.db.removeLastRollback()
-                # if the database is still in a transaction, then it
-                # probably shouldn't be.
-                if self.db.db.db.inTransaction:
-                    self.db.db.rollback()
+                # rollback the current transaction
+                self.db.db.rollback()
                 if isinstance(e, database.CommitError):
                     raise UpdateError, "changeset cannot be applied"
                 raise

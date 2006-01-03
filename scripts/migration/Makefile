@@ -12,12 +12,18 @@
 # full details.
 #
 
-class DBStoreError(Exception):
-    def __init__(self, args):
-        self._args = args
+python_files = schema.py  sqlite2mysql.py  sqlite2pgsql.py
 
-    def __str__(self):
-        return str(args)
+extra_dist = 
 
-class ColumnNotUnique(DBStoreError):
-    pass
+dist_files = $(python_files) $(extra_dist)
+
+SUBDIRS	= 
+
+all: default-subdirs default-all
+
+dist: default-dist
+
+clean: default-clean
+
+include ../../Make.rules
