@@ -245,8 +245,13 @@ class DataStoreSet:
     Duplicates data across multiple content stores.
     """
 
+    def hashToPath(self, hash):
+        store = self.storeIter.next()
+        return store.hashToPath(hash)
+
     def hasFile(self, hash):
-        return self.stores[0].hasFile(hash)
+        store = self.storeIter.next()
+        return store.hasFile(hash)
 
     def addFile(self, f, hash, precompressed = False):
         for store in self.stores:
