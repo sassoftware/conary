@@ -1513,4 +1513,5 @@ class ServerConfig(ConfigFile):
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgString
+    staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
