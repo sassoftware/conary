@@ -801,9 +801,9 @@ order by
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE getFilesTbl(row INTEGER PRIMARY KEY AUTO_INCREMENT,
+	    CREATE TEMPORARY TABLE getFilesTbl(row %(PRIMARYKEY)s,
                                                fileId BINARY)
-	""", start_transaction = False)
+	""" % self.db.keywords, start_transaction = False)
 
 	for (i, (pathId, fileId, version)) in enumerate(l):
 	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)",
@@ -853,11 +853,11 @@ order by
         cu = self.db.cursor()
 
         cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
-                                idx INTEGER PRIMARY KEY AUTO_INCREMENT,
+                                idx %(PRIMARYKEY)s,
                                 troveName STRING,
                                 troveVersion STRING,
                                 flavorId INT)
-                   """, start_transaction = False)
+                   """ % self.db.keywords, start_transaction = False)
 
         for i, (name, version, flavor) in enumerate(troveList):
             flavorId = self.flavors.get(flavor, "")
@@ -986,7 +986,7 @@ order by
         if not self.needsCleanup:
             self.needsCleanup = True
             cu.execute("CREATE TEMPORARY TABLE RemovedVersions "
-                       "(rmvdVer INTEGER PRIMARY KEY AUTO_INCREMENT)")
+                       "(rmvdVer %(PRIMARYKEY)s)" % self.db.keywords)
 
 	troveVersionId = self.versionTable[troveVersion]
 	if troveFlavor is None:
