@@ -168,7 +168,7 @@ class Database(BaseDatabase):
             self.closed = False
             return True
 	sb = os.stat(self.database)
-        self.inode= (sb.st_dev, sb.st_ino)
+        self.inode = (sb.st_dev, sb.st_ino)
         self.closed = False
         return True
 
