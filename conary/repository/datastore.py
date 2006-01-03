@@ -239,6 +239,54 @@ class DataStore(AbstractDataStore):
 	if (not os.path.isdir(self.top)):
 	    raise IOError, ("path is not a directory: %s" % topPath)
 
+class OverlayDataStoreSet:
+
+    """
+    The first data store is used for writing; all of them are checked
+    for reading.
+    """
+
+    def hashToPath(self, hash):
+ 	for store in self.stores:
+ 	    if store.hasFile(hash):
+ 		return store.hashToPath(hash)
+
+        return False
+
+    def hasFile(self, hash):
+ 	for store in self.stores:
+ 	    if store.hasFile(hash):
+ 		return True
+ 
+ 	return False
+
+    def addFile(self, f, hash, precompressed = False):
+ 	self.stores[0].addFile(f, hash, precompressed = precompressed)
+
+    def addFileReference(self, hash):
+ 	self.stores[0].addFileReference(hash)
+
+    def openFile(self, hash, mode = "r"):
+ 	for store in self.stores:
+ 	    if store.hasFile(hash):
+ 		return store.openFile(hash, mode = mode)
+ 
+ 	assert(0)
+
+    def openRawFile(self, hash):
+ 	for store in self.stores:
+ 	    if store.hasFile(hash):
+ 		return store.openRawFile(hash)
+ 
+ 	assert(0)
+
+    def removeFile(self, hash):
+        assert(0)
+
+    def __init__(self, *storeList):
+        self.stores = storeList
+        self.storeIter = itertools.cycle(self.stores)
+
 class DataStoreSet:
 
     """
