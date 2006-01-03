@@ -562,6 +562,10 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         except sqlite.ProgrammingError, e:
             assert (str(e) == "attempt to write a readonly database")
 
+    def CheckNoColumnNameResult(self):
+        self.cur.execute('pragma schema_version')
+        assert (self.cur.fetchall() == [(0,)])
+
 def suite():
     dbapi_suite = unittest.makeSuite(DBAPICompliance, "Check")
     module_suite = unittest.makeSuite(moduleTestCases, "Check")

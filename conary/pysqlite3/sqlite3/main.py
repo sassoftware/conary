@@ -32,7 +32,10 @@ class Row:
         self.data = data
         self.col_names = {}
         for idx, col in enumerate(description):
-            self.col_names[col[0].upper()] = idx
+            col_name = col[0]
+            if not col_name:
+                col_name = ''
+            self.col_names[col_name.upper()] = idx
 
     def __getitem__(self, idx):
         if isinstance(idx, str):
