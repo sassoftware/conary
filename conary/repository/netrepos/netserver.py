@@ -1034,18 +1034,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 primary = (l[0], trvCs.getNewVersion(), l[2][1])
                 cs.addPrimaryTrove(*primary)
 
-                try:
-                    (key, path) = self.cache.addEntry(l, recurse, withFiles,
-                                                      withFileContents,
-                                                      excludeAutoSource,
-                                                      (trovesNeeded,
-                                                       filesNeeded))
-                except:
-                    # something went wrong.  make sure that we roll
-                    # back any pending change
-                    if self.cache.db and self.cache.db.inTransaction:
-                        self.cache.db.rollback()
-                    raise
+		(key, path) = self.cache.addEntry(l, recurse, withFiles,
+						  withFileContents,
+						  excludeAutoSource,
+						  (trovesNeeded,
+						   filesNeeded))
+
                 size = cs.writeToFile(path, withReferences = True)
                 self.cache.setEntrySize(key, size)
             else:

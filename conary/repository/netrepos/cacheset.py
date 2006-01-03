@@ -114,41 +114,48 @@ class CacheSet:
         # or adding IDs for versions and flavors
         cu = self.db.transaction()
 
-        if oldVersion:
-            oldVersionId = self.versions.get(oldVersion, None)
-            if oldVersionId is None:
-                oldVersionId = self.versions.addId(oldVersion)
+        try:
+            if oldVersion:
+                oldVersionId = self.versions.get(oldVersion, None)
+                if oldVersionId is None:
+                    oldVersionId = self.versions.addId(oldVersion)
 
-        if oldFlavor:
-            oldFlavorId = self.flavors.get(oldFlavor, None)
-            if oldFlavorId is None:
-                oldFlavorId = self.flavors.addId(oldFlavor)
+            if oldFlavor:
+                oldFlavorId = self.flavors.get(oldFlavor, None)
+                if oldFlavorId is None:
+                    oldFlavorId = self.flavors.addId(oldFlavor)
 
-        if newFlavor:
-            newFlavorId = self.flavors.get(newFlavor, None)
-            if newFlavorId is None:
-                newFlavorId = self.flavors.addId(newFlavor)
+            if newFlavor:
+                newFlavorId = self.flavors.get(newFlavor, None)
+                if newFlavorId is None:
+                    newFlavorId = self.flavors.addId(newFlavor)
 
-        newVersionId = self.versions.get(newVersion, None)
-        if newVersionId is None:
-            newVersionId = self.versions.addId(newVersion)
+            newVersionId = self.versions.get(newVersion, None)
+            if newVersionId is None:
+                newVersionId = self.versions.addId(newVersion)
 
-        cu.execute("""
-        INSERT INTO CacheContents
-        (row, troveName,
-        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
-        absolute, recurse, withFiles, withFileContents,
-        excludeAutoSource, returnValue, size)
-        VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,NULL)""",
-                   (name,
-                   oldFlavorId, oldVersionId, newFlavorId, newVersionId,
-                   absolute, recurse, withFiles, withFileContents,
-                   excludeAutoSource, cPickle.dumps(returnVal, protocol = -1)))
+            cu.execute("""
+            INSERT INTO CacheContents
+            (row, troveName,
+            oldFlavorId, oldVersionId, newFlavorId, newVersionId,
+            absolute, recurse, withFiles, withFileContents,
+            excludeAutoSource, returnValue, size)
+            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,NULL)""",
+                       (name,
+                       oldFlavorId, oldVersionId, newFlavorId, newVersionId,
+                       absolute, recurse, withFiles, withFileContents,
+                       excludeAutoSource, cPickle.dumps(returnVal, 
+                                                        protocol = -1)))
 
-        row = cu.lastrowid
-        path = self.filePattern % (self.tmpDir, row)
+            row = cu.lastrowid
+            path = self.filePattern % (self.tmpDir, row)
 
-        self.db.commit()
+            self.db.commit()   
+        except:
+            # something went wrong.  make sure that we roll
+            # back any pending change
+            self.rollback()
+            raise
 
         return (row, path)
 
