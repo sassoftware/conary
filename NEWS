@@ -9,6 +9,9 @@ Changes in @NEW@:
     * The Make() build action can now take a makeName keyword argument
       for cases when the normal Make() handling is exactly right but
       a different make program is required (nmake, qmake, etc.)
+  o Client Changes:
+    * When committing source changes in interactive mode, conary will ask you 
+      you to confirm the commit.
 
 Changes in 0.80.4:
   o Build Changes:
