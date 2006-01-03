@@ -16,6 +16,8 @@ from conary import deps, files, sqlite3, trove, versions
 from conary.dbstore import idtable, migration
 from conary.local import deptable, troveinfo, versiontable, schema
 
+import itertools
+
 OldDatabaseSchema = schema.OldDatabaseSchema
 
 class Tags(idtable.CachedIdTable):
@@ -559,7 +561,8 @@ order by
 	if troveFlavor:
 	    self.flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+                                                           weakRefs=True):
 	    if flavor:
 		self.flavorsNeeded[flavor] = True
 
@@ -589,7 +592,8 @@ order by
 	if troveFlavor:
 	    flavors[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+                                                           weakRefs=True):
 	    if flavor:
 		flavors[flavor] = True
 
@@ -622,19 +626,27 @@ order by
                                 versionId INT,
                                 flavorId INT,
                                 timeStamps STRING,
-                                byDefault BOOLEAN)
+                                flags INT)
                    """)
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor), byDefault, isStrong \
+                                                in trove.iterTroveListInfo():
 	    versionId = self.getVersionId(version, self.addVersionCache)
 	    if flavor:
 		flavorId = flavorMap[flavor.freeze()]
 	    else:
 		flavorId = 0
+
+            flags = 0
+            if not isStrong:
+                flags |= schema.TROVE_TROVES_WEAKREF
+            if byDefault:
+                flags |= schema.TROVE_TROVES_BYDEFAULT;
+
             cu.execute("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
                        name, versionId, flavorId, 
                         ":".join([ "%.3f" % x for x in version.timeStamps()]), 
-                       trove.includeTroveByDefault(name, version, flavor))
+                       flags)
 
         # make sure every trove we include has an instanceid
         cu.execute("""
@@ -652,7 +664,7 @@ order by
 
         # now include the troves in this one
         cu.execute("""
-            INSERT INTO TroveTroves SELECT ?, instanceId, byDefault, ?
+            INSERT INTO TroveTroves SELECT ?, instanceId, flags, ?
                 FROM IncludedTroves JOIN Instances ON
                     IncludedTroves.troveName == Instances.troveName AND
                     IncludedTroves.versionId == Instances.versionId AND
@@ -758,8 +770,8 @@ order by
             if newVersion is None: continue
 
             oldIncludedId = instanceDict[(name, oldVersion, oldFlavor)]
-            byDefault = cu.execute("""
-                    SELECT byDefault FROM TroveTroves WHERE
+            flags = cu.execute("""
+                    SELECT flags FROM TroveTroves WHERE
                         instanceId=? and includedId=?""",
                     instanceId, oldIncludedId).next()[0]
 
@@ -778,7 +790,7 @@ order by
                         troveName = ? AND
                         version = ? AND
                         flavor %s
-                """ % flavorStr, instanceId, byDefault, name,
+                """ % flavorStr, instanceId, flags, name,
                         newVersion.asString())
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
@@ -960,7 +972,7 @@ order by
             pristineClause = "Instances.isPresent = 1"
 
 	cu.execute("""
-	    SELECT troveName, versionId, byDefault, timeStamps, 
+	    SELECT troveName, versionId, flags, timeStamps, 
                    Flavors.flavorId, flavor FROM 
 		TroveTroves INNER JOIN Instances INNER JOIN Flavors ON 
 		    TroveTroves.includedId = Instances.instanceId AND
@@ -970,7 +982,7 @@ order by
 	""" % pristineClause, troveInstanceId)
 
 	versionCache = {}
-	for (name, versionId, byDefault, timeStamps, flavorId, flavorStr) in cu:
+	for (name, versionId, flags, timeStamps, flavorId, flavorStr) in cu:
 	    version = self.versionTable.getBareId(versionId)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
@@ -982,7 +994,11 @@ order by
 		    flavor = deps.deps.ThawDependencySet(flavorStr)
 		    flavorCache[flavorId] = flavor
 
-	    trv.addTrove(name, version, flavor, byDefault = byDefault)
+            byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
+            weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
+
+	    trv.addTrove(name, version, flavor, byDefault = byDefault,
+                         weakRef = weakRef)
 
         cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
                    "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
@@ -1210,7 +1226,7 @@ order by
         # now add link collections to these troves
         cu.execute("""INSERT INTO TroveTroves 
                         SELECT TroveTroves.instanceId, pinnedInst.instanceId,
-                               TroveTroves.byDefault, 0 FROM
+                               TroveTroves.flags, 0 FROM
                             mlt JOIN Flavors AS pinFlv ON
                                 pinnedFlavor == pinFlv.flavor OR
                                 pinnedFlavor IS NULL and pinFlv.flavor IS NULL
@@ -1439,7 +1455,8 @@ order by
 
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
-                       timeStamps, TroveTroves.inPristine FROM
+                       timeStamps, TroveTroves.flags, TroveTroves.inPristine 
+                    FROM
                     gcts LEFT OUTER JOIN Instances 
                         USING (troveName)
                     JOIN Versions 
@@ -1455,10 +1472,12 @@ order by
         # it's much faster to build up lists and then turn them into
         # sets than build up the set one member at a time
         installedNotReferenced = []
-        referencedNotInstalled = []
         installedAndReferenced = []
+        referencedStrong = []
+        referencedWeak = []
 
-        for (name, version, flavor, isPresent, timeStamps, hasParent) in cu:
+        for (name, version, flavor, isPresent, timeStamps, 
+                                               flags, hasParent) in cu:
             if flavor is None:
                 flavor = ""
 
@@ -1472,13 +1491,20 @@ order by
                     installedAndReferenced.append(info)
                 else:
                     installedNotReferenced.append(info)
+            elif flags & schema.TROVE_TROVES_WEAKREF:
+                referencedWeak.append(info)
             else:
-                referencedNotInstalled.append(info)
+                referencedStrong.append(info)
 
         cu.execute("DROP TABLE gcts", start_transaction = False)
 
-        return (set(installedNotReferenced), set(installedAndReferenced), 
-                set(referencedNotInstalled))
+        referencedStrong = set(referencedStrong)
+        installedAndReferenced = set(installedAndReferenced)
+
+        return (set(installedNotReferenced) - installedAndReferenced, 
+                installedAndReferenced, 
+                referencedStrong, 
+                set(referencedWeak) - referencedStrong)
 
     def close(self):
 	self.db.close()

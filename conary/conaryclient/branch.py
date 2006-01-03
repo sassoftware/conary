@@ -49,7 +49,9 @@ class ClientBranch:
 
 	    for trove in troves:
                 # add contained troves to the todo-list
-                newTroves = [ x for x in trove.iterTroveList() if x not in seen ]
+                newTroves = [ x for x in 
+                        trove.iterTroveList(strongRefs=True,
+                                            weakRefs=True) if x not in seen ]
                 troveList.update(newTroves)
                 seen.update(newTroves)
 
@@ -94,18 +96,19 @@ class ClientBranch:
                 # FIXME we should add a new digital signature in cases
                 # where we can (aka user is at kb and can provide secret key
 
-		for (name, version, flavor) in trove.iterTroveList():
+		for ((name, version, flavor), byDefault, isStrong) \
+                                            in trove.iterTroveListInfo():
                     if shadow:
                         branchedVersion = version.createShadow(newLabel)
                     else:
                         branchedVersion = version.createBranch(newLabel,
                                                                withVerRel = 1)
-                    byDefault = trove.includeTroveByDefault(name, 
-                                                            version, flavor)
 		    branchedTrove.delTrove(name, version, flavor,
-                                           missingOkay = False)
+                                           missingOkay = False,
+                                           weakRef=not isStrong)
 		    branchedTrove.addTrove(name, branchedVersion, flavor,
-                                            byDefault=byDefault)
+                                           byDefault=byDefault, 
+                                           weakRef=not isStrong)
 
                 key = (trove.getName(), branchedTrove.getVersion(),
                        trove.getFlavor())

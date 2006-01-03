@@ -200,6 +200,7 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
     autoResolve           =  (CfgBool, False)
+    autoResolvePackages   =  (CfgBool, True)
     buildPath             =  '/var/tmp/conary/builds'
     context		  =  None
     dbPath                =  '/var/lib/conarydb'

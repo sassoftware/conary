@@ -381,17 +381,18 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
 
         return new
 
-_STREAM_TRV_NAME       = 0
-_STREAM_TRV_VERSION    = 1
-_STREAM_TRV_FLAVOR     = 2
-_STREAM_TRV_CHANGELOG  = 3
-_STREAM_TRV_TROVEINFO  = 4
-_STREAM_TRV_PROVIDES   = 5
-_STREAM_TRV_REQUIRES   = 6
-_STREAM_TRV_TROVES     = 7
-_STREAM_TRV_FILES      = 8
-_STREAM_TRV_REDIRECT   = 9
-_STREAM_TRV_SIGS       = 10
+_STREAM_TRV_NAME            = 0
+_STREAM_TRV_VERSION         = 1
+_STREAM_TRV_FLAVOR          = 2
+_STREAM_TRV_CHANGELOG       = 3
+_STREAM_TRV_TROVEINFO       = 4
+_STREAM_TRV_PROVIDES        = 5
+_STREAM_TRV_REQUIRES        = 6
+_STREAM_TRV_STRONG_TROVES   = 7
+_STREAM_TRV_FILES           = 8
+_STREAM_TRV_REDIRECT        = 9
+_STREAM_TRV_SIGS            = 10
+_STREAM_TRV_WEAK_TROVES     = 11
 
 class Trove(streams.StreamSet):
     """
@@ -408,16 +409,28 @@ class Trove(streams.StreamSet):
     Conary often directly manipulates TroveChangeSet objects))
     """
     streamDict = { 
-        _STREAM_TRV_NAME       : (SMALL, streams.StringStream,        "name"       ),
-        _STREAM_TRV_VERSION    : (SMALL, streams.FrozenVersionStream, "version"    ), 
-        _STREAM_TRV_FLAVOR     : (LARGE, streams.DependenciesStream,  "flavor"     ), 
-        _STREAM_TRV_PROVIDES   : (LARGE, streams.DependenciesStream,  "provides"   ), 
-        _STREAM_TRV_REQUIRES   : (LARGE, streams.DependenciesStream,  "requires"   ), 
-        _STREAM_TRV_CHANGELOG  : (LARGE, changelog.ChangeLog,         "changeLog"  ), 
-        _STREAM_TRV_TROVEINFO  : (LARGE, TroveInfo,                   "troveInfo"  ), 
-        _STREAM_TRV_TROVES     : (LARGE, TroveRefsTrovesStream,       "troves"     ), 
-        _STREAM_TRV_FILES      : (LARGE, TroveRefsFilesStream,        "idMap"      ), 
-        _STREAM_TRV_REDIRECT   : (SMALL, ByteStream,                  "redirect"   ),
+        _STREAM_TRV_NAME          : 
+                    (SMALL, streams.StringStream,        "name"         ),
+        _STREAM_TRV_VERSION       : 
+                    (SMALL, streams.FrozenVersionStream, "version"      ), 
+        _STREAM_TRV_FLAVOR        : 
+                    (LARGE, streams.DependenciesStream,  "flavor"       ), 
+        _STREAM_TRV_PROVIDES      : 
+                    (LARGE, streams.DependenciesStream,  "provides"     ), 
+        _STREAM_TRV_REQUIRES      : 
+                    (LARGE, streams.DependenciesStream,  "requires"     ), 
+        _STREAM_TRV_CHANGELOG     : 
+                    (LARGE, changelog.ChangeLog,         "changeLog"    ), 
+        _STREAM_TRV_TROVEINFO     : 
+                    (LARGE, TroveInfo,                   "troveInfo"    ), 
+        _STREAM_TRV_STRONG_TROVES : 
+                    (LARGE, TroveRefsTrovesStream,       "strongTroves" ), 
+        _STREAM_TRV_WEAK_TROVES   : 
+                    (LARGE, TroveRefsTrovesStream,       "weakTroves"   ), 
+        _STREAM_TRV_FILES         : 
+                    (LARGE, TroveRefsFilesStream,        "idMap"        ), 
+        _STREAM_TRV_REDIRECT      : 
+                    (SMALL, ByteStream,                  "redirect"     ),
     }
     ignoreUnknown = False
 
@@ -425,7 +438,8 @@ class Trove(streams.StreamSet):
     # makes sure we don't add data to troves and forget to make it part
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
-                  "changeLog", "troveInfo", "troves", "idMap", "redirect" ]
+                  "changeLog", "troveInfo", "strongTroves", "weakTroves",
+                  "idMap", "redirect" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -573,7 +587,8 @@ class Trove(streams.StreamSet):
                             None,
                             isRedirect = self.isRedirect())
         new.idMap = self.idMap.copy()
-        new.troves = self.troves.copy()
+        new.strongTroves = self.strongTroves.copy()
+        new.weakTroves = self.weakTroves.copy()
         new.provides.thaw(self.provides.freeze())
         new.requires.thaw(self.requires.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
@@ -652,7 +667,7 @@ class Trove(streams.StreamSet):
         return len(self.idMap) != 0
 
     def addTrove(self, name, version, flavor, presentOkay = False,
-                 byDefault = True):
+                 byDefault = True, weakRef = False):
 	"""
 	Adds a single version of a trove.
 
@@ -665,11 +680,17 @@ class Trove(streams.StreamSet):
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
-	if not presentOkay and self.troves.has_key((name, version, flavor)):
-	    raise TroveError, "duplicate trove included in %s" % self.name()
-	self.troves[(name, version, flavor)] = byDefault
+        if weakRef:
+            troveGroup = self.weakTroves
+        else:
+            troveGroup = self.strongTroves
 
-    def delTrove(self, name, version, flavor, missingOkay):
+	if not presentOkay and troveGroup.has_key((name, version, flavor)):
+	    raise TroveError, "duplicate trove included in %s" % self.name()
+
+        troveGroup[(name, version, flavor)] = byDefault
+
+    def delTrove(self, name, version, flavor, missingOkay, weakRef = False):
 	"""
 	Removes a single version of a trove.
 
@@ -683,32 +704,68 @@ class Trove(streams.StreamSet):
 	part of this trove?
 	@type missingOkay: boolean
 	"""
-	if self.troves.has_key((name, version, flavor)):
-	    del self.troves[(name, version, flavor)]
+        key = (name, version, flavor)
+        if weakRef and key in self.weakTroves:
+	    del self.weakTroves[key]
+	elif not weakRef and key in self.strongTroves:
+	    del self.strongTroves[key]
 	elif missingOkay:
 	    pass
 	else:
 	    # FIXME, we should have better text here
 	    raise TroveError
 
-    def iterTroveList(self):
+    def iterTroveList(self, strongRefs = False, weakRefs = False):
 	"""
 	Returns a generator for (name, version, flavor) ordered pairs, 
 	listing all of the trove in the group, along with their versions. 
 
 	@rtype: list
 	"""
-	return self.troves.iterkeys()
+        assert(strongRefs or weakRefs)
+        if strongRefs:
+            for key in self.strongTroves.iterkeys():
+                yield key
+
+        if weakRefs:
+            for key in self.weakTroves.iterkeys():
+                yield key
+
+    def iterTroveListInfo(self):
+	"""
+	Returns a generator for (name, version, flavor), byDefault, isStrong
+
+	@rtype: list
+	"""
+
+        for item, byDefault in self.strongTroves.iteritems():
+            yield item, byDefault, True
+
+        for item, byDefault in self.weakTroves.iteritems():
+            yield item, byDefault, False
+
+    def isStrongReference(self, name, version, flavor):
+        key = (name, version, flavor)
+        rc = self.strongTroves.get(key, None)
+        if rc is None:
+            return False
+        return True
 
     def includeTroveByDefault(self, name, version, flavor):
-        return self.troves[(name, version, flavor)]
+        key = (name, version, flavor)
+        rc = self.strongTroves.get(key, None)
+        if rc is None:
+            rc = self.weakTroves[key]
+
+        return rc
 
     def compatibleWith(self, other):
         return self.troveInfo.pathHashes.compatibleWith(
                                             other.troveInfo.pathHashes)
 
     def hasTrove(self, name, version, flavor):
-	return self.troves.has_key((name, version, flavor))
+        key = (name, version, flavor)
+	return (key in self.strongTroves) or (key in self.weakTroves)
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False):
@@ -750,7 +807,9 @@ class Trove(streams.StreamSet):
 	for pathId in trvCs.getOldFileList():
 	    self.removeFile(pathId)
 
-	self.mergeTroveListChanges(trvCs.iterChangedTroves())
+	self.mergeTroveListChanges(
+              trvCs.iterChangedTroves(strongRefs = True,  weakRefs = False),
+              trvCs.iterChangedTroves(strongRefs = False, weakRefs = True))
 	self.flavor.set(trvCs.getNewFlavor())
 	self.changeLog = trvCs.getChangeLog()
 	self.setProvides(trvCs.getProvides())
@@ -772,11 +831,13 @@ class Trove(streams.StreamSet):
                 #log.warning('changeset does not contain a sha1 checksum')
                 pass
 
-        assert((not self.idMap) or (not self.troves))
+        assert((not self.idMap) or 
+               (not(self.strongTroves and not self.weakTroves)))
 
 	return fileMap
 
-    def mergeTroveListChanges(self, changeList, redundantOkay = False):
+    def mergeTroveListChanges(self, strongChangeList, weakChangeList, 
+                              redundantOkay = False):
         """
         Merges a set of changes to the included trove list into this
         trove.
@@ -790,20 +851,25 @@ class Trove(streams.StreamSet):
         @type redundantOkay: boolean
         """
 
-        for (name, list) in changeList:
-            for (oper, version, flavor, byDefault) in list:
-                if oper == '+':
-                    self.addTrove(name, version, flavor,
-                                           presentOkay = redundantOkay,
-                                           byDefault = byDefault)
+        for (changeList, weakRef, troveDict) in \
+                    ( (strongChangeList, False, self.strongTroves),
+                      (weakChangeList,   True,  self.weakTroves) ):
+            for (name, l) in changeList:
+                for (oper, version, flavor, byDefault) in l:
+                    if oper == '+':
+                        self.addTrove(name, version, flavor,
+                                      presentOkay = redundantOkay,
+                                      byDefault = byDefault,
+                                      weakRef = weakRef)
 
-                elif oper == "-":
-                    self.delTrove(name, version, flavor,
-                                           missingOkay = redundantOkay)
-                elif oper == "~":
-                    self.troves[(name, version, flavor)] = byDefault
-                else:
-                    assert(0)
+                    elif oper == "-":
+                        self.delTrove(name, version, flavor,
+                                               missingOkay = redundantOkay,
+                                               weakRef = weakRef)
+                    elif oper == "~":
+                        troveDict[(name, version, flavor)] = byDefault
+                    else:
+                        assert(0)
     
     def __eq__(self, them):
 	"""
@@ -951,11 +1017,39 @@ class Trove(streams.StreamSet):
 
             return matches
 
+        def troveSetDiff(ourDict, theirDict, weakRefs):
+            ourSet = set(ourDict)
+
+            if theirDict:
+                theirSet = set(theirDict)
+                sameSet = ourSet & theirSet
+                addedSet = ourSet - sameSet
+                removedSet = theirSet - sameSet
+            else:
+                sameSet = set()
+                addedSet = ourSet
+                removedSet = set()
+
+            for key in sameSet:
+                if ourDict[key] != theirDict[key]:
+                    chgSet.changedTrove(key[0], key[1], key[2], ourDict[key], 
+                                        weakRef = weakRefs)
+
+            for key in addedSet:
+                chgSet.newTroveVersion(key[0], key[1], key[2], ourDict[key],
+                                       weakRef = weakRefs)
+
+            for key in removedSet:
+                chgSet.oldTroveVersion(key[0], key[1], key[2],
+                                       weakRef = weakRefs)
+
         # def diff() begins here
 
 	assert(not them or self.name() == them.name())
-        assert((not self.idMap) or (not self.troves))
-        assert((not them) or (not them.idMap) or (not them.troves))
+        assert((not self.idMap) or (not self.strongTroves) or 
+               (not self.weakTroves))
+        assert((not them) or (not them.idMap) or (not them.strongTroves or
+               (not them.weakTroves)))
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
@@ -1035,30 +1129,27 @@ class Trove(streams.StreamSet):
                     chgSet.changedFile(pathId, newPath, selfFileId, newVersion)
 
 	# now handle the troves we include
+        if them:
+            troveSetDiff(self.strongTroves, them.strongTroves, False)
+            troveSetDiff(self.weakTroves, them.weakTroves, True)
+        else:
+            troveSetDiff(self.strongTroves, None, False)
+            troveSetDiff(self.weakTroves, None, True)
+
 	added = {}
 	removed = {}
 
-	for key in self.troves.iterkeys():
-	    if them and them.troves.has_key(key): 
-                if self.troves[key] != them.troves[key]:
-                    chgSet.changedTrove(key[0], key[1], key[2],
-                                        self.troves[key])
-                continue
+        for name, chgList in \
+                chgSet.iterChangedTroves(strongRefs = True, weakRefs = False):
+            for (how, version, flavor, byDefault) in chgList:
+                if how == '+':
+                    whichD = added
+                elif how == '-':
+                    whichD = removed
+                else:
+                    continue
 
-	    (name, version, flavor) = key
-	    chgSet.newTroveVersion(name, version, flavor, self.troves[key])
-
-            d = added.setdefault(name, {})
-            l = d.setdefault(flavor, [])
-            l.append(version)
-
-	if them:
-	    for key in them.troves.iterkeys():
-		if self.troves.has_key(key): continue
-
-		(name, version, flavor) = key
-		chgSet.oldTroveVersion(name, version, flavor)
-                d = removed.setdefault(name, {})
+                d = whichD.setdefault(name, {})
                 l = d.setdefault(flavor, [])
                 l.append(version)
 
@@ -1482,23 +1573,24 @@ class ReferencedFileList(list, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
-_STREAM_TCS_NAME	    =  0
-_STREAM_TCS_OLD_VERSION	    =  1
-_STREAM_TCS_NEW_VERSION	    =  2
-_STREAM_TCS_REQUIRES	    =  3
-_STREAM_TCS_PROVIDES	    =  4
-_STREAM_TCS_CHANGE_LOG	    =  5
-_STREAM_TCS_OLD_FILES	    =  6
-_STREAM_TCS_TYPE	    =  7
-_STREAM_TCS_TROVE_CHANGES   =  8
-_STREAM_TCS_NEW_FILES       =  9
-_STREAM_TCS_CHG_FILES       = 10
-_STREAM_TCS_OLD_FLAVOR      = 11
-_STREAM_TCS_NEW_FLAVOR      = 12
-_STREAM_TCS_IS_REDIRECT     = 13
-_STREAM_TCS_TROVEINFO       = 14
-_STREAM_TCS_OLD_SIGS        = 15
-_STREAM_TCS_NEW_SIGS        = 16
+_STREAM_TCS_NAME	            =  0
+_STREAM_TCS_OLD_VERSION	            =  1
+_STREAM_TCS_NEW_VERSION	            =  2
+_STREAM_TCS_REQUIRES	            =  3
+_STREAM_TCS_PROVIDES	            =  4
+_STREAM_TCS_CHANGE_LOG	            =  5
+_STREAM_TCS_OLD_FILES	            =  6
+_STREAM_TCS_TYPE	            =  7
+_STREAM_TCS_STRONG_TROVE_CHANGES    =  8
+_STREAM_TCS_NEW_FILES               =  9
+_STREAM_TCS_CHG_FILES               = 10
+_STREAM_TCS_OLD_FLAVOR              = 11
+_STREAM_TCS_NEW_FLAVOR              = 12
+_STREAM_TCS_IS_REDIRECT             = 13
+_STREAM_TCS_TROVEINFO               = 14
+_STREAM_TCS_OLD_SIGS                = 15
+_STREAM_TCS_NEW_SIGS                = 16
+_STREAM_TCS_WEAK_TROVE_CHANGES      = 17
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -1514,7 +1606,10 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_CHANGE_LOG  : (LARGE, ChangeLog,            "changeLog"  ),
         _STREAM_TCS_OLD_FILES   : (LARGE, OldFileStream,        "oldFiles"   ),
         _STREAM_TCS_TYPE        : (SMALL, streams.IntStream,    "tcsType"    ),
-        _STREAM_TCS_TROVE_CHANGES:(LARGE, ReferencedTroveSet,   "troves"     ),
+        _STREAM_TCS_STRONG_TROVE_CHANGES:
+                                  (LARGE, ReferencedTroveSet,   "strongTroves"),
+        _STREAM_TCS_WEAK_TROVE_CHANGES:
+                                  (LARGE, ReferencedTroveSet,   "weakTroves" ),
         _STREAM_TCS_NEW_FILES   : (LARGE, ReferencedFileList,   "newFiles"   ),
         _STREAM_TCS_CHG_FILES   : (LARGE, ReferencedFileList,   "changedFiles"),
         _STREAM_TCS_OLD_FLAVOR  : (SMALL, DependenciesStream,   "oldFlavor"  ),
@@ -1595,10 +1690,17 @@ class AbstractTroveChangeSet(streams.StreamSet):
         return (len(self.newFiles) + len(self.changedFiles) + 
                 len(self.oldFiles)) != 0
 
-    def iterChangedTroves(self):
-	return self.troves.iteritems()
+    def iterChangedTroves(self, strongRefs = True, weakRefs = False):
+        if strongRefs:
+	    for x in self.strongTroves.iteritems():
+                yield x
 
-    def newTroveVersion(self, name, version, flavor, byDefault):
+        if weakRefs:
+	    for x in self.weakTroves.iteritems():
+                yield x
+
+    def newTroveVersion(self, name, version, flavor, byDefault, 
+                        weakRef = False):
 	"""
 	Adds a version of a troves which appeared in newVersion.
 
@@ -1609,13 +1711,19 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@param flavor: new flavor
 	@type flavor: deps.deps.DependencySet
         @param byDefault: value of byDefault
+        @param weakRef: is this a weak references?
+        @type weakRef: boolean
         @type byDefault: boolean
 	"""
 
-        l = self.troves.setdefault(name, [])
+        if weakRef:
+            l = self.weakTroves.setdefault(name, [])
+        else:
+            l = self.strongTroves.setdefault(name, [])
+
 	l.append(('+', version, flavor, byDefault))
 
-    def updateChangedTrove(self, name, flavor, old, new):
+    def updateChangedTrove(self, name, flavor, old, new, weakRef = False):
 	"""
 	Removes trove (name, flavor, old version) from the changed list and
 	adds trove (name, flavor, version) new to the list (with the same 
@@ -1629,8 +1737,15 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type old: versions.VersionString
 	@param new: version to add to the changed list
 	@type new: versions.VersionString
+        @param weakRefs: True if we are switching a weakRef
+        @type weakRefs: boolean
 	"""
-	for (theName, l) in self.troves.iteritems():
+        if weakRef:
+            chgGroup = self.weakTroves
+        else:
+            chgGroup = self.strongTroves
+
+	for (theName, l) in chgGroup.iteritems():
 	    if theName != name: continue
 	    for (i, (change, ver, flavor, byDefault)) in enumerate(l):
 		if ver == old:
@@ -1639,7 +1754,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
         raise TroveError, "trove not found to update"
 
-    def oldTroveVersion(self, name, version, flavor):
+    def oldTroveVersion(self, name, version, flavor, weakRef = False):
 	"""
 	Adds a version of a trove which appeared in oldVersion.
 
@@ -1649,11 +1764,18 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type version: versions.Version
 	@param flavor: old flavor
 	@type flavor: deps.deps.DependencySet
+        @param weakRef: is this a weak reference?
+        @type weakRef: boolean
 	"""
-        l = self.troves.setdefault(name, [])
+
+        if weakRef:
+            l = self.weakTroves.setdefault(name, [])
+        else:
+            l = self.strongTroves.setdefault(name, [])
+
         l.append(('-', version, flavor, None))
 
-    def changedTrove(self, name, version, flavor, byDefault):
+    def changedTrove(self, name, version, flavor, byDefault, weakRef = False):
 	"""
 	Records the change in the byDefault setting of a referenced trove.
 
@@ -1665,8 +1787,14 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@type flavor: deps.deps.DependencySet
         @param byDefault: New value of byDefault
         @type byDefault: boolean
+        @param weakRef: is this a weak reference?
+        @type weakRef: boolean
 	"""
-        l = self.troves.setdefault(name, [])
+        if weakRef:
+            l = self.weakTroves.setdefault(name, [])
+        else:
+            l = self.strongTroves.setdefault(name, [])
+
         l.append(('~', version, flavor, byDefault))
 
     def formatToFile(self, changeSet, f):
@@ -1723,7 +1851,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	    pathIdStr = sha1helper.md5ToString(pathId)
 	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
-	for name in self.troves.keys():
+	for name in self.strongTroves.keys():
             l = []
             for x in self.troves[name]:
                 l.append(x[0] + x[1].asString())

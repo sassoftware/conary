@@ -122,6 +122,17 @@ Arguments include
 See \-\-replace-files description from \fBconary update\fP
 .RE
 .TP
+.B syncchildren [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Update the children of \fItrovename\fP so that the versions of the child
+troves match the version specified by the parent trove.  
+Arguments include
+.RS 4
+.TP 4
+.B \-\-update-only
+Only change the versions of installed children to match the ones referenced 
+by the specified troves, do not install any missing troves.
+.RE
+.TP
 .B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP][--[\fIversion\fP][\fIflavor\fP]]>* <\fIchangeset-file\fP>*
 Updates each \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP and \fIflavor\fP given (otherwise the most 
@@ -189,7 +200,7 @@ If you want conary to update anyway, replacing the contents
 of the file with the new version from the changeset, you will need
 to provide the \-\-replace-files option.
 .TP
-.B \-\-sync
+.B \-\-sync-to-parents
 Only allow updates to versions that are referenced by other troves on the 
 system.  This allows you to easily update a trove to a version specified 
 within a group, or ensure you match the :lib component with an out-of-date

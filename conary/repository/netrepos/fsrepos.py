@@ -269,7 +269,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 else:
                     # remove this trove and any trove contained in it
                     cs.oldTrove(troveName, oldVersion, oldFlavor)
-                    for (name, version, flavor) in old.iterTroveList():
+                    for (name, version, flavor) in \
+                                            old.iterTroveList(strongRefs=True):
                         troveWrapper.append((name, (version, flavor),
                                                 (None, None), absolute))
 		continue

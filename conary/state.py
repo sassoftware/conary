@@ -97,7 +97,8 @@ class SourceState(trove.Trove):
 	.
 	PATHIDn PATHn FILEIDn VERSIONn
 	"""
-        assert(len(self.troves) == 0)
+        assert(len(self.strongTroves) == 0)
+        assert(len(self.weakTroves) == 0)
 
         f.write("name %s\n" % self.getName())
         f.write("version %s\n" % self.getVersion().freeze())
