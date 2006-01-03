@@ -453,7 +453,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             for dir in contentsDir:
                 storeList.append(DataStore(dir))
                 
-            store = DataStoreSet(storeList)
+            store = DataStoreSet(*storeList)
 
 	DataStoreRepository.__init__(self, dataStore = store)
 	AbstractRepository.__init__(self)
