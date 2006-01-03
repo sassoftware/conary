@@ -47,7 +47,7 @@ def createDBTroveFiles(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE DBTroveFiles(
-        streamId            INTEGER PRIMARY KEY AUTO_INCREMENT,
+        streamId            %(PRIMARYKEY)s,
         pathId              BINARY(16),
         versionId           INTEGER,
         path                STRING,
@@ -55,7 +55,7 @@ def createDBTroveFiles(db):
         instanceId          INTEGER,
         isPresent           INTEGER,
         stream              BLOB
-    )""")
+    )""" % db.keywords)
     cu.execute("CREATE INDEX DBTroveFilesIdx ON DBTroveFiles(fileId)")
     cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
     cu.execute("CREATE INDEX DBTroveFilesPathIdx ON DBTroveFiles(path)")
@@ -74,14 +74,14 @@ def createInstances(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE Instances(
-        instanceId      INTEGER PRIMARY KEY AUTO_INCREMENT,
+        instanceId      %(PRIMARYKEY)s,
         troveName       STRING,
         versionId       INTEGER,
         flavorId        INTEGER,
         timeStamps      STRING,
         isPresent       INTEGER,
         pinned          BOOLEAN
-    )""")
+    )""" % db.keywords)
     cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
     cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                "Instances(troveName, versionId, flavorId)")
