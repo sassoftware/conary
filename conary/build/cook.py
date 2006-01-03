@@ -921,7 +921,9 @@ def logBuildEnvironment(out, sourceVersion, macros, cfg):
 
     write("Macros:" + '\n')
     for macro in sorted(macros.keys()):
-        write("%s: %s\n" % (macro, macros[macro]))
+        # important for this to be unexpanded, because at this point,
+        # not some macros may not have an expansion
+        write("%s: %s\n" % (macro, macros._get(macro)))
 
     write("*"*60 + '\n')
 
@@ -1120,7 +1122,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         recipeClass = loader.getRecipe()
 
 	if emerge:
-	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % item)
+	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
 	    os.close(fd)
 	    targetLabel = versions.EmergeLabel()
 

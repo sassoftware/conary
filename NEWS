@@ -1,3 +1,18 @@
+Changes in @NEW@:
+  o Build Changes:
+    * Build logs now contain unexpanded macros, since not all macros
+      may be defined when the build log is initially created.
+    * The emerge command can now accept version strings.
+    * The RemoveNonPackageFiles policy now removes fonts.cache*,
+      fonts.dir, and fonts.scale files, since they are always
+      handled by tag handlers.
+    * The Make() build action can now take a makeName keyword argument
+      for cases when the normal Make() handling is exactly right but
+      a different make program is required (nmake, qmake, etc.)
+  o Client Changes:
+    * When committing source changes in interactive mode, conary will ask you 
+      you to confirm the commit.
+
 Changes in 0.80.4:
   o Build Changes:
     * PackageRecipe has been changed to follow our change to split

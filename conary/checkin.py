@@ -384,6 +384,16 @@ def commit(repos, cfg, message, callback=None):
 	log.error("no change log message was given")
 	return
 
+    if cfg.interactive:
+        print 'The following commits will be performed:'
+        print
+        print '\t%s=%s' % (recipeObj.name, newVersion.asString())
+        print
+        okay = cmdline.askYn('continue with update? [Y/n]', default=True)
+
+        if not okay:
+            return
+
     newState.changeChangeLog(cl)
     signatureKey = selectSignatureKey(cfg, newState.getBranch().label().asString())
     if signatureKey is not None:

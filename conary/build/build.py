@@ -346,12 +346,13 @@ class Make(BuildCommand):
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
-                ' %(preMake)s make %%(overrides)s'
+                ' %(preMake)s %(makeName)s %%(overrides)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': '',
                 'skipMissingSubDir': False,
-		'forceFlags': False}
+		'forceFlags': False,
+                'makeName': 'make'}
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -365,6 +366,8 @@ class Make(BuildCommand):
 	@keyword forceFlags: boolean; if set, unconditionally override
 	the Makefile definitions of *FLAGS (that is, C{CFLAGS}, C{CXXFLAGS},
         C{LDFLAGS})
+        @keyword makeName: the name of the make command; normally
+        C{make} but occasionally C{qmake} or something else.
         """
 	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
