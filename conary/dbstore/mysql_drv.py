@@ -22,6 +22,7 @@ class KeywordDict(BaseKeywordDict):
 
     keys = BaseKeywordDict.keys
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+    keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
 
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
