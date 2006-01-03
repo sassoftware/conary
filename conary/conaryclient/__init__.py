@@ -290,7 +290,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @param skipNotByDefault: If True, troves which are included in
         a container with byDefault as False are not included (this flag
         doesn't do anything if recurse is False)
-        @type recurse: boolean
+        @type skipNotByDefault: boolean
         @param excludeList: List of regular expressions which are matched
         against recursively included trove names. Troves which match any 
         of the expressions are left out of the change set (this list
