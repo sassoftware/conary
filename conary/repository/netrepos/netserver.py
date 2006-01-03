@@ -91,8 +91,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             # the first argument is a version number
             r = method(authToken, *args)
+            self.db.commit()
             return (False, False, r)
         except Exception, e:
+            self.db.rollback()
             pass
 
         if (isinstance(e, errors.InsufficientPermission)
