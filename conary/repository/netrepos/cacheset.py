@@ -219,7 +219,7 @@ class CacheSet:
         if "CacheContents" not in self.db.tables:
             cu.execute("""
             CREATE TABLE CacheContents(
-               row              INTEGER PRIMARY KEY AUTO_INCREMENT,
+               row              %(PRIMARYKEY)s,
                troveName        VARCHAR(254),
                oldFlavorId      INTEGER,
                oldVersionId     INTEGER,
@@ -232,7 +232,7 @@ class CacheSet:
                excludeAutoSource BOOLEAN,
                returnValue      BINARY,
                size             INTEGER
-            )""")
+            )""" % self.db.keywords)
             cu.execute("""
             CREATE INDEX CacheContentsIdx ON
                 CacheContents(troveName)
