@@ -99,14 +99,16 @@ def timings(current, total, tstart):
         tpassed/60, tpassed % 60,
         tremaining/60, tremaining % 60)
 
+BATCH=5000
+
 for t in tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
     t1 = time.time()
     while True:
-        row = cs.fetchone()
-        if row is None:
+        rows = cs.fetchmany(BATCH)
+        if not len(rows):
             break
         fields = cs.fields()
         if t.lower() == "permissions":
@@ -117,24 +119,24 @@ for t in tList:
                 fields[fields.index("user")] = "userName"
         if t.lower() == "trovefiles":
             # versionId was declared as a binary string in sqlite instead of integer
-            row[2] = int(row[2])
+            rows = [list(row) for row in rows]
+            for row in rows:
+                row[2] = int(row[2])
+            rows = [tuple(row) for row in rows]
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (
             t, ", ".join(fields), ",".join(["?"]*len(fields)))
-        i += 1
-        try:
-            cp.execute(sql, tuple(row))
-        except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING" % t, row
-        except:
-            print "ERROR - SQL", sql
-            raise
-        else:
-            if i % 1000 == 0:
-                t2 = time.time()
-                sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
-                sys.stdout.flush()
-            if i % 10000 == 0:
-                dest.commit()
+        for row in rows:
+            i += 1
+            try:
+                cp.execute(sql, tuple(row))
+            except:
+                print "ERROR - SQL", sql, row
+                raise
+        t2 = time.time()
+        sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
+        sys.stdout.flush()
+        if i % (BATCH*5) == 0:
+            dest.commit()
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
     dest.commit()
 
