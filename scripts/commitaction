@@ -52,6 +52,8 @@ def main(argv):
     }
 
     cfg = conarycfg.ConaryConfiguration()
+    cfg.root = ":memory:"
+    cfg.dbPath = ":memory:"
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                             argv=argv)
 
