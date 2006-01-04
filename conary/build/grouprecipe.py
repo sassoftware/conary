@@ -15,13 +15,14 @@ from itertools import chain, izip
 import tempfile
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
-from conary.build.errors import RecipeFileError
+from conary.build.errors import RecipeFileError, GroupPathConflicts
 from conary.build import macros
 from conary.build import use
 from conary import conaryclient
 from conary.deps import deps
 from conary.lib import log, util
 from conary.repository import errors, trovesource
+from conary import trove
 from conary import versions
 
 class SingleGroup:
@@ -66,19 +67,67 @@ class SingleGroup:
             if failedDeps:
                 return failedDeps
 
-    def calcSize(self):
+    def calcSizeAndCheckHashes(self, repos):
         self.size = 0
         validSize = True
-        for (n,v,f), (explicit, size, byDefault) in self.troves.iteritems():
+
+        implicit = []
+        allPathHashes = []
+        checkPathConflicts = self.checkPathConflicts
+
+        for (n,v,f), (explicit, size, byDefault, pathHashes) in self.troves.iteritems():
             l = self.troveVersionFlavors.setdefault(n,[])
             l.append((v,f,byDefault,explicit))
-            if not explicit:
+            if trove.troveIsCollection(n):
+                continue
+            if not explicit and size is None:
+                if byDefault:
+                    implicit.append((n,v,f))
                 continue
             if size is None:
                 validSize = False
                 self.size = None
-            if validSize:
+            elif validSize and byDefault:
                 self.size += size
+
+            if checkPathConflicts and pathHashes:
+                allPathHashes.extend(pathHashes)
+
+        troves = repos.getTroves(implicit, withFiles=False)
+        for troveTup, trv in izip(implicit, troves):
+            size = trv.getSize()
+            pathHashes = trv.getPathHashes()
+            self.size += size
+
+
+            allPathHashes.extend(pathHashes)
+
+            # add newly discovered info back to the group, so that 
+            # it can be used by groups containing this group.
+            (explicit, _, byDefault, _) = self.troves[troveTup]
+            self.troves[troveTup] = (explicit, size, byDefault, pathHashes)
+
+        if checkPathConflicts:
+            pathHashCount = len(allPathHashes)
+            allPathHashes = set(allPathHashes)
+            if pathHashCount != len(allPathHashes):
+                conflicts = self._getHashConflicts()
+                return conflicts
+
+    def _getHashConflicts(self):
+        # afaict, this is just going to be slow no matter what I do.
+        # I try to at least not have to iterate through any lists more
+        # than once.
+        allPathHashes = {}
+        for troveTup, (_, byDefault, _, pathHashes) in self.troves.iteritems():
+            if pathHashes is None:
+                continue
+            for pathHash in pathHashes:
+                allPathHashes.setdefault(pathHash, []).append(troveTup)
+
+        conflicts = set(tuple(x) \
+                         for x in allPathHashes.itervalues() if len(x) > 1)
+        return conflicts
 
     def _findTroves(self, troveMap):
         """ given a trove map which already contains a dict for all queries
@@ -88,15 +137,15 @@ class SingleGroup:
         validSize = True
 
         for (name, versionStr, flavor, source, 
-                byDefault, refSource, components) in self.addTroveList:
+             byDefault, refSource, components) in self.addTroveList:
             troveList = troveMap[refSource][name, versionStr, flavor]
 
             if byDefault is None:
                 byDefault = self.byDefault
             
-            for (troveTup, size, isRedirect, childTroves) in troveList:
+            for (troveTup, size, isRedirect, childTroves, pathHash) in troveList:
                 self._foundTrove(troveTup, True, byDefault, isRedirect, size,
-                                 components, childTroves)
+                                 components, childTroves, pathHash)
 
 
         # these are references which were used in addAll() commands
@@ -127,14 +176,22 @@ class SingleGroup:
                     childTroves = [ (x, x in byDefaultDict)
                                      for x in trv.iterTroveList(weakRefs=True, 
                                                             strongRefs=True) ]
+
+                if trove.troveIsCollection(troveTup[0]):
+                    size = trv.getSize()
+                    pathHashes = trv.getPathHashes()
+                else:
+                    size = 0
+                    pathHashes = []
+
                 self._foundTrove(troveTup, True, byDefault, trv.isRedirect(),
-                                 trv.getSize(), [], childTroves)
+                                 size, [], childTroves, pathHashes)
 
 
 
     def _foundTrove(self, troveTup, explicit, byDefault, 
                     isRedirect=False, size=None, components=None, 
-                    childTroves=None):
+                    childTroves=None, pathHashes=None):
         if explicit:
             if isRedirect:
                 # we check later to ensure that all redirects added 
@@ -145,12 +202,13 @@ class SingleGroup:
         info =  self.troves.get(troveTup, None)
         if info:
             self.troves[troveTup] = (info[0] or explicit, 
-                                     info[1] or size, info[2] or byDefault)
+                                     info[1] or size, info[2] or byDefault,
+                                     info[3])
             if childTroves is not None:
                 # FIXME: childTrove byDefault information should be merged
                 self.childTroves[troveTup] = (components, childTroves)
         else:
-            self.troves[troveTup] = (explicit, size, byDefault)
+            self.troves[troveTup] = (explicit, size, byDefault, pathHashes)
             if childTroves is not None:
                 self.childTroves[troveTup] = (components, childTroves)
 
@@ -216,7 +274,8 @@ class SingleGroup:
         troves = repos.getTroves(neededTups, withFiles=False)
         for troveTup, trv in izip(neededTups, troves):
             self._foundTrove(troveTup, True, self.byDefault,
-                             trv.isRedirect(), trv.getSize(), [], [])
+                             trv.isRedirect(), trv.getSize(), [], [],
+                             trv.getPathHashes())
             
     def _checkDependencies(self, cfg):
         if self.checkOnlyByDefaultDeps:
@@ -263,7 +322,7 @@ class SingleGroup:
 
     def addPackagesForComponents(self, troveSource):
         packages = {}
-        for (n,v,f), (explicit, size, byDefault) in self.troves.iteritems():
+        for (n,v,f), (explicit, size, byDefault, pathHashes) in self.troves.iteritems():
             if not explicit:
                 continue
             if ':' in n:
@@ -303,9 +362,10 @@ class SingleGroup:
             byDefault = bool([ x for x in childTroves if x[1]])
 
             self._foundTrove(troveTup, True, byDefault, False, trv.getSize())
+
             for childTup, childByDefault in childTroves:
-                self._foundTrove(childTup, False, childByDefault and byDefault, 
-                                 False, trv.getSize())
+                # this is after implicit troves have been added 
+                self._foundTrove(childTup, False, childByDefault and byDefault)
             
 
 
@@ -314,14 +374,16 @@ class SingleGroup:
 
         for childGroup, byDefault in childGroups:
             for trove, info in childGroup.troves.iteritems():
-                childByDefault = byDefault and info[-1]
+                isExplicit, size, childByDefault, pathHashes = info
+                childByDefault = byDefault and childByDefault
                 if childByDefault and componentsToRemove:
                     parts = trove[0].split(':', 1)
                     if len(parts) != 1:
                         if parts[1] in componentsToRemove:
                             childByDefault = False
                     
-                self._foundTrove(trove, False, childByDefault)
+                self._foundTrove(trove, False, childByDefault, False, size,
+                                 pathHashes)
         
         for components, childTroves in self.childTroves.itervalues():
             for (childTrove, byDefault) in childTroves:
@@ -338,7 +400,7 @@ class SingleGroup:
                     else:
                         byDefault = False
 
-                self._foundTrove(childTrove, False, byDefault)
+                self._foundTrove(childTrove, False, byDefault, False)
 
     def _removeImplicitTroves(self, source):
         if not self.removeTroveList:
@@ -350,7 +412,7 @@ class SingleGroup:
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
             info = self.troves[troveTup]
-            self.troves[troveTup] = (info[0], info[1], False)
+            self.troves[troveTup] = (info[0], info[1], False, info[3])
 
     def _checkForRedirects(self, repos):
         if self.redirects:
@@ -405,7 +467,7 @@ The following troves are missing targets:
         return bool(self.newGroupList or self.getTroveList())
 
     def __init__(self, depCheck, autoResolve, checkOnlyByDefaultDeps,
-                 byDefault = True):
+                 checkPathConflicts, byDefault = True):
 
         self.troves = {}
         self.redirects = set()
@@ -421,6 +483,7 @@ The following troves are missing targets:
         self.depCheck = depCheck
         self.autoResolve = autoResolve
         self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
+        self.checkPathConflicts = checkPathConflicts
         self.byDefault = byDefault
 
     def Requires(self, requirement):
@@ -472,6 +535,7 @@ class GroupRecipe(Recipe):
     depCheck = False
     autoResolve = False
     checkOnlyByDefaultDeps = True
+    checkPathConflicts = True
     ignore = 1
     _recipeType = RECIPE_TYPE_GROUP
 
@@ -603,7 +667,8 @@ class GroupRecipe(Recipe):
         self.labelPath = [ versions.Label(x) for x in path ]
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
-                    byDefault = None, checkOnlyByDefaultDeps = None):
+                    byDefault = None, checkOnlyByDefaultDeps = None,
+                    checkPathConflicts = None):
         if self.groups.has_key(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
         if not groupName.startswith('group-'):
@@ -612,9 +677,12 @@ class GroupRecipe(Recipe):
             byDefault = self.groups[self.name].byDefault
         if checkOnlyByDefaultDeps is None:
             checkOnlyByDefaultDeps  = self.groups[self.name].checkOnlyByDefaultDeps
+        if checkPathConflicts is None:
+            checkPathConflicts  = self.groups[self.name].checkPathConflicts
 
         self.groups[groupName] = SingleGroup(depCheck, autoResolve, 
-                                             checkOnlyByDefaultDeps, byDefault)
+                                             checkOnlyByDefaultDeps, 
+                                             checkPathConflicts, byDefault)
 
     def getGroupNames(self):
         return self.groups.keys()
@@ -709,11 +777,26 @@ class GroupRecipe(Recipe):
 
         groupNames = self._orderGroups()
 
+        groupsWithConflicts = {}
+
         for groupName in groupNames:
             groupObj = self.groups[groupName]
 
+            badGroup = False
+
+            childGroupNames = groupObj.getNewGroupList()
+            for childGroupName, byDefault in childGroupNames:
+                if childGroupName in groupsWithConflicts:
+                    # if there are conflicts in a child group, there will
+                    # be conflicts in this group as well.
+                    badGroup = True
+
+            if badGroup:
+                continue
+                
 
             childGroups = self.getChildGroups(groupName)
+            
             # assign troves to this group
             groupObj.findTroves(self.troveSpecMap, self.repos, childGroups)
 
@@ -728,10 +811,15 @@ class GroupRecipe(Recipe):
 
             groupObj.addPackagesForComponents(self.repos)
 
-            groupObj.calcSize()
+            conflicts = groupObj.calcSizeAndCheckHashes(self.repos)
+            if conflicts:
+                groupsWithConflicts[groupName] = conflicts
 
             if not groupObj.hasTroves():
                 raise RecipeFileError('%s has no troves in it' % groupName)
+
+        if groupsWithConflicts:
+            raise GroupPathConflicts(groupsWithConflicts)
 
 
     def _findSources(self):
@@ -804,10 +892,12 @@ class GroupRecipe(Recipe):
         for troveSource, toFind in self.toFind.iteritems():
             d = {}
             for troveSpec in toFind:
+                
                 d[troveSpec] = [ (x,
                                   foundTroves[x].getSize(), 
                                   foundTroves[x].isRedirect(),
-                                  _getChildTroves(foundTroves[x]))
+                                  _getChildTroves(foundTroves[x]),
+                                  foundTroves[x].getPathHashes())
                                     for x in results[troveSource][troveSpec] ]
             troveSpecMap[troveSource] = d
         self.troveSpecMap = troveSpecMap
@@ -828,4 +918,5 @@ class GroupRecipe(Recipe):
 
         self.groups = {}
         self.groups[self.name] = SingleGroup(self.depCheck, self.autoResolve,   
-                                             self.checkOnlyByDefaultDeps)
+                                             self.checkOnlyByDefaultDeps,
+                                             self.checkPathConflicts)
