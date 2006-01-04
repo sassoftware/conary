@@ -272,15 +272,15 @@ Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
 .B updateall
-Iterates through all the packages installed by anaconda and manually by the
-users and updates with the most recent version in the repository. This does not
-scan every package installed unless the system was installed before groups came
-into use. Thus, if foo:lib has been updated upstream but is only installed on
-your system because its a member of group-dist, it will only be updated to the
-version in group-dist. If, however, foo:lib was installed by "conary update
-foo:lib", \fBupdateall\fP will scan the repository for an update.
+Iterates through all the top-level troves installed on the system
+and updates to the most recent version in the repository.
+Thus, if foo:lib has been updated upstream but is only installed on
+your system because its a member of group-dist, it will be updated to the
+version referenced in the latest group-dist.  If, however, foo:lib is
+not referenced by any other trove installed on the system,
+\fBupdateall\fP will scan the repository for an update for foo:lib directly.
 \fBupdateall\fP will also not update packages installed from local cooks or
-emerges.
+emerges, thanks to branch affinity.
 .RS 4
 .TP 4
 .B \-\-exclude-troves <patterns>
