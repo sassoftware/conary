@@ -199,6 +199,8 @@ class Database(BaseDatabase):
             elif type == "view":
                 self.views.setdefault(name, None)
             elif type == "index":
+                if name.startswith("sqlite_autoindex_"):
+                    continue
                 self.tables.setdefault(tbl_name, []).append(name)
             elif type == "trigger":
                 self.triggers.setdefault(name, tbl_name)
