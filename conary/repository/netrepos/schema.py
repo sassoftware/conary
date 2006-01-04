@@ -273,7 +273,7 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
+        cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
                    "UserGroups(userGroup)")
         commit = True
 
@@ -847,6 +847,9 @@ class MigrateTo_8(SchemaMigration):
                         "UserGroupMembers(userId)")
         self.cu.execute("DROP INDEX UsersUserIdx")
         self.cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
+        self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
+        self.cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
+                        "UserGroups(userGroup)")
         # done...
         self.db.loadSchema()
         return self.Version
