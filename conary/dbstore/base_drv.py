@@ -29,11 +29,13 @@ class BaseBinary:
     def __repr__(self):
         return self.s
 
+# this will be derived by the backend drivers to handle schema creation
 class BaseKeywordDict(dict):
-
     keys = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
              'BLOB'       : 'BLOB',
              'MEDIUMBLOB' : 'BLOB'                  }
+    def __init__(self):
+        dict.__init__(self, self.keys)
 
     def binaryVal(self, binLen):
         return "BINARY(%d)" % binLen
@@ -44,9 +46,6 @@ class BaseKeywordDict(dict):
             return self.binaryVal(int(binLen))
 
         return dict.__getitem__(self, val)
-
-    def __init__(self):
-        dict.__init__(self, self.keys)
 
 # base Cursor class. All backend drivers are expected to provide this
 # interface
