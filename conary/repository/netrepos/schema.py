@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,7 +17,7 @@ from conary.lib.tracelog import logMe
 
 from conary.local.schema import createDependencies, createTroveInfo, createMetadata, resetTable
 
-VERSION = 7
+VERSION = 8
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.trigger(table, column, "INSERT")
@@ -260,7 +260,7 @@ def createUsers(db):
             password        %(BINARY254)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
+        cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
         commit = True
 
     if createTrigger(db, "Users"):
@@ -273,7 +273,7 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroupIdx ON "
+        cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
                    "UserGroups(userGroup)")
         commit = True
 
@@ -292,9 +292,9 @@ def createUsers(db):
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("CREATE INDEX UserGroupMembersIdx ON "
-                   "UserGroupMembers(userGroupId)")
-        cu.execute("CREATE INDEX UserGroupMembersIdx2 ON "
+        cu.execute("CREATE UNIQUE INDEX UserGroupMembers_uq ON "
+                   "UserGroupMembers(userGroupId, userId)")
+        cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
                    "UserGroupMembers(userId)")
         commit = True
 
@@ -409,16 +409,15 @@ def createPGPKeys(db):
     cu = db.cursor()
     commit = False
     if "PGPKeys" not in db.tables:
+        # userId can be null (and hence so not in the usertable) when pgp
+        # keys are imported by mirrors or proxies
         cu.execute("""
         CREATE TABLE PGPKeys(
             keyId           %(PRIMARYKEY)s,
-            userId          INTEGER NOT NULL,
+            userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT PGPKeys_userId_fk
-                FOREIGN KEY (userId) REFERENCES Users(userId)
-                ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
@@ -499,15 +498,13 @@ def createTroves(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT TroveTroves_includedId_fk
                 FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT TroveTroves_instance_included_uq
-                UNIQUE(instanceId, includedId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
-        # ideally we would attempt to create a unique index on (instance, included)
-        # for sqlite as well for integrity checking, but sqlite's performance will hurt
-        cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
-        # this index is so we can quickly tell what troves are needed
-        # by another trove
+        # This index is used to enforce that TroveTroves only contains
+        # unique TroveTrove (instanceId, includedId) pairs.
+        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+                   "TroveTroves(instanceId,includedId)")
+        # this index is so we can quickly tell what troves are needed by another trove
         cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
         commit = True
     if createTrigger(db, "TroveTroves"):
@@ -724,6 +721,7 @@ class MigrateTo_5(SchemaMigration):
 class MigrateTo_6(SchemaMigration):
     Version = 6
     def migrate(self):
+        from conary import trove
         # calculate path hashes for every trove
         instanceIds = [ x[0] for x in self.cu.execute(
                 "select instanceId from instances") ]
@@ -788,31 +786,71 @@ class MigrateTo_7(SchemaMigration):
 class MigrateTo_8(SchemaMigration):
     Version = 8
     def migrate(self):
+        # these views will have to be recreated because of the changed column names
+        if "UserPermissions" in self.db.views:
+            self.cu.execute("DROP VIEW UserPermissions")
+        if "UsersView" in self.db.views:
+            self.cu.execute("DROP VIEW UsersView")
+        # drop oldLatest - obsolete table from many migrations ago
+        if "oldLatest" in self.db.tables:
+            self.cu.execute("DROP TABLE oldLatest")
         # Permissions.write -> Permissions.canWrite
-        for idx in self.db.tables["Permissions"]:
+        # Users.user -> Users.userName
+        for idx in self.db.tables["Permissions"] + self.db.tables["Users"]:
             self.cu.execute("DROP INDEX %s" % (idx,))
         self.cu.execute("ALTER TABLE Permissions RENAME TO oldPermissions")
-        createUsers(db)
+        self.cu.execute("ALTER TABLE Users RENAME TO oldUsers")
+        self.db.loadSchema()
+        createUsers(self.db)
         self.cu.execute("""
         INSERT INTO Permissions
         (userGroupId, labelId, itemId, canWrite, admin)
         SELECT userGroupId, labelId, itemId, write, admin
         FROM oldPermissions
         """)
+        self.cu.execute("""
+        INSERT INTO Users
+        (userId, userName, salt, password)
+        SELECT userId, user, salt, password
+        FROM oldUsers
+        """)
         self.cu.execute("DROP TABLE oldPermissions")
-        # drop oldLatest
-        if "oldLatest" in self.db.tables:
-            self.cu.execute("DROP TABLE oldLatest")
+        self.cu.execute("DROP TABLE oldUsers")
         # add the changed columns to the important tables
+        # Note: Permissions and Users have been recreated, they
+        # already should have triggers defined
         for table in ["Instances", "Nodes", "ChangeLogs", "Latest",
-                      "Users", "UserGroups", "Permissions",
-                      "EntitlementGroups", "Entitlements",
+                      "UserGroups", "EntitlementGroups", "Entitlements",
                       "PGPKeys", "PGPFingerprints",
-                      "TroveFiles", "TroveTroves",
+                      "TroveFiles", "TroveTroves", "FileStreams",
                       "TroveInfo", "Metadata", "MetadataItems"]:
+            logMe(3, "add changed column and triggers to", table)
             self.cu.execute("ALTER TABLE %s ADD COLUMN "
                             "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
             createTrigger(self.db, table)
+        # indexes we changed
+        self.cu.execute("CREATE INDEX EntitlementOwnersOwnerIdx ON "
+                        "EntitlementOwners(ownerGroupId)")
+        self.cu.execute("CREATE INDEX TroveInfoTypeIdx ON "
+                        "TroveInfo(infoType, instanceId)")
+        if "TroveInfoIdx2" in self.db.tables["TroveInfo"]:
+            self.cu.execute("DROP INDEX TroveInfoIdx2")
+        if "TroveTrovesInstanceIdx" in self.db.tables["TroveTroves"]:
+            self.cu.execute("DROP INDEX TroveTrovesInstanceIdx")
+        self.cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+                        "TroveTroves(instanceId,includedId)")
+        self.cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
+        self.cu.execute("DROP INDEX UserGroupMembersIdx")
+        self.cu.execute("DROP INDEX UserGroupMembersIdx2")
+        self.cu.execute("CREATE UNIQUE INDEX UserGroupMembers_uq ON "
+                        "UserGroupMembers(userGroupId, userId)")
+        self.cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
+                        "UserGroupMembers(userId)")
+        if "UserGroupsUserGroupIdx" in self.db.tables["UserGroups"]:
+            self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
+        self.cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
+                        "UserGroups(userGroup)")
+        # done...
         self.db.loadSchema()
         return self.Version
 
@@ -869,12 +907,13 @@ def checkVersion(db):
         version = db.setVersion(VERSION)
 
     # surely there is a more better way of handling this...
-    if version == 1: MigrateTo_2(db)()
-    if version == 2: MigrateTo_3(db)()
-    if version == 3: MigrateTo_4(db)()
-    if version == 4: MigrateTo_5(db)()
-    if version == 5: MigrateTo_6(db)()
-    if version == 6: MigrateTo_7(db)()
+    if version == 1: version = MigrateTo_2(db)()
+    if version == 2: version = MigrateTo_3(db)()
+    if version == 3: version = MigrateTo_4(db)()
+    if version == 4: version = MigrateTo_5(db)()
+    if version == 5: version = MigrateTo_6(db)()
+    if version == 6: version = MigrateTo_7(db)()
+    if version == 7: version = MigrateTo_8(db)()
 
     return version
 

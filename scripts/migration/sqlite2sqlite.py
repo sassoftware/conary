@@ -13,6 +13,11 @@
 # full details.
 #
 
+# There are certain schema changing operations that can not be done
+# through the automatic schema migration (constraints, schema
+# definition formatting, etc). This script will regenerate the sqlite
+# schema into a new file and transfer data over
+
 import sys
 import os
 if 'CONARY_PATH' in os.environ:
@@ -28,27 +33,27 @@ from conary.repository.netrepos.schema import VERSION
 from schema import getTables, getIndexes
 
 if len(sys.argv) != 3:
-    print "Usage: migrate <sqlite_path> <mysql_spec>"
+    print "Usage: migrate <sqldb-orig> <sqldb-new>"
 
-sqlite = dbstore.connect(sys.argv[1], driver = "sqlite")
-cs = sqlite.cursor()
-mysql = dbstore.connect(sys.argv[2], driver = "mysql")
-cm = mysql.cursor()
+source = dbstore.connect(sys.argv[1], driver = "sqlite")
+cs = source.cursor()
+dest = dbstore.connect(sys.argv[2], driver = "sqlite")
+cp = dest.cursor()
 
 # create the tables, avoid the indexes
-for stmt in getTables("mysql"):
+for stmt in getTables("sqlite"):
     print stmt
-    cm.execute(stmt)
-mysql.loadSchema()
+    cp.execute(stmt)
+dest.loadSchema()
 
-for t in sqlite.tables.keys():
-    if t in mysql.tables:
+for t in source.tables.keys():
+    if t in dest.tables:
         continue
-    print "Only in sqlite:", t
-for t in mysql.tables.keys():
-    if t in sqlite.tables:
+    print "Only in source:", t
+for t in dest.tables.keys():
+    if t in source.tables:
         continue
-    print "Only in mysql:", t
+    print "Only in dest:", t
 
 tList = [
     'Branches',
@@ -83,30 +88,6 @@ tList = [
     'TroveFiles',
     ]
 
-BATCH=400
-TICK=10
-
-def hexstr(s):
-    return "".join("%02x" % ord(c) for c in s)
-
-def sqlstr(val):
-    if isinstance(val, (types.IntType, types.FloatType)):
-        return str(val)
-    elif isinstance(val, types.StringType):
-        return "x'%s'" % hexstr(val)
-    elif val is None:
-        return "NULL"
-    elif isinstance(val, tuple):
-        return "(" + ",".join([sqlstr(x) for x in val]) + ")"
-    # ugly sqlite hack - why does sqlite makes it so hard to get a
-    # real tuple out of a row without peeking inside the instance
-    # structure?!
-    elif hasattr(val, "data"):
-        return sqlstr(val.data)
-    else:
-        raise AttributeError("We're not handling a value correctly", val, type(val))
-
-
 def timings(current, total, tstart):
     tnow = time.time()
     tpassed = max(tnow-tstart,1)
@@ -118,22 +99,8 @@ def timings(current, total, tstart):
         tpassed/60, tpassed % 60,
         tremaining/60, tremaining % 60)
 
-def slow_insert(t, fields, rows):
-    global mysql, cm
-    for row in rows:
-        assert(len(fields) == len(row))
-        sql = "INSERT INTO %s (%s) VALUES %s" % (
-            t, ", ".join(fields), sqlstr(row))
-        try:
-            cm.execute(sql)
-        except sqlerrors.ConstraintViolation, e:
-            print
-            print "%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
-            print e.msg
-            print
-    mysql.commit()
+BATCH=5000
 
-cm.execute("SET SESSION AUTOCOMMIT = 0")
 for t in tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
@@ -156,42 +123,26 @@ for t in tList:
             for row in rows:
                 row[2] = int(row[2])
             rows = [tuple(row) for row in rows]
-        sql = "INSERT INTO %s (%s) VALUES" % (t, ", ".join(fields))
-        sql += ", ".join([sqlstr(row) for row in rows])
-        i += len(rows)
-        try:
-            cm.execute(sql)
-        except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING" % t, row
-        except sqlerrors.ConstraintViolation:
-            slow_insert(t, fields, rows)
-        except:
-            print "ERROR - SQL", sql
-            raise
-        else:
-            if i % (BATCH*TICK) == 0:
-                t2 = time.time()
-                sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
-                sys.stdout.flush()
-            if i % (BATCH*TICK*5) == 0:
-                mysql.commit()
+        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
+            t, ", ".join(fields), ",".join(["?"]*len(fields)))
+        for row in rows:
+            i += 1
+            try:
+                cp.execute(sql, tuple(row))
+            except:
+                print "ERROR - SQL", sql, row
+                raise
+        t2 = time.time()
+        sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
+        sys.stdout.flush()
+        if i % (BATCH*5) == 0:
+            dest.commit()
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-    mysql.commit()
+    dest.commit()
 
 # and now create the indexes
-wtList = ["%s WRITE" % x for x in tList]
-sql = "LOCK TABLES %s" % ", ".join(wtList)
-for stmt in getIndexes("mysql"):
-    # in MySQL, tables need to be locked every time we create an index
-    if stmt.lower().startswith("create trigger"):
-        cm.execute("UNLOCK TABLES")
-    else:
-        cm.execute(sql)
+for stmt in getIndexes("sqlite"):
     print stmt
-    try:
-        cm.execute(stmt)
-    except sqlerrors.DatabaseError, e:
-        print e.msg
-    cm.execute("UNLOCK TABLES")
-mysql.setVersion(VERSION)
-mysql.commit()
+    cp.execute(stmt)
+dest.setVersion(VERSION)
+dest.commit()

@@ -1,4 +1,17 @@
 #!/usr/bin/python
+#
+# Copyright (c) 2005-2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
 
 import sys
 import os
@@ -69,27 +82,6 @@ tList = [
     'FileStreams',
     'TroveFiles',
     ]
-
-def hexstr(s):
-    return "".join("%02x" % ord(c) for c in s)
-
-def sqlstr(val):
-    if isinstance(val, (types.IntType, types.FloatType)):
-        return str(val)
-    elif isinstance(val, types.StringType):
-        return "x'%s'" % hexstr(val)
-    elif val is None:
-        return "NULL"
-    elif isinstance(val, tuple):
-        return "(" + ",".join([sqlstr(x) for x in val]) + ")"
-    # ugly sqlite hack - why does sqlite makes it so hard to get a
-    # real tuple out of a row without peeking inside the instance
-    # structure?!
-    elif hasattr(val, "data"):
-        return sqlstr(val.data)
-    else:
-        raise AttributeError("We're not handling a value correctly", val, type(val))
-
 
 def timings(current, total, tstart):
     tnow = time.time()

@@ -19,7 +19,6 @@ from base_drv import BaseKeywordDict
 import sqlerrors
 
 class KeywordDict(BaseKeywordDict):
-
     keys = BaseKeywordDict.keys
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
     keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
@@ -45,7 +44,7 @@ class Cursor(BindlessCursor):
             raise sqlerrors.DatabaseError(e.args[1], e.args)
         return self
 
-# Sequence implementation for sqlite
+# Sequence implementation for mysql
 class Sequence(BaseSequence):
     def __init__(self, db, name, cu = None):
         BaseSequence.__init__(self, db, name)

@@ -19,7 +19,7 @@ from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
 
-VERSION = 14
+VERSION = 15
 
 def resetTable(cu, name):
     try:
@@ -92,7 +92,6 @@ def createTroveTroves(db):
     if "TroveTroves" in db.tables:
         return
     cu = db.cursor()
-    # FIXME: add foreign keys
     cu.execute("""
     CREATE TABLE TroveTroves(
         instanceId      INTEGER,
@@ -100,13 +99,11 @@ def createTroveTroves(db):
         byDefault       BOOLEAN,
         inPristine      BOOLEAN
     )""")
-    # FIXME: this index is redundant. The UNIQUE below index should suffice
-    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON TroveTroves(instanceId)")
     # this index is so we can quickly tell what troves are needed by another trove
     cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
-    # XXX this index is used to enforce that TroveTroves only
-    # contains unique TroveTrove (instanceId, includedId) pairs.
-    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstIncIdx ON "
+    # This index is used to enforce that TroveTroves only contains
+    # unique TroveTrove (instanceId, includedId) pairs.
+    cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
                "TroveTroves(instanceId,includedId)")
     db.commit()
     db.loadSchema()
@@ -126,8 +123,7 @@ def createTroveInfo(db):
             ON DELETE CASCADE ON UPDATE CASCADE
     )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-    # FIXME: kill it in the schema migration as well
-    #cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
+    cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, instanceId)")
     db.commit()
     db.loadSchema()
 
@@ -154,7 +150,6 @@ def createMetadata(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
         commit = True
-    # FIXME: create an index here too
     if 'MetadataItems' not in db.tables:
         cu.execute("""
         CREATE TABLE MetadataItems(
@@ -167,6 +162,7 @@ def createMetadata(db):
                 FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
         commit = True
     if commit:
         db.commit()
@@ -646,6 +642,25 @@ class MigrateTo_14(SchemaMigration):
                            WHERE trovename LIKE '%:%')""")
         return self.Version
 
+class MigrateTo_15(SchemaMigration):
+    Version = 15
+    def migrate(self):
+        # some indexes have changed - we need to update the local schema
+        if "TroveInfoIdx2" in self.db.tables["TroveInfo"]:
+            self.cu.execute("DROP INDEX TroveInfoIdx2")
+        self.cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, instanceId)")
+        if "TroveTrovesInstanceIdx" in self.db.tables["TroveTroves"]:
+            self.cu.execute("DROP INDEX TroveTrovesInstanceIdx")
+        if "TroveTrovesInstIncIdx" in self.db.tables["TroveTroves"]:
+            self.cu.execute("DROP INDEX TroveTrovesInstIncIdx")
+        if "TroveTrovesInstanceIncluded_uq" not in self.db.tables["TroveTroves"]:
+            self.cu.execute(
+                       "CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+                       "TroveTroves(instanceId,includedId)")
+        self.db.commit()
+        self.db.loadSchema()
+        return self.Version
+
 
 def checkVersion(db):
     global VERSION
@@ -674,6 +689,7 @@ def checkVersion(db):
     if version == 11: version = MigrateTo_12(db)()
     if version == 12: version = MigrateTo_13(db)()
     if version == 13: version = MigrateTo_14(db)()
+    if version == 14: version = MigrateTo_15(db)()
 
     return version
 
