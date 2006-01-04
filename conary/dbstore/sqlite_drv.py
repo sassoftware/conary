@@ -50,9 +50,7 @@ class Cursor(BaseCursor):
             kw.update(args[0])
             return self._cursor.execute(sql, **kw)
         # special case the start_transaction parameter
-        st = kw.get("start_transaction", True)
-        if kw.has_key("start_transaction"):
-            del kw["start_transaction"]
+        st = kw.pop("start_transaction", True)
         if len(kw):
             raise sqlerrors.CursorError(
                 "Do not pass both positional and named bind arguments",

@@ -420,7 +420,7 @@ def createPGPKeys(db):
             userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
