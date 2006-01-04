@@ -260,7 +260,7 @@ def createUsers(db):
             password        %(BINARY254)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX UsersUserIdx on Users(userId)")
+        cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
         commit = True
 
     if createTrigger(db, "Users"):
@@ -845,6 +845,8 @@ class MigrateTo_8(SchemaMigration):
                         "UserGroupMembers(userGroupId, userId)")
         self.cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
                         "UserGroupMembers(userId)")
+        self.cu.execute("DROP INDEX UsersUserIdx")
+        self.cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
         # done...
         self.db.loadSchema()
         return self.Version
