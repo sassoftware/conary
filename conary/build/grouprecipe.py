@@ -75,13 +75,16 @@ class SingleGroup:
         allPathHashes = []
         checkPathConflicts = self.checkPathConflicts
 
+        # FIXME: perhaps this should be a config options?
+        checkNotByDefaultPaths = False
+
         for (n,v,f), (explicit, size, byDefault, pathHashes) in self.troves.iteritems():
             l = self.troveVersionFlavors.setdefault(n,[])
             l.append((v,f,byDefault,explicit))
             if trove.troveIsCollection(n):
                 continue
-            if not explicit and size is None:
-                if byDefault:
+            if not explicit and (size is None or pathHashes is None):
+                if byDefault or checkNotByDefaultPaths:
                     implicit.append((n,v,f))
                 continue
             if size is None:
@@ -581,7 +584,7 @@ class GroupRecipe(Recipe):
     # maintain addTrove for backwards compatability
     addTrove = add
 
-    def setGroupByDefault(self, byDefault=True, groupName=None):
+    def setByDefault(self, byDefault=True, groupName=None):
         """ Set whether troves added to this group are installed by default 
             or not.  (This default value can be overridden by the byDefault
             parameter to individual addTrove commands).  If you set the 
@@ -590,7 +593,7 @@ class GroupRecipe(Recipe):
         """
         groupNames = self._parseGroupNames(groupName)
         for groupName in groupNames:
-            self.groups[groupName].setGroupByDefault(byDefault)
+            self.groups[groupName].setByDefault(byDefault)
 
     def removeComponents(self, componentNames, groupName=None):
         if isinstance(componentNames, str):
