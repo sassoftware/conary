@@ -200,7 +200,15 @@ Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
 .B updateall
-.\" FIXME: document
+Iterates through all the packages installed by anaconda and manually by the
+users and updates with the most recent version in the repository. This does not
+scan every package installed unless the system was installed before groups came
+into use. Thus, if foo:lib has been updated upstream but is only installed on
+your system because its a member of group-dist, it will only be updated to the
+version in group-dist. If, however, foo:lib was installed by "conary update
+foo:lib", \fBupdateall\fP will scan the repository for an update.
+\fBupdateall\fP will also not update packages installed from local cooks or
+emerges.
 .RS 4
 .TP 4
 .B \-\-exclude-troves <patterns>
