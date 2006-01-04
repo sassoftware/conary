@@ -649,9 +649,9 @@ class MigrateTo_15(SchemaMigration):
         if "TroveTrovesInstIncIdx" in self.db.tables["TroveTroves"]:
             self.cu.execute("DROP INDEX TroveTrovesInstIncIdx")
         if "TroveTrovesInstanceIncluded_uq" not in self.db.tables["TroveTroves"]:
-            cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+            self.cu.execute(
+                       "CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
                        "TroveTroves(instanceId,includedId)")
-        self.cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
         self.db.commit()
         self.db.loadSchema()
         return self.Version
