@@ -722,6 +722,7 @@ class MigrateTo_5(SchemaMigration):
 class MigrateTo_6(SchemaMigration):
     Version = 6
     def migrate(self):
+        from conary import trove
         # calculate path hashes for every trove
         instanceIds = [ x[0] for x in self.cu.execute(
                 "select instanceId from instances") ]
