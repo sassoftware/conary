@@ -825,6 +825,7 @@ class MigrateTo_8(SchemaMigration):
                       "PGPKeys", "PGPFingerprints",
                       "TroveFiles", "TroveTroves", "FileStreams",
                       "TroveInfo", "Metadata", "MetadataItems"]:
+            logMe(3, "add changed column and triggers to", table)
             self.cu.execute("ALTER TABLE %s ADD COLUMN "
                             "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
             createTrigger(self.db, table)
@@ -907,13 +908,13 @@ def checkVersion(db):
         version = db.setVersion(VERSION)
 
     # surely there is a more better way of handling this...
-    if version == 1: MigrateTo_2(db)()
-    if version == 2: MigrateTo_3(db)()
-    if version == 3: MigrateTo_4(db)()
-    if version == 4: MigrateTo_5(db)()
-    if version == 5: MigrateTo_6(db)()
-    if version == 6: MigrateTo_7(db)()
-    if version == 7: MigrateTo_8(db)()
+    if version == 1: version = MigrateTo_2(db)()
+    if version == 2: version = MigrateTo_3(db)()
+    if version == 3: version = MigrateTo_4(db)()
+    if version == 4: version = MigrateTo_5(db)()
+    if version == 5: version = MigrateTo_6(db)()
+    if version == 6: version = MigrateTo_7(db)()
+    if version == 7: version = MigrateTo_8(db)()
 
     return version
 
