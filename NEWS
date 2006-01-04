@@ -1,4 +1,11 @@
 Changes in @NEW@:
+  o Documentation Changes:
+    * Added summaries about updateall in the conary man page and added
+      information about the command-line options for conary rq.
+    * Clarified behaviour of "conary shadow --source-only" with respect to
+      rPath bug #500.
+    * Added synonyms for cvc and conary commands which have shortcuts
+      (ex: checkout and co).
   o Build Changes:
     * Build logs now contain unexpanded macros, since not all macros
       may be defined when the build log is initially created.

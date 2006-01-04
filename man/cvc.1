@@ -146,12 +146,14 @@ Check the \fI<trove>\fB:source\fR component out of the repository
 and put it in directory \fI<dir>\fP if specified, and directory
 \fI<trove>\fP otherwise.  Fetches the most recent version
 specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
+Synonyms: \fBco\fP
 .TP
 .B commit [\-\-message \fI<message>\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
 It will ask for a changelog message unless one is passed on the
 command line with \fB\-\-message\fP.  
+Synonyms: \fBci\fP
 .TP
 .B context [name]\fP
 When not passed a name, displays information about the current context.  
@@ -193,6 +195,7 @@ a source trove from the repository.
 Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
 the file from the filesystem and marks it to be removed from the next
 version checked into the repository at the next \fBcvc commit\fP.
+Synonyms: \fBrm\fP
 .TP
 .B rename \fI<oldname> <newname>\fP
 Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
@@ -222,6 +225,7 @@ respective signatures will be rejected.
 .B update [\fI<version>\fP]
 Updates the current source directory to the latest version, or to
 \fI<version>\fP if specified.  Merges changes when possible.
+Synonyms: \fBup\fP
 .RE
 .\"
 .\"
