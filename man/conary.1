@@ -81,7 +81,8 @@ represented in the repository.
 .B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
 Lists troves installed on the local system. Any number of trove names or
 absolute paths may be given. Extra arguments may be given to change what
-information is displayed (but they cannot be combined, unfortunately).
+information is displayed (but they cannot be combined, unfortunately). Can be
+abreviated as "\fBq\fP".
 .RS 4
 .TP 4
 .B \-\-deps
@@ -239,7 +240,7 @@ through a \fBconary update conary\fP invocation.
 .RE
 .TP
 .B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
-Lists troves in the repository.
+Lists troves in the repository. Can be abreviated as "\fBrq\fP".
 Arguments include
 .RS 4
 .TP 4
@@ -247,31 +248,31 @@ Arguments include
 .\" FIXME: document
 .TP
 .B \-\-buildreqs
-Displays the troves that fulfilled the build requirements of the trove
+Displays the troves that fulfilled the build requirements of the trove.
 .TP
 .B \-\-deps
-.\" FIXME: document
+Displays full dependency information.
 .TP
 .B \-\-flavors
-Displays flavors of the troves
+Displays flavors of the troves.
 .TP
 .B \-\-full-versions
-.\" FIXME: document
+Full version strings are displayed instead of abbreviated version numbers.
 .TP
 .B \-\-ids
 .\" FIXME: document
 .TP
 .B \-\-info
-.\" FIXME: document
+Displays information on the specified troves, including flavors, and requirements.
 .TP
 .B \-\-leaves
 .\" FIXME: document
 .TP
 .B \-\-ls
-.\" FIXME: document
+Lists the files in the changeset.
 .TP
 .B \-\-sha1s
-.\" FIXME: document
+Lists the sha1s of all the file contents in the changeset.
 .TP
 .B \-\-tags
 .\" FIXME: document
@@ -291,14 +292,14 @@ within all packages in the changeset will be displayed.
 .RS 4
 .TP 4
 .B \-\-full-versions
-Does not attempt to shorten version strings for display
+Does not attempt to shorten version strings for display.
 .\" FIXME: add semantics
 .TP
 .B \-\-deps
 Displays provides and requires information about the troves in the changeset.
 .TP
 .B \-\-ls
-Lists the files in the changeset
+Lists the files in the changeset.
 .TP
 .B \-\-show-changes
 For files that have been modified, lists the old version of the file above the
