@@ -12,13 +12,13 @@
 # full details.
 #
 
-python_files = schema.py  sqlite2mysql.py  sqlite2pgsql.py
+python_files = schema.py  sqlite2mysql.py  sqlite2pgsql.py sqlite2sqlite.py
 
-extra_dist = 
+extra_dist =
 
 dist_files = $(python_files) $(extra_dist)
 
-SUBDIRS	= 
+SUBDIRS	=
 
 all: default-subdirs default-all
 
