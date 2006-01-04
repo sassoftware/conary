@@ -30,6 +30,9 @@ Changes in @NEW@:
       collection and the children of collections it contains.  This allows
       us to add several new features to conary, documented in Client and Build
       changes.
+  o Config Changes:
+    * Conary config handling now supports comments at the end of config lines.
+      # can be escaped by a \ to use a literal # in a configuration option.
 
 Changes in 0.80.4:
   o Build Changes:

@@ -851,7 +851,7 @@ class FileRetriever:
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
             self.cu.execute("INSERT INTO getFilesTbl VALUES(?, ?)",
-                            cu.binary(itemId), cu.binary(fileId), 
+                            self.cu.binary(itemId), self.cu.binary(fileId), 
                             start_transaction = False)
             lookup[itemId] = (pathId, fileId)
 
@@ -865,7 +865,7 @@ class FileRetriever:
         for itemId, stream in self.cu:
             pathId, fileId = lookup[itemId]
             if stream is not None:
-                f = files.ThawFile(cu.frombinary(stream), pathId)
+                f = files.ThawFile(self.cu.frombinary(stream), pathId)
             else:
                 f = None
             d[(pathId, fileId)] = f

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -19,8 +19,12 @@ import time
 from conary import sqlite3
 from conary.lib.tracelog import logMe
 
-from base_drv import BaseDatabase, BaseCursor, BaseSequence
+from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseKeywordDict
 import sqlerrors
+
+class KeywordDict(BaseKeywordDict):
+    keys = BaseKeywordDict.keys
+    keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
 # implement the regexp function for sqlite
 def _regexp(pattern, item):
@@ -143,8 +147,7 @@ class Database(BaseDatabase):
     basic_transaction = "begin immediate"
     VIRTUALS = [ ":memory:" ]
     TIMEOUT = 10000
-    keywords = BaseDatabase.keywords
-    keywords['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
+    keywords = KeywordDict()
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -168,7 +171,7 @@ class Database(BaseDatabase):
             self.closed = False
             return True
 	sb = os.stat(self.database)
-        self.inode= (sb.st_dev, sb.st_ino)
+        self.inode = (sb.st_dev, sb.st_ino)
         self.closed = False
         return True
 
@@ -192,6 +195,8 @@ class Database(BaseDatabase):
             return self.version
         for (type, name, tbl_name) in slist:
             if type == "table":
+                if name in ["sqlite_master", "sqlite_sequence"]:
+                    continue
                 if name.endswith("_sequence"):
                     self.sequences.setdefault(name[:-len("_sequence")], None)
                 else:
@@ -199,6 +204,8 @@ class Database(BaseDatabase):
             elif type == "view":
                 self.views.setdefault(name, None)
             elif type == "index":
+                if name.startswith("sqlite_autoindex_"):
+                    continue
                 self.tables.setdefault(tbl_name, []).append(name)
             elif type == "trigger":
                 self.triggers.setdefault(name, tbl_name)
