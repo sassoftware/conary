@@ -409,16 +409,15 @@ def createPGPKeys(db):
     cu = db.cursor()
     commit = False
     if "PGPKeys" not in db.tables:
+        # userId can be null (and hence so not in the usertable) when pgp
+        # keys are imported by mirrors or proxies
         cu.execute("""
         CREATE TABLE PGPKeys(
             keyId           %(PRIMARYKEY)s,
-            userId          INTEGER NOT NULL,
+            userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT PGPKeys_userId_fk
-                FOREIGN KEY (userId) REFERENCES Users(userId)
-                ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
