@@ -126,8 +126,6 @@ def createTroveInfo(db):
             ON DELETE CASCADE ON UPDATE CASCADE
     )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-    # FIXME: kill it in the schema migration as well
-    #cu.execute("CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, data)")
     db.commit()
     db.loadSchema()
 
