@@ -845,9 +845,8 @@ class MigrateTo_8(SchemaMigration):
                         "UserGroupMembers(userGroupId, userId)")
         self.cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
                         "UserGroupMembers(userId)")
-        self.cu.execute("DROP INDEX UsersUserIdx")
-        self.cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
-        self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
+        if "UserGroupsUserGroupIdx" in self.db.tables["UserGroups"]:
+            self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
         self.cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
                         "UserGroups(userGroup)")
         # done...
