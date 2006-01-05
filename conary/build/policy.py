@@ -276,8 +276,7 @@ class Policy(action.RecipeAction):
 
     def _addClassName(self, args):
         args = list(args)
-        classname = str(self.__class__).split('.')[-1]
-        args[0] = ': '.join((classname, args[0]))
+        args[0] = ': '.join((self.__class__.__name__, args[0]))
         return args
 
     def dbg(self, *args, **kwargs):
