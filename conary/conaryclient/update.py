@@ -261,7 +261,7 @@ class ClientUpdate:
                                           keepExisting = False,
                                           recurse = False,
                                           ineligible = beingRemoved,
-                                          checkPrimaryPins = False)
+                                          checkPrimaryPins = True)
                 assert(not (newJob & jobSet))
                 jobSet.update(newJob)
 
@@ -936,11 +936,12 @@ conary unpin '%s=%s%s'
 conary erase '%s=%s%s'
 """ % ((name, name, name) + replacedInfo + replacedInfo))
                         else:
-                            if isPrimary and checkPrimaryPins:
+                            if not isPrimary:
+                                recurseThis = False
+                                break
+                            elif checkPrimaryPins:
                                 raise UpdatePinnedTroveError(replacedInfo, 
                                                              newInfo)
-
-                            break
 
                 newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), 
                            False))
