@@ -748,6 +748,9 @@ class SchemaMigration(migration.SchemaMigration):
 class MigrateTo_2(SchemaMigration):
     Version = 2
     def migrate(self):
+        # create the OpenPGP tables
+        createPGPKeys(self.db)
+
         ## First insert the new Item and Label keys
         self.cu.execute("INSERT INTO Items (itemId, item) VALUES(0, 'ALL')")
         self.cu.execute("INSERT INTO Labels (labelId, label) VALUES(0, 'ALL')")
@@ -764,8 +767,8 @@ class MigrateTo_2(SchemaMigration):
                 table)
 
         ## Finally fix the index
-        cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
+        self.cu.execute("DROP INDEX PermissionsIdx")
+        self.cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
                    "Permissions(userGroupId, labelId, itemId)")
         return self.Version
 
@@ -776,16 +779,49 @@ class MigrateTo_3(SchemaMigration):
         self.cu.execute("CREATE INDEX LatestItemIdx on Latest(itemId)")
         return self.Version
 
-# FIXME: we should incorporate the script here
 class MigrateTo_4(SchemaMigration):
     Version = 4
     def migrate(self):
-        from conary.lib.tracelog import printErr
-        printErr("""
-        Conversion to version 4 requires script available
-        from http://wiki.rpath.com/ConaryConversion
-        """)
-        return 0
+        import itertools
+        from conary.local import deptable
+        from conary.deps import deps
+
+        class FakeTrove:
+            def setRequires(self, req):
+                self.r = req
+            def setProvides(self, prov):
+                self.p = prov
+            def getRequires(self):
+                return self.r
+            def getProvides(self):
+                return self.p
+            def __init__(self):
+                self.r = deps.DependencySet()
+                self.p = deps.DependencySet()
+
+        instances = [ x[0] for x in 
+                      self.cu.execute("select instanceId from Instances") ]
+        dtbl = deptable.DependencyTables(self.db)
+        troves = []
+
+        logMe(1, 'Reading %d instances' % len(instances))
+        for i, instanceId in enumerate(instances):
+            logMe(3, "Reading %d of %d..." % (i + 1, len(instances)))
+
+            trv = FakeTrove()
+            dtbl.get(self.cu, trv, instanceId)
+            troves.append(trv)
+
+        self.cu.execute("delete from dependencies")
+        self.cu.execute("delete from requires")
+        self.cu.execute("delete from provides")
+
+        logMe(1, 'Reading %d instances' % len(instances))
+        for i, (instanceId, trv) in enumerate(itertools.izip(instances, troves)):
+            logMe(3, 'Writing %d of %d...' % (i + 1, len(instances)))
+            dtbl.add(self.cu, trv, instanceId)
+
+        return self.Version
 
 class MigrateTo_5(SchemaMigration):
     Version = 5
@@ -911,9 +947,16 @@ class MigrateTo_8(SchemaMigration):
                       "PGPKeys", "PGPFingerprints",
                       "TroveFiles", "TroveTroves", "FileStreams",
                       "TroveInfo", "Metadata", "MetadataItems"]:
-            logMe(3, "add changed column and triggers to", table)
-            self.cu.execute("ALTER TABLE %s ADD COLUMN "
-                            "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
+
+            try:
+                self.cu.execute("ALTER TABLE %s ADD COLUMN "
+                                "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
+                logMe(3, "add changed column and triggers to", table)
+            except sqlerrors.DuplicateColumnName:
+                # the column already exists, probably because we created
+                # a brand new table.  Then it would use the already-current
+                # schema
+                pass
             createTrigger(self.db, table)
         # indexes we changed
         if "TroveInfoIdx2" in self.db.tables["TroveInfo"]:
@@ -954,7 +997,7 @@ class MigrateTo_9(SchemaMigration):
         INSERT INTO TroveTroves2 
             SELECT instanceId, includedId, 
                    CASE WHEN byDefault THEN %d ELSE 0 END, 
-                   inPristine, changed
+                   changed
             FROM TroveTroves''' % TROVE_TROVES_BYDEFAULT)
 
         cu.execute('DROP TABLE TroveTroves')
