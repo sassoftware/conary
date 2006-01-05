@@ -20,7 +20,7 @@ from conary.local.schema import createMetadata, resetTable
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 8
+VERSION = 9
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.trigger(table, column, "INSERT")
@@ -860,6 +860,7 @@ class MigrateTo_8(SchemaMigration):
 class MigrateTo_9(SchemaMigration):
     Version = 9
     def migrate(self):
+        cu = self.cu
         cu.execute("""
             CREATE TABLE TroveTroves2(
             instanceId      INTEGER NOT NULL,
