@@ -195,9 +195,6 @@ class SingleGroup:
     def _foundTrove(self, troveTup, explicit, byDefault, 
                     isRedirect=False, size=None, components=None, 
                     childTroves=None, pathHashes=None):
-        if size is not None and pathHashes is None:
-            import epdb
-            epdb.st()
         if explicit:
             if isRedirect:
                 # we check later to ensure that all redirects added 
