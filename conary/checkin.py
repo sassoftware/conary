@@ -389,7 +389,7 @@ def commit(repos, cfg, message, callback=None):
         print
         print '\t%s=%s' % (recipeObj.name, newVersion.asString())
         print
-        okay = cmdline.askYn('continue with update? [Y/n]', default=True)
+        okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
 
         if not okay:
             return
