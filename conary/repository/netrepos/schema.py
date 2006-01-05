@@ -417,7 +417,10 @@ def createPGPKeys(db):
             userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT PGPKeys_userId_fk
+                FOREIGN KEY (userId) REFERENCES Users(userId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
