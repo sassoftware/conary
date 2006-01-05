@@ -360,6 +360,8 @@ def createUsers(db):
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX EntitlementGroupsEntGroupIdx ON "
                    "EntitlementGroups(entGroup)")
+        cu.execute("CREATE INDEX EntitlementGroupsUGIdx ON "
+                   "EntitlementGroups(userGroupId)")
         commit = True
 
     if createTrigger(db, "EntitlementGroups"):
@@ -854,6 +856,9 @@ class MigrateTo_8(SchemaMigration):
                         "UserGroups(userGroup)")
         if "LatestItemIdx" in self.db.tables["Latest"]:
             self.cu.execute("DROP INDEX LatestItemIdx")
+        if "EntitlementGroupsUGIdx" not in self.db.tables["EntitlementGroups"]:
+            self.cu.execute("CREATE INDEX EntitlementGroupsUGIdx ON "
+                            "EntitlementGroups(userGroupId)")
         # done...
         self.db.loadSchema()
         return self.Version
