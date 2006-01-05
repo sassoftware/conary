@@ -195,6 +195,9 @@ class SingleGroup:
     def _foundTrove(self, troveTup, explicit, byDefault, 
                     isRedirect=False, size=None, components=None, 
                     childTroves=None, pathHashes=None):
+        if size is not None and pathHashes is None:
+            import epdb
+            epdb.st()
         if explicit:
             if isRedirect:
                 # we check later to ensure that all redirects added 
@@ -364,7 +367,8 @@ class SingleGroup:
             # components is.
             byDefault = bool([ x for x in childTroves if x[1]])
 
-            self._foundTrove(troveTup, True, byDefault, False, trv.getSize())
+            self._foundTrove(troveTup, True, byDefault, False, trv.getSize(),
+                             [], [], [])
 
             for childTup, childByDefault in childTroves:
                 # this is after implicit troves have been added 
@@ -386,7 +390,7 @@ class SingleGroup:
                             childByDefault = False
                     
                 self._foundTrove(trove, False, childByDefault, False, size,
-                                 pathHashes)
+                                 [], [], pathHashes)
         
         for components, childTroves in self.childTroves.itervalues():
             for (childTrove, byDefault) in childTroves:
