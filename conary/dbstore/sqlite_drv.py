@@ -76,6 +76,10 @@ class Cursor(BaseCursor):
             elif e.args[0] == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
+        except sqlite3.DatabaseError, e:
+            if e.args[0].startswith('duplicate column name:'):
+                raise sqlerrors.DuplicateColumnName(str(e))
+            raise sqlerrors.CursorError(e.args[0], e)
         else:
             if ret == self._cursor:
                 return self

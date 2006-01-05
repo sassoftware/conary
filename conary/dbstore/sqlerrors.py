@@ -46,3 +46,6 @@ class ColumnNotUnique(CursorError):
 
 class ConstraintViolation(CursorError):
     pass
+
+class DuplicateColumnName(CursorError):
+    pass
