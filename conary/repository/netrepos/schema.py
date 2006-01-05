@@ -218,7 +218,6 @@ def createLatest(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
                    "Latest(itemId, branchId, flavorId)")
         commit = True
@@ -853,6 +852,8 @@ class MigrateTo_8(SchemaMigration):
             self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
         self.cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
                         "UserGroups(userGroup)")
+        if "LatestItemIdx" in self.db.tables["Latest"]:
+            self.cu.execute("DROP INDEX LatestItemIdx")
         # done...
         self.db.loadSchema()
         return self.Version
