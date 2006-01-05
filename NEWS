@@ -6,7 +6,7 @@ Changes in @NEW@:
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
-  o Build Changes:
+  o Package Building Changes:
     * Build logs now contain unexpanded macros, since not all macros
       may be defined when the build log is initially created.
     * The emerge command can now accept version strings.
@@ -16,8 +16,27 @@ Changes in @NEW@:
     * The Make() build action can now take a makeName keyword argument
       for cases when the normal Make() handling is exactly right but
       a different make program is required (nmake, qmake, etc.)
+  o Group Building Changes:
+    * add() now takes a "components" option.  r.add(<package>, 
+      components=['devel', 'runtime'])  will install <package>, but only the
+      'runtime' and 'devel' components of <package> by default.
+    * remove() can now 'remove' troves within child troves.  
+    * when a component is added, (either via r.add() or dep resolution)
+      is automatically added as well (though not all its sibling components)
+    * added r.removeComponents(<complist>), which allows you 
+      to create a group where all devel components are byDefault False, 
+      for example. r.removeComponents(['devel', 'devellib'])
+  o Client Changes:
     * When committing source changes in interactive mode, conary will ask you 
       you to confirm the commit.
+    * A new configuration option, autoResolvePackages, tells conary to install
+      the packages that include the components needed for dep resolution.
+  o Code structure:
+    * Conary now has the concept of "weak references", where a weak reference
+      allows conary to be able to recognize the relationship between a 
+      collection and the children of collections it contains.  This allows
+      us to add several new features to conary, documented in Client and Build
+      changes.
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.

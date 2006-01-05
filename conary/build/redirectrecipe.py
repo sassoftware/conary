@@ -73,7 +73,8 @@ class RedirectRecipe(Recipe):
             # this redirects from oldTrove -> newTrove
             d.add((topName, topVersion, topFlavor))
 
-            for (name, version, flavor) in topLevelTrove.iterTroveList():
+            for (name, version, flavor) in topLevelTrove.iterTroveList(strongRefs=True,
+                                                                       weakRefs=True):
                 # redirect from oldTrove -> referencedPackage
                 d.add((name, version, flavor))
 

@@ -213,7 +213,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                recurse = True, info = False, 
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
-                               checkPathConflicts = True):
+                               checkPathConflicts = True, syncChildren = False,
+                               updateOnly = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -240,7 +241,11 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
 
     applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
                                         updateByDefault, allowChangeSets=True)
-
+    if syncChildren:
+        for name, oldInf, newInfo, isAbs in applyList:
+            if not isAbs:
+                log.error('cannot specify erases/relative updates with sync')
+                return
     try:
         _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                       tagScript = tagScript, 
@@ -250,7 +255,9 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                       updateByDefault = updateByDefault, callback = callback, 
                       split = split, sync = sync,
                       fromChangesets = fromChangesets,
-                      checkPathConflicts = checkPathConflicts)
+                      checkPathConflicts = checkPathConflicts,
+                      syncChildren = syncChildren,
+                      updateOnly = updateOnly)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -273,7 +280,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   split=True, sync = False, 
                                   fromChangesets = [],
                                   checkPathConflicts = True, 
-                                  checkPrimaryPins = True):
+                                  checkPrimaryPins = True, 
+                                  syncChildren = False, updateOnly = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -289,7 +297,9 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                callback = callback, split = split,
                                sync = sync, fromChangesets = fromChangesets,
                                checkPathConflicts = checkPathConflicts,
-                               checkPrimaryPins = checkPrimaryPins)
+                               checkPrimaryPins = checkPrimaryPins,
+                               syncChildren = syncChildren,
+                               updateOnly = updateOnly)
     except:
         callback.done()
         raise

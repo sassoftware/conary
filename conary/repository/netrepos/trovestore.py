@@ -255,7 +255,8 @@ class TroveStore:
 	if troveFlavor:
 	    flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList():
+	for (name, version, flavor) in trove.iterTroveList(strongRefs = True,
+                                                           weakRefs = True):
 	    if flavor:
 		flavorsNeeded[flavor] = True
 
@@ -385,7 +386,15 @@ class TroveStore:
         JOIN FileStreams as FS USING(fileId)
         """ % (troveInstanceId,))
 
-	for (name, version, flavor) in trove.iterTroveList():
+        # iterate over both strong and weak troves, and set weakFlag to
+        # indicate which kind we're looking at when
+        for ((name, version, flavor), weakFlag) in itertools.chain(
+                itertools.izip(trove.iterTroveList(strongRefs = True,
+                                                   weakRefs   = False),
+                               itertools.repeat(0)),
+                itertools.izip(trove.iterTroveList(strongRefs = False,
+                                                   weakRefs   = True),
+                               itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
 	    itemId = self.getItemId(name)
 
 	    if flavor:
@@ -422,6 +431,11 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
                                             isPresent = False)
+
+            flags = weakFlag
+            if trove.includeTroveByDefault(name, version, flavor):
+                flags |= schema.TROVE_TROVES_BYDEFAULT
+
             if trove.includeTroveByDefault(name, version, flavor):
                 byDefault = 1
             else:
@@ -429,9 +443,9 @@ class TroveStore:
 
             cu.execute("""
             INSERT INTO TroveTroves
-                (instanceId, includedId, byDefault)
+                (instanceId, includedId, flags)
             VALUES(?, ?, ?)""",
-                       troveInstanceId, instanceId, byDefault)
+                       troveInstanceId, instanceId, flags)
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
@@ -582,7 +596,7 @@ class TroveStore:
 
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-                        SELECT idx, item, version, flavor, byDefault,
+                        SELECT idx, item, version, flavor, flags,
                                Nodes.timeStamps
                         FROM
                             gtlInst, TroveTroves, Instances, Items,
@@ -661,7 +675,7 @@ class TroveStore:
 
             try:
                 while troveTrovesCursor.peek()[0] == idx:
-                    idxA, name, version, flavor, byDefault, timeStamps = \
+                    idxA, name, version, flavor, flags, timeStamps = \
                                                 troveTrovesCursor.next()
                     version = versions.VersionFromString(version)
                     if flavor == 'none':
@@ -672,7 +686,10 @@ class TroveStore:
                     version.setTimeStamps(
                             [ float(x) for x in timeStamps.split(":") ])
 
-                    trv.addTrove(name, version, flavor, byDefault = byDefault)
+                    byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
+                    weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
+                    trv.addTrove(name, version, flavor, byDefault = byDefault,
+                                 weakRef = weakRef)
             except StopIteration:
                 # we're at the end; that's okay
                 pass

@@ -14,10 +14,13 @@
 
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
+from conary.local.schema import createDependencies, createTroveInfo
+from conary.local.schema import createMetadata, resetTable
 
-from conary.local.schema import createDependencies, createTroveInfo, createMetadata, resetTable
+TROVE_TROVES_BYDEFAULT = 1 << 0
+TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 8
+VERSION = 9
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.trigger(table, column, "INSERT")
@@ -549,7 +552,7 @@ def createTroves(db):
         CREATE TABLE TroveTroves(
             instanceId      INTEGER NOT NULL,
             includedId      INTEGER NOT NULL,
-            byDefault       INTEGER NOT NULL DEFAULT 0,
+            flags           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
@@ -929,6 +932,44 @@ class MigrateTo_8(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
+class MigrateTo_9(SchemaMigration):
+    Version = 9
+    def migrate(self):
+        cu = self.cu
+        cu.execute("""
+            CREATE TABLE TroveTroves2(
+            instanceId      INTEGER NOT NULL,
+            includedId      INTEGER NOT NULL,
+            flags           INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT TroveTroves_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveTroves_includedId_fk
+                FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+
+        cu.execute('''
+        INSERT INTO TroveTroves2 
+            SELECT instanceId, includedId, 
+                   CASE WHEN byDefault THEN %d ELSE 0 END, 
+                   inPristine, changed
+            FROM TroveTroves''' % TROVE_TROVES_BYDEFAULT)
+
+        cu.execute('DROP TABLE TroveTroves')
+        cu.execute('ALTER TABLE TroveTroves2 RENAME TO TroveTroves')
+
+        # This index is used to enforce that TroveTroves only contains
+        # unique TroveTrove (instanceId, includedId) pairs.
+        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+                   "TroveTroves(instanceId,includedId)")
+        # this index is so we can quickly tell what troves are needed by another trove
+        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+        # done...
+        self.db.loadSchema()
+        return self.Version
+
 # create the server repository schema
 def createSchema(db):
     # FIXME: find a better way to create the tables made by the __init__
@@ -989,6 +1030,7 @@ def checkVersion(db):
     if version == 5: version = MigrateTo_6(db)()
     if version == 6: version = MigrateTo_7(db)()
     if version == 7: version = MigrateTo_8(db)()
+    if version == 8: version = MigrateTo_9(db)()
 
     return version
 

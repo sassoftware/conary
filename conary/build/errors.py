@@ -31,3 +31,18 @@ class RecipeDependencyError(RecipeFileError):
 
 class BadRecipeNameError(RecipeFileError):
     pass
+
+class GroupPathConflicts(BuildError):
+    def __init__(self, conflicts):
+        self.conflicts = conflicts
+        errStrings = []
+        for groupName, conflictSets in conflicts.iteritems():
+            errStrings.append('%s:' % groupName)
+            for conflictSet in conflictSets:
+                errStrings.append('The following %s troves have conflicting paths:' % (len(conflictSet),))
+                errStrings.extend('    %s=%s[%s]' % x for x in conflictSet)
+            
+        self.msg = """
+The following troves in the following groups have conflicts:
+
+%s""" % ('\n'.join(errStrings))
