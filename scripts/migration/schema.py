@@ -155,8 +155,6 @@ class PrintDatabase:
             # prepare the sql and the trigger name and pass it to the
             # BaseTrigger for creation
             when = "AFTER"
-            if onAction == "insert":
-                when = "BEFORE"
             if pinned:
                 sql = ("UPDATE %s SET %s = OLD.%s "
                        "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column, column))
