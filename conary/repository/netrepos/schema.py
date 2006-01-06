@@ -23,8 +23,8 @@ TROVE_TROVES_WEAKREF   = 1 << 1
 VERSION = 9
 
 def createTrigger(db, table, column = "changed"):
-    retInsert = db.trigger(table, column, "INSERT")
-    retUpdate = db.trigger(table, column, "UPDATE")
+    retInsert = db.createTrigger(table, column, "INSERT")
+    retUpdate = db.createTrigger(table, column, "UPDATE")
     return retInsert or retUpdate
 
 def createInstances(db):
@@ -799,7 +799,7 @@ class MigrateTo_4(SchemaMigration):
                 self.r = deps.DependencySet()
                 self.p = deps.DependencySet()
 
-        instances = [ x[0] for x in 
+        instances = [ x[0] for x in
                       self.cu.execute("select instanceId from Instances") ]
         dtbl = deptable.DependencyTables(self.db)
         troves = []
@@ -978,9 +978,11 @@ class MigrateTo_8(SchemaMigration):
 class MigrateTo_9(SchemaMigration):
     Version = 9
     def migrate(self):
-        cu = self.cu
-        cu.execute("""
-            CREATE TABLE TroveTroves2(
+        # change the byDefault column to flags in TroveTroves
+
+        # create the correct table under a new name, move the data over, drop the old one, rename
+        self.cu.execute("""
+        CREATE TABLE TroveTroves2(
             instanceId      INTEGER NOT NULL,
             includedId      INTEGER NOT NULL,
             flags           INTEGER NOT NULL DEFAULT 0,
@@ -992,25 +994,20 @@ class MigrateTo_9(SchemaMigration):
                 FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
-
-        cu.execute('''
-        INSERT INTO TroveTroves2 
-            SELECT instanceId, includedId, 
-                   CASE WHEN byDefault THEN %d ELSE 0 END, 
+        # now move the data over
+        self.cu.execute("""
+        INSERT INTO TroveTroves
+        (instanceId, includedId, flags, changed)
+            SELECT instanceId, includedId,
+                   CASE WHEN byDefault THEN %d ELSE 0 END,
                    changed
-            FROM TroveTroves''' % TROVE_TROVES_BYDEFAULT)
-
-        cu.execute('DROP TABLE TroveTroves')
-        cu.execute('ALTER TABLE TroveTroves2 RENAME TO TroveTroves')
-
-        # This index is used to enforce that TroveTroves only contains
-        # unique TroveTrove (instanceId, includedId) pairs.
-        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
-                   "TroveTroves(instanceId,includedId)")
-        # this index is so we can quickly tell what troves are needed by another trove
-        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
-        # done...
+            FROM TroveTroves2""" % TROVE_TROVES_BYDEFAULT)
+        self.cu.execute("DROP TABLE TroveTroves")
+        self.cu.execute("ALTER TABLE TroveTroves2 RENAME TO TroveTroves")
+        # reload the schema and call createTrove() to fill in the missing triggers and indexes
         self.db.loadSchema()
+        createTroves()
+        # done...
         return self.Version
 
 # create the server repository schema
