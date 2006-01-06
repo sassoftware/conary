@@ -1257,6 +1257,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                Permissions.userGroupId in (%s)
                            ) as UP ON
                            ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                        WHERE
+                            Instances.isPresent = 1
                     """ % " ".join("%d" % x for x in userGroupIds)
         cu.execute(query)
 
@@ -1541,7 +1543,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     JOIN Flavors ON
                         Instances.flavorId = flavors.flavorId
                     WHERE
-                        Instances.changed >= ?
+                        Instances.changed >= ? AND
+                        Instances.isPresent = 1
                     """ % " ".join("%d" % x for x in userGroupIds)
 
         cu.execute(query, mark)
