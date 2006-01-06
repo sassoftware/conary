@@ -1207,6 +1207,63 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                    self.fromFileId(fileId))
         return ids
 
+    def hasTroves(self, authToken, clientVersion, troveList):
+        # returns False for troves the user doesn't have permission to view
+        logMe(1)
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'hasTrovesTmp')
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return {}
+
+        for row, item in enumerate(troveList):
+            if item[2]:
+                flavor = item[2]
+            else:
+                flavor = 'none'
+
+            cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
+                       "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
+
+        results = [ False ] * len(troveList)
+
+        query = """SELECT row, item, UP.permittedTrove FROM hasTrovesTmp 
+                        JOIN Items USING (item)
+                        JOIN Versions ON
+                            hasTrovesTmp.version = Versions.version
+                        JOIN Flavors ON
+                            (hasTrovesTmp.flavor = Flavors.flavor) OR
+                            (hasTrovesTmp.flavor is NULL AND
+                             Flavors.flavor is NULL)
+                        JOIN Instances ON
+                            Instances.itemId = Items.itemId AND
+                            Instances.versionId = Versions.versionId AND
+                            Instances.flavorId = Flavors.flavorId
+                        JOIN Nodes USING 
+                            (itemId, versionId)
+                        JOIN LabelMap USING 
+                            (branchId, itemId)
+                        JOIN (SELECT
+                               Permissions.labelId as labelId,
+                               PerItems.item as permittedTrove,
+                               Permissions.permissionId as aclId
+                           FROM
+                               Permissions
+                               join Items as PerItems using (itemId)
+                           WHERE
+                               Permissions.userGroupId in (%s)
+                           ) as UP ON
+                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                    """ % " ".join("%d" % x for x in userGroupIds)
+        cu.execute(query)
+
+        for row, name, pattern in cu:
+            if results[row]: continue
+            results[row]= self.auth.checkTrove(pattern, name)
+
+        return results
+
     def getCollectionMembers(self, authToken, clientVersion, troveName,
                                 branch):
         logMe(1, troveName, branch)

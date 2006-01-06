@@ -417,7 +417,7 @@ def createPGPKeys(db):
             userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
@@ -578,7 +578,18 @@ def createTroves(db):
             versionSpec         VARCHAR(767),
             flavorId            INTEGER
         )""")
-        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")
+        db.commit()
+
+    if not resetTable(cu, 'hasTrovesTmp'):
+        db.rollback()
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        hasTrovesTmp(
+            row                 INTEGER,
+            item                VARCHAR(254),
+            version             VARCHAR(767),
+            flavor              VARCHAR(767)
+        )""")
         db.commit()
 
     db.loadSchema()

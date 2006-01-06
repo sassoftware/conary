@@ -11,6 +11,8 @@ Changes in @NEW@:
       a different make program is required (nmake, qmake, etc.)
     * When committing source changes in interactive mode, conary will ask you 
       you to confirm the commit.
+  o Protocol Changes:
+    * Added hasTroves() repository code
 
 Changes in 0.80.4:
   o Build Changes:
@@ -34,7 +36,6 @@ Changes in 0.80.3:
       excluded from packaging, except for /tmp and /var/tmp.
     * DanglingSymlinks now traverses intermediate symlinks; a symlink
       to a symlink to a symlink will no longer confuse it.
-
 
 Changes in 0.80.2:
   o Client Changes:
