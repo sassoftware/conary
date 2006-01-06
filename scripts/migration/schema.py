@@ -159,17 +159,17 @@ class PrintDatabase:
                 when = "BEFORE"
             if pinned:
                 sql = ("UPDATE %s SET %s = OLD.%s "
-                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column, column))
+                       "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column, column))
             else:
                 sql = ("UPDATE %s SET %s = unix_timestamp() "
-                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column))
+                       "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column))
         elif self.driver == "mysql":
             when = "BEFORE"
             # force the current_timestamp into a numeric context
             if pinned:
-                sql = "SET NEW.%s = OLD.%s" % (column, column)
+                sql = "SET NEW.%s = OLD.%s ; " % (column, column)
             else:
-                sql = "SET NEW.%s = current_timestamp() + 0" % (column,)
+                sql = "SET NEW.%s = current_timestamp() + 0 ; " % (column,)
         else:
             raise NotImplementedError
         sql = """
