@@ -194,7 +194,7 @@ for stmt in getIndexes("mysql"):
     try:
         cm.execute(stmt)
     except sqlerrors.DatabaseError, e:
-        print e.msg
+        print "ERROR:", e.msg
     cm.execute("UNLOCK TABLES")
 mysql.setVersion(VERSION)
 mysql.commit()
