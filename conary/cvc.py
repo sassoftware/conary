@@ -16,8 +16,13 @@
 Provides the output for the "cvc" subcommands
 """
 
-import os
+#ondemand importing
 import sys
+
+from conary.lib import importer
+sys.meta_path.append(importer.OnDemandImporter())
+
+import os
 import xmlrpclib
 
 from conary import branch

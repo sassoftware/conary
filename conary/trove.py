@@ -22,7 +22,6 @@ from conary import changelog
 from conary import files
 from conary import streams
 from conary import versions
-from conary.changelog import ChangeLog
 from conary.deps import deps
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
@@ -1511,7 +1510,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_NEW_VERSION : (SMALL, FrozenVersionStream,  "newVersion" ),
         _STREAM_TCS_REQUIRES    : (LARGE, DependenciesStream,   "requires"   ),
         _STREAM_TCS_PROVIDES    : (LARGE, DependenciesStream,   "provides"   ),
-        _STREAM_TCS_CHANGE_LOG  : (LARGE, ChangeLog,            "changeLog"  ),
+        _STREAM_TCS_CHANGE_LOG  : (LARGE, changelog.ChangeLog,  "changeLog"  ),
         _STREAM_TCS_OLD_FILES   : (LARGE, OldFileStream,        "oldFiles"   ),
         _STREAM_TCS_TYPE        : (SMALL, streams.IntStream,    "tcsType"    ),
         _STREAM_TCS_TROVE_CHANGES:(LARGE, ReferencedTroveSet,   "troves"     ),
