@@ -116,22 +116,33 @@ class PrintDatabase:
             return
         self.statements.append(sql)
 
-    def createTrigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, pinned=False):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
         assert(onAction in ["insert", "update"])
 
         if self.driver == "postgresql":
             funcName = "%s_func" % name
-            self.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column))
+            if pinned:
+                self.execute("""
+                CREATE OR REPLACE FUNCTION %s()
+                RETURNS trigger
+                AS $$
+                BEGIN
+                    NEW.%s := OLD.%s ;
+                    RETURN NEW;
+                END ; $$ LANGUAGE 'plpgsql';
+                """ % (funcName, column, column))
+            else:
+                self.execute("""
+                CREATE OR REPLACE FUNCTION %s()
+                RETURNS trigger
+                AS $$
+                BEGIN
+                    NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
+                    RETURN NEW;
+                END ; $$ LANGUAGE 'plpgsql';
+                """ % (funcName, column))
             # now create the trigger based on the above function
             self.execute("""
             CREATE TRIGGER %s
@@ -146,15 +157,19 @@ class PrintDatabase:
             when = "AFTER"
             if onAction == "insert":
                 when = "BEFORE"
-            sql = ("UPDATE %s SET %s = unix_timestamp() WHERE id = NEW.id ; "
-                   "%s " % (table, column, sql))
+            if pinned:
+                sql = ("UPDATE %s SET %s = OLD.%s "
+                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column, column))
+            else:
+                sql = ("UPDATE %s SET %s = unix_timestamp() "
+                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column))
         elif self.driver == "mysql":
             when = "BEFORE"
             # force the current_timestamp into a numeric context
-            sql = "SET NEW.%s = current_timestamp() + 0 ; %s" % (column, sql)
-
-            when = "BEFORE"
-            sql = ""
+            if pinned:
+                sql = "SET NEW.%s = OLD.%s" % (column, column)
+            else:
+                sql = "SET NEW.%s = current_timestamp() + 0" % (column,)
         else:
             raise NotImplementedError
         sql = """
