@@ -903,7 +903,6 @@ class ClientUpdate:
 
                 if pinned:
                     if replaced[0] is not None:
-
                         try:
                             trv = troveSource.getTrove(withFiles = False, *newInfo)
                         except errors.TroveMissing:
@@ -1216,36 +1215,34 @@ conary erase '%s=%s%s'
         if not jobSet:
             raise NoNewTrovesError
 
-        if jobSet:
-            # FIXME changeSetSource: I should just be able to call 
-            # csSource.createChangeSet but it can't handle recursive
-            # createChangeSet calls, and you can only call createChangeSet
-            # once on a csSource.  So, we avoid having to call it more than
-            # once by checking to see if the changeSets are already in the
-            # update job.
-            hasTroves = uJob.getTroveSource().hasTroves(
-                [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
+        # FIXME changeSetSource: I should just be able to call 
+        # csSource.createChangeSet but it can't handle recursive
+        # createChangeSet calls, and you can only call createChangeSet
+        # once on a csSource.  So, we avoid having to call it more than
+        # once by checking to see if the changeSets are already in the
+        # update job.
+        hasTroves = uJob.getTroveSource().hasTroves(
+            [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
 
-            reposChangeSetList = set([ x[1] for x in
-                              itertools.izip(hasTroves, jobSet)
-                               if x[0] is not True ])
+        reposChangeSetList = set([ x[1] for x in
+                          itertools.izip(hasTroves, jobSet)
+                           if x[0] is not True ])
 
-            if reposChangeSetList != jobSet:
-                # we can't trust the closure from the changeset we're getting
-                # since we're not getting everything for jobSet
-                forceJobClosure = True
+        if reposChangeSetList != jobSet:
+            # we can't trust the closure from the changeset we're getting
+            # since we're not getting everything for jobSet
+            forceJobClosure = True
 
-            csSource = trovesource.TroveSourceStack(
-                                         uJob.getSearchSource(),
-                                         self.repos)
+        csSource = trovesource.stack(uJob.getSearchSource(),
+                                     self.repos)
 
-            cs, notFound = csSource.createChangeSet(reposChangeSetList, 
-                                                    withFiles = False,
-                                                    recurse = recurse)
-            assert(not notFound)
-            uJob.getTroveSource().addChangeSet(cs)
-            transitiveClosure.update(cs.getJobSet(primaries = False))
-            del cs
+        cs, notFound = csSource.createChangeSet(reposChangeSetList, 
+                                                withFiles = False,
+                                                recurse = recurse)
+        assert(not notFound)
+        uJob.getTroveSource().addChangeSet(cs)
+        transitiveClosure.update(cs.getJobSet(primaries = False))
+        del cs
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
 
@@ -1257,6 +1254,27 @@ conary erase '%s=%s%s'
                                             trovesource.stack(
                                                 uJob.getTroveSource(),
                                                 self.repos), jobSet)
+            # Since we couldn't trust the transitive closure generated,
+            # we need to check to see if any of the recursive troves we'll
+            # need are not in the changeset.  This will be true 
+            # of group changesets.
+            transitiveJobs = list(transitiveClosure)
+            hasTroves = uJob.getTroveSource().hasTroves(
+                            (x[0], x[2][0], x[2][1]) for x in transitiveJobs)
+
+            reposChangeSetList = set([ x[1] for x in
+                              itertools.izip(hasTroves, transitiveJobs)
+                               if x[0] is not True ])
+
+            csSource = trovesource.stack(uJob.getSearchSource(),
+                                         self.repos)
+            cs, notFound = csSource.createChangeSet(reposChangeSetList, 
+                                                    withFiles = False,
+                                                    recurse = recurse)
+            #NOTE: we allow any missing recursive bits to be skipped.
+            #They'll show up in notFound.
+            #assert(not notFound)
+            uJob.getTroveSource().addChangeSet(cs)
         elif forceJobClosure:
             transitiveClosure = jobSet
         # else we trust the transitiveClosure which was passed in
