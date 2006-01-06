@@ -1,0 +1,215 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+	fullPath = os.path.dirname(sys.argv[0])
+    else:
+	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg
+from conary.repository import netclient
+from conary.lib import cfg, util, log
+import optparse
+
+sys.excepthook = util.genExcepthook(debug=True)
+
+class MirrorConfigurationSection(cfg.ConfigSection):
+    repositoryMap         =  conarycfg.CfgRepoMap
+    user                  =  conarycfg.CfgUserInfo
+
+class MirrorConfiguration(cfg.SectionedConfigFile):
+    host                  =  cfg.CfgString
+    threshHold            =  [ cfg.CfgInt, 20 ]
+    entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
+    source                =  MirrorConfigurationSection
+    target                =  MirrorConfigurationSection
+
+    def __init__(self):
+        cfg.SectionedConfigFile.__init__(self)
+
+def parseArgs():
+    parser = optparse.OptionParser(version = '%prog 0.1')
+    parser.add_option("--config", dest = "configFile",
+                      help = "configuration file", metavar = "FILE")
+    parser.add_option("--test", dest = "test", action = "store_true",
+                      default = False,
+                      help = "skip commiting changes to the target repository")
+    parser.add_option("-v", "--verbose", dest = "verbose", 
+                      action = "store_true", default = False,
+                      help = "display information on what is going on")
+
+    (options, args) = parser.parse_args()
+
+    if options.configFile is None:
+        print >> sys.stderr, 'a mirror configuration must be provided'
+        sys.exit(1)
+    elif args:
+        print >> sys.stderr, 'unexpected arguments:', " ".join(args)
+        sys.exit(1)
+
+    return options
+
+def buildJobList(repos, troveList):
+    # troveList here is a list of (mark, (name, version, flavor)) tuples.
+    # we need it sorted from smallest mark to highest to ensure we don't
+    # miss something if we terminate and need to be rerun
+    troveList.sort()
+
+    # Filter out troves which are already in the local repository. Since
+    # the marks aren't distinct (they increase, but not monotonially), it's 
+    # possible that something new got committed with the same mark we
+    # last updated to, so we have to look again at all of the troves in the
+    # source repository with the last mark which made it into our target.
+    present = repos.hasTroves([ x[1] for x in troveList ])
+    filteredList = [ x[1] for x in troveList if not present[x[1]] ]
+
+    # Match each trove with something we already have; this is to mirror
+    # using relative changesets, which is a lot more efficient than using
+    # absolute ones. 
+    q = {}
+    for (name, version, flavor) in filteredList:
+        d = q.setdefault(name, {})
+        l = d.setdefault(version.branch(), [])
+        l.append(flavor)
+
+    latestAvailable = repos.getTroveLeavesByBranch(q)
+
+    # we'll keep latestAvailable in sync with what the target will look like
+    # as the mirror progresses
+    jobList = []
+    for (name, version, flavor) in filteredList:
+        if name not in latestAvailable:
+            job = (name, (None, None), (version, flavor), True)
+            currentMatch = (None, None, None, None)
+        else:
+            d = latestAvailable[name]
+            verFlvMap = set()
+            # name, version, versionDistance, flavorScore
+            currentMatch = (None, None, None, None)
+            for repVersion, flavorList in d.iteritems():
+                for repFlavor in flavorList:
+                    score = flavor.score(repFlavor)
+                    closeness = version.closeness(repVersion)
+                    if score is False: continue
+                    if score < currentMatch[3]: 
+                        continue
+                    elif score > currentMatch[3]:
+                        currentMatch = (repVersion, repFlavor, closeness, score)
+                    elif closeness < currentMatch[2]:
+                        continue
+                    else:
+                        currentMatch = (repVersion, repFlavor, closeness, score)
+
+            job = (name, (currentMatch[0], currentMatch[1]),
+                         (version, flavor),
+                         currentMatch[0] is None)
+
+        jobList.append(job)
+
+        d = latestAvailable.setdefault(name, {})
+        if currentMatch[0] is not None:
+            d[currentMatch[0]].remove(currentMatch[1])
+            if not d[currentMatch[0]]: del d[currentMatch[0]]
+
+        flavorList = d.setdefault(job[2][0], [])
+        flavorList.append(job[2][1])
+
+    return jobList
+
+def bundleJobs(jobList, count):
+    bundles = []
+    bundle = []
+    newInBundle = set()
+
+    for job in jobList:
+        old = (job[0], job[1][0], job[1][1])
+        new = (job[0], job[2][0], job[2][1])
+
+        if len(bundle) >= count or old in newInBundle:
+            # break the bundle here because it's getting too large or this
+            # job is relative to something else in the bundle
+            bundles.append(bundle)
+            bundle = []
+            newInBundle = set()
+        
+        newInBundle.add(new)
+        bundle.append(job)
+
+    if bundle:
+        bundles.append(bundle)
+
+    return bundles
+
+def mirrorTroves(sourceRepos, targetRepos, cfg, test):
+    # find the latest timestamp stored on the target mirror
+    #currentMark = repos.getLatestTroveMark(cfg.host)
+    #log.debug("currently up to date through %d", currentMark)
+
+    # now find all of the troves we need from from the mirror source
+    #troveList = repos.getNewTroveList(cfg.host, currentMark)
+    #log.debug("need %d new troves", len(troveList))
+
+    tl = sourceRepos.getTroveVersionList(cfg.host, { None : None })
+    troveList = []
+    for name in tl:
+        for version in tl[name]:
+            for flavor in tl[name][version]:
+                troveList.append((0, (name, version, flavor)))
+
+    jobList = buildJobList(targetRepos, troveList)
+    bundles = bundleJobs(jobList, cfg.threshHold)
+
+    for i, bundle in enumerate(bundles):
+        (outFd, tmpName) = util.mkstemp()
+        os.close(outFd)
+        log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), bundle))
+        cs = sourceRepos.createChangeSetFile(bundle, tmpName, recurse = False)
+        # XXX it's a shame we can't give a hint as to what server to use
+        # to avoid having to open the changeset and read in bits of it
+        if test:
+            log.debug("(skipping commit due to test mode)")
+        else:
+            log.debug("committing")
+            targetRepos.commitChangeSetFile(tmpName)
+        os.unlink(tmpName)
+
+options = parseArgs()
+cfg = MirrorConfiguration()
+cfg.read(options.configFile)
+
+if options.verbose:
+    log.setVerbosity(log.DEBUG)
+
+# We need to repos clients, one for the server and one for the client. Since
+# they have the same name (the repositorymap gets us to the right hosts)
+sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap, 
+                          cfg.source.user,
+                          entitlementDir = cfg.entitlementDirectory)
+
+targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap, 
+                          cfg.target.user,
+                          entitlementDir = cfg.entitlementDirectory)
+
+mirrorTroves(sourceRepos, targetRepos, cfg, options.test)
