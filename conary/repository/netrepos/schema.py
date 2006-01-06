@@ -286,6 +286,7 @@ def createUsers(db):
         CREATE TABLE UserGroups (
             userGroupId     %(PRIMARYKEY)s,
             userGroup       VARCHAR(254) NOT NULL,
+            canMirror       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
         db.tables["UserGroups"] = []
@@ -920,7 +921,7 @@ class MigrateTo_8(SchemaMigration):
         # Permissions.write -> Permissions.canWrite
         # Users.user -> Users.userName
         # we have to deal with conflicts over trigger names, index names and constraint names.
-        # since these are smallish atbles, we can afford to take the "easy way out"
+        # since these are smallish tables, we can afford to take the "easy way out"
         self.cu.execute("CREATE TABLE oldUsers AS SELECT * FROM Users")
         self.cu.execute("DROP TABLE Users")
         self.cu.execute("CREATE TABLE oldPermissions AS SELECT * FROM Permissions")
@@ -980,8 +981,10 @@ class MigrateTo_8(SchemaMigration):
 class MigrateTo_9(SchemaMigration):
     Version = 9
     def migrate(self):
+        # UserGroups.canMirror
+        self.cu.execute("ALTER TABLE UserGroups ADD COLUMN "
+                        "canMirror INTEGER NOT NULL DEFAULT 0")
         # change the byDefault column to flags in TroveTroves
-
         # create the correct table under a new name, move the data over, drop the old one, rename
         self.cu.execute("""
         CREATE TABLE TroveTroves2(
