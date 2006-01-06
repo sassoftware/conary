@@ -133,7 +133,7 @@ class CacheSet:
 
             cu.execute("""
             INSERT INTO CacheContents
-            (row, troveName, size
+            (row, troveName, size,
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
             excludeAutoSource, returnValue )
