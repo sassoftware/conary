@@ -150,15 +150,15 @@ class Database(BaseDatabase):
     # Postgresql's trigegr syntax kind of sucks because we have to
     # create a function first and then call that function from the
     # trigger
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, sql = ""):
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # first create the trigger function
-        cu = self.dbh.cursor()
         triggerName = "%s_%s" % (table, onAction)
         if triggerName in self.triggers:
             return False
         funcName = "%s_func" % triggerName
+        cu = self.dbh.cursor()
         cu.execute("""
         CREATE OR REPLACE FUNCTION %s()
         RETURNS trigger
