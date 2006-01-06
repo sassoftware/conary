@@ -110,3 +110,6 @@ class OnDemandImporter(object):
             # don't return an import error.  That will stop 
             # the automated search mechanism from working.
             return None
+
+def install():
+    sys.meta_path.append(OnDemandImporter)

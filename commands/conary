@@ -22,11 +22,14 @@ if sys.version_info < (2, 4):
     print "error: python 2.4 or later is requried"
     sys.exit(1)
 
-#ondemand importing
 import sys
 
-from conary.lib import importer
-sys.meta_path.append(importer.OnDemandImporter())
+if __name__ == "__main__":
+    # ondemand importing for conary command line tool 
+    # - but don't impose it on others!  They can load it on their own if they
+    # want.
+    from conary.lib import importer
+    importer.install()
 
 #stdlib
 import os
