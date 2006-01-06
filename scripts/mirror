@@ -164,19 +164,12 @@ def bundleJobs(jobList, count):
 
 def mirrorTroves(sourceRepos, targetRepos, cfg, test):
     # find the latest timestamp stored on the target mirror
-    #currentMark = repos.getLatestTroveMark(cfg.host)
-    #log.debug("currently up to date through %d", currentMark)
+    currentMark = targetRepos.getLatestTroveMark(cfg.host)
+    log.debug("currently up to date through %d", currentMark)
 
     # now find all of the troves we need from from the mirror source
-    #troveList = repos.getNewTroveList(cfg.host, currentMark)
-    #log.debug("need %d new troves", len(troveList))
-
-    tl = sourceRepos.getTroveVersionList(cfg.host, { None : None })
-    troveList = []
-    for name in tl:
-        for version in tl[name]:
-            for flavor in tl[name][version]:
-                troveList.append((0, (name, version, flavor)))
+    troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
+    log.debug("need %d new troves", len(troveList))
 
     jobList = buildJobList(targetRepos, troveList)
     bundles = bundleJobs(jobList, cfg.threshHold)

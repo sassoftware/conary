@@ -1497,6 +1497,63 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return "%s/%s" % (_baseUrl, ret)
         return ""
 
+    def getLatestTroveMark(self, authToken, clientVersion):
+	if not self.auth.check(authToken, write = False):
+	    raise errors.InsufficientPermission
+
+        # the mark doesn't tell anything interesting about the repository,
+        # so just return the latest one. no need to get fancy.
+        cu = self.db.cursor()
+        result = cu.execute("select max(changed) from instances").fetchall()
+        if not result or result[0][0] == None:
+            return -1
+
+        return result[0][0]
+
+    def getNewTroveList(self, authToken, clientVersion, mark):
+        # only show troves the user is allowed to see
+        cu = self.db.cursor()
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+
+        query = """
+                SELECT UP.permittedTrove, item, version, flavor, 
+                          timeStamps, Instances.changed FROM Instances
+                    JOIN Nodes USING (itemId, versionId)
+                    JOIN LabelMap USING (itemId, branchId)
+                    JOIN (SELECT
+                           Permissions.labelId as labelId,
+                           PerItems.item as permittedTrove,
+                           Permissions.permissionId as aclId
+                       FROM
+                           Permissions
+                           join Items as PerItems using (itemId)
+                       WHERE
+                           Permissions.userGroupId in (%s)
+                       ) as UP ON
+                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                    JOIN Items ON
+                        Instances.itemId = Items.itemId
+                    JOIN Versions ON
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = flavors.flavorId
+                    WHERE
+                        Instances.changed >= ?
+                    """ % " ".join("%d" % x for x in userGroupIds)
+
+        cu.execute(query, mark)
+
+        l = []
+
+        for pattern, name, version, flavor, timeStamps, mark in cu:
+            if self.auth.checkTrove(pattern, name):
+                version = versions.strToFrozen(version, 
+                    [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
+                l.append((mark, (name, version, flavor)))
+
+        return l
+
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise errors.InsufficientPermission

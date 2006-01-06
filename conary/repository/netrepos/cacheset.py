@@ -133,12 +133,12 @@ class CacheSet:
 
             cu.execute("""
             INSERT INTO CacheContents
-            (row, troveName,
+            (row, troveName, size,
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
-            excludeAutoSource, returnValue, size)
-            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,?)""",
-                       (name,
+            excludeAutoSource, returnValue )
+            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?)""",
+                       (name, size,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
                        excludeAutoSource, cPickle.dumps(returnVal, 

@@ -1208,6 +1208,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
+    def getLatestTroveMark(self, host):
+        return self.c[host].getLatestTroveMark()
+
+    def getNewTroveList(self, host, mark):
+        return [ (x[0], (x[1][0], self.thawVersion(x[1][1]), 
+                                  self.toFlavor(x[1][2]))) for
+                    x in self.c[host].getNewTroveList(mark) ]
+
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False):

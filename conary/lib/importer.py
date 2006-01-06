@@ -36,6 +36,7 @@ def makeImportedModule(name, data, scope):
         if mod is None or not isinstance(mod, types.ModuleType):
             mod = imp.load_module(name, *data)
             sys.modules[name] = mod
+
         scope[name] = mod
 
         frame = sys._getframe(2)
@@ -43,9 +44,11 @@ def makeImportedModule(name, data, scope):
         local_scope = frame.f_locals
 
         if name in local_scope:
-            local_scope[name] = mod
+            if name.__class__.__name__ == 'ModuleProxy': 
+                local_scope[name] = mod
         elif name in global_scope:
-            global_scope[name] = mod
+            if name.__class__.__name__ == 'ModuleProxy': 
+                global_scope[name] = mod
 
         return mod
 
@@ -87,8 +90,12 @@ class OnDemandLoader(object):
         self.scope = scope
         
     def load_module(self, fullname):
-        mod = makeImportedModule(self.name, self.data, self.scope)
-        sys.modules[fullname] = mod
+	if fullname in __builtins__:
+            mod = imp.load_module(self.name, *self.data)
+	    sys.modules[fullname] = mod
+        else:
+            mod = makeImportedModule(self.name, self.data, self.scope)
+            sys.modules[fullname] = mod
         return mod
     
 class OnDemandImporter(object):
