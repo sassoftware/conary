@@ -1,3 +1,21 @@
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+""" Defines an on-demand importer that only actually loads modules when their
+    attributes are accessed.  NOTE: if the ondemand module is viewed using
+    introspection, like dir(), isinstance, etc, it will appear as a 
+    ModuleProxy, not a module, and will not have the correct attributes.
+    Barring introspection, however, the module will behave as normal.
+"""
 import sys
 import imp
 import os
