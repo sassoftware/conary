@@ -22,18 +22,24 @@ if sys.version_info < (2, 4):
     print "error: python 2.4 or later is requried"
     sys.exit(1)
 
+#ondemand importing
+import sys
+
+from conary.lib import importer
+sys.meta_path.append(importer.OnDemandImporter())
+
 #stdlib
 import os
 import xmlrpclib
 
+from conary.repository import errors
 #conary
 from conary import callbacks, checkin, commit, conarycfg, constants
 from conary import cscmd, deps, flavorcfg, query
 from conary import queryrep, conaryclient, rollbacks, showchangeset
-from conary import updatecmd, verify, versions
-from conary.lib import cfg,log, openpgpkey, options, util
+from conary import trove, updatecmd, verify, versions
+from conary.lib import cfg,cfgtypes,log, openpgpkey, options, util
 from conary.local import database
-from conary.trove import DigitalSignatureVerificationError
 
 sys.excepthook = util.genExcepthook(debug=True)
 
@@ -603,7 +609,7 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
 	return realMain(ccfg, argv)
-    except cfg.CfgError, e:
+    except cfgtypes.CfgError, e:
         log.error(str(e))
     except xmlrpclib.ProtocolError, e:
 	if e.errcode == 403:
@@ -629,7 +635,7 @@ def main(argv=sys.argv):
         print >> sys.stderr, str(e)
     except conaryclient.InstallPathConflicts, e:
         print >> sys.stderr, str(e)
-    except DigitalSignatureVerificationError, e:
+    except trove.DigitalSignatureVerificationError, e:
         print >> sys.stderr, str(e)
     except:
         raise

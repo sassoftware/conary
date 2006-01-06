@@ -157,7 +157,9 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     OpenPGPKeyCache based object that reads keys from public and private
     keyrings
     """
-    def __init__(self, callback = callbacks.KeyCacheCallback()):
+    def __init__(self, callback = None):
+        if callback is None:
+            callback = callbacks.KeyCacheCallback()
         OpenPGPKeyCache.__init__(self)
         self.callback = callback
         if 'HOME' not in os.environ:
