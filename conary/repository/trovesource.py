@@ -59,7 +59,7 @@ class AbstractTroveSource:
         return {}
 
     def hasTroves(self, troveList):
-        return [False] * len(troveList)
+        return NotImplementedError
 
     def getTrove(self, name, version, flavor, withFiles = True):
         trv = self.getTroves([(name, version, flavor)], withFiles)[0]
@@ -945,10 +945,13 @@ class TroveSourceStack(SearchableTroveSource):
             if not jobList:
                 break
 
-            res = source.createChangeSet(jobList, 
-                                       withFiles = withFiles,
-                                       withFileContents = withFileContents,
-                                       recurse = recurse)
+            try:
+                res = source.createChangeSet(jobList, 
+                                           withFiles = withFiles,
+                                           withFileContents = withFileContents,
+                                           recurse = recurse)
+            except errors.OpenError:
+                res = changeset.ReadOnlyChangeSet(), jobList
             if isinstance(res, (list, tuple)):
                 newCs, jobList = res
             else: 
@@ -990,7 +993,12 @@ def stack(*sources):
         source1, source2 = sources
 
     if source1 is source2:
-        return source1
+        # trove source stacks may have different behavior than
+        # individual trove sources, so always return a 
+        # stack even when there's nothing to stack
+        if isinstance(source1, TroveSourceStack):
+            return source1
+        return TroveSourceStack(source1)
 
     if isinstance(source1, TroveSourceStack):
         if source1.hasSource(source2):
