@@ -2316,9 +2316,10 @@ class Requires(_addInfo, _BuildPackagePolicy):
             if depPath.endswith('.py') or depPath.endswith('.so'):
                 depPath = depPath[:-3]
             else:
-                # FIXME: not sure if this makes sense or not?
-                assert(False)
-                # not something we recognize, drop it and go on
+                # Not something we provide, so not something we can
+                # require either.  Drop it and go on.  We have seen
+                # this when a script in /usr/bin has ended up in the
+                # requires list.
                 continue
 
             depPath = depPath.replace('/', '.')

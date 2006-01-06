@@ -169,7 +169,7 @@ class LocalTroveFormatter(display.TroveFormatter):
 
         changes = localTrv.diff(trv)[2]
         changesByOld = dict(((x[0], x[1][0], x[1][1]), x) for x in changes)
-        troveList = itertools.chain(trv.iterTroveList(),
+        troveList = itertools.chain(trv.iterTroveList(strongRefs=True),
                [ (x[0], x[2][0], x[2][1]) for x in changes if x[1][0] is None ])
         for (troveName, ver, fla) in sorted(troveList):
             change = changesByOld.get((troveName, ver, fla), None)

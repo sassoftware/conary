@@ -263,8 +263,12 @@ class ConfigFile(_Config):
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
         line = line.strip()
-        if not line or line[0] == '#':
+        line = line.replace('\\\\', '\0').replace('\\#', '\1')
+        line = line.split('#', 1)[0]
+        if not line:
             return
+        line = line.replace('\0', '\\').replace('\1', '#')
+
         parts = line.split(None, 1)
         if len(parts) == 1:
             key = parts[0]

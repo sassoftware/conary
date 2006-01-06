@@ -14,14 +14,17 @@
 
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
+from conary.local.schema import createDependencies, createTroveInfo
+from conary.local.schema import createMetadata, resetTable
 
-from conary.local.schema import createDependencies, createTroveInfo, createMetadata, resetTable
+TROVE_TROVES_BYDEFAULT = 1 << 0
+TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 8
+VERSION = 9
 
-def createTrigger(db, table, column = "changed"):
-    retInsert = db.trigger(table, column, "INSERT")
-    retUpdate = db.trigger(table, column, "UPDATE")
+def createTrigger(db, table, column = "changed", pinned = False):
+    retInsert = db.createTrigger(table, column, "INSERT")
+    retUpdate = db.createTrigger(table, column, "UPDATE", pinned=pinned)
     return retInsert or retUpdate
 
 def createInstances(db):
@@ -47,11 +50,13 @@ def createInstances(db):
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
-        cu.execute(" CREATE UNIQUE INDEX InstancesIdx ON "
-                   " Instances(itemId, versionId, flavorId) ")
+        db.tables["Instances"] = []
         commit = True
-
-    if createTrigger(db, "Instances"):
+    if "InstancesIdx" not in db.tables["Instances"]:
+        cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
+                   "Instances(itemId, versionId, flavorId) ")
+        commit = True
+    if createTrigger(db, "Instances", pinned = True):
         commit = True
 
     if "InstancesView" not in db.views:
@@ -83,8 +88,11 @@ def createFlavors(db):
             flavorId        %(PRIMARYKEY)s,
             flavor          VARCHAR(767)
         )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, 'none')")
+        db.tables["Flavors"] = []
+        commit = True
+    if "FlavorsFlavorIdx" not in db.tables["Flavors"]:
+        cu.execute("CREATE UNIQUE INDEX FlavorsFlavorIdx ON Flavors(flavor)")
         commit = True
 
     if "FlavorMap" not in db.tables:
@@ -98,6 +106,9 @@ def createFlavors(db):
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        db.tables["FlavorMap"] = []
+        commit = True
+    if "FlavorMapIndex" not in db.tables["FlavorMap"]:
         cu.execute("CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)")
         commit = True
 
@@ -109,24 +120,21 @@ def createFlavors(db):
             present         INTEGER,
             value           INTEGER NOT NULL DEFAULT -1000000
         )""")
-        cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
-                   "FlavorScores(request, present)")
-
-        # don't mix schema changes w/ table population
-        db.commit()
+        db.tables["FlavorScores"] = []
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
                 value = -1000000
             cu.execute("INSERT INTO FlavorScores (request, present, value) VALUES (?,?,?)",
                        request, present, value)
-        db.commit()
-        commit = False
+        commit = True
+    if "FlavorScoresIdx" not in db.tables["FlavorScores"]:
+        cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
+                   "FlavorScores(request, present)")
+        commit = True
 
     if not resetTable(cu, 'ffFlavor'):
-        db.commit()
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        ffFlavor(
+        CREATE TEMPORARY TABLE ffFlavor(
             flavorId    INTEGER,
             base        VARCHAR(254),
             sense       INTEGER,
@@ -161,14 +169,18 @@ def createNodes(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["Nodes"] = []
         cu.execute("""INSERT INTO Nodes
         (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
         VALUES (0, 0, 0, 0, NULL, 0.0)""")
+        commit = True
+    if "NodesItemBranchVersionIdx" not in db.tables["Nodes"]:
         cu.execute("CREATE UNIQUE INDEX NodesItemBranchVersionIdx "
                    "ON Nodes(itemId, branchId, versionId)")
+        commit = True
+    if "NodesItemVersionIdx" not in db.tables["Nodes"]:
         cu.execute("CREATE INDEX NodesItemVersionIdx ON Nodes(itemId, versionId)")
         commit = True
-
     if createTrigger(db, "Nodes"):
         commit = True
 
@@ -218,11 +230,12 @@ def createLatest(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
-        cu.execute("CREATE INDEX LatestItemIdx ON Latest(itemId)")
+        db.tables["Latest"] = []
+        commit = True
+    if "LatestIdx" not in db.tables["Latest"]:
         cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
                    "Latest(itemId, branchId, flavorId)")
         commit = True
-
     if createTrigger(db, "Latest"):
         commit = True
 
@@ -260,9 +273,11 @@ def createUsers(db):
             password        %(BINARY254)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
+        db.tables["Users"] = []
+        commit = True
+    if "UsersUser_uq" not in db.tables["Users"]:
         cu.execute("CREATE UNIQUE INDEX UsersUser_uq on Users(userName)")
         commit = True
-
     if createTrigger(db, "Users"):
         commit = True
 
@@ -273,10 +288,12 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
+        db.tables["UserGroups"] = []
+        commit = True
+    if "UserGroupsUserGroup_uq" not in db.tables["UserGroups"]:
         cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
                    "UserGroups(userGroup)")
         commit = True
-
     if createTrigger(db, "UserGroups"):
         commit = True
 
@@ -292,8 +309,13 @@ def createUsers(db):
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        db.tables["UserGroupMembers"] = []
+        commit = True
+    if "UserGroupMembers_uq" not in db.tables["UserGroupMembers"]:
         cu.execute("CREATE UNIQUE INDEX UserGroupMembers_uq ON "
                    "UserGroupMembers(userGroupId, userId)")
+        commit = True
+    if "UserGroupMembersUserIdx" not in db.tables["UserGroupMembers"]:
         cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
                    "UserGroupMembers(userId)")
         commit = True
@@ -321,10 +343,12 @@ def createUsers(db):
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["Permissions"] = []
+        commit = True
+    if "PermissionsIdx" not in db.tables["Permissions"]:
         cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
                    "Permissions(userGroupId, labelId, itemId)")
         commit = True
-
     if createTrigger(db, "Permissions"):
         commit = True
 
@@ -359,10 +383,16 @@ def createUsers(db):
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["EntitlementGroups"] = []
+        commit = True
+    if "EntitlementGroupsEntGroupIdx" not in db.tables["EntitlementGroups"]:
         cu.execute("CREATE UNIQUE INDEX EntitlementGroupsEntGroupIdx ON "
                    "EntitlementGroups(entGroup)")
         commit = True
-
+    if "EntitlementGroupsUGIdx" not in db.tables["EntitlementGroups"]:
+        cu.execute("CREATE INDEX EntitlementGroupsUGIdx ON "
+                   "EntitlementGroups(userGroupId)")
+        commit = True
     if createTrigger(db, "EntitlementGroups"):
         commit = True
 
@@ -378,15 +408,20 @@ def createUsers(db):
                 FOREIGN KEY (ownerGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        db.tables["EntitlementOwners"] = []
+        commit = True
+    if "EntitlementOwnersEntOwnerIdx" not in db.tables["EntitlementOwners"]:
         cu.execute("CREATE UNIQUE INDEX EntitlementOwnersEntOwnerIdx ON "
                    "EntitlementOwners(entGroupId, ownerGroupId)")
+        commit = True
+    if "EntitlementOwnersOwnerIdx" not in db.tables["EntitlementOwners"]:
         cu.execute("CREATE INDEX EntitlementOwnersOwnerIdx ON "
                    "EntitlementOwners(ownerGroupId)")
         commit = True
 
     if "Entitlements" not in db.tables:
         cu.execute("""
-        CREATE TABLE Entitlements (
+        CREATE TABLE Entitlements(
             entGroupId      INTEGER NOT NULL,
             entitlement     %(BINARY255)s NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
@@ -394,10 +429,12 @@ def createUsers(db):
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["Entitlements"] = []
+        commit = True
+    if "EntitlementsEntGroupEntitlementIdx" not in db.tables["Entitlements"]:
         cu.execute("CREATE UNIQUE INDEX EntitlementsEntGroupEntitlementIdx ON "
                    "Entitlements(entGroupId, entitlement)")
         commit = True
-
     if createTrigger(db, "Entitlements"):
         commit = True
 
@@ -417,10 +454,19 @@ def createPGPKeys(db):
             userId          INTEGER,
             fingerprint     CHAR(40) NOT NULL,
             pgpKey          %(BLOB)s NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT PGPKeys_userId_fk
+                FOREIGN KEY (userId) REFERENCES Users(userId)
+                ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["PGPKeys"] = []
+        commit = True
+    if "PGPKeysFingerprintIdx" not in db.tables["PGPKeys"]:
         cu.execute("CREATE UNIQUE INDEX PGPKeysFingerprintIdx ON "
                    "PGPKeys(fingerprint)")
+        commit = True
+    if "PGPKeysUserIdx" not in db.tables["PGPKeys"]:
+        cu.execute("CREATE INDEX PGPKeysUserIdx ON PGPKeys(userId)")
         commit = True
     if createTrigger(db, "PGPKeys"):
         commit = True
@@ -435,6 +481,11 @@ def createPGPKeys(db):
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["PGPFingerprints"] = []
+        commit = True
+    if "PGPFingerprintsKeyIdx" not in db.tables["PGPFingerprints"]:
+        cu.execute("CREATE UNIQUE INDEX PGPFingerprintsKeyIdx ON "
+                   "PGPFingerprints(keyId,fingerprint)")
         commit = True
     if createTrigger(db, "PGPFingerprints"):
         commit = True
@@ -454,6 +505,10 @@ def createTroves(db):
             stream      %(BLOB)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         )""" % db.keywords)
+        db.tables["FileStreams"] = []
+        commit = True
+    if "FileStreamsIdx" not in db.tables["FileStreams"]:
+        # XXX: is this still true now? --gafton
         # in sqlite 2.8.15, a unique here seems to cause problems
         # (as the versionId isn't unique, apparently)
         cu.execute("CREATE INDEX FileStreamsIdx ON FileStreams(fileId)")
@@ -480,7 +535,13 @@ def createTroves(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["TroveFiles"] = []
+        commit = True
+    # FIXME: rename these indexes
+    if "TroveFilesIdx" not in db.tables["TroveFiles"]:
         cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
+        commit = True
+    if "TroveFilesIdx2" not in db.tables["TroveFiles"]:
         cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
         commit = True
     if createTrigger(db, "TroveFiles"):
@@ -491,7 +552,7 @@ def createTroves(db):
         CREATE TABLE TroveTroves(
             instanceId      INTEGER NOT NULL,
             includedId      INTEGER NOT NULL,
-            byDefault       INTEGER NOT NULL DEFAULT 0,
+            flags           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveTroves_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
@@ -500,19 +561,28 @@ def createTroves(db):
                 FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
+        db.tables["TroveTroves"] = []
+        commit = True
+    if "TroveTrovesInstanceIncluded_uq" not in db.tables["TroveTroves"]:
         # This index is used to enforce that TroveTroves only contains
         # unique TroveTrove (instanceId, includedId) pairs.
         cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
                    "TroveTroves(instanceId,includedId)")
+        commit = True
+    if "TroveTrovesIncludedIdx" not in db.tables["TroveTroves"]:
         # this index is so we can quickly tell what troves are needed by another trove
         cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
         commit = True
     if createTrigger(db, "TroveTroves"):
         commit = True
-
+    # FIXME - move the temporary table handling into a separate
+    # fucntion that can also be called before we start processing a
+    # request (as opposed to the schema management which will be
+    # restricted to standalone mode)
     if commit:
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'NewFiles'):
         db.rollback()
         cu.execute("""
@@ -525,11 +595,13 @@ def createTroves(db):
         )""" % db.keywords)
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'NeededFlavors'):
         db.rollback()
         cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'gtl'):
         db.rollback()
         cu.execute("""
@@ -541,6 +613,7 @@ def createTroves(db):
         )""" % db.keywords)
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'gtlInst'):
         db.rollback()
         cu.execute("""
@@ -550,6 +623,7 @@ def createTroves(db):
         )""" % db.keywords)
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'getFilesTbl'):
         db.rollback()
         cu.execute("""
@@ -559,6 +633,7 @@ def createTroves(db):
         )""" % db.keywords)
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'itf'):
         db.rollback()
         cu.execute("""
@@ -569,6 +644,7 @@ def createTroves(db):
         )""")
         db.commit()
 
+    # FIXME
     if not resetTable(cu, 'gtvlTbl'):
         db.rollback()
         cu.execute("""
@@ -621,41 +697,52 @@ def createChangeLog(db):
                     FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
                     ON DELETE CASCADE ON UPDATE CASCADE
             )""")
-        cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
-                   "ChangeLogs(nodeId)")
+        db.tables["ChangeLogs"] = []
         cu.execute("INSERT INTO ChangeLogs (nodeId, name, contact, message) "
                    "VALUES(0, NULL, NULL, NULL)")
         commit = True
+    if "ChangeLogsNodeIdx" not in db.tables["ChangeLogs"]:
+        cu.execute("CREATE UNIQUE INDEX ChangeLogsNodeIdx ON "
+                   "ChangeLogs(nodeId)")
+        commit = True
     if createTrigger(db, "ChangeLogs"):
         commit = True
+
     if commit:
         db.commit()
         db.loadSchema()
 
 def createLabelMap(db):
-    if "LabelMap" in db.tables:
-        return
+    commit = False
     cu = db.cursor()
-    cu.execute("""
-    CREATE TABLE LabelMap(
-        itemId          INTEGER NOT NULL,
-        labelId         INTEGER NOT NULL,
-        branchId        INTEGER NOT NULL,
-        CONSTRAINT LabelMap_itemId_fk
-            FOREIGN KEY (itemId) REFERENCES Items(itemId)
-            ON DELETE CASCADE ON UPDATE CASCADE,
-        CONSTRAINT LabelMap_labelId_fk
-            FOREIGN KEY (labelId) REFERENCES Labels(labelId)
-            ON DELETE CASCADE ON UPDATE CASCADE,
-        CONSTRAINT LabelMap_branchId_fk
-            FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-            ON DELETE CASCADE ON UPDATE CASCADE
-    )""")
+    if "LabelMap" not in db.tables:
+        cu.execute("""
+        CREATE TABLE LabelMap(
+            itemId          INTEGER NOT NULL,
+            labelId         INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            CONSTRAINT LabelMap_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT LabelMap_labelId_fk
+                FOREIGN KEY (labelId) REFERENCES Labels(labelId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT LabelMap_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+        db.tables["LabelMap"] = []
+        commit = True
     # FIXME: rename indexes accordingly
-    cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(itemId)")
-    cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
-    db.commit()
-    db.loadSchema()
+    if "" not in db.tables["LabelMap"]:
+        cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(itemId)")
+        commit = True
+    if "" not in db.tables["LabelMap"]:
+        cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
+        commit = True
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 # SCHEMA Migration
 class SchemaMigration(migration.SchemaMigration):
@@ -672,6 +759,9 @@ class SchemaMigration(migration.SchemaMigration):
 class MigrateTo_2(SchemaMigration):
     Version = 2
     def migrate(self):
+        # create the OpenPGP tables
+        createPGPKeys(self.db)
+
         ## First insert the new Item and Label keys
         self.cu.execute("INSERT INTO Items (itemId, item) VALUES(0, 'ALL')")
         self.cu.execute("INSERT INTO Labels (labelId, label) VALUES(0, 'ALL')")
@@ -688,8 +778,8 @@ class MigrateTo_2(SchemaMigration):
                 table)
 
         ## Finally fix the index
-        cu.execute("DROP INDEX PermissionsIdx")
-        cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
+        self.cu.execute("DROP INDEX PermissionsIdx")
+        self.cu.execute("CREATE UNIQUE INDEX PermissionsIdx ON "
                    "Permissions(userGroupId, labelId, itemId)")
         return self.Version
 
@@ -700,16 +790,49 @@ class MigrateTo_3(SchemaMigration):
         self.cu.execute("CREATE INDEX LatestItemIdx on Latest(itemId)")
         return self.Version
 
-# FIXME: we should incorporate the script here
 class MigrateTo_4(SchemaMigration):
     Version = 4
     def migrate(self):
-        from conary.lib.tracelog import printErr
-        printErr("""
-        Conversion to version 4 requires script available
-        from http://wiki.rpath.com/ConaryConversion
-        """)
-        return 0
+        import itertools
+        from conary.local import deptable
+        from conary.deps import deps
+
+        class FakeTrove:
+            def setRequires(self, req):
+                self.r = req
+            def setProvides(self, prov):
+                self.p = prov
+            def getRequires(self):
+                return self.r
+            def getProvides(self):
+                return self.p
+            def __init__(self):
+                self.r = deps.DependencySet()
+                self.p = deps.DependencySet()
+
+        instances = [ x[0] for x in
+                      self.cu.execute("select instanceId from Instances") ]
+        dtbl = deptable.DependencyTables(self.db)
+        troves = []
+
+        logMe(1, 'Reading %d instances' % len(instances))
+        for i, instanceId in enumerate(instances):
+            logMe(3, "Reading %d of %d..." % (i + 1, len(instances)))
+
+            trv = FakeTrove()
+            dtbl.get(self.cu, trv, instanceId)
+            troves.append(trv)
+
+        self.cu.execute("delete from dependencies")
+        self.cu.execute("delete from requires")
+        self.cu.execute("delete from provides")
+
+        logMe(1, 'Reading %d instances' % len(instances))
+        for i, (instanceId, trv) in enumerate(itertools.izip(instances, troves)):
+            logMe(3, 'Writing %d of %d...' % (i + 1, len(instances)))
+            dtbl.add(self.cu, trv, instanceId)
+
+        return self.Version
 
 class MigrateTo_5(SchemaMigration):
     Version = 5
@@ -807,10 +930,12 @@ class MigrateTo_8(SchemaMigration):
             self.cu.execute("DROP TABLE oldLatest")
         # Permissions.write -> Permissions.canWrite
         # Users.user -> Users.userName
-        for idx in self.db.tables["Permissions"] + self.db.tables["Users"]:
-            self.cu.execute("DROP INDEX %s" % (idx,))
-        self.cu.execute("ALTER TABLE Permissions RENAME TO oldPermissions")
-        self.cu.execute("ALTER TABLE Users RENAME TO oldUsers")
+        # we have to deal with conflicts over trigger names, index names and constraint names.
+        # since these are smallish atbles, we can afford to take the "easy way out"
+        self.cu.execute("CREATE TABLE oldUsers AS SELECT * FROM Users")
+        self.cu.execute("DROP TABLE Users")
+        self.cu.execute("CREATE TABLE oldPermissions AS SELECT * FROM Permissions")
+        self.cu.execute("DROP TABLE Permissions")
         self.db.loadSchema()
         createUsers(self.db)
         self.cu.execute("""
@@ -835,34 +960,71 @@ class MigrateTo_8(SchemaMigration):
                       "PGPKeys", "PGPFingerprints",
                       "TroveFiles", "TroveTroves", "FileStreams",
                       "TroveInfo", "Metadata", "MetadataItems"]:
-            logMe(3, "add changed column and triggers to", table)
-            self.cu.execute("ALTER TABLE %s ADD COLUMN "
-                            "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
+
+            try:
+                self.cu.execute("ALTER TABLE %s ADD COLUMN "
+                                "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
+                logMe(3, "add changed column and triggers to", table)
+            except sqlerrors.DuplicateColumnName:
+                # the column already exists, probably because we created
+                # a brand new table.  Then it would use the already-current
+                # schema
+                pass
             createTrigger(self.db, table)
         # indexes we changed
-        self.cu.execute("CREATE INDEX EntitlementOwnersOwnerIdx ON "
-                        "EntitlementOwners(ownerGroupId)")
-        self.cu.execute("CREATE INDEX TroveInfoTypeIdx ON "
-                        "TroveInfo(infoType, instanceId)")
         if "TroveInfoIdx2" in self.db.tables["TroveInfo"]:
             self.cu.execute("DROP INDEX TroveInfoIdx2")
         if "TroveTrovesInstanceIdx" in self.db.tables["TroveTroves"]:
             self.cu.execute("DROP INDEX TroveTrovesInstanceIdx")
-        self.cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
-                        "TroveTroves(instanceId,includedId)")
-        self.cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
-        self.cu.execute("DROP INDEX UserGroupMembersIdx")
-        self.cu.execute("DROP INDEX UserGroupMembersIdx2")
-        self.cu.execute("CREATE UNIQUE INDEX UserGroupMembers_uq ON "
-                        "UserGroupMembers(userGroupId, userId)")
-        self.cu.execute("CREATE INDEX UserGroupMembersUserIdx ON "
-                        "UserGroupMembers(userId)")
+        if "UserGroupMembersIdx" in self.db.tables["UserGroupMembers"]:
+            self.cu.execute("DROP INDEX UserGroupMembersIdx")
+        if "UserGroupMembersIdx2" in self.db.tables["UserGroupMembers"]:
+            self.cu.execute("DROP INDEX UserGroupMembersIdx2")
         if "UserGroupsUserGroupIdx" in self.db.tables["UserGroups"]:
             self.cu.execute("DROP INDEX UserGroupsUserGroupIdx")
-        self.cu.execute("CREATE UNIQUE INDEX UserGroupsUserGroup_uq ON "
-                        "UserGroups(userGroup)")
+        if "LatestItemIdx" in self.db.tables["Latest"]:
+            self.cu.execute("DROP INDEX LatestItemIdx")
         # done...
         self.db.loadSchema()
+        return self.Version
+
+class MigrateTo_9(SchemaMigration):
+    Version = 9
+    def migrate(self):
+        # change the byDefault column to flags in TroveTroves
+
+        # create the correct table under a new name, move the data over, drop the old one, rename
+        self.cu.execute("""
+        CREATE TABLE TroveTroves2(
+            instanceId      INTEGER NOT NULL,
+            includedId      INTEGER NOT NULL,
+            flags           INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT
+                FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""")
+        # now move the data over
+        self.cu.execute("""
+        INSERT INTO TroveTroves2
+        (instanceId, includedId, flags, changed)
+            SELECT instanceId, includedId,
+                   CASE WHEN byDefault THEN %d ELSE 0 END,
+                   changed
+            FROM TroveTroves""" % TROVE_TROVES_BYDEFAULT)
+        self.cu.execute("DROP TABLE TroveTroves")
+        self.cu.execute("ALTER TABLE TroveTroves2 RENAME TO TroveTroves")
+        # reload the schema and call createTrove() to fill in the missing triggers and indexes
+        self.db.loadSchema()
+        createTroves(self.db)
+
+        # we changed the Instances update trigger to protect the changed column from changing
+        self.db.dropTrigger("Instances", "UPDATE")
+        createTrigger(self.db, "Instances", pinned=True)
+        # done...
         return self.Version
 
 # create the server repository schema
@@ -925,6 +1087,7 @@ def checkVersion(db):
     if version == 5: version = MigrateTo_6(db)()
     if version == 6: version = MigrateTo_7(db)()
     if version == 7: version = MigrateTo_8(db)()
+    if version == 8: version = MigrateTo_9(db)()
 
     return version
 

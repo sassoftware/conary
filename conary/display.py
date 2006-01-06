@@ -127,7 +127,7 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
             yield troveTup, trv, 0
 
             if iterTroves:
-                newTroveTups = sorted(trv.iterTroveList())
+                newTroveTups = sorted(trv.iterTroveList(strongRefs=True))
                 if needTroves:
                     newTroves = troveSource.getTroves(newTroveTups, 
                                                       withFiles=False)

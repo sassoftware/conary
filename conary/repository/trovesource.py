@@ -34,6 +34,9 @@ class AbstractTroveSource:
         self._bestFlavor = False
         self._getLeavesOnly = False
 
+    def requiresLabelPath(self):
+        return not self._allowNoLabel
+
     def getTroveLeavesByLabel(self, query, bestFlavor=True):
         raise NotImplementedError
 
@@ -52,8 +55,11 @@ class AbstractTroveSource:
     def getTroves(self, troveList, withFiles = True):
         raise NotImplementedError
 
+    def resolveDependencies(self, label, depList):
+        return {}
+
     def hasTroves(self, troveList):
-        return [False] * len(troveList)
+        return NotImplementedError
 
     def getTrove(self, name, version, flavor, withFiles = True):
         trv = self.getTroves([(name, version, flavor)], withFiles)[0]
@@ -97,7 +103,7 @@ class AbstractTroveSource:
 	seen = { trove.getName() : [ (trove.getVersion(),
 				      trove.getFlavor()) ] }
 
-	troveList = [x for x in trove.iterTroveList()]
+	troveList = [x for x in trove.iterTroveList(strongRefs=True)]
 
 	while troveList:
 	    (name, version, flavor) = troveList[0]
@@ -120,7 +126,7 @@ class AbstractTroveSource:
 
                 yield trv
 
-                troveList += [ x for x in trv.iterTroveList() ]
+                troveList += [ x for x in trv.iterTroveList(strongRefs=True) ]
 	    except errors.TroveMissing:
 		if not ignoreMissing:
 		    raise
@@ -378,7 +384,8 @@ class TroveListTroveSource(SimpleTroveSource):
             foundTups.update(newTroves)
             troveTups = []
             for newTrove in newTroves:
-                for tup in newTrove.iterTroveList():
+                for tup in newTrove.iterTroveList(strongRefs=True,
+                                                  weakRefs=True):
                     self._trovesByName.setdefault(tup[0], set()).add(tup)
                     if tup not in foundTups:
                         troveTups.append(tup)
@@ -777,6 +784,12 @@ class TroveSourceStack(SearchableTroveSource):
             else:
                 self.addSource(source)
 
+    def requiresLabelPath(self):
+        for source in self.iterSources():
+            if source.requiresLabelPath():
+                return True
+        return False
+
     def addSource(self, source):
         if source is not None and source not in self:
             self.sources.append(source)
@@ -932,10 +945,13 @@ class TroveSourceStack(SearchableTroveSource):
             if not jobList:
                 break
 
-            res = source.createChangeSet(jobList, 
-                                       withFiles = withFiles,
-                                       withFileContents = withFileContents,
-                                       recurse = recurse)
+            try:
+                res = source.createChangeSet(jobList, 
+                                           withFiles = withFiles,
+                                           withFileContents = withFileContents,
+                                           recurse = recurse)
+            except errors.OpenError:
+                res = changeset.ReadOnlyChangeSet(), jobList
             if isinstance(res, (list, tuple)):
                 newCs, jobList = res
             else: 
@@ -977,7 +993,12 @@ def stack(*sources):
         source1, source2 = sources
 
     if source1 is source2:
-        return source1
+        # trove source stacks may have different behavior than
+        # individual trove sources, so always return a 
+        # stack even when there's nothing to stack
+        if isinstance(source1, TroveSourceStack):
+            return source1
+        return TroveSourceStack(source1)
 
     if isinstance(source1, TroveSourceStack):
         if source1.hasSource(source2):

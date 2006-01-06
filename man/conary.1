@@ -1,5 +1,5 @@
-.\" Copyright (c) 2004-2005 rPath, Inc.
-.TH CONARY 1 "21 February 2005" "rPath, Inc."
+.\" Copyright (c) 2004-2006 rPath, Inc.
+.TH CONARY 1 "4 January 2006" "rPath, Inc."
 .SH NAME
 conary \- repository-based software configuration manager
 .SH SYNOPSIS
@@ -81,7 +81,7 @@ represented in the repository.
 .B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
 Lists troves installed on the local system. Any number of trove names or
 absolute paths may be given. Extra arguments may be given to change what
-information is displayed (but they cannot be combined, unfortunately).
+information is displayed (but they cannot be combined, unfortunately). Synonyms: \fBq\fP
 .RS 4
 .TP 4
 .B \-\-deps
@@ -112,6 +112,49 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
+.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Lists troves in the repository. Synonyms: \fBrq\fP
+Arguments include
+.RS 4
+.TP 4
+.B \-\-all
+.\" FIXME: document
+.TP
+.B \-\-buildreqs
+Displays the troves that fulfilled the build requirements of the trove.
+.TP
+.B \-\-deps
+Displays full dependency information.
+.TP
+.B \-\-flavors
+Displays flavors of the troves.
+.TP
+.B \-\-full-versions
+Full version strings are displayed instead of abbreviated version numbers.
+.TP
+.B \-\-ids
+.\" FIXME: document
+.TP
+.B \-\-info
+Displays information on the specified troves, including flavors, and requirements.
+.TP
+.B \-\-leaves
+.\" FIXME: document
+.TP
+.B \-\-ls
+Lists the files in the changeset.
+.TP
+.B \-\-sha1s
+Lists the sha1s of all the file contents in the changeset.
+.TP
+.B \-\-tags
+.\" FIXME: document
+.TP
+.B \-\-signatures
+Displays digital signatures for the specified troves.
+.RE
+.RE
+
 .B rollback \fIrollback\fP [\fIargs\fP] 
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
@@ -120,6 +163,45 @@ Arguments include
 .TP 4
 .B \-\-replace-files
 See \-\-replace-files description from \fBconary update\fP
+.RE
+.TP
+.B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
+The \fBshowcs\fP command lists the contents of the provided 
+\fBchangeset\fP.  If a trove is specified, and that trove is within the 
+changeset, only that trove is displayed.  A component specifier, such as 
+:runtime, can be given instead of a trove.  In that case, all components 
+within all packages in the changeset will be displayed.
+
+.RS 4
+.TP 4
+.B \-\-full-versions
+Does not attempt to shorten version strings for display.
+.\" FIXME: add semantics
+.TP
+.B \-\-deps
+Displays provides and requires information about the troves in the changeset.
+.TP
+.B \-\-ls
+Lists the files in the changeset.
+.TP
+.B \-\-show-changes
+For files that have been modified, lists the old version of the file above the
+new version of the file for easy comparison.   Only has an effect if --ls
+is specified.  
+.TP
+.B \-\-tags
+Show any files in the changeset that have tags.
+.RE
+.TP
+.B syncchildren [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Update the children of \fItrovename\fP so that the versions of the child
+troves match the version specified by the parent trove.  
+Arguments include
+.RS 4
+.TP 4
+.B \-\-update-only
+Only change the versions of installed children to match the ones referenced 
+by the specified troves, do not install any missing troves.
 .RE
 .TP
 .B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP][--[\fIversion\fP][\fIflavor\fP]]>* <\fIchangeset-file\fP>*
@@ -189,7 +271,7 @@ If you want conary to update anyway, replacing the contents
 of the file with the new version from the changeset, you will need
 to provide the \-\-replace-files option.
 .TP
-.B \-\-sync
+.B \-\-sync-to-parents
 Only allow updates to versions that are referenced by other troves on the 
 system.  This allows you to easily update a trove to a version specified 
 within a group, or ensure you match the :lib component with an out-of-date
@@ -200,7 +282,15 @@ Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
 .B updateall
-.\" FIXME: document
+Iterates through all the top-level troves installed on the system
+and updates to the most recent version in the repository.
+Thus, if foo:lib has been updated upstream but is only installed on
+your system because its a member of group-dist, it will be updated to the
+version referenced in the latest group-dist.  If, however, foo:lib is
+not referenced by any other trove installed on the system,
+\fBupdateall\fP will scan the repository for an update for foo:lib directly.
+\fBupdateall\fP will also not update packages installed from local cooks or
+emerges, thanks to branch affinity.
 .RS 4
 .TP 4
 .B \-\-exclude-troves <patterns>
@@ -230,76 +320,6 @@ old (or otherwise misbehaves) and cannot perform a regular upgrade
 through a \fBconary update conary\fP invocation.
 .RE
 .TP
-.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
-Lists troves in the repository.
-Arguments include
-.RS 4
-.TP 4
-.B \-\-all
-.\" FIXME: document
-.TP
-.B \-\-buildreqs
-Displays the troves that fulfilled the build requirements of the trove
-.TP
-.B \-\-deps
-.\" FIXME: document
-.TP
-.B \-\-flavors
-Displays flavors of the troves
-.TP
-.B \-\-full-versions
-.\" FIXME: document
-.TP
-.B \-\-ids
-.\" FIXME: document
-.TP
-.B \-\-info
-.\" FIXME: document
-.TP
-.B \-\-leaves
-.\" FIXME: document
-.TP
-.B \-\-ls
-.\" FIXME: document
-.TP
-.B \-\-sha1s
-.\" FIXME: document
-.TP
-.B \-\-tags
-.\" FIXME: document
-.TP
-.B \-\-signatures
-Displays digital signatures for the specified troves.
-.RE
-.RE
-.TP
-.B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
-The \fBshowcs\fP command lists the contents of the provided 
-\fBchangeset\fP.  If a trove is specified, and that trove is within the 
-changeset, only that trove is displayed.  A component specifier, such as 
-:runtime, can be given instead of a trove.  In that case, all components 
-within all packages in the changeset will be displayed.
-
-.RS 4
-.TP 4
-.B \-\-full-versions
-Does not attempt to shorten version strings for display
-.\" FIXME: add semantics
-.TP
-.B \-\-deps
-Displays provides and requires information about the troves in the changeset.
-.TP
-.B \-\-ls
-Lists the files in the changeset
-.TP
-.B \-\-show-changes
-For files that have been modified, lists the old version of the file above the
-new version of the file for easy comparison.   Only has an effect if --ls
-is specified.  
-.TP
-.B \-\-tags
-Show any files in the changeset that have tags.
-.RE
 .TP
 .B verify [--all] \fI<trove>[=version]*\fP
 Compares the files in the given \fItrove\fP (or all troves if the --all 

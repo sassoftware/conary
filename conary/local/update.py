@@ -1039,7 +1039,9 @@ class FilesystemJob:
             self._singleTrove(db, troveCs, changeSet, baseTrove,
                                       newFsTrove, root, removeHints, flags)
 
-            newFsTrove.mergeTroveListChanges(troveCs.iterChangedTroves(),
+            newFsTrove.mergeTroveListChanges(
+                troveCs.iterChangedTroves(strongRefs = True, weakRefs = False),
+                troveCs.iterChangedTroves(strongRefs = False, weakRefs = True),
                                            redundantOkay = True)
 
         pkgList = [ x[1] for x in pkgList ]
@@ -1326,7 +1328,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
         return (changeSet, returnList)
 
     for i, (curTrove, srcTrove, newVersion, flags) in enumerate(pkgList):
-        inclusions = [ x for x in curTrove.iterTroveList() ]
+        inclusions = [ x for x in curTrove.iterTroveList(strongRefs=True) ]
         if not inclusions: continue
         assert(curTrove == srcTrove)
         assert(srcTrove.emptyFileList() and curTrove.emptyFileList())

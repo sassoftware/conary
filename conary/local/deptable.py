@@ -866,7 +866,7 @@ class DependencyTables:
                 trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
                                            withFiles = False)
 
-                for name, version, flavor in trv.iterTroveList():
+                for name, version, flavor in trv.iterTroveList(strongRefs=True):
                     targetTrove = troveInfo.get((name, version, flavor), -1)
                     if targetTrove >= 0:
                         newNewEdges.add((i + 1, targetTrove, None))

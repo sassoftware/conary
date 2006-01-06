@@ -19,7 +19,10 @@ from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
 
-VERSION = 15
+TROVE_TROVES_BYDEFAULT = 1 << 0
+TROVE_TROVES_WEAKREF   = 1 << 1
+
+VERSION = 16
 
 def resetTable(cu, name):
     try:
@@ -96,7 +99,7 @@ def createTroveTroves(db):
     CREATE TABLE TroveTroves(
         instanceId      INTEGER,
         includedId      INTEGER,
-        byDefault       BOOLEAN,
+        flags           INTEGER,
         inPristine      BOOLEAN
     )""")
     # this index is so we can quickly tell what troves are needed by another trove
@@ -238,6 +241,7 @@ def createRequiresTable(db, cu, name, isTemp):
                start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = startTrans)
+    # XXX: do we really need this index?
     cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = startTrans)
 
@@ -303,6 +307,7 @@ def createDepWorkTable(db, cu, name):
 def createDependencies(db):
     commit = False
     cu = db.cursor()
+
     if "Dependencies" not in db.tables:
         createDepTable(db, cu, "Dependencies", False)
         commit = True
@@ -323,17 +328,20 @@ def createDependencies(db):
 
     if not resetTable(cu, "SuspectDepsOrig"):
         db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
+        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
+                   start_transaction=False)
         db.commit()
 
     if not resetTable(cu, "SuspectDeps"):
         db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)")
+        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)",
+                   start_transaction=False)
         db.commit()
 
     if not resetTable(cu, "BrokenDeps"):
         db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)")
+        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
+                   start_transaction=False)
         db.commit()
 
     if not resetTable(cu, "RemovedTroveIds"):
@@ -342,9 +350,11 @@ def createDependencies(db):
         CREATE TEMPORARY TABLE RemovedTroveIds(
             troveId INTEGER,
             nodeId INTEGER
-        )""")
+        )""",
+                   start_transaction=False)
 	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
-                   "RemovedTroveIds(troveId)")
+                   "RemovedTroveIds(troveId)",
+                   start_transaction=False)
         db.commit()
 
     db.loadSchema()
@@ -649,12 +659,48 @@ class MigrateTo_15(SchemaMigration):
         if "TroveTrovesInstIncIdx" in self.db.tables["TroveTroves"]:
             self.cu.execute("DROP INDEX TroveTrovesInstIncIdx")
         if "TroveTrovesInstanceIncluded_uq" not in self.db.tables["TroveTroves"]:
-            cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+            self.cu.execute(
+                       "CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
                        "TroveTroves(instanceId,includedId)")
-        self.cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
         self.db.commit()
         self.db.loadSchema()
         return self.Version
+
+class MigrateTo_16(SchemaMigration):
+    Version = 16
+    def migrate(self):
+        cu = self.cu
+        cu.execute("""
+        CREATE TABLE TroveTroves2(
+            instanceId      INTEGER,
+            includedId      INTEGER,
+            flags           INTEGER,
+            inPristine      BOOLEAN
+        )""")
+        cu.execute('''
+        INSERT INTO TroveTroves2 
+            SELECT instanceId, includedId, 
+                   CASE WHEN byDefault THEN %d ELSE 0 END, 
+                   inPristine 
+            FROM TroveTroves''' % TROVE_TROVES_BYDEFAULT)
+
+        cu.execute('DROP TABLE TroveTroves')
+        cu.execute('ALTER TABLE TroveTroves2 RENAME TO TroveTroves')
+
+        cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON TroveTroves(includedId)")
+        # This index is used to enforce that TroveTroves only contains
+        # unique TroveTrove (instanceId, includedId) pairs.
+
+        cu.execute("CREATE UNIQUE INDEX TroveTrovesInstanceIncluded_uq ON "
+                   "TroveTroves(instanceId,includedId)")
+
+        self.db.commit()
+        self.db.loadSchema()
+        return self.Version
+
+
+                
+
 
 
 def checkVersion(db):
@@ -685,6 +731,7 @@ def checkVersion(db):
     if version == 12: version = MigrateTo_13(db)()
     if version == 13: version = MigrateTo_14(db)()
     if version == 14: version = MigrateTo_15(db)()
+    if version == 15: version = MigrateTo_16(db)()
 
     return version
 
