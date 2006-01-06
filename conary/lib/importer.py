@@ -112,4 +112,4 @@ class OnDemandImporter(object):
             return None
 
 def install():
-    sys.meta_path.append(OnDemandImporter)
+    sys.meta_path.append(OnDemandImporter())
