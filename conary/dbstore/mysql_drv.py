@@ -173,4 +173,4 @@ class Database(BaseDatabase):
             sql = """
             SET NEW.%s = current_timestamp() + 0 ;
             """ % (column,)
-        return BaseDatabase.trigger(self, table, when, onAction, sql)
+        return BaseDatabase.createTrigger(self, table, when, onAction, sql)

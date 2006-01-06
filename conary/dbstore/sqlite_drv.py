@@ -251,7 +251,7 @@ class Database(BaseDatabase):
             sql = """
             UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
             """ % (table, column)
-        return BaseDatabase.trigger(self, table, when, onAction, sql)
+        return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):
