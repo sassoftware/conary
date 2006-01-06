@@ -22,9 +22,9 @@ TROVE_TROVES_WEAKREF   = 1 << 1
 
 VERSION = 9
 
-def createTrigger(db, table, column = "changed"):
+def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
-    retUpdate = db.createTrigger(table, column, "UPDATE")
+    retUpdate = db.createTrigger(table, column, "UPDATE", pinned=pinned)
     return retInsert or retUpdate
 
 def createInstances(db):
@@ -56,7 +56,7 @@ def createInstances(db):
         cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                    "Instances(itemId, versionId, flavorId) ")
         commit = True
-    if createTrigger(db, "Instances"):
+    if createTrigger(db, "Instances", pinned = True):
         commit = True
 
     if "InstancesView" not in db.views:
@@ -1007,6 +1007,10 @@ class MigrateTo_9(SchemaMigration):
         # reload the schema and call createTrove() to fill in the missing triggers and indexes
         self.db.loadSchema()
         createTroves()
+
+        # we changed the Instances update trigger to protect the changed column from changing
+        self.db.dropTrigger("Instances", "UPDATE")
+        createTrigger(db, "Instances", pinned=True)
         # done...
         return self.Version
 
