@@ -655,7 +655,18 @@ def createTroves(db):
             versionSpec         VARCHAR(767),
             flavorId            INTEGER
         )""")
-        cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)")
+        db.commit()
+
+    if not resetTable(cu, 'hasTrovesTmp'):
+        db.rollback()
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        hasTrovesTmp(
+            row                 INTEGER,
+            item                VARCHAR(254),
+            version             VARCHAR(767),
+            flavor              VARCHAR(767)
+        )""")
         db.commit()
 
     db.loadSchema()

@@ -45,6 +45,10 @@ Changes in @NEW@:
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.
+  o Server Changes:
+    * Added hasTroves() repository code
+    * Creating changesets atomically moves complete changesets into place
+    * Content store no longer reference counts entries
 
 Changes in 0.80.4:
   o Build Changes:
@@ -68,7 +72,6 @@ Changes in 0.80.3:
       excluded from packaging, except for /tmp and /var/tmp.
     * DanglingSymlinks now traverses intermediate symlinks; a symlink
       to a symlink to a symlink will no longer confuse it.
-
 
 Changes in 0.80.2:
   o Client Changes:
