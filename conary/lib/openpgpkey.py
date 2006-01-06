@@ -14,15 +14,13 @@
 
 import os
 import sys
-from getpass import getpass
+import getpass
 from time import time
 
 from conary import callbacks
 from conary.lib.util import log
 
 from Crypto.PublicKey import DSA
-from Crypto.PublicKey import RSA
-from Crypto.Util.number import getPrime
 from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
 from openpgpfile import getPublicKeyFromString
@@ -259,7 +257,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         tries = 0
         while tries < 3:
             # FIXME: make this a callback
-            passPhrase = getpass("Passphrase: ")
+            passPhrase = getpass.getpass("Passphrase: ")
             try:
                 cryptoKey = getPrivateKey(keyId, passPhrase, self.privatePath)
                 self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
