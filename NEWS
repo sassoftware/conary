@@ -16,6 +16,10 @@ Changes in @NEW@:
     * The Make() build action can now take a makeName keyword argument
       for cases when the normal Make() handling is exactly right but
       a different make program is required (nmake, qmake, etc.)
+    * The new PythonSetup() build action uses very recent versions
+      of the python setuptools package to install python programs
+      which have a setup.py that uses either the old disttools or
+      new setuptools package.
   o Group Building Changes:
     * add() now takes a "components" option.  r.add(<package>, 
       components=['devel', 'runtime'])  will install <package>, but only the

@@ -477,7 +477,7 @@ class CompilePython(BuildCommand):
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'; """
 	"""python -O -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'"""
-	)
+    )
 
     def do(self, macros):
 	macros = macros.copy()
@@ -493,6 +493,71 @@ class CompilePython(BuildCommand):
 	    for directory in util.braceGlob(destdir+arg):
 		macros['dir'] = directory[destlen:]
 		util.execute(self.command %macros)
+
+
+class PythonSetup(BuildCommand):
+    """
+    Calls setup.py in the correct way to use python-setuptools to
+    install without building a .egg file, regardless of whether
+    this version of setup.py was written to use disttools or
+    setuptools.  (If a different name is used for the disttools
+    or setuptools script, pass that name as the argument.)
+
+    @keyword dir: Directory in which to find the setup.py file,
+    defaults to the build directory.
+
+    @keyword action: The main argument to pass to setup.py,
+    C{install} by default.
+
+    @keyword rootDir: The directory to pass to setup.py via
+    the C{--root} option, the destdir by default.
+    """
+    template = (
+        '%%(cdcmd)s'
+        '%%(pythonsetup)s'
+        ' %%(action)s'
+        ' --single-version-externally-managed'
+        ' --root=%%(rootdir)s'
+    )
+    keywords = {
+        'dir': '',
+        'action': 'install',
+        'rootDir': '',
+    }
+
+    def do(self, macros):
+	if 'python-setuptools:runtime' not in self.recipe.buildRequires:
+            self.recipe.reportErrors(
+                "Must add 'python-setuptools:runtime' to buildRequires")
+	macros = macros.copy()
+        if self.dir:
+            rundir = action._expandOnePath(self.dir, macros)
+            macros.cdcmd = 'cd %s; ' % rundir
+	else:
+            rundir = macros.builddir
+	    macros.cdcmd = ''
+
+        if self.rootDir:
+            macros.rootdir = '%(destdir)s/' + self.rootDir
+        else:
+            macros.rootdir = '%(destdir)s'
+
+        if self.arglist:
+            macros.setup = self.arglist[0]
+        else:
+            macros.setup = 'setup.py'
+
+        macros.action = self.action
+
+        # now figure out which kind of setup.py this is
+        if 'import setuptools' in file('%s/%s' %(rundir, macros.setup)).read():
+            macros.pythonsetup = 'python %(setup)s '
+        else:
+            # hack to use setuptools instead of disttools
+            macros.pythonsetup = (
+                '''python -c "import setuptools;execfile('%(setup)s')"''')
+
+        util.execute(self.command %macros)
 
 
 class Ldconfig(BuildCommand):
