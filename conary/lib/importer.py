@@ -53,6 +53,7 @@ def makeImportedModule(name, data, scope):
         return mod
 
     class ModuleProxy(object):
+        __slots__ = []
         # we don't add any docs for the module in case the 
         # user tries accessing '__doc__'
         def __hasattr__(self, key):
