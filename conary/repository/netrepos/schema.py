@@ -56,6 +56,9 @@ def createInstances(db):
         cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                    "Instances(itemId, versionId, flavorId) ")
         commit = True
+    if "InstancesChangedIdx" not in db.tables["Instances"]:
+        cu.execute("CREATE INDEX InstancesChangedIdx ON "
+                   "Instances(changed)")
     if createTrigger(db, "Instances", pinned = True):
         commit = True
 
