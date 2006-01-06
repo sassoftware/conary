@@ -158,7 +158,7 @@ class Database(BaseDatabase):
         return version
 
     # A trigger that syncs up a column to the timestamp
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, sql = ""):
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the

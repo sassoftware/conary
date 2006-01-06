@@ -234,16 +234,8 @@ class Database(BaseDatabase):
             cu.execute('ANALYZE')
             self.loadSchema()
 
-    def transaction(self, name = None):
-        try:
-            return BaseDatabase.transaction(self, name)
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'attempt to write a readonly database':
-                raise sqlerrors.ReadOnlyDatabase(str(e))
-            raise
-
     # A trigger that syncs up the changed column
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, sql = ""):
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the
@@ -263,5 +255,10 @@ class Database(BaseDatabase):
         cu = self.cursor()
         if self.dbh.inTransaction:
             return cu
-        self.dbh._begin()
+        try:
+            self.dbh._begin()
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase(str(e))
+            raise
         return cu
