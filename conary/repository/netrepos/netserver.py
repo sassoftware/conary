@@ -1036,14 +1036,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 primary = (l[0], trvCs.getNewVersion(), l[2][1])
                 cs.addPrimaryTrove(*primary)
 
+
+                (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                                 suffix = '.tmp')
+                os.close(fd)
+
+                size = cs.writeToFile(tmpPath, withReferences = True)
+
 		(key, path) = self.cache.addEntry(l, recurse, withFiles,
 						  withFileContents,
 						  excludeAutoSource,
 						  (trovesNeeded,
-						   filesNeeded))
+						   filesNeeded),
+                                                  size = size)
 
-                size = cs.writeToFile(path, withReferences = True)
-                self.cache.setEntrySize(key, size)
+                os.rename(tmpPath, path)
             else:
                 path, (trovesNeeded, filesNeeded), size = cacheEntry
 

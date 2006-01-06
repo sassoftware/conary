@@ -27,20 +27,17 @@ class NullCacheSet:
         return None
 
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal):
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
+                 excludeAutoSource, returnVal, size):
+        (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
                                       suffix = '.ccs-out')
         os.close(fd)
         return None, path
 
-    def setEntrySize(self, row, size):
-        pass
-
     def invalidateEntry(self, name, version, flavor):
         pass
 
-    def __init__(self, tmpPath):
-        self.tmpPath = tmpPath
+    def __init__(self, tmpDir):
+        self.tmpDir = tmpDir
 
 
 class CacheSet:
@@ -102,7 +99,7 @@ class CacheSet:
         return None
 
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal):
+                 excludeAutoSource, returnVal, size):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -140,7 +137,7 @@ class CacheSet:
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
             excludeAutoSource, returnValue, size)
-            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,NULL)""",
+            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,size)""",
                        (name,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
@@ -188,11 +185,6 @@ class CacheSet:
                     os.unlink(path)
                 except OSError:
                     pass
-        self.db.commit()
-
-    def setEntrySize(self, row, size):
-        cu = self.db.cursor()
-        cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
         self.db.commit()
 
     def __cleanCache(self):
