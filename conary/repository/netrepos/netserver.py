@@ -1240,10 +1240,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             Instances.itemId = Items.itemId AND
                             Instances.versionId = Versions.versionId AND
                             Instances.flavorId = Flavors.flavorId
-                        JOIN Nodes USING 
-                            (itemId, versionId)
-                        JOIN LabelMap USING 
-                            (branchId, itemId)
+                        JOIN Nodes ON
+                            Nodes.itemId = Instances.itemId AND
+                            Nodes.versionId = Instances.versionId
+                        JOIN LabelMap ON
+                            Nodes.itemId = LabelMap.itemId AND
+                            Nodes.branchId = LabelMap.branchId
                         JOIN (SELECT
                                Permissions.labelId as labelId,
                                PerItems.item as permittedTrove,
