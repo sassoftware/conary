@@ -1259,7 +1259,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
                         WHERE
                             Instances.isPresent = 1
-                    """ % " ".join("%d" % x for x in userGroupIds)
+                    """ % ",".join("%d" % x for x in userGroupIds)
         cu.execute(query)
 
         for row, name, pattern in cu:
@@ -1545,7 +1545,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     WHERE
                         Instances.changed >= ? AND
                         Instances.isPresent = 1
-                    """ % " ".join("%d" % x for x in userGroupIds)
+                    """ % ",".join("%d" % x for x in userGroupIds)
 
         cu.execute(query, mark)
 
