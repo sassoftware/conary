@@ -137,7 +137,7 @@ class CacheSet:
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
             excludeAutoSource, returnValue, size)
-            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,size)""",
+            VALUES (NULL,?,   ?,?,?,?,   ?,?,?,?,   ?,?,?)""",
                        (name,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
@@ -151,7 +151,7 @@ class CacheSet:
         except:
             # something went wrong.  make sure that we roll
             # back any pending change
-            self.rollback()
+            self.db.rollback()
             raise
 
         return (row, path)
