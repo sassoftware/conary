@@ -26,6 +26,7 @@ import gzip
 import itertools
 import os
 import sha
+import tempfile
 
 from conary.lib import log
 from conary.lib import util
@@ -64,123 +65,9 @@ class DataStore(AbstractDataStore):
 	path = self.hashToPath(hash)
 	return os.path.exists(path)
 
-    def decrementCount(self, path):
-	"""
-	Decrements the count by one; it it becomes 1, the count file
-	is removed. If it becomes zero, the contents are removed.
-	"""
-        countPath = path + "#"
-
-	# use the count file for locking, *even if it doesn't exist*
-        # first ensure that the directory exists
-        self.makeDir(path)
-	countFile = os.open(countPath, os.O_RDWR | os.O_CREAT)
-	fcntl.lockf(countFile, fcntl.LOCK_EX)
-        
-	val = os.read(countFile, 100)
-	if not val:
-	    # no count file, remove the file
-            try:
-                os.unlink(path)
-            except OSError, e:
-                if e.errno == errno.ENOENT:
-                    # the contents have already been erased
-                    log.warning("attempted to remove %s from the data store, but it was missing", path)
-                else:
-                    raise
-	    # someone may try to recreate the file in here, but it should
-	    # work fine. even if multiple processes try to, one will create
-	    # the file and the rest will block on the countFile. once
-	    # we unlink it, everything will get moving again.
-	    os.unlink(countPath)
-	else:
-	    val = int(val[:-1])
-	    if val == 1:
-		os.unlink(countPath)
-	    else:
-		val -= 1
-		os.lseek(countFile, 0, 0)
-		os.ftruncate(countFile, 0)
-		os.write(countFile, "%d\n" % val)
-
-	os.close(countFile)
-
-    def incrementCount(self, path, fileObj = None, precompressed = False):
-	"""
-	Increments the count by one.  it becomes one, the contents
-	of fileObj are stored into that path. Return the new count.
-	"""
-        countPath = path + "#"
-
-        self.makeDir(path)
-	if os.path.exists(path):
-	    # if the path exists, it must be correct since we move the
-	    # contents into place atomicly. all we need to do is
-	    # increment the count
-	    countFile = os.open(countPath, os.O_RDWR | os.O_CREAT)
-	    fcntl.lockf(countFile, fcntl.LOCK_EX)
-
-	    val = os.read(countFile, 100)
-	    if not val:
-		val = 0
-	    else:
-		val = int(val[:-1])
-
-	    val += 1
-	    os.lseek(countFile, 0, 0)
-	    os.ftruncate(countFile, 0)
-	    os.write(countFile, "%d\n" % val)
-	    os.close(countFile)
-            return (val, None)
-	else:
-	    # new file, try to be the one who creates it
-	    newPath = path + ".new"
-
-	    fd = os.open(newPath, os.O_RDWR | os.O_CREAT)
-
-	    # get a write lock on the file
-	    fcntl.lockf(fd, fcntl.LOCK_EX)
-
-	    # if the .new file doesn't exist anymore, someone else must
-	    # have gotten the write lock before we did, created the
-	    # file, and then moved it into place. when this happens
-	    # we need to update the count instead
-	    
-	    if not os.path.exists(newPath):
-		os.close(fd)
-		return self.incrementCount(path, fileObj = fileObj,
-                                           precompressed = precompressed)
-
-            fObj = os.fdopen(fd, "r+")
-            if precompressed:
-                # this requires fileObj to be seekable. it's just easier
-                # that way
-                contentSha1 = sha.new()
-                uncompObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
-                s = uncompObj.read(128 * 1024)
-                while s:
-                    contentSha1.update(s)
-                    s = uncompObj.read(128 * 1024)
-                fileObj.seek(0)
-                
-                util.copyfileobj(fileObj, fObj)
-                uncompObj.close()
-            else:
-                dest = gzip.GzipFile(mode = "w", fileobj = fObj)
-                contentSha1 = sha.new()
-                util.copyfileobj(fileObj, dest, digest = contentSha1)
-                dest.close()
-
-            os.rename(newPath, path)
-	    # this closes fd for us
-	    fObj.close()
-            return (1, contentSha1.hexdigest())
-
-    # add one to the reference count for a file which already exists
-    # in the archive
     def addFileReference(self, hash):
-	path = self.hashToPath(hash)
-	self.incrementCount(path)
+        # this is for file reference counting, which we don't support
+        return
 
     def makeDir(self, path):
         d = os.path.dirname(path)
@@ -195,15 +82,44 @@ class DataStore(AbstractDataStore):
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
-    def addFile(self, f, hash, precompressed = False):
+    def addFile(self, fileObj, hash, precompressed = False):
 	path = self.hashToPath(hash)
         self.makeDir(path)
-	newCount, sha1 = self.incrementCount(path, fileObj = f,
-                                             precompressed = precompressed)
-        if sha1 and sha1 != hash:
+        if os.path.exists(path): return
+
+        tmpFd, tmpName = tempfile.mkstemp(suffix = ".new", 
+                                          dir = os.path.dirname(path))
+
+        outFileObj = os.fdopen(tmpFd, "w")
+        if precompressed:
+            # this requires fileObj to be seekable. it's just easier
+            # that way
+            contentSha1 = sha.new()
+            uncompObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
+            s = uncompObj.read(128 * 1024)
+            while s:
+                contentSha1.update(s)
+                s = uncompObj.read(128 * 1024)
+            fileObj.seek(0)
+            
+            util.copyfileobj(fileObj, outFileObj)
+            uncompObj.close()
+        else:
+            dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
+            contentSha1 = sha.new()
+            util.copyfileobj(fileObj, dest, digest = contentSha1)
+            dest.close()
+
+        # this closes tmpFd for us
+        outFileObj.close()
+
+        if contentSha1.hexdigest() != hash:
+            os.unlink(tmpName)
             raise errors.IntegrityError
 
-        if newCount == 1 and self.logFile:
+        os.rename(tmpName, path)
+
+        if self.logFile:
             open(self.logFile, "a").write(path + "\n")
 
     # returns a python file object for the file requested
@@ -219,18 +135,6 @@ class DataStore(AbstractDataStore):
 	path = self.hashToPath(hash)
 	f = open(path, "r")
 	return f
-
-    def removeFile(self, hash):
-	path = self.hashToPath(hash)
-	self.decrementCount(path)
-
-	try:
-            # XXX remove the next level up as well
-	    os.rmdir(os.path.dirname(path))
-	except OSError:
-	    # if this fails there are probably just other files
-	    # in that directory; just ignore it
-	    pass
 
     def __init__(self, topPath, logFile = None):
 	self.top = topPath
