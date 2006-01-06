@@ -137,7 +137,7 @@ class CacheSet:
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
             excludeAutoSource, returnValue )
-            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?,?)""",
+            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?)""",
                        (name, size,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
