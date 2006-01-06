@@ -47,6 +47,8 @@ Changes in @NEW@:
       # can be escaped by a \ to use a literal # in a configuration option.
   o Server Changes:
     * Added hasTroves() repository code
+    * Creating changesets atomically moves complete changesets into place
+    * Content store no longer reference counts entries
 
 Changes in 0.80.4:
   o Build Changes:
