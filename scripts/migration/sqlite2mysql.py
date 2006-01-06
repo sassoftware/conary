@@ -150,6 +150,9 @@ for t in tList:
         if t.lower() == "users":
             if "user" in fields:
                 fields[fields.index("user")] = "userName"
+        if t.lower() == "trovetroves":
+            if "byDefault" in fields:
+                fields[fields.index("byDefault")] = "flags"
         if t.lower() == "trovefiles":
             # versionId was declared as a binary string in sqlite instead of integer
             rows = [list(row) for row in rows]
