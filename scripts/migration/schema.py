@@ -23,11 +23,11 @@ if 'CONARY_PATH' in os.environ:
 import re
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
-
+from conary.dbstore.sqllib import CaselessDict
 class PrintDatabase:
     def __init__(self, showTables = True, driver="sqlite"):
-        self.tables = self.views = self.sequences = []
-        self.tempTables = []
+        self.tables = self.views = self.sequences = CaselessDict()
+        self.tempTables = CaselessDict()
         self.version = 0
         self.showTables = showTables
         self.statements = []
@@ -65,7 +65,7 @@ class PrintDatabase:
         if m is not None:
             d = m.groupdict()
             # remember this temporary table
-            self.tempTables.append(d["table"].strip())
+            self.tempTables.setdefault(d["table"].strip(), [])
             return True
         return False
     # ignore indexes for temporary tables
@@ -90,8 +90,8 @@ class PrintDatabase:
         m = tbl.match(sql)
         if m is not None:
             d = m.groupdict()
-            if d["table"]: self.tables.append(d["table"].strip())
-            if d["view"]: self.views.append(d["view"].strip())
+            if d["table"]: self.tables.setdefault(d["table"].strip(), [])
+            if d["view"]: self.views.setdefault(d["view"].strip(), True)
             return skipAll
         return False
 
@@ -116,22 +116,33 @@ class PrintDatabase:
             return
         self.statements.append(sql)
 
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, pinned=False):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
         assert(onAction in ["insert", "update"])
 
         if self.driver == "postgresql":
             funcName = "%s_func" % name
-            self.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column))
+            if pinned:
+                self.execute("""
+                CREATE OR REPLACE FUNCTION %s()
+                RETURNS trigger
+                AS $$
+                BEGIN
+                    NEW.%s := OLD.%s ;
+                    RETURN NEW;
+                END ; $$ LANGUAGE 'plpgsql';
+                """ % (funcName, column, column))
+            else:
+                self.execute("""
+                CREATE OR REPLACE FUNCTION %s()
+                RETURNS trigger
+                AS $$
+                BEGIN
+                    NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
+                    RETURN NEW;
+                END ; $$ LANGUAGE 'plpgsql';
+                """ % (funcName, column))
             # now create the trigger based on the above function
             self.execute("""
             CREATE TRIGGER %s
@@ -146,15 +157,19 @@ class PrintDatabase:
             when = "AFTER"
             if onAction == "insert":
                 when = "BEFORE"
-            sql = ("UPDATE %s SET %s = unix_timestamp() WHERE id = NEW.id ; "
-                   "%s " % (table, column, sql))
+            if pinned:
+                sql = ("UPDATE %s SET %s = OLD.%s "
+                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column, column))
+            else:
+                sql = ("UPDATE %s SET %s = unix_timestamp() "
+                       "WHERE _ROWID_ = NEW._ROWID_ " %(table, column))
         elif self.driver == "mysql":
             when = "BEFORE"
             # force the current_timestamp into a numeric context
-            sql = "SET NEW.%s = current_timestamp() + 0 ; %s" % (column, sql)
-
-            when = "BEFORE"
-            sql = ""
+            if pinned:
+                sql = "SET NEW.%s = OLD.%s" % (column, column)
+            else:
+                sql = "SET NEW.%s = current_timestamp() + 0" % (column,)
         else:
             raise NotImplementedError
         sql = """
@@ -180,8 +195,22 @@ def getIndexes(driver = "sqlite"):
     schema.checkVersion(pd)
     return pd.statements
 
+import getopt
 if __name__ == '__main__':
     driver = os.environ.get("CONARY_DRIVER", "sqlite")
+    (opts, args) = getopt.getopt(sys.argv[1:], "msph", [
+        "mysql", "postgres", "postgresql", "sqlite", "help"])
+    for opt, val in opts:
+        if opt == "-m" or opt.startswith("--m"):
+            driver = "mysql"
+        elif opt == "-s" or opt.startswith("--s"):
+            driver = "sqlite"
+        elif opt == "-p" or opt.startswith("--p"):
+            driver = "postgresql"
+        elif opt in ["-h", "--help"]:
+            print "%s [--mysql | --postgresql | --sqlite ]" % (sys.argv[0],)
+            print "Prints the network server repository schema"
+            sys.exit(0)
     assert(driver in ["sqlite", "mysql", "postgresql"])
     for x in getTables(driver): print x
     for x in getIndexes(driver): print x

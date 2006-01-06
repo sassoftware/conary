@@ -234,16 +234,8 @@ class Database(BaseDatabase):
             cu.execute('ANALYZE')
             self.loadSchema()
 
-    def transaction(self, name = None):
-        try:
-            return BaseDatabase.transaction(self, name)
-        except sqlite3.ProgrammingError, e:
-            if str(e) == 'attempt to write a readonly database':
-                raise sqlerrors.ReadOnlyDatabase(str(e))
-            raise
-
     # A trigger that syncs up the changed column
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, pinned = False):
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the
@@ -251,11 +243,15 @@ class Database(BaseDatabase):
         when = "AFTER"
         if onAction == "insert":
             when = "BEFORE"
-        sql = """
-        UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
-        %s
-        """ % (table, column, sql)
-        return BaseDatabase.trigger(self, table, when, onAction, sql)
+        if pinned:
+            sql = """
+            UPDATE %s SET %s = OLD.%s WHERE _ROWID_ = NEW._ROWID_ ;
+            """ % (table, column, column)
+        else:
+            sql = """
+            UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
+            """ % (table, column)
+        return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):
@@ -263,5 +259,10 @@ class Database(BaseDatabase):
         cu = self.cursor()
         if self.dbh.inTransaction:
             return cu
-        self.dbh._begin()
+        try:
+            self.dbh._begin()
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'attempt to write a readonly database':
+                raise sqlerrors.ReadOnlyDatabase(str(e))
+            raise
         return cu

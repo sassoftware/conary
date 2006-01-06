@@ -316,7 +316,7 @@ class BaseDatabase:
         assert(self.dbh)
         return self.dbh.rollback()
 
-    def trigger(self, table, when, onAction, sql):
+    def createTrigger(self, table, when, onAction, sql):
         name = "%s_%s" % (table, onAction)
         if name in self.triggers:
             return False
@@ -328,6 +328,15 @@ class BaseDatabase:
         """ % (name, when.upper(), onAction.upper(), table, sql)
         cu = self.dbh.cursor()
         cu.execute(sql)
+        return True
+
+    def dropTrigger(self, table, onAction):
+        onAction = onAction.lower()
+        name = "%s_%s" % (table, onAction)
+        if name in self.triggers:
+            return False
+        cu = self.dbh.cursor()
+        cu.execute("DROP TRIGGER %s" % name)
         return True
 
     # easy access to the schema state
