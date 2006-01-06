@@ -53,6 +53,7 @@ def makeImportedModule(name, data, scope):
         return mod
 
     class ModuleProxy(object):
+        __slots__ = []
         # we don't add any docs for the module in case the 
         # user tries accessing '__doc__'
         def __hasattr__(self, key):
@@ -61,13 +62,6 @@ def makeImportedModule(name, data, scope):
 
         def __getattr__(self, key):
             mod = _loadModule()
-            if key == '__all__':
-                # the caller tried to use __all__ to implement import *.
-                # Unforunately, that probably means the caller is
-                # an import statement which has a handle on an import
-                # object.  We can't rely on being able to overwrite that
-                # variable, so just update the proxy's dict.
-                self.__dict__.update(mod.__dict__)
             return getattr(mod, key)
 
         def __setattr__(self, key, value):
