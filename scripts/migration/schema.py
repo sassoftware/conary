@@ -195,8 +195,22 @@ def getIndexes(driver = "sqlite"):
     schema.checkVersion(pd)
     return pd.statements
 
+import getopt
 if __name__ == '__main__':
     driver = os.environ.get("CONARY_DRIVER", "sqlite")
+    (opts, args) = getopt.getopt(sys.argv[1:], "msph", [
+        "mysql", "postgres", "postgresql", "sqlite", "help"])
+    for opt, val in opts:
+        if opt == "-m" or opt.startswith("--m"):
+            driver = "mysql"
+        elif opt == "-s" or opt.startswith("--s"):
+            driver = "sqlite"
+        elif opt == "-p" or opt.startswith("--p"):
+            driver = "postgresql"
+        elif opt in ["-h", "--help"]:
+            print "%s [--mysql | --postgresql | --sqlite ]" % (sys.argv[0],)
+            print "Prints the network server repository schema"
+            sys.exit(0)
     assert(driver in ["sqlite", "mysql", "postgresql"])
     for x in getTables(driver): print x
     for x in getIndexes(driver): print x
