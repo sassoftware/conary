@@ -36,6 +36,7 @@ Changes in @NEW@:
     * A new configuration option, autoResolvePackages, tells conary to install
       the packages that include the components needed for dep resolution.
     * You can now install locally cooked groups.
+    * Added script to mirror repositories
   o Code structure:
     * Conary now has the concept of "weak references", where a weak reference
       allows conary to be able to recognize the relationship between a 
@@ -49,6 +50,7 @@ Changes in @NEW@:
     * Added hasTroves() repository code
     * Creating changesets atomically moves complete changesets into place
     * Content store no longer reference counts entries
+    * Added support for trove marks to support mirroring
 
 Changes in 0.80.4:
   o Build Changes:
