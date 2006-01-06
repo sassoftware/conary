@@ -23,11 +23,11 @@ if 'CONARY_PATH' in os.environ:
 import re
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import schema
-
+from conary.dbstore.sqllib import CaselessDict
 class PrintDatabase:
     def __init__(self, showTables = True, driver="sqlite"):
-        self.tables = self.views = self.sequences = []
-        self.tempTables = []
+        self.tables = self.views = self.sequences = CaselessDict()
+        self.tempTables = CaselessDict()
         self.version = 0
         self.showTables = showTables
         self.statements = []
@@ -65,7 +65,7 @@ class PrintDatabase:
         if m is not None:
             d = m.groupdict()
             # remember this temporary table
-            self.tempTables.append(d["table"].strip())
+            self.tempTables.setdefault(d["table"].strip(), [])
             return True
         return False
     # ignore indexes for temporary tables
@@ -90,8 +90,8 @@ class PrintDatabase:
         m = tbl.match(sql)
         if m is not None:
             d = m.groupdict()
-            if d["table"]: self.tables.append(d["table"].strip())
-            if d["view"]: self.views.append(d["view"].strip())
+            if d["table"]: self.tables.setdefault(d["table"].strip(), [])
+            if d["view"]: self.views.setdefault(d["view"].strip(), True)
             return skipAll
         return False
 
@@ -116,7 +116,7 @@ class PrintDatabase:
             return
         self.statements.append(sql)
 
-    def trigger(self, table, column, onAction, sql = ""):
+    def createTrigger(self, table, column, onAction, sql = ""):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
         assert(onAction in ["insert", "update"])
