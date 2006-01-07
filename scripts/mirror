@@ -83,13 +83,13 @@ def buildJobList(repos, troveList):
     # last updated to, so we have to look again at all of the troves in the
     # source repository with the last mark which made it into our target.
     present = repos.hasTroves([ x[1] for x in troveList ])
-    filteredList = [ x[1] for x in troveList if not present[x[1]] ]
+    filteredList = [ x for x in troveList if not present[x[1]] ]
 
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
     # absolute ones. 
     q = {}
-    for (name, version, flavor) in filteredList:
+    for mark, (name, version, flavor) in filteredList:
         d = q.setdefault(name, {})
         l = d.setdefault(version.branch(), [])
         l.append(flavor)
@@ -99,7 +99,7 @@ def buildJobList(repos, troveList):
     # we'll keep latestAvailable in sync with what the target will look like
     # as the mirror progresses
     jobList = []
-    for (name, version, flavor) in filteredList:
+    for mark, (name, version, flavor) in filteredList:
         if name not in latestAvailable:
             job = (name, (None, None), (version, flavor), True)
             currentMatch = (None, None, None, None)
@@ -111,7 +111,11 @@ def buildJobList(repos, troveList):
             for repVersion, flavorList in d.iteritems():
                 for repFlavor in flavorList:
                     score = flavor.score(repFlavor)
-                    closeness = version.closeness(repVersion)
+                    if repVersion == version:
+                        closeness = 100000
+                    else:
+                        closeness = version.closeness(repVersion)
+
                     if score is False: continue
                     if score < currentMatch[3]: 
                         continue
@@ -123,10 +127,9 @@ def buildJobList(repos, troveList):
                         currentMatch = (repVersion, repFlavor, closeness, score)
 
             job = (name, (currentMatch[0], currentMatch[1]),
-                         (version, flavor),
-                         currentMatch[0] is None)
+                          (version, flavor), currentMatch[0] is None)
 
-        jobList.append(job)
+        jobList.append((mark, job))
 
         d = latestAvailable.setdefault(name, {})
         if currentMatch[0] is not None:
@@ -141,21 +144,18 @@ def buildJobList(repos, troveList):
 def bundleJobs(jobList, count):
     bundles = []
     bundle = []
-    newInBundle = set()
+    namesInBundle = set()
 
-    for job in jobList:
-        old = (job[0], job[1][0], job[1][1])
-        new = (job[0], job[2][0], job[2][1])
-
-        if len(bundle) >= count or old in newInBundle:
+    for mark, job in jobList:
+        if len(bundle) >= count or job[0] in namesInBundle:
             # break the bundle here because it's getting too large or this
             # job is relative to something else in the bundle
             bundles.append(bundle)
             bundle = []
-            newInBundle = set()
+            namesInBundle = set()
         
-        newInBundle.add(new)
-        bundle.append(job)
+        namesInBundle.add(job[0])
+        bundle.append((mark, job))
 
     if bundle:
         bundles.append(bundle)
@@ -164,21 +164,25 @@ def bundleJobs(jobList, count):
 
 def mirrorTroves(sourceRepos, targetRepos, cfg, test):
     # find the latest timestamp stored on the target mirror
-    currentMark = targetRepos.getLatestTroveMark(cfg.host)
+    currentMark = targetRepos.getMirrorMark(cfg.host)
     log.debug("currently up to date through %d", currentMark)
 
     # now find all of the troves we need from from the mirror source
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
     log.debug("need %d new troves", len(troveList))
 
+    log.debug("building job list")
     jobList = buildJobList(targetRepos, troveList)
+    log.debug("building job bundles")
     bundles = bundleJobs(jobList, cfg.threshHold)
 
     for i, bundle in enumerate(bundles):
         (outFd, tmpName) = util.mkstemp()
         os.close(outFd)
         log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), bundle))
-        cs = sourceRepos.createChangeSetFile(bundle, tmpName, recurse = False)
+        jobList = [ x[1] for x in bundle ]
+        newMark = max(x[0] for x in bundle)
+        cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
         # XXX it's a shame we can't give a hint as to what server to use
         # to avoid having to open the changeset and read in bits of it
         if test:
@@ -186,6 +190,7 @@ def mirrorTroves(sourceRepos, targetRepos, cfg, test):
         else:
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName)
+            targetRepos.setMirrorMark(cfg.host, newMark)
         os.unlink(tmpName)
 
 options = parseArgs()

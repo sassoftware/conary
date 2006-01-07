@@ -686,6 +686,17 @@ def createInstructionSets(db):
         db.commit()
         db.loadSchema()
 
+def createMirrorTracking(db):
+    cu = db.cursor()
+    if 'LatestMirror' not in db.tables:
+        cu.execute("""
+        CREATE TABLE LatestMirror(
+            host            VARCHAR(254),
+            mark            NUMERIC(14,0) NOT NULL
+        )""" % db.keywords)
+        db.commit()
+        db.loadSchema()
+
 def createChangeLog(db):
     commit = False
     cu = db.cursor()
@@ -1064,6 +1075,8 @@ def createSchema(db):
     createMetadata(db)
     createTrigger(db, "Metadata")
     createTrigger(db, "MetadataItems")
+
+    createMirrorTracking(db)
 
 # schema creation/migration/maintenance entry point
 def checkVersion(db):

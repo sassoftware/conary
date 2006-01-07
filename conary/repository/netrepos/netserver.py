@@ -1501,18 +1501,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return "%s/%s" % (_baseUrl, ret)
         return ""
 
-    def getLatestTroveMark(self, authToken, clientVersion):
+    def getMirrorMark(self, authToken, clientVersion, host):
 	if not self.auth.check(authToken, write = False):
 	    raise errors.InsufficientPermission
 
-        # the mark doesn't tell anything interesting about the repository,
-        # so just return the latest one. no need to get fancy.
         cu = self.db.cursor()
-        result = cu.execute("select max(changed) from instances").fetchall()
+        cu.execute("select mark from LatestMirror where host=?", host)
+        result = cu.fetchall()
         if not result or result[0][0] == None:
             return -1
 
         return result[0][0]
+
+    def setMirrorMark(self, authToken, clientVersion, host, mark):
+	if not self.auth.check(authToken, write = False):
+	    raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        cu.execute("select mark from LatestMirror where host=?", host)
+        result = cu.fetchall()
+        if not result:
+            cu.execute("insert into LatestMirror (host, mark) "
+                       "values (?, ?)", host, mark)
+        else:
+            cu.execute("update LatestMirror set mark=? where host=?",
+                       mark, host)
+
+        return ""
 
     def getNewTroveList(self, authToken, clientVersion, mark):
         # only show troves the user is allowed to see

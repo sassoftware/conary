@@ -1208,8 +1208,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
-    def getLatestTroveMark(self, host):
-        return self.c[host].getLatestTroveMark()
+    def getMirrorMark(self, host):
+        return self.c[host].getMirrorMark(host)
+
+    def setMirrorMark(self, host, mark):
+        return self.c[host].setMirrorMark(host, mark)
 
     def getNewTroveList(self, host, mark):
         return [ (x[0], (x[1][0], self.thawVersion(x[1][1]), 
