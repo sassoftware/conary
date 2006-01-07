@@ -392,7 +392,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             del argSet['flavor']
         if argSet.has_key('macro'):
             for macro in argSet['macro']:
-                cfg.configLine('macros.' + macro)
+                cfg.configLine('macros ' + macro)
             del argSet['macro']
 
         if argSet.has_key('prep'):
