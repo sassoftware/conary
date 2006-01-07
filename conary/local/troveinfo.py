@@ -36,12 +36,8 @@ class TroveInfoTable:
                            "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
 
     def getInfo(self, cu, trove, idNum):
-        from array import array
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?",
                    idNum)
         for (tag, frz) in cu:
             name = trove.troveInfo.streamDict[tag][2]
-            # FIXME: check the return values for BLOBs
-            if isinstance(frz, array):
-                frz = frz.tostring()
             trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))

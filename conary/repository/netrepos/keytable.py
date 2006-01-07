@@ -79,10 +79,6 @@ class OpenPGPKeyTable:
             origKey = cu.fetchone()
             if origKey:
                 origKey = origKey[0]
-                # FIXME: remove this whend dbstore handles mysql BLOBs
-                from array import array
-                if isinstance(origKey, array):
-                    origKey = origKey.tostring()
                 # ensure new key is a superset of old key. we can't allow the
                 # repo to let go of subkeys or revocations.
                 openpgpfile.assertReplaceKeyAllowed(origKey, pgpKeyData)
@@ -145,11 +141,7 @@ class OpenPGPKeyTable:
         if (len(keys) != 1):
             raise openpgpkey.KeyNotFound(keyId)
 
-        # FIXME: remove this whend dbstore handles mysql BLOBs
-        from array import array
         data = keys[0][0]
-        if isinstance(data, array):
-            data = data.tostring()
 
         return data
 
