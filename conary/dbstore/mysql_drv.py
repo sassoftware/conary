@@ -14,9 +14,18 @@
 
 import re
 import MySQLdb as mysql
+from MySQLdb import converters
 from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
 from base_drv import BaseKeywordDict
 import sqlerrors
+
+# modify the default conversion dictionary
+conversions = converters.conversions.copy()
+# don't convert blobs to arrays
+del conversions[mysql.constants.FIELD_TYPE.BLOB]
+# handle NEWDECIMAL (this needs to be fixed in MySQL-python)
+MYSQL_TYPE_NEWDECIMAL = 246
+conversions[MYSQL_TYPE_NEWDECIMAL] = float
 
 class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys
@@ -93,6 +102,7 @@ class Database(BaseDatabase):
         if kwargs.has_key("timeout"):
             cdb["connect_time"] = kwargs["timeout"]
             del kwargs["timeout"]
+        cdb["conv"] = conversions
         cdb.update(kwargs)
         self.dbh = mysql.connect(**cdb)
         self.dbName = cdb['db']
