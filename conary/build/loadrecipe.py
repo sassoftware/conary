@@ -337,6 +337,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     util.copyfileobj(inF, outF)
 
     del inF
+    outF.close()
     del outF
 
     try:
