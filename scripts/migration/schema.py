@@ -120,7 +120,7 @@ class PrintDatabase:
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
         assert(onAction in ["insert", "update"])
-
+        create = "CREATE TRIGGER"
         if self.driver == "postgresql":
             funcName = "%s_func" % name
             if pinned:
@@ -152,15 +152,9 @@ class PrintDatabase:
             """ % (name, onAction, table, funcName))
             return
         if self.driver == "sqlite":
-            # prepare the sql and the trigger name and pass it to the
-            # BaseTrigger for creation
             when = "AFTER"
-            if pinned:
-                sql = ("UPDATE %s SET %s = OLD.%s "
-                       "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column, column))
-            else:
-                sql = ("UPDATE %s SET %s = unix_timestamp() "
-                       "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column))
+            sql = ("UPDATE %s SET %s = unix_timestamp() "
+                   "WHERE _ROWID_ = NEW._ROWID_ ; " %(table, column))
         elif self.driver == "mysql":
             when = "BEFORE"
             # force the current_timestamp into a numeric context
@@ -168,14 +162,15 @@ class PrintDatabase:
                 sql = "SET NEW.%s = OLD.%s ; " % (column, column)
             else:
                 sql = "SET NEW.%s = current_timestamp() + 0 ; " % (column,)
+            create = "CREATE DEFINER = 'root'@'localhost' TRIGGER"
         else:
             raise NotImplementedError
         sql = """
-        CREATE TRIGGER %s %s %s ON %s
+        %s %s %s %s ON %s
         FOR EACH ROW BEGIN
         %s
         END
-        """ % (name, when.upper(), onAction.upper(), table, sql)
+        """ % (create, name, when.upper(), onAction.upper(), table, sql)
         self.execute(sql)
 
     def setVersion(self, version):
