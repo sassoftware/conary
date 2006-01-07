@@ -1017,10 +1017,10 @@ class MigrateTo_9(SchemaMigration):
             includedId      INTEGER NOT NULL,
             flags           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT
+            CONSTRAINT TroveTroves2_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT
+            CONSTRAINT TroveTroves2_includedId_fk
                 FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
