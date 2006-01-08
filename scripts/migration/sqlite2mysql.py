@@ -15,6 +15,8 @@
 
 import sys
 import os
+import re
+
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
@@ -36,9 +38,9 @@ mysql = dbstore.connect(sys.argv[2], driver = "mysql")
 cm = mysql.cursor()
 
 # create the tables, avoid the indexes
-for stmt in getTables("mysql"):
-    print stmt
-    cm.execute(stmt)
+#for stmt in getTables("mysql"):
+#    print stmt
+#    cm.execute(stmt)
 mysql.loadSchema()
 
 for t in sqlite.tables.keys():
@@ -134,7 +136,7 @@ def slow_insert(t, fields, rows):
     mysql.commit()
 
 cm.execute("SET SESSION AUTOCOMMIT = 0")
-for t in tList:
+for t in ["LabelMap"]: # tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
@@ -185,8 +187,10 @@ for t in tList:
 wtList = ["%s WRITE" % x for x in tList]
 sql = "LOCK TABLES %s" % ", ".join(wtList)
 for stmt in getIndexes("mysql"):
-    # in MySQL, tables need to be locked every time we create an index
-    if stmt.lower().startswith("create trigger"):
+    # in MySQL, tables need to be locked every time we create an
+    # index. We need the unlocked every time we create a trigger.
+    sqlre = re.compile("^create .*trigger", re.I)
+    if sqlre.match(stmt):
         cm.execute("UNLOCK TABLES")
     else:
         cm.execute(sql)

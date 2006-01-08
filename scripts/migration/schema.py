@@ -79,7 +79,7 @@ class PrintDatabase:
                 return True
         return False
     def __skip_Triggers(self, sql, skipAll = False):
-        tmptrg = re.compile("(?i)CREATE\s+(OR\s+REPLACE\s+)?(TRIGGER|FUNCTION)")
+        tmptrg = re.compile("(?i)CREATE\s+(OR\s+REPLACE\s+)?((DEFINER.*)?TRIGGER|FUNCTION)")
         if tmptrg.match(sql):
             return skipAll
         return False
