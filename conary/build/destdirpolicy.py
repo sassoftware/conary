@@ -704,7 +704,7 @@ class Strip(policy.Policy):
                     # just in case strip is eu-strip, which segfaults
                     # whenever it touches an ar archive, and seems to 
                     # break some .o files
-                    util.execute('%(strip-archive)s ' %self.dm +fullpath)
+                    util.execute('%(strip_archive)s ' %self.dm +fullpath)
                 else:
                     util.execute('%(strip)s ' %self.dm +fullpath)
 

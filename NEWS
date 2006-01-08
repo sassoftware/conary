@@ -46,6 +46,9 @@ Changes in @NEW@:
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.
+    * Default macros used in cooking are now stored in /etc/conary/macros.  
+      The 'defaultMacros' parameter determines where cvc searches for macro
+      definitions.
   o Server Changes:
     * Added hasTroves() repository code
     * Creating changesets atomically moves complete changesets into place
