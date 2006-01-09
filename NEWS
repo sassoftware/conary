@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 0.90.0:
   o Documentation Changes:
     * Added summaries about updateall in the conary man page and added
       information about the command-line options for conary rq.
