@@ -20,6 +20,8 @@ Changes in @NEW@:
       of the python setuptools package to install python programs
       which have a setup.py that uses either the old disttools or
       new setuptools package.
+    * fixed bug #bz470: loadInstalled('foo') will now work when you have 
+      installed a local cook of foo.
   o Group Building Changes:
     * add() now takes a "components" option.  r.add(<package>, 
       components=['devel', 'runtime'])  will install <package>, but only the
