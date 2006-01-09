@@ -37,6 +37,10 @@ Changes in @NEW@:
       the packages that include the components needed for dep resolution.
     * You can now install locally cooked groups.
     * Added script to mirror repositories
+    * If foo is a redirect to bar, and you run 'conary update foo' when
+      foo is not installed on your system, conary will act as if you had 
+      typed 'conary update bar'.  Previously, it would act as if you had typed
+      'conary update bar --no-recurse'.
   o Code structure:
     * Conary now has the concept of "weak references", where a weak reference
       allows conary to be able to recognize the relationship between a 
