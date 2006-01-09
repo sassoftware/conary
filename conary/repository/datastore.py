@@ -27,7 +27,6 @@ import itertools
 import os
 import sha
 import tempfile
-import zlib
 
 from conary.lib import log
 from conary.lib import util
