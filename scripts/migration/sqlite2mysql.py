@@ -38,9 +38,9 @@ mysql = dbstore.connect(sys.argv[2], driver = "mysql")
 cm = mysql.cursor()
 
 # create the tables, avoid the indexes
-#for stmt in getTables("mysql"):
-#    print stmt
-#    cm.execute(stmt)
+for stmt in getTables("mysql"):
+    print stmt
+    cm.execute(stmt)
 mysql.loadSchema()
 
 for t in sqlite.tables.keys():
@@ -136,7 +136,7 @@ def slow_insert(t, fields, rows):
     mysql.commit()
 
 cm.execute("SET SESSION AUTOCOMMIT = 0")
-for t in ["LabelMap"]: # tList:
+for t in tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
     cs.execute("SELECT * FROM %s" % t)
