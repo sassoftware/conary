@@ -996,7 +996,7 @@ def newTrove(repos, cfg, name, dir = None):
 
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel(
-                        { name : { cfg.buildLabel : None } }).get(name, []):
+                        { name : { label : None } }).get(name, []):
 	log.error("package %s already exists" % name)
 	return
 
