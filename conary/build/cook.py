@@ -767,7 +767,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     if logBuild and recipeObj._autoCreatedFileCount:
         logFile.close()
-        os.unlink(logPath)
+        if os.path.exists(logPath):
+            os.unlink(logPath)
         if cfg.noClean:
             # leave the easily accessible copy in place in 
             # builddir

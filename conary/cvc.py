@@ -211,6 +211,8 @@ def realMain(cfg, argv=sys.argv):
     for line in argSet.pop('config', []):
         cfg.configLine(line)
 
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+
     cfg.initializeFlavors()
     # set the build flavor here, just to set architecture information 
     # which is used when initializing a recipe class
