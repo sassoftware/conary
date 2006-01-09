@@ -59,6 +59,7 @@ def doLocalCommit(db, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
     if not cs.isLocal():
 	log.error("repository changesets must be applied with update instead")
-    db.commitChangeSet(cs, set(), isRollback = True, toStash = False)
+    else:
+        db.commitChangeSet(cs, set(), isRollback = True, toStash = False)
 
 
