@@ -6,6 +6,7 @@ Changes in 0.90.0:
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
+
   o Package Building Changes:
     * Build logs now contain unexpanded macros, since not all macros
       may be defined when the build log is initially created.
@@ -22,6 +23,7 @@ Changes in 0.90.0:
       new setuptools package.
     * fixed bug #bz470: loadInstalled('foo') will now work when you have 
       installed a local cook of foo.
+
   o Group Building Changes:
     * add() now takes a "components" option.  r.add(<package>, 
       components=['devel', 'runtime'])  will install <package>, but only the
@@ -32,6 +34,7 @@ Changes in 0.90.0:
     * added r.removeComponents(<complist>), which allows you 
       to create a group where all devel components are byDefault False, 
       for example. r.removeComponents(['devel', 'devellib'])
+
   o Client Changes:
     * When committing source changes in interactive mode, conary will ask you 
       you to confirm the commit.
@@ -43,18 +46,21 @@ Changes in 0.90.0:
       foo is not installed on your system, conary will act as if you had 
       typed 'conary update bar'.  Previously, it would act as if you had typed
       'conary update bar --no-recurse'.
+
   o Code structure:
     * Conary now has the concept of "weak references", where a weak reference
       allows conary to be able to recognize the relationship between a 
       collection and the children of collections it contains.  This allows
       us to add several new features to conary, documented in Client and Build
       changes.
+
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.
     * Default macros used in cooking are now stored in /etc/conary/macros.  
       The 'defaultMacros' parameter determines where cvc searches for macro
       definitions.
+
   o Server Changes:
     * Added hasTroves() repository code
     * Creating changesets atomically moves complete changesets into place
