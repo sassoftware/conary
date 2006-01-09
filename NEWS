@@ -60,6 +60,10 @@ Changes in 0.90.0:
     * Creating changesets atomically moves complete changesets into place
     * Content store no longer reference counts entries
     * Added support for trove marks to support mirroring
+    * The repository contents store was reworked to avoid reading
+      precompressed gzipped data twice (once to double check the uncompressed
+      contents sha1 and once to copy the file in place).
+
 
 Changes in 0.80.4:
   o Build Changes:

@@ -27,6 +27,7 @@ import itertools
 import os
 import sha
 import tempfile
+import zlib
 
 from conary.lib import log
 from conary.lib import util
@@ -52,6 +53,36 @@ class AbstractDataStore:
 
     def removeFile(self, hash):
         raise NotImplementedError
+
+
+class Tee:
+    """
+    The Tee class takes two file objects.  Reads are done on the
+    input file object.  All data read is written to the output
+    file object.
+    """
+    def __init__(self, inf, outf):
+        self.inf = inf
+        self.outf = outf
+
+    def read(self, *args, **kw):
+        buf = self.inf.read(*args, **kw)
+        self.outf.write(buf)
+        return buf
+
+    def seek(self, *args, **kw):
+        self.outf.seek(*args, **kw)
+        return self.inf.seek(*args, **kw)
+
+    def tell(self, *args, **kw):
+        return self.inf.tell(*args, **kw)
+
+    def close(self, *args, **kw):
+        self.inf.close()
+        self.outf.close()
+
+    def __del__(self):
+        self.close()
 
 class DataStore(AbstractDataStore):
 
@@ -92,17 +123,13 @@ class DataStore(AbstractDataStore):
 
         outFileObj = os.fdopen(tmpFd, "w")
         if precompressed:
-            # this requires fileObj to be seekable. it's just easier
-            # that way
+            tee = Tee(fileObj, outFileObj)
             contentSha1 = sha.new()
-            uncompObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
+            uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
             s = uncompObj.read(128 * 1024)
             while s:
                 contentSha1.update(s)
                 s = uncompObj.read(128 * 1024)
-            fileObj.seek(0)
-            
-            util.copyfileobj(fileObj, outFileObj)
             uncompObj.close()
         else:
             dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
