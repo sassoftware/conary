@@ -387,7 +387,7 @@ def commit(repos, cfg, message, callback=None):
     if cfg.interactive:
         print 'The following commits will be performed:'
         print
-        print '\t%s=%s' % (recipeObj.name, newVersion.asString())
+        print '\t%s=%s' % (troveName, newVersion.asString())
         print
         okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
 
