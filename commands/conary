@@ -43,6 +43,7 @@ from conary import queryrep, conaryclient, rollbacks, showchangeset
 from conary import trove, updatecmd, verify, versions
 from conary.lib import cfg,cfgtypes,log, openpgpkey, options, util
 from conary.local import database
+from conary.conaryclient import cmdline
 
 sys.excepthook = util.genExcepthook(debug=True)
 

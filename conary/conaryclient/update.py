@@ -477,12 +477,12 @@ class ClientUpdate:
                 needParents = newNeedParents
 
             # don't erase nodes which are referenced by troves we're about
-            # to install unless there is a really good reason
+            # to install - the only troves we list here are primary installs,
+            # and they should never be erased.
             for info in referencedTroves:
                 if info in nodeIdx:
                     node = nodeList[nodeIdx[info]]
-                    if node[1] == UNKNOWN:
-                        node[1] = KEEP
+                    node[1] = KEEP
 
 	    seen = [ False ] * len(nodeList)
             # DFS to mark troves as KEEP
