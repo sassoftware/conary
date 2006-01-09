@@ -15,6 +15,7 @@
 Provides the output for the "conary repquery" command
 """
 import itertools
+import sys
 import time
 
 from conary import conaryclient
@@ -82,6 +83,7 @@ def displayTroves(cfg, troveSpecs = [], all = False, ls = False,
 
     if dcfg.needFiles() and all:
         log.error('cannot use "all" with commands that require file lists')
+        sys.exit(1)
 
     formatter = display.TroveFormatter(dcfg)
 
