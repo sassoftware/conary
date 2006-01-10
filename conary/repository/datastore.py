@@ -121,9 +121,9 @@ class DataStore(AbstractDataStore):
                                           dir = os.path.dirname(path))
 
         outFileObj = os.fdopen(tmpFd, "w")
+        contentSha1 = sha.new()
         if precompressed:
             tee = Tee(fileObj, outFileObj)
-            contentSha1 = sha.new()
             uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
             s = uncompObj.read(128 * 1024)
             while s:
@@ -132,7 +132,6 @@ class DataStore(AbstractDataStore):
             uncompObj.close()
         else:
             dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
-            contentSha1 = sha.new()
             util.copyfileobj(fileObj, dest, digest = contentSha1)
             dest.close()
 
