@@ -35,7 +35,7 @@ Changes in 0.90.0:
     * added r.removeComponents(<complist>), which allows you
       to create a group where all devel components are byDefault False,
       for example. r.removeComponents(['devel', 'devellib'])
-
+    * store labelPath used to build a group in troveInfo
   o Client Changes:
     * When committing source changes in interactive mode, conary will ask you
       you to confirm the commit.
