@@ -116,10 +116,15 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
-##     def reopen(self):
-##         self.dbh.close()
-##         self.connect()
-##         return True
+    def reopen(self):
+        # make sure the connection is still valid by attempting a
+        # ping.  If an exception happens, reconnect.
+        try:
+            self.dbh.ping()
+        except mysql.MySQLError:
+            self.dbh.close()
+            return self.connect()
+        return False
 
     def loadSchema(self, cu = None):
         BaseDatabase.loadSchema(self)
