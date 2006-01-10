@@ -6,6 +6,7 @@ Changes in 0.90.0:
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
+    * Added man page entry about cvc clone.
 
   o Package Building Changes:
     * Build logs now contain unexpanded macros, since not all macros

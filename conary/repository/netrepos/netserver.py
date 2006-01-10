@@ -1502,7 +1502,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ""
 
     def getMirrorMark(self, authToken, clientVersion, host):
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1514,7 +1514,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return result[0][0]
 
     def setMirrorMark(self, authToken, clientVersion, host, mark):
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1530,6 +1530,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ""
 
     def getNewTroveList(self, authToken, clientVersion, mark):
+	if not self.auth.check(authToken, write = False, mirror = True):
+	    raise errors.InsufficientPermission
+
         # only show troves the user is allowed to see
         cu = self.db.cursor()
 
