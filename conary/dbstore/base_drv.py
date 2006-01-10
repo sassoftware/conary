@@ -120,9 +120,9 @@ class BaseCursor:
         return self._cursor.fetchone()
     # [(a1,b1),(a2, b2)]
     def fetchall(self):
-        return self._cursor.fetchall()
+        return list(self._cursor.fetchall())
     def fetchmany(self, count=1):
-        return self._cursor.fetchmany(count)
+        return list(self._cursor.fetchmany(count))
 
     # { name_a : a, name_b : b }
     def fetchone_dict(self):
