@@ -490,7 +490,8 @@ class ChangeSetJob:
                                 [(oldFileId, oldVersion, oldfile)])[0].get()
 
 		oldLines = f.readlines()
-		del f
+                f.close()
+                del f
 		diff = fileContents.get().readlines()
 		(newLines, failedHunks) = patch.patch(oldLines, 
 						      diff)

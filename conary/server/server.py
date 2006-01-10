@@ -121,6 +121,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                     size = int(size)
                     totalSize += size
                     items.append((path, size))
+                f.close()
                 del f
             else:
                 size = os.stat(localName).st_size;
