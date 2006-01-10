@@ -203,7 +203,7 @@ def mirrorTroves(sourceRepos, targetRepos, cfg, test, sync):
             log.debug("(skipping commit due to test mode)")
         else:
             log.debug("committing")
-            targetRepos.commitChangeSetFile(tmpName)
+            targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
         os.unlink(tmpName)
 
