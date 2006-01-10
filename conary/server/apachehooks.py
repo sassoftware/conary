@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,11 +15,16 @@
 from mod_python import apache
 from mod_python import util
 from mod_python.util import FieldStorage
+from email import MIMEText
 import os
+import sys
+import time
+import smtplib
 import traceback
 import xmlrpclib
 import zlib
 
+from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
@@ -190,37 +195,110 @@ def writeTraceback(wfile, cfg):
     kid_error.write(wfile, cfg = cfg, pageTitle = "Error",
                            error = traceback.format_exc())
 
+def logErrorAndEmail(req, cfg, exception, e, bt):
+    c = req.connection
+    req.add_common_vars()
+    info_dict = {
+        'local_addr'     : c.local_ip + ':' + str(c.local_addr[1]),
+        'remote_addr'    : c.remote_ip + ':' + str(c.remote_addr[1]),
+        'remote_host'    : c.remote_host,
+        'remote_logname' : c.remote_logname,
+        'aborted'        : c.aborted,
+        'keepalive'      : c.keepalive,
+        'double_reverse' : c.double_reverse,
+        'keepalives'     : c.keepalives,
+        'local_host'     : c.local_host,
+        'connection_id'  : c.id,
+        'notes'          : c.notes,
+        'the_request'    : req.the_request,
+        'proxyreq'       : req.proxyreq,
+        'header_only'    : req.header_only,
+        'protocol'       : req.protocol,
+        'proto_num'      : req.proto_num,
+        'hostname'       : req.hostname,
+        'request_time'   : time.ctime(req.request_time),
+        'status_line'    : req.status_line,
+        'status'         : req.status,
+        'method'         : req.method,
+        'allowed'        : req.allowed,
+        'headers_in'     : req.headers_in,
+        'headers_out'    : req.headers_out,
+        'uri'            : req.uri,
+        'unparsed_uri'   : req.unparsed_uri,
+        'args'           : req.args,
+        'parsed_uri'     : req.parsed_uri,
+        'filename'       : req.filename,
+        'subprocess_env' : req.subprocess_env,
+        'referer'        : req.headers_in.get('referer', 'N/A')
+    }
+    info_dict_small = {
+        'local_addr'     : c.local_ip + ':' + str(c.local_addr[1]),
+        'uri'            : req.uri,
+        'request_time'   : time.ctime(req.request_time),
+    }
+
+    timeStamp = time.ctime(time.time())
+
+    # log error
+    log.error('[%s] Unhandled exception from conary repository: %s: %s', 
+              timeStamp, exception.__name__, e)
+    log.error('sending mail to %s' % cfg.bugsToEmail)
+
+    # send email
+    body = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
+    body += 'Time of occurrence: %s\n\n' % timeStamp
+    body += ''.join(traceback.format_tb(bt))
+    body += '\nConnection Information:\n'
+    for key, val in sorted(info_dict.items()):
+        body += '\n' + key + ': ' + str(val)
+
+    def sendMail(fromEmail, fromEmailName, toEmail, subject, body):
+        msg = MIMEText.MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = '"%s" <%s>' % (fromEmailName, fromEmail)
+        msg['To'] = toEmail
+
+        log.error(msg.as_string())
+
+        s = smtplib.SMTP()
+        s.connect()
+        s.sendmail(fromEmail, [toEmail], msg.as_string())
+        s.close()
+
+    sendMail(cfg.bugsFromEmail, cfg.bugsEmailName, cfg.bugsToEmail, 
+             cfg.bugsEmailSubject, body)
+
 def handler(req):
     repName = req.filename
     if not repositories.has_key(repName):
         cfg = netserver.ServerConfig()
         cfg.read(req.filename)
 
-	if os.path.basename(req.uri) == "changeset":
-	   rest = os.path.dirname(req.uri) + "/"
-	else:
-	   rest = req.uri
+        if os.path.basename(req.uri) == "changeset":
+            rest = os.path.dirname(req.uri) + "/"
+        else:
+            rest = req.uri
 
-	rest = req.uri
-	# pull out any queryargs
-	if '?' in rest:
-	    rest = req.uri.split("?")[0]
+        rest = req.uri
+        # pull out any queryargs
+        if '?' in rest:
+            rest = req.uri.split("?")[0]
 
-	# and throw away any subdir portion
-	rest = req.uri[:-len(req.path_info)] + '/'
+        # and throw away any subdir portion
+        rest = req.uri[:-len(req.path_info)] + '/'
 
-	urlBase = "%%(protocol)s://%s:%%(port)d" % \
+        urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
         if not cfg.repositoryDB:
-            print "error: repositoryDB is required in %s" % req.filename
-            return
+            log.error("repositoryDB is required in %s" % req.filename)
+            return apache.HTTP_INTERNAL_SERVER_ERROR
         elif not cfg.contentsDir:
-            print "error: contentsDir is required in %s" % req.filename
-            return
+            log.error("contentsDir is required in %s" % req.filename)
+            return apache.HTTP_INTERNAL_SERVER_ERROR
         elif not cfg.serverName:
-            print "error: serverName is required in %s" % req.filename
-            return
+            log.error("serverName is required in %s" % req.filename)
+            return apache.HTTP_INTERNAL_SERVER_ERROR
 
         if cfg.closed:
             repositories[repName] = netserver.ClosedRepositoryServer(cfg.closed)
@@ -237,13 +315,20 @@ def handler(req):
     repos = repositories[repName]
     method = req.method.upper()
 
-    if method == "POST":
-        return post(port, secure, repos, req)
-    elif method == "GET":
-        return get(port, secure, repos, req)
-    elif method == "PUT":
-        return putFile(port, secure, repos, req)
-    else:
-        return apache.HTTP_METHOD_NOT_ALLOWED
+    try:
+        if method == "POST":
+            return post(port, secure, repos, req)
+        elif method == "GET":
+            return get(port, secure, repos, req)
+        elif method == "PUT":
+            return putFile(port, secure, repos, req)
+        else:
+            return apache.HTTP_METHOD_NOT_ALLOWED
+    except:
+        if cfg.bugsFromEmail and cfg.bugsToEmail:
+            exception, e, bt = sys.exc_info()
+            logErrorAndEmail(req, cfg, exception, e, bt)
+        return apache.HTTP_INTERNAL_SERVER_ERROR
+        
 
 repositories = {}

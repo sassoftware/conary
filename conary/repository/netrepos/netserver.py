@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1644,6 +1644,11 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
         self.closedMessage = closedMessage
 
 class ServerConfig(ConfigFile):
+    bugsToEmail             = CfgString
+    bugsFromEmail           = CfgString
+    bugsEmailName           = (CfgString, 'Conary Repository Bugs')
+    bugsEmailSubject        = (CfgString, 
+                               'Conary Repository Unhandled Exception Report')
     cacheDB                 = dbstore.CfgDriver
     closed                  = CfgString
     commitAction            = CfgString

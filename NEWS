@@ -51,6 +51,7 @@ Changes in @NEW@:
     * Creating changesets atomically moves complete changesets into place
     * Content store no longer reference counts entries
     * Added support for trove marks to support mirroring
+    * Added support for traceback emails from the repository server
 
 Changes in 0.80.4:
   o Build Changes:
