@@ -63,7 +63,7 @@ class NetworkAuthorization:
         return groupsFromUser
 
     def check(self, authToken, write = False, admin = False, label = None,
-              trove = None):
+              trove = None, mirror = False):
         logMe(2, authToken[0], authToken[1], authToken[2], write, admin,
               label, trove)
 
@@ -79,6 +79,13 @@ class NetworkAuthorization:
             groupIds = self.getAuthGroups(cu, authToken)
         except errors.InsufficientPermission:
             return False
+
+        if mirror:
+            cu.execute("select canMirror from usergroups where "
+                       "canMirror = 1 and userGroupId IN (%s)" %
+                        ",".join("%d" % x for x in groupIds))
+            if not cu.fetchall():
+                return False
 
         stmt = """
         select Items.item

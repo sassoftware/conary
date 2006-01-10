@@ -94,6 +94,17 @@ def timings(current, total, tstart):
         tpassed/60, tpassed % 60,
         tremaining/60, tremaining % 60)
 
+# escape the row data based on the sqlite column types
+def escape(cu, data):
+    row = list(data)
+    for i in range(len(data.data)):
+        assert(data.description[i][1] in (0,1,6,8,9))
+        if data.description[i][1] == 8:
+            row[i] = cu.binary(data.data[i])
+        elif data.description[i][1] == 9:
+            row[i] = int(data.data[i])
+    return tuple(row)
+
 for t in tList:
     count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
     i = 0
@@ -104,6 +115,8 @@ for t in tList:
         if row is None:
             break
         fields = cs.fields()
+        row.data = list(row.data)
+        row.description = [ list(x) for x in row.description ]
         if t.lower() == "permissions":
             if "write" in fields:
                 fields[fields.index("write")] = "canWrite"
@@ -115,15 +128,23 @@ for t in tList:
                 fields[fields.index("byDefault")] = "flags"
         if t.lower() == "trovefiles":
             # versionId was declared as a binary string in sqlite instead of integer
-            row[2] = int(row[2])
+            row.data[2] = int(row.data[2])
+            row.description[2][1] = 0
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (
             t, ", ".join(fields), ",".join(["?"]*len(fields)))
         i += 1
         try:
-            cp.execute(sql, tuple(row))
+            cp.execute(sql, escape(cp, row))
         except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING" % t, row
-        except:
+            print "\r%s: DUPLICATE" % t, row
+            pgsql.commit()
+        except sqlerrors.ConstraintViolation, e:
+            print
+            print "%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
+            print row, e.msg
+            print
+            pgsql.commit()
+        except Exception, e:
             print "ERROR - SQL", sql
             raise
         else:

@@ -206,6 +206,8 @@ class ConaryConfiguration(SectionedConfigFile):
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, True)
     debugRecipeExceptions =  CfgBool
+    defaultMacros         =  (CfgPathList, ('/etc/conary/macros',
+                                            '~/.conary/macros'))
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool

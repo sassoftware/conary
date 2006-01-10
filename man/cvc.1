@@ -148,6 +148,15 @@ and put it in directory \fI<dir>\fP if specified, and directory
 specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
 Synonyms: \fBco\fP
 .TP
+.B clone newclone [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Clones a trove from one repository to another. This is similar to shadowing in
+that it creates a new trove with information from another. However, unlike
+shadowing, cloning will not create a new label on the target branch and it is
+not possible to merge changes (see "merge" later in this document) with clone.
+The commit will appear to origionate from the individual who last committed the
+trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
+name. See the \fBExamples\fP section for more information.
+.TP
 .B commit [\-\-message \fI<message>\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
@@ -274,6 +283,12 @@ cvc checkout --build-label conary.example.com@rpl:example-foo foo
 .br
 Committing changes to that copy of foo:source will go into the
 conary.example.com repository on the rpl:example-foo branch.
+.P
+.TP 4
+.B Cloning
+cvc clone /ignoreme.rpath.org@rpl:devel/ pork:source=contrib.rpath.org@rpl:devel
+.br
+This creates a clone of pork:source on ignoreme.rpath.org@rpl:devel
 .P
 More examples coming soon to a man page near you!
 .\"
