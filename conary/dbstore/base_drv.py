@@ -21,6 +21,9 @@ from conary.lib import cfg
 # class for encapsulating binary strings for dumb drivers
 class BaseBinary:
     def __init__(self, s):
+        if s is None:
+            self.s = None
+            return
         assert(isinstance(s, str))
         self.s = s
     def __str__(self):
