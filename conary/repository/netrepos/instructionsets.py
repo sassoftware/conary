@@ -50,7 +50,7 @@ class InstructionSets:
                    (base, flags))
 
     def delId(self, theId):
-        assert(type(theId) is int)
+        assert(isinstance(theId, (int, long)))
         cu = self.db.cursor()
         cu.execute("DELETE FROM InstructionSets WHERE isnSetId=?", (theId,))
 
