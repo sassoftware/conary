@@ -338,6 +338,12 @@ class StringsStream(list, InfoStream):
     def __init__(self, frz = ''):
 	self.thaw(frz)
 
+class OrderedStringsStream(StringsStream):
+    def set(self, val):
+	assert(type(val) is str)
+        self.append(val)
+        # like StringsStream except not sorted
+
 class ReferencedTroveList(list, InfoStream):
 
     def freeze(self, skipSet = None):
