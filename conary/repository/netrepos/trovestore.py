@@ -851,7 +851,7 @@ class FileRetriever:
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
             self.cu.execute("INSERT INTO getFilesTbl VALUES(?, ?)",
-                            self.cu.binary(itemId), self.cu.binary(fileId), 
+                            (itemId, self.cu.binary(fileId)),
                             start_transaction = False)
             lookup[itemId] = (pathId, fileId)
 
