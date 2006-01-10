@@ -1104,7 +1104,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
-    def commitChangeSet(self, authToken, clientVersion, url):
+    def commitChangeSet(self, authToken, clientVersion, url, mirror=False):
 	assert(url.startswith(self.urlBase()))
         logMe(1, url)
 	# +1 strips off the ? from the query url
@@ -1118,15 +1118,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
-	items = {}
-	for troveCs in cs.iterNewTroveList():
-	    items[(troveCs.getName(), troveCs.getNewVersion())] = True
-	    if not self.auth.check(authToken, write = True,
-		       label = troveCs.getNewVersion().branch().label(),
-		       trove = troveCs.getName()):
-		raise errors.InsufficientPermission
+        items = {}
+        for troveCs in cs.iterNewTroveList():
+            name = troveCs.getName()
+            version = troveCs.getNewVersion()
+            items[(name, version)] = True
+            if not self.auth.check(authToken, write = True, mirror = mirror,
+                                   label = version.branch().label(),
+                                   trove = name):
+                raise errors.InsufficientPermission
 
-	self.repos.commitChangeSet(cs, self.name)
+	self.repos.commitChangeSet(cs, self.name, mirror=mirror)
 
 	if not self.commitAction:
 	    return True

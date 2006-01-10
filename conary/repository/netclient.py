@@ -1196,13 +1196,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = changeset.ChangeSetFromFile(fName)
         return self._commit(cs, fName)
 
-    def commitChangeSet(self, chgSet, callback = None):
+    def commitChangeSet(self, chgSet, callback = None, mirror=False):
 	(outFd, path) = util.mkstemp()
 	os.close(outFd)
 	chgSet.writeToFile(path)
 
 	try:
-            result = self._commit(chgSet, path, callback = callback)
+            result = self._commit(chgSet, path, callback = callback,
+                                  mirror=mirror)
         finally:
             os.unlink(path)
 
@@ -1307,7 +1308,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.c[version].getConaryUrl(self.fromVersion(ver),
                                             self.fromFlavor(flavor))
 
-    def _commit(self, chgSet, fName, callback = None):
+    def _commit(self, chgSet, fName, callback = None, mirror=False):
 	serverName = None
 	for trove in chgSet.iterNewTroveList():
 	    v = trove.getOldVersion()
@@ -1330,7 +1331,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         self._putFile(url, fName, callbackFn = callbackFn)
 
-	self.c[serverName].commitChangeSet(url)
+        if mirror:
+            # avoid sending the mirror keyword unless we have to.
+            # this helps preserve backwards compatibility with old
+            # servers.
+            self.c[serverName].commitChangeSet(url, mirror=mirror)
+        else:
+            self.c[serverName].commitChangeSet(url)
 
     def _putFile(self, url, path, callbackFn=None):
         """ send a file to a url.  Takes a callbackFn
