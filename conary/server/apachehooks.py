@@ -274,17 +274,7 @@ def handler(req):
         cfg = netserver.ServerConfig()
         cfg.read(req.filename)
 
-        if os.path.basename(req.uri) == "changeset":
-            rest = os.path.dirname(req.uri) + "/"
-        else:
-            rest = req.uri
-
-        rest = req.uri
-        # pull out any queryargs
-        if '?' in rest:
-            rest = req.uri.split("?")[0]
-
-        # and throw away any subdir portion
+        # Throw away any subdir portion.
         rest = req.uri[:-len(req.path_info)] + '/'
 
         urlBase = "%%(protocol)s://%s:%%(port)d" % \
