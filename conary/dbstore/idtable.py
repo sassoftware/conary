@@ -56,8 +56,9 @@ class IdTable:
         return cu.lastrowid
 
     def getOrAddIds(self, items):
+        # FIXME: unused method
         cu = self.db.cursor()
-        cu.execute('CREATE TEMPORARY TABLE neededIds (num INT, %s STR)' % self.strName)
+        cu.execute('CREATE TEMPORARY TABLE neededIds (num INTEGER, %s VARCHAR(767))' % self.strName)
         for num, item in enumerate(items):
             cu.execute('INSERT INTO neededIds VALUES (?, ?)', num, item)
 
@@ -75,7 +76,7 @@ class IdTable:
         return ids
 
     def delId(self, theId):
-        assert(type(theId) is int)
+        assert(isinstance(theId, (int, long)))
         cu = self.db.cursor()
         cu.execute("DELETE FROM %s WHERE %s=?"
                    %(self.tableName, self.keyName), (theId,))
