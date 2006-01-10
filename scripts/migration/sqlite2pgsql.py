@@ -98,8 +98,11 @@ def timings(current, total, tstart):
 def escape(cu, data):
     row = list(data)
     for i in range(len(data.data)):
+        assert(data.description[i][1] in (0,1,6,8,9))
         if data.description[i][1] == 8:
             row[i] = cu.binary(data.data[i])
+        elif data.description[i][1] == 9:
+            row[i] = int(data.data[i])
     return tuple(row)
 
 for t in tList:
