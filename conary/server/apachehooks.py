@@ -258,8 +258,6 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
         msg['From'] = '"%s" <%s>' % (fromEmailName, fromEmail)
         msg['To'] = toEmail
 
-        log.error(msg.as_string())
-
         s = smtplib.SMTP()
         s.connect()
         s.sendmail(fromEmail, [toEmail], msg.as_string())
