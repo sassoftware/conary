@@ -30,7 +30,7 @@ import types
 
 from conary import callbacks, conaryclient, constants, files, trove, versions
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, loadrecipe
+from conary.build import recipe, grouprecipe, loadrecipe
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
@@ -407,7 +407,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
-                            cfg.flavor, macros)
+                            cfg.buildFlavor, macros)
 
     try:
         use.track(True)
@@ -419,70 +419,58 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     grpFlavor = deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
-    groupNames = recipeObj.getGroupNames()
     try:
-        failedDeps = recipeObj.findAllTroves()
+        grouprecipe.buildGroups(recipeObj, cfg, repos)
     except builderrors.RecipeFileError, msg:
 	raise CookError(str(msg))
 
-    if failedDeps:
-        groupName, failedDeps = failedDeps
-        lns = ["Dependency failure\n"]
-        lns.append("Group %s has unresolved dependencies:" % groupName)
-        for (name, depSet) in failedDeps:
-            lns.append("\n" + name[0])
-            lns.append('\n\t')
-            lns.append("\n\t".join(str(depSet).split("\n")))
-        raise CookError(''.join(lns))
+    for group in recipeObj.iterGroupList():
+        for (name, ver, flavor) in group.iterTroveList():
+            grpFlavor.union(flavor,
+                        mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
-    for groupName in groupNames:
-        for (name, versionFlavorList) in recipeObj.getTroveList(
-                                            groupName = groupName).iteritems():
-            for (version, flavor, byDefault, explicit) in versionFlavorList:
-                grpFlavor.union(flavor,
-                            mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
-
+    groupNames = recipeObj.getGroupNames()
     targetVersion = nextVersion(repos, db, groupNames, sourceVersion, 
                                 grpFlavor, targetLabel, 
                                 alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
-    groups = {}
-    for groupName in groupNames:
-        grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
-                          isRedirect = False)
-        grp.setRequires(recipeObj.getRequires(groupName = groupName))
+    built = []
+    for group in recipeObj.iterGroupList():
+        groupName = group.name
+        grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
+                             isRedirect = False)
+        grpTrv.setRequires(group.getRequires())
 
 	provides = deps.DependencySet()
 	provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
-	grp.setProvides(provides)
+	grpTrv.setProvides(provides)
 
-        groups[groupName] = grp
 
-        for (name, versionFlavorList) in recipeObj.getTroveList(groupName = groupName).iteritems():
-            for (version, flavor, byDefault, explicit) in versionFlavorList:
-                grp.addTrove(name, version, flavor, byDefault = byDefault,
-                             weakRef=not explicit)
+        grpTrv.setBuildTime(buildTime)
+        grpTrv.setSourceName(fullName + ':source')
+        grpTrv.setSize(group.getSize())
+        grpTrv.setConaryVersion(constants.version)
+        grpTrv.setIsCollection(True)
 
-	# add groups which were newly created by this group. also build
-	# the graph we need for cycle detection
-	for name, byDefault in recipeObj.getNewGroupList(groupName = groupName):
-	    grp.addTrove(name, targetVersion, grpFlavor, byDefault = byDefault)
+        for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+            grpTrv.addTrove(byDefault = byDefault,
+                            weakRef=not explicit, *troveTup)
 
-        grp.setBuildTime(buildTime)
-        grp.setSourceName(fullName + ':source')
-        grp.setSize(recipeObj.getSize(groupName = groupName))
-        grp.setConaryVersion(constants.version)
-        grp.setIsCollection(True)
+	# add groups which were newly created by this group. 
+	for name, byDefault in group.iterNewGroupList():
+	    grpTrv.addTrove(name, targetVersion, grpFlavor, 
+                            byDefault = byDefault)
 
-        grpDiff = grp.diff(None, absolute = 1)[0]
+        grpDiff = grpTrv.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
+
+        built.append((grpTrv.getName(), str(grpTrv.getVersion()),
+                                        grpTrv.getFlavor()))
+
 
     for primaryName in recipeObj.getPrimaryGroupNames():
         changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
-
-    built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) 
-              for grp in groups.itervalues()]
 
     return (changeSet, built, None)
 

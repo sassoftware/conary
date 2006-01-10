@@ -83,7 +83,7 @@ class DirectedGraph:
 
     def addNode(self, item):
         nodeId = self.data.getIndex(item)
-        self.edges[nodeId] = set()
+        self.edges.setdefault(nodeId, set())
         return nodeId
 
     def get(self, idx):
@@ -92,7 +92,7 @@ class DirectedGraph:
     def addEdge(self, fromItem, toItem):
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
-        self.edges[fromIdx].add(toIdx)
+        self.edges.setdefault(fromIdx, set()).add(toIdx)
 
     def getReversedEdges(self):
         newEdges = {}
@@ -176,7 +176,7 @@ class DirectedGraph:
         t = self.transpose()
 
         def nodeSelect(a, b):
-            return cmp(finishes[b[0]], finishes[b[0]])
+            return cmp(finishes[b[0]], finishes[a[0]])
 
         finishesByTime = sorted(finishes.iteritems(), key=lambda x: x[1])
         starts, finished, trees = t.doDFS(

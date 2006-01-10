@@ -12,7 +12,7 @@
 # full details.
 #
 
-class BuildError(Exception):
+class RecipeFileError(Exception):
     def __init__(self, msg):
         self.msg = msg
 
@@ -22,9 +22,8 @@ class BuildError(Exception):
     def __str__(self):
 	return repr(self)
     
-class RecipeFileError(BuildError):
+class BuildError(RecipeFileError):
     pass
-
 
 class RecipeDependencyError(RecipeFileError):
     pass
@@ -32,7 +31,10 @@ class RecipeDependencyError(RecipeFileError):
 class BadRecipeNameError(RecipeFileError):
     pass
 
-class GroupPathConflicts(BuildError):
+class GroupBuildError(RecipeFileError):
+    pass
+
+class GroupPathConflicts(GroupBuildError):
     def __init__(self, conflicts):
         self.conflicts = conflicts
         errStrings = []
@@ -46,3 +48,20 @@ class GroupPathConflicts(BuildError):
 The following troves in the following groups have conflicts:
 
 %s""" % ('\n'.join(errStrings))
+
+class GroupDependencyFailure(GroupBuildError):
+    def __init__(self, groupName, failedDeps):
+        lns = ["Dependency failure\n"]
+        lns.append("Group %s has unresolved dependencies:" % groupName)
+        for (name, depSet) in failedDeps:
+            lns.append("\n" + name[0])
+            lns.append('\n\t')
+            lns.append("\n\t".join(str(depSet).split("\n")))
+        self.msg = ''.join(lns)
+
+
+class GroupCyclesError(GroupBuildError):
+    def __init__(self, cycles):
+        lns = ['cycle in groups:']
+        lns.extend(str(sorted(x)) for x in cycles)
+        self.msg = '\n  '.join(lns)
