@@ -76,13 +76,6 @@ class Tee:
     def tell(self, *args, **kw):
         return self.inf.tell(*args, **kw)
 
-    def close(self, *args, **kw):
-        self.inf.close()
-        self.outf.close()
-
-    def __del__(self):
-        self.close()
-
 class DataStore(AbstractDataStore):
 
     def hashToPath(self, hash):
