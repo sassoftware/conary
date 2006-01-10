@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1104,7 +1104,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
-    def commitChangeSet(self, authToken, clientVersion, url):
+    def commitChangeSet(self, authToken, clientVersion, url, mirror=False):
 	assert(url.startswith(self.urlBase()))
         logMe(1, url)
 	# +1 strips off the ? from the query url
@@ -1118,15 +1118,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
-	items = {}
-	for troveCs in cs.iterNewTroveList():
-	    items[(troveCs.getName(), troveCs.getNewVersion())] = True
-	    if not self.auth.check(authToken, write = True,
-		       label = troveCs.getNewVersion().branch().label(),
-		       trove = troveCs.getName()):
-		raise errors.InsufficientPermission
+        items = {}
+        for troveCs in cs.iterNewTroveList():
+            name = troveCs.getName()
+            version = troveCs.getNewVersion()
+            items[(name, version)] = True
+            if not self.auth.check(authToken, write = True, mirror = mirror,
+                                   label = version.branch().label(),
+                                   trove = name):
+                raise errors.InsufficientPermission
 
-	self.repos.commitChangeSet(cs, self.name)
+	self.repos.commitChangeSet(cs, self.name, mirror=mirror)
 
 	if not self.commitAction:
 	    return True
@@ -1502,7 +1504,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ""
 
     def getMirrorMark(self, authToken, clientVersion, host):
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1514,7 +1516,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return result[0][0]
 
     def setMirrorMark(self, authToken, clientVersion, host, mark):
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1530,6 +1532,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ""
 
     def getNewTroveList(self, authToken, clientVersion, mark):
+	if not self.auth.check(authToken, write = False, mirror = True):
+	    raise errors.InsufficientPermission
+
         # only show troves the user is allowed to see
         cu = self.db.cursor()
 
@@ -1646,6 +1651,11 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
         self.closedMessage = closedMessage
 
 class ServerConfig(ConfigFile):
+    bugsToEmail             = CfgString
+    bugsFromEmail           = CfgString
+    bugsEmailName           = (CfgString, 'Conary Repository Bugs')
+    bugsEmailSubject        = (CfgString, 
+                               'Conary Repository Unhandled Exception Report')
     cacheDB                 = dbstore.CfgDriver
     closed                  = CfgString
     commitAction            = CfgString

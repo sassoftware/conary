@@ -84,7 +84,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, serverName):
+    def commitChangeSet(self, cs, serverName, mirror=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -98,9 +98,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         else:
             threshold = TRUST_UNTRUSTED
         try:
-            # a little odd that creating a class instance has the side
-            # effect of modifying the repository...
-            ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True,
+            # reset time stamps only if we're not mirroring.
+            ChangeSetJob(self, cs, [ serverName ],
+                         resetTimestamps = not mirror,
                          keyCache = self.troveStore.keyTable.keyCache,
                          threshold = threshold)
         except openpgpfile.KeyNotFound:

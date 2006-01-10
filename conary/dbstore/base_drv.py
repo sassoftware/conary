@@ -75,6 +75,8 @@ class BaseCursor:
         return self.dbh.cursor()
 
     def binary(self, s):
+        if s is None:
+            return None
         return self.binaryClass(s)
 
     def frombinary(self, s):

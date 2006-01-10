@@ -115,6 +115,8 @@ for t in tList:
         if row is None:
             break
         fields = cs.fields()
+        row.data = list(row.data)
+        row.description = [ list(x) for x in row.description ]
         if t.lower() == "permissions":
             if "write" in fields:
                 fields[fields.index("write")] = "canWrite"
@@ -126,7 +128,8 @@ for t in tList:
                 fields[fields.index("byDefault")] = "flags"
         if t.lower() == "trovefiles":
             # versionId was declared as a binary string in sqlite instead of integer
-            row[2] = int(row[2])
+            row.data[2] = int(row.data[2])
+            row.description[2][1] = 0
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (
             t, ", ".join(fields), ",".join(["?"]*len(fields)))
         i += 1
@@ -141,7 +144,7 @@ for t in tList:
             print row, e.msg
             print
             pgsql.commit()
-        except:
+        except Exception, e:
             print "ERROR - SQL", sql
             raise
         else:

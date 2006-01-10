@@ -6,6 +6,7 @@ Changes in 0.90.0:
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
+    * Added man page entry about cvc clone.
 
   o Package Building Changes:
     * Build logs now contain unexpanded macros, since not all macros
@@ -71,10 +72,10 @@ Changes in 0.90.0:
     * Creating changesets atomically moves complete changesets into place
     * Content store no longer reference counts entries
     * Added support for trove marks to support mirroring
+    * Added support for traceback emails from the repository server
     * The repository contents store was reworked to avoid reading
       precompressed gzipped data twice (once to double check the uncompressed
       contents sha1 and once to copy the file in place).
-
 
 Changes in 0.80.4:
   o Build Changes:
