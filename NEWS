@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 0.90.0:
   o Documentation Changes:
     * Added summaries about updateall in the conary man page and added
       information about the command-line options for conary rq.
@@ -6,6 +6,8 @@ Changes in @NEW@:
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
+    * Added man page entry about cvc clone.
+
   o Package Building Changes:
     * Build logs now contain unexpanded macros, since not all macros
       may be defined when the build log is initially created.
@@ -20,37 +22,60 @@ Changes in @NEW@:
       of the python setuptools package to install python programs
       which have a setup.py that uses either the old disttools or
       new setuptools package.
+    * fixed bug #bz470: loadInstalled('foo') will now work when you have
+      installed a local cook of foo.
+
   o Group Building Changes:
-    * add() now takes a "components" option.  r.add(<package>, 
+    * add() now takes a "components" option.  r.add(<package>,
       components=['devel', 'runtime'])  will install <package>, but only the
       'runtime' and 'devel' components of <package> by default.
-    * remove() can now 'remove' troves within child troves.  
+    * remove() can now 'remove' troves within child troves.
     * when a component is added, (either via r.add() or dep resolution)
       is automatically added as well (though not all its sibling components)
-    * added r.removeComponents(<complist>), which allows you 
-      to create a group where all devel components are byDefault False, 
+    * added r.removeComponents(<complist>), which allows you
+      to create a group where all devel components are byDefault False,
       for example. r.removeComponents(['devel', 'devellib'])
+
   o Client Changes:
-    * When committing source changes in interactive mode, conary will ask you 
+    * When committing source changes in interactive mode, conary will ask you
       you to confirm the commit.
     * A new configuration option, autoResolvePackages, tells conary to install
       the packages that include the components needed for dep resolution.
     * You can now install locally cooked groups.
     * Added script to mirror repositories
+    * If foo is a redirect to bar, and you run 'conary update foo' when
+      foo is not installed on your system, conary will act as if you had
+      typed 'conary update bar'.  Previously, it would act as if you had typed
+      'conary update bar --no-recurse'.
+
   o Code structure:
     * Conary now has the concept of "weak references", where a weak reference
-      allows conary to be able to recognize the relationship between a 
+      allows conary to be able to recognize the relationship between a
       collection and the children of collections it contains.  This allows
       us to add several new features to conary, documented in Client and Build
       changes.
+    * SQL operations have been migrated to the dbstore driver to allow
+      for an easier switch of the database backends for the server side.
+    * Various query and code structure optimizations have been
+      implemented to allow running under MySQL and PostgreSQL
+
+
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.
+    * Default macros used in cooking are now stored in /etc/conary/macros.
+      The 'defaultMacros' parameter determines where cvc searches for macro
+      definitions.
+
   o Server Changes:
     * Added hasTroves() repository code
     * Creating changesets atomically moves complete changesets into place
     * Content store no longer reference counts entries
     * Added support for trove marks to support mirroring
+    * The repository contents store was reworked to avoid reading
+      precompressed gzipped data twice (once to double check the uncompressed
+      contents sha1 and once to copy the file in place).
+
 
 Changes in 0.80.4:
   o Build Changes:
@@ -91,8 +116,8 @@ Changes in 0.80.2:
       consistently pins all troves that match a pinTrove line.
     * When a trove is left on the system because of dependency resolution
       during an update, a warning message is printed.
-    * Command line configuration, such as --config 
-      'buildLabel conary.rpath.com@rpl:devel', now overrides context 
+    * Command line configuration, such as --config
+      'buildLabel conary.rpath.com@rpl:devel', now overrides context
       configuration.
 
   o Server Changes:
@@ -165,7 +190,7 @@ Changes in 0.80.1:
     * The skipMissingSubDir keyword argument now actually works correctly
       when the subdirectory is missing.
   o Common Changes:
-    * Entitlement support has been added as an alternate method of 
+    * Entitlement support has been added as an alternate method of
       authentication.
 
 Changes in 0.80.0:
@@ -174,12 +199,12 @@ Changes in 0.80.0:
       replaced. Instead of rigidly following the trove digraph, we flatten
       the update to choose how troves get updated, and walk the hierarchy
       to determine which updates to actually apply.
-    * Dependency resolution could include troves which caused duplicate 
+    * Dependency resolution could include troves which caused duplicate
       removals for the troves those included troves replace
     * Chroot handling was broken in 0.71.2 and prevented the user name
       lookup code for the chroot from exiting back out of the chroot
     * showchangeset on relative changesets now displays them as jobs.
-    * query and queryrep now exclude components if they match their 
+    * query and queryrep now exclude components if they match their
       package name
     * Conary cleans up rollbacks when a changeset fails to apply.
       Previously, an invalid changeset was saved in the rollback
@@ -196,7 +221,7 @@ Changes in 0.80.0:
     * When in multi-threaded mode, the download thread now checks to see
       if the update thread wants to exit.  This fixes many of the
       "timeout waiting for download thread to terminate" messages.
-    * Fixed bug where conary erase foo --no-deps wouldn't erase a component 
+    * Fixed bug where conary erase foo --no-deps wouldn't erase a component
       of foo if it was required by something else
   o Build Changes:
     * Dependencies are now generated for Java .class and .jar files.
@@ -213,17 +238,17 @@ Changes in 0.80.0:
       does not exist.  By default, those build actions will now raise
       an error if the directory does not exist, rather than running in
       the wrong subdirectory as they did previously.
-    * You can now cook a recipe that has a superclass that is defined  
+    * You can now cook a recipe that has a superclass that is defined
       locally but a has supersuperclass that is in the repository.  Similarly,
       if you have a superclass that is in the repository but a supersuperclass
-      locally, conary will find that as well 
+      locally, conary will find that as well
     * r.Replace with parameters in the wrong order will now behave correctly
     * The automatic :config component for configuration files has been
       disabled because Conary does not handle files moving between
       troves, and config files were being re-initialized when packages
       were updated.
   o Code structure:
-    * queryrep, query, showchangeset, and update --info all use the same 
+    * queryrep, query, showchangeset, and update --info all use the same
       code to determine how to display their data.  Display.py was changed
       to perform general display operations.
     * query.py added
@@ -243,7 +268,7 @@ Changes in 0.71.2
       bugzilla #428
     * buildPath can be set in contexts
     * cvc co <foo> will work even if there are two foos on the same label with
-      different branches.  In that case, it will warn about the older foo 
+      different branches.  In that case, it will warn about the older foo
       which it doesn't check out
     * Test mode didn't work for updates and erases which were split into
       multiple jobs
@@ -263,7 +288,7 @@ Changes in 0.71.2
       interpreted relative first to the destdir and then to the system.
 
 Changes in 0.71.1:
-  o Server Changes 
+  o Server Changes
     * Added iterTroves() call which iterates over large numbers of troves
       much more efficiently than a single getTrove() call would.
     * Split out FileRetriever object to allow file information to be pulled
@@ -271,15 +296,15 @@ Changes in 0.71.1:
     * The web interface shows the troves contained in a group trove instead
       of trying to list all files in a group.
   o Client Changes
-    * Config file options that take a path as a value now support ~ for 
+    * Config file options that take a path as a value now support ~ for
       home directory substitution
     * Trove.diff() returns a standard job list instead of the previous
       only-used-here format
     * /var/log/conary tracks all update, remove, rollback, and erase events
-    * Progress output is simplified when stdout is not a tty (no line 
+    * Progress output is simplified when stdout is not a tty (no line
       overwrites)
     * Tracebacks during logged commands get copied to the log
-    * Code which checked to see if a shadow has been locally modified didn't 
+    * Code which checked to see if a shadow has been locally modified didn't
       work for shadows more than a single level deep
     * When you are installing from changesets using --from-files, other troves
       in the changesets can be used for dependency resolution
@@ -329,7 +354,7 @@ Changes in 0.70.5:
       r.Requires('soname: libfoo.so', '/path/to/file')
     * r.Requires now enforces that packages that require a file and
       include that required file must also explicitly provide it. (bz #148)
-  o Server Changes 
+  o Server Changes
     * Packages added to the repository are checked to ensure the version and
       flavor of all referenced components are the same as for the package
 
@@ -340,8 +365,8 @@ Changes in 0.70.4:
       dependencies" message.
     * Components are now displayed on the same line as their parent
       package in "conary update" output.
-    * A new 'interactive' option has been added to conary configuration. 
-      When set to true, conary will display info about clone, branch, 
+    * A new 'interactive' option has been added to conary configuration.
+      When set to true, conary will display info about clone, branch,
       update, and erase operations, and then ask before proceding.
   o Build Changes (cvc)
     * The CompilePython action has been fixed to accept macros at the
@@ -368,17 +393,17 @@ Changes in 0.70.3:
   o Client Changes (conary)
     * Conary now works harder to avoid having separate erase/installs,
       instead preferring to link those up into one update when possible.
-    * Conary configuration now supports contexts.  Contexts are defined in 
-      sections starting with a [<name>] line, and provide contextual 
-      configurations for certain variables, defined in the man page.  All 
-      configuration options after the [<name>] will be associated with that 
-      context, and will override the default configuration when that context 
-      is active.  The current context can be selected by using the --context 
-      parameter, or by setting the CONARY_CONTEXT environment variable. 
+    * Conary configuration now supports contexts.  Contexts are defined in
+      sections starting with a [<name>] line, and provide contextual
+      configurations for certain variables, defined in the man page.  All
+      configuration options after the [<name>] will be associated with that
+      context, and will override the default configuration when that context
+      is active.  The current context can be selected by using the --context
+      parameter, or by setting the CONARY_CONTEXT environment variable.
     * 'conary config --show-contexts' will display the available contexts
   o Build Changes (cvc)
-    * A local cook of a trove foo will ensure that the changeset created is 
-      installable on your local system, by making sure the version number 
+    * A local cook of a trove foo will ensure that the changeset created is
+      installable on your local system, by making sure the version number
       created is unique.
     * The builddir is no longer allowed to appear in ELF RPATHs.
     * The build documentation strings have been significantly updated
@@ -387,7 +412,7 @@ Changes in 0.70.3:
       to the destdir.
     * The ManualConfigure action now sets the standard Configure
       environment.
-    * cvc will allow you to cook a trove locally even when you are unable 
+    * cvc will allow you to cook a trove locally even when you are unable
       to access the trove's source repository
   * Common Changes:
     * Version closeness was improperly measured for troves on different
@@ -421,7 +446,7 @@ Changes in 0.70.2:
       system.
     * New option, "conary update-conary" has been added in an attempt
       to provide a workaround for future drastic protocol revisions
-      such as what happened for 0.70 
+      such as what happened for 0.70
     * Methods for parsing command line update request and changeset requests
       have been added to conaryclient.cmdline
     * A metric for the distance between arbitrary versions on different
@@ -434,7 +459,7 @@ Changes in 0.70.2:
     * updateall command respects pins on top-level troves
     * Dependency resolution no longer blows away pinned troves
     * conary update now takes a changeSpec, allowing you to specify both
-      the version to remove and the update version, like 
+      the version to remove and the update version, like
       'conary update foo=2.0--3.0'
 
   o Build Changes (cvc)
@@ -468,11 +493,11 @@ Changes in 0.70.2:
        repository.errors module.
 
 Changes in 0.70.1:
-  * Collection merging didn't handle (admittedly obscure) cases where 
+  * Collection merging didn't handle (admittedly obscure) cases where
     a component on the local system was updated to a new version of a
     trove, and updating that package also tries to update to that version
     but using a different path
-  * Redirects are allowed in group cooking as long as the target of the 
+  * Redirects are allowed in group cooking as long as the target of the
     redirect is also specified in the group (this allows cleaner handling
     when trying to clean up after label multiplicity)
   * Shorten display for versions and flavors in internal debugging output.
@@ -540,15 +565,15 @@ Changes in 0.62.16:
     to splitting transactions this should be a good trade off).
   * Added removeIfExist call to miscmodule for some peformance improvement.
   * ELF files that find non-system libraries via an RPATH now have the path
-    to the library encoded in their dependency requirement, matching the 
+    to the library encoded in their dependency requirement, matching the
     path encoded in the dependency provision.  Before this, the RPATH
     was ignored and the path encoding was only guessed within one source
     package.
   * The LinkCount policy now enforces the requirement that hardlink groups
     contain only files in the same directory as each other; no hardlinks
     between files in different directories are allowed.
-  * When updating a group across branches, if a subtrove within the update has 
-    already been manually moved to the new branch by the user, conary will 
+  * When updating a group across branches, if a subtrove within the update has
+    already been manually moved to the new branch by the user, conary will
     recognize this and sync that trove with the group
   * A new "closed" configuration variable has been added to the
     apache-based networked repository server.  When set, the server
@@ -557,14 +582,14 @@ Changes in 0.62.16:
     The string will also be returned to the client.
   * Removed install buckets and replaced with comparisons of hashed path
     values to determine trove compatibility.
-  * If a trove is included in an update twice, once directly, and once 
+  * If a trove is included in an update twice, once directly, and once
     implicitly through recursion, ignore the recursive update.
   * More constraints added to the repository schema
   * Added hasTrove to Items table for faster trove names check
 
 Changes in 0.62.15:
   * The MakeDevices() policy now accepts mode= as a named argument.
-  * Added (undocumented) --debug (prints debugging output), 
+  * Added (undocumented) --debug (prints debugging output),
     switched old (undocumented) --debug to now be --debugger (starts debugger
     on initialization)
   * Added debug messages to conaryclient/update.py
@@ -573,11 +598,11 @@ Changes in 0.62.15:
   * Cloning now updates buildRequirements and loadedTroves in troveInfo
     and enforces their consistency on the target branch
   * Cloning groups is now supported
-  * Fix update case where a group update should cause conary to search the 
+  * Fix update case where a group update should cause conary to search the
     system for an older version of a trove to replace.
-  * If you update a trove foo locally to a new version on the same branch, and 
+  * If you update a trove foo locally to a new version on the same branch, and
     then update the containing group to a new version on a different branch,
-    conary will now update foo to the new branch as well. 
+    conary will now update foo to the new branch as well.
   * fix error message when you try to pin as non-root
 
 Changes in 0.62.14:
@@ -657,7 +682,7 @@ Changes in 0.62.12:
   * By default, when you shadow a binary trove, its source is shadowed with it.
   * Instead of a --sources option, cvc shadow and cvc branch now take
     --source-only and --binary-only options that allow you to control whether
-    sources or binaries are shadowed. 
+    sources or binaries are shadowed.
   * Branch and shadow commands now take an unlimited number of troves
     to branch/shadow.
   * Files sharing versions but with different contents (thanks to flavors)
@@ -665,10 +690,10 @@ Changes in 0.62.12:
   * troves can now be specified for rq, q, and update as <labelpart>/<version>,
     e.g., foo=:rpl1/1.0, or foo=contrib.rpath.com@/2.3-1-2
   * version.hasParent() handles more cases of shadows of shadows correctly.
-  * cooking troves into the repository with --flavor <newflavor> now modifies 
+  * cooking troves into the repository with --flavor <newflavor> now modifies
     the flavor before the recipe is even loaded, not when the recipe's setup
     function is called.
-  * add a check to ensure RPATHs in cooked packages do not have %(destdir)s 
+  * add a check to ensure RPATHs in cooked packages do not have %(destdir)s
     or /tmp or /var/tmp in them.
   * EnforceSonameBuildRequirements has been temporarily changed to produce
     warnings instead of errors.
@@ -687,9 +712,9 @@ Changes in 0.62.11:
     an application packages private versions of libraries -- the
     dependencies still need to be there so that inter-component
     requirements are honored, but they must not perturb the rest
-    of the system.  
-  * Recursive pinning now behaves itself 
-  * Switch group recipe syntax to use r.add() instead of r.addTrove, 
+    of the system.
+  * Recursive pinning now behaves itself
+  * Switch group recipe syntax to use r.add() instead of r.addTrove,
     r.remove() instead of r.removeTrove(), and add a
     r.setDefaultGroup() command to set the default group.
 
@@ -711,7 +736,7 @@ Changes in 0.62.10:
   * Added a check to warn when a trove is installed multiple times from
     the same branch with incompatible install buckets (--no-conflict-check
     overrides this check)
-  * Redirects can now redirect to nothing, which allows components to 
+  * Redirects can now redirect to nothing, which allows components to
     disappear gracefully on a redirection
   * A soname dependency is now provided only if the library is in a
     default library directory, or in a directory explicitly added with a
@@ -738,8 +763,8 @@ Changes in 0.62.8:
     find the right missing build requirements.
   * Make users and groups in a repository such that they may not differ only
     in case, i.e. if user foo exists, user Foo cannot be created.
-  * files in /usr/%(lib)s/python/.* are no longer automatically given an 
-    architecture flavor - if there are architecture-specific files in those 
+  * files in /usr/%(lib)s/python/.* are no longer automatically given an
+    architecture flavor - if there are architecture-specific files in those
     dirs, they should result in an arch-specific flavor through normal
     means.
   * By default, no OpenPGP signatures will be added to troves when
@@ -832,7 +857,7 @@ Changes in 0.62.4:
 
 Changes in 0.62.3:
   * Don't link troves to groups when the branch has changed
-  * Link new troves to collections (and new collections to old troves) when 
+  * Link new troves to collections (and new collections to old troves) when
     a trove isn't installed but a suitable replacement (meaning on the same
     branch) is available
   * Installing changesets w/ not by default from files broke
@@ -868,20 +893,20 @@ Changes in 0.62.0:
     repository.
   * Change set generation on the command line is more flexible. It can generate
     erasure changesets as well as relative to nothing changesets
-  * When creating multiple groups from the same recipe using newGroup(), 
-    Conary now searches all subgroups when resolving dependencies within 
+  * When creating multiple groups from the same recipe using newGroup(),
+    Conary now searches all subgroups when resolving dependencies within
     a parent group
   * Conary no longer resolves dependencies for troves with byDefault=False
     (such as :test and :debuginfo).  Conary will now resolve dependencies in
     those troves only if you set checkOnlyByDefaultDeps=False.  When creating
     subgroups using newGroup(), pass the checkOnlyByDefaultDeps flag as an
     argument to the newGroup() function.
-  * excludeTroves now applies to troves which have been added to 
+  * excludeTroves now applies to troves which have been added to
     already installed collections
 
 Changes in 0.61.12:
-  * You can now search for troves by <trove>=<host>@ 
-  * A bug when cooking groups with depCheck = True (introduced in 0.61.10) 
+  * You can now search for troves by <trove>=<host>@
+  * A bug when cooking groups with depCheck = True (introduced in 0.61.10)
     has been fixed.
   * A new r.ByDefault policy controls how components are included in their
     enclosing packages; the default is True except for :test and :debuginfo
@@ -898,17 +923,17 @@ Changes in 0.61.11:
     troves were already present
 
 Changes in 0.61.10:
-  * The conary update command now takes a --sync parameter, documented in 
+  * The conary update command now takes a --sync parameter, documented in
     'man conary'
-  * Groups now allow you to create a reference to another cooked trove, 
+  * Groups now allow you to create a reference to another cooked trove,
     and use that reference to add troves that are contained in that trove.
     For example, if you want to create a group-python based on the troves in
-    an already cooked group-dist, you add a reference to the group-dist in 
+    an already cooked group-dist, you add a reference to the group-dist in
     group-python, and pass the group-dist reference in when you call
     addTroves.
-  * Work has begun towards generalizing the concept of a trove source.  
+  * Work has begun towards generalizing the concept of a trove source.
     A class SimpleTroveSource has been added that, when subclassed and given
-    access to the troves, will allow you to call findTroves to search that 
+    access to the troves, will allow you to call findTroves to search that
     source.  The same code is used in update code to unify updating from
     the repository and from changesets, and it is used to provide the search
     capabilities for the local database.
@@ -925,7 +950,7 @@ Changes in 0.61.10:
     cleanups. Many bugs seem to have gone away.
 
 Changes in 0.61.9:
-  * Fix a bug added in 0.61.8 that breaks tag handlers 
+  * Fix a bug added in 0.61.8 that breaks tag handlers
 
 Changes in 0.61.8:
   * Fix a bug introduced in 0.61.7 that occurred when, in the repository,
@@ -945,13 +970,13 @@ Changes in 0.61.8:
     transactions are committed
 
 Changes in 0.61.7:
-  * Several bugs related to updating two troves with the same name have been 
-    fixed - including branch affinity, flavor affinity, correct handling of 
+  * Several bugs related to updating two troves with the same name have been
+    fixed - including branch affinity, flavor affinity, correct handling of
     already updated troves, and correct handling of empty flavors.
   * "conary emerge" as root (or as a user than can apply the changeset
     produced by the build) did not install anything but the toplevel
     package.  This bug has been fixed.
-  * No longer hide descriptive TroveNotFound errors behind a generic 
+  * No longer hide descriptive TroveNotFound errors behind a generic
     NoNewTroves wrapper.
   * Group recipes can now request that dependencies be resolved and
     added to the group at cook time.  To automatically add required
@@ -1039,7 +1064,7 @@ Changes in 0.61.4:
   * Creating branches and shadows had a command line parsing bug
   * "cvc newpkg" takes --dir and now complains for unexpected arguments
     (which is used to just ignore)
-  * when using flavor affinity for installed troves, merge subarchitecture 
+  * when using flavor affinity for installed troves, merge subarchitecture
     flags
   * group handling didn't always preserve troves which were needed by a
     newly installed trove properly
@@ -1053,7 +1078,7 @@ Changes in 0.61.2:
   * Fix a bunch of typos in the authentication checking server side
   * Add permission editing capabilities to the server component and hooks
     in the netclient
-  * Overhaul of ACL system so that uniqueness constraints on Troves and 
+  * Overhaul of ACL system so that uniqueness constraints on Troves and
     Labels can be enforced: we now use a special Trove and Label "0 | ALL"
     instead of Null
   * Dependency resolution enforces label ACLs.
@@ -1130,13 +1155,13 @@ Changes in 0.61.0:
   * --replace-files marks the replaced versions of the files as no longer
     present
   * Troves store information about Install Buckets - not used yet.
-    By specifying a component's install bin, which is a set of key-value 
-    pairs, you can describe whether two versions of a component are 
+    By specifying a component's install bin, which is a set of key-value
+    pairs, you can describe whether two versions of a component are
     installable side-by-side.  If two versions of the component share the
     same keys for their install bins, but at least one different value, then
     the components are installable side-by-side.
   * Troves store information about troves loaded when building a recipe
-  * Build Requirements are stored with the trove 
+  * Build Requirements are stored with the trove
   * Add isCollection() to TroveInfo
   * Changesets download while instals are going on
   * StreamSet.twm() respects ignoreUnknown now
@@ -1198,7 +1223,7 @@ Changes in 0.60.9:
 Changes in 0.60.8:
   * The changemail script is now actually packaged, in
     /usr/lib{,64}/python2.4/site-packages/conary/changemail
-  * Build requirements for superclasses are automatically added to 
+  * Build requirements for superclasses are automatically added to
     subclasses.
   * Build requirements now look at all labels in a version to see if they
     satisfy a build requirement.
@@ -1256,7 +1281,7 @@ Changes in 0.60.3:
     conversion is now in place
 
 Changes in 0.60.2:
-  * Added InitialContent flag 
+  * Added InitialContent flag
   * Fixed bug which caused servers to leak file descriptors when the sqldb
     was replaced
   * "repquery --deps" output fixed (broken in 0.60.1)
@@ -1296,7 +1321,7 @@ Changes in 0.60.1:
     to the client to sort it all out
   * Client uses timestamps to determine which troves to install when their
     flavors score equally
-  * Fixed build-side bug handling meta characters ([,*,etc) in file names 
+  * Fixed build-side bug handling meta characters ([,*,etc) in file names
   * "cvc newpkg" now accepts pkgname=label syntax
   * files.contentsChanged() function updated to work with StreamSets
   * Basic local changeset creation, retargeting, and commits work
@@ -1307,7 +1332,7 @@ Changes in 0.60.1:
     to be installed.
   * Committing troves to the repository no longer recompresses non-config
     files
-  * Timestamps are set on the server at commit time; the timestamps the 
+  * Timestamps are set on the server at commit time; the timestamps the
     client assigned is not used (this is to protect against clients with
     a bad idea of time; servers should be consistent, even if they're
     wrong, and as long as time doesn't go backwards on that server all is
@@ -1353,7 +1378,7 @@ Changes in 0.50.13:
     modified with the ComponentRequires policy.
   * The build/buildpackage.py file has variable and function names changed
     to better match our terminology for packages and components.
-  * Change flavor specified in the conaryrc to a flavor path -- accept the 
+  * Change flavor specified in the conaryrc to a flavor path -- accept the
     flavor config parameter multiple times to create a flavor path
   * Added a "filewrap" argument to r.Run() that inserts an LD_PRELOAD
     wrapper that overrides some library funtions to look in %(destdir)s
@@ -1364,13 +1389,13 @@ Changes in 0.50.12:
   * Implemented --quiet for conary update changeset commands, and cvc cook.
     Also implemented the 'quiet' configuration value. This option suppresses
     progress indicators.
-  * Split loadRecipe into loadInstalled and loadSuperClass, depending on the 
+  * Split loadRecipe into loadInstalled and loadSuperClass, depending on the
     purpose of the recipe loading.  loadInstalled will examine the local
-    system to look for a matching installed trove, and load that version, 
+    system to look for a matching installed trove, and load that version,
     while loadSuperClass will not.
-  * Logs of builds are now stored in cooked changesets in the :debuginfo 
-    component -- generally in 
-    /usr/src/debug/buildlogs/<name>-<version>-log.bz2, controlled by 
+  * Logs of builds are now stored in cooked changesets in the :debuginfo
+    component -- generally in
+    /usr/src/debug/buildlogs/<name>-<version>-log.bz2, controlled by
     macros.buildlogpath
   * Added lib/logger.py
   * Fixed conarybugz.py to work with Conary's new site-packages location
@@ -1383,7 +1408,7 @@ Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
   * Fixed sorting for --info
   * Don't make --info installs require a writeable database
-  * Added an exception to group updating, restricting removal of existing 
+  * Added an exception to group updating, restricting removal of existing
     troves to match the group's contents to troves on the same branch
   * Groups which had the same trove added (via a referenced trove) and
     removed (from the primary trove) got confused
@@ -1399,7 +1424,7 @@ Changes in 0.50.11:
   * Fixed bug in update process which caused files to be incorrectly skipped
 
 Changes in 0.50.10:
-  * Added callback for creating database transaction, so that it does 
+  * Added callback for creating database transaction, so that it does
     not look like we spend an inordinate amount of time executing tag
     pre scripts.
   * Added findtrove.py to the Makefile so that it is included in
@@ -1463,7 +1488,7 @@ Changes in 0.50.5:
   * Streams return their value through __call__ instead of value()
   * Reimplemented ShortStream and IntStream in C
   * conary config now takes --show-passwords option, and does not pretty
-    print config file values when not printing to screen.  This means that 
+    print config file values when not printing to screen.  This means that
     conary config > <file> will result in a valid configuration file.
   * Updating groups didn't work when the group referenced troves as new
     which were already installed on the system
@@ -1471,10 +1496,10 @@ Changes in 0.50.5:
     file specifications for packaging :debuginfo and :test components.
   * loadRecipe now takes a troveSpec as its first parameter, and uses that
     troveSpec to find the trove on the local system that matches the source
-    component that is being loaded.  loadRecipe also automatically searches 
-    the labels that are parents of the current recipe, so if you shadow a 
-    recipe, any loadRecipe lines contained in that recipe should still do 
-    what you want. 
+    component that is being loaded.  loadRecipe also automatically searches
+    the labels that are parents of the current recipe, so if you shadow a
+    recipe, any loadRecipe lines contained in that recipe should still do
+    what you want.
   * merge didn't handle files converging
   * merge doesn't need to deal with autosource files
   * diffs between groups failed when members disappeared
@@ -1501,24 +1526,24 @@ Changes in 0.50.4:
     there were multiple files for that fileId
   * conary config output masks user/password info in repository maps
   * the config option useDir has been changed to useDirs, and archDir has been
-    changed to archDirs, to allow for tiered use/arch flag definitions, and 
-    the tweaking of use and arch flag settings.  By default, useDirs and 
-    archDirs look in /etc/conary/<dir>, followed by /etc/conary/distro/<dir>, 
-    follwed by ~/.conary/<dir>, where dir is use or arch, depending on the 
+    changed to archDirs, to allow for tiered use/arch flag definitions, and
+    the tweaking of use and arch flag settings.  By default, useDirs and
+    archDirs look in /etc/conary/<dir>, followed by /etc/conary/distro/<dir>,
+    follwed by ~/.conary/<dir>, where dir is use or arch, depending on the
     context.
   * Arch files can now contain arbitrary macro definitions, and in the future
-    will contain values for macros like %(lib)s, which is lib64 
+    will contain values for macros like %(lib)s, which is lib64
     on some platforms.
   * when using --keep-existing, the install label path and install flavor
-    are used to determine which version to install instead of using affinity 
-    to install something close to what you already have.   
+    are used to determine which version to install instead of using affinity
+    to install something close to what you already have.
   * a bug that prevented a changeset from applying to the system when
     the changeset removed a component from a package and the component
     is not installed on the system has been fixed.
 
 Changes in 0.50.3:
-  * database findTrove now has an interface that is much closer to the 
-    repository findTrove function -- this enables conary q to work like 
+  * database findTrove now has an interface that is much closer to the
+    repository findTrove function -- this enables conary q to work like
     conary rq.
   * Group handling didn't work for multiple levels of group inclusion.
   * Database.hasTrove() no longer needs to instantiate troves.
@@ -1550,7 +1575,7 @@ Changes in 0.50.2:
     correct server when contents from more than one server are requested
 
 Changes in 0.50.1:
-  * Add support for trove=<troveVersion> in rq, cvc co, and other places that 
+  * Add support for trove=<troveVersion> in rq, cvc co, and other places that
     use findTrove
   * Add conary q --info option to display flavors
   * changeset command uses system flavor if no flavor is specified, skips
@@ -1575,7 +1600,7 @@ Changes in 0.50.0:
   * Redirections work
   * Sped up group generation
   * Troves which reference other troves (groups and packages) can now specify
-    whether a trove is installed by default or not. Packages now reference 
+    whether a trove is installed by default or not. Packages now reference
     :test, but don't install it by default
   * Added optional 'recurse' parameter to netclient.createChangeSetFile
   * The first argument to the Requires and TagSpec commands can now have
@@ -1583,7 +1608,7 @@ Changes in 0.50.0:
   * Groups can have requirements now
   * protocol-level getFileContents works on multiple files simultaneously
   * repository log had too many files added to it
-  * set instruction set flavor for a cooked trove whenever any Arch flags are 
+  * set instruction set flavor for a cooked trove whenever any Arch flags are
     checked
 
 Changes in 0.14.12:
@@ -1598,7 +1623,7 @@ Changes in 0.14.12:
   * Policy now helps ensure that :python components are either
     architecture-neutral or multilib-friendly.
   * Better error messages for "%(foo)/" (which should be "%(foo)s/")
-  * Looking up files in the local database gave erroneous results in 
+  * Looking up files in the local database gave erroneous results in
     some cases (this was noticeably primarily when distributed change
     sets were being generated)
 
@@ -1607,10 +1632,10 @@ Changes in 0.14.11:
     /usr/share/conary/convertcontents to convert to the new data store.
     Note that this means that any *config file* managed by conary can be
     read through the main SQL database file in /var/lib/conarydb/conarydb.
-  * Actually check build requirements before building, use --no-deps to 
+  * Actually check build requirements before building, use --no-deps to
     ignore the check.
   * make conary q and conary update convert all flavors to  strong flavors
-    for comparison; ~readline becomes readline, and ~!readline becomes 
+    for comparison; ~readline becomes readline, and ~!readline becomes
     !readline, so that conary q foo[readline] works as expected.
   * no default flavor is presumed for local operations (erase, q)
   * changed getPackageBranchPathIds to base64 encode the filename in
@@ -1759,16 +1784,16 @@ Changes in 0.13.3
 Changes in 0.13.2
   * reworked use.py code almost entirely.
   * added /etc/conary/arch directory to contain architecture definition files;
-    changed /etc/conary/use files to contain more information about how 
+    changed /etc/conary/use files to contain more information about how
     flags are used when building.  Flag definitions are no longer in use.py.
-  * fixed buildFlavor so that it affects cooking packages as well as 
+  * fixed buildFlavor so that it affects cooking packages as well as
     determining troves to include when cooking a group
-  * changed --noclean to --no-clean to be in line with the rest of the 
+  * changed --noclean to --no-clean to be in line with the rest of the
     options; documented it
   * removed Use.foo and Flags.foo options from conary config files.  Macros.foo
-    is still there.  Added --use-flavor option to cvc cook which takes a flavor 
-    and overrides the build flavor while cooking.  
-  * groups now take flavor strings to determine the flavor of a trove to 
+    is still there.  Added --use-flavor option to cvc cook which takes a flavor
+    and overrides the build flavor while cooking.
+  * groups now take flavor strings to determine the flavor of a trove to
     include, not flag sets.
   * dependencies resolution is flavor sensitive now (and uses flavor
     affinity)
@@ -1776,7 +1801,7 @@ Changes in 0.13.2
   * renamed classes and methods in versions.py to match current terminology
 
 Changes in 0.13.1
-  * repquery wasn't filtering by flavor properly (exposed by a bug fix 
+  * repquery wasn't filtering by flavor properly (exposed by a bug fix
     in 0.13.0)
 
 Changes in 0.13.0
@@ -1793,12 +1818,12 @@ Changes in 0.13.0
 Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
   * moved destdir to %(builddir)s/_ROOT_
-  * made macros.destdir available during the unpacking of sources 
-  * source commands (r.addAction, etc.), if given absolute paths for 
+  * made macros.destdir available during the unpacking of sources
+  * source commands (r.addAction, etc.), if given absolute paths for
     their dir keywords, will perform their actions in the destdir instead
     of the builddir
   * most build commands (r.Make, r.Create, etc.), will work in either builddir
-    or destdir, depending on whether they are given relative or absolute 
+    or destdir, depending on whether they are given relative or absolute
     paths
   * add dir keyword for r.Run
   * include /usr/bin/rpm2cpio
@@ -1843,7 +1868,7 @@ Changes in 0.12.1
   * added a check to prevent mangled flags from getting committed
 
 Changes in 0.12.0
-  * document config command, and display supplied macro/use/arch information 
+  * document config command, and display supplied macro/use/arch information
     in output
   * repository acl's work for almost everything
   * anonymous access must be explicitly enabled by creating an acl for
@@ -1862,7 +1887,7 @@ Changes in 0.11.10
     the distribution python version will not add all of the python
     recipe's flavor information to the loading recipe class, as long
     as the loading recipe does not subclass the Python class.)
-  * add conary verify command for comparing the local system's state to 
+  * add conary verify command for comparing the local system's state to
     the state it was in at install time
   * when a trove is installed for the first time, it comes from a single
     repository
@@ -1890,11 +1915,11 @@ Changes in 0.11.7
   * Added r.ConsoleHelper() for recipes
   * PAM configuration files shouldn't have paths to modules by default,
     so we remove what used to be the standard path
-  * changed repository user authentication to use user groups (currently 
+  * changed repository user authentication to use user groups (currently
     one per user)
   * added password salt
   * restructured repository a bit
-  * removed lots of unused code from FilesystemRepository 
+  * removed lots of unused code from FilesystemRepository
 
 Changes in 0.11.6
   * branches are created as changesets now instead of as a protocol call
@@ -1905,7 +1930,7 @@ Changes in 0.11.5
   * Internals reworked to eliminate flavor of None in favor of empty flavor
   * Added (currently unused) code to parse command line flavor specifications
   * static libraries (.a files) get proper flavors now
-  * Handle attempts to update already installed troves from absolute 
+  * Handle attempts to update already installed troves from absolute
     change sets
 
 Changes in 0.11.4
@@ -1928,7 +1953,7 @@ Changes in 0.11.2:
   * added a database version to the database schema
 
 Changes in 0.11.1:
-  * erasing troves enforces dependencies -- this requires a database 
+  * erasing troves enforces dependencies -- this requires a database
     conversion (run the conary-add-filedeps script which fixed the
     conversion to 0.11.0 after updating conary)
   * reworked dependency queries to take advantage of indices for much
@@ -1952,7 +1977,7 @@ Changes in 0.11.0:
   * files are explicitly disallowed from depending on groups, packages,
     or filesets; the only trove dependency that a file or component
     can have is on a component.  Only filesets can depend on filesets.
- 
+
 Changes in 0.10.11:
   * reworked how absolute change sets get converted to relative change
     sets for better efficiency
@@ -1962,7 +1987,7 @@ Changes in 0.10.11:
   * source flag wasn't set properly for newly added non-text files
   * flavor information is now printed by "conary query" when multiple
     flavors of the same version of a trove are installed
-  * "conary repquery --all" flavor output formatting has been improved 
+  * "conary repquery --all" flavor output formatting has been improved
 
 Changes in 0.10.10:
   * changesets get downloaded into a single (meta) file instead of lots
@@ -2037,7 +2062,7 @@ Changes in 0.10.3:
   * a warning message is now displayed when the user attempts to
     create a branch that already exists on a trove.
   * the correct trove names are displayed when automatically resolving
-    dependencies 
+    dependencies
   * packages no longer get the union of all the dependency information
     of the components they contain.  This information would have to be
     recalculated if a user installed a package then removed a
@@ -2093,14 +2118,14 @@ Changes in 0.10.0:
     in a different format.  This means that repositories that use old
     versions of Conary will be unable to give valid changesets to
     Conary 0.10.0 or later.  Therefore, the protocol version number has
-    been increased. 
+    been increased.
   * --no-deps argument added
   * "cvc co" is now a synonym for "cvc checkout"
 
 Changes in 0.9.6:
   * dependency enforcement infrastructure has been added (the code is
     currently disabled)
-  * bug fixes 
+  * bug fixes
     * applying a changeset that un-hardlinks files now works
     * conary rq [trove] --info now works
     * running "conary update [trove]" when more than one flavor of
@@ -2140,7 +2165,7 @@ Changes in 0.9.3:
     packages that have just been created, not just the name of the
     recipe.
   * Cooking as root is no longer allowed
-  * Miscellaneous bug fixes.  
+  * Miscellaneous bug fixes.
 
 Changes in 0.9.2:
  * Bug fixes:
@@ -2183,8 +2208,8 @@ Changes in 0.8.2:
  * You can now install multiple troves at once (even a combination of
    changeset files and troves from repositories), and the entire
    action is recorded in a single rollback (this required a change in
-   command-line arguments for updating troves). 
- * The beginnings of support for searching multiple repositories 
+   command-line arguments for updating troves).
+ * The beginnings of support for searching multiple repositories
  * Miscellaneous code cleanup and bug fixes.
 
 Changes in 0.8.1:

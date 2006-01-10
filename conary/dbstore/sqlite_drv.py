@@ -241,14 +241,9 @@ class Database(BaseDatabase):
         # prepare the sql and the trigger name and pass it to the
         # BaseTrigger for creation
         when = "AFTER"
-        if pinned:
-            sql = """
-            UPDATE %s SET %s = OLD.%s WHERE _ROWID_ = NEW._ROWID_ ;
-            """ % (table, column, column)
-        else:
-            sql = """
-            UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
-            """ % (table, column)
+        sql = """
+        UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
+        """ % (table, column)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # sqlite is more peculiar when it comes to firing off transactions

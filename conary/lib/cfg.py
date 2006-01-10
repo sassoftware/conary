@@ -395,8 +395,10 @@ class SectionedConfigFile(ConfigFile):
         # when reading a new config file, reset the section.
         oldSection = self._sectionName
         self._sectionName = None
-        return ConfigFile.read(self, *args, **kw)
+        rv = ConfigFile.read(self, *args, **kw)
         self._sectionName = oldSection
+        return rv
+
 
 #----------------------------------------------------------
 

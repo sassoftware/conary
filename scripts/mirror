@@ -20,9 +20,9 @@ import sys
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
-	fullPath = os.path.dirname(sys.argv[0])
+        fullPath = os.path.dirname(sys.argv[0])
     else:
-	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
 else:
     fullPath = os.getcwd()
 
@@ -200,8 +200,8 @@ cfg.read(options.configFile)
 if options.verbose:
     log.setVerbosity(log.DEBUG)
 
-# We need to repos clients, one for the server and one for the client. Since
-# they have the same name (the repositorymap gets us to the right hosts)
+# We need two repos clients, one for the server and one for the client. Since
+# they have the same name (the repositorymap gets us to the right hosts).
 sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap, 
                           cfg.source.user,
                           entitlementDir = cfg.entitlementDirectory)

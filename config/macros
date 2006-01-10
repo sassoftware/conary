@@ -1,0 +1,96 @@
+# These are the default macro definitions used when cooking packages using
+# cvc.  You can override these values in individual recipes, as well as on
+# the command line.
+
+lib                 = 'lib'
+# NOTE: lib is an architecture-specific macro, 
+# and is defined in /etc/conary/arch for some architectures, specifically 
+# 64bit systems.
+
+prefix		    = '/usr'
+sysconfdir	    = '/etc'
+initdir		    = '%(sysconfdir)s/init.d'
+exec_prefix	    = '%(prefix)s'
+bindir		    = '%(exec_prefix)s/bin'
+
+essentialbindir	    = '/bin'
+sbindir		    = '%(exec_prefix)s/sbin'
+essentialsbindir    = '/sbin'
+libdir		    = '%(exec_prefix)s/%(lib)s'
+essentiallibdir	    = '/%(lib)s'
+libexecdir	    = '%(exec_prefix)s/libexec'
+localstatedir	    = '/var'
+servicedir          = '/srv'
+cachedir	    = '%(localstatedir)s/cache'
+sharedstatedir	    = '%(prefix)s/com'
+includedir	    = '%(prefix)s/include'
+datadir		    = '%(prefix)s/share'
+mandir		    = '%(datadir)s/man'
+infodir		    = '%(datadir)s/info'
+docdir		    = '%(datadir)s/doc'
+thisdocdir          = '%(docdir)s/%(name)s-%(version)s'
+tagdescriptiondir   = '%(sysconfdir)s/conary/tags'
+taghandlerdir       = '%(libexecdir)s/conary/tags'
+tagdatadir          = '%(datadir)s/conary/tags'
+testdir	            = '%(localstatedir)s/conary/tests'
+thistestdir	    = '%(testdir)s/%(name)s-%(version)s'
+debuglibdir         = '/usr/lib/debug' # no %(prefix)s or %(lib)s!
+debugsrcdir         = '/usr/src/debug' # no %(prefix)s!
+userinfodir         = '%(sysconfdir)s/conary/userinfo'
+groupinfodir        = '%(sysconfdir)s/conary/groupinfo'
+buildlogpath        = '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2'
+# special component prefixes that the whole system needs to share
+krbprefix	    = '%(exec_prefix)s/kerberos'
+x11prefix	    = '%(exec_prefix)s/X11R6'
+# programs/options (empty ones are for documentation)
+cc		    = 'gcc'
+cxx		    = 'g++'
+cxxflags            = ''    # cxx specific flags
+optflags            = '-O2'
+dbgflags            = '-g' # for debuginfo
+cflags              = '%(optflags)s %(dbgflags)s' 
+cppflags	    = '' 
+ldflags		    = '%(dbgflags)s'
+mflags		    = '' # make flags
+parallelmflags      = ''
+sysroot		    = ''
+os		    = 'linux'
+debugedit           = 'debugedit'
+strip               = 'eu-strip' # eu-strip for debuginfo, "strip -g" else
+strip_archive       = 'strip -g' # eu-strip segfaults on ar
+monodis             = '%(bindir)s/monodis' # tool to determine mono dependencies
+
+# cross compiling macros
+# most of the macros beyond this point will only be of interest if you
+# are cross compiling.
+
+# targetarch, buildarch, and hostarch are determined internally by 
+# conary (although you can override them using command line options)
+
+targetvendor        = 'unknown'
+targetos            = 'linux'
+target		    = '%(targetarch)s-%(targetvendor)s-%(targetos)s'
+
+# the platform on which the created binaries should be run
+# (different from host only when the resulting binary is a cross-compiler)
+hostvendor          = 'unknown'
+hostos              = 'linux'
+host		    = '%(hostarch)s-%(hostvendor)s-%(hostos)s'
+
+# build is the system on which the binaries are being run
+buildvendor         = 'unknown'
+buildos             = 'linux'
+build		    = '%(buildarch)s-%(buildvendor)s-%(buildos)s'
+
+# in a default non-cross-compiling build, the build system cc is just the 
+# regular cc.  These will be overridden by conary when cross-compiling
+
+buildcc             = '%(cc)s'
+buildcxx            = '%(cxx)s'
+
+# The following macros will be set when cross-compiling unless they are set
+# here.
+#crossdir       = 'cross-target-%(target)s'
+#crossprefix	= '/opt/%(crossdir)s'
+#sysroot        = '%(crossprefix)s/sys-root'
+#headerpath     = '%(sysroot)s/%(includeprefix)s'

@@ -14,6 +14,7 @@
 
 import copy
 import os
+import imp
 import inspect
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
@@ -33,101 +34,24 @@ from conary import files
 from conary.lib import log, magic, util
 from conary.local import database
 
-baseMacros = {
-    # paths
-    'prefix'		: '/usr',
-    'sysconfdir'	: '/etc',
-    'initdir'		: '%(sysconfdir)s/init.d',
-    'lib'               : 'lib',  # may be overridden with 'lib64'
-    'exec_prefix'	: '%(prefix)s',
-    'bindir'		: '%(exec_prefix)s/bin',
-    'essentialbindir'	: '/bin',
-    'sbindir'		: '%(exec_prefix)s/sbin',
-    'essentialsbindir'	: '/sbin',
-    'libdir'		: '%(exec_prefix)s/%(lib)s',
-    'essentiallibdir'	: '/%(lib)s',
-    'libexecdir'	: '%(exec_prefix)s/libexec',
-    'localstatedir'	: '/var',
-    'servicedir'        : '/srv',
-    'cachedir'		: '%(localstatedir)s/cache',
-    'sharedstatedir'	: '%(prefix)s/com',
-    'includedir'	: '%(prefix)s/include',
-    'datadir'		: '%(prefix)s/share',
-    'mandir'		: '%(datadir)s/man',
-    'infodir'		: '%(datadir)s/info',
-    'docdir'		: '%(datadir)s/doc',
-    'thisdocdir'        : '%(docdir)s/%(name)s-%(version)s',
-    'tagdescriptiondir' : '%(sysconfdir)s/conary/tags',
-    'taghandlerdir'     : '%(libexecdir)s/conary/tags',
-    'tagdatadir'        : '%(datadir)s/conary/tags',
-    'testdir'	        : '%(localstatedir)s/conary/tests',
-    'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
-    'debuglibdir'       : '/usr/lib/debug', # no %(prefix)s or %(lib)s!
-    'debugsrcdir'       : '/usr/src/debug', # no %(prefix)s!
-    'userinfodir'       : '%(sysconfdir)s/conary/userinfo',
-    'groupinfodir'      : '%(sysconfdir)s/conary/groupinfo',
-    'buildlogpath'      : '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2',
-    # special component prefixes that the whole system needs to share
-    'krbprefix'		: '%(exec_prefix)s/kerberos',
-    'x11prefix'		: '%(exec_prefix)s/X11R6',
-    # programs/options (empty ones are for documentation)
-    'cc'		: 'gcc',
-    'cxx'		: 'g++',
-    'cxxflags'          : '',    # cxx specific flags
-    'optflags'          : '-O2',
-    'dbgflags'          : '-g', # for debuginfo
-    'cflags'            : '%(optflags)s %(dbgflags)s', 
-    'cppflags'		: '', # just for providing in recipes
-    'ldflags'		: '%(dbgflags)s',
-    'mflags'		: '', # make flags
-    'parallelmflags'    : '',
-    'sysroot'		: '',
-    'os'		: 'linux',
-    'debugedit'         : 'debugedit',
-    'strip'             : 'eu-strip', # eu-strip for debuginfo, "strip -g" else
-    'strip-archive'     : 'strip -g', # eu-strip segfaults on ar
-    'monodis'           : '%(bindir)s/monodis',
-    # filled in at cook time
-    'buildbranch'       : '',
-    'buildlabel'        : '',
-    'target'		: '%(targetarch)s-unknown-linux',
-    'host'		: '%(targetarch)s-unknown-linux',
-    'build'		: '%(targetarch)s-unknown-linux',
-    'buildcc'           : '%(cc)s',
-    'buildcxx'          : '%(cxx)s',
 
-}
 
 crossMacros = {
-    # set crossdir from cook, directly or indirectly, before adding the rest
-    #'crossdir'		: 'cross-target',
+    'crossdir'          : 'cross-target-%(target)s',
     'crossprefix'	: '/opt/%(crossdir)s',
     'sysroot'		: '%(crossprefix)s/sys-root',
-
-    # cross compiling tools often need critical headers for 
-    # 
-    'headerpath'	: '%(sysroot)s/usr/include',
-
-
-
-    # the target platform for the created binaries
-
-    'targetvendor'      : 'unknown',
-    'targetos'          : 'linux',
-    'target'		: '%(targetarch)s-%(targetvendor)s-%(targetos)s',
-    # the platform on which the created binaries should be run
-    # (different from host only when the resulting binary is a cross-compiler)
-    'hostvendor'        : 'unknown',
-    'hostos'            : 'linux',
-    'host'		: '%(hostarch)s-%(hostvendor)s-%(hostos)s',
-
-    # build is the system on which the binaries are being run
-    'buildvendor'       : 'unknown',
-    'buildos'           : 'linux',
-    'build'		: '%(buildarch)s-%(buildvendor)s-%(buildos)s',
-
+    'headerpath'	: '%(sysroot)s%(includedir)s'
 }
 
+def loadMacros(paths):
+    baseMacros = {}
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        macroModule = imp.load_source('tmpmodule', path)
+        baseMacros.update(x for x in macroModule.__dict__.iteritems() 
+                          if not x[0].startswith('__'))
+    return baseMacros
 
 class _recipeHelper:
     def __init__(self, list, recipe, theclass):
@@ -650,7 +574,9 @@ class _AbstractPackageRecipe(Recipe):
             use.Arch = tmpArch
 
              
-        macros = crossMacros.copy()
+        macros = self.macros
+        macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
+
         tmpArch = use.Arch.copy()
 
         _setBuildMacros(macros)
@@ -694,12 +620,13 @@ class _AbstractPackageRecipe(Recipe):
         macros['cc'] = '%s-gcc' % compileTarget
         macros['cxx'] = '%s-g++' % compileTarget
         macros['strip'] = '%s-strip' % compileTarget
-        macros['strip-archive'] = '%s-strip -g' % compileTarget
+        macros['strip_archive'] = '%s-strip -g' % compileTarget
 
-        macros['crossdir'] = 'cross-target-%(target)s'
 
-	self.macros.update(use.Arch._getMacros())
-        self.macros.update(macros)
+	archMacros = use.Arch._getMacros()
+        # don't override values we've set for crosscompiling
+        archMacros = dict(x for x in archMacros.iteritems() if x[0] != 'targetarch')
+        macros.update(archMacros)
         newPath = '%(crossprefix)s/bin:' % self.macros
         os.environ['PATH'] = newPath + os.environ['PATH']
 
@@ -730,11 +657,14 @@ class _AbstractPackageRecipe(Recipe):
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
+        baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
         if crossCompile:
             self.setCrossCompile(crossCompile)
         else:
             self.macros.update(use.Arch._getMacros())
+            self.macros['hostarch'] = self.macros['targetarch']
+            self.macros['buildarch'] = self.macros['targetarch']
 
         # allow for architecture not to be set -- this could happen 
         # when storing the recipe e.g. 

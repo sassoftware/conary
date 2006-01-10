@@ -1302,6 +1302,8 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
     @type defaultBranch: Version
     """
     if ver[0] != "/":
+        if not defaultBranch:
+            raise ParseError('Expected full version, got "%s"' % ver)
         ver = defaultBranch.asString() + "/" + ver
 
     parts = ver.split("/")

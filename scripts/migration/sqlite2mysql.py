@@ -15,6 +15,8 @@
 
 import sys
 import os
+import re
+
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
@@ -185,8 +187,10 @@ for t in tList:
 wtList = ["%s WRITE" % x for x in tList]
 sql = "LOCK TABLES %s" % ", ".join(wtList)
 for stmt in getIndexes("mysql"):
-    # in MySQL, tables need to be locked every time we create an index
-    if stmt.lower().startswith("create trigger"):
+    # in MySQL, tables need to be locked every time we create an
+    # index. We need the unlocked every time we create a trigger.
+    sqlre = re.compile("^create .*trigger", re.I)
+    if sqlre.match(stmt):
         cm.execute("UNLOCK TABLES")
     else:
         cm.execute(sql)

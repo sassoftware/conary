@@ -20,6 +20,7 @@ python_files=	    __init__.py		\
 		    erlcompleter.py	\
 		    epdb.py     	\
 		    fixedglob.py	\
+		    importer.py		\
 		    javadeps.py     	\
 		    log.py		\
 		    logger.py		\

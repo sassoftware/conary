@@ -14,7 +14,6 @@
 
 import sys
 import re
-import types
 
 import sqlerrors, sqllib
 from conary.lib import cfg
@@ -22,7 +21,7 @@ from conary.lib import cfg
 # class for encapsulating binary strings for dumb drivers
 class BaseBinary:
     def __init__(self, s):
-        assert(isinstance(s, types.StringType))
+        assert(isinstance(s, str))
         self.s = s
     def __str__(self):
         return self.s

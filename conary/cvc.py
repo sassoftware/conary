@@ -211,6 +211,8 @@ def realMain(cfg, argv=sys.argv):
     for line in argSet.pop('config', []):
         cfg.configLine(line)
 
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+
     cfg.initializeFlavors()
     # set the build flavor here, just to set architecture information 
     # which is used when initializing a recipe class
@@ -392,7 +394,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             del argSet['flavor']
         if argSet.has_key('macro'):
             for macro in argSet['macro']:
-                cfg.configLine('macros.' + macro)
+                cfg.configLine('macros ' + macro)
             del argSet['macro']
 
         if argSet.has_key('prep'):

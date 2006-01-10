@@ -53,6 +53,29 @@ class AbstractDataStore:
     def removeFile(self, hash):
         raise NotImplementedError
 
+
+class Tee:
+    """
+    The Tee class takes two file objects.  Reads are done on the
+    input file object.  All data read is written to the output
+    file object.
+    """
+    def __init__(self, inf, outf):
+        self.inf = inf
+        self.outf = outf
+
+    def read(self, *args, **kw):
+        buf = self.inf.read(*args, **kw)
+        self.outf.write(buf)
+        return buf
+
+    def seek(self, *args, **kw):
+        self.outf.seek(*args, **kw)
+        return self.inf.seek(*args, **kw)
+
+    def tell(self, *args, **kw):
+        return self.inf.tell(*args, **kw)
+
 class DataStore(AbstractDataStore):
 
     def hashToPath(self, hash):
@@ -91,22 +114,17 @@ class DataStore(AbstractDataStore):
                                           dir = os.path.dirname(path))
 
         outFileObj = os.fdopen(tmpFd, "w")
+        contentSha1 = sha.new()
         if precompressed:
-            # this requires fileObj to be seekable. it's just easier
-            # that way
-            contentSha1 = sha.new()
-            uncompObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
+            tee = Tee(fileObj, outFileObj)
+            uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
             s = uncompObj.read(128 * 1024)
             while s:
                 contentSha1.update(s)
                 s = uncompObj.read(128 * 1024)
-            fileObj.seek(0)
-            
-            util.copyfileobj(fileObj, outFileObj)
             uncompObj.close()
         else:
             dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
-            contentSha1 = sha.new()
             util.copyfileobj(fileObj, dest, digest = contentSha1)
             dest.close()
 

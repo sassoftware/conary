@@ -1563,6 +1563,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     WHERE
                         Instances.changed >= ? AND
                         Instances.isPresent = 1
+                    ORDER BY
+                        Instances.changed
                     """ % ",".join("%d" % x for x in userGroupIds)
 
         cu.execute(query, mark)

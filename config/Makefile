@@ -14,12 +14,12 @@
 
 SUBDIRS=arch use
 
-dist_files = Makefile pubring.gpg trustdb.gpg
+dist_files = Makefile pubring.gpg trustdb.gpg macros
 
 all: default-subdirs
 
 install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg $(DESTDIR)/etc/conary
+	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
 
 dist: default-dist
 

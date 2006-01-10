@@ -337,6 +337,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     util.copyfileobj(inF, outF)
 
     del inF
+    outF.close()
     del outF
 
     try:
@@ -502,6 +503,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                           versionStr, flavor)
             if parts:
                 version, flavor = parts
+                while version.isOnLocalHost():
+                    version = version.parentVersion()
                 versionStr = version.getSourceVersion().asString()
         if flavor:
             # override the current flavor with the flavor found in the 

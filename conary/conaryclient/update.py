@@ -477,12 +477,12 @@ class ClientUpdate:
                 needParents = newNeedParents
 
             # don't erase nodes which are referenced by troves we're about
-            # to install unless there is a really good reason
+            # to install - the only troves we list here are primary installs,
+            # and they should never be erased.
             for info in referencedTroves:
                 if info in nodeIdx:
                     node = nodeList[nodeIdx[info]]
-                    if node[1] == UNKNOWN:
-                        node[1] = KEEP
+                    node[1] = KEEP
 
 	    seen = [ False ] * len(nodeList)
             # DFS to mark troves as KEEP
@@ -690,7 +690,8 @@ class ClientUpdate:
 
         # thew newTroves parameters are described below.
         newTroves = [ ((x[0], x[2][0], x[2][1]), 
-                        True, {}, False, None, respectBranchAffinity, True) 
+                        True, {}, False, None, respectBranchAffinity, True,
+                        True) 
                             for x in itertools.chain(absolutePrimaries, 
                                                      relativePrimaries) ]
 
@@ -716,11 +717,14 @@ class ClientUpdate:
             #              if a) a primary trove update is overriding branch
             #              affinity, or b) the call to mergeGroupChanges
             #              had respectBranchAffinity False
+            # installRedirects: If True, we install redirects even when they
+            #                are not upgrades.
             # followLocalChanges: see the code where it is used for a description.
                           
 
             (newInfo, isPrimary, byDefaultDict, parentInstalled, branchHint,
-               respectBranchAffinity, followLocalChanges) = newTroves.pop(0)
+               respectBranchAffinity, installRedirects,
+               followLocalChanges) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
@@ -834,12 +838,17 @@ class ClientUpdate:
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
 
-                    elif (not isPrimary 
-                            and not redirectHack.get(newInfo, (None,))):
-                        # an empty list in redirectHack means the trove we're
-                        # redirecting from wasn't installed, so we shouldn't 
-                        # install this trove either
-                        break
+                    elif not installRedirects:
+                        if not redirectHack.get(newInfo, True):
+                            # a parent redirect was added as an upgrade
+                            # but this would be a new install of this child
+                            # trove.  Skip it.
+                            break
+                    elif redirectHack.get(newInfo, False):
+                        # we are upgrading a redirect, so don't allow any child
+                        # redirects to be installed unless they have a matching
+                        # trove to redirect on the system.
+                        installRedirects = False
                     
                     if (respectBranchAffinity 
                         and replacedInfo in localUpdatesByPresent):
@@ -895,12 +904,18 @@ class ClientUpdate:
                 elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
                     # New trove matches excludeTroves
                     break
-                elif not isPrimary and not redirectHack.get(newInfo, (None,)):
-                    # an empty list in redirectHack means the trove we're
-                    # redirecting from wasn't installed, so we shouldn't 
-                    # install this trove either
-                    break
-
+                elif not installRedirects:
+                    if not redirectHack.get(newInfo, True):
+                        # a parent redirect was added as an upgrade
+                        # but this would be a new install of this child
+                        # trove.  Skip it.
+                        break
+                elif redirectHack.get(newInfo, False):
+                    # we are upgrading a redirect, so don't allow any child
+                    # redirects to be installed unless they have a matching
+                    # trove to redirect on the system.
+                    installRedirects = False
+                
                 if pinned:
                     if replaced[0] is not None:
                         try:
@@ -997,7 +1012,7 @@ conary erase '%s=%s%s'
 
                 newTroves.append((info, False, 
                                   byDefaultDict, jobAdded, branchHint,
-                                  respectBranchAffinity,
+                                  respectBranchAffinity, installRedirects,
                                   childrenFollowLocalChanges))
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
