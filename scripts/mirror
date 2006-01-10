@@ -43,6 +43,7 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
     threshHold            =  [ cfg.CfgInt, 20 ]
     entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
+    labels                =  conarycfg.CfgInstallLabelPath
     source                =  MirrorConfigurationSection
     target                =  MirrorConfigurationSection
 
@@ -51,8 +52,12 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
 
 def parseArgs():
     parser = optparse.OptionParser(version = '%prog 0.1')
-    parser.add_option("--config", dest = "configFile",
+    parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
+    parser.add_option("--full-sync", dest = "sync", action = "store_true",
+                      default = False,
+                      help = "ignore the last-mirrored information in the "
+                             "target repository")
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
                       help = "skip commiting changes to the target repository")
@@ -162,14 +167,23 @@ def bundleJobs(jobList, count):
 
     return bundles
 
-def mirrorTroves(sourceRepos, targetRepos, cfg, test):
-    # find the latest timestamp stored on the target mirror
-    currentMark = targetRepos.getMirrorMark(cfg.host)
-    log.debug("currently up to date through %d", currentMark)
+def mirrorTroves(sourceRepos, targetRepos, cfg, test, sync):
+    if sync:
+        currentMark = -1
+    else:
+        # find the latest timestamp stored on the target mirror
+        currentMark = targetRepos.getMirrorMark(cfg.host)
+        log.debug("currently up to date through %d", int(currentMark))
 
     # now find all of the troves we need from from the mirror source
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
-    log.debug("need %d new troves", len(troveList))
+    log.debug("%d new troves are available", len(troveList))
+
+    if cfg.labels:
+        labelDict = set(cfg.labels)
+        troveList = [ x for x in troveList if 
+                            x[1][1].branch().label() in cfg.labels ]
+        log.debug("after label filtering %d troves are needed", len(troveList))
 
     log.debug("building job list")
     jobList = buildJobList(targetRepos, troveList)
@@ -210,4 +224,4 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-mirrorTroves(sourceRepos, targetRepos, cfg, options.test)
+mirrorTroves(sourceRepos, targetRepos, cfg, options.test, options.sync)
