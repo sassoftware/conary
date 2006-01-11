@@ -14,8 +14,7 @@
 
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
-from conary.local.schema import createDependencies, createTroveInfo
-from conary.local.schema import createMetadata, resetTable
+from conary.local.schema import createDependencies, resetTable
 
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
@@ -37,17 +36,21 @@ def createInstances(db):
             itemId          INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
+            clonedFromId    INTEGER,
             isRedirect      INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
+                ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Instances_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Instances_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Instances_clonedfromid_fk
+                FOREIGN KEY (clonedFromId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
         db.tables["Instances"] = []
@@ -58,7 +61,10 @@ def createInstances(db):
         commit = True
     if "InstancesChangedIdx" not in db.tables["Instances"]:
         cu.execute("CREATE INDEX InstancesChangedIdx ON "
-                   "Instances(changed)")
+                   "Instances(changed, instanceId)")
+    if "InstancesClonedFromIdx" not in db.tables["Instances"]:
+        cu.execute("CREATE INDEX InstancesClonedFromIdx ON "
+                   "Instances(clonedFromId, instanceId)")
     if createTrigger(db, "Instances", pinned = True):
         commit = True
 
@@ -159,6 +165,7 @@ def createNodes(db):
             itemId          INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
+            sourceItemId    INTEGER,
             timeStamps      VARCHAR(1000),
             finalTimeStamp  NUMERIC(13,3) NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
@@ -170,6 +177,9 @@ def createNodes(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Nodes_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Nodes_sourceItem_fk
+                FOREIGN KEY (sourceItemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
         db.tables["Nodes"] = []
@@ -183,6 +193,9 @@ def createNodes(db):
         commit = True
     if "NodesItemVersionIdx" not in db.tables["Nodes"]:
         cu.execute("CREATE INDEX NodesItemVersionIdx ON Nodes(itemId, versionId)")
+        commit = True
+    if "NodesSourceItemIdx" not in db.tables["Nodes"]:
+        cu.execute("CREATE INDEX NodesSourceItemIdx ON Nodes(sourceItemId, branchId)")
         commit = True
     if createTrigger(db, "Nodes"):
         commit = True
@@ -579,6 +592,29 @@ def createTroves(db):
         commit = True
     if createTrigger(db, "TroveTroves"):
         commit = True
+
+    if "TroveInfo" not in db.tables:
+        cu.execute("""
+        CREATE TABLE TroveInfo(
+            instanceId      INTEGER NOT NULL,
+            infoType        INTEGER NOT NULL,
+            data            %(MEDIUMBLOB)s,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT TroveInfo_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""" % db.keywords)
+        db.tables["TroveInfo"] = []
+        commit = True
+    if "TroveInfoIdx" not in db.tables["TroveInfo"]:
+        cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
+        commit = True
+    if "TroveInfoTypeIdx" not in db.tables["TroveInfo"]:
+        cu.execute("CREATE UNIQUE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, instanceId)")
+        commit = True
+    if createTrigger(db, "TroveInfo"):
+        commit = True
+
     # FIXME - move the temporary table handling into a separate
     # fucntion that can also be called before we start processing a
     # request (as opposed to the schema management which will be
@@ -673,6 +709,53 @@ def createTroves(db):
         db.commit()
 
     db.loadSchema()
+
+def createMetadata(db):
+    commit = False
+    cu = db.cursor()
+    if 'Metadata' not in db.tables:
+        cu.execute("""
+        CREATE TABLE Metadata(
+            metadataId          %(PRIMARYKEY)s,
+            itemId              INTEGER NOT NULL,
+            versionId           INTEGER NOT NULL,
+            branchId            INTEGER NOT NULL,
+            timeStamp           NUMERIC(13,3) NOT NULL,
+            changed             NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT Metadata_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Metadata_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT Metadata_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        )""" % db.keywords)
+        commit = True
+    if createTrigger(db, "Metadata"):
+        commit = True
+    if 'MetadataItems' not in db.tables:
+        cu.execute("""
+        CREATE TABLE MetadataItems(
+            metadataId      INTEGER NOT NULL,
+            class           INTEGER NOT NULL,
+            data            TEXT NOT NULL,
+            language        VARCHAR(254) NOT NULL DEFAULT 'C',
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT MetadataItems_metadataId_fk
+                FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        )""")
+    if "MetadataItemsIdx" not in db.tables["MetadataItems"]:
+        cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
+        commit = True
+    if createTrigger(db, "MetadataItems"):
+        commit = True
+
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 def createInstructionSets(db):
     cu = db.cursor()
@@ -1044,6 +1127,84 @@ class MigrateTo_9(SchemaMigration):
         # done...
         return self.Version
 
+class MigrateTo_10(SchemaMigration):
+    Version = 10
+    def migrate(self):
+        from  conary import trove
+        # redo the troveInfoTypeIndex to be UNIQUE
+        if "TroveInfoTypeIdx" in db.tables["TroveInfo"]:
+            self.cu.execute("DROP INDEX TroveInfoTypeIdx")
+        self.cu.execute("CREATE UNIQUE INDEX TroveInfoTypeIdx ON "
+                        "TroveInfo(infoType, instanceId)")
+        # add instanceId to the InstancesChanged index
+        if "InstancesChangedIdx" in self.db.tables["Instances"]:
+            self.cu.execute("DROP INDEX InstancesChangedIdx")
+        self.cu.execute("CREATE INDEX InstancesChangedIdx ON "
+                        "Instances(changed, instanceId)")
+        # add the clonedFrom column to the Instances table
+        self.cu.execute("ALTER TABLE Instances ADD COLUMN "
+                        "clonedFromId INTEGER REFERENCES Versions(versionId) "
+                        "ON DELETE RESTRICT ON UPDATE CASCADE")
+        if "InstancesClonedFromIdx" not in self.db.tables["Instances"]:
+            self.cu.execute("CREATE INDEX InstancesClonedFromIdx ON "
+                            "Instances(clonedFromId, instanceId)")
+        # add the sourceItemId to the Nodes table
+        self.cu.execute("ALTER TABLE Nodes ADD COLUMN "
+                        "sourceItemId INTEGER REFERENCES Items(itemId) "
+                        "ON DELETE RESTRICT ON UPDATE CASCADE")
+        if "NodesSourceItemIdx" not in db.tables["Nodes"]:
+            self.cu.execute("CREATE INDEX NodesSourceItemIdx ON "
+                       "Nodes(sourceItemId, branchId)")
+        # FIXME: Transfer the data from the TroveInfo table
+        # transfer the sourceItemIds from TroveInfo into the Nodes table
+        # first, create the missing Items
+        self.cu.execute("""
+        INSERT INTO Items (item)
+        SELECT DISTINCT data
+            FROM TroveInfo as TI
+            LEFT OUTER JOIN Items as AI ON TI.data = AI.item
+            WHERE TI.infoType = ?
+            AND   AI.itemId is NULL
+        """, trove._TROVEINFO_TAG_SOURCENAME)
+        # update the nodes table
+        self.cu.execute("""
+        UPDATE Nodes
+        SET sourceItemId = (
+            SELECT DISTINCT Items.itemId
+            FROM Instances
+            JOIN TroveInfo as TI USING (instanceId)
+            JOIN Items on TI.data = Items.item
+            WHERE TI.infotype = ?
+            AND Nodes.itemId = Instances.itemId
+            AND Nodes.versionId = Instances.versionId )
+        """, trove._TROVEINFO_TAG_SOURCENAME)
+        # clean up TroveInfo
+        self.cu.execute("DELETE FROM TroveInfo WHERE infoType = ?",
+                        trove._TROVEINFO_TAG_SOURCENAME)
+        # repeat the same deal for Versions, Instances and clonedFromId
+        self.cu.execute("""
+        INSERT INTO Versions (version)
+        SELECT DISTINCT data
+            FROM TroveInfo as TI
+            LEFT OUTER JOIN Versions as V ON TI.data = V.version
+            WHERE TI.infoType = ?
+            AND   V.version is NULL
+        """, trove._TROVEINFO_TAG_CLONEDFROM)
+        # update the instances table
+        self.cu.execute("""
+        UPDATE Instances
+        SET clonedFromId = (
+            SELECT DISTINCT V.versionId
+            FROM TroveInfo AS TI
+            JOIN Versions as V ON TI.data = V.version
+            WHERE TI.infoType = ?
+            AND Instances.instanceId = TI.instanceId )
+        """, trove._TROVEINFO_TAG_CLONEDFROM)
+        # clean up TroveInfo
+        self.cu.execute("DELETE FROM TroveInfo WHERE infoType IN (?, ?)",
+                        (trove._TROVEINFO_TAG_SOURCENAME, trove._TROVEINFO_TAG_CLONEDFROM))
+        return self.Version
+
 # create the server repository schema
 def createSchema(db):
     # FIXME: find a better way to create the tables made by the __init__
@@ -1070,12 +1231,7 @@ def createSchema(db):
     createTroves(db)
 
     createDependencies(db)
-    createTroveInfo(db)
-    createTrigger(db, "TroveInfo")
     createMetadata(db)
-    createTrigger(db, "Metadata")
-    createTrigger(db, "MetadataItems")
-
     createMirrorTracking(db)
 
 # schema creation/migration/maintenance entry point
