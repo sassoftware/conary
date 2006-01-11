@@ -16,8 +16,9 @@
 
 def createIdTable(db, tableName, keyName, strName):
     commit = False
+    idxName = "%s_uq" % tableName
     cu = db.cursor()
-    if  tableName not in db.tables:
+    if tableName not in db.tables:
         cu.execute("""
         CREATE TABLE %s (
             %s %%(PRIMARYKEY)s,
@@ -25,10 +26,7 @@ def createIdTable(db, tableName, keyName, strName):
         )""" %(tableName, keyName, strName) % db.keywords)
         db.tables[tableName] = []
         commit = True
-    if "%s_uq" % tableName not in db.tables[tableName]:
-        cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
-            tableName, tableName, strName))
-        commit = True
+    db.createIndex(tableName, idxName, strName, unique = True)
     return commit
 
 def createMappingTable(db, tableName, key, item):
