@@ -346,8 +346,16 @@ def createSchema(db):
     import versiontable
     import sqldb
 
-    idtable.createIdTable(db, "Tags", "tagId", "tag")
-    idtable.createIdTable(db, "Versions", "versionId", "version")
+    commit = idtable.createIdTable(db, "Tags", "tagId", "tag")
+    if commit:
+        db.commit()
+        commit = False
+
+    commit = idtable.createIdTable(db, "Versions", "versionId", "version")
+    if commit:
+        db.commit()
+        commit = False
+
     createInstances(db)
     createTroveTroves(db)
     createDBTroveFiles(db)
@@ -355,7 +363,10 @@ def createSchema(db):
     versiontable.VersionTable(db)
     sqldb.DBFlavorMap(db)
     createFlavors(db)
-    idtable.createMappingTable(db, "DBFlavorMap", "instanceId", "flavorId")
+    commit = idtable.createMappingTable(db, "DBFlavorMap", "instanceId", "flavorId")
+    if commit:
+        db.commit()
+        commit = False
     createDependencies(db)
     createTroveInfo(db)
 
