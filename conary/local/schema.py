@@ -136,17 +136,7 @@ def createMetadata(db):
             itemId              INTEGER NOT NULL,
             versionId           INTEGER NOT NULL,
             branchId            INTEGER NOT NULL,
-            timeStamp           NUMERIC(13,3) NOT NULL,
-            changed             NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT Metadata_itemId_fk
-                FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Metadata_versionId_fk
-                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Metadata_branchId_fk
-                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+            timeStamp           NUMERIC(13,3) NOT NULL
         )""" % db.keywords)
         commit = True
     if 'MetadataItems' not in db.tables:
@@ -155,11 +145,7 @@ def createMetadata(db):
             metadataId      INTEGER NOT NULL,
             class           INTEGER NOT NULL,
             data            TEXT NOT NULL,
-            language        VARCHAR(254) NOT NULL DEFAULT 'C',
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT MetadataItems_metadataId_fk
-                FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
-                ON DELETE CASCADE ON UPDATE CASCADE
+            language        VARCHAR(254) NOT NULL DEFAULT 'C'
         )""")
         cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
         commit = True
