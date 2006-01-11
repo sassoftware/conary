@@ -1,7 +1,7 @@
 #!/usr/bin/python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -176,7 +176,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             if authString.count(":") != 1:
                 self.send_error(400)
                 return None
-                
+
             httpAuthToken = authString.split(":")
 
         entitlement = self.headers.get('X-Conary-Entitlement', None)
@@ -426,7 +426,7 @@ if __name__ == '__main__':
     for fd in fds.iterkeys():
         p.register(fd, select.POLLIN)
 
-    print "listening"
+    logMe(1, "Server ready for requests")
 
     while True:
         try:

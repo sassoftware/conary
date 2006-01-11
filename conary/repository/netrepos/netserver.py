@@ -1179,7 +1179,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
 
         query = """
-            SELECT DISTINCT pathId, path, version, fileId, 
+            SELECT DISTINCT pathId, path, version, fileId,
                             Nodes.finalTimestamp FROM
                 TroveInfo JOIN Instances using (instanceId)
                 INNER JOIN Nodes using (itemId, versionId)
@@ -1230,7 +1230,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         results = [ False ] * len(troveList)
 
-        query = """SELECT row, item, UP.permittedTrove FROM hasTrovesTmp 
+        query = """SELECT row, item, UP.permittedTrove FROM hasTrovesTmp
                         JOIN Items USING (item)
                         JOIN Versions ON
                             hasTrovesTmp.version = Versions.version
@@ -1541,7 +1541,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
         query = """
-                SELECT UP.permittedTrove, item, version, flavor, 
+                SELECT UP.permittedTrove, item, version, flavor,
                           timeStamps, Instances.changed FROM Instances
                     JOIN Nodes USING (itemId, versionId)
                     JOIN LabelMap USING (itemId, branchId)
@@ -1575,7 +1575,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         for pattern, name, version, flavor, timeStamps, mark in cu:
             if self.auth.checkTrove(pattern, name):
-                version = versions.strToFrozen(version, 
+                version = versions.strToFrozen(version,
                     [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
                 l.append((mark, (name, version, flavor)))
 
@@ -1654,7 +1654,7 @@ class ServerConfig(ConfigFile):
     bugsToEmail             = CfgString
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository Bugs')
-    bugsEmailSubject        = (CfgString, 
+    bugsEmailSubject        = (CfgString,
                                'Conary Repository Unhandled Exception Report')
     cacheDB                 = dbstore.CfgDriver
     closed                  = CfgString
