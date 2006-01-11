@@ -625,6 +625,8 @@ def main(argv=sys.argv):
 	print >> sys.stderr, \
 	    "An unknown exception occured on the repository server:"
 	print >> sys.stderr, "\t%s" % str(e)
+    except cfg.CfgError:
+	print >> sys.stderr, str(e)
     except errors.RepositoryError, e:
 	print >> sys.stderr, str(e)
     except database.OpenError, e:

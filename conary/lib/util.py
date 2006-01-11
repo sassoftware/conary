@@ -95,8 +95,14 @@ def findFile(file, searchdirs):
 
 errorMessage = '''
 *******************************************************************
-*** An error has occurred in conary.
-*** Please run the following script:
+*** An error has occurred in conary:
+***
+*** %(filename)s:%(lineno)s
+*** %(errtype)s: %(errmsg)s
+***
+*** The related traceback has been output to %(stackfile)s
+***
+*** To report this error, please run the following script:
 ***
 *** conary-debug %(command)s
 ***
@@ -106,7 +112,7 @@ For more information, or if you have trouble with the conary-debug
 command, go to http://wiki.conary.com/HowToReportProblems for more
 help.
 
-To get a traceback, rerun this command with --config 'debugExceptions True'
+To get a debug prompt, rerun this command with --config 'debugExceptions True'
 '''
 
 def genExcepthook(debug=True, dumpStack=False, 
@@ -136,7 +142,17 @@ def genExcepthook(debug=True, dumpStack=False,
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
             cmd = normpath(cmd)
             sys.argv[0] = cmd
-            sys.stderr.write(errorMessage % dict(command=' '.join(sys.argv)))
+            lineno = tb.tb_frame.f_lineno
+            filename = tb.tb_frame.f_code.co_filename
+            tmpfd, stackfile = tempfile.mkstemp('.txt', 'conary-error-')
+            os.write(tmpfd, ''.join(lines))
+            os.close(tmpfd)
+            sys.stderr.write(errorMessage % dict(command=' '.join(sys.argv),
+                                                 filename=filename,
+                                                 lineno=lineno,
+                                                 errtype=type.__name__,
+                                                 errmsg=value,
+                                                 stackfile=stackfile))
             
     return excepthook
 

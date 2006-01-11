@@ -38,6 +38,7 @@ else:
 mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
 
+from conary import dbstore
 from conary.conarycfg import CfgRepoMap
 from conary.lib import options
 from conary.lib import util
@@ -56,6 +57,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
     outFiles = {}
     inFiles = {}
 
+    tmpDir = None
+
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
 
@@ -68,7 +71,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	path = path.split("?", 1)[1]
         words = path.split('/')
         words = filter(None, words)
-        path = FILE_PATH
+        path = self.tmpDir
         for word in words:
             drive, word = os.path.splitdrive(word)
             head, word = os.path.split(word)
@@ -101,7 +104,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
         if base == 'changeset':
             urlPath = posixpath.normpath(urllib.unquote(self.path))
-            localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
+            localName = self.tmpDir + "/" + urlPath.split('?', 1)[1] + "-out"
             if os.path.realpath(localName) != localName:
                 self.send_error(403, "File not found")
                 return None
@@ -147,7 +150,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                     f = open(path)
                     util.copyfileobj(f, self.wfile)
 
-                if path.startswith(FILE_PATH):
+                if path.startswith(self.tmpDir):
                     os.unlink(path)
         else:
             self.send_error(501, "Not Implemented")
@@ -261,7 +264,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         if '/' in path:
 	    self.send_error(403, "Forbidden")
 
-	path = FILE_PATH + '/' + path + "-in"
+	path = self.tmpDir + '/' + path + "-in"
 
 	size = os.stat(path).st_size
 	if size != 0:
@@ -303,7 +306,7 @@ class ServerConfig(netserver.ServerConfig):
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
-	self.read(path)
+	self.read(path, exception=False)
 
     def check(self):
         assert(not self.cacheDB)
@@ -311,22 +314,20 @@ class ServerConfig(netserver.ServerConfig):
         assert(not self.commitAction)
         assert(not self.forceSSL)
         assert(not self.repositoryDir)
-        assert(not self.serverName)
 
 def usage():
-    print "usage: %s repospath reposname" %sys.argv[0]
-    print "       %s --add-user <username> repospath" %sys.argv[0]
+    print "usage: %s" % sys.argv[0]
+    print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
+    print '              --db "driver <path>"'
     print '              --log-file <path>'
     print '              --map "<from> <to>"'
+    print "              --server-name <host>"
     print "              --tmp-dir <path>"
     sys.exit(1)
 
-def addUser(cfg, userName, otherArgs, admin=False):
-    if len(otherArgs) != 2:
-        usage()
-
+def addUser(netRepos, userName, admin = False, mirror = False):
     if os.isatty(0):
         from getpass import getpass
 
@@ -340,25 +341,23 @@ def addUser(cfg, userName, otherArgs, admin=False):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
-    cfg.contentsDir = otherArgs[1] + '/contents'
-
-    netRepos = NetworkRepositoryServer(cfg, '')
-
     # never give anonymous write access by default
     write = userName != 'anonymous'
     netRepos.auth.addUser(userName, pw1)
     # user/group, trovePattern, label, write, capped, admin
     netRepos.auth.addAcl(userName, None, None, write, False, admin)
+    netRepos.auth.setMirror(userName, mirror)
 
 if __name__ == '__main__':
     argDef = {}
     cfgMap = {
+	'db'	        : 'repositoryDB',
 	'log-file'	: 'logFile',
 	'map'	        : 'repositoryMap',
 	'port'	        : 'port',
 	'tmp-dir'       : 'tmpDir',
-        'require-sigs'  : 'requireSigs'
+        'require-sigs'  : 'requireSigs',
+        'server-name'   : 'serverName'
     }
 
     cfg = ServerConfig()
@@ -366,10 +365,12 @@ if __name__ == '__main__':
     argDef["config"] = options.MULT_PARAM
     # magically handled by processArgs
     argDef["config-file"] = options.ONE_PARAM
+
     argDef['add-user'] = options.ONE_PARAM
     argDef['admin'] = options.NO_PARAM
     argDef['help'] = options.NO_PARAM
     argDef['migrate'] = options.NO_PARAM
+    argDef['mirror'] = options.NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
@@ -379,24 +380,16 @@ if __name__ == '__main__':
 
     cfg.check()
 
-    FILE_PATH = cfg.tmpDir
-
     if argSet.has_key('help'):
         usage()
 
-    if argSet.has_key('add-user'):
-        admin = 'admin' in argSet
-        sys.exit(addUser(cfg, argSet['add-user'], otherArgs, admin=admin))
-
-    if not os.path.isdir(FILE_PATH):
-	print FILE_PATH + " needs to be a directory"
+    if not os.path.isdir(cfg.tmpDir):
+	print cfg.tmpDir + " needs to be a directory"
 	sys.exit(1)
-    if not os.access(FILE_PATH, os.R_OK | os.W_OK | os.X_OK):
-        print FILE_PATH + " needs to allow full read/write access"
+    if not os.access(cfg.tmpDir, os.R_OK | os.W_OK | os.X_OK):
+        print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)
-
-    if len(otherArgs) != 3 or argSet:
-	usage()
+    HttpRequests.tmpDir = cfg.tmpDir
 
     profile = 0
     if profile:
@@ -407,23 +400,39 @@ if __name__ == '__main__':
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     # start the logging
-    initLog(level=3, trace=1)
-
-    util.mkdirChain(otherArgs[1])
+    if 'add-user' not in argSet:
+        initLog(level=3, trace=1)
 
     if not cfg.repositoryDB:
-        cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
-    if not cfg.contentsDir:
-        cfg.contentsDir = otherArgs[1] + '/contents'
-    if not cfg.serverName:
-        cfg.serverName = otherArgs[2]
+        cfg.repositoryDB = ("sqlite",  "%s/sqldb" % otherArgs[1])
+        del otherArgs[1]
 
-    if argSet.has_key("migrate"):
-        (driver, database) = cfg.repositoryDB
-        db= dbstore.connect(database, driver)
-        schema.loadSchema(db)
+    if len(otherArgs) > 1:
+	usage()
+
+    if not cfg.contentsDir:
+        assert(cfg.repositoryDB[0] == "sqlite")
+        cfg.contentsDir = os.path.dirname(cfg.repositoryDB[1]) + '/contents'
+
+    if cfg.repositoryDB[0] == 'sqlite':
+        util.mkdirChain(os.path.dirname(cfg.repositoryDB[1]))
+
+    (driver, database) = cfg.repositoryDB
+    db= dbstore.connect(database, driver)
+    schema.loadSchema(db)
         
-    netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+    netRepos = NetworkRepositoryServer(cfg, baseUrl)
+
+    if 'add-user' in argSet:
+        admin = argSet.pop('admin', False)
+        mirror = argSet.pop('mirror', False)
+        userName = argSet.pop('add-user')
+        if argSet:
+            usage()
+        sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
+    
+    if argSet:
+        usage()
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)
 

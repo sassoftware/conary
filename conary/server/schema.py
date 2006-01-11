@@ -732,10 +732,10 @@ def createLabelMap(db):
         db.tables["LabelMap"] = []
         commit = True
     # FIXME: rename indexes accordingly
-    if "" not in db.tables["LabelMap"]:
+    if "LabelMapItemIdx" not in db.tables["LabelMap"]:
         cu.execute("CREATE INDEX LabelMapItemIdx  ON LabelMap(itemId)")
         commit = True
-    if "" not in db.tables["LabelMap"]:
+    if "LabelMapLabelIdx" not in db.tables["LabelMap"]:
         cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
         commit = True
     if commit:

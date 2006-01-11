@@ -238,28 +238,33 @@ class ConfigFile(_Config):
 
     def read(self, path, exception=True):
 	if os.path.exists(path):
-	    f = open(path, "r")
-	    lineno = 1
-            while True:
-                line = f.readline()
-                if not line:
-                    break
+            try:
+                f = open(path, "r")
+                lineno = 1
+                while True:
+                    line = f.readline()
+                    if not line:
+                        break
 
-                lineCount = 1
-                while len(line) > 1 and '#' not in line and line[-2] == '\\':
-                    # handle \ at the end of the config line.
-                    # keep track of the lines we use so that we can
-                    # give accurate line #s for errors.  This config line
-                    # will be considered to live on its first line even 
-                    # though it spans multiple lines.
+                    lineCount = 1
+                    while len(line) > 1 and '#' not in line and line[-2] == '\\':
+                        # handle \ at the end of the config line.
+                        # keep track of the lines we use so that we can
+                        # give accurate line #s for errors.  This config line
+                        # will be considered to live on its first line even 
+                        # though it spans multiple lines.
 
-                    line = line[:-2] + f.readline()
-                    lineCount += 1
-		self.configLine(line, path, lineno)
-		lineno = lineno + lineCount
-	    f.close()
+                        line = line[:-2] + f.readline()
+                        lineCount += 1
+                    self.configLine(line, path, lineno)
+                    lineno = lineno + lineCount
+                f.close()
+            except EnvironmentError, err:
+                raise CfgEnvironmentError(err.errno, err.strerror, err.filename)
 	elif exception:
-	    raise IOError, "No such file or directory: '%s'" % path
+	    raise CfgOSError(errno.EEXIST, 
+                          "No such file or directory: '%s'" % path, 
+                          path)
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
         line = line.strip()
