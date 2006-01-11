@@ -17,7 +17,8 @@ import tempfile
 import cPickle
 
 from conary import dbstore
-from conary.local import sqldb, versiontable
+from conary.local import schema, sqldb, versiontable
+from conary.dbstore import idtable
 
 CACHE_SCHEMA_VERSION = 17
 
@@ -229,6 +230,10 @@ class CacheSet:
             CREATE INDEX CacheContentsIdx ON
                 CacheContents(troveName)
             """)
+            schema.createFlavors(self.db)
+            idtable.createIdTable(db, "Versions", "versionId", "version")
+
+
             self.db.commit()
 
     def __init__(self, cacheDB, tmpDir):
