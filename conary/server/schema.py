@@ -1213,6 +1213,7 @@ def resetTable(cu, name):
 
 # create the server repository schema
 def createSchema(db):
+    global VERSION
     createIdTables(db)
     createLabelMap(db)
 
@@ -1231,6 +1232,7 @@ def createSchema(db):
     createDependencies(db)
     createMetadata(db)
     createMirrorTracking(db)
+    db.setVersion(VERSION)
 
 # run through the schema creation and migration (if required)
 def loadSchema(db):
