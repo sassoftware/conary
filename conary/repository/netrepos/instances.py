@@ -23,7 +23,8 @@ class InstanceTable:
         schema.createInstances(db)
         schema.createTroves(db)
 
-    def addId(self, itemId, versionId, flavorId, isRedirect, isPresent = True):
+    def addId(self, itemId, versionId, flavorId, clonedFromId,
+              isRedirect, isPresent = True):
 	if isPresent:
 	    isPresent = 1
 	else:
@@ -36,9 +37,9 @@ class InstanceTable:
 
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances "
-                   "(itemId, versionId, flavorId, isRedirect, isPresent) "
-                   "VALUES (?, ?, ?, ?, ?)",
-                   (itemId, versionId, flavorId, isRedirect, isPresent))
+                   "(itemId, versionId, flavorId, clonedFromId, isRedirect, isPresent) "
+                   "VALUES (?, ?, ?, ?, ?, ?)",
+                   (itemId, versionId, flavorId, clonedFromId, isRedirect, isPresent))
 	return cu.lastrowid
 
     def getId(self, theId):
