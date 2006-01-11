@@ -442,9 +442,8 @@ def buildGroups(recipeObj, cfg, repos):
                 # this group.
                 g.addEdge(childName, group.name)
 
-        cycles = [ x for x in g.getStronglyConnected() if len(x) > 1 ]
+        cycles = [ x for x in g.getStronglyConnectedComponents() if len(x) > 1 ]
         if cycles:
-            cycles = [[g.get(y) for y in x] for x in cycles]
             raise GroupCyclesError(cycles)
 
         return [ groupsByName[x] for x in g.getTotalOrdering() ]
