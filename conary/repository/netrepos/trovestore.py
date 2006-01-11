@@ -31,7 +31,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
     def getId(self, theId, itemId):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM Versions
-		      INNER JOIN Nodes ON Versions.versionId = Nodes.versionId
+		      JOIN Nodes ON Versions.versionId = Nodes.versionId
 		      WHERE Versions.versionId=? AND Nodes.itemId=?""",
 		   theId, itemId)
 	try:
@@ -95,11 +95,12 @@ class TroveStore:
     def getItemId(self, item):
         return self.items.getOrAddId(item)
 
-    def getInstanceId(self, itemId, versionId, flavorId, isRedirect,
-                      isPresent = True):
+    def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
+                      isRedirect, isPresent = True):
  	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
+                                         clonedFromId,
 					 isRedirect, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent:
@@ -234,6 +235,15 @@ class TroveStore:
 
 	troveVersion = trv.getVersion()
 	troveItemId = self.getItemId(trv.getName())
+        sourceName = trv.troveInfo.sourceName()
+
+        # Pull out the clonedFromId
+        clonedFrom = trv.troveInfo.clonedFrom()
+        clonedFromId = None
+        if clonedFrom:
+            clonedFromId = self.versionTable.get(clonedFrom, None)
+            if clonedFromId is None:
+                clonedFromId = self.versionTable.addId(clonedFrom)
 
         isPackage = (not trv.getName().startswith('group') and
                      not trv.getName().startswith('fileset') and
@@ -299,7 +309,7 @@ class TroveStore:
 
 	if troveVersionId is None or nodeId is None:
 	    (nodeId, troveVersionId) = self.versionOps.createVersion(
-                troveItemId, troveVersion, troveFlavorId)
+                troveItemId, troveVersion, troveFlavorId, sourceName)
 	    newVersion = True
 
 	    if trv.getChangeLog() and trv.getChangeLog().getName():
@@ -311,7 +321,7 @@ class TroveStore:
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
-					     troveFlavorId,
+					     troveFlavorId, clonedFromId,
                                              trv.isRedirect(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
@@ -339,7 +349,7 @@ class TroveStore:
             """ %(troveItemId, troveBranchId, troveFlavorId),
                        (troveItemId, troveFlavorId, troveBranchId))
 
-        self.depTables.add(cu, trove, troveInstanceId)
+        self.depTables.add(cu, trv, troveInstanceId)
 
         cu.execute("""
         INSERT INTO FileStreams
@@ -417,16 +427,17 @@ class TroveStore:
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
 						    itemId, version,
-						    flavorId,
+						    flavorId, sourceName,
 						    updateLatest = False)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
                                                 itemId, version,
-                                                flavorId,
+                                                flavorId, sourceName,
                                                 updateLatest = False)
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
+                                            clonedFromId,
                                             trv.isRedirect(),
                                             isPresent = False)
 
@@ -445,7 +456,7 @@ class TroveStore:
             VALUES(?, ?, ?)""",
                        troveInstanceId, instanceId, flags)
 
-        self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
+        self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
 	del self.fileVersionCache
 

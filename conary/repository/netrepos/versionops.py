@@ -15,7 +15,7 @@
 from conary import versions
 from conary.dbstore import idtable
 from conary.repository.errors import DuplicateBranch
-from conary.repository.netrepos import schema
+from conary.repository.netrepos import schema, items
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch):
@@ -131,13 +131,13 @@ class Nodes:
 	self.db = db
         schema.createNodes(db)
 
-    def addRow(self, itemId, branchId, versionId, timeStamps):
+    def addRow(self, itemId, branchId, versionId, sourceItemId, timeStamps):
         cu = self.db.cursor()
 	cu.execute("""
         INSERT INTO Nodes
-        (itemId, branchId, versionId, timeStamps, finalTimeStamp)
-        VALUES (?, ?, ?, ?, ?)""",
-		   itemId, branchId, versionId,
+        (itemId, branchId, versionId, sourceItemId, timeStamps, finalTimeStamp)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+		   itemId, branchId, versionId, sourceItemId,
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   '%.3f' %timeStamps[-1])
 	return cu.lastrowid
@@ -156,7 +156,7 @@ class Nodes:
 
     def getRow(self, itemId, versionId, default):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId FROM Nodes "
+        cu.execute("SELECT nodeId FROM Nodes "
 			"WHERE itemId=? AND versionId=?", itemId, versionId)
 	nodeId = cu.fetchone()
 	if nodeId is None:
@@ -191,7 +191,8 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version, flavorId, updateLatest = True):
+    def createVersion(self, itemId, version, flavorId, sourceName,
+                      updateLatest = True):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -233,7 +234,11 @@ class SqlVersioning:
 		if not currVer.isAfter(version):
 		    self.latest[(itemId, branchId, flavorId)] = versionId
 
-	nodeId = self.nodes.addRow(itemId, branchId, versionId,
+        sourceItemId = None
+        if sourceName:
+            sourceItemId = self.items.getOrAddId(sourceName)
+
+	nodeId = self.nodes.addRow(itemId, branchId, versionId, sourceItemId,
 				   version.timeStamps())
 
 	return (nodeId, versionId)
@@ -259,6 +264,7 @@ class SqlVersioning:
 	return branchId
 
     def __init__(self, db, versionTable, branchTable):
+        self.items = items.Items(db)
 	self.labels = LabelTable(db)
 	self.latest = LatestTable(db)
 	self.labelMap = LabelMap(db)
