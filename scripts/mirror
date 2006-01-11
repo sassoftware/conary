@@ -77,11 +77,6 @@ def parseArgs():
     return options
 
 def buildJobList(repos, troveList):
-    # troveList here is a list of (mark, (name, version, flavor)) tuples.
-    # we need it sorted from smallest mark to highest to ensure we don't
-    # miss something if we terminate and need to be rerun
-    troveList.sort()
-
     # Filter out troves which are already in the local repository. Since
     # the marks aren't distinct (they increase, but not monotonially), it's 
     # possible that something new got committed with the same mark we
@@ -167,17 +162,25 @@ def bundleJobs(jobList, count):
 
     return bundles
 
-def mirrorTroves(sourceRepos, targetRepos, cfg, test, sync):
+def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
     if sync:
         currentMark = -1
     else:
         # find the latest timestamp stored on the target mirror
         currentMark = targetRepos.getMirrorMark(cfg.host)
-        log.debug("currently up to date through %d", int(currentMark))
+    log.debug("currently up to date through %d", int(currentMark))
 
     # now find all of the troves we need from from the mirror source
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
     log.debug("%d new troves are available", len(troveList))
+
+    log.debug("looking for new pgp keys")
+    keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
+    if test:
+        log.debug("(not adding %d keys due to test mode)", len(keyList))
+    else:
+        log.debug("adding %d keys to target", len(keyList))
+        targetRepos.addPGPKeyList(cfg.host, keyList)
 
     if cfg.labels:
         labelDict = set(cfg.labels)
@@ -209,7 +212,7 @@ def mirrorTroves(sourceRepos, targetRepos, cfg, test, sync):
 
 options = parseArgs()
 cfg = MirrorConfiguration()
-cfg.read(options.configFile)
+cfg.read(options.configFile, exception = True)
 
 if options.verbose:
     log.setVerbosity(log.DEBUG)
@@ -224,4 +227,4 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-mirrorTroves(sourceRepos, targetRepos, cfg, options.test, options.sync)
+mirrorRepository(sourceRepos, targetRepos, cfg, options.test, options.sync)

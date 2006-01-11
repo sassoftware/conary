@@ -1220,6 +1220,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                   self.toFlavor(x[1][2]))) for
                     x in self.c[host].getNewTroveList(mark) ]
 
+    def addPGPKeyList(self, host, keyList):
+        self.c[host].addPGPKeyList([ base64.encodestring(x) for x in keyList ])
+        
+    def getNewPGPKeys(self, host, mark):
+        return [ base64.decodestring(x) for x in 
+                    self.c[host].getNewPGPKeys(mark) ]
+
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False):
