@@ -69,6 +69,82 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
+    def __init__(self, cfg, basicUrl):
+        logMe(1, cfg.items())
+        if cfg.repositoryDir:
+            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
+            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
+            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
+
+	self.map = cfg.repositoryMap
+	self.tmpPath = cfg.tmpDir
+	self.basicUrl = basicUrl
+	self.name = cfg.serverName
+	self.commitAction = cfg.commitAction
+        self.troveStore = None
+        self.logFile = cfg.logFile
+        self.requireSigs = cfg.requireSigs
+
+        self.repDB = cfg.repositoryDB
+        self.contentsDir = cfg.contentsDir.split(" ")
+
+        logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
+              self.repDB, self.contentsDir)
+
+        if cfg.cacheDB:
+            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
+        else:
+            self.cache = cacheset.NullCacheSet(self.tmpPath)
+
+        self.open()
+
+    def __init__(self, cfg, basicUrl):
+        logMe(1, cfg.items())
+        if cfg.repositoryDir:
+            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
+            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
+            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
+
+	self.map = cfg.repositoryMap
+	self.tmpPath = cfg.tmpDir
+	self.basicUrl = basicUrl
+	self.name = cfg.serverName
+	self.commitAction = cfg.commitAction
+        self.troveStore = None
+        self.logFile = cfg.logFile
+        self.requireSigs = cfg.requireSigs
+
+        self.repDB = cfg.repositoryDB
+        self.contentsDir = cfg.contentsDir.split(" ")
+
+        logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
+              self.repDB, self.contentsDir)
+
+        if cfg.cacheDB:
+            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
+        else:
+            self.cache = cacheset.NullCacheSet(self.tmpPath)
+
+        self.open()
+
+    def open(self):
+        logMe(1)
+        self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
+        schema.checkVersion(self.db)
+	self.troveStore = trovestore.TroveStore(self.db)
+        self.repos = fsrepos.FilesystemRepository(
+            self.name, self.troveStore, self.contentsDir, self.map,
+            logFile = self.logFile, requireSigs = self.requireSigs)
+	self.auth = NetworkAuthorization(self.db, self.name)
+
+    def reopen(self):
+        logMe(1)
+        if self.db.reopen():
+	    del self.troveStore
+            del self.auth
+            del self.repos
+            self.open()
+
     def callWrapper(self, protocol, port, methodname, authToken, args):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
@@ -1607,53 +1683,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def cacheChangeSets(self):
         return isinstance(self.cache, cacheset.CacheSet)
-
-    def open(self):
-        logMe(1)
-        self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
-        schema.checkVersion(self.db)
-	self.troveStore = trovestore.TroveStore(self.db)
-        self.repos = fsrepos.FilesystemRepository(
-            self.name, self.troveStore, self.contentsDir, self.map,
-            logFile = self.logFile, requireSigs = self.requireSigs)
-	self.auth = NetworkAuthorization(self.db, self.name)
-
-    def reopen(self):
-        logMe(1)
-        if self.db.reopen():
-	    del self.troveStore
-            del self.auth
-            del self.repos
-            self.open()
-
-    def __init__(self, cfg, basicUrl):
-        logMe(1, cfg.items())
-        if cfg.repositoryDir:
-            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
-            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
-            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
-
-	self.map = cfg.repositoryMap
-	self.tmpPath = cfg.tmpDir
-	self.basicUrl = basicUrl
-	self.name = cfg.serverName
-	self.commitAction = cfg.commitAction
-        self.troveStore = None
-        self.logFile = cfg.logFile
-        self.requireSigs = cfg.requireSigs
-
-        self.repDB = cfg.repositoryDB
-        self.contentsDir = cfg.contentsDir.split(" ")
-
-        logMe(1, "url=%s" % basicUrl, "name=%s" % self.name,
-              self.repDB, self.contentsDir)
-
-        if cfg.cacheDB:
-            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
-        else:
-            self.cache = cacheset.NullCacheSet(self.tmpPath)
-
-        self.open()
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args):
