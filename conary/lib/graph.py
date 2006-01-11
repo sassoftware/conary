@@ -171,7 +171,7 @@ class DirectedGraph:
 
         return [ x[1] for x in self.data.sort(nodeSelect)]
 
-    def getStronglyConnected(self):
+    def getStronglyConnectedComponents(self):
         starts, finishes, trees = self.doDFS()
         t = self.transpose()
 
@@ -184,4 +184,4 @@ class DirectedGraph:
                                         nodeSort=nodeSelect)
         treeKeys = [ x[0] for x in self.data.sortSubset(trees.iterkeys(), 
                                                         nodeSelect) ]
-        return [ set(trees[x]) for x in treeKeys ]
+        return [ set(self.get(y) for y in trees[x]) for x in treeKeys ]

@@ -204,8 +204,8 @@ class ConaryConfiguration(SectionedConfigFile):
     buildPath             =  '/var/tmp/conary/builds'
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
-    debugExceptions       =  (CfgBool, True)
-    debugRecipeExceptions =  CfgBool
+    debugExceptions       =  (CfgBool, False)
+    debugRecipeExceptions =  (CfgBool, False)
     defaultMacros         =  (CfgPathList, ('/etc/conary/macros',
                                             '~/.conary/macros'))
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
