@@ -1179,24 +1179,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
 
         query = """
-            SELECT DISTINCT pathId, path, version, fileId,
-                            Nodes.finalTimestamp FROM
-                TroveInfo JOIN Instances using (instanceId)
-                INNER JOIN Nodes using (itemId, versionId)
-                INNER JOIN Branches using (branchId)
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions ON TroveFiles.versionId = Versions.versionId
-                INNER JOIN FileStreams ON
-                    TroveFiles.streamId = FileStreams.streamId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY
-                    Nodes.finalTimestamp DESC
+        SELECT DISTINCT
+            TroveFiles.pathId, TroveFiles.path, Versions.version,
+            FileStreams.fileId, Nodes.finalTimestamp
+        FROM Instances
+        JOIN Nodes ON
+            Instances.itemid = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN Branches using (branchId)
+        JOIN Items ON
+            Nodes.sourceItemId = Items.itemId
+        JOIN TroveFiles ON
+            Instances.instanceId = TroveFiles.instanceId
+        JOIN Versions ON
+            TroveFiles.versionId = Versions.versionId
+        INNER JOIN FileStreams ON
+            TroveFiles.streamId = FileStreams.streamId
+        WHERE
+            Items.item = ? AND
+            Branches.branch = ?
+        ORDER BY
+            Nodes.finalTimestamp DESC
         """
-        args = [trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch]
+        args = [sourceName, branch]
         cu.execute(query, args)
         logMe(3, "execute query", query, args)
 
@@ -1312,18 +1317,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         cu = self.db.cursor()
         query = """
-        SELECT item, version, flavor FROM
-            TroveInfo JOIN Instances using (instanceId)
-            JOIN Items using (itemId)
-            JOIN Versions ON
-                Instances.versionId = Versions.versionId
-            JOIN Flavors ON
-                Instances.flavorId = Flavors.flavorId
-            WHERE
-                TroveInfo.infoType = 1 AND
-                TroveInfo.data = ? AND
-                Versions.version LIKE ?
-                """
+        SELECT Items.item, Versions.version, Flavors.flavor
+        FROM Instances
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN Items AS SourceItems ON
+            Nodes.sourceItemId = SourceItems.itemId
+        JOIN Items ON
+            Instances.itemId = Items.itemId
+        JOIN Versions ON
+            Instances.versionId = Versions.versionId
+        JOIN Flavors ON
+            Instances.flavorId = Flavors.flavorId
+        WHERE
+            SourceItems.item = ? AND
+            Versions.version LIKE ?
+        """
         args = [sourceName, versionMatch]
         cu.execute(query, args)
         logMe(3, "execute query", query, args)
@@ -1392,7 +1402,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # see if there's currently any troveinfo in the database
         cu.execute("""SELECT COUNT(*) FROM TroveInfo
-                          WHERE instanceId=? AND infoType=9""", (instanceId,))
+                          WHERE instanceId=? AND infoType=?""",
+                   (instanceId, trove._TROVEINFO_TAG_SIGS))
         trvInfo = cu.fetchone()[0]
         # start a transaction now. ensures simultaneous signatures by separate
         # clients won't cause a race condition.
@@ -1402,15 +1413,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             trv.addPrecomputedDigitalSignature(sig)
             if trvInfo:
                 # we have TroveInfo, so update it
-                cu.execute("""UPDATE TroveInfo SET data=?
-                              WHERE instanceId=? AND infoType=9""",
-                           (trv.troveInfo.sigs.freeze(), instanceId))
+                cu.execute("UPDATE TroveInfo SET data=? "
+                           "WHERE instanceId=? AND infoType=?", (
+                    cu.binary(trv.troveInfo.sigs.freeze()), instanceId,
+                    trove._TROVEINFO_TAG_SIGS))
             else:
                 # otherwise we need to create a new row with the signatures
-                cu.execute("INSERT INTO TroveInfo "
-                           "(instanceId, infoType, data) "
-                           "VALUES(?, 9, ?)",
-                           (instanceId, trv.troveInfo.sigs.freeze()))
+                cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
+                           "VALUES (?, ?, ?)",
+                           (instanceId, trove._TROVEINFO_TAG_SIGS,
+                            cu.binary(trv.troveInfo.sigs.freeze())))
             self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
                                        trv.getFlavor())
         except:
