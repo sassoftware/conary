@@ -99,10 +99,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.open()
 
-    def open(self):
+    def open(self, connect = True):
         logMe(1)
-        self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
+        if connect:
+            self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
         schema.checkVersion(self.db)
+        schema.setupTempTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db)
         self.repos = fsrepos.FilesystemRepository(
             self.name, self.troveStore, self.contentsDir, self.map,
@@ -115,7 +117,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    del self.troveStore
             del self.auth
             del self.repos
-            self.open()
+            self.open(connect=False)
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
         """
