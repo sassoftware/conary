@@ -239,7 +239,7 @@ class ConaryConfiguration(SectionedConfigFile):
     _allowNewSections     = True
     _defaultSectionType   =  ConaryContext
 
-    def __init__(self, readConfigFiles = True):
+    def __init__(self, readConfigFiles = False):
 	SectionedConfigFile.__init__(self)
 
         for info in ConaryContext._getConfigOptions():
@@ -253,10 +253,10 @@ class ConaryConfiguration(SectionedConfigFile):
         util.settempdir(self.tmpDir)
   
     def readFiles(self):
-	self.read("/etc/conaryrc")
+	self.read("/etc/conaryrc", exception=False)
 	if os.environ.has_key("HOME"):
-	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
-	self.read("conaryrc")
+	    self.read(os.environ["HOME"] + "/" + ".conaryrc", exception=False)
+	self.read("conaryrc", exception=False)
   
     def setContext(self, name):
         """ Copy the config values from the context named name (if any)
