@@ -183,7 +183,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     # flip to the new job set and it's trove iterator, and
                     # reset self.new for later additions
                     self.trvIterator = self.troveStore.iterTroves(
-                                troveList, withFiles = self.withFiles, 
+                                troveList, withFiles = self.withFiles,
 				withFileStreams = self.withFiles)
                     self.l = self.new
                     self.new = []
@@ -430,7 +430,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, contentsDir, repositoryMap, 
+    def __init__(self, name, troveStore, contentsDir, repositoryMap,
                  logFile = None, requireSigs = False):
 	self.name = name
 	map = dict(repositoryMap)
@@ -453,7 +453,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             storeList = []
             for dir in contentsDir:
                 storeList.append(DataStore(dir))
-                
+
             store = DataStoreSet(*storeList)
 
 	DataStoreRepository.__init__(self, dataStore = store)
