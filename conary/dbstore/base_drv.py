@@ -317,7 +317,9 @@ class BaseDatabase:
         assert(self.dbh)
         return self.dbh.rollback()
 
+    # trigger schema handling
     def createTrigger(self, table, when, onAction, sql):
+        assert(table in self.tables)
         name = "%s_%s" % (table, onAction)
         if name in self.triggers:
             return False
@@ -329,8 +331,8 @@ class BaseDatabase:
         """ % (name, when.upper(), onAction.upper(), table, sql)
         cu = self.dbh.cursor()
         cu.execute(sql)
+        self.triggers[name] = table
         return True
-
     def dropTrigger(self, table, onAction):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
@@ -338,6 +340,30 @@ class BaseDatabase:
             return False
         cu = self.dbh.cursor()
         cu.execute("DROP TRIGGER %s" % name)
+        del self.triggers[name]
+        return True
+
+    # index schema handling
+    def createIndex(self, table, name, columns, unique = False):
+        assert(table in self.tables)
+        if unique:
+            unique = "UNIQUE"
+        else:
+            unique = ""
+        if name in self.tables[table]:
+            return False
+        sql = "CREATE %s INDEX %s on %s (%s)" % (
+            unique, name, table, columns)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
+    def dropIndex(self, table, name):
+        if name not in self.tables[table]:
+            return False
+        sql = "DROP INDEX %s" % (name,)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        self.tables[table].remove(name)
         return True
 
     # easy access to the schema state

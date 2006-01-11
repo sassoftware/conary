@@ -189,3 +189,13 @@ class Database(BaseDatabase):
             SET NEW.%s = current_timestamp() + 0 ;
             """ % (column,)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
+
+    # MySQL uses its own "special" syntax for dropping indexes....
+    def dropIndex(self, table, name):
+        if name not in self.tables[table]:
+            return False
+        sql = "ALTER TABLE %s DROP INDEX %s" % (table, name)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        self.tables[table].remove(name)
+        return True

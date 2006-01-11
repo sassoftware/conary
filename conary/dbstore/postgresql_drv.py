@@ -186,4 +186,5 @@ class Database(BaseDatabase):
         FOR EACH ROW
         EXECUTE PROCEDURE %s()
         """ % (triggerName, onAction, table, funcName))
+        self.triggers[triggerName] = table
         return True
