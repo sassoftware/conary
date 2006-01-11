@@ -236,7 +236,7 @@ class ConfigFile(_Config):
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
 
-    def read(self, path, exception=False):
+    def read(self, path, exception=True):
 	if os.path.exists(path):
 	    f = open(path, "r")
 	    lineno = 1
@@ -295,7 +295,7 @@ class ConfigFile(_Config):
 
     def includeConfigFile(self, val):
         for cfgfile in util.braceGlob(val):
-            self.read(cfgfile, exception=True)
+            self.read(cfgfile)
 
 
 class ConfigSection(ConfigFile):
