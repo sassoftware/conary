@@ -19,7 +19,7 @@ from conary.local.schema import createDependencies, resetTable
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 9
+VERSION = 10
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -1134,17 +1134,20 @@ class MigrateTo_10(SchemaMigration):
     Version = 10
     def migrate(self):
         from  conary import trove
+        logMe(3, "Updating index TroveInfoTypeIdx")
         # redo the troveInfoTypeIndex to be UNIQUE
-        if "TroveInfoTypeIdx" in db.tables["TroveInfo"]:
+        if "TroveInfoTypeIdx" in self.db.tables["TroveInfo"]:
             self.cu.execute("DROP INDEX TroveInfoTypeIdx")
         self.cu.execute("CREATE UNIQUE INDEX TroveInfoTypeIdx ON "
                         "TroveInfo(infoType, instanceId)")
+        logMe(3, "Updating index InstancesChangedIdx")
         # add instanceId to the InstancesChanged index
         if "InstancesChangedIdx" in self.db.tables["Instances"]:
             self.cu.execute("DROP INDEX InstancesChangedIdx")
         self.cu.execute("CREATE INDEX InstancesChangedIdx ON "
                         "Instances(changed, instanceId)")
         # add the clonedFrom column to the Instances table
+        logMe(3, "Adding column and index for Instances.clonedFromId")
         self.cu.execute("ALTER TABLE Instances ADD COLUMN "
                         "clonedFromId INTEGER REFERENCES Versions(versionId) "
                         "ON DELETE RESTRICT ON UPDATE CASCADE")
@@ -1152,14 +1155,15 @@ class MigrateTo_10(SchemaMigration):
             self.cu.execute("CREATE INDEX InstancesClonedFromIdx ON "
                             "Instances(clonedFromId, instanceId)")
         # add the sourceItemId to the Nodes table
+        logMe(3, "Adding column and index for Nodes.sourceItemId")
         self.cu.execute("ALTER TABLE Nodes ADD COLUMN "
                         "sourceItemId INTEGER REFERENCES Items(itemId) "
                         "ON DELETE RESTRICT ON UPDATE CASCADE")
-        if "NodesSourceItemIdx" not in db.tables["Nodes"]:
+        if "NodesSourceItemIdx" not in self.db.tables["Nodes"]:
             self.cu.execute("CREATE INDEX NodesSourceItemIdx ON "
                        "Nodes(sourceItemId, branchId)")
-        # FIXME: Transfer the data from the TroveInfo table
         # transfer the sourceItemIds from TroveInfo into the Nodes table
+        logMe(3, "Extracting data for nodes.sourceItemId from TroveInfo")
         # first, create the missing Items
         self.cu.execute("""
         INSERT INTO Items (item)
@@ -1185,6 +1189,7 @@ class MigrateTo_10(SchemaMigration):
         self.cu.execute("DELETE FROM TroveInfo WHERE infoType = ?",
                         trove._TROVEINFO_TAG_SOURCENAME)
         # repeat the same deal for Versions, Instances and clonedFromId
+        logMe(3, "Extracting data for Instances.clonedFromId from TroveInfo")
         self.cu.execute("""
         INSERT INTO Versions (version)
         SELECT DISTINCT data
@@ -1263,6 +1268,7 @@ def checkVersion(db):
     if version == 6: version = MigrateTo_7(db)()
     if version == 7: version = MigrateTo_8(db)()
     if version == 8: version = MigrateTo_9(db)()
+    if version == 9: version = MigrateTo_10(db)()
 
     return version
 
