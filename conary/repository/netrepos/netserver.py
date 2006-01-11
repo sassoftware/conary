@@ -33,9 +33,10 @@ from conary.lib.tracelog import logMe
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository import repository
 from conary.trove import DigitalSignature
-from conary.repository.netrepos import schema, cacheset
+from conary.repository.netrepos import cacheset
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
+from conary.server import schema
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th

@@ -1212,8 +1212,7 @@ class MigrateTo_10(SchemaMigration):
 
 # create the server repository schema
 def createSchema(db):
-    # FIXME: find a better way to create the tables made by the __init__
-    # methods of some of the classes used here
+    global VERSION
     from conary.repository.netrepos import items, versionops
     from conary.local import versiontable
     items.Items(db)
@@ -1238,6 +1237,7 @@ def createSchema(db):
     createDependencies(db)
     createMetadata(db)
     createMirrorTracking(db)
+
 
 # schema creation/migration/maintenance entry point
 def checkVersion(db):
