@@ -1,3 +1,4 @@
+
 #
 # Copyright (c) 2005-2006 rPath, Inc.
 #
@@ -264,10 +265,6 @@ def createProvidesTable(db, cu, name, isTemp):
     return True
 
 def createDepWorkTable(db, cu, name):
-    if resetTable(cu, name):
-        return False
-    db.rollback()
-
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
         troveId         INTEGER,
@@ -286,6 +283,31 @@ def createDepWorkTable(db, cu, name):
     db.commit()
     return True
 
+# This should be called only once per establishing a db connection
+def setupTempDepTables(db, cu = None):
+    if cu is None:
+        cu  = db.cursor()
+    createRequiresTable(db, cu, "TmpRequires", isTemp = True)
+    createProvidesTable(db, cu, "TmpProvides", isTemp = True)
+    createDepTable(db, cu, 'TmpDependencies', isTemp = True)
+    createDepWorkTable(db, cu, "DepCheck")
+
+    cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
+               start_transaction=False)
+    cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)",
+               start_transaction=False)
+    cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
+               start_transaction=False)
+    cu.execute("""
+        CREATE TEMPORARY TABLE RemovedTroveIds(
+            troveId INTEGER,
+            nodeId INTEGER
+        )""", start_transaction=False)
+    cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)",
+               start_transaction=False)
+    db.commit()
+    db.loadSchema()
+
 def createDependencies(db):
     commit = False
     cu = db.cursor()
@@ -299,47 +321,9 @@ def createDependencies(db):
     if "Provides" not in db.tables:
         createProvidesTable(db, cu, "Provides", False)
         commit = True
-
     if commit:
         db.commit()
-
-    createRequiresTable(db, cu, "TmpRequires", isTemp = True)
-    createProvidesTable(db, cu, "TmpProvides", isTemp = True)
-    createDepWorkTable(db, cu, "DepCheck")
-    createDepTable(db, cu, 'TmpDependencies', isTemp = True)
-
-    if not resetTable(cu, "SuspectDepsOrig"):
-        db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
-                   start_transaction=False)
-        db.commit()
-
-    if not resetTable(cu, "SuspectDeps"):
-        db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)",
-                   start_transaction=False)
-        db.commit()
-
-    if not resetTable(cu, "BrokenDeps"):
-        db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
-                   start_transaction=False)
-        db.commit()
-
-    if not resetTable(cu, "RemovedTroveIds"):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE RemovedTroveIds(
-            troveId INTEGER,
-            nodeId INTEGER
-        )""",
-                   start_transaction=False)
-	cu.execute("CREATE INDEX RemovedTroveIdsIdx ON "
-                   "RemovedTroveIds(troveId)",
-                   start_transaction=False)
-        db.commit()
-
-    db.loadSchema()
+        db.loadSchema()
 
 def createSchema(db):
     # XXX

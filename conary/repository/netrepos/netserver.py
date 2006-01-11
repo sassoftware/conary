@@ -37,6 +37,7 @@ from conary.repository.netrepos import cacheset
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
+from conary.local import schema as depSchema
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
@@ -105,6 +106,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
         schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
+        depSchema.setupTempDepTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db)
         self.repos = fsrepos.FilesystemRepository(
             self.name, self.troveStore, self.contentsDir, self.map,
