@@ -314,6 +314,7 @@ def handler(req):
         else:
             return apache.HTTP_METHOD_NOT_ALLOWED
     except:
+        cfg = repos.cfg
         if cfg.bugsFromEmail and cfg.bugsToEmail:
             exception, e, bt = sys.exc_info()
             logErrorAndEmail(req, cfg, exception, e, bt)
