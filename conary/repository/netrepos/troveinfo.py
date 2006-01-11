@@ -12,12 +12,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.repository.netrepos import schema
 
 class TroveInfoTable:
     def __init__(self, db):
         self.db = db
-        schema.createTroves(db)
 
     def addInfo(self, cu, trove, idNum):
         # c = True if the trove is a component

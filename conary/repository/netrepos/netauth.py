@@ -17,7 +17,6 @@ import re
 import sys
 
 from conary.repository import errors
-from conary.repository.netrepos import schema
 from conary.lib.tracelog import logMe
 from conary.dbstore import sqlerrors
 
@@ -26,6 +25,10 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
+    def __init__(self, db, name):
+        self.name = name
+        self.db = db
+        self.reCache = {}
 
     def getAuthGroups(self, cu, authToken):
         logMe(3, authToken[0], authToken[2], authToken[3])
@@ -743,8 +746,3 @@ class NetworkAuthorization:
 
         return [ x[0] for x in cu ]
 
-    def __init__(self, db, name):
-        self.name = name
-        self.db = db
-        self.reCache = {}
-        schema.createUsers(db)

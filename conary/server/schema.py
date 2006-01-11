@@ -12,7 +12,7 @@
 # full details.
 #
 
-from conary.dbstore import migration, sqlerrors
+from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, resetTable
 
@@ -139,16 +139,6 @@ def createFlavors(db):
     if "FlavorScoresIdx" not in db.tables["FlavorScores"]:
         cu.execute("CREATE UNIQUE INDEX FlavorScoresIdx ON "
                    "FlavorScores(request, present)")
-        commit = True
-
-    if not resetTable(cu, 'ffFlavor'):
-        cu.execute("""
-        CREATE TEMPORARY TABLE ffFlavor(
-            flavorId    INTEGER,
-            base        VARCHAR(254),
-            sense       INTEGER,
-            flag        VARCHAR(254)
-        )""")
         commit = True
 
     if commit:
@@ -615,99 +605,6 @@ def createTroves(db):
     if createTrigger(db, "TroveInfo"):
         commit = True
 
-    # FIXME - move the temporary table handling into a separate
-    # fucntion that can also be called before we start processing a
-    # request (as opposed to the schema management which will be
-    # restricted to standalone mode)
-    if commit:
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'NewFiles'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE NewFiles(
-            pathId      %(BINARY16)s,
-            versionId   INTEGER,
-            fileId      %(BINARY20)s,
-            stream      %(BLOB)s,
-            path        VARCHAR(767)
-        )""" % db.keywords)
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'NeededFlavors'):
-        db.rollback()
-        cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'gtl'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE gtl(
-        idx             %(PRIMARYKEY)s,
-        name            VARCHAR(254),
-        version         VARCHAR(767),
-        flavor          VARCHAR(767)
-        )""" % db.keywords)
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'gtlInst'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE gtlInst(
-        idx             %(PRIMARYKEY)s,
-        instanceId      INTEGER
-        )""" % db.keywords)
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'getFilesTbl'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE getFilesTbl(
-            itemId       INTEGER PRIMARY KEY,
-            fileId      %(BINARY20)s
-        )""" % db.keywords)
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'itf'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE itf(
-        item            VARCHAR(254),
-        version         VARCHAR(767),
-        fullVersion     VARCHAR(767)
-        )""")
-        db.commit()
-
-    # FIXME
-    if not resetTable(cu, 'gtvlTbl'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        gtvlTbl(
-            item                VARCHAR(254),
-            versionSpec         VARCHAR(767),
-            flavorId            INTEGER
-        )""")
-        db.commit()
-
-    if not resetTable(cu, 'hasTrovesTmp'):
-        db.rollback()
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        hasTrovesTmp(
-            row                 INTEGER,
-            item                VARCHAR(254),
-            version             VARCHAR(767),
-            flavor              VARCHAR(767)
-        )""")
-        db.commit()
-
     db.loadSchema()
 
 def createMetadata(db):
@@ -840,6 +737,35 @@ def createLabelMap(db):
         commit = True
     if "" not in db.tables["LabelMap"]:
         cu.execute("CREATE INDEX LabelMapLabelIdx ON LabelMap(labelId)")
+        commit = True
+    if commit:
+        db.commit()
+        db.loadSchema()
+
+def createIdTables(db):
+    commit = False
+    cu = db.cursor()
+    if idtable.createIdTable(db, "Branches", "branchId", "branch"):
+        cu.execute("INSERT INTO Branches (branchId, branch) VALUES (0, NULL)")
+        commit = True
+    if idtable.createIdTable(db, "Labels", "labelId", "label"):
+        cu.execute("INSERT INTO Labels (labelId, label) VALUES (0, 'ALL')")
+        commit = True
+    if idtable.createIdTable(db, "Versions", "versionId", "version"):
+        cu.execute("INSERT INTO Versions (versionId, version) VALUES (0, NULL)")
+        commit = True
+    if "Items" not in db.tables:
+        cu.execute("""
+        CREATE TABLE Items(
+            itemId      %(PRIMARYKEY)s,
+            item        VARCHAR(254),
+            hasTrove    INTEGER NOT NULL DEFAULT 0
+        )""" % db.keywords)
+        db.tables["Items"] = []
+        cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
+        commit = True
+    if "Items_uq" not in db.tables["Items"]:
+        cu.execute("CREATE UNIQUE INDEX Items_uq on Items(item)")
         commit = True
     if commit:
         db.commit()
@@ -1210,16 +1136,84 @@ class MigrateTo_10(SchemaMigration):
         """, trove._TROVEINFO_TAG_CLONEDFROM)
         return self.Version
 
+# sets up temporary tables for a brand new connection
+# WARNING: will yield failures if called multiple times for the same connection!
+def setupTempTables(db):
+    cu = db.cursor()
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE ffFlavor(
+        flavorId    INTEGER,
+        base        VARCHAR(254),
+        sense       INTEGER,
+        flag        VARCHAR(254)
+    )""")
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE NewFiles(
+        pathId      %(BINARY16)s,
+        versionId   INTEGER,
+        fileId      %(BINARY20)s,
+        stream      %(BLOB)s,
+        path        VARCHAR(767)
+    )""" % db.keywords)
+
+    cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE gtl(
+    idx             %(PRIMARYKEY)s,
+    name            VARCHAR(254),
+    version         VARCHAR(767),
+    flavor          VARCHAR(767)
+    )""" % db.keywords)
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE gtlInst(
+    idx             %(PRIMARYKEY)s,
+    instanceId      INTEGER
+    )""" % db.keywords)
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE getFilesTbl(
+        itemId       INTEGER PRIMARY KEY,
+        fileId      %(BINARY20)s
+    )""" % db.keywords)
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE itf(
+    item            VARCHAR(254),
+    version         VARCHAR(767),
+    fullVersion     VARCHAR(767)
+    )""")
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE
+    gtvlTbl(
+        item                VARCHAR(254),
+        versionSpec         VARCHAR(767),
+        flavorId            INTEGER
+    )""")
+
+    cu.execute("""
+    CREATE TEMPORARY TABLE
+    hasTrovesTmp(
+        row                 INTEGER,
+        item                VARCHAR(254),
+        version             VARCHAR(767),
+        flavor              VARCHAR(767)
+    )""")
+
+    db.commit()
+    db.loadSchema()
+
+def resetTable(cu, name):
+    cu.execute("DELETE FROM %s" % name,
+               start_transaction = False)
+
 # create the server repository schema
 def createSchema(db):
-    global VERSION
-    from conary.repository.netrepos import items, versionops
-    from conary.local import versiontable
-    items.Items(db)
-    versionops.BranchTable(db)
-    versionops.LabelTable(db)
-    versiontable.VersionTable(db)
-
+    createIdTables(db)
     createLabelMap(db)
 
     createUsers(db)
@@ -1238,26 +1232,10 @@ def createSchema(db):
     createMetadata(db)
     createMirrorTracking(db)
 
-
-# schema creation/migration/maintenance entry point
-def checkVersion(db):
+# run through the schema creation and migration (if required)
+def loadSchema(db):
     global VERSION
     version = db.getVersion()
-    logMe(3, VERSION, version)
-    if version == VERSION:
-        return version
-
-    # figure out if we're initializing a brand new database
-    if version == 0:
-        # assume we are setting up a brand new one
-        if "DatabaseVersion" not in db.tables:
-            # if DatabaseVersion does not exist, but any other tables do exist,
-            # then the database version is too old to deal with it
-            if len(db.tables) > 0:
-                raise sqlerrors.SchemaVersionError(
-                    "Can not migrate from this schema version")
-        createSchema(db)
-        version = db.setVersion(VERSION)
 
     # surely there is a more better way of handling this...
     if version == 1: version = MigrateTo_2(db)()
@@ -1270,5 +1248,45 @@ def checkVersion(db):
     if version == 8: version = MigrateTo_9(db)()
     if version == 9: version = MigrateTo_10(db)()
 
-    return version
+    if version:
+        db.loadSchema()
+    # run through the schema creation to create any missing objects
+    createSchema(db)
+    if version > 0 and version != VERSION:
+        # schema creation/conversion failed. SHOULD NOT HAPPEN!
+        raise sqlerrors.SchemaVersionError("""
+        Schema migration process has failed to bring the database
+        schema version up to date. Please report this error at
+        http://bugs.rpath.com/.
+
+        Current schema version is %s; Required schema version is %s.
+        """ % (version, VERSION))
+    db.loadSchema()
+    return db.setVersion(VERSION)
+
+# schema creation/migration/maintenance entry point
+def checkVersion(db):
+    global VERSION
+    version = db.getVersion()
+    logMe(3, VERSION, version)
+    if version == VERSION:
+        return version
+
+    if version > VERSION:
+        raise sqlerrors.SchemaVersionError("""
+        This code version is too old for the Conary repository
+        database schema that you are running. you need to upgrade the
+        conary repository code base to a more recent version.
+
+        Current schema version is %s; Required schema version is %s.
+        """ % (version, VERSION))
+
+    raise sqlerrors.SchemaVersionError("""
+    Your database schema is not initalized or it is too old.  Please
+    run the standalone server with the --migrate argument to
+    upgrade/initialize the database schema for the Conary Repository.
+
+    Current schema version is %s; Required schema version is %s.
+    """ % (version, VERSION))
+
 

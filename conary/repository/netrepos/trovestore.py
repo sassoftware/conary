@@ -23,8 +23,9 @@ from conary.local import deptable
 from conary.local import versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
-from conary.repository.netrepos import troveinfo, versionops, cltable, schema
+from conary.repository.netrepos import troveinfo, versionops, cltable
 from conary.dbstore import sqlerrors
+from conary.server import schema
 
 class LocalRepVersionTable(versiontable.VersionTable):
 

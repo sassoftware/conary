@@ -49,6 +49,7 @@ from conary.repository.filecontainer import FileContainer
 from conary.repository.netrepos import netauth
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
+from conary.server import schema
 
 class HttpRequests(SimpleHTTPRequestHandler):
 
@@ -341,7 +342,7 @@ def addUser(cfg, userName, otherArgs, admin=False):
     cfg.repositoryDB = ("sqlite", otherArgs[1] + '/sqldb')
     cfg.contentsDir = otherArgs[1] + '/contents'
 
-    netRepos = ResetableNetworkRepositoryServer(cfg, '')
+    netRepos = NetworkRepositoryServer(cfg, '')
 
     # never give anonymous write access by default
     write = userName != 'anonymous'
@@ -366,7 +367,8 @@ if __name__ == '__main__':
     argDef["config-file"] = options.ONE_PARAM
     argDef['add-user'] = options.ONE_PARAM
     argDef['admin'] = options.NO_PARAM
-    argDef['help'] = options.ONE_PARAM
+    argDef['help'] = options.NO_PARAM
+    argDef['migrate'] = options.NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
@@ -415,6 +417,11 @@ if __name__ == '__main__':
     if not cfg.serverName:
         cfg.serverName = otherArgs[2]
 
+    if argSet.has_key("migrate"):
+        (driver, database) = cfg.repositoryDB
+        db= dbstore.connect(database, driver)
+        schema.loadSchema(db)
+        
     netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)

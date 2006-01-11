@@ -13,7 +13,6 @@
 #
 
 from conary import changelog
-from conary.repository.netrepos import schema
 
 class ChangeLogTable:
     """
@@ -21,7 +20,6 @@ class ChangeLogTable:
     """
     def __init__(self, db):
         self.db = db
-        schema.createChangeLog(db)
 
     def add(self, nodeId, cl):
         cu = self.db.cursor()

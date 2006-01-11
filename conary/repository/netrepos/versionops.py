@@ -15,9 +15,12 @@
 from conary import versions
 from conary.dbstore import idtable
 from conary.repository.errors import DuplicateBranch
-from conary.repository.netrepos import schema, items
+from conary.repository.netrepos import items
 
 class BranchTable(idtable.IdTable):
+    def __init__(self, db):
+        idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
+
     def addId(self, branch):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
@@ -50,13 +53,9 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
-    def initTable(self, cu):
-        cu.execute("INSERT INTO Branches (branchId, branch) VALUES (0, NULL)")
-
-    def __init__(self, db):
-        idtable.IdTable.__init__(self, db, "Branches", "branchId", "branch")
-
 class LabelTable(idtable.IdTable):
+    def __init__(self, db):
+        idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
     def addId(self, label):
 	idtable.IdTable.addId(self, label.asString())
@@ -79,16 +78,9 @@ class LabelTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
-    def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
-
-    def initTable(self, cu):
-        cu.execute("INSERT INTO Labels (labelId, label) VALUES (0, 'ALL')")
-
 class LatestTable:
     def __init__(self, db):
         self.db = db
-        schema.createLatest(db)
 
     def __setitem__(self, key, versionId):
 	(itemId, branchId, flavorId) = key
@@ -119,8 +111,6 @@ class LatestTable:
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
-        if "LabelMap" not in db.tables:
-            schema.createLabelMap(db)
 	idtable.IdPairMapping.__init__(self, db, 'LabelMap', 'itemId', 'labelId', 'branchId')
 
     def branchesByItem(self, itemId):
@@ -129,7 +119,6 @@ class LabelMap(idtable.IdPairSet):
 class Nodes:
     def __init__(self, db):
 	self.db = db
-        schema.createNodes(db)
 
     def addRow(self, itemId, branchId, versionId, sourceItemId, timeStamps):
         cu = self.db.cursor()

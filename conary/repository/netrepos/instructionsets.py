@@ -13,11 +13,10 @@
 #
 
 from conary.deps import deps
-from conary.repository.netrepos import schema
+
 class InstructionSets:
     def __init__(self, db):
         self.db = db
-        schema.createInstructionSets(db)
 
     def _freezeIsd(self, isd):
         frozen = isd.freeze()

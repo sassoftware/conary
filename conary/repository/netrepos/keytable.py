@@ -18,13 +18,11 @@ import base64
 from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
-from conary.repository.netrepos import schema
 from conary.dbstore import sqlerrors
 
 class OpenPGPKeyTable:
     def __init__(self, db):
         self.db = db
-        schema.createPGPKeys(db)
         # create a keyCache for this keyTable.
         self.keyCache = OpenPGPKeyDBCache(self)
 

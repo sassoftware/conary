@@ -14,6 +14,50 @@
 
 # FIXME: convert to use the dbstore modules
 
+def createIdTable(db, tableName, keyName, strName):
+    commit = False
+    cu = db.cursor()
+    if  tableName not in db.tables:
+        cu.execute("""
+        CREATE TABLE %s (
+            %s %%(PRIMARYKEY)s,
+            %s VARCHAR(767)
+        )""" %(tableName, keyName, strName) % db.keywords)
+        db.tables[tableName] = []
+        commit = True
+    if "%s_uq" % tableName not in db.tables[tableName]:
+        cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
+            tableName, tableName, strName))
+        commit = True
+    return commit
+
+def createMappingTable(db, tableName, key, item):
+    commit = False
+    cu = db.cursor()
+    if  tableName not in db.tables:
+        cu.execute("""
+        CREATE TABLE %s(
+            %s INTEGER,
+            %s INTEGER
+        )""" % (tableName, key, item))
+        db.tables[tableName] = []
+        commit = True
+    return commit
+
+def createIdPairTable(db, tableName, tup1, tup2, item):
+    commit = False
+    cu - db.cursor()
+    if tableName not in db.tables:
+        cu.execute("""
+        CREATE TABLE %s(
+            %s INTEGER,
+            %s INTEGER,
+            %s INTEGER
+        )""" % (tableName, tup1, tup2, item))
+        db.tables[tableName] = []
+        commit = True
+    return commit
+
 class IdTable:
     """
     Generic table for assigning id's to simple items.
@@ -23,23 +67,6 @@ class IdTable:
 	self.tableName = tableName
 	self.keyName = keyName
 	self.strName = strName
-
-        if  tableName in db.tables:
-            return
-        cu = self.db.cursor()
-        cu.execute("""
-        CREATE TABLE %s (
-            %s %%(PRIMARYKEY)s,
-            %s VARCHAR(254)
-        )""" %(self.tableName, self.keyName, self.strName) % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX %s_uq on %s (%s)" %(
-            self.tableName, self.tableName, self.strName))
-        self.initTable(cu)
-        db.commit()
-        db.loadSchema()
-
-    def initTable(self, cu):
-	pass
 
     def getOrAddId(self, item):
         id = self.get(item, None)
@@ -212,22 +239,6 @@ class IdPairMapping:
 	self.item = item
 	self.tableName = tableName
 
-        if self.tableName in db.tables:
-            return
-        cu = self.db.cursor()
-        cu.execute("""
-        CREATE TABLE %s(
-            %s INTEGER,
-            %s INTEGER,
-            %s INTEGER
-        )""" % (tableName, tup1, tup2, item))
-        self.initTable(cu)
-        db.commit()
-        db.loadSchema()
-
-    def initTable(self, cu):
-        pass
-
     def __setitem__(self, key, val):
 	(first, second) = key
         cu = self.db.cursor()
@@ -283,22 +294,6 @@ class IdMapping:
 	self.key = key
 	self.item = item
 	self.tableName = tableName
-
-        if self.tableName in db.tables:
-            return
-        cu = self.db.cursor()
-        cu.execute("""
-        CREATE TABLE %s(
-            %s INTEGER,
-            %s INTEGER
-        )""" % (tableName, key, item))
-        self.initTable(cu)
-        db.commit()
-        db.loadSchema()
-
-
-    def initTable(self, cu):
-        pass
 
     def __setitem__(self, key, val):
         cu = self.db.cursor()

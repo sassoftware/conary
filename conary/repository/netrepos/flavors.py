@@ -13,13 +13,11 @@
 #
 
 from conary.deps import deps
-from conary.repository.netrepos import schema
 
 class Flavors:
     # manages the Flavors and FlavorMap tables
     def __init__(self, db):
         self.db = db
-        schema.createFlavors(db)
 
     def createFlavor(self, flavor):
 	cu = self.db.cursor()

@@ -12,16 +12,12 @@
 # full details.
 #
 
-from conary.repository.netrepos import schema
-
 class InstanceTable:
     """
     Generic table for assigning id's to a 3-tuple of IDs.
     """
     def __init__(self, db):
         self.db = db
-        schema.createInstances(db)
-        schema.createTroves(db)
 
     def addId(self, itemId, versionId, flavorId, clonedFromId,
               isRedirect, isPresent = True):

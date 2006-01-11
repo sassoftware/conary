@@ -36,7 +36,7 @@ def createFlavors(db):
     if "Flavors" in db.tables:
         return
     cu = db.cursor()
-    f = idtable.IdTable(db, "Flavors", "flavorId", "flavor")
+    idtable.createIdTable(db, "Flavors", "flavorId", "flavor")
     cu.execute("SELECT FlavorID from Flavors")
     if cu.fetchone() == None:
         # reserve flavor 0 for "no flavor information"
@@ -346,6 +346,8 @@ def createSchema(db):
     import versiontable
     import sqldb
 
+    idtable.createIdTable(db, "Tags", "tagId", "tag")
+    idtable.createIdTable(db, "Versions", "versionId", "version")
     createInstances(db)
     createTroveTroves(db)
     createDBTroveFiles(db)
@@ -353,6 +355,7 @@ def createSchema(db):
     versiontable.VersionTable(db)
     sqldb.DBFlavorMap(db)
     createFlavors(db)
+    idtable.createMappingTable(db, "DBFlavorMap", "instanceId", "flavorId")
     createDependencies(db)
     createTroveInfo(db)
 
