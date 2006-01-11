@@ -1593,9 +1593,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return ""
 
+    def getNewPGPKeys(self, authToken, clientVersion, mark):
+	if not self.auth.check(authToken, write = False, mirror = True):
+	    raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        cu.execute("select pgpKey from PGPKeys where changed >= ?", mark)
+        return [ base64.encodestring(x[0]) for x in cu ]
+
+    def addPGPKeyList(self, authToken, clientVersion, keyList):
+	if not self.auth.check(authToken, write = False, mirror = True):
+	    raise errors.InsufficientPermission
+
+        for encKey in keyList:
+            key = base64.decodestring(encKey)
+            # this ignores duplicate keys
+            self.repos.troveStore.keyTable.addNewKey(None, key)
+
+        return ""
+
     def getNewTroveList(self, authToken, clientVersion, mark):
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
 
         # only show troves the user is allowed to see
         cu = self.db.cursor()

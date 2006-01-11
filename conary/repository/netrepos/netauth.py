@@ -330,6 +330,12 @@ class NetworkAuthorization:
         m.update(password)
         return self.addUserByMD5(user, salt, m.hexdigest())
 
+    def setMirror(self, userGroup, canMirror):
+        cu = self.db.cursor()
+        cu.execute("update userGroups set canMirror=? where userGroup=?",
+                   canMirror, userGroup)
+        self.db.commit()
+
     def addUserByMD5(self, user, salt, password):
 
         #Insert the UserGroup first, but since usergroups can be added

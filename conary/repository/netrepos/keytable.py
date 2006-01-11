@@ -42,6 +42,8 @@ class OpenPGPKeyTable:
         self.addNewKey(userId, keyData)
 
     def addNewKey(self, userId, pgpKeyData):
+        # this ignore duplicate keys
+        #
         # start a transaction so that our SELECT is protected against
         # race conditions
         cu = self.db.transaction()
