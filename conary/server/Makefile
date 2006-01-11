@@ -17,7 +17,8 @@ SUBDIRS=templates
 python_files = __init__.py    \
 	       apachehooks.py \
 	       server.py      \
-               http.py
+               http.py        \
+	       schema.py
 
 extra_dist = Makefile
 

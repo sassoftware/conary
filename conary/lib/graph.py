@@ -25,6 +25,9 @@ class NodeData(object):
         self.index = 0
         self.data = []
 
+    def isEmpty(self):
+        return not self.data
+
     def copy(self):
         new = self.__class__()
         new.data = list(self.data)
@@ -85,6 +88,9 @@ class DirectedGraph:
         nodeId = self.data.getIndex(item)
         self.edges.setdefault(nodeId, set())
         return nodeId
+    
+    def isEmpty(self):
+        return self.data.isEmpty()
 
     def get(self, idx):
         return self.data.get(idx)
@@ -172,6 +178,9 @@ class DirectedGraph:
         return [ x[1] for x in self.data.sort(nodeSelect)]
 
     def getStronglyConnectedComponents(self):
+        if self.isEmpty():
+            return []
+
         starts, finishes, trees = self.doDFS()
         t = self.transpose()
 

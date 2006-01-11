@@ -153,9 +153,9 @@ def main(argv=sys.argv):
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
-            cfg = conarycfg.ConaryConfiguration(False)
-        else:
             cfg = conarycfg.ConaryConfiguration()
+        else:
+            cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 	realMain(cfg, argv)
