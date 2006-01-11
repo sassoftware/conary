@@ -732,6 +732,7 @@ def createMetadata(db):
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""" % db.keywords)
+        db.tables["Metadata"] = []
         commit = True
     if createTrigger(db, "Metadata"):
         commit = True
@@ -747,6 +748,8 @@ def createMetadata(db):
                 FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         )""")
+        db.tables["MetadataItems"] = []
+        commit = True
     if "MetadataItemsIdx" not in db.tables["MetadataItems"]:
         cu.execute("CREATE INDEX MetadataItemsIdx ON MetadataItems(metadataId)")
         commit = True
@@ -1200,9 +1203,6 @@ class MigrateTo_10(SchemaMigration):
             WHERE TI.infoType = ?
             AND Instances.instanceId = TI.instanceId )
         """, trove._TROVEINFO_TAG_CLONEDFROM)
-        # clean up TroveInfo
-        self.cu.execute("DELETE FROM TroveInfo WHERE infoType IN (?, ?)",
-                        (trove._TROVEINFO_TAG_SOURCENAME, trove._TROVEINFO_TAG_CLONEDFROM))
         return self.Version
 
 # create the server repository schema
