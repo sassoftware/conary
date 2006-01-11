@@ -21,7 +21,7 @@ import imp
 import os
 import types
 
-def makeImportedModule(name, data, scope):
+def makeImportedModule(name, pathname, desc, scope):
     """ Returns a ModuleProxy that has access to a closure w/ 
         information about the module to load, but is otherwise 
         empty.  On an attempted access of any member of the module,
@@ -32,9 +32,20 @@ def makeImportedModule(name, data, scope):
         """ Load the given module, and insert it into the parent
             scope, and also the original importing scope.
         """
+
         mod = sys.modules.get(name, None)
         if mod is None or not isinstance(mod, types.ModuleType):
-            mod = imp.load_module(name, *data)
+            try:
+                file = open(pathname, 'U')
+            except:
+                file = None
+            
+            try:
+                mod = imp.load_module(name, file, pathname, desc)
+            finally:
+                if file is not None:
+                    file.close()
+            
             sys.modules[name] = mod
 
         scope[name] = mod
@@ -78,17 +89,27 @@ class OnDemandLoader(object):
         "loads" it - in this case returning loading a proxy that 
         will only load the class when an attribute is accessed.
     """
-    def __init__(self, name, data, scope):
+    def __init__(self, name, file, pathname, desc, scope):
+        self.file = file
         self.name = name
-        self.data = data
+        self.pathname = pathname
+        self.desc = desc
         self.scope = scope
         
     def load_module(self, fullname):
 	if fullname in __builtins__:
-            mod = imp.load_module(self.name, *self.data)
+            try:
+                mod = imp.load_module(self.name, self.file, 
+                                      self.pathname, self.desc)
+            finally:
+                if self.file:
+                    self.file.close()
 	    sys.modules[fullname] = mod
         else:
-            mod = makeImportedModule(self.name, self.data, self.scope)
+            if self.file:
+                self.file.close()
+            mod = makeImportedModule(self.name, self.pathname, self.desc, 
+                                     self.scope)
             sys.modules[fullname] = mod
         return mod
     
@@ -123,8 +144,8 @@ class OnDemandImporter(object):
                 path = mod.__path__
 
         try:
-            data = imp.find_module(fullname, path)
-            return OnDemandLoader(origName, data, global_scope)
+            file, pathname, desc = imp.find_module(fullname, path)
+            return OnDemandLoader(origName, file, pathname, desc, global_scope)
         except ImportError:
             # don't return an import error.  That will stop 
             # the automated search mechanism from working.

@@ -1226,8 +1226,8 @@ class dictAsCsf:
         os.unlink(path)
         gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
         util.copyfileobj(f, gzf)
-        del f
-        del gzf
+        gzf.close()
+        f.close()
         os.lseek(fd, 0, 0)
         f = os.fdopen(fd, "r")
         return (name, contType, f)

@@ -452,6 +452,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         grpTrv.setSize(group.getSize())
         grpTrv.setConaryVersion(constants.version)
         grpTrv.setIsCollection(True)
+        grpTrv.setLabelPath(recipeObj.getLabelPath())
 
         for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
             grpTrv.addTrove(byDefault = byDefault,
@@ -547,7 +548,6 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     fileset.setSourceName(fullName + ':source')
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
-    fileset.setIsCollection(False)
     fileset.setIsCollection(False)
     fileset.computePathHashes()
     

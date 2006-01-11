@@ -432,6 +432,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             # XXX sick hack
             macroSrc = "macros =" + f.read()
             exec macroSrc
+            f.close()
             del f
             del argSet['macros']
 

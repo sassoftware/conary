@@ -459,6 +459,24 @@ class ClientClone:
             if trv.troveInfo.clonedFrom() is None:
                 trv.troveInfo.clonedFrom.set(trv.getVersion())
 
+            # clone the labelPath 
+            labelPath = list(trv.getLabelPath())
+            if labelPath:
+                oldLabel = trv.getVersion().branch().label()
+                newLabel = newVersion.branch().label()
+                if oldLabel in labelPath:
+                    oldLabelIdx = labelPath.index(oldLabel)
+                    if newLabel in labelPath:
+                        newLabelIdx = labelPath.index(newLabel)
+                        if oldLabelIdx > newLabelIdx:
+                            del labelPath[oldLabelIdx]
+                        else:
+                            labelPath[oldLabelIdx] = newLabel
+                            del labelPath[newLabelIdx]
+                    else:
+                        labelPath[oldLabelIdx] = newLabel
+                trv.setLabelPath(labelPath)
+
             trv.changeVersion(newVersion)
 
             # look through files which aren't already on the right host for

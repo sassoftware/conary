@@ -76,6 +76,9 @@ class TroveTupleList(streams.StreamCollection):
     def iter(self):
         return ( x[1] for x in self.iterAll() )
 
+class LabelPath(streams.OrderedStringsStream):
+    pass
+
 class BuildDependencies(TroveTupleList):
     pass
 
@@ -268,6 +271,7 @@ _TROVEINFO_TAG_FLAGS          =  7
 _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10 
+_TROVEINFO_TAG_LABEL_PATH     = 11 
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -283,6 +287,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CLONEDFROM    : (SMALL, StringVersionStream,  'clonedFrom'   ),
         _TROVEINFO_TAG_SIGS          : (LARGE, TroveSignatures,      'sigs'         ),
         _TROVEINFO_TAG_PATH_HASHES   : (LARGE, PathHashes,           'pathHashes'   ),
+        _TROVEINFO_TAG_LABEL_PATH    : (SMALL, LabelPath,            'labelPath'   ),
     }
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
@@ -1376,6 +1381,14 @@ class Trove(streams.StreamSet):
 
     def isCollection(self):
         return self.troveInfo.flags.isCollection()
+
+    def setLabelPath(self, labelPath):
+        self.troveInfo.labelPath = LabelPath()
+        for label in labelPath:
+            self.troveInfo.labelPath.set(str(label))
+
+    def getLabelPath(self):
+        return [ versions.Label(x) for x in self.troveInfo.labelPath ]
 
     def setBuildRequirements(self, itemList):
         for (name, ver, release) in itemList:
