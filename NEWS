@@ -36,6 +36,7 @@ Changes in 0.90.0:
       to create a group where all devel components are byDefault False,
       for example. r.removeComponents(['devel', 'devellib'])
     * store labelPath used to build a group in troveInfo
+
   o Client Changes:
     * When committing source changes in interactive mode, conary will ask you
       you to confirm the commit.
@@ -59,13 +60,14 @@ Changes in 0.90.0:
     * Various query and code structure optimizations have been
       implemented to allow running under MySQL and PostgreSQL
 
-
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
       # can be escaped by a \ to use a literal # in a configuration option.
     * Default macros used in cooking are now stored in /etc/conary/macros.
       The 'defaultMacros' parameter determines where cvc searches for macro
       definitions.
+    * Conary configuration now searches for configuration files in 
+      /etc/conary/conf.d/ after reading in /etc/conaryrc
 
   o Server Changes:
     * Added hasTroves() repository code
