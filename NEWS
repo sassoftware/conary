@@ -76,13 +76,12 @@ Changes in 0.90.0:
     * The repository contents store was reworked to avoid reading
       precompressed gzipped data twice (once to double check the uncompressed
       contents sha1 and once to copy the file in place).
-    * We have chanhed the way we handle the schema creation and migration
+    * We have changed the way schema creation and migration is handled
       in the repository code. For administrative and data safety reasons,
-      schema migrations and installs can be performed from now on only by
-      running the standalone server (basically, shut down httpd and run
-      conary/server/server.py --migrate), thus avoiding race conditions
-      previously created by having multiple apache processes trying to
-      deal with the SQL schema updates.
+      schema upgrades and installs can be performed from now on only by
+      running the standalone server (conary/server/server.py --migrate),
+      thus avoiding race conditions previously created by having multiple
+      apache processes trying to deal with the SQL schema updates.
 
 
 Changes in 0.80.4:
