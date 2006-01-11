@@ -217,27 +217,27 @@ class TroveStore:
         for (item,) in cu:
             yield item
 
-    def addTrove(self, trove):
+    def addTrove(self, trv):
 	cu = self.db.cursor()
 
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 
 	self.fileVersionCache = {}
-	return (cu, trove)
+	return (cu, trv)
 
     def addTroveDone(self, troveInfo):
 	versionCache = {}
-	(cu, trove) = troveInfo
+	(cu, trv) = troveInfo
 
-        logMe(3, trove)
+        logMe(3, trv)
 
-	troveVersion = trove.getVersion()
-	troveItemId = self.getItemId(trove.getName())
+	troveVersion = trv.getVersion()
+	troveItemId = self.getItemId(trv.getName())
 
-        isPackage = (not trove.getName().startswith('group') and
-                     not trove.getName().startswith('fileset') and
-                     ':' not in trove.getName())
+        isPackage = (not trv.getName().startswith('group') and
+                     not trv.getName().startswith('fileset') and
+                     ':' not in trv.getName())
 
 	# does this version already exist (for another flavor?)
 	newVersion = False
@@ -246,7 +246,7 @@ class TroveStore:
 	    nodeId = self.versionOps.nodes.getRow(troveItemId,
 						  troveVersionId, None)
 
-	troveFlavor = trove.getFlavor()
+	troveFlavor = trv.getFlavor()
 
 	# start off by creating the flavors we need; we could combine this
 	# to some extent with the file table creation below, but there are
@@ -255,7 +255,7 @@ class TroveStore:
 	if troveFlavor:
 	    flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList(strongRefs = True,
+	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
                                                            weakRefs = True):
 	    if flavor:
 		flavorsNeeded[flavor] = True
@@ -299,12 +299,11 @@ class TroveStore:
 
 	if troveVersionId is None or nodeId is None:
 	    (nodeId, troveVersionId) = self.versionOps.createVersion(
-					    troveItemId, troveVersion,
-                                            troveFlavorId)
+                troveItemId, troveVersion, troveFlavorId)
 	    newVersion = True
 
-	    if trove.getChangeLog() and trove.getChangeLog().getName():
-		self.changeLogs.add(nodeId, trove.getChangeLog())
+	    if trv.getChangeLog() and trv.getChangeLog().getName():
+		self.changeLogs.add(nodeId, trv.getChangeLog())
             updateLatest = False
         else:
             updateLatest = True
@@ -313,7 +312,7 @@ class TroveStore:
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
 					     troveFlavorId,
-                                             trove.isRedirect(),
+                                             trv.isRedirect(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
@@ -322,9 +321,9 @@ class TroveStore:
             # this name/version already exists, so this must be a new
             # flavor. update the latest table as needed
             troveBranchId = self.branchTable[troveVersion.branch()]
-            cu.execute("DELETE FROM Latest WHERE branchId=? AND itemId=? "
-                       "AND flavorId=?", troveBranchId, troveItemId,
-                       troveFlavorId)
+            cu.execute("""
+            DELETE FROM Latest WHERE branchId=? AND itemId=? AND flavorId=?
+            """, troveBranchId, troveItemId, troveFlavorId)
             cu.execute("""
             INSERT INTO Latest
                 (itemId, branchId, flavorId, versionId)
@@ -388,10 +387,10 @@ class TroveStore:
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
         for ((name, version, flavor), weakFlag) in itertools.chain(
-                itertools.izip(trove.iterTroveList(strongRefs = True,
+                itertools.izip(trv.iterTroveList(strongRefs = True,
                                                    weakRefs   = False),
                                itertools.repeat(0)),
-                itertools.izip(trove.iterTroveList(strongRefs = False,
+                itertools.izip(trv.iterTroveList(strongRefs = False,
                                                    weakRefs   = True),
                                itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
 	    itemId = self.getItemId(name)
@@ -407,9 +406,9 @@ class TroveStore:
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
-            assert(trove.isRedirect() or
+            assert(trv.isRedirect() or
                             (not isPackage or versionId == troveVersionId))
-            assert(trove.isRedirect() or
+            assert(trv.isRedirect() or
                             (not isPackage or flavorId == troveFlavorId))
 
 	    if versionId is not None:
@@ -428,14 +427,14 @@ class TroveStore:
                                                 updateLatest = False)
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                            trove.isRedirect(),
+                                            trv.isRedirect(),
                                             isPresent = False)
 
             flags = weakFlag
-            if trove.includeTroveByDefault(name, version, flavor):
+            if trv.includeTroveByDefault(name, version, flavor):
                 flags |= schema.TROVE_TROVES_BYDEFAULT
 
-            if trove.includeTroveByDefault(name, version, flavor):
+            if trv.includeTroveByDefault(name, version, flavor):
                 byDefault = 1
             else:
                 byDefault = 0
