@@ -20,10 +20,10 @@ from conary.deps import deps
 from conary.lib import util
 from conary.lib.tracelog import logMe
 from conary.local import deptable
-from conary.local import troveinfo, versiontable, sqldb
+from conary.local import versiontable, sqldb
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
-from conary.repository.netrepos import versionops, cltable, schema
+from conary.repository.netrepos import troveinfo, versionops, cltable, schema
 from conary.dbstore import sqlerrors
 
 class LocalRepVersionTable(versiontable.VersionTable):
@@ -263,8 +263,7 @@ class TroveStore:
 	flavorIndex = {}
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO NeededFlavors VALUES(?)",
-		       flavor.freeze())
+	    cu.execute("INSERT INTO NeededFlavors VALUES(?)", flavor.freeze())
 
 	del flavorsNeeded
 
