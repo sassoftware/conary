@@ -347,6 +347,7 @@ class Database:
         schema.checkVersion(self.db)
 
         schema.createSchema(self.db)
+        schema.setupTempDepTables(self.db, cu)
 
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)

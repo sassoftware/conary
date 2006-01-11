@@ -1121,7 +1121,6 @@ class DependencyTables:
 
     def __init__(self, db):
         self.db = db
-        schema.createDependencies(db)
 
 class DependencyDatabase(DependencyTables):
     """ Creates a thin database (either on disk or in memory)
