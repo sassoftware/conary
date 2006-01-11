@@ -87,7 +87,7 @@ class VersionTable:
 
     def get(self, version, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=?", 
+        cu.execute("SELECT versionId FROM Versions WHERE version=?",
 		   version.asString())
 
 	item = cu.fetchone()
@@ -101,10 +101,10 @@ class VersionTable:
 	# by any FileStreams
         cu = self.db.cursor()
 	cu.execute("""
-	    DELETE FROM Versions WHERE versionId IN 
-		(SELECT versionId from Versions LEFT OUTER JOIN 
-		    (SELECT versionId AS fooId from Parent UNION 
-		     SELECT versionId AS fooId FROM FileStreams) 
+	    DELETE FROM Versions WHERE versionId IN
+		(SELECT versionId from Versions LEFT OUTER JOIN
+		    (SELECT versionId AS fooId from Parent UNION
+		     SELECT versionId AS fooId FROM FileStreams)
 		ON Versions.versionId = fooId WHERE fooId is NULL)
 	    """)
 
