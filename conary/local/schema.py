@@ -97,8 +97,8 @@ def createTroveTroves(db):
     cu = db.cursor()
     cu.execute("""
     CREATE TABLE TroveTroves(
-        instanceId      INTEGER,
-        includedId      INTEGER,
+        instanceId      INTEGER NOT NULL,
+        includedId      INTEGER NOT NULL,
         flags           INTEGER,
         inPristine      BOOLEAN
     )""")
@@ -119,14 +119,10 @@ def createTroveInfo(db):
     CREATE TABLE TroveInfo(
         instanceId      INTEGER NOT NULL,
         infoType        INTEGER NOT NULL,
-        data            %(MEDIUMBLOB)s,
-        changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-        CONSTRAINT TroveInfo_instanceId_fk
-            FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
-            ON DELETE CASCADE ON UPDATE CASCADE
+        data            %(MEDIUMBLOB)s
     )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-    cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, instanceId)")
+    cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, data)")
     db.commit()
     db.loadSchema()
 
@@ -470,7 +466,7 @@ class MigrateTo_8(SchemaMigration):
         self.cu.execute('DROP INDEX InstancesNameIdx')
         self.cu.execute('DROP INDEX InstancesIdx')
         createInstances(self.db)
-        self.cu.execute("""INSERT INTO Instances 
+        self.cu.execute("""INSERT INTO Instances
                             (instanceId, troveName, versionId, flavorId,
                              timeStamps, isPresent, pinned)
                            SELECT instanceId, troveName, versionId, flavorId,
@@ -678,10 +674,10 @@ class MigrateTo_16(SchemaMigration):
             inPristine      BOOLEAN
         )""")
         cu.execute('''
-        INSERT INTO TroveTroves2 
-            SELECT instanceId, includedId, 
-                   CASE WHEN byDefault THEN %d ELSE 0 END, 
-                   inPristine 
+        INSERT INTO TroveTroves2
+            SELECT instanceId, includedId,
+                   CASE WHEN byDefault THEN %d ELSE 0 END,
+                   inPristine
             FROM TroveTroves''' % TROVE_TROVES_BYDEFAULT)
 
         cu.execute('DROP TABLE TroveTroves')
@@ -697,10 +693,6 @@ class MigrateTo_16(SchemaMigration):
         self.db.commit()
         self.db.loadSchema()
         return self.Version
-
-
-                
-
 
 
 def checkVersion(db):
