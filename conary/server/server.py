@@ -317,7 +317,7 @@ class ServerConfig(netserver.ServerConfig):
 
 def usage():
     print "usage: %s" % sys.argv[0]
-    print "       %s --add-user <username> " % sys.argv[0]
+    print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
     print '              --db "driver <path>"'
@@ -327,7 +327,7 @@ def usage():
     print "              --tmp-dir <path>"
     sys.exit(1)
 
-def addUser(netRepos, userName, admin=False):
+def addUser(netRepos, userName, admin = False, mirror = False):
     if os.isatty(0):
         from getpass import getpass
 
@@ -346,6 +346,7 @@ def addUser(netRepos, userName, admin=False):
     netRepos.auth.addUser(userName, pw1)
     # user/group, trovePattern, label, write, capped, admin
     netRepos.auth.addAcl(userName, None, None, write, False, admin)
+    netRepos.auth.setMirror(userName, mirror)
 
 if __name__ == '__main__':
     argDef = {}
@@ -364,10 +365,12 @@ if __name__ == '__main__':
     argDef["config"] = options.MULT_PARAM
     # magically handled by processArgs
     argDef["config-file"] = options.ONE_PARAM
+
     argDef['add-user'] = options.ONE_PARAM
     argDef['admin'] = options.NO_PARAM
     argDef['help'] = options.NO_PARAM
     argDef['migrate'] = options.NO_PARAM
+    argDef['mirror'] = options.NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
@@ -422,10 +425,11 @@ if __name__ == '__main__':
 
     if 'add-user' in argSet:
         admin = argSet.pop('admin', False)
+        mirror = argSet.pop('mirror', False)
         userName = argSet.pop('add-user')
         if argSet:
             usage()
-        sys.exit(addUser(netRepos, userName, admin=admin))
+        sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
     
     if argSet:
         usage()
