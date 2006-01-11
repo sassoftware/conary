@@ -303,7 +303,7 @@ class ServerConfig(netserver.ServerConfig):
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
-	self.read(path)
+	self.read(path, exception=False)
 
     def check(self):
         assert(not self.cacheDB)
