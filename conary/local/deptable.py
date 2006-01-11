@@ -1128,6 +1128,8 @@ class DependencyDatabase(DependencyTables):
     """
     def __init__(self, path=":memory:", driver="sqlite"):
 	db = dbstore.connect(path, driver=driver, timeout=30000)
+        schema.setupTempDepTables(db)
+        schema.createDependencies(db)
         DependencyTables.__init__(self, db)
 
     def add(self, troveId, provides, requires):

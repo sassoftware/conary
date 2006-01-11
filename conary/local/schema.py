@@ -1,3 +1,4 @@
+
 #
 # Copyright (c) 2005-2006 rPath, Inc.
 #
@@ -264,10 +265,6 @@ def createProvidesTable(db, cu, name, isTemp):
     return True
 
 def createDepWorkTable(db, cu, name):
-    if resetTable(cu, name):
-        return False
-    db.rollback()
-
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
         troveId         INTEGER,
@@ -292,8 +289,8 @@ def setupTempDepTables(db, cu = None):
         cu  = db.cursor()
     createRequiresTable(db, cu, "TmpRequires", isTemp = True)
     createProvidesTable(db, cu, "TmpProvides", isTemp = True)
-    createDepWorkTable(db, cu, "DepCheck")
     createDepTable(db, cu, 'TmpDependencies', isTemp = True)
+    createDepWorkTable(db, cu, "DepCheck")
 
     cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
                start_transaction=False)
