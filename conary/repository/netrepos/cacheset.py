@@ -188,8 +188,9 @@ class CacheSet:
                     pass
         self.db.commit()
 
-    def __cleanCache(self):
-        cu = self.db.cursor()
+    def __cleanCache(self, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
         cu.execute("SELECT row from CacheContents")
         for (row,) in cu:
             fn = self.filePattern % (self.tmpDir, row)
@@ -199,16 +200,24 @@ class CacheSet:
                 except OSError:
                     pass
 
-    def createSchema(self, dbInfo, schemaVersion):
-        self.db = dbstore.connect(dbInfo[1], driver = dbInfo[0])
+    def __cleanDatabase(self, cu = None):
+        global CACHE_SCHEMA_VERSION
+        if self.db.version != CACHE_SCHEMA_VERSION:
+            self.__cleanCache(cu)
+            if cu is None:
+                cu = self.db.cursor()
+            for t in self.db.tables:
+                cu.execute("DROP TABLE %s" % (t,))
+            self.db.setVersion(CACHE_SCHEMA_VERSION)
+            self.db.loadSchema()
+
+    def __init__(self, cacheDB, tmpDir):
+	self.tmpDir = tmpDir
+        self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
         cu = self.db.cursor()
         if "CacheContents" in self.db.tables:
-            if self.db.version != CACHE_SCHEMA_VERSION:
-                self.__cleanCache()
-                for t in self.db.tables:
-                    cu.execute("DROP TABLE %s" % (t,))
-                self.db.setVersion(CACHE_SCHEMA_VERSION)
-
+            self.__cleanDatabase(cu)
+        # previous one might have dropped it...
         if "CacheContents" not in self.db.tables:
             cu.execute("""
             CREATE TABLE CacheContents(
@@ -225,24 +234,13 @@ class CacheSet:
                excludeAutoSource BOOLEAN,
                returnValue      BINARY,
                size             INTEGER
-            )""" % self.db.keywords)
-            cu.execute("""
-            CREATE INDEX CacheContentsIdx ON
-                CacheContents(troveName)
-            """)
-            schema.createFlavors(self.db)
-
-            cu.execute("""
-            CREATE TABLE Versions(
-                versionId       %(PRIMARYKEY)s,
-                version         VARCHAR(767)
-            )""" % self.db.keywords)
-
-            self.db.commit()
-
-    def __init__(self, cacheDB, tmpDir):
-	self.tmpDir = tmpDir
-        self.createSchema(cacheDB, CACHE_SCHEMA_VERSION)
-        self.flavors = sqldb.Flavors(self.db)
+            ) %(TABLEOPTS)s""" % self.db.keywords)
+            cu.execute("CREATE INDEX CacheContentsIdx "
+                       "ON CacheContents(troveName)")
+        idtable.createIdTable(self.db, "Versions", "versionId", "version")
         self.versions = versiontable.VersionTable(self.db)
+        schema.createFlavors(self.db)
+        self.flavors = sqldb.Flavors(self.db)
+        self.db.commit()
+        self.db.loadSchema()
 
