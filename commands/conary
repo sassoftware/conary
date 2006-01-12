@@ -261,6 +261,9 @@ def realMain(cfg, argv=sys.argv):
     for line in argSet.pop('config', []):
         cfg.configLine(line)
 
+    # now set the debug hook using the potentially new cfg.debugExceptions value
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+
     l = []
     for labelStr in argSet.get('install-label', []):
         l.append(versions.Label(labelStr))
