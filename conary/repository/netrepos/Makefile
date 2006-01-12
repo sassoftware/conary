@@ -23,6 +23,7 @@ python_files = __init__.py	\
 		keytable.py	\
                 netauth.py      \
 		netserver.py	\
+		troveinfo.py	\
 		trovestore.py	\
 		versionops.py
 
