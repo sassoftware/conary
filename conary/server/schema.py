@@ -594,18 +594,6 @@ def createMetadata(db):
         db.commit()
         db.loadSchema()
 
-def createInstructionSets(db):
-    cu = db.cursor()
-    if 'InstructionSets' not in db.tables:
-        cu.execute("""
-        CREATE TABLE InstructionSets(
-            isnSetId        %(PRIMARYKEY)s,
-            base            VARCHAR(254),
-            flags           VARCHAR(254)
-        )""" % db.keywords)
-        db.commit()
-        db.loadSchema()
-
 def createMirrorTracking(db):
     cu = db.cursor()
     if 'LatestMirror' not in db.tables:
@@ -1167,7 +1155,6 @@ def createSchema(db):
     createNodes(db)
     createChangeLog(db)
     createLatest(db)
-    createInstructionSets(db)
 
     createTroves(db)
 
