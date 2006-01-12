@@ -231,8 +231,11 @@ class CacheSet:
                 CacheContents(troveName)
             """)
             schema.createFlavors(self.db)
-            idtable.createIdTable(db, "Versions", "versionId", "version")
 
+            cu.execute("CREATE TABLE Versions(
+                versionId       %(PRIMARYKEY)s,
+                version         VARCHAR(767)
+            )""" % self.db.keywords)
 
             self.db.commit()
 
