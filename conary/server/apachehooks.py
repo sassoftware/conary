@@ -290,7 +290,7 @@ def handler(req):
             return apache.HTTP_INTERNAL_SERVER_ERROR
 
         if cfg.closed:
-            repositories[repName] = netserver.ClosedRepositoryServer(cfg.closed)
+            repositories[repName] = netserver.ClosedRepositoryServer(cfg)
         else:
             repositories[repName] = netserver.NetworkRepositoryServer(
                                                     cfg, urlBase)
