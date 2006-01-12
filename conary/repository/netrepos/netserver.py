@@ -1684,10 +1684,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args):
-        return (True, ("RepositoryClosed", self.closedMessage))
+        return (True, ("RepositoryClosed", self.cfg.closedMessage))
 
-    def __init__(self, closedMessage):
-        self.closedMessage = closedMessage
+    def __init__(self, cfg):
+        self.cfg = cfg
 
 class ServerConfig(ConfigFile):
     bugsToEmail             = CfgString
