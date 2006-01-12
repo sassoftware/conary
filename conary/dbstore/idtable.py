@@ -44,7 +44,7 @@ def createMappingTable(db, tableName, key, item):
 
 def createIdPairTable(db, tableName, tup1, tup2, item):
     commit = False
-    cu - db.cursor()
+    cu = db.cursor()
     if tableName not in db.tables:
         cu.execute("""
         CREATE TABLE %s(
