@@ -262,7 +262,7 @@ class ConfigFile(_Config):
             except EnvironmentError, err:
                 raise CfgEnvironmentError(err.errno, err.strerror, err.filename)
 	elif exception:
-	    raise CfgOSError(errno.EEXIST, 
+	    raise CfgEnvironmentError(errno.EEXIST, 
                           "No such file or directory: '%s'" % path, 
                           path)
 
