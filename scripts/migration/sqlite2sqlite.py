@@ -29,7 +29,7 @@ import types
 
 from conary import dbstore
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos.schema import VERSION
+from conary.server.schema import VERSION
 from schema import getTables, getIndexes
 
 if len(sys.argv) != 3:

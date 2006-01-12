@@ -22,7 +22,7 @@ if 'CONARY_PATH' in os.environ:
 
 import re
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos import schema
+from conary.server import schema
 from conary.dbstore.sqllib import CaselessDict
 class PrintDatabase:
     def __init__(self, showTables = True, driver="sqlite"):
@@ -173,6 +173,15 @@ class PrintDatabase:
         """ % (create, name, when.upper(), onAction.upper(), table, sql)
         self.execute(sql)
 
+    def createIndex(self, table, name, columns, unique = False):
+        if unique:
+            unique = "UNIQUE"
+        else:
+            unique = ""
+        sql = "CREATE %s INDEX %s on %s (%s)" % (
+            unique, name, table, columns)
+        self.execute(sql)
+
     def setVersion(self, version):
         self.version = version
     def getVersion(self):
@@ -180,12 +189,12 @@ class PrintDatabase:
 
 def getTables(driver = "sqlite"):
     pd = PrintDatabase(True, driver)
-    schema.checkVersion(pd)
+    schema.loadSchema(pd)
     return pd.statements
 
 def getIndexes(driver = "sqlite"):
     pd = PrintDatabase(False, driver)
-    schema.checkVersion(pd)
+    schema.loadSchema(pd)
     return pd.statements
 
 import getopt
