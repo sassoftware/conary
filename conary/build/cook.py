@@ -648,6 +648,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     policyFiles = recipeObj.loadPolicy()
     db = database.Database(cfg.root, cfg.dbPath)
     policyTroves = set()
+    unmanagedPolicyFiles = []
     for policyPath in policyFiles:
         troveList = list(db.iterTrovesByPath(policyPath))
         if troveList:
@@ -655,11 +656,15 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 policyTroves.add((trove.getName(), trove.getVersion(),
                                   trove.getFlavor()))
         else:
-            # FIXME: enforce not building into repository
+            if not 'local@local' in macros['buildlabel']:
+                unmanagedPolicyFiles.append(policyPath)
             ver = versions.VersionFromString('/local@local:LOCAL/0-0')
             ver.resetTimeStamps()
             policyTroves.add((policyPath, ver, deps.DependencySet()))
     del db
+    if unmanagedPolicyFiles and cfg.enforceManagedPolicy:
+        raise CookError, ('Cannot cook into repository with'
+            ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
 
     recipeObj.setup()
     try:
