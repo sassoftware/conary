@@ -291,6 +291,7 @@ def handler(req):
 
         if cfg.closed:
             repositories[repName] = netserver.ClosedRepositoryServer(cfg)
+            repositories[repName].forceSecure = False
         else:
             repositories[repName] = netserver.NetworkRepositoryServer(
                                                     cfg, urlBase)
