@@ -23,7 +23,7 @@ from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseKeywordDict
 import sqlerrors, sqllib
 
 class KeywordDict(BaseKeywordDict):
-    keys = BaseKeywordDict.keys
+    keys = BaseKeywordDict.keys.copy()
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
 # implement the regexp function for sqlite

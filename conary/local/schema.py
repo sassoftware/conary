@@ -198,7 +198,7 @@ def createDepTable(db, cu, name, isTemp):
         class           INTEGER NOT NULL,
         name            VARCHAR(254) NOT NULL,
         flag            VARCHAR(254) NOT NULL
-    )""" % d % db.keywords, start_transaction = (not isTemp))
+    ) %%(TABLEOPTS)s""" % d % db.keywords, start_transaction = (not isTemp))
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
     if isTemp:
@@ -233,7 +233,7 @@ def createRequiresTable(db, cu, name, isTemp):
         depId           INTEGER NOT NULL,
         depNum          INTEGER,
         depCount        INTEGER %(constraint)s
-    )""" % d, start_transaction = startTrans)
+    ) %%(TABLEOPTS)s""" % d % db.keywords, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
@@ -270,7 +270,7 @@ def createProvidesTable(db, cu, name, isTemp):
     CREATE %(tmp)s TABLE %(name)s(
         instanceId          INTEGER NOT NULL,
         depId               INTEGER NOT NULL %(constraint)s
-    )""" % d, start_transaction = startTrans)
+    ) %%(TABLEOPTS)s""" % d % db.keywords, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
@@ -293,7 +293,7 @@ def createDepWorkTable(db, cu, name):
         class           INTEGER,
         name            VARCHAR(254),
         flag            VARCHAR(254)
-    )""" % name, start_transaction = False)
+    ) %%(TABLEOPTS)s""" % name % db.keywords, start_transaction = False)
 
     cu.execute("""
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
