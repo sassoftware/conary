@@ -313,6 +313,10 @@ def handler(req):
             return putFile(port, secure, repos, req)
         else:
             return apache.HTTP_METHOD_NOT_ALLOWED
+    except apache.SERVER_RETURN:
+        # if the exception was an apache server return code,
+        # re-raise it and let mod_python handle it.
+        raise
     except:
         cfg = repos.cfg
         if cfg.bugsFromEmail and cfg.bugsToEmail:
