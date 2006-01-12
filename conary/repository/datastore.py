@@ -231,7 +231,6 @@ class DataStoreSet:
     def addFileReference(self, hash):
         for store in self.stores:
             store.addFileReference(hash)
-            f.seek(0)
 
     def openFile(self, hash, mode = "r"):
         store = self.storeIter.next()
