@@ -847,7 +847,14 @@ def addPackagesForComponents(group, repos, troveCache):
         allComps = troveCache.getChildTroves(troveTup)
 
         for comp, byDefault in troveCache.getChildTroves(troveTup):
-            byDefault = addedComps.get(comp[0], False)
+            if comp[0] in addedComps:
+                byDefault = addedComps[comp[0]]
+                # delete the strong reference to this trove, so that 
+                # the trove can be added as a weak reference
+                group.delTrove(*comp)
+            else:
+                byDefault = False
+                
 
             group.addTrove(comp, False, byDefault, [])
 
