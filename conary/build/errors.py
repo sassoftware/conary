@@ -65,3 +65,17 @@ class GroupCyclesError(GroupBuildError):
         lns = ['cycle in groups:']
         lns.extend(str(sorted(x)) for x in cycles)
         self.msg = '\n  '.join(lns)
+
+class GroupAddAllError(GroupBuildError):
+    def __init__(self, parentGroup, troveTup, groupTups ):
+        groupNames = [ x[0] for x in groupTups ]
+        repeatedGroups = sorted(set(x for x in groupNames \
+                                                if groupNames.count(x) > 1))
+
+        repeatedGroups = "'" + "', '".join(repeatedGroups) + "'"
+
+        lns = ['Cannot recursively addAll from group "%s":' % troveTup[0]]
+        lns.append('Multiple groups with the same name(s) %s' % repeatedGroups)
+        lns.append('are included.')
+            
+        self.msg = '\n  '.join(lns)
