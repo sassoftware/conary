@@ -318,6 +318,11 @@ def handler(req):
         if cfg.bugsFromEmail and cfg.bugsToEmail:
             exception, e, bt = sys.exc_info()
             logErrorAndEmail(req, cfg, exception, e, bt)
+        timeStamp = time.ctime(time.time())
+        log.error('[%s] Unhandled exception from conary repository: %s: %s',
+                 timeStamp, exception.__name__, e)
+        log.error(''.join(traceback.format_exception(*sys.exc_info())))
+
         return apache.HTTP_INTERNAL_SERVER_ERROR
         
 
