@@ -14,7 +14,7 @@
 
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
-from conary.local.schema import createDependencies
+from conary.local.schema import createDependencies, setupTempDepTables
 
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
@@ -768,6 +768,8 @@ class MigrateTo_4(SchemaMigration):
         instances = [ x[0] for x in
                       self.cu.execute("select instanceId from Instances") ]
         dtbl = deptable.DependencyTables(self.db)
+        createDependencies(self.db)
+        setupTempDepTables(self.db)
         troves = []
 
         logMe(1, 'Reading %d instances' % len(instances))
@@ -1152,7 +1154,7 @@ def resetTable(cu, name):
     cu.execute("DELETE FROM %s" % name,
                start_transaction = False)
 
-# create the server repository schema
+# create the (permanent) server repository schema
 def createSchema(db):
     createIdTables(db)
     createLabelMap(db)
