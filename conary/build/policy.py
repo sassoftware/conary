@@ -281,7 +281,6 @@ class Policy(action.RecipeAction):
             pkg = self.recipe.autopkg
             for thispath in sorted(pkg.pathMap):
                 if self._pathAllowed(thispath):
-                    # FIXME: spinner?
                     self.doFile(thispath)
             return
 
@@ -306,7 +305,6 @@ class Policy(action.RecipeAction):
 	for name in names:
 	   thispath = util.normpath(path + os.sep + name)
 	   if self._pathAllowed(thispath):
-               # FIXME: spinner?
 	       self.doFile(thispath)
 
     def _pathAllowed(self, path):
