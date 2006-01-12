@@ -341,7 +341,7 @@ class QueryByLabelPath(Query):
 
     def missingMsg(self, name):
         # collapse all the labels searched in the queries to a unique list
-        labelPath = itertools.chain(*(x.keys() for x in self.query[name]))
+        labelPath = list(itertools.chain(*(x.keys() for x in self.query[name])))
         if labelPath:
             return "%s was not found on path %s" \
                     % (name, ', '.join(x.asString() for x in labelPath))
