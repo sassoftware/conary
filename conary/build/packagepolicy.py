@@ -12,14 +12,8 @@
 # full details.
 #
 """
-Module used after C{%(destdir)s} has been finalized to choose packages
-and components; set flags, tags, and dependencies; and enforce policy
-requirements on the contents of C{%(destdir)s}.
-
-Classes from this module are not used directly; instead, they are accessed
-through eponymous interfaces in recipe.  Most of these policies are rarely
-(if ever) invoked.  Examples are presented only for policies that are
-expected to be invoked in some recipes.
+Module used after C{%(destdir)s} has been finalized to create the
+initial packaging.  Also contains error reporting.
 """
 import itertools
 import os
@@ -28,408 +22,115 @@ import stat
 import sys
 
 from conary import files
-from conary.build import buildpackage, destdirpolicy, filter, policy
+from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.build.use import Use
 from conary.deps import deps
 from conary.lib import elf, util, log, pydeps
 from conary.local import database
 
-class NonBinariesInBindirs(policy.Policy):
+
+
+class _filterSpec(policy.Policy):
     """
-    Directories that are specifically for binaries should have only
-    files that have some executable bit set:
-    C{r.NonBinariesInBindirs(exceptions=I{filterexp})}
+    Pure virtual base class from which C{ComponentSpec} and C{PackageSpec}
+    are derived.
     """
-    invariantexceptions = [ ('.*', stat.S_IFDIR) ]
-    invariantsubtrees = [
-	'%(bindir)s/',
-	'%(essentialbindir)s/',
-	'%(krbprefix)s/bin/',
-	'%(x11prefix)s/bin/',
-	'%(sbindir)s/',
-	'%(essentialsbindir)s/',
-	'%(initdir)s/',
-	'%(libexecdir)s/',
-	'%(sysconfdir)s/profile.d/',
-	'%(sysconfdir)s/cron.daily/',
-	'%(sysconfdir)s/cron.hourly/',
-	'%(sysconfdir)s/cron.weekly/',
-	'%(sysconfdir)s/cron.monthly/',
-    ]
-
-    def doFile(self, file):
-	d = self.macros['destdir']
-	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
-	if not mode & 0111:
-            self.error(
-                "%s has mode 0%o with no executable permission in bindir",
-                file, mode)
-	m = self.recipe.magic[file]
-	if m and m.name == 'ltwrapper':
-            self.error("%s is a build-only libtool wrapper script", file)
-
-
-class FilesInMandir(policy.Policy):
-    """
-    The C{%(mandir)s} directory should normally have only files in it;
-    the main cause of files in C{%(mandir)s} is confusion in packages
-    about whether "mandir" means /usr/share/man or /usr/share/man/man<n>.
-    """
-    invariantsubtrees = [
-        '%(mandir)s',
-        '%(x11prefix)s/man',
-        '%(krbprefix)s/man',
-    ]
-    invariantinclusions = [
-	(r'.*', None, stat.S_IFDIR),
-    ]
-    recursive = False
-
-    def doFile(self, file):
-        self.error("%s is non-directory file in mandir", file)
-
-
-class BadInterpreterPaths(policy.Policy):
-    """
-    Interpreters must not use relative paths.  There should be no
-    exceptions outside of %(thisdocdir)s.
-    """
-    invariantexceptions = [ '%(thisdocdir.literalRegex)s/', ]
-
-    def doFile(self, path):
-	d = self.macros['destdir']
-	mode = os.lstat(util.joinPaths(d, path))[stat.ST_MODE]
-	if not mode & 0111:
-            # we care about interpreter paths only in executable scripts
-            return
-        m = self.recipe.magic[path]
-	if m and m.name == 'script':
-            interp = m.contents['interpreter']
-            if not interp:
-                self.error(
-                    'missing interpreter in "%s", missing buildRequires?',
-                    path)
-            elif interp[0] != '/':
-                self.error(
-                    "illegal relative interpreter path %s in %s (%s)",
-                    interp, path, m.contents['line'])
-
-
-class BadFilenames(policy.Policy):
-    """
-    Filenames must not contain newlines because filenames are separated
-    by newlines in several conary protocols.  No exceptions are allowed.
-    """
-    def test(self):
-        assert(not self.exceptions)
-        return True
-    def doFile(self, path):
-        if path.find('\n') != -1:
-            self.error("path %s has illegal newline character", path)
-
-
-class NonUTF8Filenames(policy.Policy):
-    """
-    Filenames should be UTF-8 encoded because that is the standard system
-    encoding.
-    """
-    def doFile(self, path):
-        try:
-            path.decode('utf-8')
-        except UnicodeDecodeError:
-            self.error('path "%s" is not valid UTF-8', path)
-
-
-
-class NonMultilibComponent(policy.Policy):
-    """
-    Python and Perl components should generally be under /usr/lib, unless
-    they have binaries and are built on a 64-bit platform, in which case
-    they should have no files under /usr/lib, so that both the 32-bit abd
-    64-bit components can be installed at the same time (that is, they
-    should have multilib support).
-    """
-    invariantsubtrees = [
-        '%(libdir)s/',
-        '%(prefix)s/lib/',
-    ]
-    invariantinclusions = [
-        '.*/python[^/]*/site-packages/.*',
-        '.*/perl[^/]*/vendor-perl/.*',
-    ]
-    invariantexceptions = [
-        '%(debuglibdir)s/',
-    ]
-
+    bucket = policy.PACKAGE_CREATION
     def __init__(self, *args, **keywords):
-        self.foundlib = {'python': False, 'perl': False}
-        self.foundlib64 = {'python': False, 'perl': False}
-        self.reported = {'python': False, 'perl': False}
-        self.productMapRe = re.compile(
-            '.*/(python|perl)[^/]*/(site-packages|vendor-perl)/.*')
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def test(self):
-	if self.macros.lib == 'lib':
-	    # no need to do anything
-	    return False
-        return True
-
-    def doFile(self, path):
-        if not False in self.reported.values():
-            return
-        # we've already matched effectively the same regex, so should match...
-        p = self.productMapRe.match(path).group(1)
-        if self.reported[p]:
-            return
-        if self.currentsubtree == '%(libdir)s/':
-            self.foundlib64[p] = path
-        else:
-            self.foundlib[p] = path
-        if self.foundlib64[p] and self.foundlib[p] and not self.reported[p]:
-            self.error(
-                '%s packages may install in /usr/lib or /usr/lib64,'
-                ' but not both: at least %s and %s both exist',
-                p, self.foundlib[p], self.foundlib64[p])
-            self.reported[p] = True
-
-
-class NonMultilibDirectories(policy.Policy):
-    """
-    Troves for 32-bit platforms should not normally contain
-    directories named "lib64".
-    """
-    invariantinclusions = [ ( '.*/lib64', stat.S_IFDIR ), ]
-
-    def test(self):
-	if self.macros.lib == 'lib64':
-	    # no need to do anything
-	    return False
-        return True
-
-    def doFile(self, path):
-        self.error('path %s has illegal lib64 component on 32-bit platform',
-                   path)
-
-
-
-class ImproperlyShared(policy.Policy):
-    """
-    The C{%(datadir)s} directory (normally /usr/share) is intended for
-    data that can be shared between architectures; therefore, no
-    ELF files should be there.
-    """
-    invariantsubtrees = [ '/usr/share/' ]
-
-    def doFile(self, file):
-        m = self.recipe.magic[file]
-	if m:
-	    if m.name == "ELF":
-                self.error(
-                    "Architecture-specific file %s in shared data directory",
-                    file)
-	    if m.name == "ar":
-                self.error("Possibly architecture-specific file %s in shared data directory", file)
-
-
-class CheckDesktopFiles(policy.Policy):
-    """
-    Warns about possible errors in desktop files, such as missing icon
-    files; C{r.CheckDesktopFiles(exceptions=I{filterexp}} if (for
-    example) an icon is provided somehow, directly or indirectly, by a
-    runtime requirement of this package.
-
-    C{CheckDesktopFiles} looks for icon files in C{%(destdir)s/%(datadir)s}
-    and C{%(datadir)s/icons}; you can add additional directories (which
-    will be searched both within C{%(destdir)s} and relative to C{/})
-    with C{CheckDesktopFiles(iconDirs='I{/path/to/dir}')} or
-    C{CheckDesktopFiles(iconDirs=('I{/path/to/dir1}', 'I{/path/to/dir2}'))}
-    """
-    invariantsubtrees = [ '%(datadir)s/applications/' ]
-    invariantinclusions = [ r'.*\.desktop' ]
-
-    def __init__(self, *args, **keywords):
-        self.iconDirs = [ '%(datadir)s/icons/' ]
+	self.extraFilters = []
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-        if 'iconDirs' in keywords:
-            iconDirs = keywords.pop('iconDirs')
-            if type(iconDirs) in (list, tuple):
-                self.iconDirs.extend(iconDirs)
-            else:
-                self.iconDirs.append(iconDirs)
-        policy.Policy.updateArgs(self, *args, **keywords)
-
-    def doFile(self, filename):
-        self.iconDirs = [ x % self.macros for x in self.iconDirs ]
-        self.checkIcon(filename)
-
-    def checkIcon(self, filename):
-        fullname = self.macros.destdir + '/' + filename
-        iconfiles = [x.split('=', 1)[1].strip()
-                     for x in file(fullname).readlines()
-                     if x.startswith('Icon=')]
-        for iconfilename in iconfiles:
-            if iconfilename.startswith('/'):
-                fulliconfilename = self.macros.destdir + '/' + iconfilename
-                if (not os.path.exists(fulliconfilename) and
-                    not os.path.exists(iconfilename)):
-                    self.error('%s says Icon=%s must exist, but is missing',
-                               filename, iconfilename)
-            elif '/' in iconfilename:
-                self.error('Illegal relative path Icon=%s in %s',
-                           iconfilename, filename)
-            else:
-                ext = '.' in iconfilename
-                fulldatadir = self.macros.destdir + '/' + self.macros.datadir
-                for iconDir in [ fulldatadir ] + self.iconDirs:
-                    for root, dirs, files in os.walk(iconDir):
-                        if ext:
-                            if iconfilename in files:
-                                return
-                        else:
-                            if [ x for x in files
-                                 if x.startswith(iconfilename+'.') ]:
-                                return
-                # didn't find anything
-                self.error('%s says Icon=%s must exist, but it does not exist'
-                           ' anywhere in: %s',
-                           filename, iconfilename,
-                           " ".join([ self.macros.datadir ] + self.iconDirs))
+	"""
+	Call derived classes (C{ComponentSpec} or C{PackageSpec}) as::
+	    ThisClass('<name>', 'filterexp1', 'filterexp2')
+	where C{filterexp} is either a regular expression or a
+	tuple of C{(regexp[, setmodes[, unsetmodes]])}
+	"""
+	if args:
+	    theName = args[0]
+	    for filterexp in args[1:]:
+		self.extraFilters.append((theName, filterexp))
+	policy.Policy.updateArgs(self, **keywords)
 
 
-
-class CheckSonames(policy.Policy):
+class _addInfo(policy.Policy):
     """
-    Warns about various possible shared library packaging errors:
-    C{r.CheckSonames(exceptions=I{filterexp})} for things like directories
-    full of plugins.
+    Pure virtual class for policies that add information such as tags,
+    requirements, and provision, to files.
     """
-    invariantsubtrees = destdirpolicy.librarydirs
-    invariantinclusions = [
-	(r'..*\.so', None, stat.S_IFDIR),
-    ]
-    recursive = False
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+    keywords = {
+	'included': {},
+	'excluded': {}
+    }
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	Call as::
+	    C{I{ClassName}(I{info}, I{filterexp})}
+	or::
+	    C{I{ClassName}(I{info}, exceptions=I{filterexp})}
+	where C{I{filterexp}} is either a regular expression or a
+	tuple of C{(regexp[, setmodes[, unsetmodes]])}
+	"""
+	if args:
+	    args = list(args)
+	    info = args.pop(0)
+	    if args:
+                if not self.included:
+                    self.included = {}
+		if info not in self.included:
+		    self.included[info] = []
+		self.included[info].extend(args)
+	    elif 'exceptions' in keywords:
+		# not the usual exception handling, this is an exception
+                if not self.excluded:
+                    self.excluded = {}
+		if info not in self.excluded:
+		    self.excluded[info] = []
+		self.excluded[info].append(keywords.pop('exceptions'))
+            else:
+                raise TypeError, 'no paths provided'
+	policy.Policy.updateArgs(self, **keywords)
+
+    def doProcess(self, recipe):
+        # for filters
+	self.rootdir = self.rootdir % recipe.macros
+
+	# instantiate filters
+	d = {}
+	for info in self.included:
+            newinfo = info % recipe.macros
+	    l = []
+	    for item in self.included[info]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[newinfo] = l
+	self.included = d
+
+	d = {}
+	for info in self.excluded:
+            newinfo = info % recipe.macros
+	    l = []
+	    for item in self.excluded[info]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[newinfo] = l
+	self.excluded = d
+
+	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
-	d = self.macros.destdir
-	destlen = len(d)
-	l = util.joinPaths(d, path)
-	if not os.path.islink(l):
-	    m = self.recipe.magic[path]
-	    if m and m.name == 'ELF' and 'soname' in m.contents:
-		if os.path.basename(path) == m.contents['soname']:
-		    target = m.contents['soname']+'.something'
-		else:
-		    target = m.contents['soname']
-                self.warn(
-                    '%s is not a symlink but probably should be a link to %s',
-                    path, target)
+	fullpath = self.recipe.macros.destdir+path
+	if not util.isregular(fullpath) and not os.path.islink(fullpath):
 	    return
+        self.runInfo(path)
 
-	# store initial contents
-	sopath = util.joinPaths(os.path.dirname(l), os.readlink(l))
-	so = util.normpath(sopath)
-	# find final file
-	while os.path.islink(l):
-	    l = util.normpath(util.joinPaths(os.path.dirname(l),
-					     os.readlink(l)))
-
-	p = util.joinPaths(d, path)
-	linkpath = l[destlen:]
-	m = self.recipe.magic[linkpath]
-
-	if m and m.name == 'ELF' and 'soname' in m.contents:
-	    if so == linkpath:
-                self.dbg('%s is final path, soname is %s;'
-                    ' soname usually is symlink to specific implementation',
-                    linkpath, m.contents['soname'])
-	    soname = util.normpath(util.joinPaths(
-			os.path.dirname(sopath), m.contents['soname']))
-	    s = soname[destlen:]
-	    try:
-		os.stat(soname)
-		if not os.path.islink(soname):
-                    self.warn('%s has soname %s; therefore should be a symlink',
-                              s, m.contents['soname'])
-	    except:
-                self.warn("%s implies %s, which does not exist --"
-                          " use r.Ldconfig('%s')?",
-                          path, s, os.path.dirname(path))
-
-
-class RequireChkconfig(policy.Policy):
-    """
-    Require that all initscripts provide chkconfig information; the only
-    exceptions should be core initscripts like reboot:
-    C{r.RequireChkconfig(exceptions=I{filterexp})}
-    """
-    invariantsubtrees = [ '%(initdir)s' ]
-    def doFile(self, path):
-	d = self.macros.destdir
-        fullpath = util.joinPaths(d, path)
-	if not (os.path.isfile(fullpath) and util.isregular(fullpath)):
-            return
-        f = file(fullpath)
-        lines = f.readlines()
-        f.close()
-        foundChkconfig = False
-        for line in lines:
-            if not line.startswith('#'):
-                # chkconfig tag must come before any uncommented lines
-                break
-            if line.find('chkconfig:') != -1:
-                foundChkconfig = True
-                break
-        if not foundChkconfig:
-            self.error("initscript %s must contain chkconfig information before any uncommented lines", path)
-
-
-class CheckDestDir(policy.Policy):
-    """
-    Look for the C{%(destdir)s} path in file paths and symlink contents;
-    it should not be there.  Does not check the contents of files, though
-    files also should not contain C{%(destdir)s}.
-    """
-    def doFile(self, file):
-	d = self.macros.destdir
-        b = self.macros.builddir
-
-	if file.find(d) != -1:
-            self.error('Path %s contains destdir %s', file, d)
-	fullpath = d+file
-	if os.path.islink(fullpath):
-	    contents = os.readlink(fullpath)
-	    if contents.find(d) != -1:
-                self.error('Symlink %s contains destdir %s in contents %s',
-                           file, d, contents)
-	    if contents.find(b) != -1:
-                self.error('Symlink %s contains builddir %s in contents %s',
-                           file, b, contents)
-
-        badRPATHS = (d, b, '/tmp', '/var/tmp')
-        m = self.recipe.magic[file]
-        if m and m.name == "ELF":
-            rpaths = m.contents['RPATH'] or ''
-            for rpath in rpaths.split(':'):
-                for badRPATH in badRPATHS:
-                    if rpath.startswith(badRPATH):
-                        self.warn('file %s has illegal RPATH %s',
-                                    file, rpath)
-                        break
-
-
-class EtcConfig(policy.Policy):
-    """
-    Deprecated class included only for backwards compatibility; use
-    C{Config} instead.
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('EtcConfig deprecated, please use Config instead')
-        self.recipe.Config(*args, **keywords)
-    def do(self):
+    def runInfo(self, path):
+        'pure virtual'
         pass
 
 
@@ -441,6 +142,11 @@ class Config(policy.Policy):
     Mark explicit inclusions as config files:
     C{r.Config(I{filterexp})}
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        # for :config component
+        ('ComponentSpec', policy.REQUIRED_SUBSEQUENT),
+    )
     invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
 
     def doFile(self, filename):
@@ -473,31 +179,6 @@ class Config(policy.Policy):
         self.recipe.ComponentSpec(_config=filename)
 
 
-# now the packaging classes
-
-class _filterSpec(policy.Policy):
-    """
-    Pure virtual base class from which C{ComponentSpec} and C{PackageSpec}
-    are derived.
-    """
-    def __init__(self, *args, **keywords):
-	self.extraFilters = []
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	Call derived classes (C{ComponentSpec} or C{PackageSpec}) as::
-	    ThisClass('<name>', 'filterexp1', 'filterexp2')
-	where C{filterexp} is either a regular expression or a
-	tuple of C{(regexp[, setmodes[, unsetmodes]])}
-	"""
-	if args:
-	    theName = args[0]
-	    for filterexp in args[1:]:
-		self.extraFilters.append((theName, filterexp))
-	policy.Policy.updateArgs(self, **keywords)
-
-
 class ComponentSpec(_filterSpec):
     """
     Determines which component each file is in:
@@ -514,6 +195,10 @@ class ComponentSpec(_filterSpec):
     is C{runtime} by default but can be changed with the C{catchall=}
     argument.
     """
+    requires = (
+        ('Config', policy.REQUIRED_PRIOR),
+        ('PackageSpec', policy.REQUIRED_SUBSEQUENT),
+    )
     invariantFilters = (
         # These must never be overridden; keeping this separate allows for
         # r.ComponentSpec('runtime', '.*')
@@ -521,6 +206,7 @@ class ComponentSpec(_filterSpec):
 	('debuginfo', ('%(debugsrcdir)s/',
 		       '%(debuglibdir)s/')),
     )
+    # FIXME: baseFilters should be initialized like macros at some point
     baseFilters = (
         # development docs go in :devel
         ('devel',     ('%(mandir)s/man(2|3)/')),
@@ -606,6 +292,9 @@ class PackageSpec(_filterSpec):
     Determines which package (and optionally also component) each file is in:
     C{r.PackageSpec(I{packagename}, I{filterexp}...)}
     """
+    requires = (
+        ('ComponentSpec', policy.REQUIRED_PRIOR),
+    )
     keywords = { 'compFilters': None }
 
     def __init__(self, *args, **keywords):
@@ -652,15 +341,6 @@ class PackageSpec(_filterSpec):
             self.recipe.autopkg.pathMap[confname].flags.isConfig(True)
 
 
-class InstallBucket(policy.Policy):
-    """
-    Stub for older recipes
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('Install buckets are deprecated')
-
-    def test(self):
-        return False
 
 
 class InitialContents(policy.Policy):
@@ -669,6 +349,11 @@ class InitialContents(policy.Policy):
     provide their contents only if the file does not yet exist:
     C{r.InitialContents(I{filterexp})}
     """
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Config', policy.REQUIRED_PRIOR),
+    )
+    bucket = policy.PACKAGE_CREATION
 
     # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
@@ -691,7 +376,6 @@ class InitialContents(policy.Policy):
                     ' an initial contents file', filename)
 
 
-
 class Transient(policy.Policy):
     """
     Mark files that have transient contents as such:
@@ -701,6 +385,13 @@ class Transient(policy.Policy):
     version without question at update time; almost the opposite of
     configuration files.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Config', policy.REQUIRED_PRIOR),
+        ('InitialContents', policy.REQUIRED_PRIOR),
+    )
+
     invariantinclusions = [
 	r'..*\.py(c|o)$',
         r'..*\.elc$',
@@ -718,44 +409,6 @@ class Transient(policy.Policy):
                     ' a configuration or initial contents file', filename)
 
 
-class SharedLibrary(policy.Policy):
-    """
-    Mark system shared libaries as such so that ldconfig will be run:
-    C{r.SharedLibrary(subtrees=I{path})} to mark a path as containing
-    shared libraries; C{r.SharedLibrary(I{filterexp})} to mark a file.
-
-    C{r.SharedLibrary} does B{not} walk entire directory trees.  Every
-    directory that you want to add must be passed in using the
-    C{subtrees} keyword.
-    """
-    invariantsubtrees = destdirpolicy.librarydirs
-    invariantinclusions = [
-	(r'..*\.so\..*', None, stat.S_IFDIR),
-    ]
-    recursive = False
-
-    def updateArgs(self, *args, **keywords):
-	policy.Policy.updateArgs(self, *args, **keywords)
-        if 'subtrees' in keywords:
-            # share with other policies that need to know about shlibs
-            d = {'subtrees': keywords['subtrees']}
-            self.recipe.ExecutableLibraries(**d)
-            self.recipe.CheckSonames(**d)
-            self.recipe.NormalizeLibrarySymlinks(**d)
-            # Provides and Requires need a different limitation...
-            d = {'sonameSubtrees': keywords['subtrees']}
-            self.recipe.Provides(**d)
-            self.recipe.Requires(**d)
-
-    def doFile(self, filename):
-	fullpath = self.macros.destdir + filename
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    m = self.recipe.magic[filename]
-	    if m and m.name == 'ELF' and 'soname' in m.contents:
-                self.dbg(filename)
-		self.recipe.autopkg.pathMap[filename].tags.set("shlib")
-
-
 class TagDescription(policy.Policy):
     """
     Mark tag description files as such so that conary handles them
@@ -763,6 +416,11 @@ class TagDescription(policy.Policy):
     is marked as a tag description file.  No file outside of
     %(tagdescriptiondir)s/ will be considered by this policy.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
     invariantsubtrees = [ '%(tagdescriptiondir)s/' ]
 
     def doFile(self, file):
@@ -779,6 +437,10 @@ class TagHandler(policy.Policy):
     is marked as a tag handler file.  No file outside of
     %(taghandlerdir)s/ will be considered by this policy.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
     invariantsubtrees = [ '%(taghandlerdir)s/' ]
 
     def doFile(self, file):
@@ -786,81 +448,6 @@ class TagHandler(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             self.dbg('conary tag handler: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
-
-
-class _addInfo(policy.Policy):
-    """
-    Pure virtual class for policies that add information such as tags,
-    requirements, and provision, to files.
-    """
-    keywords = {
-	'included': {},
-	'excluded': {}
-    }
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	Call as::
-	    C{I{ClassName}(I{info}, I{filterexp})}
-	or::
-	    C{I{ClassName}(I{info}, exceptions=I{filterexp})}
-	where C{I{filterexp}} is either a regular expression or a
-	tuple of C{(regexp[, setmodes[, unsetmodes]])}
-	"""
-	if args:
-	    args = list(args)
-	    info = args.pop(0)
-	    if args:
-                if not self.included:
-                    self.included = {}
-		if info not in self.included:
-		    self.included[info] = []
-		self.included[info].extend(args)
-	    elif 'exceptions' in keywords:
-		# not the usual exception handling, this is an exception
-                if not self.excluded:
-                    self.excluded = {}
-		if info not in self.excluded:
-		    self.excluded[info] = []
-		self.excluded[info].append(keywords.pop('exceptions'))
-            else:
-                raise TypeError, 'no paths provided'
-	policy.Policy.updateArgs(self, **keywords)
-
-    def doProcess(self, recipe):
-        # for filters
-	self.rootdir = self.rootdir % recipe.macros
-
-	# instantiate filters
-	d = {}
-	for info in self.included:
-            newinfo = info % recipe.macros
-	    l = []
-	    for item in self.included[info]:
-		l.append(filter.Filter(item, recipe.macros))
-	    d[newinfo] = l
-	self.included = d
-
-	d = {}
-	for info in self.excluded:
-            newinfo = info % recipe.macros
-	    l = []
-	    for item in self.excluded[info]:
-		l.append(filter.Filter(item, recipe.macros))
-	    d[newinfo] = l
-	self.excluded = d
-
-	policy.Policy.doProcess(self, recipe)
-
-    def doFile(self, path):
-	fullpath = self.recipe.macros.destdir+path
-	if not util.isregular(fullpath) and not os.path.islink(fullpath):
-	    return
-        self.runInfo(path)
-
-    def runInfo(self, path):
-        'pure virtual'
-        pass
 
 
 class TagSpec(_addInfo):
@@ -871,6 +458,9 @@ class TagSpec(_addInfo):
     C{r.TagSpec(I{tagname}, I{filterexp})} to add manually, or
     C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
     """
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
     def doProcess(self, recipe):
 	self.tagList = []
 	# read the system and %(destdir)s tag databases
@@ -940,76 +530,6 @@ class TagSpec(_addInfo):
 		    self.markTag(name, tag.tag, path, tag)
 
 
-class ParseManifest(policy.Policy):
-    """
-    Parses a file containing a manifest intended for RPM:
-    C{r.ParseManifest(I{filename})}
-    
-    In the manifest, it finds the information that can't be represented by
-    pure filesystem status with a non-root built: device files (C{%dev})
-    and permissions (C{%attr}); it ignores directory ownership (C{%dir})
-    because Conary handled directories very differently from RPM,
-    and C{%defattr} because Conary's default ownership is root:root
-    and because permissions (except for setuid and setgid files) are
-    collected from the filesystem.  It translates each manifest line
-    which it handles into the related Conary construct.
-
-    Warning: tested only with MAKEDEV output so far.
-    """
-
-    def __init__(self, *args, **keywords):
-	self.paths = []
-	policy.Policy.__init__(self, *args, **keywords)
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	ParseManifest(path(s)...)
-	"""
-	if args:
-	    self.paths.extend(args)
-	policy.Policy.updateArgs(self, **keywords)
-
-    def do(self):
-	for path in self.paths:
-	    self.processPath(path)
-
-    def processPath(self, path):
-	if not path.startswith('/'):
-	    path = self.macros['builddir'] + os.sep + path
-        f = open(path)
-        for line in f:
-            line = line.strip()
-            fields = line.split(')')
-
-            attr = fields[0].lstrip('%attr(').split(',')
-            perms = attr[0].strip()
-            owner = attr[1].strip()
-            group = attr[2].strip()
-
-            fields[1] = fields[1].strip()
-            if fields[1].startswith('%dev('):
-                dev = fields[1][5:].split(',')
-                devtype = dev[0]
-                major = dev[1]
-                minor = dev[2]
-                target = fields[2].strip()
-                self.recipe.MakeDevices(target, devtype, int(major), int(minor),
-                                        owner, group, int(perms, 0))
-            elif fields[1].startswith('%dir '):
-		pass
-		# ignore -- Conary directory handling is too different
-		# to map
-            else:
-		# XXX is this right?
-                target = fields[1].strip()
-		if int(perms, 0) & 06000:
-		    self.recipe.AddModes(int(perms, 0),
-                                         util.literalRegex(target))
-		if owner != 'root' or group != 'root':
-		    self.recipe.Ownership(owner, group,
-                                          util.literalRegex(target))
-
-
 class MakeDevices(policy.Policy):
     """
     Makes device nodes:
@@ -1019,6 +539,12 @@ class MakeDevices(policy.Policy):
     to enable Conary's policy of non-root builds (only root can actually
     create device nodes).
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Ownership', policy.REQUIRED_SUBSEQUENT),
+    )
+
     def __init__(self, *args, **keywords):
 	self.devices = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -1049,88 +575,23 @@ class MakeDevices(policy.Policy):
             r.Ownership(owner, group, filename)
 
 
-class DanglingSymlinks(policy.Policy):
-    # This policy must run after all modifications to the packaging
-    # are complete because it counts on self.recipe.autopkg.pathMap
-    # being final
-    """
-    Disallow dangling symbolic links (symbolic links which point to
-    files which do not exist):
-    C{DanglingSymlinks(exceptions=I{filterexp})} for intentionally
-    dangling symlinks.
-    
-    If you know that a dangling symbolic link created by your package
-    is fulfilled by another package on which your package depends,
-    you may set up an exception for that file.
-    """
-    invariantexceptions = (
-	'%(testdir)s/.*', )
-    targetexceptions = [
-        # ('filterexp', 'requirement')
-	('.*consolehelper', 'usermode:runtime'),
-	('/proc(/.*)?', None), # provided by the kernel, no package
-    ]
-    def doProcess(self, recipe):
-	self.rootdir = self.rootdir % recipe.macros
-	self.targetFilters = []
-	self.macros = recipe.macros # for filterExpression
-	for targetitem, requirement in self.targetexceptions:
-	    filterargs = self.filterExpression(targetitem)
-	    self.targetFilters.append((filter.Filter(*filterargs), requirement))
-	policy.Policy.doProcess(self, recipe)
-
-    def doFile(self, path):
-	d = self.macros.destdir
-        l = len(d)
-	f = util.joinPaths(d, path)
-        recipe = self.recipe
-	if os.path.islink(f):
-	    contents = os.readlink(f)
-	    if contents[0] == '/':
-                self.warn('Absolute symlink %s points to %s,'
-                          ' should probably be relative', path, contents)
-		return
-	    abscontents = util.joinPaths(os.path.dirname(path), contents)
-            # now resolve any intermediate symlinks
-            abscontents = os.path.realpath(d+abscontents)[l:]
-	    if abscontents in recipe.autopkg.pathMap:
-		componentMap = recipe.autopkg.componentMap
-		if componentMap[abscontents] != componentMap[path] and \
-		   not path.endswith('.so') and \
-		   not componentMap[path].getName().endswith(':test'):
-		    # warn about suspicious cross-component symlink
-                    self.warn('symlink %s points from package %s to %s',
-                              path, componentMap[path].getName(),
-                              componentMap[abscontents].getName())
-	    else:
-		for targetFilter, requirement in self.targetFilters:
-		    if targetFilter.match(abscontents):
-			# contents are an exception
-                        self.dbg('allowing special dangling symlink %s -> %s',
-                                 path, contents)
-                        if requirement:
-                            self.dbg('automatically adding requirement'
-                                     ' %s for symlink %s', requirement, path)
-                            recipe.Requires(requirement,
-                                            util.literalRegex(path))
-			return
-		self.error(
-		    "Dangling symlink: %s points to non-existant %s (%s)"
-		    %(path, contents, abscontents))
-
-
-class AddModes(policy.Policy):
+class setModes(policy.Policy):
     """
     Do not call from recipes; this is used internally by C{r.SetModes}
     and C{r.ParseManifest}
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
+    )
     def __init__(self, *args, **keywords):
 	self.fixmodes = {}
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
-	AddModes(mode, path(s)...)
+	setModes(mode, path(s)...)
 	"""
 	if args:
 	    for path in args[1:]:
@@ -1147,151 +608,15 @@ class AddModes(policy.Policy):
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 
-class WarnWriteable(policy.Policy):
-    """
-    Warns about unexpectedly group- or other-writeable files; rather
-    than set exceptions to this policy, use C{r.SetModes} so that the
-    open permissions are explicitly and expected.
-    """
-    # Needs to run after AddModes because AddModes sets exceptions
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
-	if os.path.islink(fullpath):
-	    return
-	if file not in self.recipe.autopkg.pathMap:
-	    # directory has been deleted
-	    return
-	mode = os.lstat(fullpath)[stat.ST_MODE]
-	if mode & 022:
-	    if stat.S_ISDIR(mode):
-		type = "directory"
-	    else:
-		type = "file"
-            self.warn('Possibly inappropriately writeable permission'
-                      ' 0%o for %s %s', mode & 0777, type, file)
-
-
-class WorldWriteableExecutables(policy.Policy):
-    """
-    No executable file should ever be world-writeable.  If you have an
-    exception, you can use:
-    C{r.NonBinariesInBindirs(exceptions=I{filterexp})}
-    But you should never have an exception.  Note that this policy is
-    separate from C{WarnWriteable} because calling C{r.SetModes} should
-    not override this policy automatically.
-    """
-    invariantexceptions = [ ('.*', stat.S_IFDIR) ]
-    def doFile(self, file):
-	d = self.macros['destdir']
-	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
-        if mode & 0111 and mode & 02 and not stat.S_ISLNK(mode):
-            self.error(
-                "%s has mode 0%o with world-writeable permission in bindir",
-                file, mode)
-
-
-
-class FilesForDirectories(policy.Policy):
-    """
-    Warn about files where we expect directories, commonly caused
-    by bad C{r.Install()} invocations.  Does not honor exceptions!
-    """
-    # This list represents an attempt to pick the most likely directories
-    # to make these mistakes with: directories potentially inhabited by
-    # files from multiple packages, with reasonable possibility that they
-    # will have files installed by hand rather than by a "make install".
-    candidates = (
-	'/bin',
-	'/sbin',
-	'/etc',
-	'/etc/X11',
-	'/etc/init.d',
-	'/etc/sysconfig',
-	'/etc/xinetd.d',
-	'/lib',
-	'/mnt',
-	'/opt',
-	'/usr',
-	'/usr/bin',
-	'/usr/sbin',
-	'/usr/lib',
-	'/usr/libexec',
-	'/usr/include',
-	'/usr/share',
-	'/usr/share/info',
-	'/usr/share/man',
-	'/usr/share/man/man1',
-	'/usr/share/man/man2',
-	'/usr/share/man/man3',
-	'/usr/share/man/man4',
-	'/usr/share/man/man5',
-	'/usr/share/man/man6',
-	'/usr/share/man/man7',
-	'/usr/share/man/man8',
-	'/usr/share/man/man9',
-	'/usr/share/man/mann',
-	'/var/lib',
-	'/var/spool',
-    )
-    def do(self):
-	d = self.recipe.macros.destdir
-	for path in self.candidates:
-	    fullpath = util.joinPaths(d, path)
-	    if os.path.exists(fullpath):
-		if not os.path.isdir(fullpath):
-                    # XXX only report error if directory is included in
-                    # the package; if it is merely in the filesystem
-                    # only log a warning.  Needs to follow ExcludeDirectories...
-                    self.error(
-                        'File %s should be a directory; bad r.Install()?', path)
-
-
-class ObsoletePaths(policy.Policy):
-    """
-    Warn about paths that used to be considered correct, but now are
-    obsolete.  Does not honor exceptions!
-    """
-    candidates = {
-	'/usr/man': '/usr/share/man',
-	'/usr/info': '/usr/share/info',
-	'/usr/doc': '/usr/share/doc',
-    }
-    def do(self):
-	d = self.recipe.macros.destdir
-	for path in self.candidates.keys():
-	    fullpath = util.joinPaths(d, path)
-	    if os.path.exists(fullpath):
-                # XXX only report error if directory is included in
-                # the package; if it is merely in the filesystem
-                # only log a warning.  Needs to follow ExcludeDirectories...
-                self.error('Path %s should not exist, use %s instead',
-                           path, self.candidates[path])
-
-
-class IgnoredSetuid(policy.Policy):
-    """
-    Files/directories that are setuid/setgid in the filesystem
-    but do not have that mode explicitly set in the recipe will
-    be packaged without setuid/setgid bits set.  This might be
-    a bug, so flag it with a warning.
-    """
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
-	mode = os.lstat(fullpath)[stat.ST_MODE]
-	if mode & 06000 and \
-	   not self.recipe.autopkg.pathMap[file].inode.perms() & 06000:
-	    if stat.S_ISDIR(mode):
-		type = "directory"
-	    else:
-		type = "file"
-            self.warn('%s %s has unpackaged set{u,g}id mode 0%o in filesystem',
-                      type, file, mode&06777)
-
-
 class LinkType(policy.Policy):
     """
     Only regular, non-config files may have hardlinks; no exceptions.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('Config', policy.REQUIRED_PRIOR),
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
     def do(self):
         for component in self.recipe.autopkg.getComponents():
             for path in component.hardlinks:
@@ -1311,6 +636,10 @@ class LinkCount(policy.Policy):
     C{r.LinkCount(exceptions=I{regexp}} or
     C{r.LinkCount(exceptions=[I{regexp}, I{regexp}])}
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
         self.excepts = set()
@@ -1349,40 +678,6 @@ class LinkCount(policy.Policy):
                                % "', '".join(sorted(list(dirSet))))
 
 
-
-class User(policy.Policy):
-    """
-    Stub for older recipes
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('User policy is deprecated, create a separate UserInfoRecipe instead')
-
-    def test(self):
-        return False
-
-
-class SupplementalGroup(policy.Policy):
-    """
-    Stub for older recipes
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('SupplementalGroup policy is deprecated, create a separate GroupInfoRecipe instead')
-
-    def test(self):
-        return False
-
-
-class Group(policy.Policy):
-    """
-    Stub for older recipes
-    """
-    def updateArgs(self, *args, **keywords):
-        self.warn('Group policy is deprecated, create a separate GroupInfoRecipe instead')
-
-    def test(self):
-        return False
-
-
 class ExcludeDirectories(policy.Policy):
     """
     Causes directories to be excluded from the package by default; set
@@ -1403,6 +698,10 @@ class ExcludeDirectories(policy.Policy):
     that there is a place to put a file; Conary will appropriately create
     the directory, and delete it later if the directory becomes empty.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
     def doFile(self, path):
@@ -1425,7 +724,11 @@ class ByDefault(policy.Policy):
     The default is that :test and :debuginfo packages are not installed
     by default.
     """
-    # Must follow ExcludeDirectories as well as PackageSpec
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+    filetree = policy.NO_FILES
 
     invariantexceptions = [':test', ':debuginfo']
 
@@ -1439,13 +742,20 @@ class ByDefault(policy.Policy):
                                          self.invariantexceptions))
 
 
-class _UserGroup:
+class _UserGroup(policy.Policy):
     """
     Abstract base class that implements marking owner/group dependencies.
     """
+    bucket = policy.PACKAGE_CREATION
     # All classes that descend from _UserGroup must run before the
     # Requires policy, as they implicitly depend on it to set the
     # file requirements and union the requirements up to the package.
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Requires', policy.REQUIRED_SUBSEQUENT),
+    )
+    filetree = policy.PACKAGE
+
     def setUserGroupDep(self, path, info, depClass):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
@@ -1459,26 +769,18 @@ class _UserGroup:
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, []))
 
 
-class _BuildPackagePolicy(policy.Policy):
-    """
-    Abstract base class for policy that walks the buildpackage
-    rather than the %(destdir)s
-    """
-    def do(self):
-        pkg = self.recipe.autopkg
-        for thispath in sorted(pkg.pathMap):
-            if self._pathAllowed(thispath):
-                self.doFile(thispath)
-
-
-class Ownership(_BuildPackagePolicy, _UserGroup):
+class Ownership(_UserGroup):
     """
     Sets user and group ownership of files when the default of
     root:root is not appropriate:
     C{r.Ownership(I{username}, I{groupname}, I{filterexp}...)}
+    List them in order, most specific first, ending with most
+    general; the filespecs will be matched in the order that
+    you provide them.
 
     No exceptions to this policy are permitted.
     """
+
     def __init__(self, *args, **keywords):
 	self.filespecs = []
         self.systemusers = ('root',)
@@ -1486,13 +788,6 @@ class Ownership(_BuildPackagePolicy, _UserGroup):
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-	"""
-	call as::
-	  Ownership(user, group, filespec(s)...)
-	List them in order, most specific first, ending with most
-	general; the filespecs will be matched in the order that
-	you provide them.
-	"""
 	if args:
 	    for filespec in args[2:]:
 		self.filespecs.append((filespec, args[0], args[1]))
@@ -1530,7 +825,7 @@ class Ownership(_BuildPackagePolicy, _UserGroup):
                 self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 
-class _Utilize(_BuildPackagePolicy, _UserGroup):
+class _Utilize(_UserGroup):
     """
     Pure virtual base class for C{UtilizeUser} and C{UtilizeGroup}
     """
@@ -1565,6 +860,10 @@ class _Utilize(_BuildPackagePolicy, _UserGroup):
 	    if f.match(path):
 		self._markItem(path, item)
 		return
+
+    def _markItem(self, path, item):
+        # pure virtual
+        assert(False)
 
 
 class UtilizeUser(_Utilize):
@@ -1611,6 +910,11 @@ class ComponentRequires(policy.Policy):
     require capability flags; use C{Requires} if you need to specify a
     requirement including a capability flag.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
     def __init__(self, *args, **keywords):
         self.depMap = {
             # component: components that require it if they both exist
@@ -1649,13 +953,8 @@ class ComponentRequires(policy.Policy):
                     if (reqName in components and wantName in components and
                         components[reqName] and components[wantName]):
                         # Note: this does not add dependencies to files;
-                        # we could iterate over all the files in the
-                        # requiring trove and make them require the
-                        # required trove, but that seems slow and useless.
-                        # These dependencies really shouldn't be useful
-                        # for fileset creation anyway.  And we do have
-                        # other places where we attach information to troves
-                        # without it bubbling up from files.
+                        # these dependencies are insufficiently specific
+                        # to attach to files.
                         ds = deps.DependencySet()
                         depClass = deps.TroveDependencies
                         ds.addDep(depClass, deps.Dependency(reqName))
@@ -1677,6 +976,11 @@ class ComponentProvides(policy.Policy):
     package.  It is impossible to provide a capability flag for one
     component but not another within a single package.
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
     # frozenset to make sure we do not modify class data
     flags = frozenset()
 
@@ -1719,8 +1023,7 @@ def _getmonodis(macros, recipe, path):
 
 def _getperlincpath(perl):
     """
-    Fetch the perl @INC path
-    , and sort longest first for removing
+    Fetch the perl @INC path, and sort longest first for removing
     prefixes from perl files that are provided.
     """
     if not perl:
@@ -1776,7 +1079,7 @@ def _getperl(macros, recipe):
     return ['', '']
 
 
-class Provides(_BuildPackagePolicy):
+class Provides(policy.Policy):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
     such as for package-private plugin modules installed in system library
@@ -1789,15 +1092,23 @@ class Provides(_BuildPackagePolicy):
     reserved.  Note: use C{ComponentProvides} to add capability flags to
     components.
     """
-    # must come before Requires because Requires depends on _ELFPathProvide
-    # having been run
+    bucket = policy.PACKAGE_CREATION
+
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('SharedLibrary', policy.REQUIRED),
+        # _ELFPathProvide calls Requires to pass in discovered info
+        ('Requires', policy.REQUIRED_SUBSEQUENT),
+    )
+    filetree = policy.PACKAGE
+
     invariantexceptions = (
 	'%(docdir)s/',
     )
 
     def __init__(self, *args, **keywords):
 	self.provisions = []
-        self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        self.sonameSubtrees = set()
         self.sysPath = None
         self.monodisPath = None
         self.perlIncPath = None
@@ -2075,9 +1386,7 @@ class Provides(_BuildPackagePolicy):
             return m
 
 
-class Requires(_addInfo, _BuildPackagePolicy):
-    # _addInfo must come first to use its updateArgs() member
-    # _BuildPackagePolicy provides package-walking do() member
+class Requires(_addInfo):
     """
     Drives requirement mechanism: to avoid adding requirements for a file,
     such as example shell scripts outside C{%(docdir)s},
@@ -2135,12 +1444,22 @@ class Requires(_addInfo, _BuildPackagePolicy):
     C{r.Requires(exceptDeps=(('I{filterexp}', 'I{regexp}'), ...))} to
     specify multiple overrides.
     """
+
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('SharedLibrary', policy.REQUIRED),
+        # Requires depends on _ELFPathProvide having been run
+        ('Provides', policy.REQUIRED_PRIOR),
+    )
+    filetree = policy.PACKAGE
+
     invariantexceptions = (
 	'%(docdir)s/',
     )
 
     def __init__(self, *args, **keywords):
-        self.sonameSubtrees = set(destdirpolicy.librarydirs)
+        self.sonameSubtrees = set()
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
@@ -2406,8 +1725,11 @@ class Requires(_addInfo, _BuildPackagePolicy):
 	pkg = componentMap[path]
 	f = pkg.getFile(path)
         macros = self.recipe.macros
-        m = self.recipe.magic[path]
         fullpath = macros.destdir + path
+        m = None
+        if not isinstance(f, files.DeviceFile):
+            # device is not in filesystem to look at with magic
+            m = self.recipe.magic[path]
 
         # we may have some dependencies that need converting
         if (m and m.name == 'ELF'
@@ -2563,11 +1885,19 @@ class Requires(_addInfo, _BuildPackagePolicy):
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
 
-class Flavor(_BuildPackagePolicy):
+class Flavor(policy.Policy):
     """
     Drives flavor mechanism: to avoid marking a file's flavor:
     C{r.Flavor(exceptions=I{filterexp})}
     """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Requires', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.REQUIRED_PRIOR),
+    )
+    filetree = policy.PACKAGE
+
     def doProcess(self, recipe):
 	self.libRe = re.compile(
             '^(%(libdir)s'
@@ -2621,428 +1951,26 @@ class Flavor(_BuildPackagePolicy):
 
 
 
-class _enforceBuildRequirements(policy.Policy):
-    """
-    Pure virtual base class from which classes are derived that
-    enforce buildRequires population from runtime dependencies.
-    """
-    def preProcess(self):
-        self.compExceptions = set()
-        if self.exceptions:
-            for exception in self.exceptions:
-                self.compExceptions.add(exception % self.recipe.macros)
-        self.exceptions = None
-
-        # right now we do not enforce branches.  This could be
-        # done with more work.  There is no way I know of to
-        # enforce flavors, so we just remove them from the spec.
-        self.truncatedBuildRequires = set(
-            self.recipe.buildReqMap[spec].getName()
-            for spec in self.recipe.buildRequires
-            if spec in self.recipe.buildReqMap)
-
-	components = self.recipe.autopkg.components
-        reqDepSet = deps.DependencySet()
-        provDepSet = deps.DependencySet()
-        for pkg in components.values():
-            reqDepSet.union(pkg.requires)
-            provDepSet.union(pkg.provides)
-        self.depSet = deps.DependencySet()
-        self.depSet.union(reqDepSet - provDepSet)
-
-        self.setTalk()
-
-    def test(self):
-        localDeps = self.depSet.getDepClasses().get(self.depClassType, None)
-        if not localDeps:
-            return False
-
-        depSetList = [ ]
-        for dep in localDeps.getDeps():
-            depSet = deps.DependencySet()
-            depSet.addDep(self.depClass, dep)
-            depSetList.append(depSet)
-
-        cfg = self.recipe.cfg
-        self.db = database.Database(cfg.root, cfg.dbPath)
-        self.localProvides = self.db.getTrovesWithProvides(depSetList)
-        self.unprovided = [x for x in depSetList if x not in self.localProvides]
-
-        return True
-
-    def postProcess(self):
-        del self.db
-
-    def setTalk(self):
-        # FIXME: remove "True or " when we are ready for errors
-        if (True or 'local@local' in self.recipe.macros.buildlabel
-            or Use.bootstrap._get()):
-            self.talk = self.warn
-        else:
-            self.talk = self.error
-
-    def do(self):
-        missingBuildRequires = set()
-        missingBuildRequiresChoices = []
-
-	components = self.recipe.autopkg.components
-        pathMap = self.recipe.autopkg.pathMap
-        pathReqMap = {}
-
-        for dep in self.localProvides:
-            provideNameList = [x[0] for x in self.localProvides[dep]]
-            # normally, there is only one name in provideNameList
-
-            foundCandidates = set()
-            for name in provideNameList:
-                for candidate in self.providesNames(name):
-                    if self.db.hasTroveByName(candidate):
-                        foundCandidates.add(candidate)
-                        break
-            foundCandidates -= self.compExceptions
-
-            missingCandidates = foundCandidates - self.truncatedBuildRequires
-            if missingCandidates == foundCandidates:
-                # None of the troves that provides this requirement is
-                # reflected in the buildRequires list.  Add candidates
-                # to proper list to print at the end:
-                if len(foundCandidates) > 1:
-                    found = False
-                    for candidateSet in missingBuildRequiresChoices:
-                        if candidateSet == foundCandidates:
-                            found = True
-                    if found == False:
-                        missingBuildRequiresChoices.append(foundCandidates)
-                else:
-                    missingBuildRequires.update(foundCandidates)
-
-                # Now give lots of specific information to help the packager
-                # in case things do not look so obvious...
-                pathList = []
-                for path in pathMap:
-                    pkgfile = pathMap[path]
-                    if pkgfile.hasContents and (pkgfile.requires() & dep):
-                        pathList.append(path)
-                        l = pathReqMap.setdefault(path, [])
-                        l.append(dep)
-                if pathList:
-                    self.warn('buildRequires %s needed to satisfy "%s"'
-                              ' for files: %s',
-                              str(sorted(list(foundCandidates))),
-                              str(dep),
-                              ', '.join(sorted(pathList)))
-
-        if pathReqMap:
-            for path in pathReqMap:
-                self.warn('file %s has unsatisfied build requirements "%s"',
-                          path, '", "'.join([
-                             str(x) for x in
-                               sorted(list(set(pathReqMap[path])))]))
-
-        if missingBuildRequires:
-            self.talk('add to buildRequires: %s',
-                       str(sorted(list(set(missingBuildRequires)))))
-            # one special case:
-            if list(missingBuildRequires) == [ 'glibc:devel' ]:
-                self.warn('consider CPackageRecipe or AutoPackageRecipe')
-        if missingBuildRequiresChoices:
-            for candidateSet in missingBuildRequiresChoices:
-                self.talk('add to buildRequires one of: %s',
-                           str(sorted(list(candidateSet))))
-        if self.unprovided:
-            self.talk('The following dependencies are not resolved'
-                      ' within the package or in the system database: %s',
-                      str(sorted([str(x) for x in self.unprovided])))
-
-    def providesNames(self, libname):
-        return [libname]
-
-
-class EnforceSonameBuildRequirements(_enforceBuildRequirements):
-    """
-    Test to ensure that each requires dependency in the package
-    is matched by a suitable element in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforceSonameBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-
-    depClassType = deps.DEP_CLASS_SONAME
-    depClass = deps.SonameDependencies
-
-    def providesNames(self, libname):
-        # Instead of requiring the :lib component that satisfies
-        # the dependency, our first choice, if possible, is to
-        # require :devel, because that would include header files;
-        # if it does not exist, then :devellib for a soname link;
-        # finally if neither of those exists, then :lib (though
-        # that is a degenerate case).
-        return [libname.replace(':lib', ':devel'),
-                libname.replace(':lib', ':devellib'),
-                libname]
-
-
-class EnforcePythonBuildRequirements(_enforceBuildRequirements):
-    """
-    All Python runtime requirements should be met either by this package
-    or by components listed in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforcePythonBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-
-    depClassType = deps.DEP_CLASS_PYTHON
-    depClass = deps.PythonDependencies
-
-    # FIXME: remove this when we are ready to enforce Python dependencies
-    def setTalk(self):
-        self.talk = self.warn
-
-
-class EnforceJavaBuildRequirements(_enforceBuildRequirements):
-    """
-    All Java runtime requirements should be met either by this package
-    or by components listed in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforceJavaBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-
-    depClassType = deps.DEP_CLASS_JAVA
-    depClass = deps.JavaDependencies
-
-    # FIXME: remove this when we are ready to enforce Java dependencies
-    def setTalk(self):
-        self.talk = self.warn
-
-
-class EnforceCILBuildRequirements(_enforceBuildRequirements):
-    """
-    All CIL runtime requirements should be met either by this package
-    or by components listed in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforceCILBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-
-    depClassType = deps.DEP_CLASS_CIL
-    depClass = deps.CILDependencies
-
-
-class EnforcePerlBuildRequirements(_enforceBuildRequirements):
-    """
-    All Perl runtime requirements should be met either by this package
-    or by components listed in the C{buildRequires} list;
-    any trove names wrongly suggested can be eliminated from the
-    list with C{r.EnforcePerlBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-
-    depClassType = deps.DEP_CLASS_PERL
-    depClass = deps.PerlDependencies
-
-    # FIXME: remove this when we are ready to enforce Perl dependencies
-    def setTalk(self):
-        self.talk = self.warn
-
-
-class EnforceConfigLogBuildRequirements(policy.Policy):
-    """
-    This class looks through the builddir for config.log files, and looks
-    in them for mention of files that configure found on the system, and
-    makes sure that the components that contain them are listed as
-    build requirements; pass exceptions in with
-    C{r.EnforceConfigLogBuildRequirements(exceptions='I{/path/to/file/found}'}
-    or with
-    C{r.EnforceConfigLogBuildRequirements(exceptions='I{pkg}:I{comp}')}.
-    """
-    rootdir = '%(builddir)s'
-    invariantinclusions = [ (r'.*/config\.log', 0400, stat.S_IFDIR), ]
-    # list of regular expressions (using macros) that cause an
-    # entry to be ignored unless a related strings is found in
-    # another named file (empty tuple is unconditional blacklist)
-    greylist = [
-        # config.log string, ((filename, regexp), ...)
-        ('%(prefix)s/X11R6/bin/makedepend', ()),
-        ('%(bindir)s/g77',
-            (('configure.ac', r'\s*AC_PROG_F77'),
-             ('configure.in', r'\s*AC_PROG_F77'))),
-        ('%(bindir)s/bison',
-            (('configure.ac', r'\s*AC_PROC_YACC'),
-             ('configure.in', r'\s*(AC_PROG_YACC|YACC=)'))),
-    ]
-
-    def test(self):
-        return not self.recipe.ignoreDeps
-
-    def preProcess(self):
-        self.foundRe = re.compile('^[^ ]+: found (/([^ ]+)?bin/[^ ]+)\n$')
-        self.foundPaths = set()
-        self.greydict = {}
-        # turn list into dictionary, interpolate macros, and compile regexps
-        for greyTup in self.greylist:
-            self.greydict[greyTup[0] % self.macros] = (
-                (x, re.compile(y % self.macros)) for x, y in greyTup[1])
-        # process exceptions differently; user can specify either the
-        # source (found path) or destination (found component) to ignore
-        self.pathExceptions = set()
-        self.compExceptions = set()
-        if self.exceptions:
-            for exception in self.exceptions:
-                exception = exception % self.recipe.macros
-                if '/' in exception:
-                    self.pathExceptions.add(exception)
-                else:
-                    self.compExceptions.add(exception)
-        # never suggest a recursive buildRequires
-        self.compExceptions.update(set(self.recipe.autopkg.components.keys()))
-        self.exceptions = None
-
-    def foundPath(self, line):
-        match = self.foundRe.match(line)
-        if match:
-            return match.group(1)
-        return False
-
-    def doFile(self, path):
-        fullpath = self.macros.builddir + path
-        # iterator to avoid reading in the whole file at once;
-        # nested iterators to avoid matching regexp twice
-        foundPaths = set(path for path in 
-           (self.foundPath(line) for line in file(fullpath))
-           if path and path not in self.pathExceptions)
-
-        # now remove false positives using the greylist
-        # copy() for copy because modified
-        for foundPath in foundPaths.copy():
-            if foundPath in self.greydict:
-                foundMatch = False
-                for otherFile, testRe in self.greydict[foundPath]:
-                    otherFile = fullpath.replace('config.log', otherFile)
-                    if not foundMatch and os.path.exists(otherFile):
-                        otherFile = file(otherFile)
-                        if [line for line in otherFile if testRe.match(line)]:
-                            foundMatch = True
-                if not foundMatch:
-                    # greylist entry has no match, so this is a false
-                    # positive and needs to be removed from the set
-                    foundPaths.remove(foundPath)
-        self.foundPaths.update(foundPaths)
-
-    def postProcess(self):
-        # first, get all the trove names in the transitive buildRequires
-        # runtime dependency closure
-        db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
-        transitiveBuildRequires = set(
-            self.recipe.buildReqMap[spec].getName()
-            for spec in self.recipe.buildRequires)
-        depSetList = [ self.recipe.buildReqMap[spec].getRequires()
-                       for spec in self.recipe.buildRequires ]
-        d = db.getTransitiveProvidesClosure(depSetList)
-        for depSet in d:
-            transitiveBuildRequires.update(set(tup[0] for tup in d[depSet]))
-
-        # next, for each file found, report if it is not in the
-        # transitive closure of runtime requirements of buildRequires
-        fileReqs = set()
-        for path in sorted(self.foundPaths):
-            thisFileReqs = set(trove.getName()
-                               for trove in db.iterTrovesByPath(path))
-            thisFileReqs -= self.compExceptions
-            missingReqs = thisFileReqs - transitiveBuildRequires
-            if missingReqs:
-                self.warn('path %s suggests buildRequires: %s',
-                          path, ', '.join((sorted(list(missingReqs)))))
-            fileReqs.update(thisFileReqs)
-
-        # finally, give the coalesced suggestion for cut and paste
-        # into the recipe if all the individual messages make sense
-        missingReqs = fileReqs - transitiveBuildRequires
-        if missingReqs:
-            self.warn('Probably add to buildRequires: %s',
-                      str(sorted(list(missingReqs))))
-
-
 class reportErrors(policy.Policy):
     """
-    This class is used to pull together all package errors in the
-    sanity-checking rules that come above it; do not call it
-    directly; it is for internal use only.
+    This class is used to report together all package errors.
+    Do not call it directly; it is for internal use only.
     """
-    # Must come after all the other package classes that report
-    # fatal errors, so might as well come last.
+    bucket = policy.ERROR_REPORTING
+    filetree = policy.NO_FILES
+
     def __init__(self, *args, **keywords):
 	self.warnings = []
 	policy.Policy.__init__(self, *args, **keywords)
+
     def updateArgs(self, *args, **keywords):
 	"""
 	Called once, with printf-style arguments, for each warning.
 	"""
 	self.warnings.append(args[0] %tuple(args[1:]))
+
     def do(self):
 	if self.warnings:
 	    for warning in self.warnings:
 		log.error(warning)
-	    raise PackagePolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
-
-
-
-def DefaultPolicy(recipe):
-    """
-    Return a list of actions that expresses the default policy.
-    """
-    return [
-	NonBinariesInBindirs(recipe),
-	FilesInMandir(recipe),
-        BadInterpreterPaths(recipe),
-        BadFilenames(recipe),
-        NonUTF8Filenames(recipe),
-        NonMultilibComponent(recipe),
-        NonMultilibDirectories(recipe),
-	ImproperlyShared(recipe),
-        CheckDesktopFiles(recipe),
-	CheckSonames(recipe),
-        RequireChkconfig(recipe),
-	CheckDestDir(recipe),
-	EtcConfig(recipe),
-	Config(recipe),
-	ComponentSpec(recipe),
-	PackageSpec(recipe),
-        InstallBucket(recipe),
-	InitialContents(recipe),
-	Transient(recipe),
-	SharedLibrary(recipe),
-	TagDescription(recipe),
-	TagHandler(recipe),
-	TagSpec(recipe),
-	ParseManifest(recipe),
-	MakeDevices(recipe),
-	DanglingSymlinks(recipe),
-	AddModes(recipe),
-	WarnWriteable(recipe),
-        WorldWriteableExecutables(recipe),
-	FilesForDirectories(recipe),
-	ObsoletePaths(recipe),
-	IgnoredSetuid(recipe),
-	LinkType(recipe),
-	LinkCount(recipe),
-        User(recipe),
-        SupplementalGroup(recipe),
-        Group(recipe),
-	ExcludeDirectories(recipe),
-        ByDefault(recipe),
-	Ownership(recipe),
-        UtilizeUser(recipe),
-        UtilizeGroup(recipe),
-	ComponentRequires(recipe),
-        ComponentProvides(recipe),
-	Provides(recipe),
-	Requires(recipe),
-	Flavor(recipe),
-        EnforceSonameBuildRequirements(recipe),
-        EnforcePythonBuildRequirements(recipe),
-        EnforceJavaBuildRequirements(recipe),
-        EnforceCILBuildRequirements(recipe),
-        EnforcePerlBuildRequirements(recipe),
-        EnforceConfigLogBuildRequirements(recipe),
-	reportErrors(recipe),
-    ]
-
-
-class PackagePolicyError(policy.PolicyError):
-    pass
+	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)

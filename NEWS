@@ -1,3 +1,9 @@
+Changes in 0.90.1:
+  o Package Building Changes:
+    * Conary policy has been split out into the conary-policy package.
+      (Some internal packaging work is done using the same mechanism; this
+      was left in conary proper.)
+
 Changes in 0.90.0:
   o Code Structure/Architecture Changes:
     * Conary now has the concept of "weak references", where a weak reference

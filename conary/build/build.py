@@ -576,7 +576,10 @@ class Ldconfig(BuildCommand):
     def do(self, macros):
         BuildCommand.do(self, macros)
         # since we already did this, don't do it again in policy
-        self.recipe.NormalizeLibrarySymlinks(exceptions=self.arglist)
+        try:
+            self.recipe.NormalizeLibrarySymlinks(exceptions=self.arglist)
+        except AttributeError:
+            pass
 
 
 class _FileAction(BuildAction):
@@ -609,18 +612,25 @@ class _FileAction(BuildAction):
                     # we need to be able to traverse this directory as
                     # the non-root build user
                     os.chmod(path, (mode & 01777) | 0700)
-                    # not literalRegex because AddModes is per-path
+                    # not literalRegex because setModes is per-path
                     # internal-only
-                    self.recipe.AddModes(mode, destPath)
+                    self.recipe.setModes(mode, destPath)
                 else:
                     os.chmod(path, mode & 01777)
                     if mode & 06000:
                         # not literalRegex, see above
-                        self.recipe.AddModes(mode, destPath)
+                        self.recipe.setModes(mode, destPath)
                 if isdir and mode != 0755:
-                    self.recipe.ExcludeDirectories(exceptions=util.literalRegex(destPath).replace('%', '%%'))
+                    self.recipe.ExcludeDirectories(
+                        exceptions=util.literalRegex(destPath).replace(
+                        '%', '%%'))
                 # set explicitly, do not warn
-                self.recipe.WarnWriteable(exceptions=util.literalRegex(destPath).replace('%', '%%'))
+                try:
+                    self.recipe.WarnWriteable(
+                        exceptions=util.literalRegex(destPath).replace(
+                        '%', '%%'))
+                except AttributeError:
+                    pass
             else:
                 if mode & 06000:
                     raise RuntimeError, \

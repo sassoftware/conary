@@ -12,14 +12,42 @@
 # full details.
 #
 """
-Base classes used for destdirpolicy and packagepolicy.
+Base classes and data used for all policy
 """
+
+import imp
 import os
+import sys
 
-from conary.lib import util, log
-from conary.build import filter
-from conary.build import action
+from conary.lib import util, log, graph
+from conary.build import action, filter
 
+
+# buckets (enum -- but may possibly work someday as bitmask for policy
+# that could run more than once in different contexts)
+TESTSUITE            = 1 << 0
+DESTDIR_PREPARATION  = 1 << 1
+DESTDIR_MODIFICATION = 1 << 2
+PACKAGE_CREATION     = 1 << 3
+PACKAGE_MODIFICATION = 1 << 4
+ENFORCEMENT          = 1 << 5
+ERROR_REPORTING      = 1 << 6
+
+# requirements (sparse bitmask, 5 sensible states)
+REQUIRED               = 1 << 0
+ORDERED                = 1 << 1
+PRIOR                  = 1 << 2
+REQUIRED_PRIOR         = REQUIRED|ORDERED|PRIOR
+REQUIRED_SUBSEQUENT    = REQUIRED|ORDERED
+CONDITIONAL_PRIOR      = ORDERED|PRIOR
+CONDITIONAL_SUBSEQUENT = ORDERED
+
+# file trees
+NO_FILES = 0 << 0
+DESTDIR  = 1 << 0
+BUILDDIR = 1 << 1
+DIR      = DESTDIR|BUILDDIR
+PACKAGE  = 1 << 2
 
 
 class Policy(action.RecipeAction):
@@ -57,10 +85,13 @@ class Policy(action.RecipeAction):
     and C{subtrees}).
     @type recursive: boolean
     """
+    bucket = None
     invariantsubtrees = []
     invariantexceptions = []
     invariantinclusions = []
     recursive = True
+    filetree = DESTDIR
+    rootdir = None
 
     keywords = {
         'use': None,
@@ -68,9 +99,6 @@ class Policy(action.RecipeAction):
         'inclusions': None,
 	'subtrees': None,
     }
-
-
-    rootdir = '%(destdir)s'
 
     def __init__(self, recipe, **keywords):
 	"""
@@ -97,7 +125,22 @@ class Policy(action.RecipeAction):
 
 	action.RecipeAction.__init__(self, None, [], **keywords)
 	self.recipe = recipe
+        if self.rootdir is None and self.filetree:
+            self.rootdir = {
+                DESTDIR: '%(destdir)s',
+                BUILDDIR: '%(builddir)s',
+                PACKAGE: '',
+            }[self.filetree]
 
+
+    def postInit(self):
+        """
+        Hook for initialization that cannot happen until after all
+        policies have been loaded into the recipe and thus cannot
+        happen in __init__; mainly for policies that need to pass
+        information to other policies at initialization time.
+        """
+        pass
 
     def updateArgs(self, *args, **keywords):
 	"""
@@ -185,7 +228,8 @@ class Policy(action.RecipeAction):
 	self.recipe = recipe
 	self.macros = recipe.macros
 
-	self.rootdir = self.rootdir % self.macros
+        if self.rootdir:
+            self.rootdir = self.rootdir % self.macros
 
 	if hasattr(self.__class__, 'preProcess'):
 	    self.preProcess()
@@ -230,6 +274,18 @@ class Policy(action.RecipeAction):
     def do(self):
 	# calls doFile on all appropriate files -- can be overridden by
 	# subclasses
+        if not self.filetree:
+            return
+
+        if self.filetree & PACKAGE:
+            pkg = self.recipe.autopkg
+            for thispath in sorted(pkg.pathMap):
+                if self._pathAllowed(thispath):
+                    # FIXME: spinner?
+                    self.doFile(thispath)
+            return
+
+        assert(self.filetree & DIR)
 	if self.subtrees:
 	    self.invariantsubtrees.extend(self.subtrees)
 	if not self.invariantsubtrees:
@@ -250,6 +306,7 @@ class Policy(action.RecipeAction):
 	for name in names:
 	   thispath = util.normpath(path + os.sep + name)
 	   if self._pathAllowed(thispath):
+               # FIXME: spinner?
 	       self.doFile(thispath)
 
     def _pathAllowed(self, path):
@@ -297,10 +354,119 @@ class Policy(action.RecipeAction):
         self.recipe.reportErrors(*args, **kwargs)
 
 
+# External policy classes (do not create classes for internal policy buckets)
+class DestdirPolicy(Policy):
+    bucket = DESTDIR_MODIFICATION
+
+class PackagePolicy(Policy):
+    bucket = PACKAGE_MODIFICATION
+
+class EnforcementPolicy(Policy):
+    bucket = ENFORCEMENT
+
+
+class _K:
+    pass
+classType = type(_K)
+
+# loading, sorting, and initializing policy modules
+def loadPolicy(recipeObj):
+    # path -> module
+    policyPathMap = {}
+    # bucket -> ordered list of policy objects
+    policies = {
+        TESTSUITE: [],
+        DESTDIR_PREPARATION: [],
+        DESTDIR_MODIFICATION: [],
+        PACKAGE_CREATION: [],
+        PACKAGE_MODIFICATION: [],
+        ENFORCEMENT: [],
+        ERROR_REPORTING: [],
+    }
+    # bucket -> dict of policy classes
+    policyMap = dict((b, {}) for b in policies.keys())
+    # name -> policy classes
+    policyNameMap = {}
+
+    # Load pluggable policy
+    for policyDir in recipeObj.cfg.policyDirs:
+        for filename in os.listdir(policyDir):
+            fullpath = os.sep.join((policyDir, filename))
+            if not filename.endswith('.py') or not util.isregular(fullpath):
+                continue
+            # do not load shared libraries as policy!
+            desc = [x for x in imp.get_suffixes() if x[0] == '.py'][0]
+            f = file(fullpath)
+            modname = filename[:-3]
+            m = imp.load_module(modname, f, fullpath, desc)
+            f.close()
+            policyPathMap[fullpath] = m
+
+            for symbolName in m.__dict__:
+                policyCls = m.__dict__[symbolName]
+                if type(policyCls) is not classType:
+                    continue
+                if symbolName[0].isupper() and issubclass(policyCls, Policy):
+                    policyNameMap[symbolName] = policyCls
+
+    # Load conary internal policy
+    import conary.build.destdirpolicy
+    import conary.build.packagepolicy
+    for pt in 'destdirpolicy', 'packagepolicy':
+        m = sys.modules['conary.build.'+pt]
+        for symbolName in m.__dict__.keys():
+            policyCls = m.__dict__[symbolName]
+            if type(policyCls) is not classType:
+                continue
+            if symbolName[0] != '_' and issubclass(policyCls, Policy):
+                policyNameMap[symbolName] = policyCls
+
+    # Enforce dependencies
+    missingDeps = []
+    for policyCls in policyNameMap.values():
+        if hasattr(policyCls, 'requires'):
+            for reqName, reqType in policyCls.requires:
+                if reqType & REQUIRED and reqName not in policyNameMap:
+                    missingDeps.append((policyCls.__name__, reqName))
+    if missingDeps:
+        raise PolicyError, '\n'.join(
+            ('policy %s missing required policy %s' %(x,y)
+             for x, y in missingDeps))
+
+    # Sort and initialize
+    for policyName, policyCls in policyNameMap.iteritems():
+        policyMap[policyCls.bucket][policyName]=policyNameMap[policyName]
+    for bucket in policyMap.keys():
+        dg = graph.DirectedGraph()
+        for policyCls in policyMap[bucket].values():
+            dg.addNode(policyCls)
+            if hasattr(policyCls, 'requires'):
+                for reqName, reqType in policyCls.requires:
+                    if reqType & ORDERED and reqName in policyMap[bucket]:
+                        if reqType & PRIOR:
+                            dg.addEdge(policyNameMap[reqName], policyCls)
+                        else:
+                            dg.addEdge(policyCls, policyNameMap[reqName])
+
+        # test for dependency loops
+        depLoops = [x for x in dg.getStronglyConnectedComponents()
+                    if len(x) > 1]
+        if depLoops:
+            # convert to names
+            depLoops = [sorted(x.__name__ for x in y) for y in depLoops]
+            raise PolicyError, '\n'.join(
+                'found dependency loop: %s' %', '.join(y)
+                 for y in depLoops)
+                
+        # store an ordered list of initialized policy objects
+        policies[bucket] = [x(recipeObj) for x in dg.getTotalOrdering(
+            nodeSort=lambda a, b: cmp(a[1].__name__, b[1].__name__))]
+
+    return policyPathMap, policies
+
+
+
 class PolicyError(Exception):
-    """
-    Base class from which policy error classes inherit
-    """
     def __init__(self, msg):
         self.msg = msg
 

@@ -28,8 +28,6 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
                  crossCompile=None):
         _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros, crossCompile)
-        self.destdirPolicy = []
-        self.packagePolicy = []
         self.requires = []
         self.infofilename = None
         self.realfilename = None
@@ -46,6 +44,12 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
         comp.provides.union(f.provides())
         comp.requires.union(f.requires())
         return [comp]
+
+    def loadPolicy(self):
+        return []
+
+    def doProcess(self, bucket):
+        pass
 
     def addProvides(self, f):
         pass
