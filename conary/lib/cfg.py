@@ -16,6 +16,7 @@ Provides a generic config file format that supports creating your own config
 types and value types.
 """
 import copy
+import errno
 import inspect
 import os
 import sys
