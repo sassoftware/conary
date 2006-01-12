@@ -23,7 +23,7 @@ def createIdTable(db, tableName, keyName, strName):
         CREATE TABLE %s (
             %s %%(PRIMARYKEY)s,
             %s VARCHAR(767)
-        )""" %(tableName, keyName, strName) % db.keywords)
+        )  %%(TABLEOPTS)s""" %(tableName, keyName, strName) % db.keywords)
         db.tables[tableName] = []
         commit = True
     db.createIndex(tableName, idxName, strName, unique = True)

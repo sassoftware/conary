@@ -28,10 +28,10 @@ MYSQL_TYPE_NEWDECIMAL = 246
 conversions[MYSQL_TYPE_NEWDECIMAL] = float
 
 class KeywordDict(BaseKeywordDict):
-    keys = BaseKeywordDict.keys
+    keys = BaseKeywordDict.keys.copy()
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
     keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
-
+    keys['TABLEOPTS'] = 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin'
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 

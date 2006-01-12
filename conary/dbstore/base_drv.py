@@ -32,7 +32,9 @@ class BaseBinary:
 class BaseKeywordDict(dict):
     keys = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
              'BLOB'       : 'BLOB',
-             'MEDIUMBLOB' : 'BLOB'                  }
+             'MEDIUMBLOB' : 'BLOB',
+             'TABLEOPTS'  : '',
+             }
     def __init__(self):
         dict.__init__(self, self.keys)
 

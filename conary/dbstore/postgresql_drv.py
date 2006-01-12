@@ -21,7 +21,7 @@ import sqlerrors
 import sqllib
 
 class KeywordDict(BaseKeywordDict):
-    keys = BaseKeywordDict.keys
+    keys = BaseKeywordDict.keys.copy()
     keys.update( { 'BLOB' : 'BYTEA',
                    'MEDIUMBLOB' : 'BYTEA',
                    'PRIMARYKEY' : 'SERIAL PRIMARY KEY' } )

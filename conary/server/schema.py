@@ -52,7 +52,7 @@ def createInstances(db):
             CONSTRAINT Instances_clonedfromid_fk
                 FOREIGN KEY (clonedFromId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Instances"] = []
         commit = True
     db.createIndex("Instances", "InstancesIdx",
@@ -93,7 +93,7 @@ def createFlavors(db):
         CREATE TABLE Flavors(
             flavorId        %(PRIMARYKEY)s,
             flavor          VARCHAR(767)
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, 'none')")
         db.tables["Flavors"] = []
         commit = True
@@ -109,7 +109,7 @@ def createFlavors(db):
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorMap"] = []
         commit = True
     db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId")
@@ -121,7 +121,7 @@ def createFlavors(db):
             request         INTEGER,
             present         INTEGER,
             value           INTEGER NOT NULL DEFAULT -1000000
-        )""")
+        )  %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorScores"] = []
         for (request, present), value in deps.flavorScores.iteritems():
             if value is None:
@@ -160,7 +160,7 @@ def createNodes(db):
             CONSTRAINT Nodes_sourceItem_fk
                 FOREIGN KEY (sourceItemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Nodes"] = []
         cu.execute("""INSERT INTO Nodes
         (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
@@ -219,7 +219,7 @@ def createLatest(db):
             CONSTRAINT Latest_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Latest"] = []
         commit = True
     db.createIndex("Latest", "LatestIdx", "itemId, branchId, flavorId",
@@ -260,7 +260,7 @@ def createUsers(db):
             salt            %(BINARY4)s NOT NULL,
             password        %(BINARY254)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Users"] = []
         commit = True
     db.createIndex("Users", "UsersUser_uq", "userName", unique = True)
@@ -274,7 +274,7 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []
         commit = True
     db.createIndex("UserGroups", "UserGroupsUserGroup_uq", "userGroup",
@@ -293,7 +293,7 @@ def createUsers(db):
             CONSTRAINT UserGroupMembers_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroupMembers"] = []
         commit = True
     db.createIndex("UserGroupMembers", "UserGroupMembers_uq",
@@ -323,7 +323,7 @@ def createUsers(db):
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Permissions"] = []
         commit = True
     db.createIndex("Permissions", "PermissionsIdx",
@@ -361,7 +361,7 @@ def createUsers(db):
             CONSTRAINT EntitlementGroups_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["EntitlementGroups"] = []
         commit = True
     db.createIndex("EntitlementGroups", "EntitlementGroupsEntGroupIdx",
@@ -382,7 +382,7 @@ def createUsers(db):
             CONSTRAINT EntitlementOwners_entOwnerId_fk
                 FOREIGN KEY (ownerGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["EntitlementOwners"] = []
         commit = True
     db.createIndex("EntitlementOwners", "EntitlementOwnersEntOwnerIdx",
@@ -399,7 +399,7 @@ def createUsers(db):
             CONSTRAINT Entitlements_entGroupId_fk
                 FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Entitlements"] = []
         commit = True
     db.createIndex("Entitlements", "EntitlementsEntGroupEntitlementIdx",
@@ -427,7 +427,7 @@ def createPGPKeys(db):
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["PGPKeys"] = []
         commit = True
     db.createIndex("PGPKeys", "PGPKeysFingerprintIdx",
@@ -446,7 +446,7 @@ def createPGPKeys(db):
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["PGPFingerprints"] = []
         commit = True
     db.createIndex("PGPFingerprints", "PGPFingerprintsKeyIdx",
@@ -468,7 +468,7 @@ def createTroves(db):
             fileId      %(BINARY20)s,
             stream      %(BLOB)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
 
@@ -494,7 +494,7 @@ def createTroves(db):
             CONSTRAINT TroveFiles_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveFiles"] = []
         commit = True
     # FIXME: rename these indexes
@@ -516,7 +516,7 @@ def createTroves(db):
             CONSTRAINT TroveTroves_includedId_fk
                 FOREIGN KEY (includedId) REFERENCES Instances(instanceId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveTroves"] = []
         commit = True
     db.createIndex("TroveTroves", "TroveTrovesInstanceIncluded_uq",
@@ -535,7 +535,7 @@ def createTroves(db):
             CONSTRAINT TroveInfo_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveInfo"] = []
         commit = True
     db.createIndex("TroveInfo", "TroveInfoIdx", "instanceId")
@@ -567,7 +567,7 @@ def createMetadata(db):
             CONSTRAINT Metadata_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Metadata"] = []
         commit = True
     if createTrigger(db, "Metadata"):
@@ -583,7 +583,7 @@ def createMetadata(db):
             CONSTRAINT MetadataItems_metadataId_fk
                 FOREIGN KEY (metadataId) REFERENCES Metadata(metadataId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["MetadataItems"] = []
         commit = True
     db.createIndex("MetadataItems", "MetadataItemsIdx", "metadataId")
@@ -601,7 +601,7 @@ def createMirrorTracking(db):
         CREATE TABLE LatestMirror(
             host            VARCHAR(254),
             mark            NUMERIC(14,0) NOT NULL
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.commit()
         db.loadSchema()
 
@@ -619,7 +619,7 @@ def createChangeLog(db):
                 CONSTRAINT ChangeLogs_nodeId_fk
                     FOREIGN KEY (nodeId) REFERENCES Nodes(nodeId)
                     ON DELETE CASCADE ON UPDATE CASCADE
-            )""")
+            ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["ChangeLogs"] = []
         cu.execute("INSERT INTO ChangeLogs (nodeId, name, contact, message) "
                    "VALUES(0, NULL, NULL, NULL)")
@@ -651,7 +651,7 @@ def createLabelMap(db):
             CONSTRAINT LabelMap_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE CASCADE ON UPDATE CASCADE
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["LabelMap"] = []
         commit = True
     db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
@@ -678,7 +678,7 @@ def createIdTables(db):
             itemId      %(PRIMARYKEY)s,
             item        VARCHAR(254),
             hasTrove    INTEGER NOT NULL DEFAULT 0
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Items"] = []
         cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
         commit = True
@@ -1068,7 +1068,7 @@ def setupTempTables(db):
             base        VARCHAR(254),
             sense       INTEGER,
             flag        VARCHAR(254)
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["ffFlavor"] = True
     if "NewFiles" not in db.tempTables:
         cu.execute("""
@@ -1078,13 +1078,13 @@ def setupTempTables(db):
             fileId      %(BINARY20)s,
             stream      %(BLOB)s,
             path        VARCHAR(767)
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
     if "NeededFlavors" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NeededFlavors(
             flavor      VARCHAR(767)
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NeededFlavors"] = True
     if "gtl" not in db.tempTables:
         cu.execute("""
@@ -1093,21 +1093,21 @@ def setupTempTables(db):
             name        VARCHAR(254),
             version     VARCHAR(767),
             flavor      VARCHAR(767)
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtl"] = True
     if "gtlInst" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE gtlInst(
             idx         %(PRIMARYKEY)s,
             instanceId  INTEGER
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtlInst"] = True
     if "getFilesTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
             itemId      INTEGER PRIMARY KEY,
             fileId      %(BINARY20)s
-        )""" % db.keywords)
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["getFilesTbl"] = True
     if "itf" not in db.tempTables:
         cu.execute("""
@@ -1115,7 +1115,7 @@ def setupTempTables(db):
             item        VARCHAR(254),
             version     VARCHAR(767),
             fullVersion VARCHAR(767)
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["itf"] = True
     if "gtvlTbl" not in db.tempTables:
         cu.execute("""
@@ -1123,7 +1123,7 @@ def setupTempTables(db):
             item        VARCHAR(254),
             versionSpec VARCHAR(767),
             flavorId    INTEGER
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtvlTbl"] = True
     if "hasTrovesTmp" not in db.tempTables:
         cu.execute("""
@@ -1133,7 +1133,7 @@ def setupTempTables(db):
             item        VARCHAR(254),
             version     VARCHAR(767),
             flavor      VARCHAR(767)
-        )""")
+        ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
     db.commit()
     db.loadSchema()
