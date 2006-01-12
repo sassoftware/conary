@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -24,6 +24,7 @@ import shutil
 import signal
 import sys
 import tempfile
+import textwrap
 import time
 import traceback
 import types
@@ -610,13 +611,14 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     if not result:
         return
 
-    (bldList, recipeObj, builddir, destdir) = result
+    (bldList, recipeObj, builddir, destdir, policyTroves) = result
     
     # 2. convert the package into a changeset ready for committal
-    changeSet, built = _createPackageChangeSet(repos, db, cfg, bldList, recipeObj,
-                           sourceVersion,
+    changeSet, built = _createPackageChangeSet(repos, db, cfg, bldList,
+                           recipeObj, sourceVersion,
                            targetLabel=targetLabel,
-                           alwaysBumpCount=alwaysBumpCount)
+                           alwaysBumpCount=alwaysBumpCount,
+                           policyTroves=policyTroves)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
@@ -641,6 +643,22 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     use.track(True)
     if recipeObj._trackedFlags is not None:
         use.setUsed(recipeObj._trackedFlags)
+
+    policyFiles = recipeObj.loadPolicy()
+    db = database.Database(cfg.root, cfg.dbPath)
+    policyTroves = set()
+    for policyPath in policyFiles:
+        troveList = list(db.iterTrovesByPath(policyPath))
+        if troveList:
+            for trove in troveList:
+                policyTroves.add((trove.getName(), trove.getVersion(),
+                                  trove.getFlavor()))
+        else:
+            # FIXME: enforce not building into repository
+            ver = versions.VersionFromString('/local@local:LOCAL/0-0')
+            ver.resetTimeStamps()
+            policyTroves.add((policyPath, ver, deps.DependencySet()))
+    del db
 
     recipeObj.setup()
     try:
@@ -698,7 +716,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        logBuildEnvironment(logFile, sourceVersion, recipeObj.macros, cfg)
+        logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                            recipeObj.macros, cfg)
     try:
         bldInfo.begin()
         bldInfo.destdir = destdir
@@ -723,9 +742,20 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                                        recipeClass.name, resume)
                 return
             log.info('Processing %s', recipeClass.name)
-            recipeObj.doDestdirProcess() # includes policy
+            if not resume:
+                # test suite policy does not work well with restart, and
+                # is generally useful mainly when cooking into repo, where
+                # restart is not allowed
+                recipeObj.doProcess(policy.TESTSUITE)
+            recipeObj.doProcess(policy.DESTDIR_PREPARATION)
+            recipeObj.doProcess(policy.DESTDIR_MODIFICATION)
+            # cannot restart after the beginning of policy.PACKAGE_CREATION
             bldInfo.stop()
             use.track(False)
+            recipeObj.doProcess(policy.PACKAGE_CREATION)
+            recipeObj.doProcess(policy.PACKAGE_MODIFICATION)
+            recipeObj.doProcess(policy.ENFORCEMENT)
+            recipeObj.doProcess(policy.ERROR_REPORTING)
         finally:
             os.chdir(cwd)
     
@@ -768,10 +798,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.updateFileContents(
             recipeObj.macros.buildlogpath, logPath)
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
-    return bldList, recipeObj, builddir, destdir
+    return bldList, recipeObj, builddir, destdir, policyTroves
 
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
-                            targetLabel=None, alwaysBumpCount=False):
+                            targetLabel=None, alwaysBumpCount=False,
+                            policyTroves=None):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
         components created by cooking a package recipe.  RecipeObj is
@@ -800,6 +831,8 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             grpMap[main].setSourceName(sourceName)
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
+            if policyTroves:
+                grpMap[main].setPolicyProviders(policyTroves)
             grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
             grpMap[main].setBuildRequirements(
                      set((x.getName(), x.getVersion(), x.getFlavor())
@@ -877,10 +910,19 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     return changeSet, built
 
-def logBuildEnvironment(out, sourceVersion, macros, cfg):
+def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
 
-    write('Building %s %s\n' % (macros.name, sourceVersion))
+    write('Building %s=%s\n' % (macros.name, sourceVersion))
+    write('using conary=%s\n' %constants.version)
+    if policyTroves:
+        write('and policy from:\n')
+        wrap = textwrap.TextWrapper(
+            initial_indent='    ',
+            subsequent_indent='        ',
+        )
+        for troveTup in sorted(policyTroves):
+            write(wrap.fill('%s[%s]=%s' %troveTup) + '\n')
 
     write('*' * 60 + '\n')
     write("Environment:\n")

@@ -269,7 +269,7 @@ def commit(repos, cfg, message, callback=None):
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            recipeObj = recipeClass(cfg, lcache, srcdirs)
+            recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
         except builderrors.RecipeFileError, msg:
             log.error(str(msg))
             sys.exit(1)

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,10 +22,9 @@ from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 
 from conary.build import build
-from conary.build import destdirpolicy
 from conary.build import errors
 from conary.build import macros
-from conary.build import packagepolicy
+from conary.build import policy
 from conary.build import source
 from conary.build import use
 from conary.conaryclient import cmdline
@@ -99,6 +98,9 @@ def clearBuildReqs(*buildReqs):
         for base in inspect.getmro(class_):
             if issubclass(base, _AbstractPackageRecipe):
                 _removePackages(base, buildReqs)
+
+def _ignoreCall(*args, **kw):
+    pass
 
 class _AbstractPackageRecipe(Recipe):
     buildRequires = []
@@ -355,14 +357,28 @@ class _AbstractPackageRecipe(Recipe):
             for bld in self._build:
                 bld.doAction()
 
-    def doDestdirProcess(self):
-	for post in self.destdirPolicy:
+    def loadPolicy(self):
+        (self._policyPathMap, self._policies) = policy.loadPolicy(self)
+        # create bucketless name->policy map for getattr
+        policyList = []
+        for bucket in self._policies.keys():
+            policyList.extend(self._policies[bucket])
+        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
+        # Some policy needs to pass arguments to other policy at init
+        # time, but that can't happen until after all policy has been
+        # initialized
+        for policyObj in self._policyMap.values():
+            policyObj.postInit()
+
+        # returns list of policy files loaded
+        return self._policyMap.keys()
+
+    def doProcess(self, policyBucket):
+	for post in self._policies[policyBucket]:
+            # FIXME: print name of policy
             post.doProcess(self)
 
     def getPackages(self):
-	# policies look at the recipe instance for all information
-	for policy in self.packagePolicy:
-	    policy.doProcess(self)
         return self.autopkg.getComponents()
 
     def setByDefaultOn(self, includeSet):
@@ -454,15 +470,11 @@ class _AbstractPackageRecipe(Recipe):
 		return _sourceHelper(source.__dict__[name[3:]], self)
 	    if name in build.__dict__:
 		return _recipeHelper(self._build, self, build.__dict__[name])
-	    for (policy, list) in (
-		(destdirpolicy, self.destdirPolicy),
-		(packagepolicy, self.packagePolicy)):
-		if name in policy.__dict__:
-		    policyClass = policy.__dict__[name]
-		    for policyObj in list:
-			if isinstance(policyObj, policyClass):
-			    return _policyUpdater(policyObj)
-		    return _recipeHelper(list, self, policyClass)
+	    if name in self._policyMap:
+	        policyObj = self._policyMap[name]
+                return _policyUpdater(policyObj)
+            if self._lightInstance:
+                return _ignoreCall
         if name in self.__dict__:
             return self.__dict__[name]
         raise AttributeError, name
@@ -471,29 +483,29 @@ class _AbstractPackageRecipe(Recipe):
 	"""
 	Allows us to delete policy items from their respective lists
 	by deleting a name in the recipe self namespace.  For example,
-	to remove the EtcConfig package policy from the package policy
+	to remove the AutoDoc package policy from the package policy
 	list, one could do::
-	 del self.EtcConfig
-	This would prevent the EtcConfig package policy from being
-	executed.  The policy objects are carefully ordered in the
-	default policy lists; deleting a policy object and then
-	referencing it again will cause it to show up at the end of
-	the list.  Don't do that.
+	 del self.AutoDoc
+	This would prevent the AutoDoc package policy from being
+	executed.
 
 	In general, delete policy only as a last resort; you can
 	usually disable policy entirely with the keyword argument::
 	 exceptions='.*'
 	"""
-	for (policy, list) in (
-	    (destdirpolicy, self.destdirPolicy),
-	    (packagepolicy, self.packagePolicy)):
-	    if name in policy.__dict__:
-		policyClass = policy.__dict__[name]
-		for index in range(len(list)):
-		    policyObj = list[index]
-		    if isinstance(policyObj, policyClass):
-			del list[index]
-			return
+        if name in self._policyMap:
+            policyObj = self._policyMap[name]
+            bucket = policyObj.bucket
+            if bucket in (policy.TESTSUITE,
+                          policy.DESTDIR_PREPARATION,
+                          policy.PACKAGE_CREATION,
+                          policy.ERROR_REPORTING):
+                # cannot delete conary internal policy
+                return
+            self._policies[bucket] = [x for x in self._policies[bucket]
+                                      if x is not policyObj]
+            del self._policyMap[policyObj.__class__.__name__]
+            return
 	del self.__dict__[name]
 
     def _includeSuperClassBuildReqs(self):
@@ -642,15 +654,18 @@ class _AbstractPackageRecipe(Recipe):
         use.Use.bootstrap._set()
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
-                 crossCompile=None):
+                 crossCompile=None, lightInstance=False):
         Recipe.__init__(self)
 	self._sources = []
 	self._build = []
         self.buildinfo = False
+        # lightInstance for only instantiating, not running (such as checkin)
+        self._lightInstance = lightInstance
 
+        self._policyPathMap = {}
+        self._policies = {}
+        self._policyMap = {}
         self._includeSuperClassBuildReqs()
-        self.destdirPolicy = destdirpolicy.DefaultPolicy(self)
-        self.packagePolicy = packagepolicy.DefaultPolicy(self)
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg

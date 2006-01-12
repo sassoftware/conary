@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -80,6 +80,9 @@ class LabelPath(streams.OrderedStringsStream):
     pass
 
 class BuildDependencies(TroveTupleList):
+    pass
+
+class PolicyProviders(TroveTupleList):
     pass
 
 class LoadedTroves(TroveTupleList):
@@ -272,6 +275,7 @@ _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10 
 _TROVEINFO_TAG_LABEL_PATH     = 11 
+_TROVEINFO_TAG_POLICY_PROV    = 12
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -288,6 +292,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SIGS          : (LARGE, TroveSignatures,      'sigs'         ),
         _TROVEINFO_TAG_PATH_HASHES   : (LARGE, PathHashes,           'pathHashes'   ),
         _TROVEINFO_TAG_LABEL_PATH    : (SMALL, LabelPath,            'labelPath'   ),
+        _TROVEINFO_TAG_POLICY_PROV   : (LARGE, PolicyProviders, 'policyProviders'),
     }
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
@@ -1397,6 +1402,14 @@ class Trove(streams.StreamSet):
     def getBuildRequirements(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
                          for x in self.troveInfo.buildReqs.iterAll() ]
+
+    def setPolicyProviders(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.policyProviders.add(name, ver, release)
+
+    def getPolicyProviders(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor()) 
+                         for x in self.troveInfo.policyProviders.iterAll() ]
 
     def setLoadedTroves(self, itemList):
         for (name, ver, release) in itemList:
