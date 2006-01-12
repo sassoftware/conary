@@ -923,7 +923,7 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
             subsequent_indent='        ',
         )
         for troveTup in sorted(policyTroves):
-            write(wrap.fill('%s[%s]=%s' %troveTup) + '\n')
+            write(wrap.fill('%s = %s [%s]' %troveTup) + '\n')
 
     write('*' * 60 + '\n')
     write("Environment:\n")

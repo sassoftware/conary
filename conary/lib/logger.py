@@ -182,6 +182,7 @@ class _ChildLogger:
         logFile = self.logFile
         directRd = self.directRd
         stdin = sys.stdin.fileno()
+        unLogged = ''
 
         stdout = sys.stdout.fileno()
 
@@ -214,6 +215,8 @@ class _ChildLogger:
                         # input/output error - pipe closed
                         # shut down logger
                         break
+                        if unLogged:
+                            logFile.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
@@ -235,13 +238,33 @@ class _ChildLogger:
                         # input/output error - pty closed 
                         # shut down logger
                         break
+                        if unLogged:
+                            logFile.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
                         raise
                 else:
-                    os.write(stdout, output)
-                    logFile.write(output)
+                    # avoid writing foo\rbar\rblah to log
+                    outputList = output.split('\r\n')
+
+                    if outputList[-1].endswith('\r'):
+                        os.write(stdout, output[:-1])
+                        # blank out previous line extra bits
+                        os.write(stdout, ' '*(78-len(outputList[-1])) + '\r')
+                    else:
+                        os.write(stdout, output)
+                    if unLogged:
+                        outputList[0] = unLogged + outputList[0]
+                        unLogged = ''
+                    outputList = [x.rsplit('\r', 1)[-1] for x in outputList
+                                  if not x.endswith('\r')]
+                    if outputList:
+                        # if output didn't end with \n, save last line for later
+                        unLogged = outputList[-1]
+                        if unLogged:
+                            outputList[-1] = ''
+                        logFile.write('\n'.join(outputList))
             if stdin in read:
                 # read input from stdin, and pass to 
                 # pseudo tty 
@@ -252,13 +275,14 @@ class _ChildLogger:
                         # input/output error - stdin closed 
                         # shut down logger
                         break
+                        if unLogged:
+                            logFile.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
                         raise
                 else:
                     os.write(ptyFd, input)
-                    logFile.write(input)
             if sigwinch:
             #   disable sigwinch to ensure the window width expected in logs is standardized
             #   self._resizeTerminal()

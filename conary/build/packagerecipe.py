@@ -16,6 +16,7 @@ import copy
 import os
 import imp
 import inspect
+import sys
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build.loadrecipe import _addRecipeToCopy
@@ -371,11 +372,13 @@ class _AbstractPackageRecipe(Recipe):
             policyObj.postInit()
 
         # returns list of policy files loaded
-        return self._policyMap.keys()
+        return self._policyPathMap.keys()
 
     def doProcess(self, policyBucket):
+        stdout = sys.stdout.fileno()
 	for post in self._policies[policyBucket]:
-            # FIXME: print name of policy
+            os.write(stdout,
+                     'Running policy: ' + post.__class__.__name__ + '\r')
             post.doProcess(self)
 
     def getPackages(self):

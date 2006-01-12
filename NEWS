@@ -3,6 +3,9 @@ Changes in 0.90.1:
     * Conary policy has been split out into the conary-policy package.
       (Some internal packaging work is done using the same mechanism; this
       was left in conary proper.)
+    * Conary prints out the name of each policy as it runs, making it
+      possible to see which policies take the most time.
+    * BuildLog files no longer contain lines that end with \r.
 
 Changes in 0.90.0:
   o Code Structure/Architecture Changes:
