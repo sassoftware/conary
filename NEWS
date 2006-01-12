@@ -36,6 +36,12 @@ Changes in 0.90.0:
       to create a group where all devel components are byDefault False,
       for example. r.removeComponents(['devel', 'devellib'])
     * store labelPath used to build a group in troveInfo
+    * r.addAll() now by default recurses through all the included groups
+      and creates local versions of them as well.  
+    * added an r.replace(<name>, <newversion>, <newflavor>) command that 
+      basically removes all versions of name from all groups in the recipe
+      and replaces them with the version found by searching for newVersion,
+      newFlavor. 
 
   o Client Changes:
     * When committing source changes in interactive mode, conary will ask you

@@ -110,7 +110,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             raise
         except:
             print >> sys.stderr, "exception occurred while committing change set"
-            print >> sys.stderr, ''.join(traceback.format_exception(type, value, tb))
+            print >> sys.stderr, ''.join(traceback.format_exception(*sys.exc_info()))
             print >> sys.stderr, "attempting rollback"
             self.troveStore.rollback()
             raise

@@ -17,6 +17,7 @@ from itertools import chain, izip
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
 from conary.build.errors import RecipeFileError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
+from conary.build.errors import GroupAddAllError
 from conary.build import macros
 from conary.build import use
 from conary import conaryclient
@@ -107,6 +108,8 @@ class GroupRecipe(_BaseGroupRecipe):
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
 
+        self.replaceSpecs = []
+
         _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck, 
                          autoResolve = self.autoResolve, 
@@ -157,29 +160,29 @@ class GroupRecipe(_BaseGroupRecipe):
         for group in self._getGroups(groupName):
             group.setByDefault(byDefault)
 
-    def addAll(self, reference, groupName = None):
+    def addAll(self, name, versionStr = None, flavor = None, ref = None,
+                                                            recurse=True, 
+                                                            groupName = None):
         """ Add all of the troves directly contained in the given 
             reference to groupName.  For example, if the cooked group-foo 
             contains references to the troves 
             foo1=<version>[flavor] and foo2=<version>[flavor],
-            the lines 
-            ref = r.addReference('group-foo')
-            followed by
-            r.addAll(ref)
+            the lines followed by
+            r.addAll(name, versionStr, flavor)
             would be equivalent to you having added the addTrove lines
-            r.addTrove('foo1', <version>) 
-            r.addTrove('foo2', <version>) 
+            r.add('foo1', <version>) 
+            r.add('foo2', <version>) 
         """
-        assert(reference is not None)
+        flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
-            group.addAll(reference)
+            group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
         if not self._hasGroup(name):
             raise RecipeFileError, 'group %s has not been created' % name
 
         for group in self._getGroups(groupName):
-            group.addNewGroup(name, byDefault)
+            group.addNewGroup(name, byDefault, explicit = True)
 
     def setDefaultGroup(self, groupName):
         self._setDefaultGroup(self._getGroup(groupName))
@@ -187,6 +190,18 @@ class GroupRecipe(_BaseGroupRecipe):
     def addReference(self, name, versionStr = None, flavor = None, ref = None):
         flavor = self._parseFlavor(flavor)
         return GroupReference(((name, versionStr, flavor),), ref)
+
+    def replace(self, name, newVersionStr = None, newFlavor = None, ref = None, 
+                groupName = None):
+        newFlavor = self._parseFlavor(newFlavor)
+        if groupName is None:
+            self.replaceSpecs.append(((name, newVersionStr, newFlavor), ref))
+        else:
+            for group in self._getGroups(groupName):
+                group.replaceSpec(name, newVersionStr, newFlavor, ref)
+
+    def iterReplaceSpecs(self):
+        return iter(self.replaceSpecs)
 
     def setLabelPath(self, *path):
         self.labelPath = [ versions.Label(x) for x in path ]
@@ -198,7 +213,7 @@ class GroupRecipe(_BaseGroupRecipe):
         return self.flavor
 
     def getChildGroups(self, groupName):
-        return [ (self._getGroup(x[0]), x[1]) for x in self._getGroup(groupName).iterNewGroupList() ]
+        return [ (self._getGroup(x[0]), x[1], x[2]) for x in self._getGroup(groupName).iterNewGroupList() ]
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
@@ -238,9 +253,10 @@ class SingleGroup(object):
         self.removeTroveList = []
         self.removeComponentList = set()
         self.addReferenceList = []
-        self.newGroupList = []
-        self.requires = deps.DependencySet()
+        self.replaceTroveList = []
+        self.newGroupList = {}
 
+        self.requires = deps.DependencySet()
 
         self.troves ={}
         self.childTroves = {}
@@ -267,9 +283,12 @@ class SingleGroup(object):
     def removeComponents(self, componentList):
         self.removeComponentList.update(componentList)
 
-    def addAll(self, reference, byDefault = None):
-        assert(reference)
-        self.addReferenceList.append((reference, byDefault))
+    def replaceSpec(self, name, newVersionStr = None, newFlavor = None, 
+                    ref = None):
+        self.replaceTroveList.append(((name, newVersionStr, newFlavor), ref))
+
+    def addAll(self, name, versionStr, flavor, ref, recurse):
+        self.addReferenceList.append(((name, versionStr, flavor), ref, recurse))
 
     def getComponentsToRemove(self):
         return self.removeComponentList
@@ -280,14 +299,26 @@ class SingleGroup(object):
     def iterRemoveSpecs(self):
         return iter(self.removeTroveList)
 
+    def iterReplaceSpecs(self):
+        return iter(self.replaceTroveList)
+
     def iterAddAllSpecs(self):
         return iter(self.addReferenceList)
 
-    def addNewGroup(self, name, byDefault = None):
-        self.newGroupList.append([ name, byDefault ])
+    def addNewGroup(self, name, byDefault = None, explicit = True):
+        if name in self.newGroupList:
+            oldByDefault, oldExplicit = self.newGroupList[name]
+            byDefault = oldByDefault or byDefault
+            explicit = oldExplicit or explicit
+
+        self.newGroupList[name] = (byDefault, explicit)
 
     def iterNewGroupList(self):
-        return iter(self.newGroupList)
+        for name, (byDefault, explicit) in self.newGroupList.iteritems():
+            yield name, byDefault, explicit
+
+    def hasNewGroup(self, name):
+        return name in self.newGroupList
 
     def setByDefault(self, byDefault):
         self.byDefault = byDefault
@@ -300,6 +331,17 @@ class SingleGroup(object):
 
     def addTrove(self, troveTup, explicit, byDefault, components):
         assert(isinstance(byDefault, bool))
+
+        if troveTup in self.troves:
+            # if you add a trove twice, once as explicit and once 
+            # as implict, make sure it stays explicit, same w/ 
+            # byDefault.
+            (oldExplicit, oldByDefault, oldComponents) = self.troves[troveTup]
+            explicit = explicit or oldExplicit
+            byDefault = byDefault or oldByDefault
+            if oldComponents:
+                components = components + oldComponents
+
         self.troves[troveTup] = (explicit, byDefault, components)
 
     def delTrove(self, name, version, flavor):
@@ -307,7 +349,7 @@ class SingleGroup(object):
         if explicit: 
             del self.troves[name, version, flavor]
         else:
-            self.troves[name, version, flavor] = (explicit, False, comps)
+            self.troves[name, version, flavor] = (False, False, comps)
 
     def setSize(self, size):
         self.size = size
@@ -324,6 +366,15 @@ class SingleGroup(object):
                 yield troveTup
             elif not explicit and weakRefs:
                 yield troveTup
+
+    def isExplicit(self, name, version, flavor):
+        return self.troves[name, version, flavor][0]
+
+    def includeTroveByDefault(self, name, version, flavor):
+        return self.troves[name, version, flavor][1]
+
+    def getComponents(self, name, version, flavor):
+        return self.troves[name, version, flavor][2]
 
     def iterTroveListInfo(self):
         for troveTup, (explicit, byDefault, comps) in self.troves.iteritems():
@@ -437,7 +488,7 @@ def buildGroups(recipeObj, cfg, repos):
             groupsByName[group.name] = group
             g.addNode(group.name)
 
-            for childName, byDefault in group.iterNewGroupList():
+            for childName, byDefault, explicit in group.iterNewGroupList():
                 # this should ensure that the child is listed before
                 # this group.
                 g.addEdge(childName, group.name)
@@ -450,18 +501,28 @@ def buildGroups(recipeObj, cfg, repos):
 
 
     cache = TroveCache(repos)
-    groupList = _sortGroups(recipeObj.iterGroupList())
 
     labelPath = recipeObj.getLabelPath()
     flavor = recipeObj.getSearchFlavor()
 
     # find all the groups needed for all groups in a few massive findTroves
     # calls.
-    troveMap = findTrovesForGroups(repos, groupList, labelPath, flavor)
+    replaceSpecs = list(recipeObj.iterReplaceSpecs())
+    troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(), 
+                                   replaceSpecs,
+                                   labelPath, flavor)
     troveTupList = list(chain(*chain(*(x.values() for x in troveMap.itervalues()))))
     cache.cacheTroves(troveTupList)
 
     groupsWithConflicts = {}
+
+    newGroups = processAddAllDirectives(recipeObj, troveMap, cache, repos)
+
+    groupList = _sortGroups(recipeObj.iterGroupList())
+
+    for group in groupList:
+        for (troveSpec, ref) in replaceSpecs:
+            group.replaceSpec(*(troveSpec + (ref,)))
 
     for group in groupList:
         childGroups = recipeObj.getChildGroups(group.name)
@@ -470,7 +531,7 @@ def buildGroups(recipeObj, cfg, repos):
         # if so, we won't bother building up this group since it's 
         # bound to have a conflict as well.
         badGroup = False
-        for childGroup, byDefault in childGroups:
+        for childGroup, byDefault, isExplicit in childGroups:
             if childGroup.name in groupsWithConflicts:
                 badGroup = True
                 # mark this group as having a conflict
@@ -507,17 +568,21 @@ def buildGroups(recipeObj, cfg, repos):
 
 
 
-def findTrovesForGroups(repos, groupList, labelPath, searchFlavor):
+def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath, 
+                        searchFlavor):
     toFind = {}
     troveMap = {}
+
+    for troveSpec, refSource in replaceSpecs:
+        toFind.setdefault(refSource, set()).add(troveSpec)
 
     for group in groupList:
         for (troveSpec, source, byDefault, 
              refSource, components) in group.iterAddSpecs():
             toFind.setdefault(refSource, set()).add(troveSpec)
 
-        for refSource, byDefault in group.iterAddAllSpecs():
-            toFind.setdefault(refSource, set())
+        for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
+            toFind.setdefault(ref, set()).add(troveSpec)
 
     results = {}
 
@@ -537,6 +602,71 @@ def findTrovesForGroups(repos, groupList, labelPath, searchFlavor):
 
     return results
     
+def processAddAllDirectives(recipeObj, troveMap, cache, repos):
+    for group in list(recipeObj.iterGroupList()):
+        groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
+        for troveSpec, refSource, recurse in group.iterAddAllSpecs():
+            for troveTup in troveMap[refSource][troveSpec]:
+                processOneAddAllDirective(group, troveTup,  recurse, 
+                                          recipeObj, cache, repos)
+            
+
+def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
+                              repos): 
+    topTrove = repos.getTrove(withFiles=False, *troveTup)
+
+    if recurse:
+        groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True, 
+                                                     weakRefs=True) \
+                                        if x[0].startswith('group-') ]
+
+        trvs = repos.getTroves(groupTups, withFiles=False)
+
+        groupTrvDict = dict(izip(groupTups, trvs))
+
+        if len(set(x[0] for x in groupTups)) != len(groupTups):
+            raise GroupAddAllError(parentGroup, troveTup, groupTups)
+        
+
+    createdGroups = set()
+    groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
+    
+    stack = [(topTrove, parentGroup)]
+    troveTups = []
+
+    while stack:
+        trv, parentGroup = stack.pop()
+        for troveTup in trv.iterTroveList(strongRefs=True):
+            byDefault = trv.includeTroveByDefault(*troveTup)
+
+            if recurse and troveTup[0].startswith('group-'):
+                name = troveTup[0]
+                childGroup = groupsByName.get(name, None)
+                if not childGroup:
+
+                    childGroup = recipeObj.createGroup(
+        name, 
+        depCheck               = parentGroup.depCheck,
+        autoResolve            = parentGroup.autoResolve,
+        checkOnlyByDefaultDeps = parentGroup.checkOnlyByDefaultDeps,
+        checkPathConflicts     = parentGroup.checkPathConflicts)
+
+                    groupsByName[name] = childGroup
+
+
+                parentGroup.addNewGroup(name, byDefault=byDefault, 
+                                        explicit = True)
+
+                if troveTup not in createdGroups:
+                    stack.append((groupTrvDict[troveTup], childGroup))
+                    createdGroups.add(troveTup)
+            else:
+                parentGroup.addTrove(troveTup, True, byDefault, [])
+                troveTups.append(troveTup)
+
+    cache.cacheTroves(troveTups)
+ 
+ 
 
 def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     def _componentMatches(troveName, compList):
@@ -553,32 +683,33 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         for troveTup in troveTupList:
             group.addTrove(troveTup, True, byDefault, components)
 
-    # add troves added using r.addAll(ref)
-    for refSource, byDefault in group.iterAddAllSpecs():
-        srcTroveList = refSource.getSourceTroves()
-
-        # get byDefault dict for troves 
-        troveTups = []
-        for sourceTrove in srcTroveList:
-            for (troveTup, byDefault, isStrong) \
-                                        in sourceTrove.iterTroveListInfo():
-                if not isStrong:
-                    continue
-                group.addTrove(troveTup, True, byDefault, [])
-                troveTups.append(troveTup)
-                
-        cache.cacheTroves(troveTups)
-        
-    # remove explicit troves
+    # remove/replace explicit troves
     removeSpecs = list(group.iterRemoveSpecs())
-    if removeSpecs:
+    replaceSpecs = list(group.iterReplaceSpecs())
+    if removeSpecs or replaceSpecs:
         groupAsSource = trovesource.GroupRecipeSource(repos, group)
         groupAsSource.searchAsDatabase()
+
+        # remove troves 
         results = groupAsSource.findTroves(None, removeSpecs, allowMissing=True)
 
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
             group.delTrove(*troveTup)
+
+        # replace troves
+        for troveSpec, ref in replaceSpecs:
+            toRemove = dict(((x[0][0], None, None), x) for x in replaceSpecs)
+            results = groupAsSource.findTroves(None, toRemove, 
+                                                allowMissing=True)
+            troveTups = chain(*results.itervalues())
+            for troveTup in troveTups:
+                byDefault = group.includeTroveByDefault(*troveTup)
+                components = group.getComponents(*troveTup)
+
+                group.delTrove(*troveTup)
+                for newTup in troveMap[ref][troveSpec]:
+                    group.addTrove(newTup, True, byDefault, [])
 
     # add implicit troves
     # first from children of explicit troves.
@@ -602,15 +733,25 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             group.addTrove(childTup, False, byDefault, [])
 
     # add implicit troves from new groups (added with r.addNewGroup())
-    for childGroup, byDefault in childGroups:
-        for (troveTup, explicit, childByDefault, comps) \
-                                    in childGroup.iterTroveListInfo():
-            childByDefault = byDefault and childByDefault
-            if childByDefault and componentsToRemove:
-                if _componentMatches(troveTup[0], componentsToRemove):
-                    childByDefault = False
+    for childGroup, childByDefault, grpIsExplicit in childGroups:
+        if grpIsExplicit:
+            for (troveTup, explicit, childChildByDefault, comps) \
+                                        in childGroup.iterTroveListInfo():
+                childChildByDefault = childByDefault and childChildByDefault
+                if childChildByDefault and componentsToRemove:
+                    if _componentMatches(troveTup[0], componentsToRemove):
+                        childChildByDefault = False
 
-            group.addTrove(troveTup, False, childByDefault, [])
+                group.addTrove(troveTup, False, childChildByDefault, [])
+
+        for (childChildName, childChildByDefault, _) \
+                                        in childGroup.iterNewGroupList():
+            # we need to also keep track of what groups the groups we've
+            # created include, so the weak references can be added 
+            # to the trove.
+            childChildByDefault = childByDefault and childChildByDefault
+            group.addNewGroup(childChildName, childChildByDefault, 
+                              explicit = False)
 
 
     # remove implicit troves
@@ -622,6 +763,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
             group.delTrove(*troveTup)
+
+    
 
 def checkForRedirects(group, repos, troveCache):
     redirectTups = []
@@ -789,7 +932,15 @@ def calcSizeAndCheckHashes(group, troveCache):
         # I try to at least not have to iterate through any lists more
         # than once.
         allPathHashes = {}
-        for troveTup, explicit, byDefault in group.iterTroveListInfo():
+
+        isColl = trove.troveIsCollection
+        neededInfo = [x for x in group.iterTroveListInfo() \
+                                if (x[1] or x[2]) and not isColl(x[0][0]) ]
+
+
+        for (troveTup, explicit, byDefault, components) in neededInfo:
+            if not byDefault:
+                continue
             pathHashes = troveCache.getPathHashes(troveTup)
             if pathHashes is None:
                 continue
@@ -810,7 +961,7 @@ def calcSizeAndCheckHashes(group, troveCache):
     checkNotByDefaultPaths = False
 
     isColl = trove.troveIsCollection
-    neededInfo = [x for x in group.iterTroveListInfo() \
+    neededInfo = [ x for x in group.iterTroveListInfo() \
                             if (x[1] or x[2]) and not isColl(x[0][0]) ]
 
     troveCache.cacheTroves(x[0] for x in neededInfo)
@@ -833,6 +984,6 @@ def calcSizeAndCheckHashes(group, troveCache):
         pathHashCount = len(allPathHashes)
         allPathHashes = set(allPathHashes)
         if pathHashCount != len(allPathHashes):
-            conflicts = _getHashConflicts(group)
+            conflicts = _getHashConflicts(group, troveCache)
             return conflicts
 
