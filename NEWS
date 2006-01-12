@@ -1,8 +1,19 @@
 Changes in 0.90.0:
+  o Code Structure/Architecture Changes:
+    * Conary now has the concept of "weak references", where a weak reference
+      allows conary to be able to recognize the relationship between a
+      collection and the children of collections it contains.  This allows
+      us to add several new features to conary, documented in Client and Build
+      changes.
+    * SQL operations have been migrated to the dbstore driver to allow
+      for an easier switch of the database backends for the server side.
+    * Various query and code structure optimizations have been
+      implemented to allow running under MySQL and PostgreSQL.
+
   o Documentation Changes:
     * Added summaries about updateall in the conary man page and added
       information about the command-line options for conary rq.
-    * Clarified behaviour of "conary shadow --source-only" with respect to
+    * Clarified behavior of "conary shadow --source-only" with respect to
       rPath bug #500.
     * Added synonyms for cvc and conary commands which have shortcuts
       (ex: checkout and co).
@@ -17,7 +28,7 @@ Changes in 0.90.0:
       handled by tag handlers.
     * The Make() build action can now take a makeName keyword argument
       for cases when the normal Make() handling is exactly right but
-      a different make program is required (nmake, qmake, etc.)
+      a different make program is required (nmake, qmake, etc.).
     * The new PythonSetup() build action uses very recent versions
       of the python setuptools package to install python programs
       which have a setup.py that uses either the old disttools or
@@ -30,18 +41,19 @@ Changes in 0.90.0:
       components=['devel', 'runtime'])  will install <package>, but only the
       'runtime' and 'devel' components of <package> by default.
     * remove() can now 'remove' troves within child troves.
-    * when a component is added, (either via r.add() or dep resolution)
+    * When a component is added, (either via r.add() or dep resolution)
       is automatically added as well (though not all its sibling components)
-    * added r.removeComponents(<complist>), which allows you
-      to create a group where all devel components are byDefault False,
-      for example. r.removeComponents(['devel', 'devellib'])
-    * store labelPath used to build a group in troveInfo
-    * r.addAll() now by default recurses through all the included groups
-      and creates local versions of them as well.  
-    * added an r.replace(<name>, <newversion>, <newflavor>) command that 
-      basically removes all versions of name from all groups in the recipe
-      and replaces them with the version found by searching for newVersion,
-      newFlavor. 
+    * A new r.removeComponents(<complist>) command has been added.  It
+      allows you to create a group where all devel components are
+      byDefault False, for example: r.removeComponents(['devel',
+      'devellib']).
+    * The installPath used to build a group in is now stored in troveInfo.
+    * r.addAll() now recurses through all the included groups
+      and creates local versions of them as well by default.
+    * A new r.replace(<name>, <newversion>, <newflavor>) command has
+      been added.  It removes all versions of name from all groups in
+      the recipe and replaces them with the version found by searching
+      for newVersion, newFlavor.
 
   o Client Changes:
     * When committing source changes in interactive mode, conary will ask you
@@ -49,22 +61,10 @@ Changes in 0.90.0:
     * A new configuration option, autoResolvePackages, tells conary to install
       the packages that include the components needed for dep resolution.
     * You can now install locally cooked groups.
-    * Added script to mirror repositories
     * If foo is a redirect to bar, and you run 'conary update foo' when
       foo is not installed on your system, conary will act as if you had
       typed 'conary update bar'.  Previously, it would act as if you had typed
       'conary update bar --no-recurse'.
-
-  o Code structure:
-    * Conary now has the concept of "weak references", where a weak reference
-      allows conary to be able to recognize the relationship between a
-      collection and the children of collections it contains.  This allows
-      us to add several new features to conary, documented in Client and Build
-      changes.
-    * SQL operations have been migrated to the dbstore driver to allow
-      for an easier switch of the database backends for the server side.
-    * Various query and code structure optimizations have been
-      implemented to allow running under MySQL and PostgreSQL
 
   o Config Changes:
     * Conary config handling now supports comments at the end of config lines.
@@ -76,11 +76,16 @@ Changes in 0.90.0:
       /etc/conary/conf.d/ after reading in /etc/conaryrc
 
   o Server Changes:
-    * Added hasTroves() repository code
-    * Creating changesets atomically moves complete changesets into place
-    * Content store no longer reference counts entries
-    * Added support for trove marks to support mirroring
-    * Added support for traceback emails from the repository server
+    * Creating changesets atomically moves complete changesets into place.
+    * The contents store no longer reference counts entries.
+    * Added support for trove marks to support mirroring.  A client
+      can use a trove mark to ask the server for any trove that has
+      been added since the last trove mark mirrored.
+    * Added the hasTroves() interface to support mirroring.  This allows
+      the mirror client to make sure that the target mirror does not
+      already have a trove that is a candidate for mirroring from the
+      source repository.
+    * Added support for traceback emails from the repository server.
     * The repository contents store was reworked to avoid reading
       precompressed gzipped data twice (once to double check the uncompressed
       contents sha1 and once to copy the file in place).
@@ -89,8 +94,11 @@ Changes in 0.90.0:
       schema upgrades and installs can be performed from now on only by
       running the standalone server (conary/server/server.py --migrate),
       thus avoiding race conditions previously created by having multiple
-      apache processes trying to deal with the SQL schema updates.
+      Apache processes trying to deal with the SQL schema updates.
 
+   o Command Changes
+    * A new script that mirrors repositories has been added.  It is in
+      the scripts/ directory in the source distribution of Conary.
 
 Changes in 0.80.4:
   o Build Changes:
