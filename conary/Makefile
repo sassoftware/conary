@@ -33,7 +33,6 @@ python_files = __init__.py	\
 	files.py		\
 	flavorcfg.py		\
         fmtroves.py             \
-        graph.py                \
         metadata.py             \
 	query.py		\
 	queryrep.py		\
