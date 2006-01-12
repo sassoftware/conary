@@ -232,7 +232,8 @@ class CacheSet:
             """)
             schema.createFlavors(self.db)
 
-            cu.execute("CREATE TABLE Versions(
+            cu.execute("""
+            CREATE TABLE Versions(
                 versionId       %(PRIMARYKEY)s,
                 version         VARCHAR(767)
             )""" % self.db.keywords)
