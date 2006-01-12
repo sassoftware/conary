@@ -1,4 +1,3 @@
-
 #
 # Copyright (c) 2005-2006 rPath, Inc.
 #
@@ -32,6 +31,16 @@ def resetTable(cu, name):
     except Exception, e:
         return False
 
+def createVersions(db, cu = None):
+    if "Versions" in db.tables:
+        return
+    if cu is None:
+        cu = db.cursor()
+    if idtable.createIdTable(db, "Versions", "versionId", "version"):
+        cu.execute("INSERT INTO Versions (versionId, version) VALUES (0, NULL)")
+        db.commit()
+        db.loadSchema()
+
 # Schema creation functions
 def createFlavors(db):
     if "Flavors" in db.tables:
@@ -42,6 +51,7 @@ def createFlavors(db):
     if cu.fetchone() == None:
         # reserve flavor 0 for "no flavor information"
         cu.execute("INSERT INTO Flavors VALUES (0, NULL)")
+    idtable.createMappingTable(db, "DBFlavorMap", "instanceId", "flavorId")
     db.commit()
     db.loadSchema()
 
@@ -49,6 +59,7 @@ def createDBTroveFiles(db):
     if "DBTroveFiles" in db.tables:
         return
     cu = db.cursor()
+    createVersions(db, cu)
     cu.execute("""
     CREATE TABLE DBTroveFiles(
         streamId            %(PRIMARYKEY)s,
@@ -64,6 +75,8 @@ def createDBTroveFiles(db):
     cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
     cu.execute("CREATE INDEX DBTroveFilesPathIdx ON DBTroveFiles(path)")
 
+    idtable.createIdTable(db, "Tags", "tagId", "tag")
+
     cu.execute("""
     CREATE TABLE DBFileTags(
         streamId            INTEGER,
@@ -76,6 +89,7 @@ def createInstances(db):
     if "Instances" in db.tables:
         return
     cu = db.cursor()
+    createVersions(db, cu)
     cu.execute("""
     CREATE TABLE Instances(
         instanceId      %(PRIMARYKEY)s,
@@ -130,6 +144,7 @@ def createTroveInfo(db):
 def createMetadata(db):
     commit = False
     cu = db.cursor()
+    createVersions(db, cu)
     if 'Metadata' not in db.tables:
         cu.execute("""
         CREATE TABLE Metadata(
@@ -172,10 +187,9 @@ def createDepTable(db, cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
-        if resetTable(cu, name):
+        if name in db.tempTables:
+            resetTable(cu, name)
             return False
-        db.rollback()
-
         d['tmp'] = 'TEMPORARY'
 
     cu.execute("""
@@ -187,7 +201,8 @@ def createDepTable(db, cu, name, isTemp):
     )""" % d % db.keywords, start_transaction = (not isTemp))
     cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" %
                (name, name), start_transaction = startTrans)
-
+    if isTemp:
+        db.tempTables[name] = True
     db.commit()
     return True
 
@@ -198,10 +213,9 @@ def createRequiresTable(db, cu, name, isTemp):
     startTrans = not isTemp
 
     if isTemp:
-        if resetTable(cu, name):
+        if name in db.tempTables:
+            resetTable(cu, name)
             return False
-        db.rollback()
-
         d['tmp'] = 'TEMPORARY'
     else:
         d['constraint'] = """,
@@ -227,7 +241,8 @@ def createRequiresTable(db, cu, name, isTemp):
     # XXX: do we really need this index?
     cu.execute("CREATE INDEX %(name)sIdx3 ON %(name)s(depNum)" % d,
                start_transaction = startTrans)
-
+    if isTemp:
+        db.tempTables[name] = True
     db.commit()
     return True
 
@@ -238,9 +253,9 @@ def createProvidesTable(db, cu, name, isTemp):
     startTrans = not isTemp
 
     if isTemp:
-        if resetTable(cu, name):
+        if name in db.tempTables:
+            resetTable(cu, name)
             return False
-        db.rollback()
         d['tmp'] = 'TEMPORARY'
     else:
         d['constraint'] = """,
@@ -260,11 +275,15 @@ def createProvidesTable(db, cu, name, isTemp):
                start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx2 ON %(name)s(depId)" % d,
                start_transaction = startTrans)
+    if isTemp:
+        db.tempTables[name] = True
 
     db.commit()
     return True
 
 def createDepWorkTable(db, cu, name):
+    if name in db.tempTables:
+        return False
     cu.execute("""
     CREATE TEMPORARY TABLE %s(
         troveId         INTEGER,
@@ -279,7 +298,7 @@ def createDepWorkTable(db, cu, name):
     cu.execute("""
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
-
+    db.tempTables[name] = True
     db.commit()
     return True
 
@@ -292,19 +311,27 @@ def setupTempDepTables(db, cu = None):
     createDepTable(db, cu, 'TmpDependencies', isTemp = True)
     createDepWorkTable(db, cu, "DepCheck")
 
-    cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
-               start_transaction=False)
-    cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)",
-               start_transaction=False)
-    cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
-               start_transaction=False)
-    cu.execute("""
-        CREATE TEMPORARY TABLE RemovedTroveIds(
-            troveId INTEGER,
-            nodeId INTEGER
-        )""", start_transaction=False)
-    cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)",
-               start_transaction=False)
+    if "suspectDepsOrig" not in db.tempTables:
+        cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
+                   start_transaction=False)
+        db.tempTables["suspectDepsOrig"] = True
+    if "suspectDeps" not in db.tempTables:
+        cu.execute("CREATE TEMPORARY TABLE suspectDeps(depId integer)",
+                   start_transaction=False)
+        db.tempTables["suspectDeps"] = True
+    if "BrokenDeps" not in db.tempTables:
+        cu.execute("CREATE TEMPORARY TABLE BrokenDeps(depNum INTEGER)",
+                   start_transaction=False)
+        db.tempTables["BrokenDeps"] = True
+    if "RemovedTroveIds" not in db.tempTables:
+        cu.execute("""
+            CREATE TEMPORARY TABLE RemovedTroveIds(
+                troveId INTEGER,
+                nodeId INTEGER
+            )""", start_transaction=False)
+        cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)",
+                   start_transaction=False)
+        db.tempTables["RemovedTroveIds"] = True
     db.commit()
     db.loadSchema()
 
@@ -326,31 +353,11 @@ def createDependencies(db):
         db.loadSchema()
 
 def createSchema(db):
-    # XXX
-    import versiontable
-    import sqldb
-
-    commit = idtable.createIdTable(db, "Tags", "tagId", "tag")
-    if commit:
-        db.commit()
-        commit = False
-
-    commit = idtable.createIdTable(db, "Versions", "versionId", "version")
-    if commit:
-        db.commit()
-        commit = False
-
+    createVersions(db)
     createInstances(db)
     createTroveTroves(db)
     createDBTroveFiles(db)
-    createInstances(db)
-    versiontable.VersionTable(db)
-    sqldb.DBFlavorMap(db)
     createFlavors(db)
-    commit = idtable.createMappingTable(db, "DBFlavorMap", "instanceId", "flavorId")
-    if commit:
-        db.commit()
-        commit = False
     createDependencies(db)
     createTroveInfo(db)
 
@@ -393,6 +400,7 @@ class MigrateTo_5(SchemaMigration):
         instances = [ x[0] for x in
                       self.cu.execute("select instanceId from DBInstances") ]
         dtbl = deptable.DependencyTables(self.db)
+        setupTempDepTables(self.db)
         troves = []
 
         for instanceId in instances:

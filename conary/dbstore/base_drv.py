@@ -238,6 +238,7 @@ class BaseDatabase:
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
         self.closed = True
+        self.tempTables = sqllib.CaselessDict()
 
     # the string syntax for database connection is [[user[:password]@]host[:port]/]database
     def _connectData(self, names = ["user", "password", "host", "port", "database"]):
@@ -371,7 +372,6 @@ class BaseDatabase:
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = sqllib.CaselessDict()
-        self.tempTables = sqllib.CaselessDict()
         self.views = sqllib.CaselessDict()
         self.functions = sqllib.CaselessDict()
         self.sequences = sqllib.CaselessDict()

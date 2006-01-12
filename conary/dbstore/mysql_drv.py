@@ -17,7 +17,7 @@ import MySQLdb as mysql
 from MySQLdb import converters
 from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
 from base_drv import BaseKeywordDict
-import sqlerrors
+import sqlerrors, sqllib
 
 # modify the default conversion dictionary
 conversions = converters.conversions.copy()
@@ -113,6 +113,8 @@ class Database(BaseDatabase):
         self.characterSet = cu.fetchone()[0]
         cu.execute("set character set %s" % self.characterSet)
         self.loadSchema(cu)
+        # reset the tempTables since we just lost them because of the (re)connect
+        self.tempTables = sqllib.CaselessDict()
         self.closed = False
         return True
 

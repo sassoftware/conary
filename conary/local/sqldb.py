@@ -34,8 +34,8 @@ class DBTroveFiles:
 
     def __init__(self, db):
         self.db = db
-	self.tags = Tags(self.db)
         schema.createDBTroveFiles(db)
+	self.tags = Tags(self.db)
 
     def __getitem__(self, instanceId):
 	cu = self.db.cursor()

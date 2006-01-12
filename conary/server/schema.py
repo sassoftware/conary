@@ -1068,73 +1068,83 @@ class MigrateTo_10(SchemaMigration):
         return self.Version
 
 # sets up temporary tables for a brand new connection
-# WARNING: will yield failures if called multiple times for the same connection!
 def setupTempTables(db):
     cu = db.cursor()
 
-    cu.execute("""
-    CREATE TEMPORARY TABLE ffFlavor(
-        flavorId    INTEGER,
-        base        VARCHAR(254),
-        sense       INTEGER,
-        flag        VARCHAR(254)
-    )""")
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE NewFiles(
-        pathId      %(BINARY16)s,
-        versionId   INTEGER,
-        fileId      %(BINARY20)s,
-        stream      %(BLOB)s,
-        path        VARCHAR(767)
-    )""" % db.keywords)
-
-    cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor VARCHAR(767))")
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE gtl(
-    idx             %(PRIMARYKEY)s,
-    name            VARCHAR(254),
-    version         VARCHAR(767),
-    flavor          VARCHAR(767)
-    )""" % db.keywords)
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE gtlInst(
-    idx             %(PRIMARYKEY)s,
-    instanceId      INTEGER
-    )""" % db.keywords)
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE getFilesTbl(
-        itemId       INTEGER PRIMARY KEY,
-        fileId      %(BINARY20)s
-    )""" % db.keywords)
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE itf(
-    item            VARCHAR(254),
-    version         VARCHAR(767),
-    fullVersion     VARCHAR(767)
-    )""")
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE
-    gtvlTbl(
-        item                VARCHAR(254),
-        versionSpec         VARCHAR(767),
-        flavorId            INTEGER
-    )""")
-
-    cu.execute("""
-    CREATE TEMPORARY TABLE
-    hasTrovesTmp(
-        row                 INTEGER,
-        item                VARCHAR(254),
-        version             VARCHAR(767),
-        flavor              VARCHAR(767)
-    )""")
-
+    if "ffFlavor" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE ffFlavor(
+            flavorId    INTEGER,
+            base        VARCHAR(254),
+            sense       INTEGER,
+            flag        VARCHAR(254)
+        )""")
+        db.tempTables["ffFlavor"] = True
+    if "NewFiles" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE NewFiles(
+            pathId      %(BINARY16)s,
+            versionId   INTEGER,
+            fileId      %(BINARY20)s,
+            stream      %(BLOB)s,
+            path        VARCHAR(767)
+        )""" % db.keywords)
+        db.tempTables["NewFiles"] = True
+    if "NeededFlavors" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE NeededFlavors(
+            flavor      VARCHAR(767)
+        )""")
+        db.tempTables["NeededFlavors"] = True
+    if "gtl" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtl(
+            idx         %(PRIMARYKEY)s,
+            name        VARCHAR(254),
+            version     VARCHAR(767),
+            flavor      VARCHAR(767)
+        )""" % db.keywords)
+        db.tempTables["gtl"] = True
+    if "gtlInst" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtlInst(
+            idx         %(PRIMARYKEY)s,
+            instanceId  INTEGER
+        )""" % db.keywords)
+        db.tempTables["gtlInst"] = True
+    if "getFilesTbl" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE getFilesTbl(
+            itemId      INTEGER PRIMARY KEY,
+            fileId      %(BINARY20)s
+        )""" % db.keywords)
+        db.tempTables["getFilesTbl"] = True
+    if "itf" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE itf(
+            item        VARCHAR(254),
+            version     VARCHAR(767),
+            fullVersion VARCHAR(767)
+        )""")
+        db.tempTables["itf"] = True
+    if "gtvlTbl" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE gtvlTbl(
+            item        VARCHAR(254),
+            versionSpec VARCHAR(767),
+            flavorId    INTEGER
+        )""")
+        db.tempTables["gtvlTbl"] = True
+    if "hasTrovesTmp" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        hasTrovesTmp(
+            row         INTEGER,
+            item        VARCHAR(254),
+            version     VARCHAR(767),
+            flavor      VARCHAR(767)
+        )""")
+        db.tempTables["hasTrovesTmp"] = True
     db.commit()
     db.loadSchema()
 

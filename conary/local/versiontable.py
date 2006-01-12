@@ -14,6 +14,7 @@
 
 from conary import versions
 from conary.local import schema
+from conary.dbstore import idtable
 
 # XXX: this looks awfully similar to an idtable...
 class VersionTable:
@@ -24,20 +25,6 @@ class VersionTable:
 
     def __init__(self, db):
         self.db = db
-        if "Versions" in db.tables:
-            return
-        cu = db.cursor()
-        cu.execute("""
-        CREATE TABLE Versions(
-        versionId       %(PRIMARYKEY)s,
-        version         VARCHAR(767)
-        )""" % db.keywords)
-        cu.execute("CREATE UNIQUE INDEX VersionsVersionIdx ON "
-                   "Versions(version)")
-        cu.execute("INSERT INTO Versions (versionId, version) VALUES (?, NULL)",
-                   self.noVersion)
-        db.commit()
-        db.loadSchema()
 
     def addId(self, version):
         cu = self.db.cursor()
