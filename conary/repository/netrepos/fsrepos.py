@@ -14,6 +14,7 @@
 
 # implements a db-based repository
 
+import traceback
 import os
 import sys
 
@@ -109,7 +110,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             raise
         except:
             print >> sys.stderr, "exception occurred while committing change set"
-            stackutil.printTraceBack()
+            print >> sys.stderr, ''.join(traceback.format_exception(type, value, tb))
             print >> sys.stderr, "attempting rollback"
             self.troveStore.rollback()
             raise
