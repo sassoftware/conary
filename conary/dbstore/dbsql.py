@@ -18,6 +18,7 @@ import sys
 from conary import dbstore
 import sqlerrors
 import os
+import itertools
 
 try:
     import readline
@@ -28,6 +29,8 @@ else:
 
 class DbSql(cmd.Cmd):
     _historyPath = os.path.expanduser('~/.dbsqlhistory')
+    yesArgs = ('on', 'yes')
+    noArgs = ('off', 'no')
 
     def __init__(self, db = None, driver = None, path = None):
         cmd.Cmd.__init__(self)
@@ -122,6 +125,43 @@ type ".quit" to exit, ".help" for help"""
             except:
                 pass
 
+    def complete(self, text, state):
+        # this is almost exacly what cmd.Cmd uses (for now).  The
+        # only difference is that we need to zap off the leading '.'
+        # in order for the function stuff to work.
+        """Return the next possible completion for 'text'.
+
+        If a command has not been entered, then complete against command list.
+        Otherwise try to call complete_<command> to get list of completions.
+        """
+        if state == 0:
+            import readline
+            origline = readline.get_line_buffer()
+            line = origline.lstrip()
+            # cut off any leading . from the command so we can look
+            # the commands up
+            if line.startswith('.'):
+                line = line[1:]
+            stripped = len(origline) - len(line)
+            begidx = readline.get_begidx() - stripped
+            endidx = readline.get_endidx() - stripped
+            if begidx>0:
+                cmd, args, foo = self.parseline(line)
+                if cmd == '':
+                    compfunc = self.completedefault
+                else:
+                    try:
+                        compfunc = getattr(self, 'complete_' + cmd)
+                    except AttributeError:
+                        compfunc = self.completedefault
+            else:
+                compfunc = self.completenames
+            self.completion_matches = compfunc(text, line, begidx, endidx)
+        try:
+            return self.completion_matches[state]
+        except IndexError:
+            return None
+
     def completenames(self, text, *ignored):
         # override completenames to append the . at the start
         if text.startswith('.'):
@@ -129,11 +169,12 @@ type ".quit" to exit, ".help" for help"""
         dotext = 'do_'+text
         return ['.' + a[3:] for a in self.get_names() if a.startswith(dotext)]
 
+    # funtions defined below
+    schemaBits = ('tables', 'triggers', 'functions', 'sequences',
+                  'triggers')
     def do_show(self, arg):
-        schemaBits = ('tables', 'triggers', 'functions', 'sequences',
-                      'triggers')
-        if arg in schemaBits:
-            d = self.db.__dict__[arg]
+        if arg in self.schemaBits:
+            d = getattr(self.db, arg)
             print '\n'.join(sorted(d.keys()))
         else:
             print 'unknown argument', arg
@@ -143,10 +184,14 @@ type ".quit" to exit, ".help" for help"""
         print """show [tables/triggers/functions/sequences/triggers]
 display database information"""
 
+    def complete_show(self, text, *ignored):
+        return [x for x in self.schemaBits if x.startswith(text)]
+
+    # headers
     def do_headers(self, arg):
-        if arg in ('on', 'yes'):
+        if arg in self.yesArgs:
             self.showHeaders = True
-        elif arg in ('off', 'no'):
+        elif arg in self.noArgs:
             self.showHeaders = False
         else:
             print 'unknown argument', arg
@@ -156,9 +201,15 @@ display database information"""
         print """headers [on/off]
 turn the display of headers on or off"""
 
-    do_head = do_headers
-    help_head = do_head
+    def complete_headers(self, text, *ignored):
+        return [x for x in itertools.chain(self.yesArgs, self.noArgs)
+                if x.startswith(text)]
 
+    do_head = do_headers
+    help_head = help_headers
+    complete_head = complete_headers
+
+    # quit
     def do_quit(self, arg):
         # ask to stop
         return True
@@ -167,6 +218,7 @@ turn the display of headers on or off"""
         print """quit
 quit the shell"""
 
+    # help (mostly builtin)
     def help_help(self):
         print """quit
 display help"""
