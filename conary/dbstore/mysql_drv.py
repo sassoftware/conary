@@ -124,7 +124,6 @@ class Database(BaseDatabase):
         try:
             self.dbh.ping()
         except mysql.MySQLError:
-            self.dbh.close()
             return self.connect()
         return False
 
