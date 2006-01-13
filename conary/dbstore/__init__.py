@@ -78,6 +78,9 @@ def connect(db, driver=None, **kw):
     assert(dbh.connect(**kw))
     return dbh
 
+def shell(*args, **kw):
+    import dbsql
+    dbsql.shell(*args, **kw)
 
-__all__ = [ "connect",
+__all__ = [ "connect", "shell"
             "DBStoreError", "DBStoreCursorError", "DBInvalidBackend" ]
