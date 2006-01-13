@@ -1,0 +1,38 @@
+#!/usr/bin/python
+
+# system imports
+import sys
+import os
+import optparse
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+# conary imports
+from conary.lib import util
+sys.excepthook = util.genExcepthook(debug=True)
+from conary.dbstore import dbsql
+
+def usage():
+    print 'usage: %s [dbstore driver] [dbstore connection path]' %sys.argv[0]
+    sys.exit(1)
+
+def main():
+    parser = optparse.OptionParser()
+    (options, args) = parser.parse_args()
+
+    if len(args) != 2:
+        usage()
+
+    shell = dbsql.DbSql(*args)
+    shell.cmdloop()
+
+if __name__ == '__main__':
+    main()

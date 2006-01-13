@@ -17,6 +17,7 @@ TOPDIR	= ../..
 python_files	= __init__.py \
 		  idtable.py \
 		  base_drv.py \
+		  dbsql.py \
 		  mysql_drv.py \
 		  postgresql_drv.py \
 		  sqlite_drv.py	\
