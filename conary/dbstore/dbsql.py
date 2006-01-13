@@ -17,9 +17,19 @@ import cmd
 import sys
 from conary import dbstore
 import sqlerrors
+import os
+
+try:
+    import readline
+except ImportError:
+    hasReadline = False
+else:
+    hasReadline = True
 
 class DbSql(cmd.Cmd):
-    def __init__(self, driver=None, path=None, db=None):
+    _historyPath = os.path.expanduser('~/.dbsqlhistory')
+
+    def __init__(self, db = None, driver = None, path = None):
         cmd.Cmd.__init__(self)
         self.prompt = 'dbsql> '
         self.doc_header = "Documented commands (type .help <topic>):"
@@ -63,8 +73,30 @@ class DbSql(cmd.Cmd):
                 print '|'.join(fields)
             print '|'.join(repr(x) for x in row)
 
+    def cmdloop(self):
+        self.read_history()
+        rc = cmd.Cmd.cmdloop(self)
+        self.save_history()
+        return rc
+
+    def read_history(self):
+        if hasReadline and self._historyPath:
+            try:
+                readline.read_history_file(self._historyPath)
+            except:
+                pass
+
+    def save_history(self):
+        if hasReadline and self._historyPath:
+            readline.set_history_length(1000)
+            try:
+                readline.write_history_file(self._historyPath)
+            except:
+                pass
+
     def do_quit(self, arg):
-        sys.exit()
+        # ask to stop
+        return True
 
     def help_quit(self):
         print """quit
@@ -73,3 +105,9 @@ quit the shell"""
     def help_help(self):
         print """quit
 display help"""
+
+
+def shell(db):
+    'invokes a dbstore sql shell on an existing db connection'
+    shell = DbSql(db)
+    return shell.cmdloop()
