@@ -562,6 +562,7 @@ class ClientUpdate:
         # in that trove as well.
         availableTrove = trove.Trove("@update", versions.NewVersion(),
                                      deps.DependencySet(), None)
+
         names = set()
         for job in transitiveClosure:
             if job[2][0] is None: continue
