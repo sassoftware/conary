@@ -1,3 +1,10 @@
+Changes in 0.91:
+  o Bugfixes
+    * A bug was fixed the code that freezes path hashes.  Previously,
+      path hashes were not sorted in the frozen representation.  Code
+      to fix the frozen path hashes in databases and repositories has
+      beed added.
+
 Changes in 0.90.0:
   o Code Structure/Architecture Changes:
     * Conary now has the concept of "weak references", where a weak reference
