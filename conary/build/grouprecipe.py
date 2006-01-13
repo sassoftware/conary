@@ -451,9 +451,39 @@ class TroveCache(dict):
                 childTroves = []
             else:
                 childTroves = [ x[0:2] for x in trv.iterTroveListInfo()]
+                childTroves = self.getChildren(troveTup, trv)
                 
             self[troveTup] = (trv.getSize(), isRedirect,
                               childTroves, trv.getPathHashes())
+
+    def getChildren(self, troveTup, trv):
+        """ Retrieve children,  and, if necessary, children's children)
+            from repos.  Children's children should only be necessary 
+            if the group doesn't have weak references (i.e. is old).
+        """
+        childTroves = []
+        hasWeak = False
+        
+        childColls = []
+
+        for childTup, byDefault, isStrong in trv.iterTroveListInfo():
+            if not isStrong:
+                hasWeak = True
+            elif not hasWeak and trove.troveIsCollection(childTup[0]):
+                childColls.append((childTup, byDefault))
+
+            childTroves.append((childTup, byDefault))
+        
+        if not hasWeak and childColls:
+            # recursively cache these child troves.
+            self.cacheTroves([x[0] for x in childColls])
+            for childTup, byDefault in childColls:
+                if byDefault:
+                    childTroves.extend(self.getChildTroves(childTup))
+                else:
+                    childTroves.extend((x[0], False) \
+                                        for x in self.getChildTroves(childTup))
+        return childTroves
 
 
     def getSize(self, troveTup):
