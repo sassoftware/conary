@@ -6,6 +6,8 @@ Changes in 0.91:
     * Conary prints out the name of each policy as it runs, making it
       possible to see which policies take the most time.
     * BuildLog files no longer contain lines that end with \r.
+    * added cleanAfterBuild config that controls whether conary tries to
+      clean up after a successful build
 
   o Bugfixes
     * A bug was fixed the code that freezes path hashes.  Previously,

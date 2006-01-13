@@ -202,6 +202,7 @@ class ConaryConfiguration(SectionedConfigFile):
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
     buildPath             =  '/var/tmp/conary/builds'
+    cleanAfterCook        =  (CfgBool, True)
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, False)
