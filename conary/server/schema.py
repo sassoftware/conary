@@ -1062,6 +1062,8 @@ class MigrateTo_11(SchemaMigration):
     def migrate(self):
         from  conary import trove
         cu = self.cu
+        cu2 = self.db.cursor()
+
         cu.execute("""
             CREATE TEMPORARY TABLE hashUpdatesTmp(
                 instanceId INTEGER,
@@ -1069,7 +1071,7 @@ class MigrateTo_11(SchemaMigration):
             )       
         """ % self.db.keywords)
 
-        rows = cu.execute("""
+        rows = cu2.execute("""
                     SELECT instanceId,data from TroveInfo WHERE infoType=?
                    """, trove._TROVEINFO_TAG_PATH_HASHES)
 
@@ -1078,10 +1080,8 @@ class MigrateTo_11(SchemaMigration):
         for instanceId, data in rows:
             frzn = PathHashes(data).freeze()
             if frzn != data:
-                neededChanges.append((instanceId, frzn)) 
-
-        for tup in neededChanges:
-            cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', tup)
+                cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', (instanceId, frzn))
+                
 
         cu.execute('''DELETE FROM TroveInfo 
                       WHERE infoType=? 
