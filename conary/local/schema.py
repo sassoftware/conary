@@ -702,8 +702,6 @@ class MigrateTo_17(SchemaMigration):
                 neededChanges.append((instanceId, frzn)) 
 
         cu = self.cu
-        import epdb
-        epdb.st()
         for instanceId, frzn in neededChanges:
             cu.execute('''DELETE FROM TroveInfo 
                           WHERE instanceId=? AND infoType=?''', instanceId, 
