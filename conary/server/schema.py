@@ -19,7 +19,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 10
+VERSION = 11
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -1057,6 +1057,50 @@ class MigrateTo_10(SchemaMigration):
         self.cu.execute("DROP TABLE TItemp")
         return self.Version
 
+class MigrateTo_11(SchemaMigration):
+    Version = 11
+    def migrate(self):
+        from  conary import trove
+        cu = self.cu
+        cu.execute("""
+            CREATE TEMPORARY TABLE hashUpdatesTmp(
+                instanceId INTEGER,
+                data       %(MEDIUMBLOB)s
+            )       
+        """ % self.db.keywords)
+
+        rows = cu.execute("""
+                    SELECT instanceId,data from TroveInfo WHERE infoType=?
+                   """, trove._TROVEINFO_TAG_PATH_HASHES)
+
+        neededChanges = []
+        PathHashes = trove.PathHashes
+        for instanceId, data in rows:
+            frzn = PathHashes(data).freeze()
+            if frzn != data:
+                neededChanges.append((instanceId, frzn)) 
+
+        for tup in neededChanges:
+            cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', tup)
+
+        cu.execute('''DELETE FROM TroveInfo 
+                      WHERE infoType=? 
+                      AND instanceId IN 
+                        (SELECT instanceId from hashUpdatesTmp)''',
+                      trove._TROVEINFO_TAG_SIGS)
+        cu.execute('''
+            UPDATE TroveInfo 
+                SET data=(SELECT data FROM hashUpdatesTmp
+                          WHERE troveInfo.instanceId=hashUpdatesTmp.instanceId)
+            WHERE troveInfo.infoType=?
+                   ''', trove._TROVEINFO_TAG_PATH_HASHES)
+
+        cu.execute('''DROP TABLE hashUpdatesTmp''')
+        
+        return self.Version
+
+
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     cu = db.cursor()
@@ -1177,6 +1221,7 @@ def loadSchema(db):
     if version == 7: version = MigrateTo_8(db)()
     if version == 8: version = MigrateTo_9(db)()
     if version == 9: version = MigrateTo_10(db)()
+    if version == 10: version = MigrateTo_11(db)()
 
     if version:
         db.loadSchema()
