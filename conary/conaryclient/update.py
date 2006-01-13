@@ -593,6 +593,21 @@ class ClientUpdate:
                 if newTrove not in avail:
                     ineligible.add(newTrove)
 
+        # skip relative installs that are already present.
+        relativeInstalls = [ ((x[0], x[2][0], x[2][1]), x)
+                         for x in relativeUpdateJobs if x[2][0] is not None]
+        isPresentList = self.db.hasTroves([ x[0] for x in relativeInstalls ])
+        for (newTrove, job), isPresent in itertools.izip(relativeInstalls,
+                                                         isPresentList):
+            if isPresent:
+                relativeUpdateJobs.remove(job)
+                ineligible.add(newTrove)
+                if job[1][0]:
+                    # this used to be a relative upgrade, but the target
+                    # is installed, so turn it into an erase.
+                    erasePrimaries.add((job[0], (job[1][0], job[1][1]), 
+                                                (None, None), False))
+
         # Get all of the currently installed and referenced troves which
         # match something being installed absolute. Troves being removed
         # through a relative changeset aren't allowed to be removed by

@@ -98,7 +98,7 @@ class PathHashes(set, streams.InfoStream):
         return set.__ne__(self, other)
 
     def freeze(self, skipSet = None):
-        return struct.pack("8s" * len(self), *self)
+        return struct.pack("8s" * len(self), *sorted(self))
 
     def thaw(self, s):
         self.clear()
