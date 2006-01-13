@@ -353,7 +353,7 @@ class ChangeSetJob:
 	    troveFlavor = csTrove.getNewFlavor()
 
 	    if repos.hasTrove(troveName, newVersion, troveFlavor):
-		raise CommitError, \
+		raise errors.CommitError, \
 		       "version %s of %s is already installed" % \
 			(newVersion.asString(), csTrove.getName())
 

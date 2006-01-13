@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 16
+VERSION = 17
 
 def resetTable(cu, name):
     try:
@@ -687,6 +687,30 @@ class MigrateTo_16(SchemaMigration):
         return self.Version
 
 
+class MigrateTo_17(SchemaMigration):
+    Version = 17
+    def migrate(self):
+        # whoops, path hashes weren't sorted, sigs are invalid.
+        rows = self.cu.execute("""
+                    SELECT instanceId,data from TroveInfo WHERE infoType=?
+                   """, trove._TROVEINFO_TAG_PATH_HASHES)
+        neededChanges = []
+        PathHashes = trove.PathHashes
+        for instanceId, data in rows:
+            frzn = PathHashes(data).freeze()
+            if frzn != data:
+                neededChanges.append((instanceId, frzn)) 
+
+        cu = self.cu
+        for instanceId, frzn in neededChanges:
+            cu.execute('''DELETE FROM TroveInfo 
+                          WHERE instanceId=? AND infoType=?''', instanceId, 
+                        trove._TROVEINFO_TAG_SIGS)
+            cu.execute('''UPDATE TroveInfo SET data=? 
+                          WHERE instanceId=? AND infoType=?
+                       ''', frzn, instanceId, trove._TROVEINFO_TAG_PATH_HASHES)
+        return self.Version
+
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
@@ -716,6 +740,7 @@ def checkVersion(db):
     if version == 13: version = MigrateTo_14(db)()
     if version == 14: version = MigrateTo_15(db)()
     if version == 15: version = MigrateTo_16(db)()
+    if version == 16: version = MigrateTo_17(db)()
 
     return version
 

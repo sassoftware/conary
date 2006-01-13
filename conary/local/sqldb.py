@@ -178,7 +178,7 @@ class DBInstanceTable:
 
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances "
-                   "VALUES (NULL, ?, ?, ?,?, ?, ?)",
+                   "VALUES (NULL, ?, ?, ?, ?, ?, ?)",
                    (troveName, versionId, flavorId,
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
                     pinned))
@@ -495,7 +495,9 @@ where
 order by
     tlList.rowId asc
 """)
-        results = [ x[0] for x in cu ]
+        # we use == 1 here to make sure that if we have NULL for
+        # pinned, we convert that to a boolean
+        results = [ x[0] == 1 for x in cu ]
         # make sure that we got the same number of results as our query
         assert(len(results) == count)
         cu.execute("DROP TABLE tlList", start_transaction = False)

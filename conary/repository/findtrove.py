@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
 
 from conary.deps import deps
 from conary.repository import errors
@@ -340,7 +341,7 @@ class QueryByLabelPath(Query):
 
     def missingMsg(self, name):
         # collapse all the labels searched in the queries to a unique list
-        labelPath = set(x.keys()[0] for x in self.query[name] if x.keys())
+        labelPath = list(itertools.chain(*(x.keys() for x in self.query[name])))
         if labelPath:
             return "%s was not found on path %s" \
                     % (name, ', '.join(x.asString() for x in labelPath))

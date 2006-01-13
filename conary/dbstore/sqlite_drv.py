@@ -153,12 +153,10 @@ class Database(BaseDatabase):
 
     def connect(self, **kwargs):
         assert(self.database)
-        cdb = self._connectData()
-        assert(cdb["database"])
         kwargs.setdefault("timeout", self.TIMEOUT)
         #kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
         try:
-            self.dbh = sqlite3.connect(cdb["database"], **kwargs)
+            self.dbh = sqlite3.connect(self.database, **kwargs)
         except sqlite3.InternalError, e:
             if str(e) == 'database is locked':
                 raise sqlerrors.DatabaseLocked(e)
