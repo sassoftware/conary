@@ -51,6 +51,8 @@ class Cursor(BindlessCursor):
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
             raise sqlerrors.DatabaseError(e.args[1], e.args)
+        except mysql.MySQLError, e:
+            raise sqlerrors.DatabaseError(e.args[1], e.args)
         return self
 
 # Sequence implementation for mysql
