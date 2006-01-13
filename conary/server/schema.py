@@ -1077,17 +1077,21 @@ class MigrateTo_11(SchemaMigration):
 
         neededChanges = []
         PathHashes = trove.PathHashes
+        logMe(3, "Finding path hashes needing an update...")
         for instanceId, data in rows:
             frzn = PathHashes(data).freeze()
             if frzn != data:
                 cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', (instanceId, frzn))
                 
 
+        logMe(3, "removing bad signatures due to path hashes...")
         cu.execute('''DELETE FROM TroveInfo 
                       WHERE infoType=? 
                       AND instanceId IN 
                         (SELECT instanceId from hashUpdatesTmp)''',
                       trove._TROVEINFO_TAG_SIGS)
+
+        logMe(3, "updating path hashes...")
         cu.execute('''
             UPDATE TroveInfo 
                 SET data=(SELECT data FROM hashUpdatesTmp
