@@ -363,29 +363,14 @@ class TroveStore:
         # this updates the stream for streams where stream is NULL
         # (because they were originally added from a distributed branch)
         # for items whose stream is present in NewFiles
-
-        # FIXME: make this SQL-compliantly fast
         cu.execute("""
         UPDATE FileStreams
         SET stream = (SELECT NewFiles.stream FROM NewFiles
-                      WHERE
-                          FileStreams.fileId = NewFiles.fileId
-                      AND NewFiles.stream IS NOT NULL)
-        WHERE
-            FileStreams.stream IS NULL
+                      WHERE FileStreams.fileId = NewFiles.fileId
+                        AND NewFiles.stream IS NOT NULL)
+        WHERE FileStreams.fileId IN (SELECT fileId FROM newFiles)
+          AND FileStreams.stream IS NULL
         """)
-
-## this is the old, sqlite3 specific way we used to update file streams
-##         cu.execute("""
-##             INSERT OR REPLACE INTO FileStreams
-##                 SELECT FileStreams.streamId, FileStreams.fileId,
-##                        NewFiles.stream
-##                 FROM NewFiles INNER JOIN FileStreams ON
-##                     NewFiles.fileId = FileStreams.FileId
-##                 WHERE
-##                     FileStreams.stream IS NULL AND
-##                     NewFiles.stream IS NOT NULL
-##         """)
 
         cu.execute("""
         INSERT INTO TroveFiles
@@ -451,11 +436,11 @@ class TroveStore:
             else:
                 byDefault = 0
 
-            cu.execute("""
-            INSERT INTO TroveTroves
-                (instanceId, includedId, flags)
-            VALUES(?, ?, ?)""",
-                       troveInstanceId, instanceId, flags)
+            cu.execute("""INSERT INTO
+                               TroveTroves (instanceId, includedId, flags)
+                          VALUES
+                               (?, ?, ?)""",
+                       (troveInstanceId, instanceId, flags))
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
