@@ -32,10 +32,11 @@ class DbShell(cmd.Cmd):
     yes_args = ('on', 'yes')
     no_args = ('off', 'no')
     # sql commands that are commonly at the start of a sql command
-    sqlstarters = ['create', 'delete', 'drop', 'insert into', 'select']
+    sqlstarters = ['alter', 'create', 'delete', 'drop', 'insert into',
+                   'select', 'update']
     # additional sql keywords
-    sqlcommands = ['from', 'limit', 'index', 'table', 'trigger', 'values',
-                   'view']
+    sqlkeywords = ['database', 'from', 'limit', 'index', 'table',
+                   'trigger', 'values', 'view']
     prompt = 'dbsh> '
     multilinePrompt = ' ...> '
     doc_header = "Documented commands (type .help <topic>):"
@@ -222,10 +223,19 @@ type ".quit" to exit, ".help" for help"""
             except:
                 pass
 
-    def completedefault(self, text, *ignored):
+    def completedefault(self, text, line, begin, end):
+        line = line.strip().lower()
         tables = self.db.tables.keys()
         views = self.db.views.keys()
-        candidates = tables + views + self.sqlcommands
+        if (line.endswith('from') or line.endswith('into')
+            or line.endswith('update')):
+            candidates = tables + views
+        elif line.endswith('table'):
+            candidates = tables
+        elif line.endswith('view'):
+            candidates = views
+        else:
+            candidates = tables + views + self.sqlkeywords
 
         text = text.lower()
         return [a + ' ' for a in candidates if a.startswith(text)]
