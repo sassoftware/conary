@@ -35,8 +35,10 @@ class DbShell(cmd.Cmd):
     sqlstarters = ['alter', 'create', 'delete', 'drop', 'insert into',
                    'select', 'update']
     # additional sql keywords
-    sqlkeywords = ['database', 'from', 'limit', 'index', 'table',
-                   'trigger', 'values', 'view']
+    sqlkeywords = ['database', 'from', 'left', 'limit', 'index',
+                   'join', 'null', 'outer', 'table', 'trigger',
+                   'using', 'values', 'view']
+
     prompt = 'dbsh> '
     multilinePrompt = ' ...> '
     doc_header = "Documented commands (type .help <topic>):"
