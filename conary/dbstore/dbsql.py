@@ -35,12 +35,15 @@ class DbSql(cmd.Cmd):
     def __init__(self, db = None, driver = None, path = None):
         cmd.Cmd.__init__(self)
         self.prompt = 'dbsql> '
+        self.multilinePrompt = '  ...> '
+
         self.doc_header = "Documented commands (type .help <topic>):"
 
         self.intro = """dbstore sql shell.
 type ".quit" to exit, ".help" for help"""
 
         self.showHeaders = False
+        self.display = self.display_list
 
         if driver and path:
             self.db = dbstore.connect(path, driver=driver)
@@ -50,32 +53,117 @@ type ".quit" to exit, ".help" for help"""
             raise RuntimeError, 'driver and path OR db must be given'
         self.cu = self.db.cursor()
 
-    def onecmd(self, cmd):
-        # remove any trailing whitespace
+    def multiline(self, firstline=''):
+        full_input = []
+        # keep a list of the entries that we've made in history
+        oldHist = []
+        if firstline:
+            full_input.append(firstline)
+        while True:
+            if hasReadline:
+                # add the current readline position
+                oldHist.append(readline.get_current_history_length())
+            if self.use_rawinput:
+                try:
+                    line = raw_input(self.multilinePrompt)
+                except EOFError:
+                    line = 'EOF'
+            else:
+                self.stdout.write(self.multilinePrompt)
+                self.stdout.flush()
+                line = self.stdin.readline()
+                if not len(line):
+                    line = 'EOF'
+                else:
+                    line = line[:-1] # chop \n
+            if line == 'EOF':
+                print
+                break
+            full_input.append(line)
+            if ';' in line:
+                break
+
+        # add the final readline history position
+        if hasReadline:
+            oldHist.append(readline.get_current_history_length())
+
+        cmd = ' '.join(full_input)
+        if hasReadline:
+            # remove the old, individual readline history entries.
+
+            # first remove any duplicate entries
+            oldHist = sorted(set(oldHist))
+
+            # Make sure you do this in reversed order so you move from
+            # the end of the history up.
+            for pos in reversed(oldHist):
+                # get_current_history_length returns pos + 1
+                readline.remove_history_item(pos - 1)
+            # now add the full line
+            readline.add_history(cmd)
+
+        return cmd
+
+    def parseline(self, line):
+        # knock off any leading .
+        line = line.strip()
+        if line.startswith('.'):
+            line = line[1:]
+        return cmd.Cmd.parseline(self, line)
+
+    def set_mode(self, mode):
+        self.display = getattr(self, 'display_' + mode)
+
+    def display_column(self, cu):
+        # print the results (if any)
+        fields = None
+        widths = [ len(s) + 2 for s in self.cu.fields() ]
+        # the total width is the sum of widths plus | for each col
+        total = sum(widths) + len(widths) - 1
+        bar = '+'.join('-' * x for x in widths)
+        bar = '+' + bar + '+'
+        format = '|'.join(('%%%d.%ds' % (x, x)) for x in widths)
+        format = '|' + format + '|'
+        print bar
+        for row in self.cu:
+            if self.showHeaders and not fields:
+                fields = self.cu.fields()
+                print format % tuple(' %s ' %x for x in fields)
+                print bar
+            print format % tuple(row)
+        print bar
+
+    def display_list(self, cu):
+        # print the results (if any)
+        fields = None
+        for row in self.cu:
+            if self.showHeaders and not fields:
+                fields = self.cu.fields()
+                print '|'.join(fields)
+            print '|'.join(str(x) for x in row)
+
+    def default(self, cmd):
         cmd = cmd.strip()
 
-        if cmd.startswith('.'):
-            cmd = cmd[1:]
-            cmd, arg, line = self.parseline(cmd)
-            try:
-                func = getattr(self, 'do_' + cmd)
-            except AttributeError:
-                return self.default(line)
-            return func(arg)
-
         if cmd == 'EOF':
-            # on EOF, ask to stop
+            # EOF means exit.  print a new line to clean up
             print
             return True
 
-        if not cmd:
-            # no command, noop
-            return False
+        if not cmd.endswith(';'):
+            cmd = self.multiline(cmd).strip()
 
+        # if there are multiple statements on one line, split them up
         if ';' in cmd:
             # split up the command and execute each part
-            for onecmd in cmd.split(';', 1):
-                self.onecmd(onecmd)
+            complete, partial = cmd.split(';', 1)
+            if partial:
+                # if there are two or more commands, run the first
+                self.default(complete + ';')
+                return self.default(partial)
+
+        if not cmd:
+            # no sql, noop
             return False
 
         # execute the SQL command
@@ -85,13 +173,7 @@ type ".quit" to exit, ".help" for help"""
             print 'Error:', str(e.args[0])
             return False
 
-        # print the results (if any)
-        fields = None
-        for row in self.cu:
-            if self.showHeaders and not fields:
-                fields = self.cu.fields()
-                print '|'.join(fields)
-            print '|'.join(str(x) for x in row)
+        self.display(self.cu)
 
         # reload the schema, in case there was a change
         self.db.loadSchema()
@@ -125,45 +207,7 @@ type ".quit" to exit, ".help" for help"""
             except:
                 pass
 
-    def complete(self, text, state):
-        # this is almost exacly what cmd.Cmd uses (for now).  The
-        # only difference is that we need to zap off the leading '.'
-        # in order for the function stuff to work.
-        """Return the next possible completion for 'text'.
-
-        If a command has not been entered, then complete against command list.
-        Otherwise try to call complete_<command> to get list of completions.
-        """
-        if state == 0:
-            import readline
-            origline = readline.get_line_buffer()
-            line = origline.lstrip()
-            # cut off any leading . from the command so we can look
-            # the commands up
-            if line.startswith('.'):
-                line = line[1:]
-            stripped = len(origline) - len(line)
-            begidx = readline.get_begidx() - stripped
-            endidx = readline.get_endidx() - stripped
-            if begidx>0:
-                cmd, args, foo = self.parseline(line)
-                if cmd == '':
-                    compfunc = self.completedefault
-                else:
-                    try:
-                        compfunc = getattr(self, 'complete_' + cmd)
-                    except AttributeError:
-                        compfunc = self.completedefault
-            else:
-                compfunc = self.completenames
-            self.completion_matches = compfunc(text, line, begidx, endidx)
-        try:
-            return self.completion_matches[state]
-        except IndexError:
-            return None
-
     def completenames(self, text, *ignored):
-        # override completenames to append the . at the start
         if text.startswith('.'):
             text = text[1:]
         dotext = 'do_'+text
@@ -209,6 +253,27 @@ turn the display of headers on or off"""
     help_head = help_headers
     complete_head = complete_headers
 
+    # mode
+    modes = ('column', 'list')
+    def do_mode(self, arg):
+        choices = [x for x in self.modes if x.startswith(arg)]
+        if len(choices) != 1:
+            print 'unknown argument', arg
+            return False
+        self.set_mode(choices[0])
+        return False
+
+    def help_mode(self):
+        print """mode [%s]
+change the display mode""" % '/'.join(self.modes)
+
+    def complete_mode(self, text, *ignored):
+        return [x for x in self.modes if x.startswith(text)]
+
+    do_head = do_headers
+    help_head = help_headers
+    complete_head = complete_headers
+
     # quit
     def do_quit(self, arg):
         # ask to stop
@@ -217,6 +282,16 @@ turn the display of headers on or off"""
     def help_quit(self):
         print """quit
 quit the shell"""
+
+    # reset
+    def do_reset(self, arg):
+        # write Ctrl+O
+        sys.stdout.write('\017')
+        sys.stdout.flush()
+
+    def help_reset(self):
+        print """reset
+shift the terminal back into mode 1 (like the reset command line tool)"""
 
     # help (mostly builtin)
     def help_help(self):
