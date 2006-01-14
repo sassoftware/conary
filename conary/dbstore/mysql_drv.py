@@ -106,7 +106,10 @@ class Database(BaseDatabase):
             del kwargs["timeout"]
         cdb["conv"] = conversions
         cdb.update(kwargs)
-        self.dbh = mysql.connect(**cdb)
+        try:
+            self.dbh = mysql.connect(**cdb)
+        except mysql.MySQLError, e:
+            raise sqlerrors.DatabaseError(e.args[1], e.args)
         self.dbName = cdb['db']
         cu = self.cursor()
         cu.execute("SELECT default_character_set_name "

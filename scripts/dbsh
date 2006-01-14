@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(fullPath))
 # conary imports
 from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
-from conary.dbstore import shell
+from conary.dbstore import shell, sqlerrors
 
 def usage():
     print 'usage: %s [dbstore driver] [dbstore connection path]' %sys.argv[0]
@@ -31,7 +31,11 @@ def main():
     if len(args) != 2:
         usage()
 
-    dbshell = shell.DbShell(driver=args[0], path=args[1])
+    try:
+        dbshell = shell.DbShell(driver=args[0], path=args[1])
+    except sqlerrors.DatabaseError, e:
+        print 'Error:', str(e.args[0])
+        sys.exit(1)
     dbshell.cmdloop()
 
 if __name__ == '__main__':
