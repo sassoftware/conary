@@ -405,7 +405,7 @@ class BaseDatabase:
 
     def shell(self):
         import shell
-        dbshell = shell.shell(self)
+        shell.shell(self)
 
     # try to close it first nicely
     def __del__(self):

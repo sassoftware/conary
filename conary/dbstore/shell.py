@@ -19,6 +19,7 @@ from conary import dbstore
 import sqlerrors
 import os
 import itertools
+import time
 
 try:
     import readline
@@ -60,6 +61,8 @@ type ".quit" to exit, ".help" for help"""
         self.use_pager = False
         # calculate column widths for column view?
         self.auto_width = False
+        # display stats: N rows in set (0.00 sec)
+        self.show_stats = True
 
         if driver and path:
             self.db = dbstore.connect(path, driver=driver)
@@ -160,13 +163,13 @@ type ".quit" to exit, ".help" for help"""
         format = '|'.join((' %%-%d.%ds ' % (x, x)) for x in widths)
         # and surround it with |
         format = '|' + format + '|'
-        yield bar
+        yield 0, bar
         if self.show_headers:
-            yield format % tuple(' %s ' %x for x in headers)
-            yield bar
+            yield 0, format % tuple(' %s ' %x for x in headers)
+            yield 0, bar
         for row in rows:
-            yield format % tuple(row)
-        yield bar
+            yield 1, format % tuple(row)
+        yield 0, bar
 
     def format_column(self, cu):
         if self.auto_width:
@@ -179,17 +182,26 @@ type ".quit" to exit, ".help" for help"""
         for row in cu:
             if self.show_headers and not fields:
                 fields = cu.fields()
-                yield '|'.join(fields)
-            yield '|'.join(str(x) for x in row)
+                yield 0, '|'.join(fields)
+            yield 1, '|'.join(str(x) for x in row)
 
     def display(self, cu):
         lines = self.format(cu)
         if self.use_pager:
             import pydoc
-            pydoc.pager('\n'.join(lines))
+            rows = [ x for x in lines ]
+            text = '\n'.join(x[1] for x in rows)
+            rows = sum(x[0] for x in rows)
+            end = time.time()
+            pydoc.pager(text)
         else:
-            for line in lines:
+            rows = 0
+            for isrow, line in lines:
+                if isrow:
+                    rows += 1
                 print line
+            end = time.time()
+        return rows, end
 
     def default(self, cmd):
         cmd = cmd.strip()
@@ -215,15 +227,18 @@ type ".quit" to exit, ".help" for help"""
             # no sql, noop
             return False
 
+        start = time.time()
         # execute the SQL command
         try:
-            self.cu.execute(cmd)
+            self.cu.execute(cmd % self.db.keywords)
         except sqlerrors.DatabaseError, e:
             print 'Error:', str(e.args[0])
             return False
 
         # display the results (if any)
-        self.display(self.cu)
+        rows, end = self.display(self.cu)
+        if self.show_stats and rows != -1:
+            print '%d rows in set (%.2f sec)' %(rows, end - start)
 
         # reload the schema, in case there was a change
         self.db.loadSchema()
@@ -364,6 +379,22 @@ turn the display of headers on or off"""
 turn the use of the pager on or off"""
 
     complete__pager = complete__yesno
+
+    # stats
+    def do__stats(self, arg):
+        if arg in self.yes_args:
+            self.show_stats = True
+        elif arg in self.no_args:
+            self.show_stats = False
+        else:
+            print 'unknown argument', arg
+        return False
+
+    def help__stats(self):
+        print """stats [on/off]
+turn the display of query statistics on or off"""
+
+    complete__stats = complete__yesno
 
     # mode
     def set_mode(self, mode):
