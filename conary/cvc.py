@@ -133,6 +133,7 @@ def realMain(cfg, argv=sys.argv):
     cfgMap["pubring"] = "pubRing", ONE_PARAM
     cfgMap["root"] = "root", ONE_PARAM
 
+    cfgMap["clean"] = "cleanAfterCook", NO_PARAM
     cfgMap['interactive'] = 'interactive', NO_PARAM
 
     for name, (cfgName, paramType) in cfgMap.items():
@@ -410,11 +411,6 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
             cfg.quiet = True
             del argSet['quiet']
 
-        if argSet.has_key('no-clean'):
-            del argSet['no-clean']
-            cfg.noClean = True
-        else:
-            cfg.noClean = False
         if argSet.has_key('resume'):
             resume = argSet['resume']
             del argSet['resume']

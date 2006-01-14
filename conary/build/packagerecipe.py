@@ -135,9 +135,7 @@ class _AbstractPackageRecipe(Recipe):
 	return '-'.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
-	if 'noClean' in self.cfg.__dict__ and self.cfg.noClean:
-	    pass
-	else:
+	if self.cfg.cleanAfterCook:
 	    util.rmtree(builddir)
 
     def sourceMap(self, path):

@@ -758,7 +758,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         logFile.close()
         if os.path.exists(logPath):
             os.unlink(logPath)
-        if cfg.noClean:
+        if not cfg.cleanAfterCook:
             # leave the easily accessible copy in place in 
             # builddir
             shutil.copy2(tmpLogPath, logPath)

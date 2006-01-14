@@ -128,9 +128,9 @@ def slow_insert(t, fields, rows):
             t, ", ".join(fields), sqlstr(row))
         try:
             cm.execute(sql)
-        except sqlerrors.ConstraintViolation, e:
+        except (sqlerrors.ColumnNotUnique, sqlerrors.ConstraintViolation), e:
             print
-            print "%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
+            print "\r%s: SKIPPING CONSTRAINT VIOLATION" % t, sql
             print e.msg
             print
     mysql.commit()
@@ -166,9 +166,7 @@ for t in tList:
         i += len(rows)
         try:
             cm.execute(sql)
-        except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING" % t, row
-        except sqlerrors.ConstraintViolation:
+        except (sqlerrors.ColumnNotUnique, sqlerrors.ConstraintViolation):
             slow_insert(t, fields, rows)
         except:
             print "ERROR - SQL", sql

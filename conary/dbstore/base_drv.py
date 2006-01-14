@@ -403,6 +403,10 @@ class BaseDatabase:
         self.loadSchema()
         return version
 
+    def shell(self):
+        import shell
+        dbshell = shell.shell(self)
+
     # try to close it first nicely
     def __del__(self):
         if self.dbh is not None:

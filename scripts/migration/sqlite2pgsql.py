@@ -136,7 +136,7 @@ for t in tList:
         try:
             cp.execute(sql, escape(cp, row))
         except sqlerrors.ColumnNotUnique:
-            print "\r%s: DUPLICATE" % t, row
+            print "\r%s: SKIPPING DUPLICATE" % t, row
             pgsql.commit()
         except sqlerrors.ConstraintViolation, e:
             print

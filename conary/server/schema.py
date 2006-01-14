@@ -466,7 +466,7 @@ def createTroves(db):
         CREATE TABLE FileStreams(
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY20)s,
-            stream      %(BLOB)s,
+            stream      %(MEDIUMBLOB)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
@@ -1010,6 +1010,7 @@ class MigrateTo_10(SchemaMigration):
             trove._TROVEINFO_TAG_CLONEDFROM, trove._TROVEINFO_TAG_SOURCENAME))
         self.cu.execute("CREATE INDEX TItempIdx ON TItemp(instanceId, data)")
         self.cu.execute("CREATE INDEX TItempIdx2 ON TItemp(infoType, data)")
+        self.cu.execute("CREATE INDEX TItempIdx3 ON TItemp(instanceId, infoType, data)")
         self.cu.execute("""
         INSERT INTO Versions (version)
         SELECT TI.data
@@ -1064,11 +1065,46 @@ class MigrateTo_11(SchemaMigration):
         cu = self.cu
         cu2 = self.db.cursor()
 
+	logMe(3, "rebuilding latest table")
+        cu.execute("DROP TABLE Latest")
+        self.db.loadSchema()
+        createLatest(self.db)
+	cu.execute("""
+            insert into Latest (itemId, branchId, flavorId, versionId)
+                select
+                    instances.itemid as itemid,
+                    nodes.branchid as branchid,
+                    instances.flavorid as flavorid,
+                    nodes.versionid as versionid
+                from
+                    ( select
+                        i.itemid as itemid,
+                        n.branchid as branchid,
+                        i.flavorid as flavorid,
+                        max(n.finalTimestamp) as finaltimestamp
+                      from
+                        instances as i, nodes as n
+                      where
+                            i.itemid = n.itemid
+                        and i.versionid = n.versionid
+                      group by i.itemid, n.branchid, i.flavorid
+                    ) as tmp
+                    join nodes on
+                      tmp.itemid = nodes.itemid and
+                      tmp.branchid = nodes.branchid and
+                      tmp.finaltimestamp = nodes.finaltimestamp
+                    join instances on
+                      nodes.itemid = instances.itemid and
+                      nodes.versionid = instances.versionid and
+                      instances.flavorid = tmp.flavorid
+        """)
+
+        logMe(3, "Finding path hashes needing an update...")
         cu.execute("""
             CREATE TEMPORARY TABLE hashUpdatesTmp(
                 instanceId INTEGER,
                 data       %(MEDIUMBLOB)s
-            )       
+            )
         """ % self.db.keywords)
 
         rows = cu2.execute("""
@@ -1081,22 +1117,25 @@ class MigrateTo_11(SchemaMigration):
             frzn = PathHashes(data).freeze()
             if frzn != data:
                 cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', (instanceId, frzn))
-                
 
-        cu.execute('''DELETE FROM TroveInfo 
-                      WHERE infoType=? 
-                      AND instanceId IN 
+
+        logMe(3, "removing bad signatures due to path hashes...")
+        cu.execute('''DELETE FROM TroveInfo
+                      WHERE infoType=?
+                      AND instanceId IN
                         (SELECT instanceId from hashUpdatesTmp)''',
                       trove._TROVEINFO_TAG_SIGS)
+
+        logMe(3, "updating path hashes...")
         cu.execute('''
-            UPDATE TroveInfo 
+            UPDATE TroveInfo
                 SET data=(SELECT data FROM hashUpdatesTmp
                           WHERE troveInfo.instanceId=hashUpdatesTmp.instanceId)
             WHERE troveInfo.infoType=?
                    ''', trove._TROVEINFO_TAG_PATH_HASHES)
 
         cu.execute('''DROP TABLE hashUpdatesTmp''')
-        
+
         return self.Version
 
 
