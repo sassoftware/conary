@@ -351,6 +351,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
 if __name__ == '__main__':
     argDef = {}
     cfgMap = {
+        'contents-dir'  : 'contentsDir',
 	'db'	        : 'repositoryDB',
 	'log-file'	: 'logFile',
 	'map'	        : 'repositoryMap',
