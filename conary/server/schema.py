@@ -1153,7 +1153,7 @@ class MigrateTo_12(SchemaMigration):
         for instanceId, in cu:
             cu2.execute("SELECT path FROM TroveFiles WHERE instanceId=?", instanceId)
             ph = trove.PathHashes()
-            for path, in cu:
+            for path, in cu2:
                 ph.addPath(path)
             cu2.execute("UPDATE TroveInfo SET data=? "
                         "WHERE instanceId=? and infotype=?",
