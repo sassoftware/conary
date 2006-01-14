@@ -31,19 +31,21 @@ class DbSql(cmd.Cmd):
     _historyPath = os.path.expanduser('~/.dbsqlhistory')
     yesArgs = ('on', 'yes')
     noArgs = ('off', 'no')
+    prompt = 'dbsql> '
+    multilinePrompt = '  ...> '
+    doc_header = "Documented commands (type .help <topic>):"
+    intro = """dbstore sql shell.
+type ".quit" to exit, ".help" for help"""
 
     def __init__(self, db = None, driver = None, path = None):
         cmd.Cmd.__init__(self)
-        self.prompt = 'dbsql> '
-        self.multilinePrompt = '  ...> '
 
-        self.doc_header = "Documented commands (type .help <topic>):"
-
-        self.intro = """dbstore sql shell.
-type ".quit" to exit, ".help" for help"""
-
+        # default to .head off
         self.showHeaders = False
+        # default to .mode list
         self.display = self.display_list
+        # a dictionary of column number: width for manual setting
+        self.manual_widths = {}
 
         if driver and path:
             self.db = dbstore.connect(path, driver=driver)
@@ -56,13 +58,13 @@ type ".quit" to exit, ".help" for help"""
     def multiline(self, firstline=''):
         full_input = []
         # keep a list of the entries that we've made in history
-        oldHist = []
+        old_hist = []
         if firstline:
             full_input.append(firstline)
         while True:
             if hasReadline:
                 # add the current readline position
-                oldHist.append(readline.get_current_history_length())
+                old_hist.append(readline.get_current_history_length())
             if self.use_rawinput:
                 try:
                     line = raw_input(self.multilinePrompt)
@@ -85,18 +87,18 @@ type ".quit" to exit, ".help" for help"""
 
         # add the final readline history position
         if hasReadline:
-            oldHist.append(readline.get_current_history_length())
+            old_hist.append(readline.get_current_history_length())
 
         cmd = ' '.join(full_input)
         if hasReadline:
             # remove the old, individual readline history entries.
 
             # first remove any duplicate entries
-            oldHist = sorted(set(oldHist))
+            old_hist = sorted(set(old_hist))
 
             # Make sure you do this in reversed order so you move from
             # the end of the history up.
-            for pos in reversed(oldHist):
+            for pos in reversed(old_hist):
                 # get_current_history_length returns pos + 1
                 readline.remove_history_item(pos - 1)
             # now add the full line
@@ -115,14 +117,21 @@ type ".quit" to exit, ".help" for help"""
         self.display = getattr(self, 'display_' + mode)
 
     def display_column(self, cu):
-        # print the results (if any)
         fields = None
         widths = [ len(s) + 2 for s in self.cu.fields() ]
+        # override widths if they are set manually
+        for col, width in enumerate(widths):
+            if col in self.manual_widths:
+                widths[col] = self.manual_widths[col]
         # the total width is the sum of widths plus | for each col
         total = sum(widths) + len(widths) - 1
+        # draw a bar like ---+---+---
         bar = '+'.join('-' * x for x in widths)
+        # surround it with + to make +---+---+---+
         bar = '+' + bar + '+'
+        # build up a format string like %5.5s|%6.6s
         format = '|'.join(('%%%d.%ds' % (x, x)) for x in widths)
+        # and surround it with |
         format = '|' + format + '|'
         print bar
         for row in self.cu:
@@ -134,7 +143,6 @@ type ".quit" to exit, ".help" for help"""
         print bar
 
     def display_list(self, cu):
-        # print the results (if any)
         fields = None
         for row in self.cu:
             if self.showHeaders and not fields:
@@ -173,10 +181,12 @@ type ".quit" to exit, ".help" for help"""
             print 'Error:', str(e.args[0])
             return False
 
+        # display the results (if any)
         self.display(self.cu)
 
         # reload the schema, in case there was a change
         self.db.loadSchema()
+        return False
 
     def cmdloop(self):
         self.read_history()
@@ -273,6 +283,42 @@ change the display mode""" % '/'.join(self.modes)
     do_head = do_headers
     help_head = help_headers
     complete_head = complete_headers
+
+    # width
+    def do_width(self, arg):
+        if '=' in arg:
+            col, width = arg.split('=', 1)
+            col = col.strip()
+            width = width.strip()
+            try:
+                col = int(col)
+            except ValueError:
+                print 'invalid argument for .width column=width: %s' %col
+                return False
+            try:
+                width = int(width)
+            except ValueError:
+                print 'invalid argument for .width column=width: %s' %width
+                return False
+            if col < 0:
+                print 'invalid argument for .width column=width: %s' %col
+            self.manual_widths[col - 1] = width
+        else:
+            new_widths = {}
+            for col, width in enumerate(arg.split()):
+                width = width.strip()
+                try:
+                    width = int(width)
+                except ValueError:
+                    print 'invalid argument for .width NUM NUM ...: %s' %width
+                    return False
+                new_widths[col] = width
+
+            self.manual_widths.update(new_widths)
+
+    def help_width(self):
+        print """width [col=width || width width width ...]
+set the width of a column manually"""
 
     # quit
     def do_quit(self, arg):
