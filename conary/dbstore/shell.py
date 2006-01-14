@@ -27,12 +27,12 @@ except ImportError:
 else:
     hasReadline = True
 
-class DbSql(cmd.Cmd):
-    _historyPath = os.path.expanduser('~/.dbsqlhistory')
+class DbShell(cmd.Cmd):
+    _historyPath = os.path.expanduser('~/.dbshellhistory')
     yesArgs = ('on', 'yes')
     noArgs = ('off', 'no')
-    prompt = 'dbsql> '
-    multilinePrompt = '  ...> '
+    prompt = 'dbsh> '
+    multilinePrompt = ' ...> '
     doc_header = "Documented commands (type .help <topic>):"
     intro = """dbstore sql shell.
 type ".quit" to exit, ".help" for help"""
@@ -347,5 +347,5 @@ display help"""
 
 def shell(db):
     'invokes a dbstore sql shell on an existing db connection'
-    shell = DbSql(db)
+    shell = DbShell(db)
     return shell.cmdloop()

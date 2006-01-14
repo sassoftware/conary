@@ -404,8 +404,8 @@ class BaseDatabase:
         return version
 
     def shell(self):
-        import dbsql
-        dbshell = dbsql.shell(self)
+        import shell
+        dbshell = shell.shell(self)
 
     # try to close it first nicely
     def __del__(self):
