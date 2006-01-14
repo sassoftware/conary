@@ -28,7 +28,7 @@ else:
     hasReadline = True
 
 class DbShell(cmd.Cmd):
-    _historyPath = os.path.expanduser('~/.dbsh_history')
+    _history_path = os.path.expanduser('~/.dbsh_history')
     yes_args = ('on', 'yes')
     no_args = ('off', 'no')
     # sql commands that are commonly at the start of a sql command
@@ -40,20 +40,26 @@ class DbShell(cmd.Cmd):
                    'using', 'values', 'view']
 
     prompt = 'dbsh> '
-    multilinePrompt = ' ...> '
+    multiline_prompt = ' ...> '
     doc_header = "Documented commands (type .help <topic>):"
     intro = """dbstore sql shell.
 type ".quit" to exit, ".help" for help"""
+    identchars = cmd.IDENTCHARS + '.'
+    default_width = 10
 
     def __init__(self, db = None, driver = None, path = None):
         cmd.Cmd.__init__(self)
 
         # default to .head off
-        self.showHeaders = False
+        self.show_headers = False
         # default to .mode list
-        self.display = self.display_list
+        self.format = self.format_list
         # a dictionary of column number: width for manual setting
         self.manual_widths = {}
+        # use a pager?
+        self.use_pager = False
+        # calculate column widths for column view?
+        self.auto_width = False
 
         if driver and path:
             self.db = dbstore.connect(path, driver=driver)
@@ -75,11 +81,11 @@ type ".quit" to exit, ".help" for help"""
                 old_hist.append(readline.get_current_history_length())
             if self.use_rawinput:
                 try:
-                    line = raw_input(self.multilinePrompt)
+                    line = raw_input(self.multiline_prompt)
                 except EOFError:
                     line = 'EOF'
             else:
-                self.stdout.write(self.multilinePrompt)
+                self.stdout.write(self.multiline_prompt)
                 self.stdout.flush()
                 line = self.stdin.readline()
                 if not len(line):
@@ -115,48 +121,75 @@ type ".quit" to exit, ".help" for help"""
         return cmd
 
     def parseline(self, line):
-        # knock off any leading .
         line = line.strip()
+        # convert . to _, which allows us to differentiate dbsh commands
+        # from sql commands (like .show tables versus show variables)
         if line.startswith('.'):
-            line = line[1:]
+            line = '_' + line[1:]
         return cmd.Cmd.parseline(self, line)
 
-    def set_mode(self, mode):
-        self.display = getattr(self, 'display_' + mode)
+    def calculate_widths(self, cu):
+        if self.show_headers:
+            widths = [ len(s) + 4 for s in cu.fields() ]
+        else:
+            widths = [ 0 ] * len(cu.fields())
+        rows = []
+        for row in cu:
+            for pos, col in enumerate(row):
+                widths[pos] = max(widths[pos], len(str(col)))
+            rows.append(row)
+        return widths, rows
 
-    def display_column(self, cu):
-        fields = None
-        widths = [ len(s) + 2 for s in self.cu.fields() ]
+    def format_column_rows(self, headers, rows, widths = None):
+        if not widths:
+            if self.show_headers:
+                widths = [ len(s) + 4 for s in headers ]
+            else:
+                widths = [ self.default_width ] * len(headers)
         # override widths if they are set manually
         for col, width in enumerate(widths):
             if col in self.manual_widths:
                 widths[col] = self.manual_widths[col]
         # the total width is the sum of widths plus | for each col
-        total = sum(widths) + len(widths) - 1
+        total = sum(widths) + (len(widths) - 1)
         # draw a bar like ---+---+---
-        bar = '+'.join('-' * x for x in widths)
+        bar = '+'.join('-' * (x + 2) for x in widths)
         # surround it with + to make +---+---+---+
         bar = '+' + bar + '+'
-        # build up a format string like %5.5s|%6.6s
-        format = '|'.join(('%%%d.%ds' % (x, x)) for x in widths)
+        # build up a format string like %-5.5s|%-6.6s
+        format = '|'.join((' %%-%d.%ds ' % (x, x)) for x in widths)
         # and surround it with |
         format = '|' + format + '|'
-        print bar
-        for row in self.cu:
-            if self.showHeaders and not fields:
-                fields = self.cu.fields()
-                print format % tuple(' %s ' %x for x in fields)
-                print bar
-            print format % tuple(row)
-        print bar
+        yield bar
+        if self.show_headers:
+            yield format % tuple(' %s ' %x for x in headers)
+            yield bar
+        for row in rows:
+            yield format % tuple(row)
+        yield bar
 
-    def display_list(self, cu):
+    def format_column(self, cu):
+        if self.auto_width:
+            widths, rows = self.calculate_widths(cu)
+            return self.format_column_rows(cu.fields(), rows, widths)
+        return self.format_column_rows(cu.fields(), cu)
+
+    def format_list(self, cu):
         fields = None
-        for row in self.cu:
-            if self.showHeaders and not fields:
-                fields = self.cu.fields()
-                print '|'.join(fields)
-            print '|'.join(str(x) for x in row)
+        for row in cu:
+            if self.show_headers and not fields:
+                fields = cu.fields()
+                yield '|'.join(fields)
+            yield '|'.join(str(x) for x in row)
+
+    def display(self, cu):
+        lines = self.format(cu)
+        if self.use_pager:
+            import pydoc
+            pydoc.pager('\n'.join(lines))
+        else:
+            for line in lines:
+                print line
 
     def default(self, cmd):
         cmd = cmd.strip()
@@ -211,17 +244,17 @@ type ".quit" to exit, ".help" for help"""
         return rc
 
     def read_history(self):
-        if hasReadline and self._historyPath:
+        if hasReadline and self._history_path:
             try:
-                readline.read_history_file(self._historyPath)
+                readline.read_history_file(self._history_path)
             except:
                 pass
 
     def save_history(self):
-        if hasReadline and self._historyPath:
+        if hasReadline and self._history_path:
             readline.set_history_length(1000)
             try:
-                readline.write_history_file(self._historyPath)
+                readline.write_history_file(self._history_path)
             except:
                 pass
 
@@ -242,22 +275,47 @@ type ".quit" to exit, ".help" for help"""
         text = text.lower()
         return [a + ' ' for a in candidates if a.startswith(text)]
 
-    def completenames(self, text, *ignored):
+    def completenames(self, text, line, begin, end):
+        cmds = ['.' + a[4:] for a in self.get_names()
+                if a.startswith('do__')]
+        if line.endswith('.help '):
+            starters = cmds
+        else:
+            starters = cmds + self.sqlstarters
+
         cmd, arg, line = self.parseline(text)
-
-        cmds = ['.' + a[3:] for a in self.get_names()
-                    if a.startswith('do_')]
-        starters = cmds + self.sqlstarters
-
         if not cmd:
             return starters
         text = text.lower()
         return [a + ' ' for a in starters if a.startswith(text)]
 
+    def print_topics(self, header, cmds, cmdlen, maxcol):
+        if cmds == ['help']:
+            return
+        if cmds:
+            self.stdout.write("%s\n"%str(header))
+            if self.ruler:
+                self.stdout.write("%s\n"%str(self.ruler * len(header)))
+            newcmds = []
+            for cmd in cmds:
+                if cmd.startswith('_'):
+                    newcmds.append('.' + cmd[1:])
+                else:
+                    newcmds.append(cmd)
+            self.columnize(newcmds, maxcol-1)
+            self.stdout.write("\n")
+
+    def complete__yesno(self, text, *ignored):
+        return [x for x in itertools.chain(self.yes_args, self.no_args)
+                if x.startswith(text)]
+
+    def complete__noop(self, *args):
+        return []
+
     # funtions defined below
     schemaBits = ('tables', 'triggers', 'functions', 'sequences',
                   'triggers')
-    def do_show(self, arg):
+    def do__show(self, arg):
         if arg in self.schemaBits:
             d = getattr(self.db, arg)
             print '\n'.join(sorted(d.keys()))
@@ -265,38 +323,56 @@ type ".quit" to exit, ".help" for help"""
             print 'unknown argument', arg
         return False
 
-    def help_show(self):
-        print """show [tables/triggers/functions/sequences/triggers]
-display database information"""
+    def help__show(self):
+        print """show %s
+display database information""" % ' '.join('[%s]' % x for x in self.schemaBits)
 
-    def complete_show(self, text, *ignored):
+    def complete__show(self, text, *ignored):
         return [x for x in self.schemaBits if x.startswith(text)]
 
     # headers
-    def do_headers(self, arg):
+    def do__headers(self, arg):
         if arg in self.yes_args:
-            self.showHeaders = True
+            self.show_headers = True
         elif arg in self.no_args:
-            self.showHeaders = False
+            self.show_headers = False
         else:
             print 'unknown argument', arg
         return False
 
-    def help_headers(self):
+    def help__headers(self):
         print """headers [on/off]
 turn the display of headers on or off"""
 
-    def complete_headers(self, text, *ignored):
-        return [x for x in itertools.chain(self.yes_args, self.no_args)
-                if x.startswith(text)]
+    do__head = do__headers
+    help__head = help__headers
+    complete__headers = complete__yesno
+    complete__head = complete__yesno
 
-    do_head = do_headers
-    help_head = help_headers
-    complete_head = complete_headers
+    # pager
+    def do__pager(self, arg):
+        if arg in self.yes_args:
+            self.use_pager = True
+        elif arg in self.no_args:
+            self.use_pager = False
+        else:
+            print 'unknown argument', arg
+        return False
+
+    def help__pager(self):
+        print """pager [on/off]
+turn the use of the pager on or off"""
+
+    complete__pager = complete__yesno
 
     # mode
+    def set_mode(self, mode):
+        self.format = getattr(self, 'format_' + mode)
+
     modes = ('column', 'list')
-    def do_mode(self, arg):
+    def do__mode(self, arg):
+        # allow the user to abbreviate, as long as it's enough
+        # to be unambiguous
         choices = [x for x in self.modes if x.startswith(arg)]
         if len(choices) != 1:
             print 'unknown argument', arg
@@ -304,20 +380,24 @@ turn the display of headers on or off"""
         self.set_mode(choices[0])
         return False
 
-    def help_mode(self):
-        print """mode [%s]
-change the display mode""" % '/'.join(self.modes)
+    def help__mode(self):
+        print """mode %s
+change the display mode""" % ' '.join('[%s]' %x for x in self.modes)
 
-    def complete_mode(self, text, *ignored):
+    def complete__mode(self, text, *ignored):
         return [x for x in self.modes if x.startswith(text)]
 
-    do_head = do_headers
-    help_head = help_headers
-    complete_head = complete_headers
+    do__head = do__headers
+    help__head = help__headers
+    complete__head = complete__headers
 
     # width
-    def do_width(self, arg):
-        if '=' in arg:
+    def do__width(self, arg):
+        if arg == 'auto':
+            self.auto_width = True
+        elif arg == 'manual':
+            self.auto_width = False
+        elif '=' in arg:
             col, width = arg.split('=', 1)
             col = col.strip()
             width = width.strip()
@@ -347,34 +427,46 @@ change the display mode""" % '/'.join(self.modes)
 
             self.manual_widths.update(new_widths)
 
-    def help_width(self):
-        print """width [col=width || width width width ...]
+    def help__width(self):
+        print """width [col=width] [width width width ...] [auto] [manual]
 set the width of a column manually"""
 
+    complete__width = complete__noop
+
     # quit
-    def do_quit(self, arg):
+    def do__quit(self, arg):
         # ask to stop
         return True
 
-    def help_quit(self):
+    def help__quit(self):
         print """quit
 quit the shell"""
 
+    complete__quit = complete__noop
+
     # reset
-    def do_reset(self, arg):
+    def do__reset(self, arg):
         # write Ctrl+O
         sys.stdout.write('\017')
         sys.stdout.flush()
 
-    def help_reset(self):
+    def help__reset(self):
         print """reset
 shift the terminal back into mode 1 (like the reset command line tool)"""
 
+    complete__reset = complete__noop
+
     # help (mostly builtin)
-    def help_help(self):
-        print """quit
+    def do__help(self, arg):
+        if arg.startswith('.'):
+            arg = '_' + arg[1:]
+        return cmd.Cmd.do_help(self, arg)
+
+    def help__help(self):
+        print """help
 display help"""
 
+    complete__help = cmd.Cmd.complete_help
 
 def shell(db):
     'invokes a dbstore sql shell on an existing db connection'
