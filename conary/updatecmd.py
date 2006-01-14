@@ -87,26 +87,27 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateText = None
         self.lock.release()
 
-    def _downloading(self, msg, got, need):
+    def _downloading(self, msg, got, rate, need):
         if got == need:
             self.csText = None
         elif need != 0:
             if self.csHunk[1] < 2 or not self.updateText:
-                self.csMsg("%s (%d%% of %dk)"
-                           % (msg, (got * 100) / need, need / 1024))
+                self.csMsg("%s %dKb (%d%%) of %dKb at %dKb/sec"
+                           % (msg, got/1024, (got*100)/need, need/1024, rate/1024))
             else:
-                self.csMsg("%s %d of %d (%d%%)"
-                           % ((msg,) + self.csHunk + (((got * 100) / need),)))
+                self.csMsg("%s %d of %d: %dKb (%d%%) of %dKb at %dKb/sec"
+                           % ((msg,) + self.csHunk + \
+                              (got/1024, (got*100)/need, need/1024, rate/1024)))
         else: # no idea how much we need, just keep on counting...
-            self.csMsg("%s (got %dk so far)" % (msg, got / 1024))
+            self.csMsg("%s (got %dKb at %dKb/s so far)" % (msg, got/1024, rate/1024))
 
         self.update()
 
-    def downloadingFileContents(self, got, need):
-        self._downloading('Downloading files for changeset', got, need)
+    def downloadingFileContents(self, got, rate, need):
+        self._downloading('Downloading files for changeset', got, rate, need)
 
-    def downloadingChangeSet(self, got, need):
-        self._downloading('Downloading', got, need)
+    def downloadingChangeSet(self, got, rate, need):
+        self._downloading('Downloading', got, rate, need)
 
     def requestingFileContents(self):
         if self.csHunk[1] < 2:
@@ -391,7 +392,7 @@ def updateConary(cfg, conaryVersion):
     callback = UpdateCallback(cfg)
     dlSize = util.copyfileobj(
         url, dst, bufSize = 16*1024,
-        callback = lambda x, m=csSize: callback.downloadingChangeSet(x, m)
+        callback = lambda x, r, m=csSize: callback.downloadingChangeSet(x, r, m)
         )
     if not dlSize:
         return _urlNotFound(url)

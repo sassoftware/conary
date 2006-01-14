@@ -27,6 +27,7 @@ import string
 import struct
 import sys
 import tempfile
+import time
 import traceback
 import weakref
 
@@ -291,8 +292,30 @@ def copyfile(sources, dest, verbose=True):
 	    log.debug('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
-def copyfileobj(source, dest, callback = None, digest = None, 
-                abortCheck = None, bufSize = 128*1024):
+def copyfileobj(source, dest, callback = None, digest = None,
+                abortCheck = None, bufSize = 64*1024, rateLimit = None):
+
+    if hasattr(dest, 'send'):
+        write = dest.send
+    else:
+        write = dest.write
+
+    if hasattr(source, 'url') or hasattr(dest, 'url'):
+        assert(rateLimit is not None)
+
+    if rateLimit is None:
+        rateLimit = 0
+
+    if not rateLimit == 0:
+        if rateLimit < 8 * 1024:
+            bufSize = 4 * 1024
+        else:
+            bufSize = 8 * 1024
+
+        rateLimit = float(rateLimit)
+
+    starttime = time.time()
+
     total = 0
     buf = source.read(bufSize)
 
@@ -305,10 +328,18 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if not buf:
             break
 
-	total += len(buf)
-	dest.write(buf)
-	if digest: digest.update(buf)
-        if callback: callback(total)
+        total += len(buf)
+        write(buf)
+
+        now = time.time()
+        rate = total / (now - starttime)
+
+        if ( rateLimit > 0 ) and ( rate > rateLimit ):
+            time.sleep( (total / rateLimit) - (total / rate) )
+
+        if digest: digest.update(buf)
+        if callback:
+                callback(total, rate)
 
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time

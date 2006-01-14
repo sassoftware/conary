@@ -21,6 +21,7 @@ import errno
 from conary.lib import log
 from conary.lib import sha1helper
 from conary.lib import util
+from conary import callbacks
 import os
 import socket
 import sys
@@ -29,6 +30,29 @@ import urllib2
 
 # location is normally the package name
 networkPrefixes = ('http://', 'https://', 'ftp://')
+
+class FetchCallback(callbacks.LineOutput, callbacks.FetchCallback):
+
+    def fetch(self, got, rate, need):
+        if need == 0:
+            self._message("Downloading source (%dKb at %dKb/sec)..." \
+                          % (got/1024, rate/1024))
+        else:
+            self._message("Downloading source (%dKb (%d%%) of %dKb at %dKb/sec)..." \
+                          % (got/1024, (got*100)/need , need/1024, rate/1024))
+
+class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
+
+    def requestingFileContents(self):
+        self._message("Requesting file...")
+
+    def downloadingFileContents(self, got, rate, need):
+        if need == 0:
+            self._message("Downloading file (%dKb at %dKb/sec)..." \
+                          % (got/1024, rate/1024))
+        else:
+            self._message("Downloading file (%dKb (%d%%) of %dKb at %dKb/sec)..." \
+                          % (got/1024, (got*100)/need , need/1024, rate/1024))
 
 def _truncateName(name):
     for prefix in networkPrefixes:
@@ -48,37 +72,25 @@ def _createCacheEntry(cfg, name, location, infile):
     # contents in different packages do not collide
     cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
-   
+
     try:
         BLOCKSIZE = 1024 * 4
-       
+
         got = 0
-        last = 0
         if infile.info().has_key('content-length'):
             need = int(infile.info()['content-length'])
         else:
             need = 0
-        
-        while 1:
-            buf = infile.read(BLOCKSIZE)
-            if not buf:
-                break
-            f.write(buf)
 
-            got += len(buf)
-            if not cfg.quiet and need != 0:
-                msg = "info: Downloading source (%d%% of %dk)..." \
-                      % ((got * 100) / need , need / 1024)
-                sys.stderr.write("\r")
-                sys.stderr.write(msg)
-                if len(msg) < last:
-                    i = last - len(msg)
-                    sys.stderr.write(" " * i + "\b" * i)
-                sys.stderr.flush()
-                last = len(msg)
-        
-        if not cfg.quiet:
-            sys.stderr.write("\n")
+        if cfg.quiet:
+            callback = callbacks.FetchCallback()
+        else:
+            callback = FetchCallback()
+
+        total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
+            rateLimit = cfg.rateLimit,
+            callback = lambda got, rate, need=need: callback.fetch(got, rate, need))
+
         f.close()
         infile.close()
     except:
@@ -271,8 +283,14 @@ class RepositoryCache:
                           sha1helper.sha1ToString(sha1Cached))
             else:
                 log.debug('%s not yet cached, fetching...', basename)
+
+            if cfg.quiet:
+                csCallback = None
+            else:
+                csCallback = ChangesetCallback()
+
             f = self.repos.getFileContents(
-                [ (fileId, troveFileVersion) ])[0].get()
+                [ (fileId, troveFileVersion) ], callback = csCallback)[0].get()
             util.copyfileobj(f, open(cachedname, "w"))
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)

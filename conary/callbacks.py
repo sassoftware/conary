@@ -23,13 +23,13 @@ class ChangesetCallback:
     def requestingChangeSet(self):
         pass
 
-    def downloadingChangeSet(self, got, need):
+    def downloadingChangeSet(self, got, rate, need):
         pass
 
     def requestingFileContents(self):
         pass
 
-    def downloadingFileContents(self, got, need):
+    def downloadingFileContents(self, got, rate, need):
         pass
 
     def setChangesetHunk(self, hunk, hunkCount):
@@ -40,7 +40,7 @@ class ChangesetCallback:
 
 class CookCallback:
 
-    def sendingChangeset(self, sent, total):
+    def sendingChangeset(self, sent, rate, total):
         pass
 
     def __init__(self):
@@ -102,6 +102,14 @@ class UpdateCallback(ChangesetCallback):
 class SignatureCallback:
 
     def signTrove(self, got, need):
+        pass
+
+    def __init__(self):
+        pass
+
+class FetchCallback:
+
+    def fetch(self, got, rate, need):
         pass
 
     def __init__(self):

@@ -805,9 +805,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 inF = urllib.urlopen(url)
 
                 if callback:
-                    callback.downloadingChangeSet(0, sum(sizes))
+                    callback.downloadingChangeSet(0, 0, sum(sizes))
                     copyCallback = \
-                        lambda x: callback.downloadingChangeSet(x, sum(sizes))
+                        lambda x, r: callback.downloadingChangeSet(x, r, sum(sizes))
                     abortCheck = callback.checkAbort
                 else:
                     copyCallback = None
@@ -819,7 +819,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     start = outFile.tell()
                     totalSize = util.copyfileobj(inF, outFile,
                                                  callback = copyCallback,
-                                                 abortCheck = abortCheck)
+                                                 abortCheck = abortCheck,
+                                                 rateLimit = self.rateLimit)
                     if totalSize == None:
                         sys.exit(0)
                     #assert(totalSize == sum(sizes))
@@ -1120,8 +1121,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inF = urllib.urlopen(url)
 
             if callback:
-                callback.downloadingFileContents(0, sum(sizes))
-                copyCallback = lambda x: callback.downloadingFileContents(x, sum(sizes))
+                callback.downloadingFileContents(0, 0, sum(sizes))
+                copyCallback = lambda x, r: callback.downloadingFileContents(x, r, sum(sizes))
             else:
                 copyCallback = None
 
@@ -1138,7 +1139,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 outF = os.fdopen(fd, "r+")
                 start = 0
 
-            totalSize = util.copyfileobj(inF, outF, callback = copyCallback)
+            totalSize = util.copyfileobj(inF, outF, rateLimit = self.rateLimit,
+                                         callback = copyCallback)
             del inF
 
             for (i, item), size in itertools.izip(itemList, sizes):
@@ -1348,8 +1350,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _putFile(self, url, path, callbackFn=None):
         """ send a file to a url.  Takes a callbackFn
-            which is called with two parameters - bytes sent
-            and total bytes
+            which is called with three parameters - bytes sent,
+            rate and total bytes
         """
         protocol, uri = urllib.splittype(url)
         assert(protocol in ('http', 'https'))
@@ -1361,7 +1363,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	f = open(path)
         size = os.fstat(f.fileno()).st_size
-        sent = 0
         BUFSIZE = 8192
 
 	c.connect()
@@ -1369,15 +1370,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         c.putheader('Content-length', str(size))
         c.endheaders()
 
-        while True:
-            content = f.read(BUFSIZE)
-            if content:
-                c.send(content)
-                sent = min(sent + BUFSIZE, size)
-                if callbackFn:
-                    callbackFn(sent, size)
-            else:
-                break
+        c.url = url
+
+        commitCallback = None
+        if callbackFn:
+            commitCallback = lambda x, r, s=size: callbackFn(x, r, s)
+
+        util.copyfileobj(f, c, bufSize=BUFSIZE, callback=commitCallback,
+                         rateLimit = self.rateLimit)
+
 	r = c.getresponse()
         # give a slightly more helpful message for 403
         if r.status == 403:
@@ -1388,13 +1389,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, userMap, localRepository = None, 
+    def __init__(self, repMap, userMap, rateLimit, localRepository = None,
                  pwPrompt = None, entitlementDir = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: None
+
+        self.rateLimit = rateLimit
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
