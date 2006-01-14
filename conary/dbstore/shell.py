@@ -28,9 +28,14 @@ else:
     hasReadline = True
 
 class DbShell(cmd.Cmd):
-    _historyPath = os.path.expanduser('~/.dbshellhistory')
-    yesArgs = ('on', 'yes')
-    noArgs = ('off', 'no')
+    _historyPath = os.path.expanduser('~/.dbsh_history')
+    yes_args = ('on', 'yes')
+    no_args = ('off', 'no')
+    # sql commands that are commonly at the start of a sql command
+    sqlstarters = ['create', 'delete', 'drop', 'insert into', 'select']
+    # additional sql keywords
+    sqlcommands = ['from', 'limit', 'index', 'table', 'trigger', 'values',
+                   'view']
     prompt = 'dbsh> '
     multilinePrompt = ' ...> '
     doc_header = "Documented commands (type .help <topic>):"
@@ -217,11 +222,25 @@ type ".quit" to exit, ".help" for help"""
             except:
                 pass
 
+    def completedefault(self, text, *ignored):
+        tables = self.db.tables.keys()
+        views = self.db.views.keys()
+        candidates = tables + views + self.sqlcommands
+
+        text = text.lower()
+        return [a + ' ' for a in candidates if a.startswith(text)]
+
     def completenames(self, text, *ignored):
-        if text.startswith('.'):
-            text = text[1:]
-        dotext = 'do_'+text
-        return ['.' + a[3:] for a in self.get_names() if a.startswith(dotext)]
+        cmd, arg, line = self.parseline(text)
+
+        cmds = ['.' + a[3:] for a in self.get_names()
+                    if a.startswith('do_')]
+        starters = cmds + self.sqlstarters
+
+        if not cmd:
+            return starters
+        text = text.lower()
+        return [a + ' ' for a in starters if a.startswith(text)]
 
     # funtions defined below
     schemaBits = ('tables', 'triggers', 'functions', 'sequences',
@@ -243,9 +262,9 @@ display database information"""
 
     # headers
     def do_headers(self, arg):
-        if arg in self.yesArgs:
+        if arg in self.yes_args:
             self.showHeaders = True
-        elif arg in self.noArgs:
+        elif arg in self.no_args:
             self.showHeaders = False
         else:
             print 'unknown argument', arg
@@ -256,7 +275,7 @@ display database information"""
 turn the display of headers on or off"""
 
     def complete_headers(self, text, *ignored):
-        return [x for x in itertools.chain(self.yesArgs, self.noArgs)
+        return [x for x in itertools.chain(self.yes_args, self.no_args)
                 if x.startswith(text)]
 
     do_head = do_headers
