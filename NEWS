@@ -1,4 +1,4 @@
-Changes in 0.91:
+Changes in 0.92:
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
       (Some internal packaging work is done using the same mechanism; this
@@ -6,9 +6,8 @@ Changes in 0.91:
     * Conary prints out the name of each policy as it runs, making it
       possible to see which policies take the most time.
     * BuildLog files no longer contain lines that end with \r.
-    * added cleanAfterCook config that controls whether conary tries to
-      clean up after a successful build
 
+Changes in 0.91:
   o Bugfixes
     * A bug was fixed the code that freezes path hashes.  Previously,
       path hashes were not sorted in the frozen representation.  Code
