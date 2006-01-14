@@ -466,7 +466,7 @@ def createTroves(db):
         CREATE TABLE FileStreams(
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY20)s,
-            stream      %(BLOB)s,
+            stream      %(MEDIUMBLOB)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
