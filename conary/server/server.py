@@ -351,6 +351,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
 if __name__ == '__main__':
     argDef = {}
     cfgMap = {
+        'contents-dir'  : 'contentsDir',
 	'db'	        : 'repositoryDB',
 	'log-file'	: 'logFile',
 	'map'	        : 'repositoryMap',
@@ -420,7 +421,10 @@ if __name__ == '__main__':
     (driver, database) = cfg.repositoryDB
     db= dbstore.connect(database, driver)
     schema.loadSchema(db)
-        
+
+    if 'migrate' in argSet:
+        sys.exit(0)
+
     netRepos = NetworkRepositoryServer(cfg, baseUrl)
 
     if 'add-user' in argSet:

@@ -19,7 +19,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 11
+VERSION = 12
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -1106,6 +1106,7 @@ class MigrateTo_11(SchemaMigration):
                 data       %(MEDIUMBLOB)s
             )
         """ % self.db.keywords)
+        cu.execute("CREATE INDEX hashUpdatesTmpIdx on hashUpdatesTmp(instanceId)")
 
         rows = cu2.execute("""
                     SELECT instanceId,data from TroveInfo WHERE infoType=?
@@ -1127,18 +1128,37 @@ class MigrateTo_11(SchemaMigration):
                       trove._TROVEINFO_TAG_SIGS)
 
         logMe(3, "updating path hashes...")
-        cu.execute('''
+        cu.execute("""
             UPDATE TroveInfo
                 SET data=(SELECT data FROM hashUpdatesTmp
-                          WHERE troveInfo.instanceId=hashUpdatesTmp.instanceId)
-            WHERE troveInfo.infoType=?
-                   ''', trove._TROVEINFO_TAG_PATH_HASHES)
+                          WHERE TroveInfo.instanceId = hashUpdatesTmp.instanceId)
+            WHERE TroveInfo.infoType=? AND
+                  TroveInfo.instanceId IN (SELECT instanceId FROM hashUpdatesTmp)
+                   """, trove._TROVEINFO_TAG_PATH_HASHES)
 
-        cu.execute('''DROP TABLE hashUpdatesTmp''')
+        cu.execute("DROP TABLE hashUpdatesTmp")
 
         return self.Version
 
-
+class MigrateTo_12(SchemaMigration):
+    Version = 12
+    def migrate(self):
+        from  conary import trove
+        cu = self.cu
+        logMe(3, "Fixing NULL path hashes...")
+        cu.execute("SELECT instanceId FROM TroveInfo "
+                   "WHERE data IS NULL and infotype = ?",
+                   trove._TROVEINFO_TAG_PATH_HASHES)
+        cu2 = self.db.cursor()
+        for instanceId, in cu:
+            cu2.execute("SELECT path FROM TroveFiles WHERE instanceId=?", instanceId)
+            ph = trove.PathHashes()
+            for path, in cu2:
+                ph.addPath(path)
+            cu2.execute("UPDATE TroveInfo SET data=? "
+                        "WHERE instanceId=? and infotype=?",
+                        (ph.freeze(), instanceId, trove._TROVEINFO_TAG_PATH_HASHES))
+        return self.Version
 
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
@@ -1261,6 +1281,7 @@ def loadSchema(db):
     if version == 8: version = MigrateTo_9(db)()
     if version == 9: version = MigrateTo_10(db)()
     if version == 10: version = MigrateTo_11(db)()
+    if version == 11: version = MigrateTo_12(db)()
 
     if version:
         db.loadSchema()

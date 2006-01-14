@@ -14,6 +14,9 @@ Changes in 0.91:
       path hashes were not sorted in the frozen representation.  Code
       to fix the frozen path hashes in databases and repositories has
       beed added.
+  o Build
+    * added cleanAfterCook config that controls whether conary tries to
+      clean up after a successful build
 
 Changes in 0.90.0:
   o Code Structure/Architecture Changes:
