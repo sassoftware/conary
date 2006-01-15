@@ -1627,7 +1627,7 @@ conary erase '%s=%s%s'
             db = database.Database(cfg.root, cfg.dbPath)
             repos = NetworkRepositoryClient(cfg.repositoryMap,
                                             cfg.user,
-                                            cfg.rateLimit,
+                                            rateLimit = cfg.rateLimit,
                                             localRepository = db)
             callback.setAbortEvent(stopSelf)
 

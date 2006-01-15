@@ -32,27 +32,34 @@ import urllib2
 networkPrefixes = ('http://', 'https://', 'ftp://')
 
 class FetchCallback(callbacks.LineOutput, callbacks.FetchCallback):
-
-    def fetch(self, got, rate, need):
+    def fetch(self, got, need):
         if need == 0:
             self._message("Downloading source (%dKb at %dKb/sec)..." \
-                          % (got/1024, rate/1024))
+                          % (got/1024, self.rate/1024))
         else:
             self._message("Downloading source (%dKb (%d%%) of %dKb at %dKb/sec)..." \
-                          % (got/1024, (got*100)/need , need/1024, rate/1024))
+                          % (got/1024, (got*100)/need , need/1024, self.rate/1024))
+
+    def __init__(self, *args, **kw):
+        callbacks.LineOutput.__init__(self, *args, **kw)
+        callbacks.FetchCallback.__init__(self, *args, **kw)
 
 class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
 
     def requestingFileContents(self):
         self._message("Requesting file...")
 
-    def downloadingFileContents(self, got, rate, need):
+    def downloadingFileContents(self, got, need):
         if need == 0:
             self._message("Downloading file (%dKb at %dKb/sec)..." \
-                          % (got/1024, rate/1024))
+                          % (got/1024, self.rate/1024))
         else:
             self._message("Downloading file (%dKb (%d%%) of %dKb at %dKb/sec)..." \
-                          % (got/1024, (got*100)/need , need/1024, rate/1024))
+                          % (got/1024, (got*100)/need , need/1024, self.rate/1024))
+
+    def __init__(self, *args, **kw):
+        callbacks.LineOutput.__init__(self, *args, **kw)
+        callbacks.ChangesetCallback.__init__(self, *args, **kw)
 
 def _truncateName(name):
     for prefix in networkPrefixes:
@@ -87,9 +94,11 @@ def _createCacheEntry(cfg, name, location, infile):
         else:
             callback = FetchCallback()
 
+        wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
+                                                need)
         total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
-            rateLimit = cfg.rateLimit,
-            callback = lambda got, rate, need=need: callback.fetch(got, rate, need))
+                                 rateLimit = cfg.rateLimit,
+                                 callback = wrapper.callback)
 
         f.close()
         infile.close()

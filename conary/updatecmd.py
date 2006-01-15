@@ -103,11 +103,11 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
         self.update()
 
-    def downloadingFileContents(self, got, rate, need):
-        self._downloading('Downloading files for changeset', got, rate, need)
+    def downloadingFileContents(self, got, need):
+        self._downloading('Downloading files for changeset', got, self.rate, need)
 
-    def downloadingChangeSet(self, got, rate, need):
-        self._downloading('Downloading', got, rate, need)
+    def downloadingChangeSet(self, got, need):
+        self._downloading('Downloading', got, self.rate, need)
 
     def requestingFileContents(self):
         if self.csHunk[1] < 2:

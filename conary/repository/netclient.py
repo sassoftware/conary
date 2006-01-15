@@ -24,6 +24,7 @@ import xml
 import xmlrpclib
 
 #conary
+from conary import callbacks
 from conary import conarycfg
 from conary import files
 from conary import metadata
@@ -805,9 +806,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 inF = urllib.urlopen(url)
 
                 if callback:
-                    callback.downloadingChangeSet(0, 0, sum(sizes))
-                    copyCallback = \
-                        lambda x, r: callback.downloadingChangeSet(x, r, sum(sizes))
+                    wrapper = callbacks.CallbackRateWrapper(
+                        callback, callback.downloadingChangeSet,
+                        sum(sizes))
+                    copyCallback = wrapper.callback
                     abortCheck = callback.checkAbort
                 else:
                     copyCallback = None
@@ -1121,8 +1123,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inF = urllib.urlopen(url)
 
             if callback:
-                callback.downloadingFileContents(0, 0, sum(sizes))
-                copyCallback = lambda x, r: callback.downloadingFileContents(x, r, sum(sizes))
+                wrapper = callbacks.CallbackRateWrapper(
+                    callback, callback.downloadingFileContents, sum(sizes))
+                copyCallback = wrapper.callback
             else:
                 copyCallback = None
 
@@ -1330,15 +1333,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    if serverName is None:
 		serverName = v.getHost()
 	    assert(serverName == v.getHost())
-	    
+
 	url = self.c[serverName].prepareChangeSet()
 
-        if callback:
-            callbackFn = callback.sendingChangeset
-        else:
-            callbackFn = None
-
-        self._putFile(url, fName, callbackFn = callbackFn)
+        self._putFile(url, fName, callback = callback)
 
         if mirror:
             # avoid sending the mirror keyword unless we have to.
@@ -1348,10 +1346,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             self.c[serverName].commitChangeSet(url)
 
-    def _putFile(self, url, path, callbackFn=None):
-        """ send a file to a url.  Takes a callbackFn
-            which is called with three parameters - bytes sent,
-            rate and total bytes
+    def _putFile(self, url, path, callback = None):
+        """
+        send a file to a url.  Takes a wrapper, which is an object
+        that has a callback() method which takes amount, total, rate
         """
         protocol, uri = urllib.splittype(url)
         assert(protocol in ('http', 'https'))
@@ -1365,6 +1363,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         size = os.fstat(f.fileno()).st_size
         BUFSIZE = 8192
 
+        callbackFn = None
+        if callback:
+            wrapper = callbacks.CallbackRateWrapper(callback,
+                                                    callback.sendingChangeset,
+                                                    size)
+            callbackFn = wrapper.callback
+
 	c.connect()
         c.putrequest("PUT", url)
         c.putheader('Content-length', str(size))
@@ -1372,11 +1377,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         c.url = url
 
-        commitCallback = None
-        if callbackFn:
-            commitCallback = lambda x, r, s=size: callbackFn(x, r, s)
-
-        util.copyfileobj(f, c, bufSize=BUFSIZE, callback=commitCallback,
+        util.copyfileobj(f, c, bufSize=BUFSIZE, callback=callbackFn,
                          rateLimit = self.rateLimit)
 
 	r = c.getresponse()
@@ -1389,8 +1390,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, userMap, rateLimit, localRepository = None,
-                 pwPrompt = None, entitlementDir = None):
+    def __init__(self, repMap, userMap, rateLimit = None,
+                 localRepository = None, pwPrompt = None,
+                 entitlementDir = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.

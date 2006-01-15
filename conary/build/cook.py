@@ -126,16 +126,21 @@ class _IdGen:
 # -------------------- public below this line -------------------------
 
 class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
+    def setRate(self, rate):
+        self.rate = rate
 
-    def sendingChangeset(self, got, rate, need):
+    def sendingChangeset(self, got, need):
         if need != 0:
-            self._message("Committing changeset \
-                           (%dKb (%d%%) of %dKb at %dKb/sec)..." \
-                           % (got/1024, (got*100)/need , need/1024, rate/1024))
+            self._message("Committing changeset "
+                          "(%dKb (%d%%) of %dKb at %dKb/sec)..."
+                          % (got/1024, (got*100)/need, need/1024, self.rate/1024))
         else:
-            self._message("Committing changeset \
-                           (%dKb at %dKb/sec)..." \
-                           % (got/1024, rate/1024))
+            self._message("Committing changeset "
+                          "(%dKb at %dKb/sec)..." % (got/1024, self.rate/1024))
+
+    def __init__(self, *args, **kw):
+        callbacks.LineOutput.__init__(self, *args, **kw)
+        callbacks.CookCallback.__init__(self, *args, **kw)
 
 def signAbsoluteChangeset(cs, fingerprint):
     # go through all the trove change sets we have in this changeset.

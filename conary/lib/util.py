@@ -143,6 +143,8 @@ def genExcepthook(debug=True, dumpStack=False,
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
             cmd = normpath(cmd)
             sys.argv[0] = cmd
+            import epdb
+            epdb.st()
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
             tmpfd, stackfile = tempfile.mkstemp('.txt', 'conary-error-')
@@ -339,7 +341,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
         if digest: digest.update(buf)
         if callback:
-                callback(total, rate)
+            callback(total, rate)
 
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
