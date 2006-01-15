@@ -334,8 +334,8 @@ def copyfileobj(source, dest, callback = None, digest = None,
         now = time.time()
         rate = total / (now - starttime)
 
-        if ( rateLimit > 0 ) and ( rate > rateLimit ):
-            time.sleep( (total / rateLimit) - (total / rate) )
+        if rateLimit > 0 and rate > rateLimit:
+            time.sleep((total / rateLimit) - (total / rate))
 
         if digest: digest.update(buf)
         if callback:
