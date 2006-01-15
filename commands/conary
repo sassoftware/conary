@@ -345,9 +345,6 @@ def realMain(cfg, argv=sys.argv):
 	log.setVerbosity(log.DEBUG)
 
 	if argSet: return usage()
-        # XXX this is pretty broken, there should be a default in the cfg
-        #     object for noClean
-        cfg.noClean = False
 	cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True)
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
