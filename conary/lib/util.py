@@ -293,7 +293,7 @@ def copyfile(sources, dest, verbose=True):
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None,
-                abortCheck = None, bufSize = 64*1024, rateLimit = None):
+                abortCheck = None, bufSize = 128*1024, rateLimit = None):
 
     if hasattr(dest, 'send'):
         write = dest.send
