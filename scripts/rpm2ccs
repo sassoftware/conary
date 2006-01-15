@@ -573,9 +573,9 @@ def main(argv):
     if '--ignore-scripts' in argv:
         packageScripts = False
 
-    cfg.noClean = False
+    cfg.cleanAfterCook = True
     if '--no-clean' in argv:
-        cfg.noClean = True
+        cfg.cleanAfterCook = False
 
     commitWork=False
     if '--commit' in argv:
@@ -618,7 +618,7 @@ def main(argv):
     if commitWork:
         checkin.commit(repos, cfg, None, True)
         cook.cookCommand(cfg, (recipe.packagename,), False, {}, resume=False)
-        if cfg.noClean:
+        if not cfg.cleanAfterCook:
             print 'Not deleting working directory %s' % dir
         else:
             util.rmtree(dir)
