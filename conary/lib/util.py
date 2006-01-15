@@ -143,8 +143,6 @@ def genExcepthook(debug=True, dumpStack=False,
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
             cmd = normpath(cmd)
             sys.argv[0] = cmd
-            import epdb
-            epdb.st()
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
             tmpfd, stackfile = tempfile.mkstemp('.txt', 'conary-error-')
