@@ -93,8 +93,8 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     If 'server' is a regular netserver.NetworkRepositoryServer instance, the shim won't be
     able to return changesets. If 'server' is a shimclient.NetworkRepositoryServer, it will.
     """
-    def __init__(self, server, protocol, port, authToken, repMap, userMap):
-        netclient.NetworkRepositoryClient.__init__(self, repMap, userMap)
+    def __init__(self, server, protocol, port, authToken, repMap, userMap, rateLimit):
+        netclient.NetworkRepositoryClient.__init__(self, repMap, userMap, rateLimit)
         proxy = ShimServerProxy(server, protocol, port, authToken)
         self.c = FakeServerCache(proxy)
 

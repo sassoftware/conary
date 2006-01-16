@@ -1,4 +1,11 @@
 Changes in 0.92:
+  o New Features
+    * Conary can now rate limit uploads and downloads.  The rate limit
+      is controlled by the "rateLimit" configuration variable, which
+      is expressed in bytes per second.  Also, Conary displays the
+      transfer rate when uploading and downloading.  Thanks to Pavel
+      Volkovitskiy for these features.
+
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
       (Some internal packaging work is done using the same mechanism; this

@@ -1624,10 +1624,11 @@ conary erase '%s=%s%s'
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
-	    db = database.Database(cfg.root, cfg.dbPath)
-	    repos = NetworkRepositoryClient(cfg.repositoryMap,
+            db = database.Database(cfg.root, cfg.dbPath)
+            repos = NetworkRepositoryClient(cfg.repositoryMap,
                                             cfg.user,
-					    localRepository = db)
+                                            rateLimit = cfg.rateLimit,
+                                            localRepository = db)
             callback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):

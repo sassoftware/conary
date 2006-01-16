@@ -98,7 +98,8 @@ class HttpHandler(WebHandler):
         cfg.repositoryMap = self.repServer.map
         cfg.user.addServerGlob(self.repServer.name, auth[0], auth[1])
         self.repos = shimclient.ShimNetClient(
-            self.repServer, self._protocol, self._port, auth, cfg.repositoryMap, cfg.user)
+            self.repServer, self._protocol, self._port, auth,
+            cfg.repositoryMap, cfg.user, cfg.rateLimit)
         self.serverName = self.repServer.name
 
         if not self.cmd:

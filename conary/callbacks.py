@@ -23,6 +23,9 @@ class ChangesetCallback:
     def requestingChangeSet(self):
         pass
 
+    def setRate(self, rate):
+        self.rate = rate
+
     def downloadingChangeSet(self, got, need):
         pass
 
@@ -36,15 +39,21 @@ class ChangesetCallback:
         pass
 
     def __init__(self):
-        pass
+        self.rate = 0
 
 class CookCallback:
+
+    def setCurrentRate(self, rate):
+        pass
+
+    def setRate(self, rate):
+        self.rate = rate
 
     def sendingChangeset(self, sent, total):
         pass
 
     def __init__(self):
-        pass
+        self.rate = 0
 
 class UpdateCallback(ChangesetCallback):
 
@@ -107,6 +116,17 @@ class SignatureCallback:
     def __init__(self):
         pass
 
+class FetchCallback:
+
+    def setRate(self, rate):
+        self.rate = rate
+
+    def fetch(self, got, need):
+        pass
+
+    def __init__(self):
+        self.rate = 0
+
 class KeyCacheCallback:
 
     def getPublicKey(self, keyId, serverName):
@@ -115,6 +135,20 @@ class KeyCacheCallback:
     def __init__(self, repositoryMap = None, pubRing = ''):
         self.repositoryMap = repositoryMap
         self.pubRing = pubRing
+
+class CallbackRateWrapper:
+    def __init__(self, callback, fn, total):
+        self._callback = callback
+        self.fn = fn
+        self.total = total
+
+        # zero counters
+        callback.setRate(0)
+        fn(0, total)
+
+    def callback(self, amount, rate):
+        self._callback.setRate(rate)
+        self.fn(amount, self.total)
 
 class LineOutput:
     last = 0

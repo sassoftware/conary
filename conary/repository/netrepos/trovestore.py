@@ -31,9 +31,10 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
     def getId(self, theId, itemId):
         cu = self.db.cursor()
-        cu.execute("""SELECT version, timeStamps FROM Versions
-		      JOIN Nodes ON Versions.versionId = Nodes.versionId
-		      WHERE Versions.versionId=? AND Nodes.itemId=?""",
+        cu.execute("""
+        SELECT Versions.version, Nodes.timeStamps
+        FROM Nodes JOIN Versions USING (versionId)
+        WHERE Nodes.versionId=? AND Nodes.itemId=?""",
 		   theId, itemId)
 	try:
 	    (s, t) = cu.next()
@@ -44,11 +45,10 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
     def getTimeStamps(self, version, itemId):
         cu = self.db.cursor()
-        cu.execute("""SELECT timeStamps FROM Nodes
-		      WHERE versionId=(
-			SELECT versionId from Versions WHERE version=?
-		      )
-		      AND itemId=?""", version.asString(), itemId)
+        cu.execute("""
+        SELECT timeStamps FROM Nodes
+        WHERE versionId = (SELECT versionId from Versions WHERE version=?)
+          AND itemId=?""", version.asString(), itemId)
 	try:
 	    (t,) = cu.next()
 	    return [ float(x) for x in t.split(":") ]
@@ -184,7 +184,7 @@ class TroveStore:
                 outD[troveName][version] = []
                 versionStr = version.asString()
                 vMap[versionStr] = version
-                cu.execute("""INSERT INTO itf VALUES (?, ?, ?) """,
+                cu.execute("INSERT INTO itf VALUES (?, ?, ?)",
                            (troveName, versionStr, versionStr),
                            start_transaction = False)
 
@@ -366,12 +366,10 @@ class TroveStore:
         cu.execute("""
         UPDATE FileStreams
         SET stream = (SELECT NewFiles.stream FROM NewFiles
-                      WHERE
-                          FileStreams.fileId = NewFiles.fileId
-                      AND NewFiles.stream IS NOT NULL)
-        WHERE
-            FileStreams.fileId IN (SELECT NewFiles.fileId FROM NewFiles)
-            AND FileStreams.stream IS NULL
+                      WHERE FileStreams.fileId = NewFiles.fileId
+                        AND NewFiles.stream IS NOT NULL)
+        WHERE FileStreams.fileId IN (SELECT NewFiles.fileId FROM NewFiles)
+          AND FileStreams.stream IS NULL
         """)
 
         cu.execute("""
@@ -438,11 +436,10 @@ class TroveStore:
             else:
                 byDefault = 0
 
-            cu.execute("""
-            INSERT INTO TroveTroves
-                (instanceId, includedId, flags)
-            VALUES(?, ?, ?)""",
-                       troveInstanceId, instanceId, flags)
+            cu.execute("INSERT INTO TroveTroves "
+                       "(instanceId, includedId, flags) "
+                       "VALUES (?, ?, ?)", (
+                troveInstanceId, instanceId, flags))
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
