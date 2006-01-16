@@ -1690,9 +1690,11 @@ class Requires(_addInfo):
                     prefix = '/usr'
                 else:
                     prefix = match.group(1)
-                # we don't use %(libdir)s, because ScanDeps is not
-                # architecture specific.
+                # ScanDeps is not architecture specific
                 scandeps = '%s/lib/conary/ScanDeps' %prefix
+                if not os.path.exists(scandeps):
+                    # but it might have been moved to lib64 for multilib
+                    scandeps = '%s/lib64/conary/ScanDeps' %prefix
                 perlreqs = '%s/libexec/conary/perlreqs.pl' %prefix
             self.perlReqs = '%s -I%s %s %s' %(
                 self.perlPath, scandeps, self.perlIncPath, perlreqs)
