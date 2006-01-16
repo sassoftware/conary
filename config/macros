@@ -60,6 +60,10 @@ strip               = 'eu-strip' # eu-strip for debuginfo, "strip -g" else
 strip_archive       = 'strip -g' # eu-strip segfaults on ar
 monodis             = '%(bindir)s/monodis' # tool to determine mono dependencies
 
+# filled in at cook time
+buildbranch         = ''
+buildlabel          = ''
+
 # cross compiling macros
 # most of the macros beyond this point will only be of interest if you
 # are cross compiling.
