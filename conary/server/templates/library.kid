@@ -30,7 +30,7 @@
             <hr />
             <span class="copyright">
                 <b>Conary Repository Server</b>
-                Copyright &#169; 2005 <a href="http://www.rpath.com/">rPath, Inc.</a>
+                Copyright &#169; 2004-2006 <a href="http://www.rpath.com/">rPath, Inc.</a>
             </span>
         </div>
     </body>
