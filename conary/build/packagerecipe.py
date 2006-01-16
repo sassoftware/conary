@@ -373,10 +373,9 @@ class _AbstractPackageRecipe(Recipe):
         return self._policyPathMap.keys()
 
     def doProcess(self, policyBucket):
-        stdout = sys.stdout.fileno()
 	for post in self._policies[policyBucket]:
-            os.write(stdout,
-                     'Running policy: ' + post.__class__.__name__ + '\r')
+            sys.stdout.write('Running policy: %s\r' %post.__class__.__name__)
+            sys.stdout.flush()
             post.doProcess(self)
 
     def getPackages(self):
