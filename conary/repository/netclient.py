@@ -249,6 +249,22 @@ class ServerCache:
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
                               trovesource.SearchableTroveSource):
+    def __init__(self, repMap, userMap, rateLimit = None,
+                 localRepository = None, pwPrompt = None,
+                 entitlementDir = None):
+        # the local repository is used as a quick place to check for
+        # troves _getChangeSet needs when it's building changesets which
+        # span repositories. it has no effect on any other operation.
+        if pwPrompt is None:
+            pwPrompt = lambda x, y: None
+
+        self.rateLimit = rateLimit
+
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
+        self.localRep = localRepository
+
+        trovesource.SearchableTroveSource.__init__(self)
+        self.searchAsRepository()
 
     def close(self, *args):
         pass
@@ -1390,19 +1406,3 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, userMap, rateLimit = None,
-                 localRepository = None, pwPrompt = None,
-                 entitlementDir = None):
-        # the local repository is used as a quick place to check for
-        # troves _getChangeSet needs when it's building changesets which
-        # span repositories. it has no effect on any other operation.
-        if pwPrompt is None:
-            pwPrompt = lambda x, y: None
-
-        self.rateLimit = rateLimit
-
-	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
-        self.localRep = localRepository
-
-        trovesource.SearchableTroveSource.__init__(self)
-        self.searchAsRepository()
