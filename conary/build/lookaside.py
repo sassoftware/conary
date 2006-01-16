@@ -97,7 +97,7 @@ def _createCacheEntry(cfg, name, location, infile):
         wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
                                                 need)
         total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
-                                 rateLimit = cfg.rateLimit,
+                                 rateLimit = cfg.downloadRateLimit,
                                  callback = wrapper.callback)
 
         f.close()

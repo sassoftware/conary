@@ -249,16 +249,19 @@ class ServerCache:
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
                               trovesource.SearchableTroveSource):
-    def __init__(self, repMap, userMap, rateLimit = None,
+    # fixme: take a cfg object instead of all these parameters
+    def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
-                 entitlementDir = None):
+                 entitlementDir = None, downloadRateLimit = 0,
+                 uploadRateLimit = 0):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: None
 
-        self.rateLimit = rateLimit
+        self.downloadRateLimit = downloadRateLimit
+        self.uploadRateLimit = uploadRateLimit
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
@@ -838,7 +841,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     totalSize = util.copyfileobj(inF, outFile,
                                                  callback = copyCallback,
                                                  abortCheck = abortCheck,
-                                                 rateLimit = self.rateLimit)
+                                                 rateLimit = self.downloadRateLimit)
                     if totalSize == None:
                         sys.exit(0)
                     #assert(totalSize == sum(sizes))
@@ -1158,7 +1161,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 outF = os.fdopen(fd, "r+")
                 start = 0
 
-            totalSize = util.copyfileobj(inF, outF, rateLimit = self.rateLimit,
+            totalSize = util.copyfileobj(inF, outF,
+                                         rateLimit = self.downloadRateLimit,
                                          callback = copyCallback)
             del inF
 
@@ -1394,7 +1398,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         c.url = url
 
         util.copyfileobj(f, c, bufSize=BUFSIZE, callback=callbackFn,
-                         rateLimit = self.rateLimit)
+                         rateLimit = self.uploadRateLimit)
 
 	r = c.getresponse()
         # give a slightly more helpful message for 403

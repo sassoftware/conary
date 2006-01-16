@@ -301,9 +301,6 @@ def copyfileobj(source, dest, callback = None, digest = None,
     else:
         write = dest.write
 
-    if hasattr(source, 'url') or hasattr(dest, 'url'):
-        assert(rateLimit is not None)
-
     if rateLimit is None:
         rateLimit = 0
 

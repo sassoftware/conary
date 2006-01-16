@@ -438,10 +438,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	map[name] = self
         # XXX this client needs to die
         from conary import conarycfg
-        rateLimit = conarycfg.ConaryConfiguration().rateLimit
         self.reposSet = netclient.NetworkRepositoryClient(map,
-                                    conarycfg.UserInformation(),
-                                    rateLimit)
+                                    conarycfg.UserInformation())
 
 	self.troveStore = troveStore
 
