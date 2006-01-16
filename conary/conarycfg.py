@@ -227,6 +227,7 @@ class ConaryConfiguration(SectionedConfigFile):
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
+    rateLimit             =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
     showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')

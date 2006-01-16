@@ -24,6 +24,7 @@ import xml
 import xmlrpclib
 
 #conary
+from conary import callbacks
 from conary import conarycfg
 from conary import files
 from conary import metadata
@@ -805,9 +806,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 inF = urllib.urlopen(url)
 
                 if callback:
-                    callback.downloadingChangeSet(0, sum(sizes))
-                    copyCallback = \
-                        lambda x: callback.downloadingChangeSet(x, sum(sizes))
+                    wrapper = callbacks.CallbackRateWrapper(
+                        callback, callback.downloadingChangeSet,
+                        sum(sizes))
+                    copyCallback = wrapper.callback
                     abortCheck = callback.checkAbort
                 else:
                     copyCallback = None
@@ -819,7 +821,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     start = outFile.tell()
                     totalSize = util.copyfileobj(inF, outFile,
                                                  callback = copyCallback,
-                                                 abortCheck = abortCheck)
+                                                 abortCheck = abortCheck,
+                                                 rateLimit = self.rateLimit)
                     if totalSize == None:
                         sys.exit(0)
                     #assert(totalSize == sum(sizes))
@@ -1120,8 +1123,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inF = urllib.urlopen(url)
 
             if callback:
-                callback.downloadingFileContents(0, sum(sizes))
-                copyCallback = lambda x: callback.downloadingFileContents(x, sum(sizes))
+                wrapper = callbacks.CallbackRateWrapper(
+                    callback, callback.downloadingFileContents, sum(sizes))
+                copyCallback = wrapper.callback
             else:
                 copyCallback = None
 
@@ -1138,7 +1142,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 outF = os.fdopen(fd, "r+")
                 start = 0
 
-            totalSize = util.copyfileobj(inF, outF, callback = copyCallback)
+            totalSize = util.copyfileobj(inF, outF, rateLimit = self.rateLimit,
+                                         callback = copyCallback)
             del inF
 
             for (i, item), size in itertools.izip(itemList, sizes):
@@ -1328,15 +1333,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    if serverName is None:
 		serverName = v.getHost()
 	    assert(serverName == v.getHost())
-	    
+
 	url = self.c[serverName].prepareChangeSet()
 
-        if callback:
-            callbackFn = callback.sendingChangeset
-        else:
-            callbackFn = None
-
-        self._putFile(url, fName, callbackFn = callbackFn)
+        self._putFile(url, fName, callback = callback)
 
         if mirror:
             # avoid sending the mirror keyword unless we have to.
@@ -1346,10 +1346,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             self.c[serverName].commitChangeSet(url)
 
-    def _putFile(self, url, path, callbackFn=None):
-        """ send a file to a url.  Takes a callbackFn
-            which is called with two parameters - bytes sent
-            and total bytes
+    def _putFile(self, url, path, callback = None):
+        """
+        send a file to a url.  Takes a wrapper, which is an object
+        that has a callback() method which takes amount, total, rate
         """
         protocol, uri = urllib.splittype(url)
         assert(protocol in ('http', 'https'))
@@ -1361,23 +1361,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	f = open(path)
         size = os.fstat(f.fileno()).st_size
-        sent = 0
         BUFSIZE = 8192
+
+        callbackFn = None
+        if callback:
+            wrapper = callbacks.CallbackRateWrapper(callback,
+                                                    callback.sendingChangeset,
+                                                    size)
+            callbackFn = wrapper.callback
 
 	c.connect()
         c.putrequest("PUT", url)
         c.putheader('Content-length', str(size))
         c.endheaders()
 
-        while True:
-            content = f.read(BUFSIZE)
-            if content:
-                c.send(content)
-                sent = min(sent + BUFSIZE, size)
-                if callbackFn:
-                    callbackFn(sent, size)
-            else:
-                break
+        c.url = url
+
+        util.copyfileobj(f, c, bufSize=BUFSIZE, callback=callbackFn,
+                         rateLimit = self.rateLimit)
+
 	r = c.getresponse()
         # give a slightly more helpful message for 403
         if r.status == 403:
@@ -1388,13 +1390,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.CommitError('Error uploading to repository: '
                                      '%s (%s)' %(r.status, r.reason))
 
-    def __init__(self, repMap, userMap, localRepository = None, 
-                 pwPrompt = None, entitlementDir = None):
+    def __init__(self, repMap, userMap, rateLimit = None,
+                 localRepository = None, pwPrompt = None,
+                 entitlementDir = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: None
+
+        self.rateLimit = rateLimit
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
