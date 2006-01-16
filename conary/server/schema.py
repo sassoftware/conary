@@ -1183,6 +1183,10 @@ def setupTempTables(db):
             path        VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
+        # since this is an index on a temp table, don't check the
+        # validity of the table
+        db.createIndex("NewFiles", "NewFilesFileIdx", "fileId",
+                       check = False)
     if "NeededFlavors" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NeededFlavors(

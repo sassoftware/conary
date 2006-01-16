@@ -227,7 +227,8 @@ class ConaryConfiguration(SectionedConfigFile):
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
-    rateLimit             =  (CfgInt, 0)
+    uploadRateLimit       =  (CfgInt, 0)
+    downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
     showComponents	  =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
@@ -260,9 +261,6 @@ class ConaryConfiguration(SectionedConfigFile):
   
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
-        for cfgfile in util.braceGlob('/etc/conary/conf.d/*'):
-            if not cfgfile.startswith('.'):
-                self.read(cfgfile)
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc", exception=False)
 	self.read("conaryrc", exception=False)

@@ -143,6 +143,7 @@ def genExcepthook(debug=True, dumpStack=False,
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
             cmd = normpath(cmd)
             sys.argv[0] = cmd
+            while tb.tb_next: tb = tb.tb_next
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
             tmpfd, stackfile = tempfile.mkstemp('.txt', 'conary-error-')
@@ -299,9 +300,6 @@ def copyfileobj(source, dest, callback = None, digest = None,
         write = dest.send
     else:
         write = dest.write
-
-    if hasattr(source, 'url') or hasattr(dest, 'url'):
-        assert(rateLimit is not None)
 
     if rateLimit is None:
         rateLimit = 0
