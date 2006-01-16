@@ -432,7 +432,6 @@ class GroupReference:
         return self.getTroves(self.sourceTups, withFiles=False)
 
 
-
 class TroveCache(dict):
     """ Simple cache for relevant information about troves needed for 
         recipes in case they are needed again for other recipes.
@@ -443,18 +442,14 @@ class TroveCache(dict):
         
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
+        if not troveTupList:
+            return
         troves = self.repos.getTroves(troveTupList, withFiles=False)
 
         for troveTup, trv in izip(troveTupList, troves):
             isRedirect = trv.isRedirect()
-            if isRedirect:
-                childTroves = []
-            else:
-                childTroves = [ x[0:2] for x in trv.iterTroveListInfo()]
-                childTroves = self.getChildren(troveTup, trv)
-                
-            self[troveTup] = (trv.getSize(), isRedirect,
-                              childTroves, trv.getPathHashes())
+            self[troveTup] = trv
+            self.getChildren(troveTup, trv)
 
     def getChildren(self, troveTup, trv):
         """ Retrieve children,  and, if necessary, children's children)
@@ -465,38 +460,58 @@ class TroveCache(dict):
         hasWeak = False
         
         childColls = []
-
         for childTup, byDefault, isStrong in trv.iterTroveListInfo():
             if not isStrong:
                 hasWeak = True
-            elif not hasWeak and trove.troveIsCollection(childTup[0]):
-                childColls.append((childTup, byDefault))
+            if trove.troveIsCollection(childTup[0]):
+                childColls.append((childTup, byDefault, isStrong))
 
-            childTroves.append((childTup, byDefault))
-        
-        if not hasWeak and childColls:
-            # recursively cache these child troves.
-            self.cacheTroves([x[0] for x in childColls])
-            for childTup, byDefault in childColls:
-                if byDefault:
-                    childTroves.extend(self.getChildTroves(childTup))
-                else:
-                    childTroves.extend((x[0], False) \
-                                        for x in self.getChildTroves(childTup))
-        return childTroves
+        # recursively cache these child troves.
+        self.cacheTroves([x[0] for x in childColls])
+
+        # FIXME: unforunately, there are a very few troves out there that
+        # do not recursively descend when creating weak reference lists.
+        # Since that's the case, we can't trust weak reference lists :/
+        #if hasWeak:
+        #    return
+
+        newColls = []
+        for childTup, byDefault, isStrong in childColls:
+
+            childTrv = self[childTup]
+            for childChildTup, childByDefault, _ in childTrv.iterTroveListInfo():
+                # by this point, we can be sure that any collections
+                # are recursively complete.
+                # They should be trustable for the rest of the recipe.
+                if not byDefault:
+                    childByDefault = False
+                if not isStrong and not trv.hasTrove(*childChildTup):
+                    trv.addTrove(byDefault=childByDefault, 
+                                 weakRef=True, *childChildTup)
 
 
     def getSize(self, troveTup):
-        return self[troveTup][0]
+        return self[troveTup].getSize()
 
     def isRedirect(self, troveTup):
-        return self[troveTup][1]
+        return self[troveTup].isRedirect()
 
-    def getChildTroves(self, troveTup):
-        return self[troveTup][2]
+    def iterTroveList(self, troveTup, strongRefs=False, weakRefs=False):
+        for troveTup, byDefault, isStrong in self[troveTup].iterTroveListInfo():
+            if isStrong:
+                if strongRefs:
+                    yield troveTup
+            elif weakRefs:
+                yield troveTup
+
+    def iterTroveListInfo(self, troveTup):
+        return(self[troveTup].iterTroveListInfo())
 
     def getPathHashes(self, troveTup):
-        return self[troveTup][3]
+        return self[troveTup].getPathHashes()
+
+    def includeByDefault(self, troveTup, childTrove):
+        return self[troveTup].includeTroveByDefault(*childTrove)
 
 
 def buildGroups(recipeObj, cfg, repos):
@@ -748,7 +763,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
          byDefault, components) in list(group.iterTroveListInfo()):
         assert(explicit)
 
-        for (childTup, byDefault) in cache.getChildTroves(troveTup):
+        for (childTup, byDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):
@@ -791,9 +806,46 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         results = groupAsSource.findTroves(None, removeSpecs, allowMissing=True)
 
         troveTups = chain(*results.itervalues())
-        for troveTup in troveTups:
+        for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache):
             group.delTrove(*troveTup)
 
+def findAllWeakTrovesToRemove(group, primaryErases, cache):
+    # we only remove weak troves if either a) they are primary 
+    # removes or b) they are referenced only by troves being removed
+    primaryErases = list(primaryErases)
+    toErase = set(primaryErases)
+    seen = set()
+    parents = {}
+
+    troveQueue = util.IterableQueue()
+
+    
+    # create temporary parents info for all troves.  Unfortunately
+    # we don't have this anywhere helpful like we do in the erase
+    # on the system in conaryclient.update
+    for troveTup in chain(group.iterTroveList(strongRefs=True), troveQueue):
+        for childTup in cache.iterTroveList(troveTup, strongRefs=True):
+            parents.setdefault(childTup, []).append(troveTup)
+            if trove.troveIsCollection(childTup[0]):
+                troveQueue.add(childTup)
+
+    for troveTup in chain(primaryErases, troveQueue):
+        for childTup in cache.iterTroveList(troveTup, strongRefs=True):
+            if childTup in seen:
+                continue
+            seen.add(childTup)
+
+            keepTrove = False
+            for parentTup in parents[childTup]:
+                if parentTup == troveTup:
+                    continue
+                if parentTup not in toErase:
+                    keepTrove = True
+                    break
+
+            if not keepTrove:
+                toErase.add(childTup)
+    return toErase
     
 
 def checkForRedirects(group, repos, troveCache):
@@ -874,9 +926,7 @@ def addPackagesForComponents(group, repos, troveCache):
         byDefault = bool([x for x in addedComps.iteritems() if x[1]])
         group.addTrove(troveTup, True, byDefault, []) 
 
-        allComps = troveCache.getChildTroves(troveTup)
-
-        for comp, byDefault in troveCache.getChildTroves(troveTup):
+        for comp, byDefault, isStrong in troveCache.iterTroveListInfo(troveTup):
             if comp[0] in addedComps:
                 byDefault = addedComps[comp[0]]
                 # delete the strong reference to this trove, so that 
@@ -1023,4 +1073,3 @@ def calcSizeAndCheckHashes(group, troveCache):
         if pathHashCount != len(allPathHashes):
             conflicts = _getHashConflicts(group, troveCache)
             return conflicts
-
