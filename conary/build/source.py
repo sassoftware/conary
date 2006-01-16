@@ -310,9 +310,9 @@ class Patch(_Source):
                                                   defaultDir=defaultDir)
         util.mkdirChain(destDir)
 	if self.applymacros:
-	    log.debug('applying macros to patch %s' %f)
+	    log.info('applying macros to patch %s' %f)
 	    pin = util.popen("%s '%s'" %(provides, f))
-	    log.debug('patch -d %s -p%s %s %s'
+	    log.info('patch -d %s -p%s %s %s'
 		      %(destDir, self.level, self.backup, self.extraArgs))
 	    pout = util.popen('patch -d %s -p%s %s %s'
 		              %(destDir, self.level, self.backup,
@@ -431,10 +431,10 @@ class Source(_Source):
 	    pout.close()
 	else:
 	    if self.applymacros:
-		log.debug('applying macros to source %s' %f)
+		log.info('applying macros to source %s' %f)
 		pin = file(f)
 		pout = file(destFile, "w")
-                log.debug('copying %s to %s' %(f, destFile))
+                log.info('copying %s to %s' %(f, destFile))
 		pout.write(pin.read()%self.recipe.macros)
 		pin.close()
 		pout.close()

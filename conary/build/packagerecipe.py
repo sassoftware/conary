@@ -324,7 +324,7 @@ class _AbstractPackageRecipe(Recipe):
 	if resume == 'policy':
 	    return
 	elif resume:
-	    log.debug("Resuming on line(s) %s" % resume)
+	    log.info("Resuming on line(s) %s" % resume)
 	    # note resume lines must be in order
 	    self.processResumeList(resume)
 	    for source in self.iterResumeList(self._sources):

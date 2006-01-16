@@ -160,7 +160,7 @@ def _searchRepository(cfg, repCache, name, location):
     basename = os.path.basename(name)
 
     if repCache.hasFileName(basename):
-	log.debug('found %s in repository', name)
+	log.info('found %s in repository', name)
 	return repCache.cacheFile(cfg, name, location)
 
     return None
@@ -287,11 +287,11 @@ class RepositoryCache:
             sha1Cached = sha1helper.sha1FileBin(cachedname)
         if sha1Cached != sha1:
             if sha1Cached:
-                log.debug('%s sha1 %s != %s; fetching new...', basename,
+                log.info('%s sha1 %s != %s; fetching new...', basename,
                           sha1helper.sha1ToString(sha1),
                           sha1helper.sha1ToString(sha1Cached))
             else:
-                log.debug('%s not yet cached, fetching...', basename)
+                log.info('%s not yet cached, fetching...', basename)
 
             if cfg.quiet:
                 csCallback = None

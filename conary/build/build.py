@@ -748,7 +748,7 @@ class SetModes(_FileAction):
 	files = []
         files = action._expandPaths(self.paths, macros, error=True)
 	for f in files:
-	    log.debug('changing mode for %s to %o' %(f, self.mode))
+	    log.info('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros.destdir, f)
 	    self.setComponents(macros.destdir, f)
 
@@ -789,10 +789,10 @@ class _PutFiles(_FileAction):
 		mode = 0644
 
 	if self.move:
-            log.debug('renaming %s to %s', source, dest)
+            log.info('renaming %s to %s', source, dest)
             os.rename(source, dest)
 	else:
-            log.debug('copying %s to %s', source, dest)
+            log.info('copying %s to %s', source, dest)
             shutil.copy2(source, dest)
 	self.setComponents(destdir, dest)
 	self.chmod(destdir, dest, mode=mode)
@@ -924,7 +924,7 @@ class Symlink(_FileAction):
             self.setComponents(macros.destdir, to)
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
-            log.debug('creating symlink %s -> %s' %(to, source))
+            log.info('creating symlink %s -> %s' %(to, source))
 	    if source[0] == '.':
 		log.warning('back-referenced symlink %s should probably be replaced by absolute symlink (start with "/" not "..")', source)
 	    os.symlink(util.normpath(source), to)
@@ -1109,7 +1109,7 @@ class Replace(BuildAction):
 
     def do(self, macros):
         paths = action._expandPaths(self.paths, macros, error=True)
-        log.debug("Replacing '%s' in %s", 
+        log.info("Replacing '%s' in %s", 
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
         if not paths:
@@ -1255,7 +1255,7 @@ class MakeDirs(_FileAction):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
             dirs = util.braceExpand(path)
             for d in dirs:
-                log.debug('creating directory %s', d)
+                log.info('creating directory %s', d)
 		self.setComponents(macros.destdir, d.replace('%', '%%'))
                 util.mkdirChain(d)
                 self.chmod(macros.destdir, d)

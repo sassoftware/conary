@@ -383,7 +383,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	checkin.updateSrc(*args, **kwargs)
     elif (args[0] == "cook"):
         level = log.getVerbosity()
-        log.setVerbosity(log.DEBUG)
+        log.setVerbosity(log.INFO)
         macros = {}
         prep = 0
         resume = None

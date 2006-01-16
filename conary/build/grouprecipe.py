@@ -972,14 +972,10 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor):
     # build a list of the troves that we're checking so far
     troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
 
-    # set verbosity to WARNING to avoid the conflicting meaning of the 
-    # DEBUG flag in update code vs. cook code
-    log.setVerbosity(log.WARNING)
     updJob, suggMap = client.updateChangeSet(troves, recurse = True,
                                              resolveDeps = True,
                                              test = True,
                                              checkPathConflicts=False)
-    log.setVerbosity(log.DEBUG)
 
     for trove, needs in suggMap.iteritems():
         print "trove:%s" % trove[0]

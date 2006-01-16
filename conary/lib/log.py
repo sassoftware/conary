@@ -132,7 +132,7 @@ class ErrorCheckingHandler(logging.StreamHandler):
 if not globals().has_key("logger"):
     logging.addLevelName(logging.WARNING, "warning:")
     logging.addLevelName(logging.ERROR, "error:")
-    logging.addLevelName(logging.INFO, "info:")
+    logging.addLevelName(logging.INFO, "+")
     logging.addLevelName(logging.DEBUG, "+")
     logger = logging.getLogger('conary')
     hdlr = ErrorCheckingHandler(sys.stderr)

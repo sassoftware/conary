@@ -875,7 +875,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             versionDict = dict((x, { searchBranch : None } ) for x in grpMap )
             versionDict = repos.getTroveLeavesByBranch(versionDict)
 
-        log.debug('looking up pathids from repository history')
+        log.info('looking up pathids from repository history')
         # look up the pathids for every file that has been built by
         # this source component, following our brach ancestry
         while True:
@@ -886,7 +886,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                 break
             searchBranch = searchBranch.parentBranch()
 
-    log.debug('pathId lookup complete')
+    log.info('pathId lookup complete')
 
     built = []
     packageList = []
