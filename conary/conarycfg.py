@@ -260,9 +260,6 @@ class ConaryConfiguration(SectionedConfigFile):
   
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
-        for cfgfile in util.braceGlob('/etc/conary/conf.d/*'):
-            if not cfgfile.startswith('.'):
-                self.read(cfgfile)
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc", exception=False)
 	self.read("conaryrc", exception=False)
