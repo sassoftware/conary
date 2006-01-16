@@ -347,26 +347,33 @@ class BaseDatabase:
         return True
 
     # index schema handling
-    def createIndex(self, table, name, columns, unique = False):
-        assert(table in self.tables)
+    def createIndex(self, table, name, columns, unique = False,
+                    check = True):
         if unique:
             unique = "UNIQUE"
         else:
             unique = ""
-        if name in self.tables[table]:
-            return False
+        if check:
+            assert(table in self.tables)
+            if name in self.tables[table]:
+                return False
         sql = "CREATE %s INDEX %s on %s (%s)" % (
             unique, name, table, columns)
         cu = self.dbh.cursor()
         cu.execute(sql)
         return True
-    def dropIndex(self, table, name):
-        if name not in self.tables[table]:
-            return False
+    def dropIndex(self, table, name, check = True):
+        remove = False
+        if check:
+            assert(table in self.tables)
+            if name not in self.tables[table]:
+                return False
+            remove = True
         sql = "DROP INDEX %s" % (name,)
         cu = self.dbh.cursor()
         cu.execute(sql)
-        self.tables[table].remove(name)
+        if remove:
+            self.tables[table].remove(name)
         return True
 
     # easy access to the schema state
