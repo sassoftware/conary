@@ -830,13 +830,20 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache):
                 troveQueue.add(childTup)
 
     for troveTup in chain(primaryErases, troveQueue):
+        # BFS through erase troves.  If any of the parents is not
+        # also being erased, keep the trove.
+        if not trove.troveIsCollection(troveTup[0]):
+            continue
+
         for childTup in cache.iterTroveList(troveTup, strongRefs=True):
-            if childTup in seen:
+            if childTup in toErase:
                 continue
-            seen.add(childTup)
 
             keepTrove = False
             for parentTup in parents[childTup]:
+                # check to make sure there are no other references to this
+                # trove that we're not erasing.  If there are, we want to
+                # keep this trove.
                 if parentTup == troveTup:
                     continue
                 if parentTup not in toErase:
@@ -845,6 +852,7 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache):
 
             if not keepTrove:
                 toErase.add(childTup)
+                troveQueue.add(childTup)
     return toErase
     
 
