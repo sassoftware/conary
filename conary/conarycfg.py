@@ -289,8 +289,11 @@ class ConaryConfiguration(SectionedConfigFile):
     def displayContext(self, out=None):
         if out is None:
             out = sys.stdout
-        out.write('[%s]\n' % self.context)
-        self.getContext(self.context).display(out)
+        if self.context:
+            out.write('[%s]\n' % self.context)
+            self.getContext(self.context).display(out)
+        else:
+            out.write('No context set.\n')
 
     def _writeSection(self, name, options):
         return self.getDisplayOption('showContexts', False)
