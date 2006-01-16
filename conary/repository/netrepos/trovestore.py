@@ -363,13 +363,15 @@ class TroveStore:
         # this updates the stream for streams where stream is NULL
         # (because they were originally added from a distributed branch)
         # for items whose stream is present in NewFiles
+
+        # XXX: speed this up - the full table scan over filestreams is
+        # too slow
         cu.execute("""
         UPDATE FileStreams
         SET stream = (SELECT NewFiles.stream FROM NewFiles
                       WHERE FileStreams.fileId = NewFiles.fileId
                         AND NewFiles.stream IS NOT NULL)
-        WHERE FileStreams.fileId IN (SELECT NewFiles.fileId FROM NewFiles)
-          AND FileStreams.stream IS NULL
+        WHERE FileStreams.stream IS NULL
         """)
 
         cu.execute("""
