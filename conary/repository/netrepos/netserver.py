@@ -1162,11 +1162,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
-	try:
-	    cs = changeset.ChangeSetFromFile(path)
-	finally:
-	    #print path
-	    os.unlink(path)
+        # FIXME: This general exception handler is to catch the case
+        # where we are retrying a commit as anonymous.  We should find
+        # a way to keep the changeset file from being deleted on the
+        # first try so we can retry it as anonymous.
+        try:
+            try:
+                cs = changeset.ChangeSetFromFile(path)
+            finally:
+                #print path
+                try:
+                    os.unlink(path)
+                except:
+                    pass
+        except Exception, e:
+            raise errors.InsufficientPermission
 
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
