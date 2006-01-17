@@ -1207,6 +1207,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # FIXME: use a logger for this
             sys.stderr.write('commitaction failed: %s\n' %e)
             sys.stderr.flush()
+        except Exception, e:
+            sys.stderr.write('unexpected exception occurred when running '
+                             'commitaction: %s\n' %e)
+            sys.stderr.flush()
 
 	return True
 
