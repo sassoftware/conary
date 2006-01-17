@@ -13,6 +13,9 @@ Changes in 0.92:
     * Conary prints out the name of each policy as it runs, making it
       possible to see which policies take the most time.
     * BuildLog files no longer contain lines that end with \r.
+    * A new config item 'emergeUser' has been added.  This is the user
+      selected when emerging packages. 
+    * --no-deps is now accepted by 'conary emerge'.
 
 Changes in 0.91:
   o Bugfixes

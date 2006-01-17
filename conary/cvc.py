@@ -487,6 +487,9 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
 	return realMain(ccfg, argv)
+    except cook.CookError, e:
+        log.error(str(e))
+        sys.exit(1)
     except cfg.CfgError, e:
         log.error(str(e))
         sys.exit(1)

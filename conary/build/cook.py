@@ -1226,17 +1226,20 @@ class CookError(Exception):
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
                 ignoreDeps = False, profile = False, logBuild = True,
-                crossCompile = None):
+                crossCompile = None, cookIds=None):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
-    # do not cook as root!
-    # XXX fix emerge to build as non-root user, either build as current
-    # non-root user and use consolehelper to install the changeset, or
-    # have an "emergeUser" config item and change uid after the fork.
-    if not emerge and not os.getuid():
-        raise CookError('Do not cook as root')
+    if cookIds:
+        cookUid, cookGid = cookIds
+    else:
+        cookUid = cookGid = None
+
+    if not os.getuid():
+        if not cookUid or not cookGid:
+            raise CookError('Do not cook as root')
+
 
     for item in args:
         # we want to fork here to isolate changes the recipe might make
@@ -1250,6 +1253,12 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof.start()
             # child, set ourself to be the foreground process
             os.setpgrp()
+
+            if cookGid:
+                os.setgid(cookGid)
+            if cookUid:
+                os.setuid(cookUid)
+
             try:
                 # the child should control stdin -- if stdin is a tty
                 # that can be controlled
