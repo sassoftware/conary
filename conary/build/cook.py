@@ -231,6 +231,19 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 							    cfg.buildFlavor, 
 							    msg))
 	sys.exit(1)
+
+    # check to make sure that policy exists
+    policyFound = False
+    for policyDir in cfg.policyDirs:
+        if os.path.isdir(policyDir):
+            policyFound = True
+            break
+    if not policyFound:
+        log.error('No conary policy directories were found.  '
+                  'You probably need to install\n'
+                  'conary-policy.  Try "conary update conary-policy".')
+	sys.exit(1)
+
     use.allowUnknownFlags(allowUnknownFlags)
     fullName = recipeClass.name
 
