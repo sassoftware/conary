@@ -323,6 +323,15 @@ class DependencyClass(object):
     depFormat = 'WORD'
     flagFormat = 'WORD'
     flagOption = DEP_CLASS_NO_FLAGS
+
+    depNameSignificant = True
+    # if True, means that the name of the dependencies in the class hold
+    # significance.  This is important for comparing a dep set with all
+    # negative flags for this dependency class (say use(!krb)) against 
+    # no dependencies of this dependency class.  In the use flag case,
+    # the dep name is not significant, for other dep classes, the dep name
+    # does matter.
+
     allowParseDep = True
 
     @classmethod
@@ -412,6 +421,13 @@ class DependencyClass(object):
         score = 0
 	for requiredDep in requirements.members.itervalues():
 	    if not self.members.has_key(requiredDep.name):
+                if self.depNameSignificant:
+                    # dependency names are always 'requires', so if the 
+                    # dependency class name is significant (i.e. the dep 
+                    # class is only defined by its flags) the empty deps cannot
+                    # match.  Otherwise, we use the empty deps score for the 
+                    # flags
+                    return False
                 thisScore = requiredDep.emptyDepsScore()
             else:
                 thisScore = self.members[requiredDep.name].score(requiredDep)
@@ -424,6 +440,12 @@ class DependencyClass(object):
 
     def emptyDepsScore(self):
         score = 0
+        if self.depNameSignificant:
+            # dependency names are always 'requires', so if the 
+            # dependency class name is significant (i.e. the dep 
+            # class is only defined by its flags) the empty deps cannot
+            # match.  Otherwise, we use the empty deps score for the flags
+            return False
 	for requiredDep in self.members.itervalues():
             thisScore = requiredDep.emptyDepsScore()
             if thisScore is False:
@@ -673,6 +695,7 @@ class UseDependency(DependencyClass):
     justOne = True
     depClass = Dependency
     allowParseDep = False
+    depNameSignificant = False
 _registerDepClass(UseDependency)
 
 class DependencySet(object):
