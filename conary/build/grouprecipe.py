@@ -972,7 +972,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor):
     # build a list of the troves that we're checking so far
     troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList]
 
-    updJob, suggMap = client.updateChangeSet(troves, recurse = True,
+    updJob, suggMap = client.updateChangeSet(troves, recurse = False,
                                              resolveDeps = True,
                                              test = True,
                                              checkPathConflicts=False)
@@ -1006,9 +1006,9 @@ def checkGroupDependencies(group, cfg):
 
     client = conaryclient.ConaryClient(cfg)
     if group.checkOnlyByDefaultDeps:
-        cs = client.createChangeSet(jobSet, recurse = True, withFiles = False)
+        cs = client.createChangeSet(jobSet, recurse = False, withFiles = False)
     else:
-        cs = client.repos.createChangeSet(jobSet, recurse = True, 
+        cs = client.repos.createChangeSet(jobSet, recurse = False, 
                                           withFiles = False)
 
     jobSet = cs.getJobSet()
