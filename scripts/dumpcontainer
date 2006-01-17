@@ -18,17 +18,18 @@
 import os
 import sys
 
-if os.path.dirname(sys.argv[0]):
+if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
-	fullPath = os.path.dirname(sys.argv[0])
+        fullPath = os.path.dirname(sys.argv[0])
     else:
-	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
 else:
     fullPath = os.getcwd()
 
-sys.path.append(os.path.dirname(fullPath))
-from repository.filecontainer import FileContainer
-from lib.sha1helper import *
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary.repository.filecontainer import FileContainer
+from conary.lib.sha1helper import *
 
 f = open(sys.argv[1], "r")
 c = FileContainer(f)
