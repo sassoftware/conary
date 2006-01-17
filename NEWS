@@ -17,6 +17,11 @@ Changes in 0.92:
       selected when emerging packages. 
     * --no-deps is now accepted by 'conary emerge'.
 
+  o Client changes:
+    * The client didn't write config files for merged changesets in the
+      right order, which could result in changesets which could not be
+      commited.
+
 Changes in 0.91:
   o Bugfixes
     * A bug was fixed the code that freezes path hashes.  Previously,
