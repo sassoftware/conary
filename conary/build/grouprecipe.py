@@ -763,6 +763,11 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
          byDefault, components) in list(group.iterTroveListInfo()):
         assert(explicit)
 
+
+        if cache.isRedirect(troveTup):
+            # children of redirect troves are special, and not included.
+            continue
+
         for (childTup, byDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
             if componentsToRemove and _componentMatches(childName,
@@ -875,10 +880,10 @@ def checkForRedirects(group, repos, troveCache):
             if (":" not in subName and ":" not in name) or \
                (":"     in subName and ":"     in name):
                targets.append((subName, subVersion, subFlavor))
-            missing = [ x for x in targets if not group.hasTrove(*x) ]
-            if missing:
-                l = missingTargets.setdefault(trv, [])
-                l += missing
+        missing = [ x for x in targets if not group.hasTrove(*x) ]
+        if missing:
+            l = missingTargets.setdefault(trv, [])
+            l += missing
 
     errmsg = []
     if not missingTargets:
