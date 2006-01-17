@@ -158,14 +158,14 @@ class Config(policy.Policy):
             # to be config files if they are shell scripts.
             # Just in case it was not intentional, warn...
             if self.macros.sysconfdir in filename:
-                self.dbg('ELF file %s found in config directory', filename)
+                self.info('ELF file %s found in config directory', filename)
             return
         fullpath = self.macros.destdir + filename
         if os.path.isfile(fullpath) and util.isregular(fullpath):
             self._markConfig(filename, fullpath)
 
     def _markConfig(self, filename, fullpath):
-        self.dbg(filename)
+        self.info(filename)
         f = file(fullpath)
         f.seek(0, 2)
         if f.tell():
@@ -367,7 +367,7 @@ class InitialContents(policy.Policy):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.dbg(filename)
+            self.info(filename)
             f = recipe.autopkg.pathMap[filename]
             f.flags.isInitialContents(True)
             if f.flags.isConfig():
@@ -426,7 +426,7 @@ class TagDescription(policy.Policy):
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.dbg('conary tag file: %s', file)
+            self.info('conary tag file: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
 
 
@@ -446,7 +446,7 @@ class TagHandler(policy.Policy):
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.dbg('conary tag handler: %s', file)
+            self.info('conary tag handler: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
 
 
@@ -485,7 +485,7 @@ class TagSpec(_addInfo):
             return
         tags = self.recipe.autopkg.pathMap[path].tags
         if tag not in tags:
-            self.dbg('%s: %s', name, path)
+            self.info('%s: %s', name, path)
             tags.set(tag)
             if tagFile:
                 for trove in self.db.iterTrovesByPath(tagFile.tagFile):
@@ -504,7 +504,7 @@ class TagSpec(_addInfo):
                     if tag in self.excluded:
 		        for filt in self.excluded[tag]:
                             if filt.match(path):
-                                self.dbg('ignoring tag match for %s: %s',
+                                self.info('ignoring tag match for %s: %s',
                                          tag, path)
                                 isExcluded = True
                                 break
@@ -522,8 +522,8 @@ class TagSpec(_addInfo):
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
 			if filt.match(path):
-                            self.dbg('ignoring tag match for %s: %s',
-                                     name, path)
+                            self.info('ignoring tag match for %s: %s',
+                                      name, path)
                             isExcluded = True
 			    break
                 if not isExcluded:
@@ -604,7 +604,7 @@ class setModes(policy.Policy):
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
                 exceptions=util.literalRegex(path.replace('%', '%%')))
-            self.dbg('suid/sgid: %s mode 0%o', path, mode & 07777)
+            self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 
@@ -709,9 +709,9 @@ class ExcludeDirectories(policy.Policy):
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
 	if mode & 0777 != 0755:
-            self.dbg('excluding directory %s with mode %o', path, mode&0777)
+            self.info('excluding directory %s with mode %o', path, mode&0777)
 	elif not os.listdir(fullpath):
-            self.dbg('excluding empty directory %s', path)
+            self.info('excluding empty directory %s', path)
 	self.recipe.autopkg.delFile(path)
 
 
@@ -1619,7 +1619,7 @@ class Requires(_addInfo):
                 self.pythonModuleFinder.load_file(fullpath)
         except:
             # not a valid python file
-            self.dbg('File %s is not a valid python file', path)
+            self.info('File %s is not a valid python file', path)
             return
 
         for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
@@ -1666,7 +1666,8 @@ class Requires(_addInfo):
             self._fetchPerl()
             if not self.perlPath:
                 # no perl == bootstrap, but print warning
-                self.dbg('Unable to find perl interpreter, disabling perl: requirements')
+                self.info('Unable to find perl interpreter,'
+                           ' disabling perl: requirements')
                 self.perlReqs = False
                 return []
             # get the base directory where conary lives.  In a checked
@@ -1857,8 +1858,8 @@ class Requires(_addInfo):
                 # exception handling is per-requirement,
                 # so handled specially
                 if filt.match(path):
-                    self.dbg('ignoring requirement match for %s: %s',
-                             path, info)
+                    self.info('ignoring requirement match for %s: %s',
+                              path, info)
                     return False
         return True
 
