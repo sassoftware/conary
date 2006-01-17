@@ -15,7 +15,11 @@ Changes in 0.92:
     * BuildLog files no longer contain lines that end with \r.
     * A new config item 'emergeUser' has been added.  This is the user
       selected when emerging packages. 
-    * --no-deps is now accepted by 'conary emerge'.
+    * --no-deps is now accepted by 'conary emerge'. 
+
+  o Group Building Changes:
+    * Fixed bug with dependency checking and autoResolve where deleted
+      weak troves would be included in autoResolve and depChecks.
 
   o Client changes:
     * The client didn't write config files for merged changesets in the
