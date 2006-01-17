@@ -1170,11 +1170,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             try:
                 cs = changeset.ChangeSetFromFile(path)
             finally:
-                #print path
-                try:
-                    os.unlink(path)
-                except:
-                    pass
+                util.removeIfExists(path)
         except Exception, e:
             raise errors.InsufficientPermission
 
