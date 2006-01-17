@@ -1129,7 +1129,6 @@ class MigrateTo_11(SchemaMigration):
 
         logMe(3, "updating path hashes...")
 	cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
-	cu2 = self.db.cursor()
 	for (instanceId, data) in cu:
             cu2.execute("UPDATE TroveInfo SET data=? WHERE "
                        "infoType=? AND instanceId=?",
