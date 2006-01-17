@@ -842,6 +842,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                  callback = copyCallback,
                                                  abortCheck = abortCheck,
                                                  rateLimit = self.downloadRateLimit)
+
+                    # attempt to remove temporary local files
+                    # possibly created by a shim client
+                    if os.path.exists(url) and os.access(os.W_OK):
+                        os.unlink(url)
+
                     if totalSize == None:
                         sys.exit(0)
                     #assert(totalSize == sum(sizes))
