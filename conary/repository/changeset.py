@@ -985,7 +985,7 @@ class ReadOnlyChangeSet(ChangeSet):
         self.absolute = False
 
     def writeAllContents(self, csf, withReferences = False):
-        # diffs go out, then we write out whatever contents are left
+        # diffs go out, then config files, then we whatever contents are left
         assert(not self.filesRead)
         assert(not withReferences)
         self.filesRead = True
@@ -993,9 +993,15 @@ class ReadOnlyChangeSet(ChangeSet):
         idList = self.configCache.keys()
         idList.sort()
 
-	for hash in idList:
-	    (tag, str, compressed) = self.configCache[hash]
-            csf.addFile(hash, filecontents.FromString(str), "1 " + tag[4:])
+        # walk through the config files, write out the diffs and then the
+        # config files
+        for writeDiffs in (True, False):
+            for hash in idList:
+                (tag, str, compressed) = self.configCache[hash]
+                if (writeDiffs and tag == ChangedFileTypes.diff) or \
+                   (not writeDiffs and tag != ChangedFileTypes.diff):
+                    csf.addFile(hash, filecontents.FromString(str), 
+                                "1 " + tag[4:])
 
         next = self._nextFile()
         while next:
@@ -1066,7 +1072,7 @@ class ReadOnlyChangeSet(ChangeSet):
                 else:
                     configs[pathId] = (contType, contents, compressed)
                     
-            wrapper = dictAsCsf(otherCs.fileContents)
+            wrapper = DictAsCsf(otherCs.fileContents)
             wrapper.addConfigs(configs)
             entry = wrapper.getNextFile()
             if entry:
@@ -1211,7 +1217,7 @@ def CreateFromFilesystem(troveList):
 
     return cs
 
-class dictAsCsf:
+class DictAsCsf:
 
     def getNextFile(self):
         if not self.items:
