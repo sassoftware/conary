@@ -1128,13 +1128,12 @@ class MigrateTo_11(SchemaMigration):
                       trove._TROVEINFO_TAG_SIGS)
 
         logMe(3, "updating path hashes...")
-        cu.execute("""
-            UPDATE TroveInfo
-                SET data=(SELECT data FROM hashUpdatesTmp
-                          WHERE TroveInfo.instanceId = hashUpdatesTmp.instanceId)
-            WHERE TroveInfo.infoType=? AND
-                  TroveInfo.instanceId IN (SELECT instanceId FROM hashUpdatesTmp)
-                   """, trove._TROVEINFO_TAG_PATH_HASHES)
+	cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
+	cu2 = self.db.cursor()
+	for (instanceId, data) in cu:
+            cu2.execute("UPDATE TroveInfo SET data=? WHERE "
+                       "infoType=? AND instanceId=?",
+                       data, trove._TROVEINFO_TAG_PATH_HASHES, instanceId)
 
         cu.execute("DROP TABLE hashUpdatesTmp")
 
@@ -1157,7 +1156,8 @@ class MigrateTo_12(SchemaMigration):
                 ph.addPath(path)
             cu2.execute("UPDATE TroveInfo SET data=? "
                         "WHERE instanceId=? and infotype=?",
-                        (ph.freeze(), instanceId, trove._TROVEINFO_TAG_PATH_HASHES))
+                        (ph.freeze(), instanceId, 
+			 trove._TROVEINFO_TAG_PATH_HASHES))
         return self.Version
 
 # sets up temporary tables for a brand new connection
