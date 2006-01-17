@@ -33,19 +33,6 @@ from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
 
-def checkAuth(req, repos):
-    if not req.headers_in.has_key('Authorization'):
-        return None
-    else:
-        authToken = getAuth(req)
-        if type(authToken) != tuple:
-            return authToken
-
-        if not repos.auth.checkUserPass(authToken):
-            return None
-
-    return authToken
-
 def post(port, isSecure, repos, req):
     authToken = getAuth(req)
     if type(authToken) is int:
@@ -111,6 +98,10 @@ def get(port, isSecure, repos, req):
     fields = FieldStorage(req)
 
     authToken = getAuth(req)
+
+    if type(authToken) is int:
+        return authToken
+
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
 
