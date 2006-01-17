@@ -23,8 +23,7 @@ a script that contains local information; something like the following:
 import os
 import re
 import sys
-import conary
-import conarybugz
+from conary import conarybugz
 
 def getPerson(name, labelText):
     for person, exp in personRe:
