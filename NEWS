@@ -1,27 +1,25 @@
 Changes in 0.92:
-  o New Features
-    * Conary can now rate limit uploads and downloads.  The rate limit
-      is controlled by the "uploadRateLimit" and "downloadRateLimit"
-      configuration variables, which is expressed in bytes per second.
-      Also, Conary displays the transfer rate when uploading and
-      downloading.  Thanks to Pavel Volkovitskiy for these features.
-
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
-      (Some internal packaging work is done using the same mechanism; this
-      was left in conary proper.)
+      (Some policy was left in conary proper; it is needed for
+      internal packaging work.)
     * Conary prints out the name of each policy as it runs, making it
       possible to see which policies take the most time.
     * BuildLog files no longer contain lines that end with \r.
-    * A new config item 'emergeUser' has been added.  This is the user
-      selected when emerging packages. 
-    * --no-deps is now accepted by 'conary emerge'. 
+    * A new 'emergeUser' config item has been added.  Conary will
+      change to this user when emerging packages as root.
+    * --no-deps is now accepted by 'conary emerge'.
 
   o Group Building Changes:
     * Fixed bug with dependency checking and autoResolve where deleted
       weak troves would be included in autoResolve and depChecks.
 
   o Client changes:
+    * Conary can now rate limit uploads and downloads.  The rate limit
+      is controlled by the "uploadRateLimit" and "downloadRateLimit"
+      configuration variables, which is expressed in bytes per second.
+      Also, Conary displays the transfer rate when uploading and
+      downloading.  Thanks to Pavel Volkovitskiy for these features.
     * The client didn't write config files for merged changesets in the
       right order, which could result in changesets which could not be
       commited.
