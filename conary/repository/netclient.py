@@ -845,7 +845,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                     # attempt to remove temporary local files
                     # possibly created by a shim client
-                    if os.path.exists(url) and os.access(os.W_OK):
+                    if os.path.exists(url) and os.access(url, os.W_OK):
                         os.unlink(url)
 
                     if totalSize == None:
