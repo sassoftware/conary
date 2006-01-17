@@ -141,6 +141,9 @@ def genExcepthook(debug=True, dumpStack=False,
             cmd = sys.argv[0]
             if cmd.endswith('/commands/conary'):
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
+            elif cmd.endswith('/commands/cvc'):
+                cmd = cmd[:len('/commands/cvc')] + '/bin/cvc'
+                
             cmd = normpath(cmd)
             sys.argv[0] = cmd
             while tb.tb_next: tb = tb.tb_next

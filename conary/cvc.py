@@ -286,7 +286,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
     elif (args[0] == "commit") or (args[0] == "ci"): # mimic cvs's shortcuts
         level = log.getVerbosity()
-        log.setVerbosity(log.INFO)
+        if level > log.INFO:
+            log.setVerbosity(log.INFO)
 	message = argSet.get("message", None)
         sourceCheck = True
 
@@ -383,7 +384,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	checkin.updateSrc(*args, **kwargs)
     elif (args[0] == "cook"):
         level = log.getVerbosity()
-        log.setVerbosity(log.INFO)
+        if level > log.INFO:
+            log.setVerbosity(log.INFO)
         macros = {}
         prep = 0
         resume = None
@@ -456,7 +458,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()
-        log.setVerbosity(log.INFO)
+        if level > log.INFO:
+            log.setVerbosity(log.INFO)
         
         xmlSource = args[1]
         conaryState = state.ConaryStateFromFile("CONARY").getSourceState()
