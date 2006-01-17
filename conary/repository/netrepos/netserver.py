@@ -1195,11 +1195,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
-	for troveCs in cs.iterNewTroveList():
-            p.write("%s\n%s\n%s\n" %(troveCs.getName(),
-		                     troveCs.getNewVersion().asString(),
-                                     deps.formatFlavor(troveCs.getNewFlavor())))
-        p.close()
+        try:
+            for troveCs in cs.iterNewTroveList():
+                p.write("%s\n%s\n%s\n" %(troveCs.getName(),
+                                         troveCs.getNewVersion().asString(),
+                                         deps.formatFlavor(troveCs.getNewFlavor())))
+            p.close()
+        except (IOError, RuntimeError), e:
+            # util.popen raises RuntimeError on error.  p.write() raises
+            # IOError on error (broken pipe, etc)
+            # FIXME: use a logger for this
+            sys.stderr.write('commitaction failed: %s\n' %e)
+            sys.stderr.flush()
 
 	return True
 
