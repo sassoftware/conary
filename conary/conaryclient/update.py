@@ -707,7 +707,7 @@ class ClientUpdate:
         # thew newTroves parameters are described below.
         newTroves = [ ((x[0], x[2][0], x[2][1]), 
                         True, {}, False, None, respectBranchAffinity, True,
-                        True) 
+                        True, updateOnly) 
                             for x in itertools.chain(absolutePrimaries, 
                                                      relativePrimaries) ]
 
@@ -734,13 +734,15 @@ class ClientUpdate:
             #              affinity, or b) the call to mergeGroupChanges
             #              had respectBranchAffinity False
             # installRedirects: If True, we install redirects even when they
-            #                are not upgrades.
-            # followLocalChanges: see the code where it is used for a description.
-                          
+            #              are not upgrades.
+            # followLocalChanges: see the code where it is used for a 
+            #              description.
+            # updateOnly:  If true, only update troves, don't install them
+            #              fresh.
 
             (newInfo, isPrimary, byDefaultDict, parentInstalled, branchHint,
                respectBranchAffinity, installRedirects,
-               followLocalChanges) = newTroves.pop(0)
+               followLocalChanges, updateOnly) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
@@ -1013,6 +1015,12 @@ conary erase '%s=%s%s'
                 byDefaultDict = dict((x[0], x[1]) \
                                             for x in trv.iterTroveListInfo())
 
+            updateOnly = updateOnly or jobAdded
+            # for all children, we only want to install them as new _if_ we 
+            # installed their parent.  If we did not install/upgrade foo, then
+            # we do not install foo:runtime (though if it's installed, it
+            # is reasonable to upgrade it).
+
             for info in trv.iterTroveList(strongRefs=True):
 
                 if not isPrimary:
@@ -1029,7 +1037,8 @@ conary erase '%s=%s%s'
                 newTroves.append((info, False, 
                                   byDefaultDict, jobAdded, branchHint,
                                   respectBranchAffinity, installRedirects,
-                                  childrenFollowLocalChanges))
+                                  childrenFollowLocalChanges,
+                                  updateOnly or not jobAdded))
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse)

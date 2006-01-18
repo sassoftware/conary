@@ -23,6 +23,9 @@ Changes in 0.92:
     * The client didn't write config files for merged changesets in the
       right order, which could result in changesets which could not be
       commited.
+    * Fixed a bug in the update code caused conary to behave incorrectly 
+      when updating groups, installing components of troves that were not 
+      installed.
 
 Changes in 0.91:
   o Bugfixes
