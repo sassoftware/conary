@@ -234,7 +234,7 @@ class TroveSignatures(streams.StreamSet):
     # we cannot allow the signatures to persist.
     def reset(self):
         self.digitalSigs = DigitalSignatures()
-        self.sha1 = streams.Sha1Stream()
+        self.sha1 = streams.AbsoluteSha1Stream()
 
     def freeze(self, skipSet = {}):
         return streams.StreamSet.freeze(self, skipSet = skipSet)
