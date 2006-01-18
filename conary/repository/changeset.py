@@ -993,15 +993,35 @@ class ReadOnlyChangeSet(ChangeSet):
         idList = self.configCache.keys()
         idList.sort()
 
-        # walk through the config files, write out the diffs and then the
-        # config files
-        for writeDiffs in (True, False):
-            for hash in idList:
-                (tag, str, compressed) = self.configCache[hash]
-                if (writeDiffs and tag == ChangedFileTypes.diff) or \
-                   (not writeDiffs and tag != ChangedFileTypes.diff):
-                    csf.addFile(hash, filecontents.FromString(str), 
-                                "1 " + tag[4:])
+        # write out the diffs. these are always in the cache
+        for pathId in idList:
+            (tag, str, compressed) = self.configCache[pathId]
+            if tag == ChangedFileTypes.diff:
+                csf.addFile(pathId, filecontents.FromString(str), 
+                            "1 " + tag[4:])
+
+        # Absolute change sets will have other contents which may or may
+        # not be cached. For the ones which are cached, turn them into a
+        # filecontainer-ish object (using DictAsCsf) which we will step
+        # through along with the rest of the file contents. It beats sucking
+        # all of this into RAM. We don't bother cleaning up the mess we
+        # make in self.fileQueue since you can't write a changeset multiple
+        # times anyway.
+        contents = {}
+        for pathId in idList:
+            (tag, str, compressed) = self.configCache[pathId]
+            if tag == ChangedFileTypes.file:
+                contents[pathId] = (ChangedFileTypes.file,
+                                    filecontents.FromString(str), False)
+
+        wrapper = DictAsCsf({})
+        wrapper.addConfigs(contents)
+
+        entry = wrapper.getNextFile()
+        if entry:
+            util.tupleListBsearchInsert(self.fileQueue,
+                                        entry + (wrapper,), 
+                                        self.fileQueueCmp)
 
         next = self._nextFile()
         while next:
