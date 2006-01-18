@@ -171,9 +171,9 @@ class Md5Stream(StringStream):
         StringStream.set(s)
 
 class Sha1Stream(StringStream):
-
+    allowedSize = (20,)
     def freeze(self, skipSet = None):
-	assert(len(self()) == 20)
+	assert(len(self()) in self.allowedSize)
 	return StringStream.freeze(self, skipSet = skipSet)
 
     def twm(self, diff, base):
@@ -184,7 +184,7 @@ class Sha1Stream(StringStream):
 	StringStream.twm(self, diff, base)
 
     def set(self, val):
-	assert(len(val) == 20)
+	assert(len(val) in self.allowedSize)
         StringStream.set(self, val)
 
     def setFromString(self, val):
@@ -192,6 +192,18 @@ class Sha1Stream(StringStream):
 			       int(val[ 8:16], 16), int(val[16:24], 16), 
 			       int(val[24:32], 16), int(val[32:40], 16))
         StringStream.set(self, val)
+
+class AbsoluteSha1Stream(Sha1Stream):
+    """
+    This is like a Sha1Stream, except that it allows for 0 length
+    diffs to represent having a sha1 set to having no sha1 set.  Normally
+    a Sha1Stream requires its data to be 20 bytes long.  We allow 20 or 0.
+    """
+    allowedSize = (0, 20)
+
+    def diff(self, them):
+        # always return ourself, since this is an absolute stream
+        return self.freeze()
 
 class FrozenVersionStream(InfoStream):
 

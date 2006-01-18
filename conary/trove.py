@@ -225,7 +225,7 @@ _TROVESIG_DIGSIG = 1
 class TroveSignatures(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVESIG_SHA1      : ( SMALL, streams.Sha1Stream,    'sha1'        ),
+        _TROVESIG_SHA1      : ( SMALL, streams.AbsoluteSha1Stream, 'sha1'   ),
         _TROVESIG_DIGSIG    : ( LARGE, DigitalSignatures,     'digitalSigs' ),
     }
 
@@ -237,9 +237,6 @@ class TroveSignatures(streams.StreamSet):
         self.sha1 = streams.Sha1Stream()
 
     def freeze(self, skipSet = {}):
-        if not self.sha1():
-            return ""
-
         return streams.StreamSet.freeze(self, skipSet = skipSet)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
