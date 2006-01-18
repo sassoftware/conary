@@ -19,6 +19,7 @@ import os
 import string
 import sys
 import tempfile
+import traceback
 import types
 
 from conary.repository import errors
@@ -172,7 +173,21 @@ class RecipeLoader:
             raise builderrors.RecipeFileError(msg)
 
         use.resetUsed()
-        exec code in self.module.__dict__
+        try:
+            exec code in self.module.__dict__
+        except Exception, err:
+            tb = sys.exc_info()[2]
+            while tb and tb.tb_frame.f_code.co_filename != filename:
+                tb = tb.tb_next
+
+            if not tb:
+                raise
+
+            err = ''.join(traceback.format_exception(err.__class__, err, tb))
+            del tb
+            msg = ('Error in recipe file "%s":\n %s' %(basename, err))
+            raise builderrors.RecipeFileError(msg)
+            
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
