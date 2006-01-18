@@ -1015,7 +1015,7 @@ conary erase '%s=%s%s'
                 byDefaultDict = dict((x[0], x[1]) \
                                             for x in trv.iterTroveListInfo())
 
-            updateOnly = updateOnly or jobAdded
+            updateOnly = updateOnly or not jobAdded
             # for all children, we only want to install them as new _if_ we 
             # installed their parent.  If we did not install/upgrade foo, then
             # we do not install foo:runtime (though if it's installed, it
@@ -1038,7 +1038,7 @@ conary erase '%s=%s%s'
                                   byDefaultDict, jobAdded, branchHint,
                                   respectBranchAffinity, installRedirects,
                                   childrenFollowLocalChanges,
-                                  updateOnly or not jobAdded))
+                                  updateOnly))
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse)
