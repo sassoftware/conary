@@ -191,7 +191,7 @@ class Sha1Stream(StringStream):
 	s = struct.pack("!5I", int(val[ 0: 8], 16), 
 			       int(val[ 8:16], 16), int(val[16:24], 16), 
 			       int(val[24:32], 16), int(val[32:40], 16))
-        StringStream.set(self, val)
+        StringStream.set(self, s)
 
 class AbsoluteSha1Stream(Sha1Stream):
     """
