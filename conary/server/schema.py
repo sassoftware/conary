@@ -1300,7 +1300,11 @@ def loadSchema(db):
         Current schema version is %s; Required schema version is %s.
         """ % (version, VERSION))
     db.loadSchema()
-    return db.setVersion(VERSION)
+
+    if version != VERSION:
+        return db.setVersion(VERSION)
+
+    return True
 
 # schema creation/migration/maintenance entry point
 def checkVersion(db):
