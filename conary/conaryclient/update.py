@@ -964,8 +964,8 @@ Not removing old %s as part of update - it is pinned.
 Installing new version of %s side-by-side instead.
 
 To remove the old %s, run:
-conary unpin '%s=%s%s'
-conary erase '%s=%s%s'
+conary unpin '%s=%s[%s]'
+conary erase '%s=%s[%s]'
 """ % ((name, name, name) + replacedInfo + replacedInfo))
                         else:
                             if not isPrimary:
