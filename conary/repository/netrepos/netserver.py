@@ -1503,7 +1503,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
         logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
-            and user != authToken[0]):
+            and (not self.auth.check(authToken) or 
+                     authToken[0] != user)):
             raise errors.InsufficientPermission
         uid = self.auth.getUserIdByName(user)
         self.repos.troveStore.keyTable.addNewAsciiKey(uid, keyData)
@@ -1512,7 +1513,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addNewPGPKey(self, authToken, label, user, encKeyData):
         logMe(1, authToken[0], label, user)
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
-            and user != authToken[0]):
+            and (not self.auth.check(authToken) or 
+                     authToken[0] != user)):
             raise errors.InsufficientPermission
         uid = self.auth.getUserIdByName(user)
         keyData = base64.b64decode(encKeyData)
@@ -1539,7 +1541,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # a valid userId to valid fingerprints. neither of these pieces of
         # information is sensitive separately.
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
-            and userId != self.auth.getUserIdByName(authToken[0])):
+            and (userId != self.auth.getUserIdByName(authToken[0]) or
+                 not self.auth.check(authToken))
+            ):
             raise errors.InsufficientPermission
         return self.repos.troveStore.keyTable.getUsersMainKeys(userId)
 
