@@ -53,6 +53,10 @@ shims = xmlshims.NetworkConvertors()
 
 CLIENT_VERSIONS = [ 36, 37 ]
 
+# this is a quote function that quotes all RFC 2396 reserved characters,
+# including / (which is normally considered "safe" by urllib.quote)
+quote = lambda s: urllib.quote(s, safe='')
+
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback):
@@ -188,12 +192,13 @@ class ServerCache:
             if userInfo is None:
                 url = "http://%s/conary/" % serverName
             else:
-                url = "https://%s:%s@%s/conary/" % \
-                    (userInfo[0], userInfo[1], serverName)
+                url = "https://%s:%s@%s/conary/" % (quote(userInfo[0]),
+                                                    quote(userInfo[1]),
+                                                    serverName)
         elif userInfo:
             s = url.split('/')
             assert(not s[1])
-            s[2] = '%s:%s@' % userInfo + s[2]
+            s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
             url = '/'.join(s)
 
         # check for an entitlement for this server
