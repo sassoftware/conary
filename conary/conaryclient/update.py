@@ -868,47 +868,72 @@ class ClientUpdate:
                         # trove to redirect on the system.
                         installRedirects = False
                     
-                    if (respectBranchAffinity 
-                        and replacedInfo in localUpdatesByPresent):
-                        # meaning of if statement above:
-                        # 1. we are trying to preserve branch affinity 
-                        #    (this is turned off if we have a primary above us
-                        #     that switched branches, see below)
-                        # 2. the update is removing a version that is seen as a 
-                        #    local change to the system (the diff between
-                        #    referencedNotInstalled and installedTroves matched
-                        #    this trove up with something not installed). 
+                    if replaced[0] and respectBranchAffinity: 
+                        # do branch affinity checks
 
-                        localUpdateBranch = replacedInfo[1].branch()
-                        notInstalledBranch = \
-                                localUpdatesByPresent[replacedInfo][0].branch()
                         newBranch = newInfo[1].branch()
+                        installedBranch = replacedInfo[1].branch()
+
+                        if replacedInfo in localUpdatesByPresent:
+                            notInstalledBranch = \
+                                localUpdatesByPresent[replacedInfo][0].branch()
+                            # create alreadyBranchSwitch variable for 
+                            # readability
+                            alreadyBranchSwitch = True
+                        else:
+                            notInstalledBranch = None
+                            alreadyBranchSwitch = False
+
                     
-                        # The trove being removed was explicitly updated to the
-                        # trove on localUpdateBranch. We don't want to replace 
-                        # that trove if it was switched to a different branch, 
-                        # unless the branch it was switched to is the same 
-                        # as the branch for the newer version.
-                        if (notInstalledBranch != localUpdateBranch and
-                            localUpdateBranch != newBranch):
-                            if (localUpdateBranch, newBranch) == branchHint:
-                                # special exception - if the parent trove
+                        # Check to see if there's reason to be concerned
+                        # about branch affinity.
+                        if (notInstalledBranch == installedBranch or
+                                    installedBranch == newBranch):
+                            # if we're moving to 'realign' branches,
+                            # then don't consider it a branch switch.
+                            pass
+                        else:
+                            # Either a) we've made a local change from branch 1
+                            # to branch 2 and now we're updating to branch 3,
+                            # or b) there's no local change but we're switching
+                            # branches.
+
+                            # Generally, we respect branch affinity and don't
+                            # do branch switches.  There 
+                            # are a few exceptions:
+                            if isPrimary:
+                                # the user explicitly asked to switch
+                                # to this branch, so we have to honor it.
+
+                                if alreadyBranchSwitch:
+                                    # it turns out the _current_ installed
+                                    # trove is a local change.  The user
+                                    # is messing with branches too much -
+                                    # don't bother with branch affinity.
+                                    respectBranchAffinity = False
+                                    pass
+                            elif (installedBranch, newBranch) == branchHint:
+                                # Exception: if the parent trove
                                 # just made this move, then allow it.
                                 pass
-                            elif not respectBranchAffinity or isPrimary:
-                                # Exception: if the trove that switched branches
-                                # was listed on the command line, then the user
-                                # is explicitly choosing to switch this trove 
-                                # to a third branch.  For this trove at least, 
-                                # they are overriding branch affinity.  We 
-                                # make sure child troves ignore branch 
-                                # affinity.
-                                respectBranchAffinity = False
+                            elif (replacedInfo in installedAndReferenced
+                                  and not alreadyBranchSwitch):
+                                # Exception: The user has not switched this
+                                # trove's branch explicitly, and now
+                                # we have an implicit request to switch 
+                                # the branch.
+                                pass
                             else:
-                                # we're not installing this trove, and because
-                                # we're rejecting the trove due to branch 
-                                # affinity, we don't consider any of its 
-                                # child troves valid either.
+                                # we're not installing this trove - 
+                                # It doesn't match any of our exceptions.
+                                # It could be that it's a trove with
+                                # no references to it on the system
+                                # (and so a branch switch would be strange)
+                                # or it could be that it is a switch
+                                # to a third branch by the user.
+                                # Since we're rejecting the update due to 
+                                # branch affinity, we don't consider any of its 
+                                # child troves for updates either.
                                 recurseThis = False 
                                 break
                 elif not byDefault:
@@ -937,10 +962,11 @@ class ClientUpdate:
                 if pinned:
                     if replaced[0] is not None:
                         try:
-                            trv = troveSource.getTrove(withFiles = False, *newInfo)
+                            trv = troveSource.getTrove(withFiles = False, 
+                                                       *newInfo)
                         except errors.TroveMissing:
-                            # we don't even actually have this trove available, making
-                            # it difficult to install.
+                            # we don't even actually have this trove available,
+                            # making it difficult to install.
                             recurseThis = False
                             break
                             
