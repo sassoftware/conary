@@ -176,7 +176,7 @@ def _handle_rc(rc, cmd):
 
 def execute(cmd, destDir=None, verbose=True):
     if verbose:
-	log.debug(cmd)
+	log.info(cmd)
     if destDir:
 	rc = os.system('cd %s; %s' %(destDir, cmd))
     else:
