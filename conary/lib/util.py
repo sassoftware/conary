@@ -105,7 +105,7 @@ errorMessage = '''
 ***
 *** To report this error, please run the following script:
 ***
-*** conary-debug %(command)s
+*** conary-debug "%(command)s"
 ***
 *******************************************************************
 
