@@ -7,9 +7,9 @@ Changes in 0.93:
       as '/') are now handled properly. (bug #587)
 
   o Server changes
-    * Standalone server reports warnings for unsupported confiration options
-      insead of exiting with a traceback
-    * Compatibility for repositoryDir has been removed
+    * Standalone server reports warnings for unsupported configuration options
+      instead of exiting with a traceback.
+    * Compatibility for repositoryDir has been removed.
 
 Changes in 0.92:
   o Package Building Changes:
