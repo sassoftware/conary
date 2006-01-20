@@ -26,6 +26,7 @@ from conary import conarycfg
 from conary import conaryclient
 from conary import constants
 from conary import deps
+from conary import errors
 from conary import flavorcfg
 from conary import state
 from conary import updatecmd
@@ -39,7 +40,7 @@ from conary.lib import openpgpkey
 from conary.lib import options
 from conary.lib import util
 from conary.local import database
-from conary.repository import errors, netclient
+from conary.repository import netclient
 from conary.repository.netclient import NetworkRepositoryClient
 
 sys.excepthook = util.genExcepthook()
@@ -490,34 +491,11 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
 	return realMain(ccfg, argv)
-    except cook.CookError, e:
+    except errors.InternalConaryError, err:
+        raise
+    except (errors.ConaryError, errors.CvcError, cfg.CfgError), err:
         log.error(str(e))
         sys.exit(1)
-    except cfg.CfgError, e:
-        log.error(str(e))
-        sys.exit(1)
-    except xmlrpclib.ProtocolError, e:
-        if e.errcode == 403:
-            print >> sys.stderr, \
-                "remote server denied permission for the requested operation"
-        else:
-            raise
-    except errors.UnknownException, e:
-        print >> sys.stderr, \
-            "An unknown exception occured on the repository server:"
-        print >> sys.stderr, "\t%s" % str(e)
-    except errors.RepositoryError, e:
-        print >> sys.stderr, str(e)
-    except builderrors.BuildError, e:
-        print >> sys.stderr, str(e)
-    except database.OpenError, e:
-        print >> sys.stderr, str(e)
-    except state.ConaryStateError, e:
-        print >> sys.stderr, str(e)
-    except openpgpfile.KeyNotFound, e:
-        print >> sys.stderr, str(e)
-    except errors.DigitalSignatureError, e:
-        print >> sys.stderr, str(e)
     except KeyboardInterrupt, e:
         pass
     return 1

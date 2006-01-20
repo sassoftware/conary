@@ -18,6 +18,7 @@ Implements branch and shadow command line functionality.
 import itertools
 
 from conary import conaryclient
+from conary import errors
 from conary import updatecmd
 from conary import versions
 from conary.lib import log
@@ -27,8 +28,8 @@ from conary.conarycfg import selectSignatureKey
 
 def _getBranchType(binaryOnly, sourceOnly):
     if binaryOnly and sourceOnly:
-        raise OptionsError, ('Can only specify one of --binary-only and'
-                             ' --source-only')
+        raise errors.ParseError, ('Can only specify one of --binary-only and'
+                                  ' --source-only')
     if binaryOnly:
         return conaryclient.ConaryClient.BRANCH_BINARY
     elif sourceOnly:

@@ -11,8 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary.errors import CvcError
 
-class RecipeFileError(Exception):
+class RecipeFileError(CvcError):
     def __init__(self, msg):
         self.msg = msg
 
@@ -23,6 +24,9 @@ class RecipeFileError(Exception):
 	return repr(self)
     
 class BuildError(RecipeFileError):
+    pass
+
+class LoadRecipeError(RecipeFileError):
     pass
 
 class RecipeDependencyError(RecipeFileError):

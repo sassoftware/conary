@@ -25,7 +25,7 @@ from conary.deps import deps
 from conary.lib import log
 from conary.lib.sha1helper import sha1ToString
 from conary.local import update
-from conary.repository import errors
+from conary import errors
 
 def usage():
     print "conary verify [--all] [trove[=version]]*"

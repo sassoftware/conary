@@ -20,10 +20,12 @@ import sys
 from conary.callbacks import UpdateCallback
 from conary import conarycfg
 from conary.deps import deps
+from conary.errors import ClientError
 from conary.lib import log, util
 from conary.lib import openpgpkey, openpgpfile
 from conary.local import database
-from conary.repository import changeset, errors, trovesource
+from conary.repository import changeset, trovesource
+from conary.repository.errors import TroveMissing
 from conary.repository.netclient import NetworkRepositoryClient
 from conary import trove, versions
 
@@ -251,7 +253,7 @@ class ClientUpdate:
                                 continue
                             try:
                                 troveSource.getTrove(withFiles=False, *pkgInfo)
-                            except errors.TroveMissing:
+                            except TroveMissing:
                                 continue
                             
                             packages.append((pkgName, job[1], job[2], True))
@@ -964,7 +966,7 @@ class ClientUpdate:
                         try:
                             trv = troveSource.getTrove(withFiles = False, 
                                                        *newInfo)
-                        except errors.TroveMissing:
+                        except TroveMissing:
                             # we don't even actually have this trove available,
                             # making it difficult to install.
                             recurseThis = False
@@ -1024,7 +1026,7 @@ conary erase '%s=%s[%s]'
             if trv is None:
                 try:
                     trv = troveSource.getTrove(withFiles = False, *newInfo)
-                except errors.TroveMissing:
+                except TroveMissing:
                     # it's possible that the trove source we're using
                     # contains references to troves that it does not 
                     # actually contain.  That's okay as long as the
@@ -1776,9 +1778,6 @@ conary erase '%s=%s[%s]'
                         # 'threaded False' to your conary config.
                         pass
 
-
-class ClientError(Exception):
-    """Base class for client errors"""
 
 class UpdateError(ClientError):
     """Base class for update errors"""

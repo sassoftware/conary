@@ -11,33 +11,27 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary.errors import ConaryError, InternalConaryError
+from conary.errors import RepositoryError, TroveNotFound
 from conary import versions
 
-class RepositoryMismatch(Exception):
+class RepositoryMismatch(RepositoryError):
     pass
 
-class InsufficientPermission(Exception):
+class InsufficientPermission(ConaryError):
 
-    def __str__(self):
-        if self.server:
-            return "Insufficient permission to access server %s" % self.server
-
-        return "Insufficient permission"
-        
     def __init__(self, server = None):
         self.server = server
+        if server:
+            self.msg = ("Insufficient permission to access server %s" % self.server)
+        else:
+            self.msg = "Insufficient permission"
 
-class RepositoryError(Exception):
-    """Base class for exceptions from the system repository"""
-
-class IntegrityError(RepositoryError):
+class IntegrityError(RepositoryError, InternalConaryError):
     """Files were added which didn't match the expected sha1"""
 
 class MethodNotSupported(RepositoryError):
     """Attempt to call a server method which does not exist"""
-
-class TroveNotFound(RepositoryError):
-    """Raised when findTrove failes"""
 
 class RepositoryLocked(RepositoryError):
     def __str__(self):
@@ -52,7 +46,7 @@ class CommitError(RepositoryError):
 class DuplicateBranch(RepositoryError):
     """Error occured commiting a trove"""
 
-class TroveMissing(RepositoryError):
+class TroveMissing(RepositoryError, InternalConaryError):
     troveType = "trove"
     def __str__(self):
         if type(self.version) == list:
@@ -90,7 +84,7 @@ class TroveMissing(RepositoryError):
         else:
             self.type = 'package'
 
-class UnknownException(RepositoryError):
+class UnknownException(RepositoryError, InternalConaryError):
     def __str__(self):
 	return "UnknownException: %s %s" % (self.eName, self.eArgs)
 
@@ -113,7 +107,7 @@ class UnknownEntitlementGroup(RepositoryError):
 class PermissionAlreadyExists(RepositoryError):
     pass
 
-class UserNotFound(Exception):
+class UserNotFound(RepositoryError):
     def __init__(self, user = "user"):
         self.user = user
 
@@ -149,7 +143,17 @@ class DigitalSignatureError(RepositoryError):
     def __str__(self):
         return self.error
     def __init__(self, error = "Trove can't be signed"):
-        self.error=error
+        self.error = error
+
+class InternalServerError(RepositoryError, InternalConaryError):
+    def __init__(self, url, err):
+        self.url = url
+        self.err = err
+        self.args = '''\
+There was an error contacting the repository at %s.   Either the server is
+configured incorrectly or the request you sent to the server was invalid.
+%s
+''' % (url, err)
 
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey

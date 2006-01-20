@@ -15,6 +15,7 @@
 import sys
 import os
 
+from conary import errors
 from conary.deps import deps
 from conary.lib import log
 from conary.repository import changeset
@@ -184,7 +185,5 @@ def askYn(prompt, default=None):
         else:
             print "Unknown response '%s'." % resp
 
-class TroveSpecError(Exception):
-
+class TroveSpecError(errors.ParseError):
     pass
-

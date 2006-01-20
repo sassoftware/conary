@@ -131,10 +131,19 @@ class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None):
+        try:
+            self._load(filename, cfg, repos, component,
+                       branch, ignoreInstalled, directory)
+        except Exception, err:
+            raise builderrors.LoadRecipeError('unable to load recipe file %s: %s'\
+                                              % (filename, err))
+
+    def _load(self, filename, cfg=None, repos=None, component=None,
+              branch=None, ignoreInstalled=False, directory=None):
         self.recipes = {}
         
         if filename[0] != "/":
-            raise IOError, "recipe file names must be absolute paths"
+            raise LoadRecipeError("recipe file names must be absolute paths")
 
         if component:
             pkgname = component.split(':')[0]
@@ -321,13 +330,13 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     try:
 	pkgs = repos.findTrove(labelPath, 
                                (component, versionStr, deps.DependencySet()))
-    except errors.TroveMissing:
-        raise builderrors.RecipeFileError(
+    except errors.TroveNotFound:
+        raise builderrors.LoadRecipeError(
                                 'cannot find source component %s' % component)
     if filterVersions:
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:
-        raise builderrors.RecipeFileError(
+        raise builderrors.LoadRecipeError(
                               "source component %s has multiple versions "
                               "on labelPath %s: %s" %(component,
                             ', '.join(x.asString() for x in labelPath),

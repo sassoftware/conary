@@ -96,6 +96,9 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             # no password was specified -- prompt for it
             if not self.__pwCallback():
                 raise
+        except xmlrpclib.ProtocolError, err:
+            if err.errcode == 500:
+                raise errors.InternalServerError(self.__host, err)
         except:
             raise
 

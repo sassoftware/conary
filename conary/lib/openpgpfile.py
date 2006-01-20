@@ -149,28 +149,31 @@ SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
 
-class MalformedKeyRing(Exception):
+class PGPError(Exception):
+    pass
+
+class MalformedKeyRing(PGPError):
     def __str__(self):
         return self.error
 
     def __init__(self, reason="Malformed Key Ring"):
         self.error = "Malformed Key Ring: %s" %reason
 
-class IncompatibleKey(Exception):
+class IncompatibleKey(PGPError):
     def __str__(self):
         return self.error
 
     def __init__(self, reason="Incompatible Key"):
         self.error = "Incompatible Key: %s" %reason
 
-class InvalidKey(Exception):
+class InvalidKey(PGPError):
     def __str__(self):
         return self.error
 
     def __init__(self, reason="Invalid Key"):
         self.error = "Invalid Key: %s" %reason
 
-class KeyNotFound(Exception):
+class KeyNotFound(PGPError):
     def __str__(self):
         return self.error
 
@@ -186,14 +189,14 @@ class KeyNotFound(Exception):
         if reason:
             self.error += ': %s' %reason
 
-class BadPassPhrase(Exception):
+class BadPassPhrase(PGPError):
     def __str__(self):
         return self.error
 
     def __init__(self, reason="Bad passphrase"):
         self.error = reason
 
-class BadSelfSignature(Exception):
+class BadSelfSignature(PGPError):
     def __str__(self):
         return self.error
 

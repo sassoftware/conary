@@ -16,7 +16,7 @@ from fnmatch import fnmatchcase
 import os
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_FILESET
-from conary.repository import errors
+from conary import errors
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.lib import util

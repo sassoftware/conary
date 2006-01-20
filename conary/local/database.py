@@ -20,6 +20,7 @@ import shutil
 #conary
 from conary import trove, versions
 from conary.build import tags
+from conary.errors import ConaryError, DatabaseError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
@@ -156,7 +157,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def getTrove(self, name, version, flavor, pristine = True,
 		 withFiles = True):
-	return self.db.getTrove(name, version, flavor, pristine = pristine)
+        try:
+            return self.db.getTrove(name, version, flavor, pristine = pristine)
+        except KeyError, e:
+            raise errors.TroveMissing(name, version)
 
     def getTroves(self, troveList, pristine = True, withFiles = True):
         return self.db.getTroves(troveList, pristine, withFiles = withFiles)
@@ -811,17 +815,7 @@ class Database(SqlDbRepository):
             SqlDbRepository.__init__(self, root + path)
 
 # Exception classes
-
-class DatabaseError(Exception):
-    """Base class for exceptions from the system database"""
-
-    def __str__(self):
-	return self.str
-
-    def __init__(self, str = None):
-	self.str = str
-
-class RollbackError(Exception):
+class RollbackError(errors.ConaryError):
 
     """Base class for exceptions related to applying rollbacks"""
 
@@ -877,19 +871,5 @@ class OpenError(DatabaseError):
 	self.path = path
 	self.msg = msg
 
-class MissingDependencies(Exception):
-
-    def __str__(self):
-        l = []
-        for (name, deps) in self.depList:
-            l.append(name + ":")
-            l.append("\t" + "\n\t".join(str(deps).split("\n")))
-
-        return "\n".join(l)
-
-    def __init__(self, depList):
-        self.depList = depList
-
-class CommitError(errors.CommitError):
+class CommitError(DatabaseError, errors.InternalConaryError):
     pass
-
