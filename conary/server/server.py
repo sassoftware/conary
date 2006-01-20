@@ -309,10 +309,18 @@ class ServerConfig(netserver.ServerConfig):
 	self.read(path, exception=False)
 
     def check(self):
-        assert(not self.cacheDB)
-        assert(not self.closed)
-        assert(not self.commitAction)
-        assert(not self.forceSSL)
+        if self.cacheDB:
+            print >> sys.stderr, "warning: cacheDB config option is ignored "
+                                 "by the standalone server"
+
+        if self.closed:
+            print >> sys.stderr, "warning: closed config option is ignored "
+                                 "by the standalone server"
+
+        if self.forceSSL:
+            print >> sys.stderr, "warning: commitAction config option is "
+                                 "ignored by the standalone server"
+
         assert(not self.repositoryDir)
 
 def usage():
@@ -379,7 +387,8 @@ if __name__ == '__main__':
         print >> sys.stderr, msg
         sys.exit(1)
 
-    cfg.check()
+    if 'migrate' not in argSet:
+        cfg.check()
 
     if argSet.has_key('help'):
         usage()
