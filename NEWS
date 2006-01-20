@@ -27,6 +27,8 @@ Changes in 0.92:
     * Fixed a bug in the update code caused conary to behave
       incorrectly when updating groups.  Conary would install
       components of troves that were not installed.
+    * Verify could error out with invalid signatures when troves were
+      changed locally
 
   o General Bug Fixes
     * Conary did not include the trove sha1 in the troveinfo diff
