@@ -310,16 +310,16 @@ class ServerConfig(netserver.ServerConfig):
 
     def check(self):
         if self.cacheDB:
-            print >> sys.stderr, "warning: cacheDB config option is ignored "
-                                 "by the standalone server"
+            print >> sys.stderr, ("warning: cacheDB config option is ignored "
+                                  "by the standalone server")
 
         if self.closed:
-            print >> sys.stderr, "warning: closed config option is ignored "
-                                 "by the standalone server"
+            print >> sys.stderr, ("warning: closed config option is ignored "
+                                  "by the standalone server")
 
         if self.forceSSL:
-            print >> sys.stderr, "warning: commitAction config option is "
-                                 "ignored by the standalone server"
+            print >> sys.stderr, ("warning: commitAction config option is "
+                                  "ignored by the standalone server")
 
 def usage():
     print "usage: %s" % sys.argv[0]
