@@ -11,6 +11,9 @@ Changes in 0.93:
       instead of exiting with a traceback.
     * Compatibility for repositoryDir has been removed.
 
+  o Client changes
+    * Compute sha1's for source checkins and local change set commits
+
 Changes in 0.92:
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
