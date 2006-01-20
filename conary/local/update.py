@@ -1260,14 +1260,20 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 				      newCont, f.flags.isConfig())
 
     (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
-    changeSet.newTrove(csTrove)
 
     if (csTrove.getOldFileList() or csTrove.getChangedFileList()
         or csTrove.getNewFileList()
         or [ x for x in csTrove.iterChangedTroves()]):
-	foundDifference = True
+        foundDifference = True
+        # This doesn't match the original trove, so we need to recompute
+        # any signatures.
+        newTrove.invalidateSignatures()
+        newTrove.computeSignatures()
+        (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
     else:
-	foundDifference = False
+        foundDifference = False
+
+    changeSet.newTrove(csTrove)
 
     return (foundDifference, newTrove)
 

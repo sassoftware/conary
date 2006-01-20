@@ -554,6 +554,9 @@ class Trove(streams.StreamSet):
                             % self.getName())
         return maxTrust, missingKeys
 
+    def invalidateSignatures(self):
+        self.troveInfo.sigs.reset()
+
     def computeSignatures(self, store = True):
         """
         Recomputes the sha1 signature of this trove.
