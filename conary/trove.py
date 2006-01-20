@@ -1661,9 +1661,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getNewFileList(self):
 	return self.newFiles
 
-    def resetNewFileList(self):
-        self.newFiles = []
-
     def oldFile(self, pathId):
 	self.oldFiles.append(pathId)
 
@@ -1681,9 +1678,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def changeOldVersion(self, version):
 	self.oldVersion.set(version)
-
-    def changeNewVersion(self, version):
-	self.newVersion.set(version)
 
     def changeChangeLog(self, cl):
         assert(0)
@@ -1704,9 +1698,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
     # path and/or version can be None
     def changedFile(self, pathId, path, fileId, version):
 	self.changedFiles.append((pathId, path, fileId, version))
-
-    def resetChangedFileList(self):
-        self.changedFiles = []
 
     def getChangedFileList(self):
 	return self.changedFiles
@@ -1747,37 +1738,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
             l = self.strongTroves.setdefault(name, [])
 
 	l.append(('+', version, flavor, byDefault))
-
-    def updateChangedTrove(self, name, flavor, old, new, weakRef = False):
-	"""
-	Removes trove (name, flavor, old version) from the changed list and
-	adds trove (name, flavor, version) new to the list (with the same 
-	change type).
-
-	@param name: name of the trove
-	@type name: str
-	@param flavor: flavor of the trove
-	@type flavor: deps.deps.DependencySet
-	@param old: version to remove from the changed list
-	@type old: versions.VersionString
-	@param new: version to add to the changed list
-	@type new: versions.VersionString
-        @param weakRefs: True if we are switching a weakRef
-        @type weakRefs: boolean
-	"""
-        if weakRef:
-            chgGroup = self.weakTroves
-        else:
-            chgGroup = self.strongTroves
-
-	for (theName, l) in chgGroup.iteritems():
-	    if theName != name: continue
-	    for (i, (change, ver, flavor, byDefault)) in enumerate(l):
-		if ver == old:
-		    l[i] = (change, new, flavor, byDefault)
-		    return
-
-        raise TroveError, "trove not found to update"
 
     def oldTroveVersion(self, name, version, flavor, weakRef = False):
 	"""
