@@ -14,7 +14,7 @@
 
 import sys
 import itertools
-from conary import trove, deps, files
+from conary import trove, deps, errors, files
 from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
@@ -744,7 +744,7 @@ def checkVersion(db):
 
     return version
 
-class OldDatabaseSchema(Exception):
+class OldDatabaseSchema(errors.DatabaseError):
     def __str__(self):
         return self.msg
 

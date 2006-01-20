@@ -21,6 +21,9 @@ import copy
 import time
 import weakref
 
+#conary
+from conary.errors import ParseError
+
 staticLabelTable = {}
 
 class AbstractRevision(object):
@@ -1384,27 +1387,6 @@ def strToFrozen(verStr, timeStamps):
 
     assert(ts == len(timeStamps))
     return "/".join(spl)
-
-class VersionsError(Exception):
-
-    """
-    Ancestor for all exceptions raised by the versions module.
-    """
-
-    pass
-
-class ParseError(VersionsError):
-
-    """
-    Indicates that an error occured turning a string into an object
-    in the versions module.
-    """
-
-    def __str__(self):
-	return self.str
-
-    def __init__(self, str):
-	self.str = str
 
 thawedVersionCache = weakref.WeakValueDictionary()
 stringVersionCache = weakref.WeakValueDictionary()

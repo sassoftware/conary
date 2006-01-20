@@ -637,36 +637,14 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
 	return realMain(ccfg, argv)
+    except errors.InternalConaryError:
+        raise
     except cfgtypes.CfgError, e:
         log.error(str(e))
-    except xmlrpclib.ProtocolError, e:
-	if e.errcode == 403:
-	    print >> sys.stderr, \
-		"remote server denied permission for the requested operation"
-	else:
-	    raise
-    except errors.UnknownException, e:
-	print >> sys.stderr, \
-	    "An unknown exception occured on the repository server:"
-	print >> sys.stderr, "\t%s" % str(e)
     except cfg.CfgError:
 	print >> sys.stderr, str(e)
-    except errors.RepositoryError, e:
+    except errors.ConaryError, e:
 	print >> sys.stderr, str(e)
-    except database.OpenError, e:
-	print >> sys.stderr, str(e)
-    except conaryclient.cmdline.TroveSpecError, e:
-	print >> sys.stderr, str(e)
-    except database.OldDatabaseSchema, e:
-	print >> sys.stderr, str(e)
-    except conaryclient.UpdateError, e:
-        print >> sys.stderr, str(e)
-    except conaryclient.CloneError, e:
-        print >> sys.stderr, str(e)
-    except conaryclient.InstallPathConflicts, e:
-        print >> sys.stderr, str(e)
-    except trove.DigitalSignatureVerificationError, e:
-        print >> sys.stderr, str(e)
     except:
         raise
     return 1

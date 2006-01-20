@@ -372,7 +372,7 @@ class TroveFormatter(TroveTupFormatter):
                                 withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
                 # on failed getTrove calls 
-            except (errors.TroveMissing, KeyError):
+            except errors.TroveMissing:
                 pass
 
         elif n.endswith(':source'):

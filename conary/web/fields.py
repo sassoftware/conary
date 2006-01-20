@@ -12,8 +12,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary import errors
 
-class MissingParameterError(Exception):
+class MissingParameterError(errors.WebError):
     def __init__(self, param):
         self.param = param
         

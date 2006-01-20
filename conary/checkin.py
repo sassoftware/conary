@@ -25,6 +25,7 @@ import time
 from conary import callbacks
 from conary import changelog
 from conary import deps
+from conary import errors
 from conary import files
 from conary import trove
 from conary import updatecmd
@@ -41,7 +42,7 @@ from conary.lib import openpgpfile
 from conary.lib import openpgpkey
 from conary.lib import util
 from conary.local import update
-from conary.repository import changeset, errors
+from conary.repository import changeset
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
 # mix UpdateCallback and CookCallback, since we use both.
@@ -77,23 +78,6 @@ def _verifyAtHead(repos, headPkg, state):
 		return False
 
     return True
-
-def _getRecipeLoader(cfg, repos, recipeFile):
-    # load the recipe; we need this to figure out what version we're building
-    try:
-        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
-    except build.errors.RecipeFileError, e:
-	log.error("unable to load recipe file %s: %s", recipeFile, str(e))
-        return None
-    except IOError, e:
-	log.error("unable to load recipe file %s: %s", recipeFile, e.strerror)
-        return None
-    
-    if not loader:
-	log.error("unable to load a valid recipe class from %s", recipeFile)
-	return None
-
-    return loader
 
 def verifyAbsoluteChangeset(cs, trustThreshold = 0):
     # go through all the trove change sets we have in this changeset.
@@ -248,8 +232,8 @@ def commit(repos, cfg, message, callback=None):
                                     state.getVersion().canonicalVersion(),
                                     deps.deps.DependencySet())
 
-    loader = _getRecipeLoader(cfg, repos, state.getRecipeFileName())
-    if loader is None: return
+    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(), 
+                                     cfg=cfg, repos=repos)
 
     srcMap = {}
     cwd = os.getcwd()

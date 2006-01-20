@@ -596,11 +596,7 @@ class ChangeSet(streams.StreamSet):
 
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
-	    try:
-		repos.getTrove(name, newVer, troveCs.getNewFlavor())
-	    except errors.TroveMissing: 
-		pass
-	    else:
+            if repos.hasTroves([(name, newVer, troveCs.getNewFlavor())])[name, newVer, troveCs.getNewFlavor()]:
 		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
 		newVer = repos.getTroveLatestVersion(name, branch)
                 newVer.incrementBuildCount()

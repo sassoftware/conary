@@ -14,7 +14,9 @@
 from mod_python import apache
 import base64
 
-class PermissionDenied(Exception):
+from conary import errors
+
+class PermissionDenied(errors.WebError):
     def __str__(self):
         return "permission denied"
 

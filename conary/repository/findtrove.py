@@ -14,8 +14,7 @@
 import itertools
 
 from conary.deps import deps
-from conary.repository import errors
-from conary import versions
+from conary import versions, errors
 
 ######################################
 # Query Types
@@ -522,7 +521,7 @@ class QueryRevisionByBranch(QueryByBranch):
         versionStr = self.map[name][1]
         try:
             verRel = versions.Revision(versionStr)
-        except versions.ParseError:
+        except errors.ParseError:
             verRel = None
 
         for version in reversed(sorted(versionFlavorDict.iterkeys())):
@@ -562,7 +561,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
         versionStr = self.map[name][1].split('/')[-1]
         try:
             verRel = versions.Revision(versionStr)
-        except versions.ParseError:
+        except errors.ParseError:
             verRel = None
         for version in reversed(sorted(versionFlavorDict.iterkeys())):
             if verRel:
@@ -696,7 +695,7 @@ class TroveFinder:
         if firstChar == '/':
             try:
                 version = versions.VersionFromString(versionStr)
-            except versions.ParseError, e:
+            except errors.ParseError, e:
                 raise errors.TroveNotFound, str(e)
             if isinstance(version, versions.Branch):
                 return VERSION_STR_BRANCH
@@ -726,16 +725,16 @@ class TroveFinder:
                                                  ' for %s' % (versionStr, name))
             for char in ' ,':
                 if char in versionStr:
-                    raise RuntimeError, \
+                    raise errors.ParseError, \
                         ('%s requests illegal version/revision %s' 
                                                 % (name, versionStr))
             if '-' in versionStr:
+                # attempt to parse the versionStr
                 try:
-                    # attempt to parse the versionStr
                     versions.Revision(versionStr)
-                    return VERSION_STR_REVISION
-                except versions.ParseError, msg:
-                    raise errors.TroveNotFound, str(msg)
+                except errors.ParseError, err:
+                    raise errors.TroveNotFound(str(err))
+                return VERSION_STR_REVISION
             return VERSION_STR_TROVE_VER
 
     def _getLabelPath(self, troveTup):
@@ -796,7 +795,7 @@ class TroveFinder:
         try:
             label = versions.Label(troveTup[1].split('/', 1)[0])
             newLabelPath = [ label ]
-        except versions.ParseError:
+        except errors.ParseError:
             raise errors.TroveNotFound, \
                                 "invalid version %s" % troveTup[1]
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)

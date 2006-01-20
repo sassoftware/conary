@@ -19,12 +19,12 @@ import urllib2
 from conary import callbacks
 from conary import conaryclient
 from conary import display
+from conary import errors
 from conary.deps import deps
 from conary.lib import log
 from conary.lib import util
 from conary.local import database
 from conary.repository import changeset
-from conary.repository import errors
 from conaryclient import cmdline
 from conaryclient.cmdline import parseTroveSpec
 
@@ -245,33 +245,20 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
     if syncChildren:
         for name, oldInf, newInfo, isAbs in applyList:
             if not isAbs:
-                log.error('cannot specify erases/relative updates with sync')
+                raise errors.ConaryError('cannot specify erases/relative updates with sync')
                 return
-    try:
-        _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                      tagScript = tagScript, 
-                      keepExisting = keepExisting, depCheck = depCheck,
-                      test = test, justDatabase = justDatabase, 
-                      recurse = recurse, info = info, 
-                      updateByDefault = updateByDefault, callback = callback, 
-                      split = split, sync = sync,
-                      fromChangesets = fromChangesets,
-                      checkPathConflicts = checkPathConflicts,
-                      syncChildren = syncChildren,
-                      updateOnly = updateOnly)
-    except conaryclient.DependencyFailure, e:
-        # XXX print dependency errors because the testsuite 
-        # prefers it
-        callback.done()
-        print e
-    except errors.TroveNotFound, e:
-        log.error(e)
-    except conaryclient.UpdateError, e:
-        log.error(e)
-    except errors.CommitError, e:
-        log.error(e)
-    except changeset.PathIdsConflictError, e:
-        log.error(e)
+
+    _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
+                  tagScript = tagScript, 
+                  keepExisting = keepExisting, depCheck = depCheck,
+                  test = test, justDatabase = justDatabase, 
+                  recurse = recurse, info = info, 
+                  updateByDefault = updateByDefault, callback = callback, 
+                  split = split, sync = sync,
+                  fromChangesets = fromChangesets,
+                  checkPathConflicts = checkPathConflicts,
+                  syncChildren = syncChildren,
+                  updateOnly = updateOnly)
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -430,19 +417,10 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
         return
 
-    try:
-        callback = UpdateCallback(cfg)
-        _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                      depCheck = depCheck, test = test, info = info, 
-                      callback = callback, checkPrimaryPins = False)
-    except conaryclient.DependencyFailure, e:
-        log.error(e)
-    except conaryclient.UpdateError, e:
-        log.error(e)
-    except errors.CommitError, e:
-        log.error(e)
-    except changeset.PathIdsConflictError, e:
-        log.error(e)
+    callback = UpdateCallback(cfg)
+    _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
+                  depCheck = depCheck, test = test, info = info, 
+                  callback = callback, checkPrimaryPins = False)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)

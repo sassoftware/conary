@@ -18,7 +18,7 @@ for a particular directory
 import copy
 import os
 
-from conary import trove
+from conary import errors, trove
 from conary.deps import deps
 from conary.lib import sha1helper
 from conary import versions
@@ -249,7 +249,7 @@ class SourceStateFromLines(SourceState):
     def copy(self):
         return SourceState.copy(self, classOverride = SourceState)
 
-class ConaryStateError(Exception):
+class ConaryStateError(errors.ConaryError):
     pass
 
 class CONARYFileMissing(ConaryStateError):

@@ -13,6 +13,7 @@
 
 import itertools
 
+from conary import errors
 from conary import versions
 from conary.build.nextversion import nextVersion
 from conary.deps import deps
@@ -553,8 +554,7 @@ class ClientClone:
 
         return True, cs
 
-class CloneError(Exception):
-
+class CloneError(errors.ClientError):
     pass
 
 class CloneIncomplete(CloneError):

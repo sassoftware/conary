@@ -70,14 +70,7 @@ class AbstractTroveDatabase:
 	trove on that branch is returned. If there is no match for a
 	particular tuple, None is placed in the return list for that tuple.
 	"""
-	rc = []
-	for item in troveList:
-	    try:
-		rc.append(self.getTrove(*item))
-	    except errors.TroveMissing:
-		rc.append(None)
-
-	return rc
+	raise NotImplementedError
 
     def iterAllTroveNames(self, serverName):
 	"""
