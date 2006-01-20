@@ -359,7 +359,7 @@ def commit(repos, cfg, message, callback=None):
                 newVersion.incrementSourceCount()
 
         del d
-            
+
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
                     forceSha1=True)
@@ -395,7 +395,10 @@ def commit(repos, cfg, message, callback=None):
             return
 
     newState.changeChangeLog(cl)
-    signatureKey = selectSignatureKey(cfg, newState.getBranch().label().asString())
+    newState.invalidateSignatures()
+    newState.computeSignatures()
+    signatureKey = selectSignatureKey(cfg,
+                                      newState.getBranch().label().asString())
     if signatureKey is not None:
         # skip integrity checks since we just want to compute the
         # new sha1 with all our changes accounted for
