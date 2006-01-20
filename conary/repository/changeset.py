@@ -587,55 +587,65 @@ class ChangeSet(streams.StreamSet):
 
 	troveVersions = {}
 
-	for troveCs in self.iterNewTroveList():
-	    name = troveCs.getName()
+        troveCsList = [ (x.getName(), x) for x in self.iterNewTroveList() ]
+        troveCsList.sort()
+        troveCsList.reverse()
+        origTroveList = repos.getTroves([ (x[1].getName(), x[1].getOldVersion(),
+                                           x[1].getOldFlavor()) 
+                                          for x in troveCsList ])
+
+        # this loop needs to handle components before packages; reverse
+        # sorting by name ensures that
+        #
+        # XXX this is busted for groups 
+
+	for (name, troveCs), oldTrv in \
+                                itertools.izip(troveCsList, origTroveList):
             origVer = troveCs.getNewVersion()
 
 	    oldVer = troveCs.getOldVersion()
+            assert(oldVer is not None)
 	    newVer = oldVer.createBranch(targetBranchLabel, withVerRel = 1)
 
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
-	    try:
-		repos.getTrove(name, newVer, troveCs.getNewFlavor())
-	    except errors.TroveMissing: 
-		pass
-	    else:
+            troveTup = (name, newVer, troveCs.getNewFlavor())
+            exists = repos.hasTroves([ troveTup ])[troveTup]
+            if exists:
 		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
 		newVer = repos.getTroveLatestVersion(name, branch)
                 newVer.incrementBuildCount()
 
-	    troveCs.changeNewVersion(newVer)
+            newTrv = oldTrv.copy()
+            newTrv.applyChangeSet(troveCs)
+
+            newTrv.changeVersion(newVer)
+
             assert(not troveVersions.has_key(name))
-	    troveVersions[(name, troveCs.getNewFlavor())] = \
+            troveVersions[(name, troveCs.getNewFlavor())] = \
                                 [ (origVer, newVer) ]
 
-            for (listMethod, addMethod, resetMethod) in [
-                    (troveCs.getChangedFileList, troveCs.changedFile,
-                     troveCs.resetChangedFileList),
-                    (troveCs.getNewFileList, troveCs.newFile,
-                     troveCs.resetNewFileList) ]:
-                fileList = [ x for x in listMethod() ]
-                resetMethod()
-                for (pathId, path, fileId, fileVersion) in fileList:
-                    if fileVersion != "-" and fileVersion.onLocalLabel():
-                        addMethod(pathId, path, fileId, newVer)
+            fileList = [ x for x in newTrv.iterFileList() ]
+            for (pathId, path, fileId, fileVersion) in fileList:
+                if not fileVersion.onLocalLabel(): continue
+                newTrv.updateFile(pathId, path, newVer, fileId)
 
-	for troveCs in self.iterNewTroveList():
-	    # the implementation of updateChangedTrove makes this whole thing
-	    # O(n^2) (n is the number of troves changed in troveCs), which is
-	    # just silly. if large groups are added like this the effect could
-	    # become noticeable
-	    for (name, list) in troveCs.iterChangedTroves():
-                for (change, version, flavor, absolute) in list:
-		    if change != '+': continue
+            subTroves = [ x for x in newTrv.iterTroveListInfo() ]
+            for (name, subVersion, flavor), byDefault, isStrong in subTroves:
+                if not troveVersions.has_key((name, flavor)): continue
 
-                    if not troveVersions.has_key((name, flavor)): continue
+                newTrv.delTrove(name, subVersion, flavor, missingOkay = False)
+                newTrv.addTrove(name, newVer, flavor, byDefault = byDefault,
+                                weakRef = (not isStrong))
 
-		    for (oldVer, newVer) in troveVersions[(name, flavor)]:
-			if oldVer == version:
-			    troveCs.updateChangedTrove(name, flavor, oldVer, 
-                                                     newVer)
+            # throw away sigs and recompute the hash
+            newTrv.invalidateSignatures()
+            newTrv.computeSignatures()
+
+            self.delNewTrove(troveCs.getName(), troveCs.getNewVersion(),
+                             troveCs.getNewFlavor())
+            troveCs = newTrv.diff(oldTrv)[0]
+            self.newTrove(troveCs)
 
 	# this has to be true, I think...
 	self.local = 0
