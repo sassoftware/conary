@@ -1,3 +1,11 @@
+Changes in 0.93:
+  * Bug Fixes
+    * A bug in the "conary verify" code sometimes resulted in an
+      unhandled TroveIntegrity exception when local modifications were
+      made on the system. (bug #507)
+    * Usernames and passwords with RFC 2396 reserved characters (such
+      as '/') are now handled properly. (bug #587)
+
 Changes in 0.92:
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
@@ -27,8 +35,6 @@ Changes in 0.92:
     * Fixed a bug in the update code caused conary to behave
       incorrectly when updating groups.  Conary would install
       components of troves that were not installed.
-    * Verify could error out with invalid signatures when troves were
-      changed locally
 
   o General Bug Fixes
     * Conary did not include the trove sha1 in the troveinfo diff
