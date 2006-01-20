@@ -1,10 +1,15 @@
 Changes in 0.93:
-  * Bug Fixes
+  o Bug Fixes
     * A bug in the "conary verify" code sometimes resulted in an
       unhandled TroveIntegrity exception when local modifications were
       made on the system. (bug #507)
     * Usernames and passwords with RFC 2396 reserved characters (such
       as '/') are now handled properly. (bug #587)
+
+  o Server changes
+    * Standalone server reports warnings for unsupported confiration options
+      insead of exiting with a traceback
+    * Compatibility for repositoryDir has been removed
 
 Changes in 0.92:
   o Package Building Changes:

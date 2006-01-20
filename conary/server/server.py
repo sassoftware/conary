@@ -321,8 +321,6 @@ class ServerConfig(netserver.ServerConfig):
             print >> sys.stderr, "warning: commitAction config option is "
                                  "ignored by the standalone server"
 
-        assert(not self.repositoryDir)
-
 def usage():
     print "usage: %s" % sys.argv[0]
     print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]

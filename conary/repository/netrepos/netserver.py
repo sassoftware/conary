@@ -73,11 +73,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def __init__(self, cfg, basicUrl):
         logMe(1, cfg.items())
-        if cfg.repositoryDir:
-            log.warning('repositoryDir configuration value is deprecated; use "repositoryDB sqlite %s/sqldb" and "contentsDir %s/contents" instead' % (cfg.repositoryDir, cfg.repositoryDir))
-            cfg.repositoryDB = ("sqlite", "%s/sqldb" % cfg.repositoryDir)
-            cfg.contentsDir = ("%s/contents" % cfg.repositoryDir)
-
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
@@ -1722,8 +1717,6 @@ class ServerConfig(ConfigFile):
     contentsDir             = CfgPath
     forceSSL                = CfgBool
     logFile                 = CfgPath
-    # XXX this is for backwards compatibility
-    repositoryDir           = CfgString
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
