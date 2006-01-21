@@ -84,8 +84,6 @@ class NetworkAuthorization:
             return False
 
         if mirror:
-            import epdb
-            epdb.st()
             # admin access includes mirror access
             cu.execute("""
                 SELECT userGroupId FROM 
