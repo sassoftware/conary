@@ -244,6 +244,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             return True
 
+    def setUserGroupCanMirror(self, authToken, clientVersion, userGroup,
+                              canMirror):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise errors.InsufficientPermission
+
+        self.auth.setMirror(userGroup, canMirror)
+
+        return True
+
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):

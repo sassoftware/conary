@@ -387,6 +387,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteUserById(self, label, userId):
         self.c[label].deleteUserById(userId)
 
+    def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
+        self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
+
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
                capped, admin):
         if not label:
