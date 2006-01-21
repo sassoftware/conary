@@ -493,7 +493,7 @@ def main(argv=sys.argv):
 	return realMain(ccfg, argv)
     except errors.InternalConaryError, err:
         raise
-    except (errors.ConaryError, errors.CvcError, cfg.CfgError), err:
+    except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
         log.error(str(e))
         sys.exit(1)
     except KeyboardInterrupt, e:
