@@ -43,6 +43,8 @@ class OpenPGPKeyTable:
 
     def addNewKey(self, userId, pgpKeyData):
         # this ignore duplicate keys
+        cu = self.db.cursor()
+
         keyRing = StringIO.StringIO(pgpKeyData)
 
         # make sure it's a public key
