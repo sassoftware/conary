@@ -1838,7 +1838,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
 	for name in self.strongTroves.keys():
             l = []
-            for x in self.troves[name]:
+            for x in self.strongTroves[name]:
                 l.append(x[0] + x[1].asString())
                 if x[3] is None:
                     l[-1] += ' (None)'
