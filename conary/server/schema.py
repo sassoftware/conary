@@ -19,7 +19,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 12
+VERSION = 13
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -471,8 +471,8 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
-
-    db.createIndex("FileStreams", "FileStreamsIdx", "fileId")
+    db.createIndex("FileStreams", "FileStreamsFileIdx",
+                   "fileId", unique = True)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -1138,6 +1138,7 @@ class MigrateTo_11(SchemaMigration):
 
         return self.Version
 
+
 class MigrateTo_12(SchemaMigration):
     Version = 12
     def migrate(self):
@@ -1155,8 +1156,53 @@ class MigrateTo_12(SchemaMigration):
                 ph.addPath(path)
             cu2.execute("UPDATE TroveInfo SET data=? "
                         "WHERE instanceId=? and infotype=?",
-                        (ph.freeze(), instanceId, 
+                        (ph.freeze(), instanceId,
 			 trove._TROVEINFO_TAG_PATH_HASHES))
+        return self.Version
+
+class MigrateTo_13(SchemaMigration):
+    Version = 13
+    def migrate(self):
+        # fix the duplicate FileStreams.fileId fields
+        logMe(3, "Looking for duplicate fileId entries...")
+        # this takes a bit to execute, especially on sqlite
+        self.cu.execute("""
+        CREATE TEMPORARY TABLE origs AS
+            SELECT a.streamId AS streamId, a.fileId AS fileId
+            FROM FileStreams AS a JOIN FileStreams AS b
+            where a.fileId = b.fileId
+              and a.streamId < b.streamId
+              and a.fileId is not null
+              and a.stream != b.stream
+        """)
+        # all the duplicate fileIds that have a streamId not in the
+        # origs table are dupes
+        logMe(3, "Removing references to duplicate fileId entries...")
+        self.cu.execute("""
+        SELECT fs.streamId, fs.fileId
+        FROM FileStreams AS fs
+        JOIN origs AS o USING (fileId)
+        WHERE fs.streamId != o.streamId
+        """)
+        # the above select holds FileStreams locked, so we have to
+        # flush it with a fetchall()
+        for (streamId, fileId) in self.cu.fetchall():
+            # update the referential integrity on TroveFiles and dispose
+            # of the duplicate streamId entries from FileStreams
+            self.cu.execute("""
+            UPDATE TroveFiles SET streamId = (
+                SELECT streamId FROM origs
+                WHERE origs.fileId = ? )
+            WHERE TroveFiles.streamId = ?
+            """, (self.cu.binary(fileId), streamId))
+            self.cu.execute("""
+            DELETE FROM FileStreams where streamId = ?""",
+            (streamId,))
+        self.cu.execute("DROP TABLE origs")
+        # force the creation of the new unique index
+        logMe(3, "Recreating the fileId index...")
+        self.db.dropIndex("FileStreams", "FileStreamsIdx")
+        createTroves(self.db)
         return self.Version
 
 # sets up temporary tables for a brand new connection
@@ -1285,6 +1331,7 @@ def loadSchema(db):
     if version == 9: version = MigrateTo_10(db)()
     if version == 10: version = MigrateTo_11(db)()
     if version == 11: version = MigrateTo_12(db)()
+    if version == 12: version = MigrateTo_13(db)()
 
     if version:
         db.loadSchema()
@@ -1306,7 +1353,9 @@ def loadSchema(db):
 
     return True
 
-# schema creation/migration/maintenance entry point
+# this should only check for the proper schema version. This function
+# is called usually from the multithreaded setup, so schema operations
+# should be avoided here
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
