@@ -14,16 +14,9 @@
 from conary.errors import CvcError
 
 class RecipeFileError(CvcError):
-    def __init__(self, msg):
-        self.msg = msg
+    pass
 
-    def __repr__(self):
-	return self.msg
-
-    def __str__(self):
-	return repr(self)
-    
-class BuildError(RecipeFileError):
+class CookError(CvcError):
     pass
 
 class LoadRecipeError(RecipeFileError):
@@ -35,10 +28,7 @@ class RecipeDependencyError(RecipeFileError):
 class BadRecipeNameError(RecipeFileError):
     pass
 
-class GroupBuildError(RecipeFileError):
-    pass
-
-class GroupPathConflicts(GroupBuildError):
+class GroupPathConflicts(CookError):
     def __init__(self, conflicts):
         self.conflicts = conflicts
         errStrings = []
@@ -48,12 +38,12 @@ class GroupPathConflicts(GroupBuildError):
                 errStrings.append('The following %s troves have conflicting paths:' % (len(conflictSet),))
                 errStrings.extend('    %s=%s[%s]' % x for x in conflictSet)
             
-        self.msg = """
+        self.args = """
 The following troves in the following groups have conflicts:
 
 %s""" % ('\n'.join(errStrings))
 
-class GroupDependencyFailure(GroupBuildError):
+class GroupDependencyFailure(CookError):
     def __init__(self, groupName, failedDeps):
         lns = ["Dependency failure\n"]
         lns.append("Group %s has unresolved dependencies:" % groupName)
@@ -61,16 +51,16 @@ class GroupDependencyFailure(GroupBuildError):
             lns.append("\n" + name[0])
             lns.append('\n\t')
             lns.append("\n\t".join(str(depSet).split("\n")))
-        self.msg = ''.join(lns)
+        self.args = ''.join(lns)
 
 
-class GroupCyclesError(GroupBuildError):
+class GroupCyclesError(RecipeFileError):
     def __init__(self, cycles):
         lns = ['cycle in groups:']
         lns.extend(str(sorted(x)) for x in cycles)
-        self.msg = '\n  '.join(lns)
+        self.args = '\n  '.join(lns)
 
-class GroupAddAllError(GroupBuildError):
+class GroupAddAllError(CookError):
     def __init__(self, parentGroup, troveTup, groupTups ):
         groupNames = [ x[0] for x in groupTups ]
         repeatedGroups = sorted(set(x for x in groupNames \
@@ -82,4 +72,4 @@ class GroupAddAllError(GroupBuildError):
         lns.append('Multiple groups with the same name(s) %s' % repeatedGroups)
         lns.append('are included.')
             
-        self.msg = '\n  '.join(lns)
+        self.args = '\n  '.join(lns)
