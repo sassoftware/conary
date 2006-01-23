@@ -527,10 +527,10 @@ class PythonSetup(BuildCommand):
     }
 
     def do(self, macros):
-	if 'python-setuptools:runtime' not in self.recipe.buildRequires:
+	if 'python-setuptools:python' not in self.recipe.buildRequires:
             if not self.bootstrap:
                 self.recipe.reportErrors(
-                    "Must add 'python-setuptools:runtime' to buildRequires")
+                    "Must add 'python-setuptools:python' to buildRequires")
 	macros = macros.copy()
         if self.dir:
             rundir = action._expandOnePath(self.dir, macros)

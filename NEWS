@@ -14,6 +14,10 @@ Changes in 0.93:
   o Client changes
     * Compute sha1's for source checkins and local change set commits
 
+  o Build changes
+    * PythonSetup() now correctly requires python-setuptools:python
+      instead of python-setuptools:runtime
+
 Changes in 0.92:
   o Package Building Changes:
     * Conary policy has been split out into the conary-policy package.
