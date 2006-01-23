@@ -84,9 +84,14 @@ class NetworkAuthorization:
             return False
 
         if mirror:
-            cu.execute("select canMirror from usergroups where "
-                       "canMirror = 1 and userGroupId IN (%s)" %
-                        ",".join("%d" % x for x in groupIds))
+            # admin access includes mirror access
+            cu.execute("""
+                SELECT userGroupId FROM 
+                    UserGroups JOIN Permissions USING (userGroupId)
+                    WHERE
+                        userGroupId IN (%s) AND
+                        (canMirror =1 OR admin = 1)
+                """ % ",".join("%d" % x for x in groupIds))
             if not cu.fetchall():
                 return False
 
