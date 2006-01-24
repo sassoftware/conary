@@ -19,6 +19,9 @@ Changes in 0.93:
       instead of python-setuptools:runtime
     * Automatic python dependency provision now searches more directories
       to better support multilib python.
+    * Conary now defaults to building in ~/.conary/builds instead of
+      /var/tmp/conary/builds, and caching in ~/.conary/cache instead
+      of /var/cache/conary
 
 Changes in 0.92:
   o Package Building Changes:
