@@ -12,20 +12,21 @@ Changes in 0.93:
     * Compatibility for repositoryDir has been removed.
 
   o Client changes
-    * Compute sha1's for source checkins and local change set commits
-    * Flavor affinity is now more relaxed when updating troves.  If you
-      have a trove with flavor that requires sse2, for example, but your
-      system flavor is ~!sse2, conary will only _prefer_ troves with sse2
-      installed instead of requiring it.
+    * SHA1 checksums are now computed for source checkins and local
+      change set commits.
+    * Flavor affinity is now more relaxed when updating troves.  For
+      example, if you have a trove with flavor that requires sse2 but
+      your system flavor is ~!sse2, conary will only prefer troves
+      with sse2 enabled instead of requiring it.
 
   o Build changes
     * PythonSetup() now correctly requires python-setuptools:python
-      instead of python-setuptools:runtime
+      instead of python-setuptools:runtime.
     * Automatic python dependency provision now searches more directories
       to better support multilib python.
     * Conary now defaults to building in ~/.conary/builds instead of
       /var/tmp/conary/builds, and caching in ~/.conary/cache instead
-      of /var/cache/conary
+      of /var/cache/conary.
 
 Changes in 0.92:
   o Package Building Changes:
