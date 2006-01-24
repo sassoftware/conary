@@ -15,7 +15,7 @@ import copy
 from itertools import chain, izip
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
-from conary.build.errors import RecipeFileError, GroupPathConflicts
+from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
 from conary.build.errors import GroupAddAllError
 from conary.build import macros
@@ -607,7 +607,7 @@ def buildGroups(recipeObj, cfg, repos):
             groupsWithConflicts[group.name] = conflicts
 
         if group.isEmpty():
-            raise RecipeFileError('%s has no troves in it' % group.name)
+            raise CookError('%s has no troves in it' % group.name)
 
     if groupsWithConflicts:
         raise GroupPathConflicts(groupsWithConflicts)
@@ -644,7 +644,7 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath,
                                                      toFind[troveSource], 
                                                      searchFlavor)
         except errors.TroveNotFound, e:
-            raise RecipeFileError, str(e)
+            raise CookError, str(e)
 
     return results
     
@@ -899,7 +899,7 @@ def checkForRedirects(group, repos, troveCache):
         errmsg.extend([(' -> %s=%s[%s]' % (n, v.asString(),
                                            deps.formatFlavor(f))) 
                             for (n,v,f) in sorted(missingTargets[trv])])
-    raise RecipeFileError, ("""\
+    raise CookError, ("""\
 If you include a redirect in this group, you must also include the
 target of the redirect.
 

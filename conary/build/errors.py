@@ -54,7 +54,7 @@ class GroupDependencyFailure(CookError):
         self.args = ''.join(lns)
 
 
-class GroupCyclesError(RecipeFileError):
+class GroupCyclesError(CookError):
     def __init__(self, cycles):
         lns = ['cycle in groups:']
         lns.extend(str(sorted(x)) for x in cycles)
