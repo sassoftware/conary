@@ -17,6 +17,8 @@ Changes in 0.93:
   o Build changes
     * PythonSetup() now correctly requires python-setuptools:python
       instead of python-setuptools:runtime
+    * Automatic python dependency provision now searches more directories
+      to better support multilib python.
 
 Changes in 0.92:
   o Package Building Changes:
