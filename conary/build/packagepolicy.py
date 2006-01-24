@@ -1176,7 +1176,14 @@ class Provides(policy.Policy):
     def _addPythonProvides(self, path, m, pkg, macros):
 
         if self.sysPath is None:
-            self.sysPath = [x for x in sys.path if x and os.path.exists(x) ]
+            self.sysPath = [ x for x in sys.path if x and os.path.exists(x) ]
+            # python does not add directories that do not exist to
+            # sys.path, but architecture-specific directories might
+            # exist in destdir but not on the system; for example,
+            # x86_64 python might not have /usr/lib/python2.4/site-packages
+            # We therefore have to synthesize some more entries.
+            self.sysPath += [ x.replace('lib64', 'lib', 1) 
+                              for x in self.sysPath if 'lib64' in x ]
             # we will need to truncate paths using longest path first
             self.sysPath.sort(key=len, reverse=True)
 

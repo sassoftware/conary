@@ -19,6 +19,7 @@ import itertools
 import struct
 
 from conary import changelog
+from conary import errors
 from conary import files
 from conary import streams
 from conary import versions
@@ -1838,7 +1839,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
 	for name in self.strongTroves.keys():
             l = []
-            for x in self.troves[name]:
+            for x in self.strongTroves[name]:
                 l.append(x[0] + x[1].asString())
                 if x[3] is None:
                     l[-1] += ' (None)'
@@ -1907,7 +1908,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
 
-class TroveError(Exception):
+class TroveError(errors.ConaryError):
 
     """
     Ancestor for all exceptions raised by the trove module.

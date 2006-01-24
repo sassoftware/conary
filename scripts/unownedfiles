@@ -1,7 +1,7 @@
 #!/usr/bin/python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,13 +20,22 @@ import os
 import re
 import sys
 
-import conary
-import conarycfg
-from deps import deps
-from local import database
-from lib import util
-import versions
-import updatecmd
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg
+from conary.deps import deps
+from conary.local import database
+from conary.lib import util
+from conary import versions
+from conary import updatecmd
 
 def usage():
     print """\
