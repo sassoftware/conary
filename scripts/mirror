@@ -215,6 +215,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
     log.debug("building grouped job list")
     bundles = buildJobList(targetRepos, groupList)
 
+    bundles = bundles[0:2]
+
+    trovesCommitted = 0
+
     for i, bundle in enumerate(bundles):
         (outFd, tmpName) = util.mkstemp()
         os.close(outFd)
@@ -230,7 +234,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
+        
+        trovesCommitted += len(bundle)
+
         os.unlink(tmpName)
+
+    return trovesCommitted
 
 options = parseArgs()
 cfg = MirrorConfiguration()
@@ -249,4 +258,8 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-mirrorRepository(sourceRepos, targetRepos, cfg, options.test, options.sync)
+count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
+                         options.sync)
+while not options.test and count:
+    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
+                             options.sync)
