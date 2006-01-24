@@ -215,7 +215,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
     log.debug("building grouped job list")
     bundles = buildJobList(targetRepos, groupList)
 
-    bundles = bundles[0:2]
+    trovesCommitted = 0
+
+    if len(bundles) > 1:
+        # We cut off the last bundle if there is more than one and let the
+        # next pass through this function handle it. That makes sure that
+        # we don't half-commit a package when the server limits the number
+        # of responses getNewTroveList() will return
+        bundles = bundles[:-1]
 
     trovesCommitted = 0
 
@@ -235,9 +242,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
         
-        trovesCommitted += len(bundle)
-
         os.unlink(tmpName)
+        trovesCommitted += len(bundle)
 
     return trovesCommitted
 
