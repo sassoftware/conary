@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2005 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -13,11 +12,14 @@
 #
 
 from conary import trove, versions
+from conary.lib import util
 from conary.repository import errors
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
+
+import itertools
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
@@ -55,28 +57,6 @@ class RedirectRecipe(Recipe):
                                   targetFlavor, fromTrove))
 
     def findTroves(self):
-        def buildRedirects(name, version, sourceFlavor, destName, destBranch,
-                           destFlavor, trvCsDict):
-            # this only handles packages so it doesn't have to be particularly
-            # careful
-            # XXX this doesn't handle components which don't exist on
-            # the target
-            d = { (name, version, sourceFlavor) : 
-                        (destName, destBranch, destFlavor) }
-
-            trvCs = trvCsDict[(name, version, sourceFlavor)]
-            trv = trove.Trove(trvCs)
-            for (subName, subVersion, subFlavor) in \
-                                        trv.iterTroveList(strongRefs = True):
-                pkgName, compName = subName.split(":")
-                assert(pkgName == name)
-                assert(subVersion == version)
-                assert(subFlavor == sourceFlavor)
-                d[(subName, subVersion, subFlavor)] = \
-                        (destName + ':' + compName, destBranch, destFlavor)
-
-            return d
-
         self.size = 0
 
         validSize = True
@@ -113,15 +93,19 @@ class RedirectRecipe(Recipe):
         trvCsDict = {}
         # We don't need to recurse here since we only support package
         # redirects
-        cs = self.repos.createChangeSet(l, recurse = False, withFiles = False)
+        cs = self.repos.createChangeSet(l, recurse = True, withFiles = False)
         for trvCs in cs.iterNewTroveList():
-            info = (trvCs.getName(), trvCs.getNewVersion(), 
+            info = (trvCs.getName(), trvCs.getNewVersion(),
                     trvCs.getNewFlavor())
             trvCsDict[info] = trvCs
 
         redirMap = {}
 
-        for name, versionDict in sourceTroveMatches.iteritems():
+        names = sourceTroveMatches.keys()
+        additionalNameQueue = util.IterableQueue()
+        for name in itertools.chain(names, additionalNameQueue):
+            versionDict = sourceTroveMatches.pop(name)
+
             destSet = fromRule.get(name, None)
             if destSet is None and ':' in name:
                 # package redirections imply component redirections
@@ -137,6 +121,7 @@ class RedirectRecipe(Recipe):
 
             # XXX the repository operations should be pulled out of all of
             # these loops
+            additionalNames = set()
             for (destName, branchStr, sourceFlavorRestriction, 
                                       targetFlavorRestriction) in destSet:
                 if branchStr[0] == '/':
@@ -180,21 +165,38 @@ class RedirectRecipe(Recipe):
                                 break
 
                         if match is not None:
-                            redirMap.update(
-                                buildRedirects(name, version, sourceFlavor,
-                                               destName, match.branch(),
-                                               targetFlavorRestriction,
-                                               trvCsDict))
+                            # we can redirect this trove. go ahead and
+                            # setup the redirect for it, and add any troves
+                            # it references to the todo list
+                            trvCs = trvCsDict[(name, version, sourceFlavor)]
+                            trv = trove.Trove(trvCs)
+
+                            for info in trv.iterTroveList(strongRefs = True):
+                                assert(info[1] == version)
+                                assert(info[2] == sourceFlavor)
+                                l = fromRule.setdefault(info[0], [])
+                                l.append((info[0], match.branch().asString(),
+                                          sourceFlavorRestriction, 
+                                          targetFlavorRestriction))
+                                additionalNames.add(info[0])
+                                d = sourceTroveMatches.setdefault(info[0], {})
+                                flavorList = d.setdefault(info[1], [])
+                                flavorList.append(info[2])
+
+                            redirMap[(name, version, sourceFlavor)] = \
+                                (destName, match.branch(),
+                                 targetFlavorRestriction,
+                                 [ x for x in 
+                                    trv.iterTroveList(strongRefs = True) ] )
                         elif targetFlavorRestriction is not None:
                             raise builderrors.RecipeFileError, \
                                 "Trove %s does not exist for flavor %s" \
                                 % (name, targetFlavor)
 
-        allComps = self.repos.getCollectionMembers(self.name, self.branch)
-        for compName in allComps:
-            if compName in self.redirections: continue
-            self.redirections[compName] = set()
-            self.redirections[self.name].add((compName, None, None))
+            for name in additionalNames:
+                additionalNameQueue.add(name)
+
+        self.redirections = redirMap
 
     def getRedirections(self):
         return self.redirections
