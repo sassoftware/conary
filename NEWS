@@ -13,6 +13,10 @@ Changes in 0.93:
 
   o Client changes
     * Compute sha1's for source checkins and local change set commits
+    * Flavor affinity is now more relaxed when updating troves.  If you
+      have a trove with flavor that requires sse2, for example, but your
+      system flavor is ~!sse2, conary will only _prefer_ troves with sse2
+      installed instead of requiring it.
 
   o Build changes
     * PythonSetup() now correctly requires python-setuptools:python

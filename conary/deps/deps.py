@@ -42,7 +42,9 @@ FLAG_SENSE_DISALLOWED   = 4
 
 DEP_MERGE_TYPE_NORMAL         = 1    # conflicts are reported
 DEP_MERGE_TYPE_OVERRIDE       = 2    # new data wins
-DEP_MERGE_TYPE_PREFS          = 3    # like override, but !ssl beats out ~!ssl
+DEP_MERGE_TYPE_PREFS          = 3    # like override, but a new !ssl loses
+                                     # to an old ~!ssl and a new ~!ssl 
+                                     # loses to an old !ssl
 DEP_MERGE_TYPE_DROP_CONFLICTS = 4    # conflicting flags are removed 
 
 senseMap = { FLAG_SENSE_REQUIRED   : "",
@@ -54,6 +56,12 @@ toStrongMap = { FLAG_SENSE_REQUIRED    : FLAG_SENSE_REQUIRED,
                 FLAG_SENSE_PREFERRED   : FLAG_SENSE_REQUIRED,
                 FLAG_SENSE_PREFERNOT   : FLAG_SENSE_DISALLOWED,
                 FLAG_SENSE_DISALLOWED  : FLAG_SENSE_DISALLOWED }
+
+toWeakMap = {   FLAG_SENSE_REQUIRED    : FLAG_SENSE_PREFERRED,
+                FLAG_SENSE_PREFERRED   : FLAG_SENSE_PREFERRED,
+                FLAG_SENSE_PREFERNOT   : FLAG_SENSE_PREFERNOT,
+                FLAG_SENSE_DISALLOWED  : FLAG_SENSE_PREFERNOT }
+strongSenses = set((FLAG_SENSE_REQUIRED, FLAG_SENSE_DISALLOWED))
 
 senseReverseMap = {}
 for key, val in senseMap.iteritems():
@@ -227,6 +235,11 @@ class Dependency(BaseDependency):
         """
 
         diffFlags = self.flags.copy()
+        if not strict:
+            unseenFlags = set(self.flags.iterkeys())
+        else:
+            unseenFlags = set()
+
         for flag, sense in other.flags.iteritems():
             if flag in diffFlags:
                 if strict:
@@ -234,6 +247,11 @@ class Dependency(BaseDependency):
                         del diffFlags[flag]
                 elif toStrongMap[sense] == toStrongMap[diffFlags[flag]]:
                     del diffFlags[flag]
+                unseenFlags.discard(flag)
+        for flag in unseenFlags:
+            if diffFlags[flag] in (FLAG_SENSE_PREFERNOT, FLAG_SENSE_DISALLOWED,
+                                   FLAG_SENSE_PREFERRED):
+                del diffFlags[flag]
         if not diffFlags:
             return None
         else:
@@ -247,20 +265,12 @@ class Dependency(BaseDependency):
 	Returns a new Dependency which merges the flags from the two
 	existing dependencies. We don't want to merge in place as this
 	Dependency could be shared between many objects (via a 
-	DependencyGroup).  Always pick an strong flavor over a weak one:
-        e.g. when merging a set of flags with a ~foo and !foo, 
-        make the merged flavor !foo.  
+	DependencyGroup).  
 	"""
 	allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
-            if mergeType == DEP_MERGE_TYPE_PREFS and allFlags.has_key(flag) \
-                    and otherSense == FLAG_SENSE_PREFERNOT \
-                    and allFlags[flag] == FLAG_SENSE_DISALLOWED:
-                allFlags[flag] = FLAG_SENSE_DISALLOWED
-                continue
-            elif mergeType == DEP_MERGE_TYPE_OVERRIDE or \
-                 mergeType == DEP_MERGE_TYPE_PREFS    or \
-                        not allFlags.has_key(flag):
+            if (mergeType == DEP_MERGE_TYPE_OVERRIDE
+                    or not allFlags.has_key(flag)):
                 allFlags[flag] = otherSense
                 continue
 
@@ -270,28 +280,32 @@ class Dependency(BaseDependency):
                 # same flag, same sense
                 continue
 
-            if ((thisSense == FLAG_SENSE_REQUIRED and 
-                        otherSense == FLAG_SENSE_DISALLOWED) or
-                (thisSense == FLAG_SENSE_DISALLOWED and
-                        otherSense == FLAG_SENSE_REQUIRED)   or
-                (thisSense == FLAG_SENSE_PREFERRED and 
-                        otherSense == FLAG_SENSE_PREFERNOT) or
-                (thisSense == FLAG_SENSE_PREFERNOT and
-                        otherSense == FLAG_SENSE_PREFERRED)):
+            thisStrong = thisSense in strongSenses
+            otherStrong = otherSense in strongSenses
+
+            if thisStrong == otherStrong:
                 if mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS:
                     del allFlags[flag]
+                    continue
+                elif mergeType == DEP_MERGE_TYPE_PREFS:
+                    # in cases where there's a conflict, new wins
+                    allFlags[flag] = otherSense
                     continue
                 thisFlag = "%s%s" % (senseMap[thisSense], flag)
                 otherFlag = "%s%s" % (senseMap[otherSense], flag)
                 raise RuntimeError, ("Invalid flag combination in merge:"
                                      " %s and %s"  % (thisFlag, otherFlag))
 
-            # know they aren't the same, and they are compatible
-            if thisSense == FLAG_SENSE_REQUIRED or \
-                    thisSense == FLAG_SENSE_DISALLOWED:
+            if mergeType == DEP_MERGE_TYPE_PREFS:
+                if thisStrong and toStrongMap[otherSense] == thisSense:
+                    continue
+                allFlags[flag] = toWeakMap[otherSense]
                 continue
-            elif otherSense == FLAG_SENSE_REQUIRED or \
-                    otherSense == FLAG_SENSE_DISALLOWED:
+
+            # know they aren't the same, and they are compatible
+            elif thisStrong:
+                continue
+            elif otherStrong:
                 allFlags[flag] = otherSense
                 continue
 
