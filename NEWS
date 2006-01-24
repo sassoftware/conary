@@ -10,6 +10,8 @@ Changes in 0.93:
     * Standalone server reports warnings for unsupported configuration options
       instead of exiting with a traceback.
     * Compatibility for repositoryDir has been removed.
+    * Queries for multiple flavors of the same trove could return incorrect
+      results
 
   o Client changes
     * SHA1 checksums are now computed for source checkins and local
