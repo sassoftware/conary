@@ -1678,6 +1678,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         Instances.isPresent = 1
                     ORDER BY
                         Instances.changed
+                    LIMIT
+                        1000
                     """ % ",".join("%d" % x for x in userGroupIds)
 
         cu.execute(query, mark)
