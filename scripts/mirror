@@ -15,6 +15,7 @@
 #
 #
 
+import itertools
 import os
 import sys
 
@@ -41,7 +42,6 @@ class MirrorConfigurationSection(cfg.ConfigSection):
 
 class MirrorConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
-    threshHold            =  [ cfg.CfgInt, 20 ]
     entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
     labels                =  conarycfg.CfgInstallLabelPath
     source                =  MirrorConfigurationSection
@@ -76,7 +76,7 @@ def parseArgs():
 
     return options
 
-def buildJobList(repos, troveList):
+def filterAlreadyPresent(repos, troveList):
     # Filter out troves which are already in the local repository. Since
     # the marks aren't distinct (they increase, but not monotonially), it's 
     # possible that something new got committed with the same mark we
@@ -85,82 +85,102 @@ def buildJobList(repos, troveList):
     present = repos.hasTroves([ x[1] for x in troveList ])
     filteredList = [ x for x in troveList if not present[x[1]] ]
 
+    return filteredList
+
+def groupTroves(troveList):
+    # combine the troves into indisolvable groups based on their version and
+    # flavor; it's assumed that adjacent troves with the same version/flavor 
+    # must be in a single commit
+    grouping = []
+    currentGroup = []
+    for info in troveList:
+        troveInfo = info[1]
+        if not currentGroup:
+            currentGroup.append(info)
+        elif troveInfo[1:] == currentGroup[0][1][1:]:
+            currentGroup.append(info)
+        else:
+            grouping.append(currentGroup)
+            currentGroup = [ info ]
+
+    return grouping
+
+def buildJobList(repos, groupList):
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
     # absolute ones. 
     q = {}
-    for mark, (name, version, flavor) in filteredList:
-        d = q.setdefault(name, {})
-        l = d.setdefault(version.branch(), [])
-        l.append(flavor)
+    for group in groupList:
+        for mark, (name, version, flavor) in group:
+            d = q.setdefault(name, {})
+            l = d.setdefault(version.branch(), [])
+            l.append(flavor)
 
     latestAvailable = repos.getTroveLeavesByBranch(q)
 
     # we'll keep latestAvailable in sync with what the target will look like
     # as the mirror progresses
     jobList = []
-    for mark, (name, version, flavor) in filteredList:
-        if name not in latestAvailable:
-            job = (name, (None, None), (version, flavor), True)
-            currentMatch = (None, None, None, None)
-        else:
-            d = latestAvailable[name]
-            verFlvMap = set()
-            # name, version, versionDistance, flavorScore
-            currentMatch = (None, None, None, None)
-            for repVersion, flavorList in d.iteritems():
-                for repFlavor in flavorList:
-                    score = flavor.score(repFlavor)
-                    if repVersion == version:
-                        closeness = 100000
-                    else:
-                        closeness = version.closeness(repVersion)
+    for group in groupList:
+        groupJobList = []
+        # for each job find what it's relative to and build up groupJobList
+        # as the job list for this group
+        for mark, (name, version, flavor) in group:
+            if name not in latestAvailable:
+                job = (name, (None, None), (version, flavor), True)
+                currentMatch = (None, None, None, None)
+            else:
+                d = latestAvailable[name]
+                verFlvMap = set()
+                # name, version, versionDistance, flavorScore
+                currentMatch = (None, None, None, None)
+                for repVersion, flavorList in d.iteritems():
+                    for repFlavor in flavorList:
+                        score = flavor.score(repFlavor)
+                        if repVersion == version:
+                            closeness = 100000
+                        else:
+                            closeness = version.closeness(repVersion)
 
-                    if score is False: continue
-                    if score < currentMatch[3]: 
-                        continue
-                    elif score > currentMatch[3]:
-                        currentMatch = (repVersion, repFlavor, closeness, score)
-                    elif closeness < currentMatch[2]:
-                        continue
-                    else:
-                        currentMatch = (repVersion, repFlavor, closeness, score)
+                        if score is False: continue
+                        if score < currentMatch[3]: 
+                            continue
+                        elif score > currentMatch[3]:
+                            currentMatch = (repVersion, repFlavor, closeness, 
+                                            score)
+                        elif closeness < currentMatch[2]:
+                            continue
+                        else:
+                            currentMatch = (repVersion, repFlavor, closeness, 
+                                            score)
 
-            job = (name, (currentMatch[0], currentMatch[1]),
-                          (version, flavor), currentMatch[0] is None)
+                job = (name, (currentMatch[0], currentMatch[1]),
+                              (version, flavor), currentMatch[0] is None)
 
-        jobList.append((mark, job))
+            groupJobList.append((mark, job))
 
-        d = latestAvailable.setdefault(name, {})
-        if currentMatch[0] is not None:
-            d[currentMatch[0]].remove(currentMatch[1])
-            if not d[currentMatch[0]]: del d[currentMatch[0]]
+        # now iterate through groupJobList and update latestAvailable to
+        # reflect the state of the mirror after this job completes
+        for mark, job in groupJobList:
+            name = job[0]
+            oldVersion, oldFlavor = job[1]
+            newVersion, newFlavor = job[2]
 
-        flavorList = d.setdefault(job[2][0], [])
-        flavorList.append(job[2][1])
+            d = latestAvailable.setdefault(name, {})
+
+            if oldVersion in d and oldVersion.branch() == newVersion.branch():
+                # If the old version is on the same branch as the new one,
+                # replace the old with the new. If it's on a different
+                # branch, we'll track both.
+                d[oldVersion].remove(oldFlavor)
+                if not d[oldVersion]: del d[oldVersion]
+
+            flavorList = d.setdefault(newVersion, [])
+            flavorList.append(newFlavor)
+
+        jobList.append(groupJobList)
 
     return jobList
-
-def bundleJobs(jobList, count):
-    bundles = []
-    bundle = []
-    namesInBundle = set()
-
-    for mark, job in jobList:
-        if len(bundle) >= count or job[0] in namesInBundle:
-            # break the bundle here because it's getting too large or this
-            # job is relative to something else in the bundle
-            bundles.append(bundle)
-            bundle = []
-            namesInBundle = set()
-        
-        namesInBundle.add(job[0])
-        bundle.append((mark, job))
-
-    if bundle:
-        bundles.append(bundle)
-
-    return bundles
 
 def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
     if sync:
@@ -188,10 +208,16 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
                             x[1][1].branch().label() in cfg.labels ]
         log.debug("after label filtering %d troves are needed", len(troveList))
 
-    log.debug("building job list")
-    jobList = buildJobList(targetRepos, troveList)
-    log.debug("building job bundles")
-    bundles = bundleJobs(jobList, cfg.threshHold)
+    log.debug("filtering troves already present on the mirror")
+    troveList = filterAlreadyPresent(targetRepos, troveList)
+    log.debug("grouping %d troves based on version and flavor", len(troveList))
+    groupList = groupTroves(troveList)
+    log.debug("building grouped job list")
+    bundles = buildJobList(targetRepos, groupList)
+
+    bundles = bundles[0:2]
+
+    trovesCommitted = 0
 
     for i, bundle in enumerate(bundles):
         (outFd, tmpName) = util.mkstemp()
@@ -208,7 +234,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
+        
+        trovesCommitted += len(bundle)
+
         os.unlink(tmpName)
+
+    return trovesCommitted
 
 options = parseArgs()
 cfg = MirrorConfiguration()
@@ -227,4 +258,8 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-mirrorRepository(sourceRepos, targetRepos, cfg, options.test, options.sync)
+count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
+                         options.sync)
+while not options.test and count:
+    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
+                             options.sync)
