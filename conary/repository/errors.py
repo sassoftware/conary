@@ -23,9 +23,10 @@ class InsufficientPermission(ConaryError):
     def __init__(self, server = None):
         self.server = server
         if server:
-            self.msg = ("Insufficient permission to access server %s" % self.server)
+            msg = ("Insufficient permission to access server %s" % self.server)
         else:
-            self.msg = "Insufficient permission"
+            msg = "Insufficient permission"
+        ConaryError.__init__(self, msg)
 
 class IntegrityError(RepositoryError, InternalConaryError):
     """Files were added which didn't match the expected sha1"""

@@ -414,6 +414,9 @@ class DependencyClass(object):
 	self.members[grpDep.name] = grpDep
 	assert(not self.justOne or len(self.members) == 1)
 
+    def hasDep(self, name):
+        return name in self.members
+
     def score(self, requirements):
 	if self.tag != requirements.tag:
 	    return False

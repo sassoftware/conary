@@ -433,20 +433,14 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                             cfg.buildFlavor, macros)
 
-    try:
-        use.track(True)
-        _callSetup(cfg, recipeObj)
-	use.track(False)
-    except builderrors.RecipeFileError, msg:
-	raise CookError(str(msg))
+    use.track(True)
+    _callSetup(cfg, recipeObj)
+    use.track(False)
 
     grpFlavor = deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
-    try:
-        grouprecipe.buildGroups(recipeObj, cfg, repos)
-    except builderrors.RecipeFileError, msg:
-	raise CookError(str(msg))
+    grouprecipe.buildGroups(recipeObj, cfg, repos)
 
     for group in recipeObj.iterGroupList():
         for (name, ver, flavor) in group.iterTroveList():
