@@ -346,10 +346,10 @@ def realMain(cfg, argv=sys.argv):
 	log.setVerbosity(log.INFO)
 
         if not os.getuid():
+            # if we're running as root, switch to the emergeUser
             cookUser = cfg.emergeUser
             if not cookUser:
-                log.error('Please set emergeUser config '
-                          'item before emerging')
+                log.error('Please set emergeUser config item before emerging')
                 return 1
             try:
                 info = pwd.getpwnam(cookUser)
@@ -357,7 +357,23 @@ def realMain(cfg, argv=sys.argv):
                 log.error("No user named '%s' to emerge with.  Please check "
                           "the 'emergeUser' config item." % cookUser)
                 return 1
+            if info.pw_dir == '/':
+                log.error("The '%s' user's home directory is set to '/'.  "
+                          "See http://wiki.conary.com/ConaryConversion for "
+                          "assistance."
+                          % cookUser)
+                return 1
+            if info.pw_uid == 0 or info.pw_gid == 0:
+                log.error("The '%s' user has root privileges." % cookUser)
+                return 1
             cookIds = (info.pw_uid, info.pw_gid)
+            # reset the HOME environment variable, and reinterpolate
+            # any buildPath/lookaside configuration variables so that
+            # the correct home directory will be used.
+            os.environ['HOME'] = info.pw_dir
+            for cfgvar in ('buildPath', 'lookaside'):
+                unexpanded = cfg[cfgvar]._getUnexpanded()
+                cfg.configLine('%s %s' %(cfgvar, unexpanded))
         else:
             cookIds = None
 

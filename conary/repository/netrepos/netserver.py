@@ -168,12 +168,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			self.fromVersion(e.version)))
         elif isinstance(e, errors.FileContentsNotFound):
             return (False, True, ('FileContentsNotFound',
-                           self.fromFileId(e.val[0]),
-                           self.fromVersion(e.val[1])))
+                           self.fromFileId(e.args[0]),
+                           self.fromVersion(e.args[1])))
         elif isinstance(e, errors.FileStreamNotFound):
             return (False, True, ('FileStreamNotFound',
-                           self.fromFileId(e.val[0]),
-                           self.fromVersion(e.val[1])))
+                           self.fromFileId(e.args[0]),
+                           self.fromVersion(e.args[1])))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
 	else:
@@ -607,7 +607,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
-        allowed = {}
+        allowed = set()
 
         troveNames = []
         troveVersions = {}
@@ -624,13 +624,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 flavorScore = 0
 
             #logMe(3, troveName, versionStr, flavor, flavorScore, finalTimestamp)
-            if allowed.has_key((troveName, versionStr, flavor)):
+            if (troveName, versionStr, flavor, localFlavorId) in allowed:
                 continue
 
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
 
-            allowed[(troveName, versionStr, flavor)] = True
+            allowed.add((troveName, versionStr, flavor, localFlavorId))
 
             # FIXME: since troveNames is no longer traveling through
             # here, this withVersions check has become superfluous.

@@ -139,10 +139,14 @@ def get(port, isSecure, repos, req):
         for (path, size) in items:
             if path.endswith('.ccs-out'):
                 cs = FileContainer(open(path))
-                cs.dump(req.write,
-                        lambda name, tag, size, f, sizeCb:
-                            _writeNestedFile(req, name, tag, size, f,
-                                             sizeCb))
+                try:
+                    cs.dump(req.write,
+                            lambda name, tag, size, f, sizeCb:
+                                _writeNestedFile(req, name, tag, size, f,
+                                                 sizeCb))
+                except IOError:
+                    # ignore errors writing to the client
+                    pass
 
                 del cs
             else:

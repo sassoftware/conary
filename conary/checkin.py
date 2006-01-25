@@ -107,14 +107,24 @@ def checkout(repos, cfg, workDir, name, callback=None):
     if flavor:
         log.error('source troves do not have flavors')
         return
-        
-    sourceName = name + ":source"
+
+    if not name.endswith(':source'):
+        sourceName = name + ":source"
+    else:
+        sourceName = name
+
+    if not versionStr and not cfg.buildLabel:
+        raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
+
     try:
         trvList = repos.findTrove(cfg.buildLabel, 
                                   (sourceName, versionStr, None))
     except errors.TroveNotFound, e:
-        log.error(str(e))
-        return
+        if not cfg.buildLabel:
+            raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
+        else:
+            raise
+
     if len(trvList) > 1:
         trvList.sort()
 

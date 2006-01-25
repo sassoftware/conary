@@ -201,7 +201,7 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '~/.conary/arch'))
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
-    buildPath             =  '~/.conary/builds'
+    buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
@@ -218,7 +218,7 @@ class ConaryConfiguration(SectionedConfigFile):
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',
                                             '~/.conary/log',))
-    lookaside             =  (CfgPath, '~/.conary/cache')
+    lookaside             =  (CfgPath, '~/conary/cache')
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList

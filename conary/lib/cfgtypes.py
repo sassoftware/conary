@@ -105,18 +105,38 @@ class CfgType:
 class CfgString(CfgType):
     pass
 
+class Path(str):
+    def __new__(cls, origString):
+        string = os.path.expanduser(os.path.expandvars(origString))
+        return str.__new__(cls, string)
+        
+    def __init__(self, origString):
+        self.__origString = origString
+
+    def _getUnexpanded(self):
+        return self.__origString
+
+    def __repr__(self):
+        return "<Path '%s'>" % self
+
 class CfgPath(CfgType):
     """ 
         String configuration option that accepts ~ as a substitute for $HOME
     """
 
     def parseString(self, str):
-        return os.path.expanduser(os.path.expandvars(str))
+        return Path(str)
 
     def getDefault(self, default=None):
         val = CfgType.getDefault(self, default)
         if val:
-            return os.path.expanduser(os.path.expandvars(val))
+            return Path(val)
+        else:
+            return val
+
+    def format(self, val, displayOptions=None):
+        if hasattr(val, '_getUnexpanded'):
+            return val._getUnexpanded()
         else:
             return val
 
