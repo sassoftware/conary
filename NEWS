@@ -12,6 +12,7 @@ Changes in 0.93:
     * Compatibility for repositoryDir has been removed.
     * Queries for multiple flavors of the same trove could return incorrect
       results
+    * Apache hooks ignore ioerrors when writing changesets to the client
 
   o Client changes
     * SHA1 checksums are now computed for source checkins and local
