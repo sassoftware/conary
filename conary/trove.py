@@ -76,6 +76,76 @@ class TroveTupleList(streams.StreamCollection):
     def iter(self):
         return ( x[1] for x in self.iterAll() )
 
+class OptionalFlavorStream(streams.DependenciesStream):
+
+    def freeze(self, skipSet = None):
+        if self.deps is None:
+            return '\0'
+
+        return streams.DependenciesStream.freeze(self)
+
+    def thaw(self, s):
+        if s == '\0':
+            self.deps = None
+        else:
+            streams.DependenciesStream.thaw(self, s)
+
+    def diff(self, other, skipSet = None):
+        if self.deps is None and other.deps is None:
+            return ''
+        elif self.deps is None:
+            return '\0';
+
+        return streams.DependenciesStream.diff(self, other)
+
+    def set(self, val):
+        # None is okay
+        self.deps = val
+
+class SingleTroveRedirect(streams.StreamSet):
+    _SINGLE_REDIRECT_NAME   = 1
+    _SINGLE_REDIRECT_BRANCH = 2
+    _SINGLE_REDIRECT_FLAVOR = 3
+
+    ignoreUnknown = True
+    streamDict = {
+        _SINGLE_REDIRECT_NAME   : 
+                (SMALL, streams.StringStream,        'name'    ),
+        _SINGLE_REDIRECT_BRANCH : 
+                (SMALL, streams.StringVersionStream, 'version' ),
+        _SINGLE_REDIRECT_FLAVOR : 
+                (SMALL, OptionalFlavorStream,        'flavor'  )
+    }
+
+    def __cmp__(self, other):
+        first = self.name()
+        second = other.name()
+
+        if first == second:
+            first = self.freeze()
+            second = other.freeze()
+
+        return cmp(first, second)
+
+    def __hash__(self):
+        return hash((self.name(), self.version(), self.flavor()))
+
+class TroveRedirectList(streams.StreamCollection):
+    streamDict = { 1 : SingleTroveRedirect }
+
+    def add(self, name, version, flavor):
+        dep = SingleTroveRedirect()
+        dep.name.set(name)
+        dep.version.set(version)
+        dep.flavor.set(flavor)
+        self.addStream(1, dep)
+
+    def remove(self, tup):
+        self.delStream(1, tup)
+
+    def iter(self):
+        return ( x[1] for x in self.iterAll() )
+
 class LabelPath(streams.OrderedStringsStream):
     pass
 
@@ -396,9 +466,10 @@ _STREAM_TRV_PROVIDES        = 5
 _STREAM_TRV_REQUIRES        = 6
 _STREAM_TRV_STRONG_TROVES   = 7
 _STREAM_TRV_FILES           = 8
-_STREAM_TRV_REDIRECT        = 9
+_STREAM_TRV_FLAGS           = 9
 _STREAM_TRV_SIGS            = 10
 _STREAM_TRV_WEAK_TROVES     = 11
+_STREAM_TRV_REDIRECTS       = 12
 
 class Trove(streams.StreamSet):
     """
@@ -435,8 +506,10 @@ class Trove(streams.StreamSet):
                     (LARGE, TroveRefsTrovesStream,       "weakTroves"   ), 
         _STREAM_TRV_FILES         : 
                     (LARGE, TroveRefsFilesStream,        "idMap"        ), 
-        _STREAM_TRV_REDIRECT      : 
+        _STREAM_TRV_FLAGS         :
                     (SMALL, ByteStream,                  "redirect"     ),
+        _STREAM_TRV_REDIRECTS     :
+                    (SMALL, TroveRedirectList,           "redirects"    ),
     }
     ignoreUnknown = False
 
@@ -445,7 +518,7 @@ class Trove(streams.StreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
-                  "idMap", "redirect" ]
+                  "idMap", "redirect", "redirects" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -767,6 +840,9 @@ class Trove(streams.StreamSet):
             rc = self.weakTroves[key]
 
         return rc
+
+    def addRedirect(self, toName, toVersion, toFlavor):
+        self.redirects.add(toName, toVersion, toFlavor)
 
     def compatibleWith(self, other):
         return self.troveInfo.pathHashes.compatibleWith(
@@ -1091,6 +1167,7 @@ class Trove(streams.StreamSet):
 	# on the client
         chgSet.setRequires(self.requires())
         chgSet.setProvides(self.provides())
+        chgSet.setRedirects(self.redirects)
 
 	removedIds = []
 	addedIds = []
@@ -1616,6 +1693,7 @@ _STREAM_TCS_TROVEINFO               = 14
 _STREAM_TCS_OLD_SIGS                = 15
 _STREAM_TCS_NEW_SIGS                = 16
 _STREAM_TCS_WEAK_TROVE_CHANGES      = 17
+_STREAM_TCS_REDIRECTS               = 18
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -1643,6 +1721,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_TROVEINFO   : (LARGE, streams.StringStream, "troveInfoDiff"),
         _STREAM_TCS_OLD_SIGS    : (LARGE, TroveSignatures,      "oldSigs"    ),
         _STREAM_TCS_NEW_SIGS    : (LARGE, TroveSignatures,      "newSigs"    ),
+        _STREAM_TCS_REDIRECTS   : (LARGE, TroveRedirectList,    "redirects"  ),
     }
 
     ignoreUnknown = True
@@ -1857,6 +1936,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getIsRedirect(self):
         return self.isRedirect()
+
+    def setRedirects(self, redirs):
+        self.redirects = redirs.copy()
 
     def getProvides(self):
         return self.provides()

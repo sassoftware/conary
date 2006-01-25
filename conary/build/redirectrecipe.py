@@ -183,7 +183,8 @@ class RedirectRecipe(Recipe):
                                 flavorList = d.setdefault(info[1], [])
                                 flavorList.append(info[2])
 
-                            redirMap[(name, version, sourceFlavor)] = \
+                            assert((name, sourceFlavor) not in redirMap)
+                            redirMap[(name, sourceFlavor)] = \
                                 (destName, match.branch(),
                                  targetFlavorRestriction,
                                  [ x for x in 
