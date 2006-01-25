@@ -187,7 +187,7 @@ class RedirectRecipe(Recipe):
                             redirMap[(name, sourceFlavor)] = \
                                 (destName, match.branch(),
                                  targetFlavorRestriction,
-                                 [ x for x in 
+                                 [ x[0] for x in 
                                     trv.iterTroveList(strongRefs = True) ] )
                         elif targetFlavorRestriction is not None:
                             raise builderrors.RecipeFileError, \

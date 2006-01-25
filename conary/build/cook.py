@@ -363,15 +363,22 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
     built = []
 
-    redirectTroves = []
     flavors = set()
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
                                  subTroveList) in redirects.iteritems():
-        redir = trove.Trove(fromName, versions.NewVersion(), fromFlavor, 
+        flavors.add(fromFlavor)
+
+    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
+                                flavors, targetLabel, 
+                                alwaysBumpCount=alwaysBumpCount)
+
+    for (fromName, fromFlavor), (toName, toBranch, toFlavor,
+                                 subTroveList) in redirects.iteritems():
+        redir = trove.Trove(fromName, targetVersion, fromFlavor, 
                             None, isRedirect = True)
 
-        for info in subTroveList:
-            redir.addTrove(*info)
+        for subName in subTroveList:
+            redir.addTrove(subName, targetVersion, fromFlavor)
 
         redir.addRedirect(toName, toBranch, toFlavor)
 
@@ -380,15 +387,6 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         redir.setConaryVersion(constants.version)
         redir.setIsCollection(False)
 
-        flavors.add(fromFlavor)
-        redirectTroves.append(redir)
-
-    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
-                                flavors, targetLabel, 
-                                alwaysBumpCount=alwaysBumpCount)
-
-    for redir in redirectTroves:
-        redir.changeVersion(targetVersion)
         trvDiff = redir.diff(None, absolute = 1)[0]
         changeSet.newTrove(trvDiff)
         built.append((redir.getName(), redir.getVersion().asString(), 
