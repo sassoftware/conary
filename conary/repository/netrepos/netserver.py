@@ -168,12 +168,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			self.fromVersion(e.version)))
         elif isinstance(e, errors.FileContentsNotFound):
             return (False, True, ('FileContentsNotFound',
-                           self.fromFileId(e.args[0]),
-                           self.fromVersion(e.args[1])))
+                           self.fromFileId(e.args[0][0]),
+                           self.fromVersion(e.args[0][1])))
         elif isinstance(e, errors.FileStreamNotFound):
             return (False, True, ('FileStreamNotFound',
-                           self.fromFileId(e.args[0]),
-                           self.fromVersion(e.args[1])))
+                           self.fromFileId(e.args[0][0]),
+                           self.fromVersion(e.args[0][1])))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
 	else:
