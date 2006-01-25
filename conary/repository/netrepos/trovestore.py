@@ -445,6 +445,46 @@ class TroveStore:
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
+        # now add the redirects
+        cu.execute("DELETE FROM NewRedirects")
+        for (name, branch, flavor) in trv.iterRedirects():
+            cu.execute("INSERT INTO NewRedirects (item, branch, flavor) "
+                       "VALUES (?, ?, ?)", name, str(branch), str(flavor))
+
+        cu.execute("""
+                INSERT INTO Items (item)
+                    SELECT NewRedirects.item FROM
+                        NewRedirects LEFT OUTER JOIN Items USING (item)
+                        WHERE Items.itemId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO Branches (branch)
+                    SELECT NewRedirects.branch FROM
+                        NewRedirects LEFT OUTER JOIN Branches USING (branch)
+                        WHERE Branches.branchId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO Flavors (flavor)
+                    SELECT NewRedirects.flavor FROM
+                        NewRedirects LEFT OUTER JOIN Flavors USING (flavor)
+                        WHERE 
+                            Flavors.flavor is not NULL 
+                            AND Flavors.flavorId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO TroveRedirects 
+                    (instanceId, itemId, branchId, flavorId)
+                    SELECT ?, itemId, branchId, flavorId FROM
+                        NewRedirects JOIN Items USING (item)
+                        JOIN Branches ON
+                            NewRedirects.branch = Branches.branch
+                        LEFT OUTER JOIN Flavors ON
+                            NewRedirects.flavor = Flavors.flavor
+        """, troveInstanceId)
+
 	del self.fileVersionCache
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,

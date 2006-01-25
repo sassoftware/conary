@@ -112,7 +112,7 @@ class SingleTroveRedirect(streams.StreamSet):
         _SINGLE_REDIRECT_NAME   : 
                 (SMALL, streams.StringStream,        'name'    ),
         _SINGLE_REDIRECT_BRANCH : 
-                (SMALL, streams.StringVersionStream, 'version' ),
+                (SMALL, streams.StringVersionStream, 'branch' ),
         _SINGLE_REDIRECT_FLAVOR : 
                 (SMALL, OptionalFlavorStream,        'flavor'  )
     }
@@ -128,20 +128,26 @@ class SingleTroveRedirect(streams.StreamSet):
         return cmp(first, second)
 
     def __hash__(self):
-        return hash((self.name(), self.version(), self.flavor()))
+        return hash((self.name(), self.branch(), self.flavor()))
 
 class TroveRedirectList(streams.StreamCollection):
     streamDict = { 1 : SingleTroveRedirect }
 
-    def add(self, name, version, flavor):
+    def add(self, name, branch, flavor):
         dep = SingleTroveRedirect()
         dep.name.set(name)
-        dep.version.set(version)
+        dep.branch.set(branch)
         dep.flavor.set(flavor)
         self.addStream(1, dep)
 
+    def addRedirectObject(self, o):
+        self.addStream(1, o)
+
     def remove(self, tup):
         self.delStream(1, tup)
+
+    def reset(self):
+        self.thaw("")
 
     def iter(self):
         return ( x[1] for x in self.iterAll() )
@@ -844,6 +850,10 @@ class Trove(streams.StreamSet):
     def addRedirect(self, toName, toVersion, toFlavor):
         self.redirects.add(toName, toVersion, toFlavor)
 
+    def iterRedirects(self):
+        for o in self.redirects.iter():
+            yield o.name(), o.branch(), o.flavor()
+
     def compatibleWith(self, other):
         return self.troveInfo.pathHashes.compatibleWith(
                                             other.troveInfo.pathHashes)
@@ -901,6 +911,10 @@ class Trove(streams.StreamSet):
 	self.setRequires(trvCs.getRequires())
 	self.changeVersion(trvCs.getNewVersion())
 	self.changeFlavor(trvCs.getNewFlavor())
+
+        self.redirects.reset()
+        for info in trvCs.getRedirects().iter():
+            self.redirects.addRedirectObject(info)
 
         if not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
@@ -1939,6 +1953,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def setRedirects(self, redirs):
         self.redirects = redirs.copy()
+
+    def getRedirects(self):
+        return self.redirects
 
     def getProvides(self):
         return self.provides()

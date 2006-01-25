@@ -544,6 +544,33 @@ def createTroves(db):
     if createTrigger(db, "TroveInfo"):
         commit = True
 
+    if "TroveRedirects" not in db.tables:
+        cu.execute("""
+        CREATE TABLE TroveRedirects(
+            instanceId      INTEGER NOT NULL,
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            flavorId        INTEGER,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT TroveRedirects_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_branchId_fk,
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_flavorId_fk,
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["TroveRedirects"] = []
+        commit = True
+    db.createIndex("TroveRedirects", "TroveRedirectsIdx", "instanceId")
+    if createTrigger(db, "TroveRedirects"):
+        commit = True
+
     db.loadSchema()
 
 def createMetadata(db):
@@ -1186,6 +1213,14 @@ def setupTempTables(db):
         # validity of the table
         db.createIndex("NewFiles", "NewFilesFileIdx", "fileId",
                        check = False)
+    if "NewRedirects" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE NewRedirects(
+            item        VARCHAR(767),
+            branch      VARCHAR(767),
+            flavor      VARCHAR(767)
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["NewRedirects"] = True
     if "NeededFlavors" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NeededFlavors(
