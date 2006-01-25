@@ -471,7 +471,7 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
-    db.createIndex("FileStreams", "FileStreamsFileIdx",
+    db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
     if createTrigger(db, "FileStreams"):
         commit = True
@@ -948,6 +948,7 @@ class MigrateTo_9(SchemaMigration):
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
         # now move the data over
+        logMe(3, "Updating the TroveTroves table...")
         self.cu.execute("""
         INSERT INTO TroveTroves2
         (instanceId, includedId, flags, changed)
@@ -959,8 +960,8 @@ class MigrateTo_9(SchemaMigration):
         self.cu.execute("ALTER TABLE TroveTroves2 RENAME TO TroveTroves")
         # reload the schema and call createTrove() to fill in the missing triggers and indexes
         self.db.loadSchema()
+        logMe(3, "Updating indexes and triggers...")
         createTroves(self.db)
-
         # we changed the Instances update trigger to protect the changed column from changing
         self.db.dropTrigger("Instances", "UPDATE")
         createTrigger(self.db, "Instances", pinned=True)
@@ -996,8 +997,8 @@ class MigrateTo_10(SchemaMigration):
         self.db.createIndex("Nodes", "NodesSourceItemIdx",
                             "sourceItemId, branchId")
         # update Versions, Instances and clonedFromId
-        logMe(3, "Extracting data for Instances.clonedFromId from TroveInfo")
-        # cerate a temp table first
+        logMe(3, "Updating the Versions table...")
+        # create a temp table first
         self.cu.execute("""
         CREATE TEMPORARY TABLE TItemp(
             instanceId INTEGER,
@@ -1008,9 +1009,8 @@ class MigrateTo_10(SchemaMigration):
                         "SELECT instanceId, infoType, data from TroveInfo "
                         "WHERE TroveInfo.infoType in (?, ?)", (
             trove._TROVEINFO_TAG_CLONEDFROM, trove._TROVEINFO_TAG_SOURCENAME))
-        self.cu.execute("CREATE INDEX TItempIdx ON TItemp(instanceId, data)")
-        self.cu.execute("CREATE INDEX TItempIdx2 ON TItemp(infoType, data)")
-        self.cu.execute("CREATE INDEX TItempIdx3 ON TItemp(instanceId, infoType, data)")
+        self.cu.execute("CREATE INDEX TItempIdx1 ON TItemp(infoType, data)")
+        self.cu.execute("CREATE INDEX TItempIdx2 ON TItemp(instanceId, infoType, data)")
         self.cu.execute("""
         INSERT INTO Versions (version)
         SELECT TI.data
@@ -1019,8 +1019,8 @@ class MigrateTo_10(SchemaMigration):
         LEFT OUTER JOIN Versions as V ON V.version = TI.data
         WHERE V.versionId is NULL
         """, trove._TROVEINFO_TAG_CLONEDFROM)
-        logMe(3, "Versions table updated")
         # update the instances table
+        logMe(3, "Extracting data for Instances.clonedFromId from TroveInfo")
         self.cu.execute("""
         UPDATE Instances
         SET clonedFromId = (
@@ -1031,7 +1031,7 @@ class MigrateTo_10(SchemaMigration):
             AND TI.infoType = ? )
         """, trove._TROVEINFO_TAG_CLONEDFROM)
         # transfer the sourceItemIds from TroveInfo into the Nodes table
-        logMe(3, "Extracting data for nodes.sourceItemId from TroveInfo")
+        logMe(3, "Updating the Items table...")
         # first, create the missing Items
         self.cu.execute("""
         INSERT INTO Items (item)
@@ -1041,8 +1041,8 @@ class MigrateTo_10(SchemaMigration):
         LEFT OUTER JOIN Items as AI ON TI.data = AI.item
         WHERE AI.itemId is NULL
         """, trove._TROVEINFO_TAG_SOURCENAME)
-        logMe(3, "Items table updated")
         # update the nodes table
+        logMe(3, "Extracting data for Nodes.sourceItemId from TroveInfo")
         self.cu.execute("""
         UPDATE Nodes
         SET sourceItemId = (
@@ -1065,7 +1065,7 @@ class MigrateTo_11(SchemaMigration):
         cu = self.cu
         cu2 = self.db.cursor()
 
-	logMe(3, "rebuilding latest table")
+	logMe(3, "Rebuilding the Latest table...")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         createLatest(self.db)
@@ -1099,41 +1099,40 @@ class MigrateTo_11(SchemaMigration):
                       instances.flavorid = tmp.flavorid
         """)
 
-        logMe(3, "Finding path hashes needing an update...")
+        # the order used for some path hashes wasn't deterministic,
+        # so we need to check all of them
         cu.execute("""
             CREATE TEMPORARY TABLE hashUpdatesTmp(
                 instanceId INTEGER,
                 data       %(MEDIUMBLOB)s
             )
         """ % self.db.keywords)
-        cu.execute("CREATE INDEX hashUpdatesTmpIdx on hashUpdatesTmp(instanceId)")
-
-        rows = cu2.execute("""
-                    SELECT instanceId,data from TroveInfo WHERE infoType=?
-                   """, trove._TROVEINFO_TAG_PATH_HASHES)
-
+        cu.execute("CREATE INDEX hashUpdatesTmpIdx ON "
+                   "hashUpdatesTmp(instanceId)")
+        logMe(3, "Finding path hashes needing an update...")
+        rows = cu2.execute("SELECT instanceId,data from TroveInfo "
+                           "WHERE infoType=?", trove._TROVEINFO_TAG_PATH_HASHES)
         neededChanges = []
         PathHashes = trove.PathHashes
         for instanceId, data in rows:
             frzn = PathHashes(data).freeze()
             if frzn != data:
-                cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)', (instanceId, frzn))
-
+                cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)',
+                           (instanceId, cu.binary(frzn)))
 
         logMe(3, "removing bad signatures due to path hashes...")
-        cu.execute('''DELETE FROM TroveInfo
-                      WHERE infoType=?
-                      AND instanceId IN
-                        (SELECT instanceId from hashUpdatesTmp)''',
-                      trove._TROVEINFO_TAG_SIGS)
+        cu.execute("""
+        DELETE FROM TroveInfo
+        WHERE infoType=?
+          AND instanceId IN (SELECT instanceId from hashUpdatesTmp)
+        """, trove._TROVEINFO_TAG_SIGS)
 
         logMe(3, "updating path hashes...")
 	cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
 	for (instanceId, data) in cu:
             cu2.execute("UPDATE TroveInfo SET data=? WHERE "
                        "infoType=? AND instanceId=?",
-                       data, trove._TROVEINFO_TAG_PATH_HASHES, instanceId)
-
+                        (data, trove._TROVEINFO_TAG_PATH_HASHES, instanceId))
         cu.execute("DROP TABLE hashUpdatesTmp")
 
         return self.Version
@@ -1168,7 +1167,8 @@ class MigrateTo_13(SchemaMigration):
         # this takes a bit to execute, especially on sqlite
         self.cu.execute("""
         CREATE TEMPORARY TABLE origs AS
-            SELECT a.streamId AS streamId, a.fileId AS fileId
+            SELECT a.streamId  AS streamId,
+                   a.fileId    AS fileId
             FROM FileStreams AS a JOIN FileStreams AS b
             where a.fileId = b.fileId
               and a.streamId < b.streamId
