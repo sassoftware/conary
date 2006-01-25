@@ -107,8 +107,12 @@ def checkout(repos, cfg, workDir, name, callback=None):
     if flavor:
         log.error('source troves do not have flavors')
         return
-        
-    sourceName = name + ":source"
+
+    if not name.endswith(':source'):
+        sourceName = name + ":source"
+    else:
+        sourceName = name
+
     try:
         trvList = repos.findTrove(cfg.buildLabel, 
                                   (sourceName, versionStr, None))
