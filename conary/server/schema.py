@@ -1162,6 +1162,7 @@ class MigrateTo_12(SchemaMigration):
 class MigrateTo_13(SchemaMigration):
     Version = 13
     def migrate(self):
+        from conary import files
         # fix the duplicate FileStreams.fileId fields
         logMe(3, "Looking for duplicate fileId entries...")
         # this takes a bit to execute, especially on sqlite
@@ -1177,12 +1178,31 @@ class MigrateTo_13(SchemaMigration):
         """)
         # all the duplicate fileIds that have a streamId not in the
         # origs table are dupes
+        # First, check that the duplicate streams differ only by the mtime field
+        logMe(3, "Checking duplicate fileId streams...")
+        self.cu.execute("""
+        SELECT fs.streamId, fs.fileId, fs.stream
+        FROM origs JOIN FileStreams AS fs USING(streamId)
+        """)
+        cu2 = self.db.cursor()
+        for (streamId, fileId, stream) in self.cu:
+            file = files.ThawFile(self.cu.frombinary(stream), None)
+            # select all other streams with the same streamId
+            cu2.execute("""
+            SELECT fs.streamId, fs.stream
+            FROM FileStreams AS fs
+            WHERE fs.fileId = ?
+              AND fs.streamId != ?
+            """, (fileId, streamId))
+            for (dupStreamId, dupStream) in cu2:
+                file2 = files.ThawFile(cu2.frombinary(dupStream), None)
+                file2.inode.mtime.set(file.inode.mtime())
+                assert (file == file2)
         logMe(3, "Removing references to duplicate fileId entries...")
         self.cu.execute("""
         SELECT fs.streamId, fs.fileId
-        FROM FileStreams AS fs
-        JOIN origs AS o USING (fileId)
-        WHERE fs.streamId != o.streamId
+        FROM origs JOIN FileStreams AS fs USING (fileId)
+        WHERE origs.streamId != fs.streamId
         """)
         # the above select holds FileStreams locked, so we have to
         # flush it with a fetchall()
