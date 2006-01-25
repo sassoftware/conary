@@ -242,7 +242,8 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     # send email
     body = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
-    body += 'Time of occurrence: %s\n\n' % timeStamp
+    body += 'Time of occurrence: %s\n' % timeStamp
+    body += 'Conary repository server: %s\n\n' % info_dict['hostname']
     body += ''.join(traceback.format_tb(bt))
     body += '\nConnection Information:\n'
     for key, val in sorted(info_dict.items()):
