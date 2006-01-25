@@ -17,6 +17,7 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
+import fcntl
 import itertools
 import os
 import resource
@@ -29,7 +30,8 @@ import time
 import traceback
 import types
 
-from conary import callbacks, conaryclient, constants, files, trove, versions
+from conary import (callbacks, conaryclient, constants, files, trove, versions,
+                    updatecmd)
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
 from conary.build import recipe, grouprecipe, loadrecipe
 from conary.build import errors as builderrors
@@ -1197,23 +1199,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    os.unlink(changeSetFile)
         raise CookError(str(e))
 
-    if emerge and troves:
-        client = conaryclient.ConaryClient(cfg)
-        try:
-            changeSet = changeset.ChangeSetFromFile(changeSetFile)
-            job = [ (x[0], (None, None), (x[1], x[2]), True) for 
-                            x in changeSet.getPrimaryTroveList() ]
-            (updJob, suggMap) = \
-                client.updateChangeSet(job, recurse=True, resolveDeps=False,
-                            fromChangesets = [ changeSet ])
-            client.applyUpdate(updJob)
-
-        except (conaryclient.UpdateError, errors.CommitError), e:
-            log.error(e)
-            log.error("Not committing changeset: please apply %s by hand" % changeSetFile)
-        else: 
-            os.unlink(changeSetFile)
-            built = (built[0], None)
     return built
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
@@ -1233,13 +1218,22 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         if not cookUid or not cookGid:
             raise CookError('Do not cook as root')
 
-
     for item in args:
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
+        # first, we need to ignore the tty output in the child process
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        # we need a pipe to enable communication with our child (mainly
+        # for emerge)
+        inpipe, outpipe = os.pipe()
         pid = os.fork()
         if not pid:
+            # we have no need for the read side of the pipe
+            os.close(inpipe)
+            # make sure that the write side of the pipe is closed
+            # when we fork/exec
+            fcntl.fcntl(outpipe, fcntl.FD_CLOEXEC)
+
             if profile:
                 import hotshot
                 prof = hotshot.Profile('conary-cook.prof')
@@ -1283,16 +1277,17 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     print str(flavor).replace("\n", " "),
                 print
             if csFile is None:
-                if emerge == True:
-                    print 'Changeset committed to local system.'
-                else:
-                    print 'Changeset committed to the repository.'
+                print 'Changeset committed to the repository.'
             else:
                 print 'Changeset written to:', csFile
+                # send the changeset file over the pipe
+                os.write(outpipe, csFile)
             if profile:
                 prof.stop()
             sys.exit(0)
         else:
+            # parent process, no need for the write side of the pipe
+            os.close(outpipe)
             while 1:
                 try:
                     (id, status) = os.waitpid(pid, os.WUNTRACED)
@@ -1312,7 +1307,35 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                             sys.exit(os.WEXITSTATUS(status))
                         break
                 except KeyboardInterrupt:
+                    # kill the entire process group
                     os.kill(-pid, signal.SIGINT)
+        # see if the child process sent us a changeset filename over
+        # the pipe
+        csFile = os.read(inpipe, 1000)
+        if emerge:
+            # apply the changeset file written by the child
+            if not csFile:
+                log.error('The cook process did not return a changeset file')
+                break
+            print 'Applying changeset file %s' %csFile
+            client = conaryclient.ConaryClient(cfg)
+            try:
+                cs = changeset.ChangeSetFromFile(csFile)
+                job = [ (x[0], (None, None), (x[1], x[2]), True) for
+                        x in cs.getPrimaryTroveList() ]
+                callback = updatecmd.UpdateCallback()
+                rc = client.updateChangeSet(job, recurse = True,
+                                            resolveDeps = False,
+                                            callback = callback,
+                                            fromChangesets = [ cs ])
+                client.applyUpdate(rc[0])
+            except (conaryclient.UpdateError, errors.CommitError), e:
+                log.error(e)
+                log.error("Not committing changeset: please apply %s by "
+                          "hand" % csFile)
+            else:
+                os.unlink(csFile)
+
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
 

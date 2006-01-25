@@ -367,6 +367,13 @@ def realMain(cfg, argv=sys.argv):
                 log.error("The '%s' user has root privileges." % cookUser)
                 return 1
             cookIds = (info.pw_uid, info.pw_gid)
+            # reset the HOME environment variable, and reinterpolate
+            # any buildPath/lookaside configuration variables so that
+            # the correct home directory will be used.
+            os.environ['HOME'] = info.pw_dir
+            for cfgvar in ('buildPath', 'lookaside'):
+                unexpanded = cfg[cfgvar]._getUnexpanded()
+                cfg.configLine('%s %s' %(cfgvar, unexpanded))
         else:
             cookIds = None
 
