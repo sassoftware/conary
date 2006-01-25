@@ -116,21 +116,25 @@ class InvalidServerVersion(RepositoryError):
     pass
 
 class GetFileContentsError(RepositoryError):
-    pass
-
-class FileContentsNotFound(GetFileContentsError):
+    error = 'Base GetFileContentsError: %s %s'
     def __init__(self, (fileId, fileVer)):
         self.fileId = fileId
         self.fileVer = fileVer
-        GetFileContentsError.__init__(self, '''\
-File Contents Not Found
-The following file was not found on the server:
+        RepositoryError.__init__(self, self.error % (fileId, fileVer))
+
+class FileContentsNotFound(GetFileContentsError):
+    error = '''File Contents Not Found
+The contents of the following file was not found on the server:
 fileId: %r
 fileVersion: %s
-''' % (fileId, fileVer))
+'''
 
 class FileStreamNotFound(GetFileContentsError):
-    pass
+    error = '''File Stream Not Found
+The following file stream was not found on the server:
+fileId: %r
+fileVersion: %s
+'''
 
 class InvalidClientVersion(RepositoryError):
     pass
