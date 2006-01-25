@@ -201,7 +201,7 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '~/.conary/arch'))
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
-    buildPath             =  '~/conary/builds'
+    buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
