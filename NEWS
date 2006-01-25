@@ -10,9 +10,11 @@ Changes in 0.93:
     * Standalone server reports warnings for unsupported configuration options
       instead of exiting with a traceback.
     * Compatibility for repositoryDir has been removed.
-    * Queries for multiple flavors of the same trove could return incorrect
-      results
-    * Apache hooks ignore ioerrors when writing changesets to the client
+    * A bug caused queries for multiple flavors of the same trove
+      to return incorrect results has been fixed.
+    * Apache hooks now ignore IOErrors when writing changesets to the
+      client.  These normally occur when the client closes the
+      connection before all the data is sent.
 
   o Client changes
     * SHA1 checksums are now computed for source checkins and local
@@ -27,8 +29,8 @@ Changes in 0.93:
       instead of python-setuptools:runtime.
     * Automatic python dependency provision now searches more directories
       to better support multilib python.
-    * Conary now defaults to building in ~/.conary/builds instead of
-      /var/tmp/conary/builds, and caching in ~/.conary/cache instead
+    * Conary now defaults to building in ~/conary/builds instead of
+      /var/tmp/conary/builds, and caching in ~/conary/cache instead
       of /var/cache/conary.
 
 Changes in 0.92:
