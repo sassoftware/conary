@@ -680,6 +680,19 @@ class TroveStore:
         else:
             troveFilesCursor = util.PeekIterator(iter(()))
 
+        troveRedirectsCursor = self.db.cursor()
+        troveRedirectsCursor.execute("""
+                    SELECT idx, item, branch, flavor 
+                    FROM gtlInst 
+                        JOIN TroveRedirects using (instanceId)
+                        JOIN Items USING (itemId)
+                        JOIN Branches ON
+                            TroveRedirects.branchId = Branches.branchId
+                        LEFT OUTER JOIN Flavors ON
+                            TroveRedirects.flavorId = Flavors.flavorId
+                    """)
+        troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
+
         neededIdx = 0
         while troveIdList:
             # [0:4] because we don't need the changelog information
@@ -740,6 +753,19 @@ class TroveStore:
                                 cu.frombinary(fileId))
 		    if stream is not None:
 			fileContents[fileId] = stream
+            except StopIteration:
+                # we're at the end; that's okay
+                pass
+
+            try:
+                while troveRedirectsCursor.peek()[0] == idx:
+                    idxA, targetName, targetBranch, targetFlavor = \
+                            troveRedirectsCursor.next()
+                    targetBranch = versions.VersionFromString(targetBranch)
+                    if targetFlavor is not None:
+                        targetFlavor = deps.deps.ThawDependencySet(targetFlavor)
+
+                    trv.addRedirect(targetName, targetBranch, targetFlavor)
             except StopIteration:
                 # we're at the end; that's okay
                 pass

@@ -289,6 +289,9 @@ class ClientUpdate:
         which maps targets of redirections to the sources of those 
         redirections.
         """
+        
+        import epdb
+        epdb.st('f')
 
         troveSet = {}
         redirectHack = {}

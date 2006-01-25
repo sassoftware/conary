@@ -363,8 +363,6 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
     built = []
 
-    import epdb
-    epdb.st()
     redirectTroves = []
     flavors = set()
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
