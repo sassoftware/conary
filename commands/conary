@@ -348,14 +348,18 @@ def realMain(cfg, argv=sys.argv):
         if not os.getuid():
             cookUser = cfg.emergeUser
             if not cookUser:
-                log.error('Please set emergeUser config '
-                          'item before emerging')
+                log.error('Please set emergeUser config item before emerging')
                 return 1
             try:
                 info = pwd.getpwnam(cookUser)
             except KeyError:
                 log.error("No user named '%s' to emerge with.  Please check "
                           "the 'emergeUser' config item." % cookUser)
+                return 1
+            if info.pw_dir == '/':
+                log.error("The '%s' user's home directory is set to '/'.  "
+                          "See http://wiki.conary.com/ConaryConversion"
+                          % cookUser)
                 return 1
             cookIds = (info.pw_uid, info.pw_gid)
         else:
