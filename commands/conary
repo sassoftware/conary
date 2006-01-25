@@ -660,7 +660,10 @@ def main(argv=sys.argv):
     except cfg.CfgError:
 	print >> sys.stderr, str(e)
     except errors.ConaryError, e:
-	print >> sys.stderr, str(e)
+        if not str(e):
+            raise
+        else:
+            print >> sys.stderr, str(e)
     except:
         raise
     return 1

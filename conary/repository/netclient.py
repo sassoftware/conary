@@ -99,6 +99,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         except xmlrpclib.ProtocolError, err:
             if err.errcode == 500:
                 raise errors.InternalServerError(self.__host, err)
+            raise
         except:
             raise
 
