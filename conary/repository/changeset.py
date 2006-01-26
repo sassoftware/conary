@@ -1123,7 +1123,10 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
         if type(fileName) is str:
-            f = open(fileName, "r")
+            try:
+                f = open(fileName, "r")
+            except IOError, err:
+                raise errors.ConaryError("Error opening changeset '%s': %s" % (fileName, err.strerror))
             csf = filecontainer.FileContainer(f)
         else:
             csf = filecontainer.FileContainer(fileName)
