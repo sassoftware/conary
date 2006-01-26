@@ -44,8 +44,16 @@ class BuildInfo(dict):
 		    if subdict not in curdict:
 			curdict[subdict] = {}
 		    curdict = curdict[subdict]
+                #unescape \\ and \n
+                value = value.replace('\\\\', '\0')
+                value = value.replace('\\n', '\n')
+                value = value.replace('\0', '\\')
 		curdict[key] = value[:-1]
 	    else:
+                #unescape \\ and \n
+                value = value.replace('\\\\', '\0')
+                value = value.replace('\\n', '\n')
+                value = value.replace('\0', '\\')
 		self[key] = value[:-1]
 
     def begin(self):
@@ -69,6 +77,9 @@ class BuildInfo(dict):
         # causes foo to be written to file, while using buildinfo['foo'] = y
         # does not
 	if not name.startswith('_BuildInfo_'):
+            #escape \\ and \n
+            value = value.replace('\\', '\\\\')
+            value = value.replace('\n', '\\n')
 	    self.write('%s %s\n' % (name,value))
 	self[name] = value
 
