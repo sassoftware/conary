@@ -43,6 +43,7 @@ from conary.lib import openpgpkey
 from conary.lib import util
 from conary.local import update
 from conary.repository import changeset
+from conary.repository import errors as repoerrors
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
 # mix UpdateCallback and CookCallback, since we use both.
@@ -233,7 +234,7 @@ def commit(repos, cfg, message, callback=None):
                 log.error("contents of working directory are not all "
                           "from the head of the branch; use update")
                 return
-        except errors.TroveMissing:
+        except repoerrors.TroveMissing:
             # the version in the CONARY file doesn't exist in the repository.
             # The only time this should happen is after a fresh merge, when
             # the new version is in the CONARY file before the commit happens.
