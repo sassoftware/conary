@@ -30,27 +30,30 @@ from conary.repository import repository, trovesource
 
 def usage():
     print "conary showcs   <changeset> [trove[=version]]"
-    print "showcs flags:   "
-    print "                --full-versions   Print full version strings instead of "
-    print "                                  attempting to shorten them" 
-    print "                --deps            Print dependency information about the troves"
-    print "                --ls              (Recursive) list file contents"
+    print "  Accepts all common display options.  Also,"
     print "                --show-changes    For modifications, show the old "
-    print "                                  file version next to new one"
-    print "                --tags            Show tagged files (use with ls to "
-    print "                                  show tagged and untagged)"
-    print "                --sha1s           Show sha1s for files"
-    print "                --ids             Show fileids"
-    print "                --all             Combine above tags except show-changes"
+    print "                                  file info below new"
+    print "                --all             Combine tags to display most information about the changeset"
     print ""
 
-def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,  
-                     showChanges=False, info=False,
-                     all=False, deps=False, sha1s=False, ids=False,
-                     asJob=False):
+def displayChangeSet(db, cs, troveSpecs, cfg,
+                     # trove options
+                     info = False, digSigs = False, deps = False,
+                     showBuildReqs = False, all = False,
+                     # file options
+                     ls = False, lsl = False, ids = False, sha1s = False, 
+                     tags = False, fileDeps = False, fileVersions = False,
+                     # collection options
+                     showTroves = False, recurse = None, showAllTroves = False,
+                     weakRefs = False, showTroveFlags = False,
+                     alwaysDisplayHeaders = False,
+                     # job options
+                     showChanges = False, asJob = False):
 
     if all:
-        ls = deps = tags = True
+        deps = tags = recurse = showTroveFlags = True
+        if ls:
+            fileDeps = lsl = True
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -63,22 +66,34 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
         if not troveSpecs:
             troveTups = cs.getPrimaryTroveList()
             primary = True
-            namesOnly = True
             if not troveTups:
                 log.warning('No primary troves in changeset, listing all troves')
                 troveTups = [(x.getName(), x.getNewVersion(), x.getNewFlavor())\
                                             for x in cs.iterNewTroveList()]
         else:
-            troveTups, namesOnly, primary  = query.getTrovesToDisplay(
-                                                         changeSetSource, 
-                                                         troveSpecs)
+            troveTups, primary  = query.getTrovesToDisplay(changeSetSource, 
+                                                           troveSpecs)
         querySource = trovesource.stack(changeSetSource, client.getRepos())
 
-        dcfg = display.DisplayConfig(querySource, ls=ls, ids=ids, 
-                             sha1s=sha1s, fullVersions=cfg.fullVersions, 
-                             tags=tags, deps=deps, info=info,
-                             showFlavors=cfg.fullFlavors,
-                             iterChildren=not namesOnly)
+        dcfg = display.DisplayConfig(querySource, client.db)
+        dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
+                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor)
+        dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
+                            fileDeps=fileDeps, fileVersions=fileVersions)
+
+        recurseOne = showTroves or showAllTroves or weakRefs
+        if recurse is None and not recurseOne:
+            # if we didn't explicitly set recurse and we're not recursing one
+            # level explicitly 
+            recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
+                               fileVersions)
+
+        dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
+                         showNotByDefault = showAllTroves,
+                         showWeakRefs = weakRefs,
+                         showTroveFlags = showTroveFlags,
+                         displayHeaders = alwaysDisplayHeaders or showTroveFlags)
+
         if primary:
             dcfg.setPrimaryTroves(set(troveTups))
         formatter = display.TroveFormatter(dcfg)
@@ -88,29 +103,42 @@ def displayChangeSet(db, cs, troveSpecs, cfg, ls = False, tags = False,
                                              trovesource.stack(db, repos))
         changeSetSource.addChangeSet(cs)
 
-        jobs, namesOnly = getJobsToDisplay(changeSetSource, troveSpecs)
+        jobs = getJobsToDisplay(changeSetSource, troveSpecs)
 
-        dcfg = display.JobDisplayConfig(changeSetSource,
-                                        ls=ls, ids=ids, sha1s=sha1s, 
-                                        info=info, tags=tags, deps=deps,
-                                        showChanges=showChanges,
-                                        iterChildren=not namesOnly,
-                                        compressJobs=not cfg.showComponents)
+        dcfg = display.JobDisplayConfig(changeSetSource, client.db)
+
+        dcfg.setJobDisplay(showChanges=showChanges,
+                           compressJobs=not cfg.showComponents)
+
+        dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
+                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor)
+
+
+        dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
+                            fileDeps=fileDeps, fileVersions=fileVersions)
+
+        recurseOne = showTroves or showAllTroves or weakRefs
+        if recurse is None and not recurseOne:
+            # if we didn't explicitly set recurse and we're not recursing one
+            # level explicitly and we specified troves (so everything won't 
+            # show up at the top level anyway), guess at whether to recurse
+            recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
+                               fileVersions)
+
+        dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
+                         showNotByDefault = showAllTroves,
+                         showWeakRefs = weakRefs,
+                         showTroveFlags = showTroveFlags)
 
         formatter = display.JobFormatter(dcfg)
         display.displayJobs(dcfg, formatter, jobs)
 
 
 def getJobsToDisplay(jobSource, jobSpecs):
-    namesOnly = True
     if jobSpecs:  
         jobSpecs = cmdline.parseChangeList(jobSpecs, allowChangeSets=False)
     else:
         jobSpecs = []
-
-    for jobSpec in jobSpecs:
-        if jobSpec[1] != (None, None) or jobSpec[2] != (None, None):
-            namesOnly = False
 
     if jobSpecs:
         results = jobSource.findJobs(jobSpecs)
@@ -118,4 +146,4 @@ def getJobsToDisplay(jobSource, jobSpecs):
     else:
         jobs = list(jobSource.iterAllJobs())
 
-    return jobs, namesOnly
+    return jobs
