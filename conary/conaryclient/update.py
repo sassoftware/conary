@@ -289,9 +289,6 @@ class ClientUpdate:
         which maps targets of redirections to the sources of those 
         redirections.
         """
-        
-        import epdb
-        epdb.st('f')
 
         troveSet = {}
         redirectHack = {}
@@ -303,7 +300,7 @@ class ClientUpdate:
         # redirects. Nice, huh?
         while toDoList:
             job = toDoList.pop()
-            
+
             (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
                 isAbsolute) = job
             item = (name, newVersion, newFlavor)
@@ -327,33 +324,23 @@ class ClientUpdate:
                 jobSet.remove(job)
 
             targets = []
-            allTargets = list(trv.iterTroveList(strongRefs=True))
-            # three possibilities:
-            #   1. no targets -- make sure a simple erase occurs
-            #   2. target is the primary target of this redirect (this is 
-            #       tricky; we use the rule that components only redirect to a
-            #       single component, and that collections redirect to a single
-            #       collection (and other, secondary, collections). the
-            #       primary redirects are added to the target list
-            #   3. secondary targets are added to the toDoList for later
-            #      handling
-            if not allTargets:
+            allTargets = [ (x[0], str(x[1]), x[2]) 
+                                    for x in trv.iterRedirects() ]
+            matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
+                                            affinityDatabase = self.db)
+            if not matches:
+                assert(not allTargets)
                 l = redirectHack.setdefault(None, [])
                 l.append(item)
             else:
-                for (subName, subVersion, subFlavor) in allTargets:
-                    if (":" not in subName and ":" not in name) or \
-                       (":"     in subName and ":"     in name):
-                        # primary
-                        l = redirectHack.setdefault((subName, subVersion,
-                                                     subFlavor), [])
+                for matchList in matches.itervalues():
+                    for match in matchList:
+                        l = redirectHack.setdefault(match, [])
                         l.append(item)
-                        targets.append((subName, subVersion, subFlavor))
-                    else:
-                        # secondary
-                        toDoList.append((subName, (None, None), 
-                                                  (subVersion, subFlavor), 
-                                         True))
+                        targets.append(match)
+
+                for info in trv.iterTroveList(strongRefs = True):
+                    toDoList.append((info[0], (None, None), info[1:], True))
 
             if isPrimary:
                 for subName, subVersion, subFlavor in targets:
@@ -361,7 +348,7 @@ class ClientUpdate:
                                 True))
 
         for l in redirectHack.itervalues():
-	    outdated = self.db.outdatedTroves(l)
+            outdated = self.db.outdatedTroves(l)
             del l[:]
             for (name, newVersion, newFlavor), \
                   (oldName, oldVersion, oldFlavor) in outdated.iteritems():
@@ -1316,6 +1303,15 @@ conary erase '%s=%s[%s]'
         del cs
 
         redirectHack = self._processRedirects(uJob, jobSet, recurse) 
+
+        # The targets of redirects need to be loaded
+        redirectCs, notFound = csSource.createChangeSet(
+                [ (x[0], (None, None), x[1:], True) for x in 
+                                redirectHack.keys() ], 
+                withFiles = False, recurse = False)
+        uJob.getTroveSource().addChangeSet(redirectCs)
+        transitiveClosure.update(redirectCs.getJobSet(primaries = False))
+        del redirectCs
 
         if forceJobClosure and recurse:
             # The transitiveClosure we computed can't be trusted; we need
