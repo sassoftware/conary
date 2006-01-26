@@ -110,7 +110,7 @@ class RedirectRecipe(Recipe):
             if destSet is None and ':' in name:
                 # package redirections imply component redirections
                 pkgName, compName = name.split(':')
-                destSet = fromMap.get(pkgName, None)
+                destSet = fromRule.get(pkgName, None)
                 if destSet is not None:
                     destSet = set(
                         [ (x[0] + ':' + compName,) + x[1:] for x in destSet ])
@@ -174,10 +174,6 @@ class RedirectRecipe(Recipe):
                             for info in trv.iterTroveList(strongRefs = True):
                                 assert(info[1] == version)
                                 assert(info[2] == sourceFlavor)
-                                l = fromRule.setdefault(info[0], [])
-                                l.append((info[0], match.branch().asString(),
-                                          sourceFlavorRestriction, 
-                                          targetFlavorRestriction))
                                 additionalNames.add(info[0])
                                 d = sourceTroveMatches.setdefault(info[0], {})
                                 flavorList = d.setdefault(info[1], [])
