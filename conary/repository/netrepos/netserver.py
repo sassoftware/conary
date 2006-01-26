@@ -1652,7 +1652,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
         query = """
-                SELECT UP.permittedTrove, item, version, flavor,
+                SELECT DISTINCT UP.permittedTrove, item, version, flavor,
                           timeStamps, Instances.changed FROM Instances
                     JOIN Nodes USING (itemId, versionId)
                     JOIN LabelMap USING (itemId, branchId)
