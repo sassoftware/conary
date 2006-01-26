@@ -143,7 +143,8 @@ class CfgFingerPrintMapItem(CfgType):
         return label, fingerprint
 
     def format(self, val, displayOptions=None):
-        return ' '.join(val)
+        # val[1] may be None
+        return ' '.join([val[0], str(val[1])])
 
 class CfgFingerPrintMap(CfgList):
     def __init__(self, default={}):
