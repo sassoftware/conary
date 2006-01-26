@@ -1220,8 +1220,9 @@ class MigrateTo_13(SchemaMigration):
             (streamId,))
         self.cu.execute("DROP TABLE origs")
         # force the creation of the new unique index
-        logMe(3, "Recreating the fileId index...")
+        logMe(3, "Droping old fileId index...")
         self.db.dropIndex("FileStreams", "FileStreamsIdx")
+        logMe(3, "Recreating the fileId index...")
         createTroves(self.db)
         return self.Version
 
