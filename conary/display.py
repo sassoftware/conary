@@ -21,19 +21,13 @@ import time
 
 #conary
 from conary import files
+from conary import trove
 from conary.deps import deps
 from conary.lib import log
 from conary.lib import util
 from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary import metadata
 from conary.repository import errors
-
-_troveFormat  = "%-39s %s"
-_troveFormatWithFlavor  = "%-39s %s[%s]"
-_fileFormat = "    %-35s %s"
-_grpFormat  = "  %-37s %s"
-_grpFormatWithFlavor  = "  %-37s %s[%s]"
-_chgFormat  = "  --> %-33s %s[%s]"
 
 def displayTroves(dcfg, formatter, troveTups):
     """
@@ -46,25 +40,38 @@ def displayTroves(dcfg, formatter, troveTups):
     @param troveTups: the trove tuples to display
     @type troveTups: ordered list of (n,v,f) tuples
     """
-    # let the formatter know what troves are going to be displayed
-    # in order to display the troves
-    formatter.prepareTuples(troveTups)
 
-    iter = iterTroveList(dcfg.getTroveSource(), 
-                         troveTups, 
-                         walkTroves=dcfg.walkTroves(),
-                         iterTroves=dcfg.iterTroves(),
+    iter = iterTroveList(dcfg.getTroveSource(),
+                         troveTups,
+                         recurseAll=dcfg.recurseAll,
+                         recurseOne=dcfg.recurseOne,
                          needTroves = dcfg.needTroves(),
-                         getPristine = dcfg.getPristine())
+                         getPristine = dcfg.getPristine(),
+                         showNotByDefault = dcfg.showNotByDefault,
+                         showWeakRefs = dcfg.showWeakRefs,
+                         checkExists = dcfg.checkExists)
+
     if dcfg.hideComponents():
         iter = skipComponents(iter, dcfg.getPrimaryTroves())
 
-    for (n,v,f), trv, indent in iter:
-        if dcfg.printTroveHeader():
-            for ln in formatter.formatTroveHeader(trv, n, v, f, indent):
-                print ln
+    allTups = list(iter)
+    # let the formatter know what troves are going to be displayed
+    # in order to determine what parts of the version/flavor to display
+    troveTups = formatter.prepareTuples([x[0] for x in allTups])
 
-        if not indent and dcfg.printFiles():
+    for (n,v,f), trv, troveFlags, indent in allTups:
+        if dcfg.printTroveHeader():
+            for ln in formatter.formatTroveHeader(trv, n, v, f, troveFlags, indent):
+                print ln
+            indent += 1
+        else:
+            indent = 0
+
+        if not trv:
+            # don't bother trying to print files for non-existant troves.
+            continue
+
+        if dcfg.printFiles():
             for ln in formatter.formatTroveFiles(trv, n, v, f, indent):
                 print ln
 
@@ -78,29 +85,40 @@ def skipComponents(tupList, primaryTroves=[]):
         tups.add((n, v, f))
 
 
-def iterTroveList(troveSource, troveTups, walkTroves=False, 
-                  iterTroves=False, needTroves=False, getPristine=True):
+TROVE_BYDEFAULT = 1 << 0
+TROVE_STRONGREF = 1 << 1
+TROVE_HASTROVE  = 1 << 2
+
+def iterTroveList(troveSource, troveTups, recurseAll=False,
+                  recurseOne=False, needTroves=False, getPristine=True,
+                  showNotByDefault=False, showWeakRefs=False,
+                  checkExists=False):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
 
     @param troveSource: place to retrieve the trove instances matching troveTups
     @type troveSource: display.DisplayConfig
-    @param walkTroves: if true, recursively descend through the listed troves
-    @type bool
-    @param iterTroves: if True, include just the first level of troves below
+    @param recurseAll: if true, recursively descend through the listed troves
+    @type recurseAll: bool
+    @param recurseOne: if True, include just the first level of troves below
     the listed troves (but do not recurse)
     @param needTroves: if True, return trove objects.  Otherwise, return None
-    as each trove objec.t
-    @type bool
-    @param needFiles: True if the returned trove objects should contain files
-    @type bool
-    @rtype: yields (troveTup, troveObj, indent) tuples
+    as each trove object
+    @type needTroves: bool
+    @param getPristine: if True, get pristine trove objects
+    @type getPristine: bool
+    @param showNotByDefault: if True, yield not bydefault troves 
+    @type showNotByDefault: bool
+    @param showWeakRefs: if True, yield troves that are weak references
+    @type showWeakRefs: bool
+    @param checkExists: if True, add flag MISSING for troves that do not
+    exist (but are referenced) in this troveSource
+    @type checkExists: bool
+
+    @rtype: yields (troveTup, troveObj, flags, indent) tuples
     """
-    assert(not (walkTroves and iterTroves))
-
-    if needTroves or walkTroves or iterTroves:
-
+    if needTroves or recurseAll or recurseOne:
         if not getPristine:
             kw = {'pristine' : False}
         else:
@@ -109,34 +127,157 @@ def iterTroveList(troveSource, troveTups, walkTroves=False,
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
     else:
         troves = [None] * len(troveTups)
-    
+
+
     indent = 0
+    troveCache = {} # cached trove info
+    missing = set() # cached hasTrove info
+    seen = set()  # cached info about what troves we've called hasTrove on.
 
     for troveTup, trv in itertools.izip(troveTups, troves):
-        if walkTroves:
-            # walk troveSet yields troves that are children of these troves
-            # and the trove itself.
-            iter = troveSource.walkTroveSet(trv, ignoreMissing=True)
-            newTroves = sorted(iter, key=lambda y: y.getName())
+        if recurseAll:
+            # recurse all troves, depth first.
+            topTrove = trv
 
-            for trv in newTroves:
-                troveTup = trv.getName(), trv.getVersion(), trv.getFlavor()
-                yield troveTup, trv, indent
+            troves = [(trv, (troveTup, trv, 
+                    TROVE_BYDEFAULT | TROVE_STRONGREF | TROVE_HASTROVE, 0))]
 
-        else:
-            yield troveTup, trv, 0
+            while troves:
+                topTrove, info = troves.pop(0)
+                yield info
 
-            if iterTroves:
-                newTroveTups = sorted(trv.iterTroveList(strongRefs=True))
+                troveTup, trv, flags, depth = info
+                if not flags & TROVE_HASTROVE:
+                    # we can't recurse this trove, it doesn't exist.
+                    continue
+
+                newTroveTups = trv.iterTroveList(strongRefs=True,
+                                                 weakRefs=showWeakRefs)
+
+                newTroveTups = sorted(newTroveTups)
                 if needTroves:
-                    newTroves = troveSource.getTroves(newTroveTups, 
+                    # might as well grab all the troves, we're supposed
+                    # to yield them all.
+                    neededTroveTups = [ x for x in newTroveTups \
+                                                    if x not in troveCache ]
+
+                    newTroves = troveSource.getTroves(neededTroveTups,
                                                       withFiles=False)
+
+                    troveCache.update(x for x \
+                        in itertools.izip(neededTroveTups, newTroves) if x[1])
+                    missing.update(x[0] for \
+                        x in itertools.izip(neededTroveTups, newTroves) if not x[1])
+                    seen.update(neededTroveTups)
+                else:
+                    newColls = [ x for x in trv.iterTroveList(weakRefs=True,
+                                                              strongRefs=True)
+                                             if trove.troveIsCollection(x[0])
+                                            and x not in troveCache ]
+                    newTroves = troveSource.getTroves(newColls,
+                                                      withFiles=False)
+                    troveCache.update(x for x in itertools.izip(newColls, newTroves) if x[1])
+                    missing.update(x[0] for x in itertools.izip(newColls, newTroves) if not x[1])
+                    seen.update(newColls)
+
+                if checkExists:
+                    toCheck = set(x for x in trv.iterTroveList(True, True))
+                    alsoToCheck = {}
+                    for newTrove in newTroves:
+                        if newTrove is None:
+                            continue
+                        alsoToCheck.update(dict((x, newTrove) for x in \
+                                            newTrove.iterTroveList(True, True) if x not in toCheck and x not in seen))
+
+                    toCheck.difference_update(seen)
+
+                    if not showNotByDefault:
+                        newToCheck = []
+                        for tup in toCheck:
+                            if topTrove.hasTrove(*tup):
+                                if topTrove.includeTroveByDefault(*tup):
+                                    newToCheck.append(tup)
+                            elif trv.includeTroveByDefault(*tup):
+                                newToCheck.append(tup)
+                        for tup, parent in alsoToCheck.iteritems():
+                            if topTrove.hasTrove(*tup):
+                                if top.includeTroveByDefault(*tup):
+                                    newToCheck.append(tup)
+                            elif trv.hasTrove(*tup):
+                                if trv.includeTroveByDefault(*tup):
+                                    newToCheck.append(tup)
+                            elif parent.includeTroveByDefault(*tup):
+                                newToCheck.append(tup)
+                        toCheck = newToCheck
+                    else:
+                        toCheck = list(toCheck)
+
+                    if toCheck:
+                        hasTroves = troveSource.hasTroves(toCheck)
+                        missing.update(x[0] for x in itertools.izip(toCheck, hasTroves) if not x[1])
+                        seen.update(toCheck)
+
+                trovesToAdd = []
+                depth += 1
+                for troveTup in newTroveTups:
+                    if not topTrove.hasTrove(*troveTup):
+                        topTrove = trv
+                    installByDefault = topTrove.includeTroveByDefault(*troveTup)
+
+
+                    if not installByDefault and not showNotByDefault:
+                        continue
+
+                    flags = TROVE_STRONGREF
+                    if installByDefault:
+                        flags |= TROVE_BYDEFAULT
+                    if troveTup not in missing:
+                        flags |= TROVE_HASTROVE
+
+                    newTrove = troveCache.get(troveTup, None)
+                    if trove.troveIsCollection(troveTup[0]):
+                        trovesToAdd.append((topTrove,
+                                (troveTup, newTrove, flags, depth)))
+                    else:
+                        yield (troveTup, newTrove, flags, depth)
+
+                troves = trovesToAdd + troves
+        else:
+            # recurse one level or recurse no levels.
+            yield troveTup, trv, TROVE_STRONGREF | TROVE_BYDEFAULT | TROVE_HASTROVE, 0
+
+            if recurseOne:
+                newTroveTups = trv.iterTroveListInfo()
+
+                if not showWeakRefs:
+                    newTroveTups = (x for x in newTroveTups if x[2])
+                if not showNotByDefault:
+                    newTroveTups = (x for x in newTroveTups if x[1])
+
+                newTroveTups = sorted(newTroveTups)
+
+                if needTroves:
+                    newTroves = troveSource.getTroves(
+                                                [x[0] for x in newTroveTups],
+                                                withFiles=False)
                 else:
                     newTroves = [None] * len(newTroveTups)
 
-                for troveTup, trv in itertools.izip(newTroveTups, newTroves):
-                    yield troveTup, trv, 1
+                if checkExists:
+                    hasTroves = troveSource.hasTroves([x[0] for x in newTroveTups])
+                else:
+                    hasTroves = [True] * len(newTroveTups)
 
+                for (troveTup, byDefault, strongRef), trv, hasTrove \
+                        in itertools.izip(newTroveTups, newTroves, hasTroves):
+                    flags = 0
+                    if strongRef:
+                        flags |= TROVE_STRONGREF
+                    if byDefault:
+                        flags |= TROVE_BYDEFAULT
+                    if hasTrove:
+                        flags |= TROVE_HASTROVE
+                    yield troveTup, trv, flags, 1
 
 
 class DisplayConfig:
@@ -146,35 +287,51 @@ class DisplayConfig:
         file lists)
     """
 
-    # NOTE: The way that display configuration options interact is 
-    # confusing.  That's at least partially because the semantics for
-    # displaying data is confusing.  For example, we display components
-    # _if_ a package was selected and it was specified using a version
-    # or a flavor (not just the name).  
-    # A next step should be to redefine these rules.
-        
-    def __init__(self, troveSource=None, ls = False, ids = False, 
-                 sha1s = False, digSigs = False,
-                 fullVersions = False, tags = False, info = False, 
-                 deps = False, showBuildReqs = False, showFlavors = False, 
-                 iterChildren = False, showComponents = False):
+    def __init__(self, troveSource=None, affinityDb=None):
         self.troveSource = troveSource
+        self.affinityDb = affinityDb
+        self.setTroveDisplay()
+        self.setFileDisplay()
+        self.setChildDisplay()
+        self.setPrimaryTroves(set())
 
-        self.ls = ls
+    def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False,
+                        digSigs=False, showLabels=False, fullVersions=False,
+                        fullFlavors=False, showComponents = False,
+                        baseFlavors=[]):
+        self.deps = deps
+        self.info = info
+        self.digSigs = digSigs
+        self.showBuildReqs = showBuildReqs
+        self.fullVersions = fullVersions
+        self.showLabels = showLabels
+        self.fullFlavors = fullFlavors
+        self.showComponents = showComponents
+        self.baseFlavors = baseFlavors
+
+    def setFileDisplay(self, ls = False, lsl = False, ids = False, 
+                       sha1s = False, tags = False, fileDeps = False,
+                       fileVersions = False):
+        ls = ls or lsl
+        self.ls = ls or lsl
+        self.lsl = lsl
         self.ids = ids
         self.sha1s = sha1s
-        self.digSigs = digSigs
-        self.fullVersions = fullVersions
-        self.fullFlavors = showFlavors
-        self.showComponents = showComponents
         self.tags = tags
-        self.info = info
-        self.deps = deps
-        self.showBuildReqs = showBuildReqs
-        self.primaryTroves = set()
+        self.fileDeps = fileDeps
+        self.fileVersions = fileVersions
 
-        self.iterChildren = True in (iterChildren, ls, ids, sha1s, tags) 
-        self.iterChildren = self.iterChildren and not (info or showBuildReqs)
+    def setChildDisplay(self, recurseAll = False, recurseOne = False,
+                        showNotByDefault = False, showWeakRefs = False,
+                        showTroveFlags = False, displayHeaders = False, 
+                        checkExists = False):
+        self.recurseAll = recurseAll
+        self.recurseOne = recurseOne
+        self.showNotByDefault = showNotByDefault
+        self.showWeakRefs = showWeakRefs
+        self.showTroveFlags = showTroveFlags
+        self.displayHeaders = displayHeaders
+        self.checkExists = checkExists
 
     def setPrimaryTroves(self, pTroves):
         self.primaryTroves = pTroves
@@ -192,11 +349,11 @@ class DisplayConfig:
         return self.showBuildReqs
 
     def printTroveHeader(self):
-        return self.info or self.showBuildReqs or self.deps or self.iterTroves() or not self.needFiles()
+        return self.info or self.showBuildReqs or self.deps or not self.printFiles() or self.displayHeaders
 
     def printSimpleHeader(self):
-        return not self.info and not self.showBuildReqs
- 
+        return not self.info and (not self.showBuildReqs or self.displayHeaders)
+
     def printDeps(self):
         return self.deps
 
@@ -213,49 +370,38 @@ class DisplayConfig:
         return self.info
 
     def printFiles(self):
-        return self.ls or self.ids or self.sha1s or self.tags or self.iterTroves()
+        return self.ls or self.ids or self.sha1s or self.tags or self.fileDeps or self.fileVersions
 
     def isVerbose(self):
-        return not self.iterFiles()
+        return self.lsl
 
-    def useFullVersions(self):  
+    def useFullVersions(self):
         return self.fullVersions
 
-    def useFullFlavors(self):  
+    def useFullFlavors(self):
         return self.fullFlavors
 
     def hideComponents(self):
-        return (not self.showComponents 
-                and not (self.iterTroves() or self.walkTroves()))
+        return (not self.showComponents
+                and not self.recurseOne
+                and not self.printFiles()
+                and not self.needTroves())
 
     #### Needed Data
     #### What the given display configuration implies that we need
 
     def needTroves(self):
         # we need the trove 
-        return self.info or self.showBuildReqs or self.digSigs
+        return self.info or self.showBuildReqs or self.digSigs or self.deps or self.printFiles()
 
     def needFiles(self):
         return self.printFiles()
 
     def needFileObjects(self):
-        return self.needFiles() and self.isVerbose()
+        return self.needFiles()
 
     def getPristine(self):
         return True
-
-    #### Recursion
-    #### Whether to recursively descend into child troves, iterate
-    #### only over child troves, or just display the listed troves.
-
-    def walkTroves(self):
-        return self.ls or self.ids or self.sha1s or self.tags or self.deps
-
-    def iterTroves(self):
-        return self.iterChildren and not self.walkTroves()
-
-    def iterFiles(self):
-        return self.iterTroves()
 
 
 class TroveTupFormatter:
@@ -294,6 +440,8 @@ class TroveTupFormatter:
 
         if self.dcfg.useFullVersions():
             vStr = str(v)
+        elif self.dcfg.showLabels:
+            vStr = '%s/%s' % (v.branch().label(), v.trailingRevision())
         elif len(self._vCache.get(n, [])) > 1:
             # print the trailing revision unless there
             # are two versions that are on different
@@ -306,7 +454,7 @@ class TroveTupFormatter:
             for ver in vers:
                 if ver.branch() != branch:
                     vStr = str(v)
-                    
+
             if not vStr:
                 vStr = str(v.trailingRevision())
         else:
@@ -317,9 +465,36 @@ class TroveTupFormatter:
         else:
             # print only the flavor differences between
             # the two troves.
-            flavors = self._fCache.get(n, [])
+
+            # FIXME Document all this!
+            if self.dcfg.affinityDb:
+                installed = set()
+                #installed = set([x[2] for x in self.dcfg.affinityDb.trovesByName(n)])
+                installed.discard(f)
+                installed = list(installed)
+            else:
+                installed = []
+
+            flavors = list(self._fCache.get(n, []))
+            if installed:
+                for baseFlavor in self.dcfg.baseFlavors:
+                    flavors += [ deps.overrideFlavor(baseFlavor, x) for x in installed ]
+            else:
+                flavors += self.dcfg.baseFlavors
+
+
             if len(flavors) > 1:
-                fStr = deps.flavorDifferences(list(flavors))[f]
+                fStr = deps.flavorDifferences(
+                                    list(flavors) + installed + [f],
+                                    strict=False)[f]
+
+                ISD = deps.InstructionSetDependency
+                if f.hasDepClass(ISD) and fStr.hasDepClass(ISD):
+                    allDeps = set(x.name for x in f.iterDepsByClass(ISD))
+                    allDeps.difference_update(x.name for x in
+                                              fStr.iterDepsByClass(ISD))
+                    for depName in allDeps:
+                        fStr.addDep(ISD, deps.Dependency(depName))
             else:
                 fStr = ''
 
@@ -332,17 +507,18 @@ class TroveTupFormatter:
 
         if format:
             return format % (name, vStr, fStr)
-            
+
+        args = []
+        format = ''
         if indent:
             if fStr:
-                return _grpFormatWithFlavor % (name, vStr, fStr)
+                return '%s%s=%s[%s]' % ('  ' * indent, name, vStr, fStr)
             else:
-                return _grpFormat % (name, vStr)
+                return '%s%s=%s' % ('  ' * indent, name, vStr)
         elif fStr:
-            return _troveFormatWithFlavor % (name, vStr, fStr)
+            return '%s=%s[%s]' % (name, vStr, fStr)
         else:
-            return _troveFormat % (name, vStr)
-
+            return '%s=%s' % (name, vStr)
 
 class TroveFormatter(TroveTupFormatter):
     """ 
@@ -350,7 +526,7 @@ class TroveFormatter(TroveTupFormatter):
     """
 
     def formatInfo(self, trove):
-        """ returns iteratore of format lines about this local trove """
+        """ returns iterator of format lines about this local trove """
         # TODO: it'd be nice if this were set up to do arbitrary
         # formats...
 
@@ -407,7 +583,7 @@ class TroveFormatter(TroveTupFormatter):
         if hasattr(troveSource, 'trovesArePinned'):
             yield "Pinned    : %s" % troveSource.trovesArePinned(
                                                             [ (n, v, f) ])[0]
-            
+
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
 
         if sourceTrove:
@@ -415,7 +591,7 @@ class TroveFormatter(TroveTupFormatter):
                 for ln in metadata.formatDetails(troveSource, None, n, 
                                                  v.branch(), sourceTrove):
                     yield ln
-        
+
             cl = sourceTrove.getChangeLog()
             if cl:
                 yield "Change log: %s (%s)" % (cl.getName(), cl.getContact())
@@ -423,13 +599,32 @@ class TroveFormatter(TroveTupFormatter):
                 for l in lines:
                     yield "    " + l
 
-    def formatTroveHeader(self, trove, n, v, f, indent):
+    def formatTroveHeader(self, trove, n, v, f, flags, indent):
         """ Print information about this trove """
 
         dcfg = self.dcfg
 
         if dcfg.printSimpleHeader():
-            yield self.formatNVF(n, v, f, indent)
+            ln =  self.formatNVF(n, v, f, indent)
+            if dcfg.showTroveFlags:
+                fmtFlags = []
+                if not flags & TROVE_HASTROVE:
+                    fmtFlags.append('Missing')
+                if not flags & TROVE_BYDEFAULT:
+                    fmtFlags.append('NotByDefault')
+                if not flags & TROVE_STRONGREF:
+                    fmtFlags.append('Weak')
+                if fmtFlags:
+                    ln += ' [%s]' % ','.join(fmtFlags)
+            yield ln
+            indent += 1
+        else:
+            indent = 0
+        if not trove:
+            # don't bother trying to print extra info for non-existant
+            # troves (they might have had flag info printed though)
+            return
+
         if dcfg.printInfo():
             for line in self.formatInfo(trove):
                 yield line
@@ -438,22 +633,29 @@ class TroveFormatter(TroveTupFormatter):
                 yield line
         if dcfg.printBuildReqs():
             for buildReq in sorted(trove.getBuildRequirements()):
-                yield self.formatNVF(*buildReq)
+                yield '  ' * (indent) + self.formatNVF(*buildReq)
         elif dcfg.printDeps():
-            for line in self.formatDeps(trove):
+            for line in self.formatDeps(trove.getProvides(), 
+                                        trove.getRequires(),
+                                        indent=indent):
                 yield line
 
-    def formatDeps(self, trove):
-        for name, dep in (('Provides', trove.getProvides()),
-                              ('Requires', trove.getRequires())):
-            yield '  %s:' %name
+    def formatDeps(self, provides, requires, indent=0, showEmpty=True):
+        for name, dep in (('Provides', provides),
+                              ('Requires', requires)):
+            if not dep and not showEmpty:
+                continue
+
+            spacer = '  ' * indent
+
+            yield '%s%s:' %(spacer, name)
             if not dep:
-                yield '     None'
+                yield '%s   None' % (spacer)
             else:
                 lines = str(dep).split('\n')
                 for l in lines:
-                    yield '    ' + l
-            yield '' 
+                    yield '%s  %s' % (spacer, l)
+            yield ''
 
     def formatDigSigs(self, trv, indent=0):
         sigList = [x for x in trv.troveInfo.sigs.digitalSigs.iter()]
@@ -474,13 +676,15 @@ class TroveFormatter(TroveTupFormatter):
                                             withFiles = needFiles)
         if needFiles:
             for (pathId, path, fileId, version, file) in iter:
-                yield self.formatFile(pathId, path, fileId, version, file)
+                for ln in self.formatFile(pathId, path, fileId, version, file,
+                                          indent=indent):
+                    yield ln
         else:
             for (pathId, path, fileId, version) in iter:
-                yield _fileFormat % (path, version.trailingRevision())
+                yield path
 
     def formatFile(self, pathId, path, fileId, version, fileObj=None, 
-                    prefix=''):
+                   prefix='', indent=0):
         taglist = ''
         sha1 = ''
         id = ''
@@ -492,6 +696,7 @@ class TroveFormatter(TroveTupFormatter):
             name = "%s -> %s" % (path, fileObj.target())
         else:
             name = path
+
         if dcfg.tags and fileObj.tags:
             taglist = ' [' + ' '.join(fileObj.tags) + ']' 
         if dcfg.sha1s:
@@ -502,13 +707,33 @@ class TroveFormatter(TroveTupFormatter):
 
         if dcfg.ids and pathId:
             id = md5ToString(pathId) + ' ' + sha1ToString(fileObj.fileId()) + ', '
-        if verbose: 
-            return "%s%s%s%s    1 %-8s %-8s %s %s %s%s" % \
-              (prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), 
-               fileObj.inode.group(), fileObj.sizeString(), 
-               fileObj.timeString(), name, taglist)
+        if dcfg.fileVersions:
+            if dcfg.useFullVersions():
+                verStr = '    %s' % version
+            elif dcfg.showLabels:
+                verStr = '    %s/%s' % (version.branch().label(), version.trailingRevision())
+            else:
+                verStr = '    %s' % version.trailingRevision()
         else:
-            return "%s%s%s%s" % (id, sha1,path, taglist)
+            verStr = ''
+
+        spacer = '  ' * indent
+
+        if verbose: 
+            ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s" % \
+              (spacer,
+               prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), 
+               fileObj.inode.group(), fileObj.sizeString(), 
+               fileObj.timeString(), name, taglist, verStr)
+        else:
+            ln = "%s%s%s%s%s%s" % (spacer, id, sha1, path, taglist, verStr)
+
+        yield ln
+
+        if dcfg.fileDeps:
+            for ln in self.formatDeps(fileObj.provides(), fileObj.requires(),
+                                      indent + 1, showEmpty = False):
+                yield ln
 
 
 
@@ -553,11 +778,14 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
 
 
 class JobDisplayConfig(DisplayConfig):
-    
+
+    def setJobDisplay(self, showChanges=False, compressJobs=False):
+        self.showChanges = showChanges
+        self.compressJobList = compressJobs
+
     def __init__(self, *args, **kw):
-        self.showChanges = kw.pop('showChanges', False)
-        self.compressJobList = kw.pop('compressJobs', True)
         DisplayConfig.__init__(self, *args, **kw)
+        self.setJobDisplay()
 
     def compressJobs(self):
         """ compress jobs so that updates of components are displayed with 
@@ -704,7 +932,7 @@ class JobFormatter(JobTupFormatter):
                 yield ln
         elif dcfg.printDeps():
             trvCs = dcfg.troveSource.getTroveChangeSet(job)
-            for ln in self.formatDeps(trvCs):
+            for ln in self.formatDeps(trvCs.getProvides(), trvCs.getRequires()):
                 yield ln
 
     def formatJobFiles(self, job):
@@ -726,20 +954,25 @@ class JobFormatter(JobTupFormatter):
 
                     if modType == troveSource.NEW_F:
                         prefix = ' New '
-                        yield self.formatFile(pathId, path, fileId, version, 
-                                              fileObj, prefix=prefix)
+                        for ln in self.formatFile(pathId, path, fileId,
+                                                  version, fileObj,
+                                                  prefix=prefix, indent=1):
+                            yield ln
 
                     elif modType == troveSource.MOD_F:
                         for ln in self.formatFileChange(pathId, path, fileId, 
-                                           version, fileObj, oldPath, oldFileId, 
-                                           oldVersion, oldFileObj):
+                                           version, fileObj, oldPath, 
+                                           oldFileId, oldVersion, oldFileObj, 
+                                           indent=1):
                             yield ln
 
                     elif modType == troveSource.OLD_F:
                         prefix = ' Del '
-                        yield self.formatFile(pathId, oldPath, oldFileId, 
-                                              oldVersion, oldFileObj, 
-                                              prefix=prefix)
+                        for ln in self.formatFile(pathId, oldPath, oldFileId,
+                                                  oldVersion, oldFileObj,
+                                                  prefix=prefix, indent=1):
+                            yield ln
+
 
             else:
                 for (pathId, path, fileId, version, fileObj, modType) in iter:
@@ -750,8 +983,10 @@ class JobFormatter(JobTupFormatter):
                     elif modType == troveSource.OLD_F:
                         prefix = ' Del '
 
-                    yield self.formatFile(pathId, path, fileId, version, 
-                                          fileObj, prefix=prefix)
+                    for ln in self.formatFile(pathId, path, fileId, version, 
+                                              fileObj, prefix=prefix,
+                                              indent=1):
+                        yield ln
 
         else:
             for (pathId, path, fileId, version) in iter:
@@ -759,9 +994,10 @@ class JobFormatter(JobTupFormatter):
 
     def formatFileChange(self, pathId, path, fileId, version, 
                          fileObj, oldPath, oldFileId, oldVersion, oldFileObj,
-                         indent=''):
-        yield self.formatFile(pathId, oldPath, oldFileId, oldVersion, 
-                              oldFileObj, prefix=' Mod ')
+                         indent=1):
+        for ln in self.formatFile(pathId, oldPath, oldFileId, oldVersion,
+                                  oldFileObj, prefix=' Mod ', indent=indent):
+            yield ln
 
         dcfg = self.dcfg
         #only print out data that has changed on the second line
@@ -786,7 +1022,7 @@ class JobFormatter(JobTupFormatter):
                 oldSha1 = oldFileObj.contents.sha1()
             else:
                 sha1 = None
-                
+
             if hasattr(fileObj, 'contents') and fileObj.contents:
                 sha1 = fileObj.contents.sha1()
             else:
@@ -813,5 +1049,7 @@ class JobFormatter(JobTupFormatter):
             taglist = ''
         else:
             taglist = ' [' + ' '.join(fileObj.tags) + ']' 
+
+        spacer = '  ' * indent
         yield "%s---> %s%s%-10s      %-8s %-8s %8s %11s %s%s" % \
-          (indent, space, sha1, mode, owner, group, size, time, name, taglist)
+          (spacer, space, sha1, mode, owner, group, size, time, name, taglist)

@@ -77,11 +77,6 @@ locally.
 Creates a local changeset, which represents the changes made on the
 local system to \fItrovename\fP, relative to the package as it is
 represented in the repository.
-.TP
-.B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
-Lists troves installed on the local system. Any number of trove names or
-absolute paths may be given. Extra arguments may be given to change what
-information is displayed (but they cannot be combined, unfortunately). Synonyms: \fBq\fP
 .RS 4
 .TP 4
 .B \-\-deps
@@ -111,49 +106,7 @@ is later renamed \fI/foo/blah\fP, when you update to a version of
 the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
-.TP
-.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
-Lists troves in the repository. Synonyms: \fBrq\fP
-Arguments include
-.RS 4
-.TP 4
-.B \-\-all
-.\" FIXME: document
-.TP
-.B \-\-buildreqs
-Displays the troves that fulfilled the build requirements of the trove.
-.TP
-.B \-\-deps
-Displays full dependency information.
-.TP
-.B \-\-flavors
-Displays flavors of the troves.
-.TP
-.B \-\-full-versions
-Full version strings are displayed instead of abbreviated version numbers.
-.TP
-.B \-\-ids
-.\" FIXME: document
-.TP
-.B \-\-info
-Displays information on the specified troves, including flavors, and requirements.
-.TP
-.B \-\-leaves
-.\" FIXME: document
-.TP
-.B \-\-ls
-Lists the files in the changeset.
-.TP
-.B \-\-sha1s
-Lists the sha1s of all the file contents in the changeset.
-.TP
-.B \-\-tags
-.\" FIXME: document
-.TP
-.B \-\-signatures
-Displays digital signatures for the specified troves.
-.RE
-.RE
+
 
 .B rollback \fIrollback\fP [\fIargs\fP] 
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
@@ -164,34 +117,7 @@ Arguments include
 .B \-\-replace-files
 See \-\-replace-files description from \fBconary update\fP
 .RE
-.TP
-.B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
-The \fBshowcs\fP command lists the contents of the provided 
-\fBchangeset\fP.  If a trove is specified, and that trove is within the 
-changeset, only that trove is displayed.  A component specifier, such as 
-:runtime, can be given instead of a trove.  In that case, all components 
-within all packages in the changeset will be displayed.
 
-.RS 4
-.TP 4
-.B \-\-full-versions
-Does not attempt to shorten version strings for display.
-.\" FIXME: add semantics
-.TP
-.B \-\-deps
-Displays provides and requires information about the troves in the changeset.
-.TP
-.B \-\-ls
-Lists the files in the changeset.
-.TP
-.B \-\-show-changes
-For files that have been modified, lists the old version of the file above the
-new version of the file for easy comparison.   Only has an effect if --ls
-is specified.  
-.TP
-.B \-\-tags
-Show any files in the changeset that have tags.
-.RE
 .TP
 .B syncchildren [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Update the children of \fItrovename\fP so that the versions of the child
@@ -325,6 +251,188 @@ through a \fBconary update conary\fP invocation.
 Compares the files in the given \fItrove\fP (or all troves if the --all 
 option if given) against the trove files as they were  at the time of install,
 and displays any differences.
+.\"
+.\"
+.\"
+.SS "Querying"
+There are several options for querying local, repository, and changeset information using conary. (Fix this text)
+.TP
+.B Trove selection
+.RS 4
+.TP
+All query modes take, optionally, any number of name[=version][[flavor]] trove specifiers that determine the troves(s) to display.  The version specifier may be either a full verison string, a label, a hostname followed by an @, just the version, the version plus source and build counts.
+.RE
+.TP
+.B Common Trove Recursion/Child Trove Display options
+.RS 4
+.TP
+.B \-\-troves
+Displays not only the trove in question, but any troves directly included in that trove that are installed by default.
+.TP
+.B \-\-all-troves
+Like \-\-troves, but also displays troves not installed by default.
+.TP
+.B \-\-recurse
+Recurses and displays all child troves of the selected troves, and the child troves of those troves, and so on.  --recurse is implied by many other options, for example, any option that displays files.
+.TP
+.B \-\-no-recurse
+Turns off implied or explicit recursion.
+.TP
+.B \-\-trove-flags
+Displays flags associated with a trove.   Important flags that can be displayed:
+.RS 4
+.TP
+.B NotByDefault
+A NotByDefault flag next to a trove means that, if you install the selected top-level trove, this trove will not be installed.
+.TP
+.B Missing
+A Missing flag means that the trove was not available in the trove source (for example, on your installed system it means that the given trove is not 
+installed).
+.RE
+.TP
+.B \-\-trove-headers
+Ensures that the short description of a trove is displayed, and that displayed information is indented to the correct level for the given trove's location in the hierarchy if recursing.  This flag is necessary when listing files, for example, to see what files are associated with an individual trove.
+.RE
+.TP
+.B Common Trove Display Options
+.RS 4
+.TP
+The following options modify the way a particular trove is displayed, or what information about the trove is displayed.  Some of the options turn off the default trove headers (which can be turned on again by --trove-headers).  Others turn imply --recurse.  Such side effects are mentioned when necessary.
+.TP
+.B \-\-flavors
+Displays full flavors of the troves.  By default conary tries to make a guess at what parts of a trove's flavor will be relevant to you by looking at what troves you have installed, your install flavors, and the other troves with the same name being displayed.  Using --flavors disables this behavior and displays the full flavor.
+.TP
+.B \-\-full-versions
+Full version strings are displayed instead of abbreviated version numbers.
+.TP
+.B \-\-labels
+Displays <label>/<revision> instead of abbreviated version numbers.
+.TP
+.B \-\-buildreqs
+Displays the troves that fulfilled the build requirements of the trove.  (Turns off trove headers)
+.TP
+.B \-\-deps
+Displays full dependency information for the given trove.  (--recurse implied)
+.TP
+.B \-\-info
+Displays information on the specified troves, including flavors, requirements, and metadata.
+.TP
+.B \-\-signatures
+Displays digital signatures for the specified troves.
+.RE
+.TP
+.B Common File Display options
+.RS 4
+.TP
+All file display options imply --recurse.  All extended file display options imply --ls (meaning that they list the file in question along with the extra info).  They also all turn off trove headers, which can be overridden by specifying --trove-headers.
+.TP
+.B \-\-file-deps
+Displays the individual provides and requires for each file.  If a file has no dependencies, no information will be displayed.
+.TP
+.B \-\-file-versions
+Displays the version of each file listed.
+.TP
+.B \-\-ids
+Displays the file ids for each file.  This is generally used for debugging.
+.TP
+.B \-\-ls
+Lists the files in the changeset.
+.TP
+.B \-\-lsl
+Lists the files in the changeset, with mode, size, and other information as would be seen with ls -l.
+.TP
+.B \-\-sha1s
+Displays the file ids for each file.  This is generally used for debugging.
+.TP
+.B \-\-tags
+Displays the tags associated with each file.  When a file with a tag is installed, removed, or change, the listed tag handler is executed.  See documentation on tag handlers for more information.
+.RE
+.TP
+.B Querying The Repository
+.RS 4
+.TP
+.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Lists troves in the repository. Synonyms: \fBrq\fP
+.TP
+Repquery takes several options to modify which troves it returns to you.  The options affect both the verisons of trove returned and the flavors returned.  We call these version and flavor filters.  All flavor filtering occurs after version filtering.  Both types of filtering occur after any version or flavor specified in a trove spec is applied.  The default version filter is --latest, the default flavor filter is--best.
+
+.TP 4
+.B Version Selection
+.RS
+.TP
+.B \-\-all-versions
+Returns all versions of all troves that match the given trove specifiers.
+.TP
+.B \-\-leaves
+Given all the troves that match a trove specifier trove foo, for each flavor that matches, return the trove with the latest version for that flavor.  This option is useful for looking at the all the flavors that exist for a trove without looking at all the available versions.
+.TP
+.B \-\-latest [default]
+For each trove specifier, return all the troves with the latest version.
+.RE
+.TP 4
+.B Flavor Selection
+.RS
+.TP
+.B \-\-all-flavors
+Do not filter by flavor -- return all troves that match the version filter.
+.TP
+.B \-\-available-flavors
+Filter using flavor and branch affinity (see section below), and return all troves that match.
+.TP
+.B \-\-best-flavors [default]
+Filter using flavor and branch affinity (see section below), and return the best trove that matches.  Note that affinity is not used when no trove specifiers are given.
+.TP
+.B \-\-compatible-flavors
+Filter the install flavors without affinity, and return all troves that match.
+.TP
+.B \-\-no-affinity
+Turn off flavor and branch affinity.  For example, when  using --best-flavors 
+(the default), the best flavor that matches your install flavor is used.
+.RE
+.TP 4
+.B Flavor and Branch affinity
+.RS
+.TP
+Both the conary update and repository query commands use flavor and branch affinity to determine what troves to either install or display.  By default, 'conary rq <trove>' acts like 'conary update <trove>' would.  
+.TP
+The affect of branch affinity on an update or query command can be described as follows:  if a trove specifier 'foo' is given with no version information, conary will look at any installed versions of 'foo' and see what branches they are on, returns the latest version of 'foo' on those branches that match the flavor specified.
+.TP 
+The affect of flavor affinity on an update or query command can be described as follows: if a trove specifier 'foo' is given with no flavor information, and the flavors of the installed versions of foo match, then conary will merge the flavor of the installed troves into the install flavor given.
+.TP
+In summary, when you install a trove on a particular branch, conary assumes, unless you explicitly specify otherwise, that you would like to continue getting updates from that branch.  Similarly, if you install a trove with a different flavor than your install flavor, conary assumes that you wish to keep that flavor.  
+Repository querying matches this behavior to help you see what trove will be installed if you perform an update.
+.RE
+.RE
+.TP
+.B Querying The Local System
+.RS 4
+.TP
+.B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
+Lists troves installed on the local system. Any number of trove names or
+absolute paths may be given. Extra arguments may be given to change what
+information is displayed (but they cannot be combined, unfortunately). Synonyms: \fBq\fP
+.RS 4
+.TP
+.B \-\-path <path>
+Displays information about the trove that owns the path <path>, if any.
+.RE
+.RE
+.TP
+.B Querying ChangeSets
+.RS 4
+.TP
+.B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
+The \fBshowcs\fP command lists the contents of the provided 
+\fBchangeset\fP.  If a trove is specified, and that trove is within the 
+changeset, only that trove is displayed.  
+.RS 4
+.TP 4
+.B \-\-show-changes
+For files that have been modified, lists the old version of the file above the
+new version of the file for easy comparison.  Implies --ls
+is specified.  
+.RE
+.RE
 .\"
 .\"
 .\"

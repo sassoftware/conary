@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -26,10 +26,31 @@ from conary.lib import log
 from conary import versions
 
 
-def displayTroves(cfg, troveSpecs = [], all = False, ls = False, 
-                  ids = False, sha1s = False, leaves = False, 
-                  info = False, tags = False, deps = False,
-                  showBuildReqs = False, digSigs = False):
+VERSION_FILTER_ALL    = 0
+VERSION_FILTER_LATEST = 1
+VERSION_FILTER_LEAVES = 2
+
+FLAVOR_FILTER_ALL    = 0
+FLAVOR_FILTER_AVAIL  = 1
+FLAVOR_FILTER_COMPAT = 2
+FLAVOR_FILTER_BEST   = 3
+
+
+def displayTroves(cfg, troveSpecs=[], 
+                  # query options
+                  versionFilter=VERSION_FILTER_LATEST, 
+                  flavorFilter=FLAVOR_FILTER_BEST, useAffinity = True,
+                  # trove options
+                  info = False, digSigs = False, deps = False,
+                  showBuildReqs = False, 
+                  # file options
+                  ls = False, lsl = False, ids = False, sha1s = False, 
+                  tags = False, fileDeps = False, fileVersions = False,
+                  # collection options
+                  showTroves = False, recurse = None, showAllTroves = False,
+                  weakRefs = False, showTroveFlags = False, 
+                  alwaysDisplayHeaders = False
+                  ):
     """
        Displays information about troves found in repositories
 
@@ -39,150 +60,305 @@ def displayTroves(cfg, troveSpecs = [], all = False, ls = False,
        @type cfg: conarycfg.ConaryConfiguration
        @param troveSpecs: troves to search for
        @type troveSpecs: list of troveSpecs (n[=v][[f]])
-       @param all: If true, find all versions of the specified troves, 
-                   not just the leaves
-       @type all: bool
-       @param leaves: If true, find all leaves of the specified troves,
-                      regardless of whether they match the cfg flavor 
-       @type leaves: bool
+       @param versionFilter: add documentation here.  Check man page for 
+       general description
+       @type versionFilter: bool
+       @param flavorFilter: add documentation here.  Check man page for 
+       general description.
+       @type flavorFilter: bool
+       @param useAffinity: If False, disallow affinity database use.
+       @type useAffinity: bool
+       @param info: If true, display general information about the trove
+       @type info: bool
+       @param digSigs: If true, display digital signatures for a trove.
+       @type digSigs: bool
+       @param showBuildReqs: If true, display the versions and flavors of the
+       build requirements that were used to build the given troves
+       @type showBuildReqs: bool
+       @param deps: If true, display provides and requires information 
+       for the trove.
+       @type deps: bool
        @param ls: If true, list files in the trove
        @type ls: bool
+       @param lsl: If true, list files in the trove + ls -l information
+       @type lsl: bool
        @param ids: If true, list pathIds for files in the troves
        @type ids: bool
        @param sha1s: If true, list sha1s for files in the troves
        @type sha1s: bool
        @param tags: If true, list tags for files in the troves
        @type tags: bool
-       @param info: If true, display general information about the trove
-       @type info: bool
-       @param deps: If true, display provides and requires information for the
-                    trove.
-       @type deps: bool
-       @param showDiff: If true, display the difference between the local and
-                        pristine versions of the trove
-       @type showDiff: bool
-       @param digSigs: If true, list digital signatures for the troves
-       @type digSigs: bool
+       @param fileDeps: If true, print file-level dependencies
+       @type fileDeps: bool
+       @param fileVersions: If true, print fileversions
+       @type fileVersions: bool
+       @param showTroves: If true, display byDefault True child troves of this
+       trove
+       @type showTroves: bool
+       @param recurse: display child troves of this trove, recursively
+       @type recurse: bool
+       @param showAllTroves: If true, display all byDefault False child troves 
+       of this trove
+       @type showAllTroves: bool
+       @param weakRefs: display both weak and strong references of this trove.
+       @type weakRefs: bool
+       @param showTroveFlags: display [<flags>] list with information about
+       the given troves.
+       @type showTroveFlags: bool
+       @param alwaysDisplayHeaders: If true, display headers even when listing  
+       files.
+       @type alwaysDisplayHeaders: bool
        @rtype: None
     """
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
-    troveTups, namesOnly, primary  = getTrovesToDisplay(repos, cfg, troveSpecs, 
-                                                        all, leaves)
-    iterChildren = not namesOnly
+    if useAffinity:
+        affinityDb = client.db
+    else:
+        affinityDb = None
 
-    dcfg = display.DisplayConfig(repos, ls, ids, sha1s, digSigs,
-                                 cfg.fullVersions, tags, info, deps,
-                                 showBuildReqs, cfg.fullFlavors, iterChildren,
-                                 cfg.showComponents)
+    troveTups = getTrovesToDisplay(repos, troveSpecs, versionFilter,
+                                   flavorFilter, cfg.installLabelPath,
+                                   cfg.flavor, affinityDb)
 
-    if primary:
+
+    dcfg = display.DisplayConfig(repos, affinityDb)
+
+    dcfg.setTroveDisplay(deps=deps, info=info, showBuildReqs=showBuildReqs,
+                         digSigs=digSigs, fullVersions=cfg.fullVersions,
+                         showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
+                         showComponents = cfg.showComponents,
+                         baseFlavors = cfg.flavor)
+
+    dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
+                        fileDeps=fileDeps, fileVersions=fileVersions)
+
+    recurseOne = showTroves or showAllTroves or weakRefs
+    if recurse is None and not recurseOne and troveSpecs:
+        # if we didn't explicitly set recurse and we're not recursing one
+        # level explicitly and we specified troves (so everything won't 
+        # show up at the top level anyway), guess at whether to recurse
+        recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
+                           fileVersions)
+    displayHeaders = alwaysDisplayHeaders or showTroveFlags 
+
+    dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
+                         showNotByDefault = showAllTroves,
+                         showWeakRefs = weakRefs,
+                         showTroveFlags = showTroveFlags,
+                         displayHeaders = displayHeaders,
+                         checkExists = False)
+
+    if troveSpecs:
         dcfg.setPrimaryTroves(set(troveTups))
-
-    if dcfg.needFiles() and all:
-        log.error('cannot use "all" with commands that require file lists')
-        sys.exit(1)
 
     formatter = display.TroveFormatter(dcfg)
 
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(repos, cfg, troveSpecs, all, leaves):
+def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
+                       labelPath, defaultFlavor, affinityDb):
     """ Finds troves that match the given trove specifiers, using the
         current configuration, and parameters
 
         @param repos: a network repository client
         @type repos: repository.netclient.NetworkRepositoryClient
-        @param cfg: conary config
-        @type cfg: conarycfg.ConaryConfiguration
         @param troveSpecs: troves to search for
         @type troveSpecs: list of troveSpecs (n[=v][[f]])
-        @param all: If true, find all versions of the specified troves, 
-                   not just the leaves
+        @param versionFilter: The VERSION_FILTER_* to use.  See man
+        page for documentation for now.
         @type all: bool
-        @param leaves: If true, find all leaves of the specified troves,
-                       regardless of whether they match the cfg flavor 
-        @type leaves: bool
+        @param flavorFilter: The FLAVOR_FILTER_* to use.  See man
+        page for documentation for now.
+        @param labelPath: The labelPath to search
+        @type labelPath: list
+        @param defaultFlavor: The default flavor(s) to search with
+        @type defaultFlavor: list
+        @param affinityDb: The affinity database to search with.
+        @type affinityDb: bool
 
         @rtype: troveTupleList (list of (name, version, flavor) tuples)
-                and a boolean that is true if all troveSpecs passed in do not 
-                specify version or flavor
     """
 
-    namesOnly = True
-
     if troveSpecs:
-        primary = True
+        # Search for troves using findTroves.  The options we
+        # specify to findTroves are determined by the version and 
+        # flavor filter.
         troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecs ]
-    else:
-        primary = False
-        troveSpecs = []
+        searchFlavor = defaultFlavor
 
-    for troveSpec in troveSpecs:
-        if troveSpec[1:] != (None, None):
-            namesOnly = False
+        if versionFilter == VERSION_FILTER_ALL:
+            getLeaves = False
+            acrossLabels = True
+        elif versionFilter == VERSION_FILTER_LATEST:
+            # we just want to limit all searches for the very latest
+            # version node.  Find trove makes this difficult, we
+            # do the leaves search and then filter.
+            getLeaves = True
+            acrossLabels = False
+        elif versionFilter == VERSION_FILTER_LEAVES:
+            # This will return all versions that are 'leaves', that is,
+            # are the latest with a unique flavor string.
+            getLeaves = True
+            acrossLabels = False
+        else:
+            assert(0)
 
-    if not (all or leaves) and not troveSpecs:
-        for label in cfg.installLabelPath:
-            troveSpecs += [ (x, None, None) for x in repos.troveNames(label) ]
-            troveSpecs.sort()
-        allowMissing = True
-    else:
-        allowMissing = False
-
-    troveTups = []
-    if all or leaves:
-        if troveSpecs:
+        if flavorFilter == FLAVOR_FILTER_ALL:
+            searchFlavor = None 
+            bestFlavor = False 
+            acrossFlavors = True # there are no flavors to go 'across'
+            newSpecs = []
+            origSpecs = {}
+            # We do extra processing here.  We want FLAVOR_FILTER_ALL to work 
+            # when you specify a flavor to limit the all to. 
+            # But findTrove won't let us do that, since it expects that
+            # the flavors it gets passed are supersets of the trove flavors
+            # So we search with no flavor and search by hand afterwards.
             for (n, vS, fS) in troveSpecs:
-                hostList = None
-                if vS:
-                    try:
-                        label = versions.Label(vS)
-                        hostList = [label.getHost()]
-                    except versions.ParseError:
-                        pass
-                    if not hostList:
-                        try:
-                            ver = versions.VersionFromString(vS)
-                            host = ver.getHost()
-                        except versions.ParseError:
-                            pass
-                if not hostList:
-                    hostList =  [ x.getHost() for x in cfg.installLabelPath ]
+                origSpecs.setdefault((n, vS), []).append(fS)
+                newSpecs.append((n, vS, None))
+            troveSpecs = newSpecs
+            affinityDb = None
+        elif flavorFilter == FLAVOR_FILTER_COMPAT:
+            # match install flavor but don't match affinity,
+            # return all flavors that match.
+            affinityDb = None
+            bestFlavor = False
+            acrossFlavors = True
+        elif flavorFilter == FLAVOR_FILTER_AVAIL:
+            # match install flavor + affinity, could affect rq branch,
+            # return all flavors that match.
+            bestFlavor = False
+            acrossFlavors = True
+            getLeaves = True
+        elif flavorFilter == FLAVOR_FILTER_BEST:
+            # match install flavor + affinity, could affect rq branch,
+            # return best match.
+            bestFlavor = True
+            acrossFlavors = False
 
-                repositories = {}
-                for host in hostList:
-                    d = repositories.setdefault(host, {})
-                    l = d.setdefault(n, [])
-                    l.append(fS)
-        else:
-            repositories = dict.fromkeys((x.getHost() for x in cfg.installLabelPath), {})
+        results = repos.findTroves(labelPath,
+                                   troveSpecs, searchFlavor,
+                                   affinityDatabase = affinityDb,
+                                   acrossLabels = acrossLabels,
+                                   acrossFlavors = acrossFlavors,
+                                   allowMissing = False,
+                                   bestFlavor = bestFlavor,
+                                   getLeaves = getLeaves)
 
-        if all:
-            fn = repos.getTroveVersionList
-        else:
-            fn = repos.getAllTroveLeaves
-
-        troveDict = {}
-        for host, names in repositories.iteritems():
-            d = fn(host, names)
-            repos.queryMerge(troveDict, d)
-
-        for n, verDict in troveDict.iteritems():
-            for v, flavors in reversed(sorted(verDict.iteritems())):
-                for f in flavors:
+        # do post processing on the result if necessary
+        if (flavorFilter == FLAVOR_FILTER_ALL or versionFilter == VERSION_FILTER_LATEST):
+            troveTups = []
+            for (n,vS,fS), tups in results.iteritems():
+                if versionFilter == VERSION_FILTER_LATEST:
+                    # only look at latest leaf.
+                    maxVersion = max(x[1] for x in tups)
+                    tups = [ x for x in tups if x[1] == maxVersion ]
+                for (_, v, f) in tups:
+                    if flavorFilter == FLAVOR_FILTER_ALL:
+                        # only look at latest leaf.
+                        foundMatch = False
+                        for fS in origSpecs[n, vS]:
+                            # FIXME: switch to stronglySatisfies
+                            # in order to implement primary flavor support
+                            # here at least?
+                            if not fS or f.satisfies(fS):
+                                foundMatch = True
+                                break
+                        if not foundMatch:
+                            continue
                     troveTups.append((n, v, f))
+        else:
+            troveTups = list(itertools.chain(*results.itervalues()))
     else:
-        results = repos.findTroves(cfg.installLabelPath, 
-                                   troveSpecs, cfg.flavor, 
-                                   acrossLabels = True,
-                                   acrossFlavors = True,
-                                   allowMissing = allowMissing)
-        for troveSpec in troveSpecs:
-            # make latest items be at top of list
-            troveTups.extend(sorted(reversed(results.get(troveSpec, []))))
+        # no troves specified, use generic fns with no names given.
+        if versionFilter == VERSION_FILTER_ALL:
+            queryFn = repos.getTroveVersionsByLabel
+        elif versionFilter == VERSION_FILTER_LATEST:
+            queryFn = repos.getTroveLeavesByLabel
+        elif versionFilter == VERSION_FILTER_LEAVES:
+            queryFn = repos.getTroveLeavesByLabel
 
-    return troveTups, namesOnly, primary
+
+        if flavorFilter == FLAVOR_FILTER_ALL:
+            flavor = None
+            bestFlavor = False
+            affinityDb = None
+        elif flavorFilter == FLAVOR_FILTER_COMPAT:
+            flavor = defaultFlavor
+            bestFlavor = False
+            affinityDb = None 
+        elif flavorFilter == FLAVOR_FILTER_AVAIL:
+            # match affinity flavors
+            # must be done client side...
+            flavor = None
+            bestFlavor = False
+            affinityDb = None 
+        elif flavorFilter == FLAVOR_FILTER_BEST:
+            # match affinity flavors
+            # must be done client side...
+            flavor = None
+            bestFlavor = False
+            affintyDb = None # XXX for now turn off.
+        resultsDict = queryFn({'': dict((x, flavor) for x in labelPath)},
+                              bestFlavor = bestFlavor)
+
+        # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,
+        # and FLAVOR_FILTER_AVAIL
+        leavesFilter = {}
+        troveTups = []
+        for name, versionDict in resultsDict.iteritems():
+            if affinityDb:
+                localFlavors = [x[2] for x in affinityDb.trovesByName(name)]
+            else:
+                localFlavors = []
+
+            if versionFilter == VERSION_FILTER_LATEST:
+                maxVersion = max(versionDict)
+                versionDict = { maxVersion: versionDict[maxVersion] }
+
+            for version, flavorList in versionDict.iteritems():
+                if flavorFilter == FLAVOR_FILTER_BEST:
+                    best = None
+                    for systemFlavor in defaultFlavor:
+                        mathing = []
+                        matchScores = []
+                        if localFlavors:
+                            matchFlavors = [ deps.overrideFlavor(systemFlavor, x) for x in localFlavors]
+                        else:
+                            matchFlavors = [systemFlavor]
+
+                        for f in flavorList:
+                            scores = ( (x.score(f), f) for x in matchFlavors)
+                            scores = [ x for x in scores if x[0] is not False]
+                            if scores:
+                                matchScores.append(max(scores))
+                        if matchScores:
+                            best = max(matchScores)[1]
+                            break
+                    if best is not None:
+                        flavorList = [best]
+                    else:
+                        continue
+                elif flavorFilter == FLAVOR_FILTER_AVAIL:
+                    if localFlavors:
+                        matchFlavors = []
+                        for systemFlavor in defaultFlavor:
+                            matchFlavors.extend(deps.overrideFlavor(systemFlavor, x) for x in localFlavors)
+                    else:
+                        matchFlavors = defaultFlavor
+                for flavor in flavorList:
+                    if flavorFilter == FLAVOR_FILTER_AVAIL:
+                        found = False
+                        for matchFlavor in matchFlavors:
+                            if matchFlavor.satisfies(flavor):
+                                found = True
+                                break
+                        if not found:
+                            continue
+                    troveTups.append((name, version, flavor))
+    return sorted(troveTups)
