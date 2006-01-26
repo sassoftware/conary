@@ -153,7 +153,8 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[]):
     primary = True
 
     if troveSpecs:
-        troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecs ]
+        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
+                                                        for x in troveSpecs ]
     else:
         troveSpecs = []
 

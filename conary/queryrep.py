@@ -187,7 +187,8 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
         # Search for troves using findTroves.  The options we
         # specify to findTroves are determined by the version and 
         # flavor filter.
-        troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecs ]
+        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
+                                                        for x in troveSpecs ]
         searchFlavor = defaultFlavor
 
         if versionFilter == VERSION_FILTER_ALL:
