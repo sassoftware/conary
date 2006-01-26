@@ -1,10 +1,11 @@
 Changes in 0.94:
   o Bug Fixes
-    * getNewTroveList() could return duplicate troves
+    * A bug in getNewTroveList() that could cause duplicate
+      troves to be returned has been fixed.
 
   o Client changes:
-    * Reworked query/repquery/showcs command line options.  See man page for
-      details.
+    * The query/repquery/showcs command line options have been
+      reworked.  See the conary man page for details.
 
 Changes in 0.93:
   o Bug Fixes
