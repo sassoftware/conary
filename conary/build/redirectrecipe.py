@@ -80,9 +80,9 @@ class RedirectRecipe(Recipe):
         sourceTroveMatches = self.repos.getTroveLeavesByBranch(sourceSearch)
 
         if len(sourceTroveMatches) != len(sourceSearch):
-            missing = set(sourceSearch) - set(matches)
+            missing = set(sourceSearch) - set(sourceTroveMatches)
             raise builderrors.RecipeFileError, \
-                    "No troves found with names %s" % " ".join(missing)
+                    "No troves found with name(s) %s" % " ".join(missing)
 
         l = []
         for name, d in sourceTroveMatches.iteritems():
