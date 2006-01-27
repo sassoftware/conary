@@ -182,6 +182,12 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
 
         @rtype: troveTupleList (list of (name, version, flavor) tuples)
     """
+    def _merge(resultD, response):
+        for troveName, troveVersions in response.iteritems():
+            d = resultD.setdefault(troveName, {})
+            for version, flavors in troveVersions.iteritems():
+                d.setdefault(version, []).extend(flavors)
+        return resultD
 
     if troveSpecs:
         # Search for troves using findTroves.  The options we
@@ -191,9 +197,9 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                                                         for x in troveSpecs ]
         searchFlavor = defaultFlavor
 
+        acrossLabels = True
         if versionFilter == VERSION_FILTER_ALL:
             getLeaves = False
-            acrossLabels = True
         elif versionFilter == VERSION_FILTER_LATEST:
             # we just want to limit all searches for the very latest
             # version node.  Find trove makes this difficult, we
@@ -241,6 +247,9 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
             # return best match.
             bestFlavor = True
             acrossFlavors = False
+
+        if not affinityDb:
+            acrossLabels = True
 
         results = repos.findTroves(labelPath,
                                    troveSpecs, searchFlavor,
@@ -305,8 +314,14 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
             flavor = None
             bestFlavor = False
             affintyDb = None # XXX for now turn off.
-        resultsDict = queryFn({'': dict((x, flavor) for x in labelPath)},
-                              bestFlavor = bestFlavor)
+
+        resultsDict = {}
+
+        resultsDict = queryFn({'': {labelPath[0] : flavor}}, 
+                               bestFlavor = bestFlavor)
+        for label in labelPath[1:]:
+            d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor)
+            _merge(resultsDict, d)
 
         # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,
         # and FLAVOR_FILTER_AVAIL
@@ -319,8 +334,13 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                 localFlavors = []
 
             if versionFilter == VERSION_FILTER_LATEST:
-                maxVersion = max(versionDict)
-                versionDict = { maxVersion: versionDict[maxVersion] }
+                versionsByBranch = {}
+                for version in versionDict:
+                    versionsByBranch.setdefault(version.branch(),
+                                                []).append(version)
+
+                maxVersions = [ max(x) for x in versionsByBranch.itervalues() ]
+                versionDict = dict((x, versionDict[x]) for x in maxVersions)
 
             for version, flavorList in versionDict.iteritems():
                 if flavorFilter == FLAVOR_FILTER_BEST:
