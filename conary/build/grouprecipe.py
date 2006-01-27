@@ -1045,7 +1045,24 @@ def calcSizeAndCheckHashes(group, troveCache):
                 allPathHashes.setdefault(pathHash, []).append(troveTup)
 
         conflicts = set(tuple(x) for x in allPathHashes.itervalues() if len(x) > 1)
-        return conflicts
+        # we've got the sets of conflicting troves, now
+        # determine the set of conflicting files
+        trovesWithFiles = {}
+
+        conflictsWithFiles = []
+        for conflictSet in conflicts:
+            needed = [ x for x in conflictSet if x not in trovesWithFiles ]
+            troves = troveCache.repos.getTroves(needed, withFiles=True)
+            trovesWithFiles.update(dict(izip(needed, troves)))
+            conflicting = set(x[1] for x \
+                              in trovesWithFiles[conflictSet[0]].iterFileList())
+            for tup in conflictSet[1:]:
+                conflicting &= set(x[1] for x in \
+                                trovesWithFiles[tup].iterFileList())
+
+            conflictsWithFiles.append((conflictSet, conflicting))
+
+        return conflictsWithFiles
 
     size = 0
     validSize = True
