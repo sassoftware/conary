@@ -2,6 +2,9 @@ Changes in 0.94:
   o Bug Fixes
     * A bug in getNewTroveList() that could cause duplicate
       troves to be returned has been fixed.
+    * A bug that caused a repository server running under Apache to
+      fail with an Internal Server Error (500) when a client requested
+      a changeset file that does not exist has been fixed.
 
   o Client changes:
     * The query/repquery/showcs command line options have been
@@ -10,6 +13,9 @@ Changes in 0.94:
       recipe version, and for accounting purposes, when cvc merge is run and
       committed on a shadow, the upstream version that was used for merging
       is committed to the shadow.
+    * "conary emerge" can now be performed on a recipe file.
+      Previously you were required to emerge from a repository. (bug
+      #526)
 
 Changes in 0.93:
   o Bug Fixes

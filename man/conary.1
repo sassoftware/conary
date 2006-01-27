@@ -53,10 +53,11 @@ Normally, conary config will mask paswords in repository maps, to avoid their
 accidental display.  You can override this masking with --show-passwords.  
 .RE
 .TP
-.B emerge \fI<component>...\fP
-Builds the recipe for the given component (which it finds by searching the
-\fIinstallLabelPath\fP) onto the \fBlocalhost@local:EMERGE\fP branch
-and updates the local system to the new build.
+.B emerge \fI<file>\fP.recipe\fI|<component>[=<version>]...
+Builds the recipe for the given recipe file or component (which it
+finds by searching the \fIinstallLabelPath\fP if no version is
+provided) onto the \fBlocalhost@local:EMERGE\fP branch and updates the
+local system to the new build.
 .TP
 .B erase [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
