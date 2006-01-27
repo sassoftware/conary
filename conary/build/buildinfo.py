@@ -78,7 +78,7 @@ class BuildInfo(dict):
         # does not
 	if not name.startswith('_BuildInfo_'):
             #escape \\ and \n
-            value = value.replace('\\', '\\\\')
+            value = str(value).replace('\\', '\\\\')
             value = value.replace('\n', '\\n')
 	    self.write('%s %s\n' % (name,value))
 	self[name] = value
