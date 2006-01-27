@@ -13,7 +13,8 @@ Changes in 0.94:
       branch with changes made on a shadow, conary now records the
       version from the parent branch that was used for the merge.
       This is required to allow conary to handle changing the upstream
-      version on a shadow.  It is also useful for accounting purposes.
+      version on a shadow.  It is also useful for accounting
+      purposes.  (bug #220)
     * "conary emerge" can now be performed on a recipe file.
       Previously you were required to emerge from a repository. (bug
       #526)
