@@ -2,6 +2,9 @@ Changes in 0.94:
   o Bug Fixes
     * A bug in getNewTroveList() that could cause duplicate
       troves to be returned has been fixed.
+    * A bug that caused a repository server running under Apache to
+      fail with an Internal Server Error (500) when a client requested
+      a changeset file that does not exist has been fixed.
 
   o Client changes:
     * The query/repquery/showcs command line options have been
