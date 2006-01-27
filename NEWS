@@ -6,6 +6,8 @@ Changes in 0.94:
   o Client changes:
     * The query/repquery/showcs command line options have been
       reworked.  See the conary man page for details.
+    * "conary emerge" can now be performed on a recipe file.
+      Previously you were required to emerge from a repository.
 
 Changes in 0.93:
   o Bug Fixes

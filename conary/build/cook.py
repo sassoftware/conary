@@ -1105,9 +1105,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         if versionStr:
             raise CookError, \
                 ("Must not specify version string when cooking recipe file")
-	if emerge:
-	    raise CookError, \
-		("Troves must be emerged directly from a repository")
 
 	recipeFile = name
 
@@ -1174,10 +1171,10 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
         recipeClass = loader.getRecipe()
 
-	if emerge:
-	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
-	    os.close(fd)
-	    targetLabel = versions.EmergeLabel()
+    if emerge:
+        (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
+        os.close(fd)
+        targetLabel = versions.EmergeLabel()
 
     built = None
     try:
