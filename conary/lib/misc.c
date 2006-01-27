@@ -53,7 +53,7 @@ static PyObject * exists(PyObject *self, PyObject *args) {
         return NULL;
 
     if (lstat(fn, &sb)) {
-        if (errno == ENOENT || errno == ENOTDIR) {
+        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG) {
             Py_INCREF(Py_False);
             return Py_False;
         }
@@ -73,7 +73,7 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args) {
         return NULL;
 
     if (unlink(fn)) {
-        if (errno == ENOENT) {
+        if (errno == ENOENT || errno == ENAMETOOLONG) {
             Py_INCREF(Py_False);
             return Py_False;
         }
