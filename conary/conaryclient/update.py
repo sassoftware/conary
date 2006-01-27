@@ -1308,7 +1308,7 @@ conary erase '%s=%s[%s]'
         redirectCs, notFound = csSource.createChangeSet(
                 [ (x[0], (None, None), x[1:], True) for x in 
                                 redirectHack.keys() ], 
-                withFiles = False, recurse = False)
+                withFiles = False, recurse = True)
         uJob.getTroveSource().addChangeSet(redirectCs)
         transitiveClosure.update(redirectCs.getJobSet(primaries = False))
         del redirectCs
