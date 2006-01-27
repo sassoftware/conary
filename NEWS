@@ -9,10 +9,11 @@ Changes in 0.94:
   o Client changes:
     * The query/repquery/showcs command line options have been
       reworked.  See the conary man page for details.
-    * In order to make shadow merging work when the shadow changes the
-      recipe version, and for accounting purposes, when cvc merge is run and
-      committed on a shadow, the upstream version that was used for merging
-      is committed to the shadow.
+    * When "cvc merge" is used to merge changes made on the parent
+      branch with changes made on a shadow, conary now records the
+      version from the parent branch that was used for the merge.
+      This is required to allow conary to handle changing the upstream
+      version on a shadow.  It is also useful for accounting purposes.
     * "conary emerge" can now be performed on a recipe file.
       Previously you were required to emerge from a repository. (bug
       #526)
