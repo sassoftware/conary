@@ -19,7 +19,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 12
+VERSION = 13
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -1186,6 +1186,23 @@ class MigrateTo_12(SchemaMigration):
 			 trove._TROVEINFO_TAG_PATH_HASHES))
         return self.Version
 
+class MigrateTo_13(SchemaMigration):
+    Version = 13
+    def migrate(self):
+        cu = self.cu
+
+        logMe(3, "Emptying out redirects...")
+        cu.execute("""
+                CREATE TEMPORARY TABLE Redirects AS
+                    SELECT instanceId FROM Instances WHERE isRedirect = 1""")
+        # IN syntax blows w/ mysql
+        for instanceId in cu:
+            cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instnaceId)
+            cu.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
+                       "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
+
+        return self.Version
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     cu = db.cursor()
@@ -1320,6 +1337,7 @@ def loadSchema(db):
     if version == 9: version = MigrateTo_10(db)()
     if version == 10: version = MigrateTo_11(db)()
     if version == 11: version = MigrateTo_12(db)()
+    if version == 12: version = MigrateTo_13(db)()
 
     if version:
         db.loadSchema()
