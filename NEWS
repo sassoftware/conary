@@ -1,3 +1,6 @@
+Changes in 0.94:
+  * Redirects now point to branches instead of to specific versions
+
 Changes in 0.93:
   o Bug Fixes
     * A bug in the "conary verify" code sometimes resulted in an
