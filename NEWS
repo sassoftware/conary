@@ -6,6 +6,10 @@ Changes in 0.94:
   o Client changes:
     * The query/repquery/showcs command line options have been
       reworked.  See the conary man page for details.
+    * In order to make shadow merging work when the shadow changes the
+      recipe version, and for accounting purposes, when cvc merge is run and
+      committed on a shadow, the upstream version that was used for merging
+      is committed to the shadow.
 
 Changes in 0.93:
   o Bug Fixes
