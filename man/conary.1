@@ -266,6 +266,9 @@ All query modes take, optionally, any number of name[=version][[flavor]] trove s
 .B Common Trove Recursion/Child Trove Display options
 .RS 4
 .TP
+.B \-\-components
+Sets whether to display components.  Also can be set by the showComponents config option.  If not set, then --recurse will not display components, and --troves will not display components.
+.TP
 .B \-\-troves
 Displays not only the trove in question, but any troves directly included in that trove that are installed by default.
 .TP

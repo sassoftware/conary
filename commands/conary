@@ -108,6 +108,7 @@ def usage(rc = 1):
     print ""
     print "     collection flags"
     print "                 --all-troves"
+    print "                 --components"
     print "                 --troves"
     print "                 --trove-flags"
     print "                 --trove-headers"
