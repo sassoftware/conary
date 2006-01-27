@@ -139,9 +139,22 @@ class RedirectRecipe(Recipe):
                                     { destName : { label : None } })
                     # if there are multiple versions returned, the label
                     # specified multiple branches
-                    if len(matches[destName]) > 1:
+                    if matches and len(matches[destName]) > 1:
                         raise builderrors.RecipeFileError, \
                             "Label %s matched multiple branches." % str(label)
+
+                # use an empty list to indicate notexistance
+                if destName not in matches:
+                    # We're redirecting to something which doesn't
+                    # exist. This is an error if it's the top of a
+                    # redirect (a package), but generates an erase
+                    # redirect if it's for a component.
+                    if name in names:
+                        raise builderrors.RecipeFileError, \
+                            "Trove %s does not exist" % (destName, targetFlavor)
+
+                    redirMap[(name, sourceFlavor)] = (None, None, None, [])
+                    continue
 
                 # Get the flavors and branch available on the target
                 targetFlavors = set()

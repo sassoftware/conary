@@ -380,7 +380,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         for subName in subTroveList:
             redir.addTrove(subName, targetVersion, fromFlavor)
 
-        redir.addRedirect(toName, toBranch, toFlavor)
+        if toName is not None:
+            redir.addRedirect(toName, toBranch, toFlavor)
 
         redir.setBuildTime(time.time())
         redir.setSourceName(fullName + ':source')
