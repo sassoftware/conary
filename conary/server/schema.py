@@ -545,6 +545,33 @@ def createTroves(db):
     if createTrigger(db, "TroveInfo"):
         commit = True
 
+    if "TroveRedirects" not in db.tables:
+        cu.execute("""
+        CREATE TABLE TroveRedirects(
+            instanceId      INTEGER NOT NULL,
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            flavorId        INTEGER,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT TroveRedirects_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_branchId_fk,
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveRedirects_flavorId_fk,
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["TroveRedirects"] = []
+        commit = True
+    db.createIndex("TroveRedirects", "TroveRedirectsIdx", "instanceId")
+    if createTrigger(db, "TroveRedirects"):
+        commit = True
+
     db.loadSchema()
 
 def createMetadata(db):
@@ -1225,8 +1252,18 @@ class MigrateTo_13(SchemaMigration):
         self.db.dropIndex("FileStreams", "FileStreamsIdx")
         logMe(3, "Recreating the fileId index...")
         createTroves(self.db)
+
         # XXX: flavorId = 0 is now ''
         self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
+
+        logMe(3, "Emptying out redirects...")
+        self.cu.execute("SELECT instanceId FROM Instances WHERE isRedirect = 1")
+        # IN syntax leaves a lot to be desired with MySQL
+        for instanceId in self.cu:
+            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
+            cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
+                        "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
+        # all done for migration to 13
         return self.Version
 
 # sets up temporary tables for a brand new connection
@@ -1256,6 +1293,14 @@ def setupTempTables(db):
         # validity of the table
         db.createIndex("NewFiles", "NewFilesFileIdx", "fileId",
                        check = False)
+    if "NewRedirects" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE NewRedirects(
+            item        VARCHAR(767),
+            branch      VARCHAR(767),
+            flavor      VARCHAR(767)
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["NewRedirects"] = True
     if "NeededFlavors" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NeededFlavors(
