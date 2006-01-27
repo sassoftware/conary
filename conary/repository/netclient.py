@@ -612,6 +612,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
+    def hasTrove(self, name, version, flavor):
+        return self.hasTroves([(name, version, flavor)])[name, version, flavor]
+
     def hasTroves(self, troveInfoList):
         byServer = {}
         for name, version, flavor in troveInfoList:
