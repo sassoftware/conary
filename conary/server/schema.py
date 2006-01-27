@@ -94,7 +94,8 @@ def createFlavors(db):
             flavorId        %(PRIMARYKEY)s,
             flavor          VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
-        cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, 'none')")
+        # XXX: flavorId = 0
+        cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, '')")
         db.tables["Flavors"] = []
         commit = True
     db.createIndex("Flavors", "FlavorsFlavorIdx", "flavor", unique = True)
@@ -1224,6 +1225,8 @@ class MigrateTo_13(SchemaMigration):
         self.db.dropIndex("FileStreams", "FileStreamsIdx")
         logMe(3, "Recreating the fileId index...")
         createTroves(self.db)
+        # XXX: flavorId = 0 is now ''
+        self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
         return self.Version
 
 # sets up temporary tables for a brand new connection
