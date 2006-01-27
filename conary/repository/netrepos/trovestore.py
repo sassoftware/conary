@@ -555,10 +555,8 @@ class TroveStore:
         schema.resetTable(cu, 'gtlInst')
 
         for idx, info in enumerate(troveInfoList):
-            if not info[2]:
-                flavorStr = "'none'"
-            else:
-                flavorStr = "'%s'" % info[2].freeze()
+            # XXX: flavorId = 0
+            flavorStr = "'%s'" % info[2].freeze()
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
@@ -674,10 +672,7 @@ class TroveStore:
                     idxA, name, version, flavor, flags, timeStamps = \
                                                 troveTrovesCursor.next()
                     version = versions.VersionFromString(version)
-                    if flavor == 'none':
-                        flavor = deps.DependencySet()
-                    else:
-                        flavor = deps.ThawDependencySet(flavor)
+                    flavor = deps.ThawDependencySet(flavor)
 
                     version.setTimeStamps(
                             [ float(x) for x in timeStamps.split(":") ])

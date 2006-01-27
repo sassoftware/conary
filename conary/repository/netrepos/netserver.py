@@ -431,19 +431,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return {}
 
+        flavorIndices = {}
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
             # need. a flavor of 0 (numeric) means "None"
-            flavorIndices = {}
             for versionDict in troveSpecs.itervalues():
                 for flavorList in versionDict.itervalues():
                     if flavorList is not None:
                         flavorIndices.update({}.fromkeys(flavorList))
             if flavorIndices.has_key(0):
                 del flavorIndices[0]
-        else:
-            flavorIndices = {}
-
         if flavorIndices:
             self._setupFlavorFilter(cu, flavorIndices)
 
@@ -724,10 +721,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     version = self.freezeVersion(version)
 
                     if withFlavors:
-                        if flavor == None:
-                            flavor = "none"
+                        # XXX: flavorId = 0
                         flist = l.setdefault(version, [])
-                        flist.append(flavor)
+                        flist.append(flavor or '')
                     else:
                         l.append(version)
 
@@ -871,11 +867,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # hardcoding the "%.3f" format. One day I'll learn about all these calls.
             version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
                                                       for x in timeStamps.split(":") ])
-            if flavor is None:
-                flavor = "none"
             retname = ret.setdefault(trove, {})
             flist = retname.setdefault(version, [])
-            flist.append(flavor)
+            flist.append(flavor or '')
         logMe(3, "finished processing results")
         return ret
 
@@ -1297,12 +1291,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return {}
 
+        # XXX: flavorId = 0
         for row, item in enumerate(troveList):
-            if item[2]:
-                flavor = item[2]
-            else:
-                flavor = 'none'
-
+            flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
                        "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
 
@@ -1457,10 +1448,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         cu = self.db.transaction()
         # get the instanceId that corresponds to this trove.
-        # if this instance is unflavored, the magic value is 'none'
-        flavorStr = flavor.freeze() or 'none'
-        cu.execute("SELECT flavorId from Flavors WHERE flavor=?",
-                   flavorStr)
+        # if this instance is unflavored, the magic value is ''
+        # XXX: flavorId = 0
+        flavorStr = flavor.freeze()
+        cu.execute("SELECT flavorId from Flavors WHERE flavor=?", flavorStr)
         flavorId = cu.fetchone()[0]
         cu.execute("SELECT versionId FROM Versions WHERE version=?",
                    version.asString())
