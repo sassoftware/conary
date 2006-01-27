@@ -22,28 +22,29 @@ from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
 def parseTroveSpec(specStr, allowEmptyName = True):
+    origSpecStr = specStr
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
         l = specStr.split('[')
         if len(l) != 2:
-            raise TroveSpecError(specStr, "bad flavor spec")
+            raise TroveSpecError(origSpecStr, "bad flavor spec")
         specStr, flavorSpec = l
         flavor = deps.parseFlavor(flavorSpec)
         if flavor is None:
-            raise TroveSpecError(specStr, "bad flavor spec")
+            raise TroveSpecError(origSpecStr, "bad flavor spec")
     else:
         flavor = None
 
     if specStr.find("=") >= 0:
         l = specStr.split("=")
         if len(l) != 2:
-            raise TroveSpecError(specStr, "Too many ='s")
+            raise TroveSpecError(origSpecStr, "Too many ='s")
         name, versionSpec = l
     else:
         name = specStr
         versionSpec = None
     if not name and not allowEmptyName:
-        raise TroveSpecError(specStr, 'Trove name is required')
+        raise TroveSpecError(origSpecStr, 'Trove name is required')
 
     return (name, versionSpec, flavor)
 
