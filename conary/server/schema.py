@@ -1257,12 +1257,10 @@ class MigrateTo_13(SchemaMigration):
         self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
 
         logMe(3, "Emptying out redirects...")
-        self.cu.execute("""
-        CREATE TEMPORARY TABLE Redirects AS
-        SELECT instanceId FROM Instances WHERE isRedirect = 1""")
+        self.cu.execute("SELECT instanceId FROM Instances WHERE isRedirect = 1")
         # IN syntax leaves a lot to be desired with MySQL
         for instanceId in self.cu:
-            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", instnaceId)
+            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
                         "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
         # all done for migration to 13
