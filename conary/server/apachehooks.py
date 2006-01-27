@@ -139,10 +139,14 @@ def get(port, isSecure, repos, req):
         for (path, size) in items:
             if path.endswith('.ccs-out'):
                 cs = FileContainer(open(path))
-                cs.dump(req.write,
-                        lambda name, tag, size, f, sizeCb:
-                            _writeNestedFile(req, name, tag, size, f,
-                                             sizeCb))
+                try:
+                    cs.dump(req.write,
+                            lambda name, tag, size, f, sizeCb:
+                                _writeNestedFile(req, name, tag, size, f,
+                                                 sizeCb))
+                except IOError:
+                    # ignore errors writing to the client
+                    pass
 
                 del cs
             else:
@@ -238,7 +242,8 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     # send email
     body = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
-    body += 'Time of occurrence: %s\n\n' % timeStamp
+    body += 'Time of occurrence: %s\n' % timeStamp
+    body += 'Conary repository server: %s\n\n' % info_dict['hostname']
     body += ''.join(traceback.format_tb(bt))
     body += '\nConnection Information:\n'
     for key, val in sorted(info_dict.items()):

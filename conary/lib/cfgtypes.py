@@ -105,18 +105,38 @@ class CfgType:
 class CfgString(CfgType):
     pass
 
+class Path(str):
+    def __new__(cls, origString):
+        string = os.path.expanduser(os.path.expandvars(origString))
+        return str.__new__(cls, string)
+        
+    def __init__(self, origString):
+        self.__origString = origString
+
+    def _getUnexpanded(self):
+        return self.__origString
+
+    def __repr__(self):
+        return "<Path '%s'>" % self
+
 class CfgPath(CfgType):
     """ 
         String configuration option that accepts ~ as a substitute for $HOME
     """
 
     def parseString(self, str):
-        return os.path.expanduser(os.path.expandvars(str))
+        return Path(str)
 
     def getDefault(self, default=None):
         val = CfgType.getDefault(self, default)
         if val:
-            return os.path.expanduser(os.path.expandvars(val))
+            return Path(val)
+        else:
+            return val
+
+    def format(self, val, displayOptions=None):
+        if hasattr(val, '_getUnexpanded'):
+            return val._getUnexpanded()
         else:
             return val
 
@@ -159,21 +179,39 @@ class CfgRegExp(CfgType):
         return val[0]
 
 class CfgEnum(CfgType):
-    """ Enumerated value type. Checks to ensure the strings passed in are 
+    """ Enumerated value type. Checks to ensure the strings passed in are
         matched in self.validValues
+        validValues can be a list or dict initially, but will be reset to a dict
     """
 
-    validValues = []
+    validValues = {}
+    origName = {}
 
-    def checkEntry(self, var):
-        var = var.lower()
-        if var not in self.validValues:
-            raise ParseError, 'valid values are %s' % '|'.join(self.validValues)
+    def checkEntry(self, val):
+        if val.lower() not in self.validValues:
+            raise ParseError, '%s not in (case insensitive): %s' % (str(val),
+                                                 '|'.join(self.validValues))
 
-    def parseString(self, var):
-        self.checkEntry(var)
-        var = var.lower()
-        return var
+    def parseString(self, val):
+        self.checkEntry(val)
+        return self.validValues[val.lower()]
+
+    def format(self, val, displayOptions=None):
+        if val not in self.origName:
+            raise ParseError, "%s not in: %s" % (str(val),
+                                                 '|'.join([str(x) for x in self.origName]))
+        return self.origName[val]
+
+    def __init__(self):
+        if isinstance(self.validValues, list):
+            self.origName = dict([(x, x) for x in self.validValues])
+            self.validValues = dict([(x.lower(), x) for x in self.validValues])
+
+        else:
+            self.origName = dict([(x[1], x[0]) \
+                                for x in self.validValues.iteritems()])
+            self.validValues = dict([(x[0].lower(), x[1]) \
+                                     for x in self.validValues.iteritems()])
 
 class CfgCallBack(CfgType):
 

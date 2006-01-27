@@ -17,6 +17,7 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
+import fcntl
 import itertools
 import os
 import resource
@@ -29,19 +30,23 @@ import time
 import traceback
 import types
 
-from conary import callbacks, conaryclient, constants, files, trove, versions
+from conary import (callbacks, conaryclient, constants, files, trove, versions,
+                    updatecmd)
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
 from conary.build import recipe, grouprecipe, loadrecipe
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
-from conary.lib import log, logger, sha1helper, util
+from conary.lib import debugger, log, logger, sha1helper, util
 from conary.local import database
 from conary.repository import changeset, errors, filecontents
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.state import ConaryStateFromFile
+
+CookError = builderrors.CookError
+RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -350,13 +355,10 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch(), cfg.flavor, 
                             macros)
 
-    try:
-        use.track(True)
-	recipeObj.setup()
-        recipeObj.findTroves()
-	use.track(False)
-    except builderrors.RecipeFileError, msg:
-	raise CookError(str(msg))
+    use.track(True)
+    _callSetup(cfg, recipeObj)
+    recipeObj.findTroves()
+    use.track(False)
 
     redirects = recipeObj.getRedirections()
 
@@ -429,20 +431,14 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                             cfg.buildFlavor, macros)
 
-    try:
-        use.track(True)
-	recipeObj.setup()
-	use.track(False)
-    except builderrors.RecipeFileError, msg:
-	raise CookError(str(msg))
+    use.track(True)
+    _callSetup(cfg, recipeObj)
+    use.track(False)
 
     grpFlavor = deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
-    try:
-        grouprecipe.buildGroups(recipeObj, cfg, repos)
-    except builderrors.RecipeFileError, msg:
-	raise CookError(str(msg))
+    grouprecipe.buildGroups(recipeObj, cfg, repos)
 
     for group in recipeObj.iterGroupList():
         for (name, ver, flavor) in group.iterTroveList():
@@ -526,7 +522,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             cfg.flavor, macros)
-    recipeObj.setup()
+    _callSetup(cfg, recipeObj)
     recipeObj.findAllFiles()
 
     changeSet = changeset.ChangeSet()
@@ -685,12 +681,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         raise CookError, ('Cannot cook into repository with'
             ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
 
-    recipeObj.setup()
-    try:
-        recipeObj.checkBuildRequirements(cfg, sourceVersion, 
-                                         ignoreDeps=ignoreDeps)
-    except builderrors.RecipeDependencyError:
-        return
+    _callSetup(cfg, recipeObj)
+    recipeObj.checkBuildRequirements(cfg, sourceVersion, 
+                                     ignoreDeps=ignoreDeps)
 
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
@@ -760,7 +753,6 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         try:
             os.chdir(builddir + '/' + recipeObj.mainDir())
             recipeObj.doBuild(builddir, resume=resume)
-            
             if resume and resume != "policy" and \
                           recipeObj.resumeList[-1][1] != False:
                 log.info('Finished Building %s Lines %s, Not Running Policy', 
@@ -800,13 +792,13 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             logFile.write(''.join(traceback.format_exception(*sys.exc_info())))
             logFile.write('\n')
             logFile.close()
-
-        if (isinstance(msg, policy.PolicyError) 
-            and not cfg.debugRecipeExceptions):
-            print msg
-            sys.exit(1)
-        else:
+        if cfg.debugRecipeExceptions:
+            traceback.print_exception(*sys.exc_info())
+            debugger.post_mortem(sys.exc_info()[2])
+        if isinstance(msg, CookError):
             raise
+        else:
+            raise CookError(str(msg))
 
     if logBuild and recipeObj._autoCreatedFileCount:
         logFile.close()
@@ -1109,9 +1101,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         if versionStr:
             raise CookError, \
                 ("Must not specify version string when cooking recipe file")
-	if emerge:
-	    raise CookError, \
-		("Troves must be emerged directly from a repository")
 
 	recipeFile = name
 
@@ -1178,10 +1167,10 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
         recipeClass = loader.getRecipe()
 
-	if emerge:
-	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
-	    os.close(fd)
-	    targetLabel = versions.EmergeLabel()
+    if emerge:
+        (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
+        os.close(fd)
+        targetLabel = versions.EmergeLabel()
 
     built = None
     try:
@@ -1203,34 +1192,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    os.unlink(changeSetFile)
         raise CookError(str(e))
 
-    if emerge and troves:
-        client = conaryclient.ConaryClient(cfg)
-        try:
-            changeSet = changeset.ChangeSetFromFile(changeSetFile)
-            job = [ (x[0], (None, None), (x[1], x[2]), True) for 
-                            x in changeSet.getPrimaryTroveList() ]
-            (updJob, suggMap) = \
-                client.updateChangeSet(job, recurse=True, resolveDeps=False,
-                            fromChangesets = [ changeSet ])
-            client.applyUpdate(updJob)
-
-        except (conaryclient.UpdateError, errors.CommitError), e:
-            log.error(e)
-            log.error("Not committing changeset: please apply %s by hand" % changeSetFile)
-        else: 
-            os.unlink(changeSetFile)
-            built = (built[0], None)
     return built
-
-class CookError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __repr__(self):
-	return self.msg
-
-    def __str__(self):
-	return repr(self)
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
@@ -1249,13 +1211,22 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         if not cookUid or not cookGid:
             raise CookError('Do not cook as root')
 
-
     for item in args:
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
+        # first, we need to ignore the tty output in the child process
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        # we need a pipe to enable communication with our child (mainly
+        # for emerge)
+        inpipe, outpipe = os.pipe()
         pid = os.fork()
         if not pid:
+            # we have no need for the read side of the pipe
+            os.close(inpipe)
+            # make sure that the write side of the pipe is closed
+            # when we fork/exec
+            fcntl.fcntl(outpipe, fcntl.FD_CLOEXEC)
+
             if profile:
                 import hotshot
                 prof = hotshot.Profile('conary-cook.prof')
@@ -1281,16 +1252,12 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
 	    os.umask(0022)
 	    # and if we do not create core files we will not package them
 	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
-            try:
-                built = cookItem(repos, cfg, item, prep=prep, macros=macros,
-				 emerge = emerge, resume = resume, 
-                                 allowUnknownFlags = allowUnknownFlags, 
-                                 ignoreDeps = ignoreDeps, logBuild = logBuild,
-                                 crossCompile = crossCompile,
-                                 callback = CookCallback())
-            except CookError, msg:
-		log.error(str(msg))
-                sys.exit(1)
+            built = cookItem(repos, cfg, item, prep=prep, macros=macros,
+                             emerge = emerge, resume = resume, 
+                             allowUnknownFlags = allowUnknownFlags, 
+                             ignoreDeps = ignoreDeps, logBuild = logBuild,
+                             crossCompile = crossCompile,
+                             callback = CookCallback())
             if built is None:
                 # --prep or perhaps an error was logged
                 if log.errorOccurred():
@@ -1303,16 +1270,17 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     print str(flavor).replace("\n", " "),
                 print
             if csFile is None:
-                if emerge == True:
-                    print 'Changeset committed to local system.'
-                else:
-                    print 'Changeset committed to the repository.'
+                print 'Changeset committed to the repository.'
             else:
                 print 'Changeset written to:', csFile
+                # send the changeset file over the pipe
+                os.write(outpipe, csFile)
             if profile:
                 prof.stop()
             sys.exit(0)
         else:
+            # parent process, no need for the write side of the pipe
+            os.close(outpipe)
             while 1:
                 try:
                     (id, status) = os.waitpid(pid, os.WUNTRACED)
@@ -1332,6 +1300,56 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                             sys.exit(os.WEXITSTATUS(status))
                         break
                 except KeyboardInterrupt:
+                    # kill the entire process group
                     os.kill(-pid, signal.SIGINT)
+        # see if the child process sent us a changeset filename over
+        # the pipe
+        csFile = os.read(inpipe, 1000)
+        if emerge:
+            # apply the changeset file written by the child
+            if not csFile:
+                log.error('The cook process did not return a changeset file')
+                break
+            print 'Applying changeset file %s' %csFile
+            client = conaryclient.ConaryClient(cfg)
+            try:
+                cs = changeset.ChangeSetFromFile(csFile)
+                job = [ (x[0], (None, None), (x[1], x[2]), True) for
+                        x in cs.getPrimaryTroveList() ]
+                callback = updatecmd.UpdateCallback()
+                rc = client.updateChangeSet(job, recurse = True,
+                                            resolveDeps = False,
+                                            callback = callback,
+                                            fromChangesets = [ cs ])
+                client.applyUpdate(rc[0])
+            except (conaryclient.UpdateError, errors.CommitError), e:
+                log.error(e)
+                log.error("Not committing changeset: please apply %s by "
+                          "hand" % csFile)
+            else:
+                os.unlink(csFile)
+
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
+
+def _callSetup(cfg, recipeObj):
+    try:
+        return recipeObj.setup()
+    except Exception, err:
+        if cfg.debugRecipeExceptions:
+            traceback.print_exception(*sys.exc_info())
+            debugger.post_mortem(sys.exc_info()[2])
+            raise CookError(str(err))
+
+        tb = sys.exc_info()[2]
+        while tb.tb_next:
+            tb = tb.tb_next
+
+        if hasattr(sys.modules[recipeObj.__module__], 'filename'):
+            filename = sys.modules[recipeObj.__module__].filename
+        else:
+            filename = '<nofile>'
+
+	linenum = tb.tb_frame.f_lineno
+        del tb
+        raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))

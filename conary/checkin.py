@@ -43,6 +43,7 @@ from conary.lib import openpgpkey
 from conary.lib import util
 from conary.local import update
 from conary.repository import changeset
+from conary.repository import errors as repoerrors
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
 # mix UpdateCallback and CookCallback, since we use both.
@@ -107,14 +108,24 @@ def checkout(repos, cfg, workDir, name, callback=None):
     if flavor:
         log.error('source troves do not have flavors')
         return
-        
-    sourceName = name + ":source"
+
+    if not name.endswith(':source'):
+        sourceName = name + ":source"
+    else:
+        sourceName = name
+
+    if not versionStr and not cfg.buildLabel:
+        raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
+
     try:
         trvList = repos.findTrove(cfg.buildLabel, 
                                   (sourceName, versionStr, None))
     except errors.TroveNotFound, e:
-        log.error(str(e))
-        return
+        if not cfg.buildLabel:
+            raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
+        else:
+            raise
+
     if len(trvList) > 1:
         trvList.sort()
 
@@ -223,7 +234,7 @@ def commit(repos, cfg, message, callback=None):
                 log.error("contents of working directory are not all "
                           "from the head of the branch; use update")
                 return
-        except errors.TroveMissing:
+        except repoerrors.TroveMissing:
             # the version in the CONARY file doesn't exist in the repository.
             # The only time this should happen is after a fresh merge, when
             # the new version is in the CONARY file before the commit happens.

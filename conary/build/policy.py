@@ -20,7 +20,7 @@ import os
 import sys
 
 from conary.lib import util, log, graph
-from conary.build import action, filter
+from conary.build import action, errors, filter
 
 
 # buckets (enum -- but may possibly work someday as bitmask for policy
@@ -466,12 +466,5 @@ def loadPolicy(recipeObj):
 
 
 
-class PolicyError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __repr__(self):
-	return self.msg
-
-    def __str__(self):
-	return repr(self)
+class PolicyError(errors.CookError):
+    pass
