@@ -5,6 +5,8 @@ Changes in 0.94:
     * A bug that caused a repository server running under Apache to
       fail with an Internal Server Error (500) when a client requested
       a changeset file that does not exist has been fixed.
+    * Conary no longer displays an error when attempting to write to a
+      broken pipe.  (bug #474)
 
   o Client changes:
     * The query/repquery/showcs command line options have been
