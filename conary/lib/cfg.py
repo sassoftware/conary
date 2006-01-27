@@ -238,7 +238,7 @@ class ConfigFile(_Config):
         self.addDirective('includeConfigFile', 'includeConfigFile')
 
     def read(self, path, exception=True):
-	if os.path.exists(path):
+        if os.path.exists(path):
             try:
                 f = open(path, "r")
                 lineno = 1
@@ -262,12 +262,13 @@ class ConfigFile(_Config):
                 f.close()
             except EnvironmentError, err:
                 raise CfgEnvironmentError(err.errno, err.strerror, err.filename)
-	elif exception:
-	    raise CfgEnvironmentError(errno.EEXIST, 
+        elif exception:
+            raise CfgEnvironmentError(errno.EEXIST, 
                           "No such file or directory: '%s'" % path, 
                           path)
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
+        origLine = line
         line = line.strip()
         line = line.replace('\\\\', '\0').replace('\\#', '\1')
         line = line.split('#', 1)[0]

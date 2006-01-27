@@ -1263,6 +1263,7 @@ class ChangeSetJobSource(JobSource):
                 if modType is self.NEW_F:
                     change = cs.getFileChange(None, fileId)
                     fileObj = files.ThawFile(change, pathId)
+                    oldPath = oldFileId = oldVersion = oldFileObj = None
                 elif modType is self.MOD_F:
                     (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
                     change = cs.getFileChange(oldFileId, fileId)

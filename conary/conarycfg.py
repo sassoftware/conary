@@ -143,7 +143,8 @@ class CfgFingerPrintMapItem(CfgType):
         return label, fingerprint
 
     def format(self, val, displayOptions=None):
-        return ' '.join(val)
+        # val[1] may be None
+        return ' '.join([val[0], str(val[1])])
 
 class CfgFingerPrintMap(CfgList):
     def __init__(self, default={}):
@@ -201,7 +202,7 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '~/.conary/arch'))
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
-    buildPath             =  '/var/tmp/conary/builds'
+    buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
@@ -218,7 +219,7 @@ class ConaryConfiguration(SectionedConfigFile):
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',
                                             '~/.conary/log',))
-    lookaside             =  (CfgPath, '/var/cache/conary')
+    lookaside             =  (CfgPath, '~/conary/cache')
     macros                =  CfgDict(CfgString)
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
@@ -231,7 +232,8 @@ class ConaryConfiguration(SectionedConfigFile):
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
-    showComponents	  =  CfgBool
+    showLabels            =  CfgBool
+    showComponents        =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')

@@ -15,7 +15,7 @@ import copy
 from itertools import chain, izip
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
-from conary.build.errors import RecipeFileError, GroupPathConflicts
+from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
 from conary.build.errors import GroupAddAllError
 from conary.build import macros
@@ -606,7 +606,7 @@ def buildGroups(recipeObj, cfg, repos):
             groupsWithConflicts[group.name] = conflicts
 
         if group.isEmpty():
-            raise RecipeFileError('%s has no troves in it' % group.name)
+            raise CookError('%s has no troves in it' % group.name)
 
     if groupsWithConflicts:
         raise GroupPathConflicts(groupsWithConflicts)
@@ -643,7 +643,7 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath,
                                                      toFind[troveSource], 
                                                      searchFlavor)
         except errors.TroveNotFound, e:
-            raise RecipeFileError, str(e)
+            raise CookError, str(e)
 
     return results
     
@@ -897,7 +897,7 @@ def checkForRedirects(group, repos, troveCache, buildFlavor):
         errmsg.extend([(' -> %s=%s[%s]' % (n, v.asString(),
                                            deps.formatFlavor(f))) 
                             for (n,v,f) in sorted(missingTargets[trv])])
-    raise RecipeFileError, ("""\
+    raise CookError, ("""\
 If you include a redirect in this group, you must also include the
 target of the redirect.
 
@@ -1043,7 +1043,24 @@ def calcSizeAndCheckHashes(group, troveCache):
                 allPathHashes.setdefault(pathHash, []).append(troveTup)
 
         conflicts = set(tuple(x) for x in allPathHashes.itervalues() if len(x) > 1)
-        return conflicts
+        # we've got the sets of conflicting troves, now
+        # determine the set of conflicting files
+        trovesWithFiles = {}
+
+        conflictsWithFiles = []
+        for conflictSet in conflicts:
+            needed = [ x for x in conflictSet if x not in trovesWithFiles ]
+            troves = troveCache.repos.getTroves(needed, withFiles=True)
+            trovesWithFiles.update(dict(izip(needed, troves)))
+            conflicting = set(x[1] for x \
+                              in trovesWithFiles[conflictSet[0]].iterFileList())
+            for tup in conflictSet[1:]:
+                conflicting &= set(x[1] for x in \
+                                trovesWithFiles[tup].iterFileList())
+
+            conflictsWithFiles.append((conflictSet, conflicting))
+
+        return conflictsWithFiles
 
     size = 0
     validSize = True

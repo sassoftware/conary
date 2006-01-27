@@ -21,27 +21,29 @@ from conary.lib import log
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
-def parseTroveSpec(specStr):
+def parseTroveSpec(specStr, allowEmptyName = True):
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
         l = specStr.split('[')
         if len(l) != 2:
-            raise TroveSpecError, "bad trove spec %s]" % specStr
+            raise TroveSpecError(specStr, "bad flavor spec")
         specStr, flavorSpec = l
         flavor = deps.parseFlavor(flavorSpec)
         if flavor is None:
-            raise TroveSpecError, "bad flavor [%s]" % flavorSpec
+            raise TroveSpecError(specStr, "bad flavor spec")
     else:
         flavor = None
 
     if specStr.find("=") >= 0:
         l = specStr.split("=")
         if len(l) != 2:
-            raise TroveSpecError, "too many ='s in %s" %specStr
+            raise TroveSpecError(specStr, "Too many ='s")
         name, versionSpec = l
     else:
         name = specStr
         versionSpec = None
+    if not name and not allowEmptyName:
+        raise TroveSpecError(specStr, 'Trove name is required')
 
     return (name, versionSpec, flavor)
 
@@ -122,7 +124,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
         l = changeSpec.split("--")
 
         if len(l) == 1:
-            (troveName, versionStr, flavor) = parseTroveSpec(l[0])
+            (troveName, versionStr, flavor) = parseTroveSpec(l[0], False)
 
             if troveName[0] == '-':
                 applyList.append((troveName, (versionStr, flavor), 
@@ -186,4 +188,6 @@ def askYn(prompt, default=None):
             print "Unknown response '%s'." % resp
 
 class TroveSpecError(errors.ParseError):
-    pass
+    def __init__(self, spec, error):
+        self.spec = spec
+        errors.ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))

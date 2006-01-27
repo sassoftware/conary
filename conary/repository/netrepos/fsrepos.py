@@ -36,10 +36,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     ### Package access functions
 
     def thawFlavor(self, flavor):
-	if flavor and flavor != "none":
-	    return deps.ThawDependencySet(flavor)
-
-	return deps.DependencySet()
+        # XXX: flavorId = 0
+        return deps.ThawDependencySet(flavor)
 
     def hasTrove(self, pkgName, version, flavor):
 	return self.troveStore.hasTrove(pkgName, troveVersion = version,

@@ -494,8 +494,11 @@ def main(argv=sys.argv):
     except errors.InternalConaryError, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
-        log.error(str(e))
-        sys.exit(1)
+        if str(e):
+            log.error(str(e))
+            sys.exit(1)
+        else:
+            raise
     except KeyboardInterrupt, e:
         pass
     return 1

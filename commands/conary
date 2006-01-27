@@ -92,35 +92,59 @@ def usage(rc = 1):
     print "                 --root <root>"
     print "                 --context <context>"
     print ""
-    print "query flags:     --buildreqs"
-    print "                 --deps"
-    print "                 --diff"
-    print "                 --ids"
-    print "                 --info"
-    print "                 --ls"
-    print "                 --path <file>"
-    print "                 --sha1s"
-    print "                 --signatures"
-    print "                 --tags"
+    print "Common query/repquery/showcs flags:"
     print ""
-    print "repquery flags:  --all"
-    print "                 --buildreqs"    
-    print "                 --deps"    
-    print "                 --ids"
+    print "      trove display flags"
+    print "                 --full-versions"
+    print "                 --labels"
+    print "                 --flavors"
+    print "                 --components"
+    print
+    print "                 --buildreqs"
+    print "                 --deps"
     print "                 --info"
-    print "                 --leaves"
-    print "                 --ls"
-    print "                 --sha1s"
     print "                 --signatures"
+    print ""
+    print ""
+    print "     collection flags"
+    print "                 --all-troves"
+    print "                 --components"
+    print "                 --troves"
+    print "                 --trove-flags"
+    print "                 --trove-headers"
+    print "                 --weak-refs"
+    print "                 --recurse"
+    print "                 --no-recurse"
+    print ""
+    print "     file flags (assumes --recurse)"
+    print "                 --file-deps"
+    print "                 --file-versions"
+    print "                 --ids"
+    print "                 --ls"
+    print "                 --lsl"
+    print "                 --sha1s"
     print "                 --tags"
+    print
+    print ""
+    print "     query only flags:"
+    print "                 --path <file>"
+    print
+    print "     repquery flags:"
+    print "                 --all-versions"
+    print "                 --latest-versions"
+    print "                 --leaves"
+    print "                 --no-affinity"
+    print ""
+    print "                 --all-flavors"
+    print "                 --available-flavors"
+    print "                 --compatible-flavors"
+    print "                 --best-flavors"
+    print ""
+    print
+    print "     showcs flags:"
+    print "                 --show-changes"
     print
     print "rollback flags:  --replace-files"
-    print
-    print "showcs flags:    --info"
-    print "                 --ls"
-    print "                 --show-changes"
-    print "                 --tags"
-    print
     print "syncchildren flags:"
     print "                 --update-only"
     print ""
@@ -166,6 +190,7 @@ def realMain(cfg, argv=sys.argv):
 
     cfgMap['interactive'] = 'interactive', NO_PARAM
     cfgMap['full-versions'] = 'fullVersions', NO_PARAM
+    cfgMap['labels'] = 'showLabels', NO_PARAM
     cfgMap['flavors'] = 'fullFlavors', NO_PARAM
     cfgMap['components'] = 'showComponents', NO_PARAM
 
@@ -179,14 +204,22 @@ def realMain(cfg, argv=sys.argv):
         argDef[name] = paramType
 
     argDef["all"] = NO_PARAM
+    argDef["all-flavors"] = NO_PARAM
+    argDef["all-versions"] = NO_PARAM
+    argDef["all-troves"] = NO_PARAM
+    argDef["available-flavors"] = NO_PARAM
+    argDef["best-flavors"] = NO_PARAM
     argDef["buildreqs"] = NO_PARAM
     argDef["components"] = NO_PARAM
+    argDef["compatible-flavors"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["context"] = ONE_PARAM
     argDef["deps"] = NO_PARAM
     argDef["diff"] = NO_PARAM
     argDef["from-file"] = MULT_PARAM
+    argDef["file-deps"] = NO_PARAM
+    argDef["file-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
     argDef["install"] = NO_PARAM
@@ -194,16 +227,21 @@ def realMain(cfg, argv=sys.argv):
     argDef["items"] = NO_PARAM
     argDef["just-db"] = NO_PARAM
     argDef["keep-existing"] = NO_PARAM
+    argDef["latest-versions"] = NO_PARAM
+    argDef["leaves"] = NO_PARAM
+    argDef["ls"] = NO_PARAM
+    argDef["lsl"] = NO_PARAM
+    argDef["no-affinity"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
     argDef["no-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
     argDef["no-conflict-check"] = NO_PARAM
-    argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
-    argDef["ls"] = NO_PARAM
+    argDef["pristine"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
+    argDef["recurse"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
@@ -213,7 +251,11 @@ def realMain(cfg, argv=sys.argv):
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
     argDef["test"] = NO_PARAM
+    argDef["troves"] = NO_PARAM
+    argDef["trove-flags"] = NO_PARAM
+    argDef["trove-headers"] = NO_PARAM
     argDef["update-only"] = NO_PARAM
+    argDef["weak-refs"] = NO_PARAM
     argDef["version"] = NO_PARAM
     argDef["show-passwords"] = NO_PARAM
     argDef["show-contexts"] = NO_PARAM
@@ -346,10 +388,10 @@ def realMain(cfg, argv=sys.argv):
 	log.setVerbosity(log.INFO)
 
         if not os.getuid():
+            # if we're running as root, switch to the emergeUser
             cookUser = cfg.emergeUser
             if not cookUser:
-                log.error('Please set emergeUser config '
-                          'item before emerging')
+                log.error('Please set emergeUser config item before emerging')
                 return 1
             try:
                 info = pwd.getpwnam(cookUser)
@@ -357,7 +399,23 @@ def realMain(cfg, argv=sys.argv):
                 log.error("No user named '%s' to emerge with.  Please check "
                           "the 'emergeUser' config item." % cookUser)
                 return 1
+            if info.pw_dir == '/':
+                log.error("The '%s' user's home directory is set to '/'.  "
+                          "See http://wiki.conary.com/ConaryConversion for "
+                          "assistance."
+                          % cookUser)
+                return 1
+            if info.pw_uid == 0 or info.pw_gid == 0:
+                log.error("The '%s' user has root privileges." % cookUser)
+                return 1
             cookIds = (info.pw_uid, info.pw_gid)
+            # reset the HOME environment variable, and reinterpolate
+            # any buildPath/lookaside configuration variables so that
+            # the correct home directory will be used.
+            os.environ['HOME'] = info.pw_dir
+            for cfgvar in ('buildPath', 'lookaside'):
+                unexpanded = cfg[cfgvar]._getUnexpanded()
+                cfg.configLine('%s %s' %(cfgvar, unexpanded))
         else:
             cookIds = None
 
@@ -389,60 +447,95 @@ def realMain(cfg, argv=sys.argv):
 
         updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
     elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
-        paths = argSet.pop('path', [])
-        tags = argSet.pop('tags', False)
-        info = argSet.pop('info', False)
-        ls = argSet.pop('ls', False)
-        deps = argSet.pop('deps', False)
-        showDiff = argSet.pop('diff', False)
-        ids = argSet.pop('ids', False)
-        sha1s = argSet.pop('sha1s', False)
-        digSigs = argSet.pop('signatures', False)
-        showBuildReqs = argSet.pop('buildreqs', False)
+        kw = {}
+        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+                ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
+                ('file-deps', 'fileDeps'), 
+                ('file-versions', 'fileVersions'),
+                ('all-troves', 'showAllTroves'),
+                ('weak-refs', 'weakRefs'),
+                ('troves', 'showTroves'),
+                ('trove-flags', 'showTroveFlags'),
+                'deps', 'info', 'pristine'):
+            if isinstance(opt, tuple):
+                kw[opt[1]] = argSet.pop(opt[0], False)
+            else:
+                kw[opt] = argSet.pop(opt, False)
+        kw['pathList'] = argSet.pop('path', [])
+
+        kw['recurse'] = argSet.pop('recurse', None)
+        if 'no-recurse' in argSet:
+            kw['recurse'] = False
+            del argset['no-recurse']
 
 	db = openDatabase(cfg.root, cfg.dbPath)
 
 	if argSet: return usage()
 
-	if len(otherArgs) >= 2:
-	    try:
-                query.displayTroves(db, cfg, otherArgs[2:], paths, ls, ids, 
-                                    sha1s, tags, info=info, deps=deps, 
-                                    showBuildReqs=showBuildReqs, 
-                                    showDiff=showDiff, digSigs = digSigs)
-	    except IOError, msg:
-		sys.stderr.write(msg.strerror + '\n')
-		return 1
-	else:
-	    return usage()
+        query.displayTroves(db, cfg, otherArgs[2:], **kw)
     elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq"):
         cfg.requireInstallLabelPath()
-        all = argSet.pop('all', False)
-        ls = argSet.pop('ls', False)
-        ids = argSet.pop('ids', False)
-        info = argSet.pop('info', False)
-        tags = argSet.pop('tags', False)
-        sha1s = argSet.pop('sha1s', False)
-        digSigs = argSet.pop('signatures', False)
-        leaves = argSet.pop('leaves', False)
-        showDeps = argSet.pop('deps', False)
-        showBuildReqs = argSet.pop('buildreqs', False)
+        versionOpts = [argSet.pop(x, False) for x in ['all-versions',
+                                                      'latest-versions',
+                                                      'leaves']]
+        if versionOpts.count(True) > 1:
+            log.error('Can only specify one of --all-versions,'
+                      '--latest-versions, --leaves')
+            sys.exit(1)
+        if True in versionOpts:
+            versionFilterIdx = versionOpts.index(True)
+            versionFilter = [queryrep.VERSION_FILTER_ALL,
+                             queryrep.VERSION_FILTER_LATEST,
+                             queryrep.VERSION_FILTER_LEAVES][versionFilterIdx]
+        else:
+            versionFilter = queryrep.VERSION_FILTER_LATEST
 
-	if argSet: return usage()
+        flavorOpts = [argSet.pop(x, False) for x in ['all-flavors',
+                                                     'available-flavors',
+                                                     'compatible-flavors', 
+                                                     'best-flavors']]
 
-	if len(otherArgs) >= 2:
-	    args = [cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    info, tags, showDeps, showBuildReqs, digSigs ]
-	    try:
-		queryrep.displayTroves(*args)
-	    except IOError, msg:
-                # XXX when is a msg.strerror not a str?
-                # at least socket.gaierror, which is a tuple of
-                # return code and string
-		sys.stderr.write(str(msg.strerror) + '\n')
-		sys.exit(1)
-	else:
-	    return usage()
+        if flavorOpts.count(True) > 1:
+            log.error('only one of --all-flavors, --available-flavors, '
+                      '--compatible-flavors, --best-flavors may be'
+                      ' specified')
+            return 1
+        if True in flavorOpts:
+            flavorFilterIdx = flavorOpts.index(True)
+            flavorFilter = [queryrep.FLAVOR_FILTER_ALL,
+                            queryrep.FLAVOR_FILTER_AVAIL,
+                            queryrep.FLAVOR_FILTER_COMPAT,
+                            queryrep.FLAVOR_FILTER_BEST][flavorFilterIdx]
+        else: # default
+            flavorFilter = queryrep.FLAVOR_FILTER_BEST
+
+        kw = {}
+        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+                ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
+                ('file-deps', 'fileDeps'), 
+                ('file-versions', 'fileVersions'),
+                ('all-troves', 'showAllTroves'),
+                ('weak-refs', 'weakRefs'),
+                ('troves', 'showTroves'),
+                ('trove-flags', 'showTroveFlags'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
+                'deps', 'info'):
+            if isinstance(opt, tuple):
+                kw[opt[1]] = argSet.pop(opt[0], False)
+            else:
+                kw[opt] = argSet.pop(opt, False)
+
+        kw['recurse'] = argSet.pop('recurse', None)
+        if 'no-recurse' in argSet:
+            kw['recurse'] = False
+            del argset['no-recurse']
+        kw['useAffinity'] = not argSet.pop('no-affinity', False)
+
+        if argSet: return usage()
+        troveList = otherArgs[2:]
+
+        queryrep.displayTroves(cfg, troveList, versionFilter, flavorFilter,
+                               **kw)
     elif (otherArgs[1] == "rblist"):
 	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
@@ -483,48 +576,38 @@ def realMain(cfg, argv=sys.argv):
         verify.verify(troves, db, cfg, all=all)
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
         from conary.repository import changeset
-        ls = argSet.has_key('ls')
-	if ls: del argSet['ls']
+        kw = {}
+        # FIXME: organize
+        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+                ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
+                ('file-deps', 'fileDeps'), 
+                ('file-versions', 'fileVersions'),
+                ('all-troves', 'showAllTroves'),
+                ('weak-refs', 'weakRefs'),
+                ('troves', 'showTroves'),
+                ('trove-flags', 'showTroveFlags'),
+                'deps', 'info', 'all', ('show-changes', 'showChanges')):
+            if isinstance(opt, tuple):
+                kw[opt[1]] = argSet.pop(opt[0], False)
+            else:
+                kw[opt] = argSet.pop(opt, False)
 
-        all = argSet.has_key('all')
-	if all: del argSet['all']
-
-        tags = argSet.has_key('tags')
-	if tags: del argSet['tags']
-
-        sha1s = argSet.has_key('sha1s')
-	if sha1s: del argSet['sha1s']
-
-        ids = argSet.has_key('ids')
-	if ids: del argSet['ids']
-
-        info = argSet.has_key('info')
-	if info: del argSet['info']
-
-        showDeps = argSet.has_key('deps')
-	if showDeps: del argSet['deps']
-
-        showChanges = argSet.has_key('show-changes')
-	if showChanges: del argSet['show-changes']
-
-        fullVersions = argSet.has_key('full-versions')
-	if fullVersions: del argSet['full-versions']
-
-        if argSet: return showchangeset.usage()
-
-        if len(otherArgs) < 3:
+        if argSet or len(otherArgs) < 3:
             showchangeset.usage()
             return 1
+
+        kw['recurse'] = argSet.pop('recurse', None)
+        if 'no-recurse' in argSet:
+            kw['recurse'] = False
+            del argset['no-recurse']
+
         cspath = otherArgs[2]
         component = None
         if len(otherArgs) > 3:
             component = otherArgs[3:]
         cs = changeset.ChangeSetFromFile(cspath)
-	db = database.Database(cfg.root, cfg.dbPath)
-        showchangeset.displayChangeSet(db, cs, component, cfg, ls, 
-                                        tags, showChanges, 
-                                        ids=ids, sha1s=sha1s, all=all, 
-                                        deps=showDeps, info=info)
+        db = database.Database(cfg.root, cfg.dbPath)
+        showchangeset.displayChangeSet(db, cs, component, cfg, **kw)
     elif otherArgs[1] == "updateconary":
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
@@ -640,11 +723,14 @@ def main(argv=sys.argv):
     except errors.InternalConaryError:
         raise
     except cfgtypes.CfgError, e:
+        if log.getVerbosity() == log.DEBUG:
+            raise
         log.error(str(e))
-    except cfg.CfgError:
-	print >> sys.stderr, str(e)
     except errors.ConaryError, e:
-	print >> sys.stderr, str(e)
+        if not str(e):
+            raise
+        else:
+            print >> sys.stderr, str(e)
     except:
         raise
     return 1
