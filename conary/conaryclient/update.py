@@ -282,7 +282,8 @@ class ClientUpdate:
 
         return (depList, suggMap, cannotResolve, changeSetList, keepList)
 
-    def _processRedirects(self, uJob, jobSet, recurse):
+    def _processRedirects(self, csSource, uJob, jobSet, transitiveClosure,
+                          recurse):
         """
         Looks for redirects in the change set, and returns a list of troves
         which need to be included in the update.  This returns redirectHack,
@@ -293,14 +294,17 @@ class ClientUpdate:
         troveSet = {}
         redirectHack = {}
 
-        toDoList = list(jobSet)
+        toDoSet = util.IterableQueue()
+        jobsToRemove = set()
+        jobsToAdd = set()
+
+        import epdb
+        epdb.st('f')
 
         # We only have to look through primaries. Troves which aren't
         # primaries can't be redirects because collections cannot include
         # redirects. Nice, huh?
-        while toDoList:
-            job = toDoList.pop()
-
+        for job in itertools.chain(jobSet, toDoSet):
             (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
                 isAbsolute) = job
             item = (name, newVersion, newFlavor)
@@ -321,9 +325,8 @@ class ClientUpdate:
             isPrimary = job in jobSet
             if isPrimary: 
                 # The redirection is a primary. Remove it.
-                jobSet.remove(job)
+                jobsToRemove.add(job)
 
-            targets = []
             allTargets = [ (x[0], str(x[1]), x[2]) 
                                     for x in trv.iterRedirects() ]
             matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
@@ -337,15 +340,12 @@ class ClientUpdate:
                     for match in matchList:
                         l = redirectHack.setdefault(match, [])
                         l.append(item)
-                        targets.append(match)
+                        if isPrimary:
+                            jobsToAdd.add((match[0], (None, None), match[1:],
+                                          True))
 
                 for info in trv.iterTroveList(strongRefs = True):
-                    toDoList.append((info[0], (None, None), info[1:], True))
-
-            if isPrimary:
-                for subName, subVersion, subFlavor in targets:
-                    jobSet.add((subName, (None, None), (subVersion, subFlavor),
-                                True))
+                    toDoSet.add((info[0], (None, None), info[1:], True))
 
         for l in redirectHack.itervalues():
             outdated = self.db.outdatedTroves(l)
@@ -354,6 +354,17 @@ class ClientUpdate:
                   (oldName, oldVersion, oldFlavor) in outdated.iteritems():
                 if oldVersion is not None:
                     l.append((oldName, oldVersion, oldFlavor))
+
+        # The targets of redirects need to be loaded
+        redirectCs, notFound = csSource.createChangeSet(
+                [ (x[0], (None, None), x[1:], True) for x in 
+                                redirectHack.keys() if x is not None ], 
+                withFiles = False, recurse = True)
+        uJob.getTroveSource().addChangeSet(redirectCs)
+        transitiveClosure.update(redirectCs.getJobSet(primaries = False))
+
+        jobSet.difference_update(jobsToRemove)
+        jobSet.update(jobsToAdd)
 
         return redirectHack
 
@@ -1302,16 +1313,8 @@ conary erase '%s=%s[%s]'
         transitiveClosure.update(cs.getJobSet(primaries = False))
         del cs
 
-        redirectHack = self._processRedirects(uJob, jobSet, recurse) 
-
-        # The targets of redirects need to be loaded
-        redirectCs, notFound = csSource.createChangeSet(
-                [ (x[0], (None, None), x[1:], True) for x in 
-                                redirectHack.keys() if x is not None ], 
-                withFiles = False, recurse = True)
-        uJob.getTroveSource().addChangeSet(redirectCs)
-        transitiveClosure.update(redirectCs.getJobSet(primaries = False))
-        del redirectCs
+        redirectHack = self._processRedirects(csSource, uJob, jobSet, 
+                                              transitiveClosure, recurse) 
 
         if forceJobClosure and recurse:
             # The transitiveClosure we computed can't be trusted; we need
