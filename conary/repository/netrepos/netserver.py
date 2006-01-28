@@ -302,6 +302,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def getUserGroups(self, authToken, clientVersion):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise errors.InsufficientPermission
         r = self.auth.getUserGroups(authToken[0])
         return r
 
