@@ -561,6 +561,7 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
+        kwargs['callback'] = updatecmd.UpdateCallback(cfg)
 	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]

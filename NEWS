@@ -20,6 +20,7 @@ Changes in 0.94:
     * "conary emerge" can now be performed on a recipe file.
       Previously you were required to emerge from a repository. (bug
       #526)
+    * Progress is now displayed as conary applies a rollback (bug #363)
 
 Changes in 0.93:
   o Bug Fixes
