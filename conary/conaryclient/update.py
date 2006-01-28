@@ -294,12 +294,8 @@ class ClientUpdate:
         troveSet = {}
         redirectHack = {}
 
-        toDoSet = util.IterableQueue()
         jobsToRemove = set()
         jobsToAdd = set()
-
-        import epdb
-        epdb.st('f')
 
         # We don't have to worry about non-primaries recursively included
         # from the job because groups can't include redirects, so any redirect
@@ -308,61 +304,87 @@ class ClientUpdate:
         # All of this itertools stuff lets us iterate through the jobSet
         # with isPrimary set to True and then iterate through the jobs we
         # create here with isPrimary set to False.
-        for isPrimary, job in  \
-                    itertools.chain(
-                        itertools.izip(itertools.repeat(True), jobSet),
-                        itertools.izip(itertools.repeat(False), toDoSet)):
-            (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
-                isAbsolute) = job
-            item = (name, newVersion, newFlavor)
 
-            if newVersion is None:
-                # Erasures don't involve redirects so they aren't interesting.
-                continue
+        # The outer loop is to allow redirects to point to redirects. The
+        # inner loop handles one set of troves.
 
-            trv = uJob.getTroveSource().getTrove(name, newVersion, newFlavor, 
-                                                 withFiles = False)
+        initialSet = itertools.izip(itertools.repeat(True), jobSet)
+        while initialSet:
+            alreadyHandled = set()
+            nextSet = set()
+            toDoSet = util.IterableQueue()
+            for isPrimary, job in itertools.chain(initialSet, toDoSet):
+                (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
+                    isAbsolute) = job
+                item = (name, newVersion, newFlavor)
 
-            if not trv.isRedirect():
-                continue
+                if item in alreadyHandled:
+                    continue
+                alreadyHandled.add(item)
 
-            if isPrimary:
-                # Don't install a redirect
-                jobsToRemove.add(job)
+                if newVersion is None:
+                    # Erasures don't involve redirects so they aren't 
+                    # interesting.
+                    continue
 
-            if not recurse:
-                raise UpdateError,  "Redirect found with --no-recurse set"
+                trv = uJob.getTroveSource().getTrove(name, newVersion, newFlavor, 
+                                                     withFiles = False)
 
-            allTargets = [ (x[0], str(x[1]), x[2]) 
-                                    for x in trv.iterRedirects() ]
-            matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
-                                            affinityDatabase = self.db)
-            if not matches:
-                assert(not allTargets)
-                l = redirectHack.setdefault(None, [])
-                l.append(item)
-            else:
-                for matchList in matches.itervalues():
-                    for match in matchList:
-                        l = redirectHack.setdefault(match, [])
-                        l.append(item)
-                        if isPrimary:
-                            jobsToAdd.add((match[0], (None, None), match[1:],
-                                          True))
+                if not trv.isRedirect():
+                    continue
 
-                for info in trv.iterTroveList(strongRefs = True):
-                    toDoSet.add((info[0], (None, None), info[1:], True))
+                if item in redirectHack:
+                    # this was from a redirect to a redirect -- the list
+                    # of what needs to be removed as part of this redirect
+                    # needs to move to the new target
+                    redirectSourceList = redirectHack[item]
+                    del redirectHack[item]
+                else:
+                    redirectSourceList = []
 
-        jobSet.difference_update(jobsToRemove)
+                if isPrimary:
+                    # Don't install a redirect
+                    jobsToRemove.add(job)
+
+                if not recurse:
+                    raise UpdateError,  "Redirect found with --no-recurse set"
+
+                allTargets = [ (x[0], str(x[1]), x[2]) 
+                                        for x in trv.iterRedirects() ]
+                matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
+                                                affinityDatabase = self.db)
+                if not matches:
+                    assert(not allTargets)
+                    l = redirectHack.setdefault(None, redirectSourceList)
+                    l.append(item)
+                else:
+                    for matchList in matches.itervalues():
+                        for match in matchList:
+                            l = redirectHack.setdefault(match, 
+                                                        redirectSourceList)
+                            l.append(item)
+                            redirectJob = (match[0], (None, None),
+                                                     match[1:], True)
+                            nextSet.add((isPrimary, redirectJob))
+                            if isPrimary:
+                                jobsToAdd.add(redirectJob)
+
+                    for info in trv.iterTroveList(strongRefs = True):
+                        toDoSet.add((False, 
+                                     (info[0], (None, None), info[1:], True)))
+
+            # The targets of redirects need to be loaded
+            redirectCs, notFound = csSource.createChangeSet(
+                    [ x[1] for x in nextSet ],
+                    withFiles = False, recurse = True)
+            uJob.getTroveSource().addChangeSet(redirectCs)
+            transitiveClosure.update(redirectCs.getJobSet(primaries = False))
+
+            initialSet = nextSet
+
+        # We may remove some jobs which we add due to redirection chains.
         jobSet.update(jobsToAdd)
-
-        # The targets of redirects need to be loaded
-        redirectCs, notFound = csSource.createChangeSet(
-                [ (x[0], (None, None), x[1:], True) for x in 
-                                redirectHack.keys() if x is not None ], 
-                withFiles = False, recurse = True)
-        uJob.getTroveSource().addChangeSet(redirectCs)
-        transitiveClosure.update(redirectCs.getJobSet(primaries = False))
+        jobSet.difference_update(jobsToRemove)
 
         for l in redirectHack.itervalues():
             outdated = self.db.outdatedTroves(l)
