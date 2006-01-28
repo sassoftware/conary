@@ -128,7 +128,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 f.close()
                 del f
             else:
-                size = os.stat(localName).st_size;
+                try:
+                    size = os.stat(localName).st_size;
+                except OSError:
+                    self.send_error(404, "File not found")
                 items = [ (localName, size) ]
                 totalSize = size
 
