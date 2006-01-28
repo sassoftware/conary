@@ -301,16 +301,23 @@ class ClientUpdate:
         import epdb
         epdb.st('f')
 
-        # We only have to look through primaries. Troves which aren't
-        # primaries can't be redirects because collections cannot include
-        # redirects. Nice, huh?
-        for job in itertools.chain(jobSet, toDoSet):
+        # We don't have to worry about non-primaries recursively included
+        # from the job because groups can't include redirects, so any redirect
+        # must either be a primary or have a parent who is a primary.
+        #
+        # All of this itertools stuff lets us iterate through the jobSet
+        # with isPrimary set to True and then iterate through the jobs we
+        # create here with isPrimary set to False.
+        for isPrimary, job in  \
+                    itertools.chain(
+                        itertools.izip(itertools.repeat(True), jobSet),
+                        itertools.izip(itertools.repeat(False), toDoSet)):
             (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
                 isAbsolute) = job
             item = (name, newVersion, newFlavor)
 
             if newVersion is None:
-                # skip erasure
+                # Erasures don't involve redirects so they aren't interesting.
                 continue
 
             trv = uJob.getTroveSource().getTrove(name, newVersion, newFlavor, 
@@ -319,13 +326,12 @@ class ClientUpdate:
             if not trv.isRedirect():
                 continue
 
+            if isPrimary:
+                # Don't install a redirect
+                jobsToRemove.add(job)
+
             if not recurse:
                 raise UpdateError,  "Redirect found with --no-recurse set"
-
-            isPrimary = job in jobSet
-            if isPrimary: 
-                # The redirection is a primary. Remove it.
-                jobsToRemove.add(job)
 
             allTargets = [ (x[0], str(x[1]), x[2]) 
                                     for x in trv.iterRedirects() ]
@@ -347,13 +353,8 @@ class ClientUpdate:
                 for info in trv.iterTroveList(strongRefs = True):
                     toDoSet.add((info[0], (None, None), info[1:], True))
 
-        for l in redirectHack.itervalues():
-            outdated = self.db.outdatedTroves(l)
-            del l[:]
-            for (name, newVersion, newFlavor), \
-                  (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-                if oldVersion is not None:
-                    l.append((oldName, oldVersion, oldFlavor))
+        jobSet.difference_update(jobsToRemove)
+        jobSet.update(jobsToAdd)
 
         # The targets of redirects need to be loaded
         redirectCs, notFound = csSource.createChangeSet(
@@ -363,8 +364,13 @@ class ClientUpdate:
         uJob.getTroveSource().addChangeSet(redirectCs)
         transitiveClosure.update(redirectCs.getJobSet(primaries = False))
 
-        jobSet.difference_update(jobsToRemove)
-        jobSet.update(jobsToAdd)
+        for l in redirectHack.itervalues():
+            outdated = self.db.outdatedTroves(l)
+            del l[:]
+            for (name, newVersion, newFlavor), \
+                  (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+                if oldVersion is not None:
+                    l.append((oldName, oldVersion, oldFlavor))
 
         return redirectHack
 
