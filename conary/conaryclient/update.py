@@ -327,7 +327,8 @@ class ClientUpdate:
                     # interesting.
                     continue
 
-                trv = uJob.getTroveSource().getTrove(name, newVersion, newFlavor, 
+                trv = uJob.getTroveSource().getTrove(name, newVersion, 
+                                                     newFlavor, 
                                                      withFiles = False)
 
                 if not trv.isRedirect():
@@ -360,6 +361,12 @@ class ClientUpdate:
                 else:
                     for matchList in matches.itervalues():
                         for match in matchList:
+                            if match in redirectSourceList:
+                                raise UpdateError, \
+                                    "Redirect loop found which includes " \
+                                    "troves %s, %s" % (item[0],
+                                    ", ".join(x[0] for x in redirectSourceList))
+                            assert(match not in redirectSourceList)
                             l = redirectHack.setdefault(match, 
                                                         redirectSourceList)
                             l.append(item)
