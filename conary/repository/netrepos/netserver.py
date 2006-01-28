@@ -71,6 +71,58 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
+    publicCalls = set([ 'addUser',
+                        'addUserByMD5',
+                        'deleteUserByName',
+                        'deleteUserById',
+                        'setUserGroupCanMirror',
+                        'addAcl',
+                        'editAcl',
+                        'changePassword',
+                        'getUserGroups',
+                        'addEntitlement',
+                        'addEntitlementGroup',
+                        'addEntitlementOwnerAcl',
+                        'listEntitlements',
+                        'updateMetadata',
+                        'getMetadata',
+                        'troveNames',
+                        'getTroveVersionList',
+                        'getTroveVersionFlavors',
+                        'getAllTroveLeaves',
+                        'getTroveVersionsByBranch',
+                        'getTroveLeavesByBranch',
+                        'getTroveLeavesByLabel',
+                        'getTroveVersionsByLabel',
+                        'getFileContents',
+                        'getTroveLatestVersion',
+                        'getChangeSet',
+                        'getDepSuggestions',
+                        'prepareChangeSet',
+                        'commitChangeSet',
+                        'getFileVersions',
+                        'getFileVersion',
+                        'getPackageBranchPathIds',
+                        'hasTroves',
+                        'getCollectionMembers',
+                        'getTrovesBySource',
+                        'addDigitalSignature',
+                        'addNewAsciiPGPKey',
+                        'addNewPGPKey',
+                        'changePGPKeyOwner',
+                        'getAsciiOpenPGPKey',
+                        'listUsersMainKeys',
+                        'listSubkeys',
+                        'getOpenPGPKeyUserIds',
+                        'getConaryUrl',
+                        'getMirrorMark',
+                        'setMirrorMark',
+                        'getNewPGPKeys',
+                        'addPGPKeyList',
+                        'getNewTroveList',
+                        'checkVersion' ])
+
+
     def __init__(self, cfg, basicUrl):
         logMe(1, cfg.items())
 	self.map = cfg.repositoryMap
@@ -128,11 +180,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
-        try:
-            # try and get the method to see if it exists
-            method = self.__getattribute__(methodname)
-        except AttributeError:
+        if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""))
+        method = self.__getattribute__(methodname)
 
         logMe(2, "calling", methodname)
         try:
