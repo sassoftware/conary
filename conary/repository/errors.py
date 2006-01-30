@@ -150,14 +150,13 @@ class DigitalSignatureError(RepositoryError):
         self.error = error
 
 class InternalServerError(RepositoryError, InternalConaryError):
-    def __init__(self, url, err):
-        self.url = url
+    def __init__(self,  err):
         self.err = err
-        RepositoryError.__init__(self, '''\
-There was an error contacting the repository at %s.   Either the server is
+        RepositoryError.__init__(self, '''
+There was an error contacting the repository.   Either the server is
 configured incorrectly or the request you sent to the server was invalid.
 %s
-''' % (url, err))
+''' % (err,))
 
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
