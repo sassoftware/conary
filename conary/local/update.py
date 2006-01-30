@@ -31,7 +31,7 @@ import stat
 import sys
 import tempfile
 
-from conary import files, trove, versions
+from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
@@ -1563,8 +1563,13 @@ def userAction(root, userFileList):
             ])
         f.setdefault('SUPPLEMENTAL', '')
         for groupName in [ x for x in f['SUPPLEMENTAL'].split(',') if x ]:
-            # dependencies ensure that groupName already exists
-            group.extendList(groupName, f['USER'])
+            # dependencies should ensure that groupName already exists
+            # but --no-deps exists
+            try:
+                group.extendList(groupName, f['USER'])
+            except KeyError, e:
+                raise errors.ConaryError(
+                    'error: /etc/group is missing group "%s"' %e)
     passwd.write()
     group.write()
 
