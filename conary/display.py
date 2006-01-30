@@ -155,7 +155,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                                                  weakRefs=showWeakRefs)
 
                 newTroveTups = sorted(newTroveTups)
-                if needTroves:
+                if needTroves or trv.isRedirect():
                     # might as well grab all the troves, we're supposed
                     # to yield them all.
                     neededTroveTups = [ x for x in newTroveTups \
@@ -256,7 +256,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
                 newTroveTups = sorted(newTroveTups)
 
-                if needTroves:
+                if needTroves or trv.isRedirect():
                     newTroves = troveSource.getTroves(
                                                 [x[0] for x in newTroveTups],
                                                 withFiles=False)
@@ -614,6 +614,15 @@ class TroveFormatter(TroveTupFormatter):
                     fmtFlags.append('NotByDefault')
                 if not flags & TROVE_STRONGREF:
                     fmtFlags.append('Weak')
+                if trove and trove.isRedirect():
+                    for rName, rBranch, rFlavor in trove.iterRedirects():
+                        if rFlavor is None:
+                            flag = 'Redirect -> %s=%s' % (rName, rBranch)
+                        else:
+                            flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
+                                                              rFlavor)
+                        fmtFlags.append(flag)
+
                 if fmtFlags:
                     ln += ' [%s]' % ','.join(fmtFlags)
             yield ln
