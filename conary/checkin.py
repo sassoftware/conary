@@ -444,10 +444,7 @@ def commit(repos, cfg, message, callback=None):
 
             # writable changesets can't do merging, so create a parent
             # readonly one
-            readOnlyCs = changeset.ReadOnlyChangeSet()
-            readOnlyCs.merge(shadowCs)
-            readOnlyCs.merge(changeSet)
-            changeSet = readOnlyCs
+            repos.commitChangeSet(shadowCs, callback = callback)
 
     repos.commitChangeSet(changeSet, callback = callback)
 
