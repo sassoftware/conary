@@ -354,10 +354,6 @@ class CfgDict(CfgType):
     def copy(self, val):
         return dict((k, self.valueType.copy(v)) for k,v in val.iteritems())
 
-    def __iter__(self):
-        for key in self.value:
-            yield key
-
 class CfgEnumDict(CfgDict):
 
     validValues = {}
