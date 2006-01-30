@@ -68,6 +68,7 @@ class ClientBranch:
                     # XXX this can go away once we don't care about
                     # pre-troveInfo troves
                     if not trove.getSourceName():
+                        from conary.lib import log
                         log.warning('%s has no source information' % troveName)
                         sourceName = troveName
                     else:
