@@ -16,7 +16,7 @@ import sys
 import re
 
 import sqlerrors, sqllib
-from conary.lib import cfg
+from conary.lib import cfg, cfgtypes
 
 # class for encapsulating binary strings for dumb drivers
 class BaseBinary:
@@ -437,7 +437,7 @@ class CfgDriver(cfg.CfgType):
     def parseString(self, str):
         s = str.split()
         if len(s) != 2:
-            raise ParseError, "database driver and path expected"
+            raise cfgtypes.ParseError("database driver and path expected")
 
         return tuple(s)
 
