@@ -19,6 +19,7 @@ import itertools
 import struct
 
 from conary import changelog
+from conary import errors
 from conary import files
 from conary import streams
 from conary import versions
@@ -2006,7 +2007,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
 
-class TroveError(Exception):
+class TroveError(errors.ConaryError):
 
     """
     Ancestor for all exceptions raised by the trove module.

@@ -153,6 +153,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         return True
 
     def __getattr__(self, name):
+        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback)
 
@@ -610,6 +611,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if v == 0:
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
+
+    def hasTrove(self, name, version, flavor):
+        return self.hasTroves([(name, version, flavor)])[name, version, flavor]
 
     def hasTroves(self, troveInfoList):
         byServer = {}
@@ -1272,7 +1276,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
-                  affinityDatabase = None, allowMissing=False):
+                  affinityDatabase = None, allowMissing=False, 
+                  getLeaves = True, bestFlavor = True):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -1328,15 +1333,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         """
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
-                                            acrossFlavors, affinityDatabase)
+                                            acrossFlavors, affinityDatabase,
+                                            getLeaves, bestFlavor)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossLabels = False, 
-                  acrossFlavors = False, affinityDatabase = None):
+                  acrossFlavors = False, affinityDatabase = None,
+                  getLeaves = True, bestFlavor = True):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossLabels, acrossFlavors,
-                              affinityDatabase)
+                              affinityDatabase, False, getLeaves, bestFlavor)
         return res[(name, versionStr, flavor)]
 
     def getConaryUrl(self, version, flavor):

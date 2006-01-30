@@ -86,12 +86,11 @@ class TroveMissing(RepositoryError, InternalConaryError):
             self.type = 'package'
 
 class UnknownException(RepositoryError, InternalConaryError):
-    def __str__(self):
-	return "UnknownException: %s %s" % (self.eName, self.eArgs)
 
     def __init__(self, eName, eArgs):
 	self.eName = eName
 	self.eArgs = eArgs
+	RepositoryError.__init__(self, "UnknownException: %s %s" % (self.eName, self.eArgs))
 
 class UserAlreadyExists(RepositoryError):
     pass
@@ -111,50 +110,54 @@ class PermissionAlreadyExists(RepositoryError):
 class UserNotFound(RepositoryError):
     def __init__(self, user = "user"):
         self.user = user
-
-    def __str__(self):
-        return "UserNotFound: %s" % self.user
+        RepositoryError.__init__(self, "UserNotFound: %s" % self.user)
 
 class InvalidServerVersion(RepositoryError):
     pass
 
 class GetFileContentsError(RepositoryError):
-    def __init__(self, val):
-        Exception.__init__(self)
-        self.val = val
+    error = 'Base GetFileContentsError: %s %s'
+    def __init__(self, (fileId, fileVer)):
+        self.fileId = fileId
+        self.fileVer = fileVer
+        RepositoryError.__init__(self, self.error % (fileId, fileVer))
 
 class FileContentsNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
+    error = '''File Contents Not Found
+The contents of the following file was not found on the server:
+fileId: %r
+fileVersion: %s
+'''
 
 class FileStreamNotFound(GetFileContentsError):
-    def __init__(self, val):
-        GetFileContentsError.__init__(self, val)
+    error = '''File Stream Not Found
+The following file stream was not found on the server:
+fileId: %r
+fileVersion: %s
+'''
 
 class InvalidClientVersion(RepositoryError):
     pass
 
 class AlreadySignedError(RepositoryError):
-    def __str__(self):
-        return self.error
     def __init__(self, error = "Already signed"):
-        self.error=error
+        RepositoryError.__init__(self, error)
+        self.error = error
 
 class DigitalSignatureError(RepositoryError):
-    def __str__(self):
-        return self.error
     def __init__(self, error = "Trove can't be signed"):
+        RepositoryError.__init__(self, error)
         self.error = error
 
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self, url, err):
         self.url = url
         self.err = err
-        self.args = '''\
+        RepositoryError.__init__(self, '''\
 There was an error contacting the repository at %s.   Either the server is
 configured incorrectly or the request you sent to the server was invalid.
 %s
-''' % (url, err)
+''' % (url, err))
 
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey

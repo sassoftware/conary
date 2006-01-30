@@ -1005,10 +1005,12 @@ class ReadOnlyChangeSet(ChangeSet):
 
         # write out the diffs. these are always in the cache
         for pathId in idList:
-            (tag, str, compressed) = self.configCache[pathId]
+            (tag, contents, compressed) = self.configCache[pathId]
+            if isinstance(contents, str):
+                contents = filecontents.FromString(contents)
+
             if tag == ChangedFileTypes.diff:
-                csf.addFile(pathId, filecontents.FromString(str), 
-                            "1 " + tag[4:])
+                csf.addFile(pathId, contents, "1 " + tag[4:])
 
         # Absolute change sets will have other contents which may or may
         # not be cached. For the ones which are cached, turn them into a
@@ -1017,15 +1019,16 @@ class ReadOnlyChangeSet(ChangeSet):
         # all of this into RAM. We don't bother cleaning up the mess we
         # make in self.fileQueue since you can't write a changeset multiple
         # times anyway.
-        contents = {}
+        allContents = {}
         for pathId in idList:
-            (tag, str, compressed) = self.configCache[pathId]
+            (tag, contents, compressed) = self.configCache[pathId]
+            if isinstance(contents, str):
+                contents = filecontents.FromString(contents)
             if tag == ChangedFileTypes.file:
-                contents[pathId] = (ChangedFileTypes.file,
-                                    filecontents.FromString(str), False)
+                allContents[pathId] = (ChangedFileTypes.file, contents, False)
 
         wrapper = DictAsCsf({})
-        wrapper.addConfigs(contents)
+        wrapper.addConfigs(allContents)
 
         entry = wrapper.getNextFile()
         if entry:
@@ -1123,7 +1126,10 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
         if type(fileName) is str:
-            f = open(fileName, "r")
+            try:
+                f = open(fileName, "r")
+            except IOError, err:
+                raise errors.ConaryError("Error opening changeset '%s': %s" % (fileName, err.strerror))
             csf = filecontainer.FileContainer(f)
         else:
             csf = filecontainer.FileContainer(fileName)

@@ -110,14 +110,12 @@ def get(port, isSecure, repos, req):
             return apache.HTTP_FORBIDDEN
 
         localName = repos.tmpPath + "/" + req.args + "-out"
-        size = os.stat(localName).st_size
 
         if localName.endswith(".cf-out"):
             try:
                 f = open(localName, "r")
             except IOError:
-                self.send_error(404, "File not found")
-                return None
+                return apache.HTTP_NOT_FOUND
 
             os.unlink(localName)
 
@@ -131,7 +129,10 @@ def get(port, isSecure, repos, req):
             f.close()
             del f
         else:
-            size = os.stat(localName).st_size;
+            try:
+                size = os.stat(localName).st_size;
+            except OSError:
+                return apache.HTTP_NOT_FOUND
             items = [ (localName, size) ]
             totalSize = size
 
@@ -139,10 +140,14 @@ def get(port, isSecure, repos, req):
         for (path, size) in items:
             if path.endswith('.ccs-out'):
                 cs = FileContainer(open(path))
-                cs.dump(req.write,
-                        lambda name, tag, size, f, sizeCb:
-                            _writeNestedFile(req, name, tag, size, f,
-                                             sizeCb))
+                try:
+                    cs.dump(req.write,
+                            lambda name, tag, size, f, sizeCb:
+                                _writeNestedFile(req, name, tag, size, f,
+                                                 sizeCb))
+                except IOError:
+                    # ignore errors writing to the client
+                    pass
 
                 del cs
             else:
@@ -238,7 +243,8 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     # send email
     body = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
-    body += 'Time of occurrence: %s\n\n' % timeStamp
+    body += 'Time of occurrence: %s\n' % timeStamp
+    body += 'Conary repository server: %s\n\n' % info_dict['hostname']
     body += ''.join(traceback.format_tb(bt))
     body += '\nConnection Information:\n'
     for key, val in sorted(info_dict.items()):

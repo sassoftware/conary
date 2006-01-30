@@ -146,7 +146,8 @@ class QueryByVersion(Query):
             # delete any found names - don't search for them again
             for name in foundNames:
                 query.pop(name, None)
-            res = troveSource.getTroveVersionFlavors(query, bestFlavor=True)
+            res = troveSource.getTroveVersionFlavors(query, 
+                                                     bestFlavor=self.bestFlavor)
             for name in res:
                 matches = self.filterTroveMatches(name, res[name])
                 if not matches: 
@@ -421,7 +422,8 @@ class QueryByBranch(Query):
 
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
-            return troveSource.getTroveLeavesByBranch(query, bestFlavor=True)
+            return troveSource.getTroveLeavesByBranch(query,
+                                                     bestFlavor=self.bestFlavor)
         else:
             return troveSource.getTroveVersionsByBranch(query)
 
@@ -513,7 +515,8 @@ class QueryRevisionByBranch(QueryByBranch):
         QueryByBranch.addQuery(self, troveTup, branch, flavorList)
 
     def callQueryFunction(self, troveSource, query):
-        return troveSource.getTroveVersionsByBranch(query, bestFlavor=True)
+        return troveSource.getTroveVersionsByBranch(query,
+                                                    bestFlavor=self.bestFlavor)
 
     def filterTroveMatches(self, name, versionFlavorDict):
         versionFlavorDict = QueryByBranch.filterTroveMatches(self, name, 
@@ -524,6 +527,7 @@ class QueryRevisionByBranch(QueryByBranch):
         except errors.ParseError:
             verRel = None
 
+        results = {}
         for version in reversed(sorted(versionFlavorDict.iterkeys())):
             if verRel:
                 if version.trailingRevision() != verRel:
@@ -531,8 +535,11 @@ class QueryRevisionByBranch(QueryByBranch):
             else:
                 if version.trailingRevision().version != versionStr:
                     continue
-            return { version: versionFlavorDict[version] }
-        return {}
+            if self.getLeaves:
+                return { version: versionFlavorDict[version] }
+            else:
+                results[version] = versionFlavorDict[version]
+        return results
 
     def missingMsg(self, name):
         branch = self.query[0][name].keys()[0]
@@ -545,7 +552,8 @@ class QueryRevisionByLabel(QueryByLabelPath):
     queryFunctionName = 'getTroveVersionsByLabel'
 
     def callQueryFunction(self, troveSource, query):
-        return troveSource.getTroveVersionsByLabel(query, bestFlavor=True)
+        return troveSource.getTroveVersionsByLabel(query,
+                                                   bestFlavor=self.bestFlavor)
 
     def filterTroveMatches(self, name, versionFlavorDict):
         """ Take the results found in QueryByLabelPath.findAll for name
@@ -571,15 +579,16 @@ class QueryRevisionByLabel(QueryByLabelPath):
                 if version.trailingRevision().version \
                                                 != versionStr:
                     continue
-            if not self.acrossLabels:
+            if self.getLeaves and not self.acrossLabels:
                 # there should be only one label in this versionFlavorDict --
                 # so, optimize to return first result found
                 return {version: versionFlavorDict[version]}
 
-            label = version.branch().label()
-            if label in matchingLabels:
-                continue
-            matchingLabels.add(label)
+            if self.getLeaves:
+                label = version.branch().label()
+                if label in matchingLabels:
+                    continue
+                matchingLabels.add(label)
             matching[version] = versionFlavorDict[version]
         return matching
 

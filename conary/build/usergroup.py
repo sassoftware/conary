@@ -13,7 +13,7 @@
 #
 
 # conary imports
-from conary.build import build
+from conary.build import build, errors
 from conary.lib import util
 
 class User(build.BuildAction):
@@ -143,7 +143,7 @@ class Group(build.BuildAction):
         f.close()
 
 
-class UserGroupError(Exception):
+class UserGroupError(errors.CookError):
     def __init__(self, msg):
         self.msg = msg
 

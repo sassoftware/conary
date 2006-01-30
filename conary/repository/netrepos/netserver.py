@@ -218,12 +218,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			self.fromVersion(e.version)))
         elif isinstance(e, errors.FileContentsNotFound):
             return (False, True, ('FileContentsNotFound',
-                           self.fromFileId(e.val[0]),
-                           self.fromVersion(e.val[1])))
+                           self.fromFileId(e.fileId),
+                           self.fromVersion(e.fileVer)))
         elif isinstance(e, errors.FileStreamNotFound):
             return (False, True, ('FileStreamNotFound',
-                           self.fromFileId(e.val[0]),
-                           self.fromVersion(e.val[1])))
+                           self.fromFileId(e.fileId),
+                           self.fromVersion(e.fileVer)))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
 	else:
@@ -481,19 +481,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return {}
 
+        flavorIndices = {}
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
             # need. a flavor of 0 (numeric) means "None"
-            flavorIndices = {}
             for versionDict in troveSpecs.itervalues():
                 for flavorList in versionDict.itervalues():
                     if flavorList is not None:
                         flavorIndices.update({}.fromkeys(flavorList))
             if flavorIndices.has_key(0):
                 del flavorIndices[0]
-        else:
-            flavorIndices = {}
-
         if flavorIndices:
             self._setupFlavorFilter(cu, flavorIndices)
 
@@ -657,7 +654,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
-        allowed = {}
+        allowed = set()
 
         troveNames = []
         troveVersions = {}
@@ -674,13 +671,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 flavorScore = 0
 
             #logMe(3, troveName, versionStr, flavor, flavorScore, finalTimestamp)
-            if allowed.has_key((troveName, versionStr, flavor)):
+            if (troveName, versionStr, flavor, localFlavorId) in allowed:
                 continue
 
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
 
-            allowed[(troveName, versionStr, flavor)] = True
+            allowed.add((troveName, versionStr, flavor, localFlavorId))
 
             # FIXME: since troveNames is no longer traveling through
             # here, this withVersions check has become superfluous.
@@ -774,10 +771,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     version = self.freezeVersion(version)
 
                     if withFlavors:
-                        if flavor == None:
-                            flavor = "none"
+                        # XXX: flavorId = 0
                         flist = l.setdefault(version, [])
-                        flist.append(flavor)
+                        flist.append(flavor or '')
                     else:
                         l.append(version)
 
@@ -921,11 +917,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # hardcoding the "%.3f" format. One day I'll learn about all these calls.
             version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
                                                       for x in timeStamps.split(":") ])
-            if flavor is None:
-                flavor = "none"
             retname = ret.setdefault(trove, {})
             flist = retname.setdefault(version, [])
-            flist.append(flavor)
+            flist.append(flavor or '')
         logMe(3, "finished processing results")
         return ret
 
@@ -1347,12 +1341,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return {}
 
+        # XXX: flavorId = 0
         for row, item in enumerate(troveList):
-            if item[2]:
-                flavor = item[2]
-            else:
-                flavor = 'none'
-
+            flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
                        "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
 
@@ -1507,10 +1498,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         cu = self.db.transaction()
         # get the instanceId that corresponds to this trove.
-        # if this instance is unflavored, the magic value is 'none'
-        flavorStr = flavor.freeze() or 'none'
-        cu.execute("SELECT flavorId from Flavors WHERE flavor=?",
-                   flavorStr)
+        # if this instance is unflavored, the magic value is ''
+        # XXX: flavorId = 0
+        flavorStr = flavor.freeze()
+        cu.execute("SELECT flavorId from Flavors WHERE flavor=?", flavorStr)
         flavorId = cu.fetchone()[0]
         cu.execute("SELECT versionId FROM Versions WHERE version=?",
                    version.asString())
@@ -1702,7 +1693,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
         query = """
-                SELECT UP.permittedTrove, item, version, flavor,
+                SELECT DISTINCT UP.permittedTrove, item, version, flavor,
                           timeStamps, Instances.changed FROM Instances
                     JOIN Nodes USING (itemId, versionId)
                     JOIN LabelMap USING (itemId, branchId)
@@ -1728,6 +1719,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         Instances.isPresent = 1
                     ORDER BY
                         Instances.changed
+                    LIMIT
+                        1000
                     """ % ",".join("%d" % x for x in userGroupIds)
 
         cu.execute(query, mark)

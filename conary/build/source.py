@@ -25,7 +25,7 @@ from conary.lib import log, magic
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
-from conary.build import action
+from conary.build import action, errors
 
 class _Source(action.RecipeAction):
     keywords = {'rpm': '',
@@ -525,7 +525,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 
 
 
-class SourceError(Exception):
+class SourceError(errors.CookError):
     """
     Base class from which source error classes inherit
     """
