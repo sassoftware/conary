@@ -344,7 +344,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def changePassword(self, authToken, clientVersion, user, newPassword):
         if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
-            and user != authToken[0]):
+            and not self.auth.check(authToken)):
             raise errors.InsufficientPermission
 
         self.auth.changePassword(user, newPassword)
@@ -352,25 +352,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def getUserGroups(self, authToken, clientVersion):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise errors.InsufficientPermission
         r = self.auth.getUserGroups(authToken[0])
         return r
 
     def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+        # self.auth does its own authentication check
         entitlement = self.toEntitlement(entitlement)
         self.auth.addEntitlement(authToken, entGroup, entitlement)
         return True
 
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,
                             userGroup):
+        # self.auth does its own authentication check
         self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
         return True
 
     def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,
                                entGroup):
+        # self.auth does its own authentication check
         self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
         return True
 
     def listEntitlements(self, authToken, clientVersion, entGroup):
+        # self.auth does its own authentication check
         return [ self.fromEntitlement(x) for x in
                         self.auth.iterEntitlements(authToken, entGroup) ]
 
