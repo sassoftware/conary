@@ -12,6 +12,7 @@
 # full details.
 #
 
+from conary import versions, trove
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, setupTempDepTables
