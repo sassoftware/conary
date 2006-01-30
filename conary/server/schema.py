@@ -1266,10 +1266,11 @@ class MigrateTo_13(SchemaMigration):
             pkgName = name.split(":")[0]
 
             includedTroves = cu2.execute("""
-                        SELECT Items.item, subItemId, Versions.version,
+                        SELECT Items.item, Instances.itemId, Versions.version,
                                TroveTroves.includedId, Instances.flavorId FROM
                         TroveTroves 
-                            JOIN Instances USING (includedId)
+                            JOIN Instances ON
+                                TroveTroves.includedId = Instances.instanceId
                             JOIN Items USING (itemId)
                             JOIN Versions ON
                                 Instances.versionId = Versions.versionId
@@ -1291,7 +1292,7 @@ class MigrateTo_13(SchemaMigration):
                                     "VALUES (?)", branchStr)
                         branchId = cu2.lastrowid
                     else:
-                        branchId = branchId[0]
+                        branchId = branchId[0][0]
 
                     # we need to move this redirect to the redirect table
                     cu2.execute("""
@@ -1301,8 +1302,8 @@ class MigrateTo_13(SchemaMigration):
                     cu2.execute("""
                             INSERT INTO TroveRedirects
                                 (instanceId, itemId, branchId, flavorId)
-                                VALUES (?, itemId, ?, NULL)""",
-                            instanceId, subItemId, branchId, subFlavorId)
+                                VALUES (?, ?, ?, NULL)""",
+                            instanceId, subItemId, branchId)
 
             cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", 
                         instanceId)
