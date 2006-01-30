@@ -955,7 +955,8 @@ class ClientUpdate:
                                 # just made this move, then allow it.
                                 pass
                             elif (replacedInfo in installedAndReferenced
-                                  and not alreadyBranchSwitch):
+                                  and not alreadyBranchSwitch
+                                  and parentInstalled):
                                 # Exception: The user has not switched this
                                 # trove's branch explicitly, and now
                                 # we have an implicit request to switch 

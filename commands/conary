@@ -22,8 +22,6 @@ if sys.version_info < (2, 4):
     print "error: python 2.4 or later is requried"
     sys.exit(1)
 
-import sys
-
 if __name__ == "__main__":
     # ondemand importing for conary command line tool 
     # - but don't impose it on others!  They can load it on their own if they
@@ -35,6 +33,7 @@ if __name__ == "__main__":
 import os
 import pwd
 import xmlrpclib
+import errno
 
 from conary.repository import errors
 #conary
@@ -562,6 +561,7 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
+        kwargs['callback'] = updatecmd.UpdateCallback(cfg)
 	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]
@@ -720,6 +720,10 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
 	return realMain(ccfg, argv)
+    except IOError, e:
+        # allow broken pipe to exit
+        if e.errno != errno.EPIPE:
+            raise
     except errors.InternalConaryError:
         raise
     except cfgtypes.CfgError, e:
