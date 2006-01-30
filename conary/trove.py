@@ -1783,6 +1783,16 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getNewVersion(self):
 	return self.newVersion()
 
+    def __cmp__(self, other):
+        first = self.name()
+        second = other.name()
+
+        if first == second:
+            first = self.freeze()
+            second = other.freeze()
+
+        return cmp(first, second)
+
     def getOldSigs(self):
         return self.oldSigs
 
