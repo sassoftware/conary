@@ -67,7 +67,7 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
 	l = []
-	for trv in self.itervalues():
+	for trv in sorted(self.itervalues()):
 	    s = trv.freeze()
 	    l.append(struct.pack("!I", len(s)))
 	    l.append(s)
@@ -94,7 +94,7 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
 	fileList = []
-	for ((oldFileId, newFileId), (csInfo)) in self.iteritems():
+	for ((oldFileId, newFileId), (csInfo)) in sorted(self.iteritems()):
 	    if not oldFileId:
                 oldFileId = ""
 
