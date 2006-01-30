@@ -1253,14 +1253,58 @@ class MigrateTo_13(SchemaMigration):
         logMe(3, "Recreating the fileId index...")
         createTroves(self.db)
 
-        # XXX: flavorId = 0 is now ''
+        # flavorId = 0 is now ''
         self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
 
         logMe(3, "Emptying out redirects...")
-        self.cu.execute("SELECT instanceId FROM Instances WHERE isRedirect = 1")
-        # IN syntax leaves a lot to be desired with MySQL
-        for instanceId in self.cu:
-            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
+        self.cu.execute("""
+                    SELECT instanceId, item FROM Instances 
+                        JOIN Items USING (itemId)
+                        WHERE isRedirect = 1""")
+        for instanceId, name in self.cu:
+            pkgName = name.split(":")[0]
+
+            includedTroves = cu2.execute("""
+                        SELECT Items.item, subItemId, Versions.version,
+                               TroveTroves.includedId, Instances.flavorId FROM
+                        TroveTroves 
+                            JOIN Instances USING (includedId)
+                            JOIN Items USING (itemId)
+                            JOIN Versions ON
+                                Instances.versionId = Versions.versionId
+                        WHERE TroveTroves.instanceId=?
+            """, instanceId).fetchall()
+
+            for subName, subItemId, subVersion, includedInstanceId, \
+                                        subFlavorId in includedTroves:
+                subPkgName = subName.split(":")[0]
+                if subPkgName != subName:
+                    version = versions.VersionFromString(subVersion)
+                    branchStr = version.branch().asString()
+
+                    branchId = cu2.execute("SELECT branchId FROM "
+                                           "Branches WHERE branch=?", 
+                                           branchStr).fetchall()
+                    if not branchId:
+                        cu2.execute("INSERT INTO Branches (branch) "
+                                    "VALUES (?)", branchStr)
+                        branchId = cu2.lastrowid
+                    else:
+                        branchId = branchId[0]
+
+                    # we need to move this redirect to the redirect table
+                    cu2.execute("""
+                            DELETE FROM TroveTroves WHERE
+                                instanceId=? AND includedId=?
+                            """, instanceId, includedInstanceId)
+                    cu2.execute("""
+                            INSERT INTO TroveRedirects
+                                (instanceId, itemId, branchId, flavorId)
+                                VALUES (?, itemId, ?, NULL)""",
+                            instanceId, subItemId, branchId, subFlavorId)
+
+            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", 
+                        instanceId)
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
                         "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
         # all done for migration to 13
@@ -1420,7 +1464,7 @@ def loadSchema(db):
     if version != VERSION:
         return db.setVersion(VERSION)
 
-    return True
+    return VERSION
 
 # this should only check for the proper schema version. This function
 # is called usually from the multithreaded setup, so schema operations
