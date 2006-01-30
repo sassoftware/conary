@@ -185,3 +185,7 @@ class Database(BaseDatabase):
         cu.execute(sql)
         self.tables[table].remove(name)
         return True
+
+    def use(self, dbName):
+        cu = self.cursor()
+        cu.execute("USE %s" % dbName)

@@ -412,6 +412,9 @@ class BaseDatabase:
         import shell
         shell.shell(self)
 
+    def use(self, dbName):
+        pass
+
     # try to close it first nicely
     def __del__(self):
         if self.dbh is not None:

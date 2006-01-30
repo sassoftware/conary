@@ -123,7 +123,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'checkVersion' ])
 
 
-    def __init__(self, cfg, basicUrl):
+    def __init__(self, cfg, basicUrl, db = None):
         logMe(1, cfg.items())
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
@@ -145,7 +145,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             self.cache = cacheset.NullCacheSet(self.tmpPath)
 
-        self.open()
+        if not db:
+            self.open()
+        else:
+            self.db = db
+            self.open(connect = False)
 
     def open(self, connect = True):
         logMe(1)
@@ -352,7 +356,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def getUserGroups(self, authToken, clientVersion):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+            and not self.auth.check(authToken)):
             raise errors.InsufficientPermission
         r = self.auth.getUserGroups(authToken[0])
         return r
