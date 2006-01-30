@@ -34,6 +34,13 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     if not isinstance(troveNames, (list, tuple, set)):
         troveNames = [troveNames]
 
+    if isinstance(troveFlavor, list):
+        troveFlavorSet = set(troveFlavor)
+    elif isinstance(troveFlavor, set):
+        troveFlavorSet = troveFlavor
+    else:
+        troveFlavorSet = set([troveFlavor])
+
     # strip off any components and remove duplicates
     pkgNames = set([x.split(':')[0] for x in troveNames])
 
@@ -76,7 +83,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
             # version, and we always want to bump the build count
             latest.incrementBuildCount()
         else:
-            if troveFlavor in flavors:
+            if troveFlavorSet & set(flavors):
                 # case 2.  There is a binary trove with this source
                 # version, and our flavor matches one already existing
                 # with this build count, so bump the build count
@@ -96,11 +103,11 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         latest = latest.getBinaryVersion()
         latest.incrementBuildCount()
     if latest.isOnLocalHost():
-        return nextLocalVersion(db, troveNames, latest, troveFlavor) 
+        return nextLocalVersion(db, troveNames, latest, troveFlavorSet)
     else:
         return latest
         
-def nextLocalVersion(db, troveNames, latest, troveFlavor):
+def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
     # if we've branched on to a local label, we check
     # the database for installed versions to see if we need to
     # bump the build count on this label
@@ -124,7 +131,7 @@ def nextLocalVersion(db, troveNames, latest, troveFlavor):
     relVersions.sort(lambda a, b: cmp(a[0].trailingRevision().buildCount,
                                       b[0].trailingRevision().buildCount))
     latest, flavors = relVersions[-1]
-    if troveFlavor in flavors:
+    if troveFlavorSet & set(flavors):
         latest.incrementBuildCount()
     return latest
 

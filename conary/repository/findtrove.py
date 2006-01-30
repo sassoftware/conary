@@ -699,6 +699,11 @@ class TroveFinder:
         versionStr = troveTup[1]
         if not versionStr:
             return VERSION_STR_NONE
+        if isinstance(versionStr, versions.Version):
+            return VERSION_STR_FULL_VERSION
+        elif isinstance(versionStr, versions.Branch):
+            return VERSION_STR_BRANCH
+
         firstChar = versionStr[0]
         lastChar = versionStr[-1]
         if firstChar == '/':
@@ -776,7 +781,12 @@ class TroveFinder:
         if self.query[QUERY_BY_BRANCH].hasName(name):
             self.remaining.append(troveTup)
             return
-        branch = versions.VersionFromString(versionStr)
+
+        if isinstance(versionStr, versions.Branch):
+            branch = versionStr
+        else:
+            branch = versions.VersionFromString(versionStr)
+
         if flavor is None and affinityTroves:
             self.query[QUERY_BY_BRANCH].addQueryWithAffinity(troveTup, branch, 
                                                              affinityTroves)
@@ -789,7 +799,11 @@ class TroveFinder:
         if self.query[QUERY_BY_VERSION].hasName(name):
             self.remaining.append(troveTup)
             return
-        version = versions.VersionFromString(versionStr)
+        if isinstance(versionStr, versions.Version):
+            version = versionStr
+        else:
+            version = versions.VersionFromString(versionStr)
+
         if flavor is None and affinityTroves:
             self.query[QUERY_BY_VERSION].addQueryWithAffinity(troveTup, 
                                                               version,

@@ -260,6 +260,11 @@ class FrozenVersionStream(InfoStream):
 class StringVersionStream(FrozenVersionStream):
     __slots__ = []
 
+    def set(self, val):
+        # we can't use the function from FrozenVersionStream because it
+        # checks for timestamps, which we don't need here
+        self.v = val
+
     def thaw(self, frz):
 	if frz:
 	    self.v = versions.VersionFromString(frz)

@@ -448,7 +448,6 @@ class TroveCache(dict):
         troves = self.repos.getTroves(troveTupList, withFiles=False)
 
         for troveTup, trv in izip(troveTupList, troves):
-            isRedirect = trv.isRedirect()
             self[troveTup] = trv
             self.getChildren(troveTup, trv)
 
@@ -599,7 +598,7 @@ def buildGroups(recipeObj, cfg, repos):
                 raise GroupDependencyFailure(group.name, failedDeps)
 
         addPackagesForComponents(group, repos, cache)
-        checkForRedirects(group, repos, cache)
+        checkForRedirects(group, repos, cache, cfg.buildFlavor)
 
         conflicts = calcSizeAndCheckHashes(group, cache)
 
@@ -764,7 +763,6 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
          byDefault, components) in list(group.iterTroveListInfo()):
         assert(explicit)
 
-
         if cache.isRedirect(troveTup):
             # children of redirect troves are special, and not included.
             continue
@@ -774,7 +772,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):
                 byDefault = False
-                    
+
             if components:
                 if _componentMatches(childName, components):
                     byDefault = True
@@ -862,7 +860,7 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache):
     return toErase
     
 
-def checkForRedirects(group, repos, troveCache):
+def checkForRedirects(group, repos, troveCache, buildFlavor):
     redirectTups = []
     for troveTup in group.iterTroveList(strongRefs=True, weakRefs=False):
         if troveCache.isRedirect(troveTup):
@@ -875,12 +873,12 @@ def checkForRedirects(group, repos, troveCache):
     missingTargets = {}
     for trv in redirectTroves:
         targets = []
-        name = trv.getName()
-        for (subName, subVersion, subFlavor) in trv.iterTroveList(
-                                                            strongRefs=True):
-            if (":" not in subName and ":" not in name) or \
-               (":"     in subName and ":"     in name):
-               targets.append((subName, subVersion, subFlavor))
+
+        allTargets = [ (x[0], str(x[1]), x[2]) 
+                                for x in trv.iterRedirects() ]
+        matches = repos.findTroves([], allTargets, buildFlavor)
+        for troveList in matches.values():
+            targets += troveList
         missing = [ x for x in targets if not group.hasTrove(*x) ]
         if missing:
             l = missingTargets.setdefault(trv, [])

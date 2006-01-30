@@ -361,43 +361,39 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     use.track(False)
 
     redirects = recipeObj.getRedirections()
-    redirectFlavor = deps.DependencySet()
-
-    for (topName, troveList) in redirects.iteritems():
-        for (name, version, flavor) in troveList:
-            redirectFlavor.union(flavor, mergeType=deps.DEP_MERGE_TYPE_NORMAL)
-
-    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
-                                redirectFlavor, targetLabel, 
-                                alwaysBumpCount=alwaysBumpCount)
-
-    redirSet = {}
-    for topName, troveList in redirects.iteritems():
-        redir = trove.Trove(topName, versions.NewVersion(), redirectFlavor, 
-                            None, isRedirect = True)
-        redirSet[topName] = redir
-
-        for (name, version, flavor) in troveList:
-            if version is None:
-                version = targetVersion
-            if flavor is None:
-                flavor = redirectFlavor
-
-            redir.addTrove(name, version, flavor)
 
     changeSet = changeset.ChangeSet()
     built = []
-    for trv in redirSet.itervalues():
-        trv.changeVersion(targetVersion)
-        trv.setBuildTime(time.time())
-        trv.setSourceName(fullName + ':source')
-        trv.setConaryVersion(constants.version)
-        trv.setIsCollection(False)
 
-        trvDiff = trv.diff(None, absolute = 1)[0]
+    flavors = set()
+    for (fromName, fromFlavor), (toName, toBranch, toFlavor,
+                                 subTroveList) in redirects.iteritems():
+        flavors.add(fromFlavor)
+
+    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
+                                flavors, targetLabel, 
+                                alwaysBumpCount=alwaysBumpCount)
+
+    for (fromName, fromFlavor), (toName, toBranch, toFlavor,
+                                 subTroveList) in redirects.iteritems():
+        redir = trove.Trove(fromName, targetVersion, fromFlavor, 
+                            None, isRedirect = True)
+
+        for subName in subTroveList:
+            redir.addTrove(subName, targetVersion, fromFlavor)
+
+        if toName is not None:
+            redir.addRedirect(toName, toBranch, toFlavor)
+
+        redir.setBuildTime(time.time())
+        redir.setSourceName(fullName + ':source')
+        redir.setConaryVersion(constants.version)
+        redir.setIsCollection(False)
+
+        trvDiff = redir.diff(None, absolute = 1)[0]
         changeSet.newTrove(trvDiff)
-        built.append((trv.getName(), trv.getVersion().asString(), 
-                      trv.getFlavor()) )
+        built.append((redir.getName(), redir.getVersion().asString(), 
+                      redir.getFlavor()) )
 
     return (changeSet, built, None)
 
