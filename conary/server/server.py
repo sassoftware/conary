@@ -52,6 +52,8 @@ from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
 
+#sys.excepthook = util.genExcepthook(debug=True)
+
 class HttpRequests(SimpleHTTPRequestHandler):
 
     outFiles = {}
