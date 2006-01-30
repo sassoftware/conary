@@ -1448,9 +1448,9 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
     def freeze(self, skipSet = {}):
 	l = []
-	for name, troveList in self.iteritems():
+	for name, troveList in sorted(self.iteritems()):
 	    subL = []
-	    for (change, version, flavor, byDefault) in troveList:
+	    for (change, version, flavor, byDefault) in sorted(troveList):
 		version = version.freeze()
 		if flavor:
 		    flavor = flavor.freeze()

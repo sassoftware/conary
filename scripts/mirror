@@ -103,6 +103,9 @@ def groupTroves(troveList):
             grouping.append(currentGroup)
             currentGroup = [ info ]
 
+    if currentGroup:
+        grouping.append(currentGroup)
+
     return grouping
 
 def buildJobList(repos, groupList):

@@ -58,10 +58,10 @@ def apply(db, cfg, *names, **kwargs):
 
     log.syslog.command()
 
-    replaceFiles = kwargs.get('replaceFiles', False)
+    defaults = { 'replaceFiles': False }
+    defaults.update(kwargs)
     try:
-	db.applyRollbackList(client.getRepos(), names, 
-                             replaceFiles=replaceFiles)
+	db.applyRollbackList(client.getRepos(), names, **defaults)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1

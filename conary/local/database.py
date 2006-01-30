@@ -696,7 +696,8 @@ class Database(SqlDbRepository):
         dir = self.rollbackCache + "/" + "%d" % num
         return Rollback(dir, load = True)
 
-    def applyRollbackList(self, repos, names, replaceFiles=False):
+    def applyRollbackList(self, repos, names, replaceFiles = False,
+                          callback = UpdateCallback()):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -735,11 +736,13 @@ class Database(SqlDbRepository):
                 try:
                     self.commitChangeSet(reposCs, UpdateJob(None),
                                          isRollback = True,
-                                         replaceFiles = replaceFiles)
+                                         replaceFiles = replaceFiles,
+                                         callback = callback)
                     self.commitChangeSet(localCs, UpdateJob(None),
                                          isRollback = True,
                                          toStash = False,
-                                         replaceFiles = replaceFiles)
+                                         replaceFiles = replaceFiles,
+                                         callback = callback)
                     rb.removeLast()
                 except CommitError:
                     raise RollbackError(name)

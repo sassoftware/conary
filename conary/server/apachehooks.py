@@ -110,14 +110,12 @@ def get(port, isSecure, repos, req):
             return apache.HTTP_FORBIDDEN
 
         localName = repos.tmpPath + "/" + req.args + "-out"
-        size = os.stat(localName).st_size
 
         if localName.endswith(".cf-out"):
             try:
                 f = open(localName, "r")
             except IOError:
-                self.send_error(404, "File not found")
-                return None
+                return apache.HTTP_NOT_FOUND
 
             os.unlink(localName)
 
@@ -131,7 +129,10 @@ def get(port, isSecure, repos, req):
             f.close()
             del f
         else:
-            size = os.stat(localName).st_size;
+            try:
+                size = os.stat(localName).st_size;
+            except OSError:
+                return apache.HTTP_NOT_FOUND
             items = [ (localName, size) ]
             totalSize = size
 

@@ -143,7 +143,8 @@ class CfgFingerPrintMapItem(CfgType):
         return label, fingerprint
 
     def format(self, val, displayOptions=None):
-        return ' '.join(val)
+        # val[1] may be None
+        return ' '.join([val[0], str(val[1])])
 
 class CfgFingerPrintMap(CfgList):
     def __init__(self, default={}):
@@ -231,7 +232,8 @@ class ConaryConfiguration(SectionedConfigFile):
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
-    showComponents	  =  CfgBool
+    showLabels            =  CfgBool
+    showComponents        =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')

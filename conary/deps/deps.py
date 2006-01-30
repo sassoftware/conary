@@ -248,10 +248,9 @@ class Dependency(BaseDependency):
                 elif toStrongMap[sense] == toStrongMap[diffFlags[flag]]:
                     del diffFlags[flag]
                 unseenFlags.discard(flag)
-        for flag in unseenFlags:
-            if diffFlags[flag] in (FLAG_SENSE_PREFERNOT, FLAG_SENSE_DISALLOWED,
-                                   FLAG_SENSE_PREFERRED):
-                del diffFlags[flag]
+        #for flag in unseenFlags:
+        #    if diffFlags[flag] in (FLAG_SENSE_PREFERNOT, FLAG_SENSE_PREFERRED):
+        #        del diffFlags[flag]
         if not diffFlags:
             return None
         else:
@@ -664,7 +663,7 @@ class PythonDependencies(DependencyClass):
     tagName = "python"
     justOne = False
     depClass = Dependency
-    flags = DEP_CLASS_HAS_FLAGS
+    flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(PythonDependencies)
 
 class PerlDependencies(DependencyClass):
@@ -673,7 +672,7 @@ class PerlDependencies(DependencyClass):
     tagName = "perl"
     justOne = False
     depClass = Dependency
-    flags = DEP_CLASS_HAS_FLAGS
+    flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(PerlDependencies)
 
 class FileDependencies(DependencyClass):

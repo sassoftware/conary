@@ -34,9 +34,13 @@ class GroupPathConflicts(CookError):
         errStrings = []
         for groupName, conflictSets in conflicts.iteritems():
             errStrings.append('%s:' % groupName)
-            for conflictSet in conflictSets:
-                errStrings.append('The following %s troves have conflicting paths:' % (len(conflictSet),))
-                errStrings.extend('    %s=%s[%s]' % x for x in conflictSet)
+            for conflictSet, paths in conflictSets:
+                errStrings.append('  The following %s troves share %s conflicting paths:' % (len(conflictSet), len(paths)))
+                errStrings.append('\n    Troves:')
+                errStrings.extend('      %s=%s[%s]' % x for x in conflictSet)
+                errStrings.append('\n    Conflicting Files:')
+                errStrings.extend('      %s' % x for x in paths)
+                errStrings.append('')
             
         self.args = """
 The following troves in the following groups have conflicts:

@@ -1,3 +1,29 @@
+Changes in 0.94:
+  o Bug Fixes
+    * A bug in getNewTroveList() that could cause duplicate
+      troves to be returned has been fixed.
+    * A bug that caused a repository server running under Apache to
+      fail with an Internal Server Error (500) when a client requested
+      a changeset file that does not exist has been fixed.
+    * Conary no longer displays an error when attempting to write to a
+      broken pipe.  (bug #474)
+    * Conary respects branch affinity when moving from old-style groups 
+      to new-style groups.
+
+  o Client changes:
+    * The query/repquery/showcs command line options have been
+      reworked.  See the conary man page for details.
+    * When "cvc merge" is used to merge changes made on the parent
+      branch with changes made on a shadow, conary now records the
+      version from the parent branch that was used for the merge.
+      This is required to allow conary to handle changing the upstream
+      version on a shadow.  It is also useful for accounting
+      purposes.  (bug #220)
+    * "conary emerge" can now be performed on a recipe file.
+      Previously you were required to emerge from a repository. (bug
+      #526)
+    * Progress is now displayed as conary applies a rollback (bug #363)
+
 Changes in 0.93:
   o Bug Fixes
     * A bug in the "conary verify" code sometimes resulted in an

@@ -24,6 +24,7 @@ import time
 
 from conary import callbacks
 from conary import changelog
+from conary import conaryclient
 from conary import deps
 from conary import errors
 from conary import files
@@ -225,22 +226,13 @@ def commit(repos, cfg, message, callback=None):
 	    return
 	srcPkg = None
     else:
-        try:
-            srcPkg = repos.getTrove(troveName, 
-                                    state.getVersion(),
-                                    deps.deps.DependencySet())
-            if not _verifyAtHead(repos, srcPkg, state):
-                log.error("contents of working directory are not all "
-                          "from the head of the branch; use update")
-                return
-        except errors.TroveMissing:
-            # the version in the CONARY file doesn't exist in the repository.
-            # The only time this should happen is after a fresh merge, when
-            # the new version is in the CONARY file before the commit happens.
-            # XXX we skip the verifyAtHead checks in this case
-            srcPkg = repos.getTrove(troveName, 
-                                    state.getVersion().canonicalVersion(),
-                                    deps.deps.DependencySet())
+        srcPkg = repos.getTrove(troveName,
+                                state.getVersion(),
+                                deps.deps.DependencySet())
+        if not _verifyAtHead(repos, srcPkg, state):
+            log.error("contents of working directory are not all "
+                      "from the head of the branch; use update")
+            return
 
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(), 
                                      cfg=cfg, repos=repos)
@@ -322,7 +314,10 @@ def commit(repos, cfg, message, callback=None):
         newVersion = state.getBranch().createVersion(
                            versions.Revision("%s-0" % recipeVersionStr))
         newVersion.incrementSourceCount()
-    elif state.getLastMerged():
+    elif (state.getLastMerged() 
+          and recipeVersionStr == state.getLastMerged().trailingRevision().getVersion()):
+        # If we've merged, and our changes did not affect the original
+        # version, then we try to maintain appropriate shadow dots
         newVersion = state.getLastMerged()
         newVersion = newVersion.createShadow(
                                     state.getVersion().branch().label())
@@ -427,6 +422,33 @@ def commit(repos, cfg, message, callback=None):
     # this replaces the TroveChangeSet update.buildLocalChanges put in
     # the changeset
     changeSet.newTrove(troveCs)
+
+    if state.getLastMerged():
+        shadowLabel = state.getVersion().branch().label()
+        shadowedVer = state.getLastMerged().createShadow(shadowLabel)
+        noDeps = deps.deps.DependencySet()
+
+        # Conary requires that if you're committing a source change that 
+        # contains an upstream merge, you also commit a shadow of that
+        # version, for tracking purposes.  This allows future merges
+        # to know that you've already merged to this point.
+        if not repos.hasTrove(troveName, shadowedVer, noDeps):
+
+            client = conaryclient.ConaryClient(cfg)
+            # FIXME: if creating this shadow fails, then there's a race
+            #        condition on commit.  Catch and raise a reasonable error.
+            log.debug('creating shadow of %s for merging...' % state.getLastMerged())
+            shadowCs = client.createShadowChangeSet(str(shadowLabel),
+                                [(troveName, state.getLastMerged(), noDeps)])[1]
+
+
+            # writable changesets can't do merging, so create a parent
+            # readonly one
+            readOnlyCs = changeset.ReadOnlyChangeSet()
+            readOnlyCs.merge(shadowCs)
+            readOnlyCs.merge(changeSet)
+            changeSet = readOnlyCs
+
     repos.commitChangeSet(changeSet, callback = callback)
 
     # committing to the repository changes the version timestamp; get the
@@ -866,6 +888,23 @@ def updateSrc(repos, versionStr = None, callback = None):
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
 
+def _determineRootVersion(repos, state):
+    ver = state.getVersion()
+    assert(ver.isShadow())
+    if ver.hasParentVersion():
+        return ver.parentVersion()
+    else:
+        branch = ver.branch()
+        name = state.getName()
+        vers = repos.getTroveVersionsByBranch({name: {branch : None}})[name]
+        for ver in reversed(sorted(vers)):
+            # find latest shadowed version
+
+            if ver.hasParentVersion():
+                return ver.parentVersion()
+        # We must have done a shadow at some point.
+        assert(0)
+
 def merge(repos, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
@@ -889,9 +928,9 @@ def merge(repos, callback=None):
 
     parentHeadVersion = repos.getTroveLatestVersion(troveName, 
                                   state.getBranch().parentBranch())
-    parentRootVersion = state.getVersion().parentVersion()
+    parentRootVersion = _determineRootVersion(repos, state)
 
-    changeSet = repos.createChangeSet([(troveName, 
+    changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.DependencySet()), 
                             (parentHeadVersion, deps.deps.DependencySet()), 
                             0)], excludeAutoSource = True, callback = callback)

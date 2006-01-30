@@ -106,7 +106,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = self.tmpDir + "/" + urlPath.split('?', 1)[1] + "-out"
             if os.path.realpath(localName) != localName:
-                self.send_error(403, "File not found")
+                self.send_error(404, "File not found")
                 return None
 
             if localName.endswith(".cf-out"):
@@ -128,7 +128,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 f.close()
                 del f
             else:
-                size = os.stat(localName).st_size;
+                try:
+                    size = os.stat(localName).st_size;
+                except OSError:
+                    self.send_error(404, "File not found")
                 items = [ (localName, size) ]
                 totalSize = size
 
