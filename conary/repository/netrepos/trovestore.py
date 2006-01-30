@@ -445,6 +445,46 @@ class TroveStore:
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
+        # now add the redirects
+        cu.execute("DELETE FROM NewRedirects")
+        for (name, branch, flavor) in trv.iterRedirects():
+            cu.execute("INSERT INTO NewRedirects (item, branch, flavor) "
+                       "VALUES (?, ?, ?)", name, str(branch), str(flavor))
+
+        cu.execute("""
+                INSERT INTO Items (item)
+                    SELECT NewRedirects.item FROM
+                        NewRedirects LEFT OUTER JOIN Items USING (item)
+                        WHERE Items.itemId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO Branches (branch)
+                    SELECT NewRedirects.branch FROM
+                        NewRedirects LEFT OUTER JOIN Branches USING (branch)
+                        WHERE Branches.branchId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO Flavors (flavor)
+                    SELECT NewRedirects.flavor FROM
+                        NewRedirects LEFT OUTER JOIN Flavors USING (flavor)
+                        WHERE 
+                            Flavors.flavor is not NULL 
+                            AND Flavors.flavorId is NULL
+                   """)
+
+        cu.execute("""
+                INSERT INTO TroveRedirects 
+                    (instanceId, itemId, branchId, flavorId)
+                    SELECT ?, itemId, branchId, flavorId FROM
+                        NewRedirects JOIN Items USING (item)
+                        JOIN Branches ON
+                            NewRedirects.branch = Branches.branch
+                        LEFT OUTER JOIN Flavors ON
+                            NewRedirects.flavor = Flavors.flavor
+        """, troveInstanceId)
+
 	del self.fileVersionCache
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
@@ -555,10 +595,8 @@ class TroveStore:
         schema.resetTable(cu, 'gtlInst')
 
         for idx, info in enumerate(troveInfoList):
-            if not info[2]:
-                flavorStr = "'none'"
-            else:
-                flavorStr = "'%s'" % info[2].freeze()
+            # XXX: flavorId = 0
+            flavorStr = "'%s'" % info[2].freeze()
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
@@ -640,6 +678,19 @@ class TroveStore:
         else:
             troveFilesCursor = util.PeekIterator(iter(()))
 
+        troveRedirectsCursor = self.db.cursor()
+        troveRedirectsCursor.execute("""
+                    SELECT idx, item, branch, flavor 
+                    FROM gtlInst 
+                        JOIN TroveRedirects using (instanceId)
+                        JOIN Items USING (itemId)
+                        JOIN Branches ON
+                            TroveRedirects.branchId = Branches.branchId
+                        LEFT OUTER JOIN Flavors ON
+                            TroveRedirects.flavorId = Flavors.flavorId
+                    """)
+        troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
+
         neededIdx = 0
         while troveIdList:
             # [0:4] because we don't need the changelog information
@@ -674,10 +725,7 @@ class TroveStore:
                     idxA, name, version, flavor, flags, timeStamps = \
                                                 troveTrovesCursor.next()
                     version = versions.VersionFromString(version)
-                    if flavor == 'none':
-                        flavor = deps.DependencySet()
-                    else:
-                        flavor = deps.ThawDependencySet(flavor)
+                    flavor = deps.ThawDependencySet(flavor)
 
                     version.setTimeStamps(
                             [ float(x) for x in timeStamps.split(":") ])
@@ -700,6 +748,19 @@ class TroveStore:
                                 cu.frombinary(fileId))
 		    if stream is not None:
 			fileContents[fileId] = stream
+            except StopIteration:
+                # we're at the end; that's okay
+                pass
+
+            try:
+                while troveRedirectsCursor.peek()[0] == idx:
+                    idxA, targetName, targetBranch, targetFlavor = \
+                            troveRedirectsCursor.next()
+                    targetBranch = versions.VersionFromString(targetBranch)
+                    if targetFlavor is not None:
+                        targetFlavor = deps.deps.ThawDependencySet(targetFlavor)
+
+                    trv.addRedirect(targetName, targetBranch, targetFlavor)
             except StopIteration:
                 # we're at the end; that's okay
                 pass

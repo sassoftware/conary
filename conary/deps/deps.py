@@ -901,7 +901,8 @@ class DependencySet(object):
 
 def ThawDependencySet(frz):
     depSet = DependencySet()
-    if frz == 'none' or frz is None:
+    # 'none' is for just-in-case backwards compatibility
+    if frz in ['', None, 'none']:
         return depSet
     l = frz.split('|')
     for line in l:
