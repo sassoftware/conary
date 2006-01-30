@@ -549,8 +549,12 @@ class _AbstractPackageRecipe(Recipe):
             try:
                 flavor = deps.parseFlavor('is: ' + arch)
             except deps.ParseError, msg:
-                raise CookError, 'Invalid architecture specification %s'
+                raise errors.CookError('Invalid architecture specification %s'
+                                       %archSpec)
 
+            if not flavor:
+                raise errors.CookError('Invalid architecture specification %s'
+                                       %archSpec)
             return flavor, vendor, hostOs
 
         def _setArchFlags(flavor):
