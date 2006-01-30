@@ -306,7 +306,7 @@ class SearchableTroveSource(AbstractTroveSource):
                                 elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
                                     troveFlavors.update([x[1] for x in scores])
                                 else:
-                                    assert(false)
+                                    assert(0)
 
                         
                             if troveFlavors: 
