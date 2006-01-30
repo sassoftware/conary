@@ -477,13 +477,13 @@ class TroveStore:
         cu.execute("""
                 INSERT INTO TroveRedirects 
                     (instanceId, itemId, branchId, flavorId)
-                    SELECT ?, itemId, branchId, flavorId FROM
+                    SELECT %d, itemId, branchId, flavorId FROM
                         NewRedirects JOIN Items USING (item)
                         JOIN Branches ON
                             NewRedirects.branch = Branches.branch
                         LEFT OUTER JOIN Flavors ON
                             NewRedirects.flavor = Flavors.flavor
-        """, troveInstanceId)
+        """ % troveInstanceId)
 
 	del self.fileVersionCache
 
