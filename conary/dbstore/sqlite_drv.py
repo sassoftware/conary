@@ -79,6 +79,8 @@ class Cursor(BaseCursor):
         except sqlite3.DatabaseError, e:
             if e.args[0].startswith('duplicate column name:'):
                 raise sqlerrors.DuplicateColumnName(str(e))
+            if e.args[0].startswith("no such table"):
+                raise sqlerrors.InvalidTable(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
         else:
             if ret == self._cursor:

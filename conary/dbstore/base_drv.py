@@ -401,7 +401,7 @@ class BaseDatabase:
         # instead of looking at the self.tables
         try:
             c.execute("select max(version) as version from DatabaseVersion")
-        except sqlerrors.CursorError, e:
+        except sqlerrors.InvalidTable, e:
             self.version = 0
             return 0
         else:
