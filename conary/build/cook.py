@@ -266,12 +266,13 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         except errors.OpenError:
             if targetLabel != versions.CookLabel():
                 raise
-            log.warning('Could not open repository -- not attempting to'
-                        ' share pathId information with the'
-                        ' repository.  This cook will not merge config'
-                        ' file information on update.')
-            time.sleep(3)
-            repos = None
+            if not sourceVersion.isOnLocalHost():
+                log.warning('Could not open repository -- not attempting to'
+                            ' share pathId information with the'
+                            ' repository.  This cook will not merge config'
+                            ' file information on update.')
+                time.sleep(3)
+                repos = None
 
 
     buildBranch = sourceVersion.branch()
@@ -867,7 +868,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # this keeps cook and emerge branchs from showing up
         searchBranch = searchBranch.parentBranch()
 
-    if repos:
+    if repos and not searchBranch.getHost() == 'local':
         versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
         versionDict = repos.getTroveLeavesByBranch(versionDict)
         if not versionDict and searchBranch.hasParentBranch():
@@ -1020,7 +1021,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
-    if repos:
+    if repos and buildLabel:
         versionDict = repos.getTroveLeavesByLabel(
                                     { srcName : { buildLabel : None } })
     else:
@@ -1135,6 +1136,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         if not sourceVersion:
             # just make up a sourceCount -- there's no version in 
             # the repository to compare against
+            if not cfg.buildLabel:
+                cfg.buildLabel = versions.LocalLabel()
             sourceVersion = versions.VersionFromString('/%s/%s-1' % (
                                                    cfg.buildLabel.asString(),
                                                    recipeClass.version))

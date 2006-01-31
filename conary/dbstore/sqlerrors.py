@@ -41,6 +41,9 @@ class SchemaVersionError(DatabaseError):
 class CursorError(DatabaseError):
     pass
 
+class UnknownDatabase(DatabaseError):
+    pass
+
 class ColumnNotUnique(CursorError):
     pass
 

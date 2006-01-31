@@ -49,7 +49,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     query = dict.fromkeys(pkgNames, 
                           {sourceVersion.getBinaryVersion().branch() : None })
     
-    if repos:
+    if repos and not sourceVersion.isOnLocalHost():
         d = repos.getTroveVersionsByBranch(query)
     else:
         d = {}
