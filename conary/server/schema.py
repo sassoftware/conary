@@ -1261,22 +1261,20 @@ class MigrateTo_13(SchemaMigration):
 
         logMe(3, "Emptying out redirects...")
         self.cu.execute("""
-                    SELECT instanceId, item FROM Instances 
-                        JOIN Items USING (itemId)
-                        WHERE isRedirect = 1""")
+        SELECT instanceId, item
+        FROM Instances JOIN Items USING (itemId)
+        WHERE isRedirect = 1""")
         for instanceId, name in self.cu:
             pkgName = name.split(":")[0]
 
             includedTroves = cu2.execute("""
-                        SELECT Items.item, Instances.itemId, Versions.version,
-                               TroveTroves.includedId, Instances.flavorId FROM
-                        TroveTroves 
-                            JOIN Instances ON
-                                TroveTroves.includedId = Instances.instanceId
-                            JOIN Items USING (itemId)
-                            JOIN Versions ON
-                                Instances.versionId = Versions.versionId
-                        WHERE TroveTroves.instanceId=?
+            SELECT Items.item, Instances.itemId, Versions.version,
+                   TroveTroves.includedId, Instances.flavorId
+            FROM TroveTroves
+            JOIN Instances ON TroveTroves.includedId = Instances.instanceId
+            JOIN Items USING (itemId)
+            JOIN Versions ON Instances.versionId = Versions.versionId
+            WHERE TroveTroves.instanceId=?
             """, instanceId).fetchall()
 
             for subName, subItemId, subVersion, includedInstanceId, \
@@ -1286,28 +1284,27 @@ class MigrateTo_13(SchemaMigration):
                     version = versions.VersionFromString(subVersion)
                     branchStr = version.branch().asString()
 
-                    branchId = cu2.execute("SELECT branchId FROM "
-                                           "Branches WHERE branch=?", 
-                                           branchStr).fetchall()
+                    branchId = cu2.execute(
+                        "SELECT branchId FROM Branches WHERE branch=?",
+                        branchStr).fetchall()
                     if not branchId:
-                        cu2.execute("INSERT INTO Branches (branch) "
-                                    "VALUES (?)", branchStr)
+                        cu2.execute(
+                            "INSERT INTO Branches (branch) VALUES (?)",
+                            branchStr)
                         branchId = cu2.lastrowid
                     else:
                         branchId = branchId[0][0]
 
                     # we need to move this redirect to the redirect table
-                    cu2.execute("""
-                            DELETE FROM TroveTroves WHERE
-                                instanceId=? AND includedId=?
-                            """, instanceId, includedInstanceId)
-                    cu2.execute("""
-                            INSERT INTO TroveRedirects
-                                (instanceId, itemId, branchId, flavorId)
-                                VALUES (?, ?, ?, NULL)""",
-                            instanceId, subItemId, branchId)
+                    cu2.execute("DELETE FROM TroveTroves "
+                                "WHERE instanceId=? AND includedId=?",
+                                instanceId, includedInstanceId)
+                    cu2.execute("INSERT INTO TroveRedirects "
+                                "(instanceId, itemId, branchId, flavorId) "
+                                "VALUES (?, ?, ?, NULL)",
+                                instanceId, subItemId, branchId)
 
-            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", 
+            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?",
                         instanceId)
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
                         "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
