@@ -151,6 +151,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db = db
             self.open(connect = False)
 
+    def __del__(self):
+        try:
+            self.db.close()
+        except:
+            pass
+        self.db = self.cache = self.troveStore = self.repos = self.auth = None
+
     def open(self, connect = True):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
