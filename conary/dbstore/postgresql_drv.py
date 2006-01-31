@@ -87,7 +87,6 @@ class Database(BaseDatabase):
         if cdb["port"]:
             host ="%s:%s" % (cdb["host"], cdb["port"])
         self.dbh = pgdb.connect(cstr, host = host)
-        self.loadSchema()
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
