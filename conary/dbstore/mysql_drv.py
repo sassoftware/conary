@@ -187,5 +187,7 @@ class Database(BaseDatabase):
         return True
 
     def use(self, dbName):
-        cu = self.cursor()
-        cu.execute("USE %s" % dbName)
+        self.dbh.select_db(dbName)
+        self.loadSchema()
+        self.tempTables = sqllib.CaselessDict()
+        BaseDatabase.use(self, dbName)
