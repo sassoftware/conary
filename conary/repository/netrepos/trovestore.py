@@ -74,7 +74,7 @@ class TroveStore:
 
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
-        self.metadataTable = metadata.MetadataTable(self.db, schema = False)
+        self.metadataTable = metadata.MetadataTable(self.db, create = False)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
         self.db.analyze()
