@@ -24,6 +24,10 @@ Changes in 0.94:
       #526)
     * Progress is now displayed as conary applies a rollback (bug #363)
 
+  o Build changes
+    * PythonSetup() no longer passes the --single-version-externally-managed
+      argument to setup.py when it uses distutils instead of setuptools.
+
   o Redirections have changed from pointing to a specific trove to pointing
     to a branch. The client chooses the latest version on that branch which
     is compatible with the local system.
