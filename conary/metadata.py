@@ -48,9 +48,10 @@ class MDClass:
              SOURCE:        STRING}
 
 class MetadataTable:
-    def __init__(self, db):
+    def __init__(self, db, schema = True):
         self.db = db
-        schema.createMetadata(db)
+        if schema:
+            schema.createMetadata(db)
 
     def add(self, itemId, versionId, branchId, shortDesc, longDesc,
             urls, licenses, categories, source="", language="C"):
