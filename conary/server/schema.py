@@ -573,7 +573,9 @@ def createTroves(db):
     if createTrigger(db, "TroveRedirects"):
         commit = True
 
-    db.loadSchema()
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 def createMetadata(db):
     commit = False
