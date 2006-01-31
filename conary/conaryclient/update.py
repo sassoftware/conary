@@ -380,7 +380,14 @@ class ClientUpdate:
                         toDoSet.add((False, 
                                      (info[0], (None, None), info[1:], True)))
 
-            # The targets of redirects need to be loaded
+            # The targets of redirects need to be loaded - but only
+            # if they're not already in the job.
+            nextSet = list(nextSet)
+            hasTroves = uJob.getTroveSource().hasTroves([
+                            (x[1][0], x[1][2][0], x[1][2][1]) for x in nextSet])
+            nextSet = [ x[0] for x in itertools.izip(nextSet, hasTroves) \
+                                                                  if not x[1] ]
+
             redirectCs, notFound = csSource.createChangeSet(
                     [ x[1] for x in nextSet ],
                     withFiles = False, recurse = True)
