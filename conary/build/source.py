@@ -190,6 +190,7 @@ class Archive(_Source):
 	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
 
 	elif f.endswith(".rpm"):
+            log.info("extracting %s into %s" % (f, destDir))
 	    _extractFilesFromRPM(f, directory=destDir)
 
 	else:
