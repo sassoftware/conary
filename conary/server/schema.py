@@ -1298,11 +1298,11 @@ class MigrateTo_13(SchemaMigration):
                     # we need to move this redirect to the redirect table
                     cu2.execute("DELETE FROM TroveTroves "
                                 "WHERE instanceId=? AND includedId=?",
-                                instanceId, includedInstanceId)
+                                (instanceId, includedInstanceId))
                     cu2.execute("INSERT INTO TroveRedirects "
                                 "(instanceId, itemId, branchId, flavorId) "
                                 "VALUES (?, ?, ?, NULL)",
-                                instanceId, subItemId, branchId)
+                                (instanceId, subItemId, branchId))
 
             cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?",
                         instanceId)
