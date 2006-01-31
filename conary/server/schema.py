@@ -1313,6 +1313,7 @@ class MigrateTo_13(SchemaMigration):
 
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
+    logMe(3)
     cu = db.cursor()
 
     if "ffFlavor" not in db.tempTables:
@@ -1402,7 +1403,6 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
     db.commit()
-    db.loadSchema()
 
 def resetTable(cu, name):
     cu.execute("DELETE FROM %s" % name,
@@ -1410,6 +1410,7 @@ def resetTable(cu, name):
 
 # create the (permanent) server repository schema
 def createSchema(db):
+    logMe(3)
     createIdTables(db)
     createLabelMap(db)
 
