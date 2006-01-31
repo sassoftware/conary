@@ -385,8 +385,6 @@ class BaseDatabase:
 
     # easy access to the schema state
     def loadSchema(self):
-        import traceback
-        traceback.print_stack()
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = sqllib.CaselessDict()
