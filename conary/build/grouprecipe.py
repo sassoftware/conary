@@ -485,7 +485,7 @@ class TroveCache(dict):
                 # They should be trustable for the rest of the recipe.
                 if not byDefault:
                     childByDefault = False
-                if not isStrong and not trv.hasTrove(*childChildTup):
+                if isStrong and not trv.hasTrove(*childChildTup):
                     trv.addTrove(byDefault=childByDefault, 
                                  weakRef=True, *childChildTup)
 

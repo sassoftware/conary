@@ -1257,13 +1257,21 @@ class MigrateTo_13(SchemaMigration):
         # flavorId = 0 is now ''
         self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
 
-        logMe(3, "Emptying out redirects...")
+        logMe(3, "Changing absolute redirects to branch redirects...")
         self.cu.execute("""
-                    SELECT instanceId, item FROM Instances 
+                    SELECT instanceId, item, version FROM Instances 
                         JOIN Items USING (itemId)
+                        JOIN Versions ON Instances.versionId = Versions.versionId
                         WHERE isRedirect = 1""")
-        for instanceId, name in self.cu:
-            pkgName = name.split(":")[0]
+        for instanceId, name, version in self.cu:
+            l = name.split(":")
+            pkgName = l[0]
+            if len(l) > 1:
+                compName = l[1]
+            else:
+                compName = None
+
+            branchStr = versions.VersionFromString(version).branch().asString()
 
             includedTroves = cu2.execute("""
                         SELECT Items.item, Instances.itemId, Versions.version,
@@ -1279,34 +1287,39 @@ class MigrateTo_13(SchemaMigration):
 
             for subName, subItemId, subVersion, includedInstanceId, \
                                         subFlavorId in includedTroves:
-                subPkgName = subName.split(":")[0]
-                if subPkgName != subName:
-                    version = versions.VersionFromString(subVersion)
-                    branchStr = version.branch().asString()
+                l = subName.split(":")
+                subPkgName = l[0]
+                if len(l) > 1:
+                    subCompName = l[1]
+                else:
+                    subCompName = None
 
-                    branchId = cu2.execute("SELECT branchId FROM "
-                                           "Branches WHERE branch=?", 
-                                           branchStr).fetchall()
-                    if not branchId:
-                        cu2.execute("INSERT INTO Branches (branch) "
-                                    "VALUES (?)", branchStr)
-                        branchId = cu2.lastrowid
-                    else:
-                        branchId = branchId[0][0]
+                subVersion = versions.VersionFromString(subVersion)
+                subBranchStr = subVersion.branch().asString()
+                if subPkgName != pkgName or branchStr != subBranchStr:
+                    if compName == subCompName:
+                        branchId = cu2.execute("SELECT branchId FROM "
+                                               "Branches WHERE branch=?", 
+                                               branchStr).fetchall()
+                        if not branchId:
+                            cu2.execute("INSERT INTO Branches (branch) "
+                                        "VALUES (?)", branchStr)
+                            branchId = cu2.lastrowid
+                        else:
+                            branchId = branchId[0][0]
+
+                        cu2.execute("""
+                                INSERT INTO TroveRedirects
+                                    (instanceId, itemId, branchId, flavorId)
+                                    VALUES (?, ?, ?, NULL)""",
+                                instanceId, subItemId, branchId)
 
                     # we need to move this redirect to the redirect table
                     cu2.execute("""
                             DELETE FROM TroveTroves WHERE
                                 instanceId=? AND includedId=?
                             """, instanceId, includedInstanceId)
-                    cu2.execute("""
-                            INSERT INTO TroveRedirects
-                                (instanceId, itemId, branchId, flavorId)
-                                VALUES (?, ?, ?, NULL)""",
-                            instanceId, subItemId, branchId)
 
-            cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?", 
-                        instanceId)
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
                         "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
         # all done for migration to 13

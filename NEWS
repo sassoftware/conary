@@ -22,7 +22,12 @@ Changes in 0.94:
     * "conary emerge" can now be performed on a recipe file.
       Previously you were required to emerge from a repository. (bug
       #526)
-    * Progress is now displayed as conary applies a rollback (bug #363)
+    * Progress is now displayed as conary applies a rollback. (bug #363)
+    * Java, Perl, and Python dependencies are now enforced by default.
+
+  o Build changes
+    * PythonSetup() no longer passes the --single-version-externally-managed
+      argument to setup.py when it uses distutils instead of setuptools.
 
   o Redirections have changed from pointing to a specific trove to pointing
     to a branch. The client chooses the latest version on that branch which

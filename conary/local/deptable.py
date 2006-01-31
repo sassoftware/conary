@@ -316,8 +316,7 @@ class DependencyTables:
                            wasIn = None):
             failedSets = [ (x, None, None, None) for x in troveNames]
             stillNeededMap = [ [] for x in troveNames ]
-            ignoreDepClasses = set((deps.DEP_CLASS_ABI, deps.DEP_CLASS_JAVA,
-                deps.DEP_CLASS_PYTHON, deps.DEP_CLASS_PERL))
+            ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
 
             for idx in idxList:
                 (troveIndex, classId, dep) = depInfoList[-idx]
