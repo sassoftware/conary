@@ -187,7 +187,14 @@ class Database(BaseDatabase):
         return True
 
     def use(self, dbName):
-        self.dbh.select_db(dbName)
+        try:
+            self.dbh.select_db(dbName)
+        except mysql.OperationalError, e:
+            if e[0] == 1049:
+                raise sqlerrors.UnknownDatabase(e.args[1], e.args)
+            else:
+                raise
+
         self.loadSchema()
         self.tempTables = sqllib.CaselessDict()
         BaseDatabase.use(self, dbName)
