@@ -239,7 +239,16 @@ class BaseDatabase:
         self.stderr = sys.stderr
         self.closed = True
         self.tempTables = sqllib.CaselessDict()
-
+    # close the connection when going out of scope
+    def __del__(self):
+        self.stderr = self.tempTables = None
+        try:
+            self.dbh.close()
+        except:
+            pass
+        self.dbh = self.database = None
+        self.closed = True
+        
     # the string syntax for database connection is [[user[:password]@]host[:port]/]database
     def _connectData(self, names = ["user", "password", "host", "port", "database"]):
         assert(self.database)
@@ -376,6 +385,8 @@ class BaseDatabase:
 
     # easy access to the schema state
     def loadSchema(self):
+        import traceback
+        traceback.print_stack()
         assert(self.dbh)
         # keyed by table, values are indexes on the table
         self.tables = sqllib.CaselessDict()
@@ -388,24 +399,31 @@ class BaseDatabase:
     def getVersion(self):
         assert(self.dbh)
         c = self.cursor()
-        if 'DatabaseVersion' not in self.tables:
+        # schema might not be loaded, so we have to try: except: here
+        # instead of looking at the self.tables
+        try:
+            c.execute("select max(version) as version from DatabaseVersion")
+        except sqlerrors.CursorError, e:
             self.version = 0
             return 0
-        c.execute("select max(version) as version from DatabaseVersion")
-        self.version = c.fetchone()[0]
+        else:
+            self.version = c.fetchone()[0]
         return self.version
 
     def setVersion(self, version):
         assert(self.dbh)
         c = self.cursor()
-        assert (version >= self.getVersion())
-        if 'DatabaseVersion' not in self.tables:
+        crtVersion = self.getVersion()
+        # do not allow "going back"
+        assert (version >= crtVersion)
+        if crtVersion == 0: # indicates table is not there
             c.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
-            c.execute("INSERT INTO DatabaseVersion (version) VALUES (0)")
-        c.execute("UPDATE DatabaseVersion set version = ?", version)
+            c.execute("INSERT INTO DatabaseVersion (version) VALUES (?)",
+                      version)
+            self.commit()
+            return version
+        c.execute("UPDATE DatabaseVersion SET version = ?", version)
         self.commit()
-        # usually a setVersion occurs after some schema modification...
-        self.loadSchema()
         return version
 
     def shell(self):
@@ -414,16 +432,6 @@ class BaseDatabase:
 
     def use(self, dbName):
         pass
-
-    # try to close it first nicely
-    def __del__(self):
-        if self.dbh is not None:
-            try:
-                self.dbh.close()
-            except:
-                pass
-        self.dbh = self.database = None
-        self.closed = True
 
 # A class to handle calls to the SQL functions and procedures
 class Callable:

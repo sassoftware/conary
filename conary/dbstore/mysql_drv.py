@@ -117,7 +117,6 @@ class Database(BaseDatabase):
                    "where schema_name=?", self.dbName)
         self.characterSet = cu.fetchone()[0]
         cu.execute("set character set %s" % self.characterSet)
-        self.loadSchema(cu)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -132,6 +131,9 @@ class Database(BaseDatabase):
             return self.connect()
         return False
 
+    # Important: MySQL can not report back a list of temporray tables
+    # created in the current connection, therefore the self.tempTables
+    # is managed separately outside of the loadSchema() calls.
     def loadSchema(self, cu = None):
         BaseDatabase.loadSchema(self)
         if cu is None:

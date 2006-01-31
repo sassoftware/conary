@@ -165,7 +165,6 @@ class Database(BaseDatabase):
         self.dbh.create_function('regexp', 2, _regexp)
         # add the serialized timestamp function
         self.dbh.create_function("unix_timestamp", 0, _timestamp)
-        self.loadSchema()
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         if self.database in self.VIRTUALS:
