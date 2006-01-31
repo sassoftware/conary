@@ -1423,7 +1423,6 @@ def resetTable(cu, name):
 
 # create the (permanent) server repository schema
 def createSchema(db):
-    logMe(3)
     createIdTables(db)
     createLabelMap(db)
 
@@ -1447,6 +1446,9 @@ def loadSchema(db):
     global VERSION
     version = db.getVersion()
 
+    logMe(3, "current =", version, "required =", VERSION)
+    # load the current schema object list
+    db.loadSchema()
     # surely there is a more better way of handling this...
     if version == 1: version = MigrateTo_2(db)()
     if version == 2: version = MigrateTo_3(db)()

@@ -344,6 +344,7 @@ class Database:
                 "automatically converted as soon as you run Conary with \n"
                 "write permissions for the database (which normally means \n"
                 "as root). \n")
+        self.db.loadSchema()
         schema.checkVersion(self.db)
 
         schema.createSchema(self.db)
