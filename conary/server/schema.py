@@ -1423,6 +1423,8 @@ def resetTable(cu, name):
 
 # create the (permanent) server repository schema
 def createSchema(db):
+    if not hasattr(db, "tables"):
+        db.loadSchema()
     createIdTables(db)
     createLabelMap(db)
 
