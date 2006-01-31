@@ -79,6 +79,8 @@ class Cursor(BaseCursor):
         except sqlite3.DatabaseError, e:
             if e.args[0].startswith('duplicate column name:'):
                 raise sqlerrors.DuplicateColumnName(str(e))
+            if e.args[0].startswith("no such table"):
+                raise sqlerrors.InvalidTable(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
         else:
             if ret == self._cursor:
@@ -165,7 +167,6 @@ class Database(BaseDatabase):
         self.dbh.create_function('regexp', 2, _regexp)
         # add the serialized timestamp function
         self.dbh.create_function("unix_timestamp", 0, _timestamp)
-        self.loadSchema()
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         if self.database in self.VIRTUALS:

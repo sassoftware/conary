@@ -151,8 +151,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db = db
             self.open(connect = False)
 
+    def __del__(self):
+        try:
+            self.db.close()
+        except:
+            pass
+        self.db = self.cache = self.troveStore = self.repos = self.auth = None
+
     def open(self, connect = True):
-        logMe(1)
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
         schema.checkVersion(self.db)
@@ -163,6 +169,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.name, self.troveStore, self.contentsDir, self.map,
             logFile = self.logFile, requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name)
+        logMe(1)
 
     def reopen(self):
         logMe(1)

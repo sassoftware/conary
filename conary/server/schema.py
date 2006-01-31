@@ -573,7 +573,9 @@ def createTroves(db):
     if createTrigger(db, "TroveRedirects"):
         commit = True
 
-    db.loadSchema()
+    if commit:
+        db.commit()
+        db.loadSchema()
 
 def createMetadata(db):
     commit = False
@@ -1274,15 +1276,13 @@ class MigrateTo_13(SchemaMigration):
             branchStr = versions.VersionFromString(version).branch().asString()
 
             includedTroves = cu2.execute("""
-                        SELECT Items.item, Instances.itemId, Versions.version,
-                               TroveTroves.includedId, Instances.flavorId FROM
-                        TroveTroves 
-                            JOIN Instances ON
-                                TroveTroves.includedId = Instances.instanceId
-                            JOIN Items USING (itemId)
-                            JOIN Versions ON
-                                Instances.versionId = Versions.versionId
-                        WHERE TroveTroves.instanceId=?
+            SELECT Items.item, Instances.itemId, Versions.version,
+                   TroveTroves.includedId, Instances.flavorId
+            FROM TroveTroves
+            JOIN Instances ON TroveTroves.includedId = Instances.instanceId
+            JOIN Items USING (itemId)
+            JOIN Versions ON Instances.versionId = Versions.versionId
+            WHERE TroveTroves.instanceId=?
             """, instanceId).fetchall()
 
             for subName, subItemId, subVersion, includedInstanceId, \
@@ -1319,14 +1319,14 @@ class MigrateTo_13(SchemaMigration):
                             DELETE FROM TroveTroves WHERE
                                 instanceId=? AND includedId=?
                             """, instanceId, includedInstanceId)
-
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
-                        "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
+                        "infoType=?", (instanceId, trove._TROVEINFO_TAG_SIGS))
         # all done for migration to 13
         return self.Version
 
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
+    logMe(3)
     cu = db.cursor()
 
     if "ffFlavor" not in db.tempTables:
@@ -1416,7 +1416,6 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
     db.commit()
-    db.loadSchema()
 
 def resetTable(cu, name):
     cu.execute("DELETE FROM %s" % name,
@@ -1424,6 +1423,8 @@ def resetTable(cu, name):
 
 # create the (permanent) server repository schema
 def createSchema(db):
+    if not hasattr(db, "tables"):
+        db.loadSchema()
     createIdTables(db)
     createLabelMap(db)
 
@@ -1447,6 +1448,9 @@ def loadSchema(db):
     global VERSION
     version = db.getVersion()
 
+    logMe(3, "current =", version, "required =", VERSION)
+    # load the current schema object list
+    db.loadSchema()
     # surely there is a more better way of handling this...
     if version == 1: version = MigrateTo_2(db)()
     if version == 2: version = MigrateTo_3(db)()

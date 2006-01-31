@@ -68,13 +68,13 @@ class TroveStore:
         self.changeLogs = cltable.ChangeLogTable(self.db)
 
 	self.versionTable = LocalRepVersionTable(self.db)
-	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
-                                                   self.branchTable)
+	self.versionOps = versionops.SqlVersioning(
+            self.db, self.versionTable, self.branchTable)
 	self.instances = instances.InstanceTable(self.db)
 
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
-        self.metadataTable = metadata.MetadataTable(self.db)
+        self.metadataTable = metadata.MetadataTable(self.db, schema = False)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
         self.db.analyze()

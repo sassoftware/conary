@@ -333,7 +333,6 @@ def setupTempDepTables(db, cu = None):
                    start_transaction=False)
         db.tempTables["RemovedTroveIds"] = True
     db.commit()
-    db.loadSchema()
 
 def createDependencies(db):
     commit = False

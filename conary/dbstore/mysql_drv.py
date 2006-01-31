@@ -46,13 +46,17 @@ class Cursor(BindlessCursor):
         except mysql.IntegrityError, e:
             if e[0] in (1062,):
                 raise sqlerrors.ColumnNotUnique(e)
-            raise errors.CursorError(e)
+            raise errors.CursorError(e.args[1], ("IntegrityError",) + tuple(e.args))
         except mysql.OperationalError, e:
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
-            raise sqlerrors.DatabaseError(e.args[1], e.args)
+            raise sqlerrors.DatabaseError(e.args[1], ("OperationalError",) + tuple(e.args))
+        except mysql.ProgrammingError, e:
+            if e[0] == 1146:
+                raise sqlerrors.InvalidTable(e)
+            raise sqlerrorrs.CursorError(e.args[1], ("ProgrammingError",) + tuple(e.args))
         except mysql.MySQLError, e:
-            raise sqlerrors.DatabaseError(e.args[1], e.args)
+            raise sqlerrors.DatabaseError(e.args[1], ("MySQLError",) + tuple(e.args))
         return self
 
 # Sequence implementation for mysql
@@ -117,7 +121,6 @@ class Database(BaseDatabase):
                    "where schema_name=?", self.dbName)
         self.characterSet = cu.fetchone()[0]
         cu.execute("set character set %s" % self.characterSet)
-        self.loadSchema(cu)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -132,6 +135,9 @@ class Database(BaseDatabase):
             return self.connect()
         return False
 
+    # Important: MySQL can not report back a list of temporray tables
+    # created in the current connection, therefore the self.tempTables
+    # is managed separately outside of the loadSchema() calls.
     def loadSchema(self, cu = None):
         BaseDatabase.loadSchema(self)
         if cu is None:

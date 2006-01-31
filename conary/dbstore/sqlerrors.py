@@ -52,3 +52,6 @@ class ConstraintViolation(CursorError):
 
 class DuplicateColumnName(CursorError):
     pass
+
+class InvalidTable(CursorError):
+    pass
