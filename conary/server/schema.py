@@ -1307,7 +1307,7 @@ class MigrateTo_13(SchemaMigration):
             cu2.execute("DELETE FROM TroveTroves WHERE instanceId=?",
                         instanceId)
             cu2.execute("DELETE FROM TroveInfo WHERE instanceId=? AND "
-                        "infoType=?", instanceId, trove._TROVEINFO_TAG_SIGS)
+                        "infoType=?", (instanceId, trove._TROVEINFO_TAG_SIGS))
         # all done for migration to 13
         return self.Version
 
