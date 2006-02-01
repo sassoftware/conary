@@ -1175,19 +1175,17 @@ class MigrateTo_12(SchemaMigration):
         from  conary import trove
         cu = self.cu
         logMe(3, "Fixing NULL path hashes...")
-        cu.execute("SELECT instanceId FROM TroveInfo "
-                   "WHERE data IS NULL and infotype = ?",
-                   trove._TROVEINFO_TAG_PATH_HASHES)
-        cu2 = self.db.cursor()
-        for instanceId, in cu:
-            cu2.execute("SELECT path FROM TroveFiles WHERE instanceId=?", instanceId)
+        cu.execute(
+            "SELECT instanceId FROM TroveInfo WHERE data IS NULL and infotype = ?",
+            trove._TROVEINFO_TAG_PATH_HASHES)
+        for instanceId, in cu.fetchall():
+            cu.execute("SELECT path FROM TroveFiles WHERE instanceId=?", instanceId)
             ph = trove.PathHashes()
-            for path, in cu2:
+            for path, in cu:
                 ph.addPath(path)
-            cu2.execute("UPDATE TroveInfo SET data=? "
-                        "WHERE instanceId=? and infotype=?",
-                        (ph.freeze(), instanceId,
-			 trove._TROVEINFO_TAG_PATH_HASHES))
+            cu.execute(
+                "UPDATE TroveInfo SET data=? WHERE instanceId=? and infotype=?",
+                (cu.binary(ph.freeze()), instanceId, trove._TROVEINFO_TAG_PATH_HASHES))
         return self.Version
 
 class MigrateTo_13(SchemaMigration):
