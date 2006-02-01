@@ -879,15 +879,13 @@ class ClientUpdate:
                             # changes.
                             break
 
-                        freshInstallOkay = (isPrimary or 
-                                            (parentInstalled and 
-                                             replacedInfo in referencedWeak))
+                        freshInstallOkay = (isPrimary or parentInstalled)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
-                        # if the trove's parent was just installed and 
-                        # the only reason _not_ to install it was some weak
-                        # reference (if the parent was installed, we just
-                        # added a strong reference).
+                        # if the trove's parent was just installed 
+                        # (if the parent was installed, we just added a
+                        # strong reference, which overrides any other
+                        # references that might suggest not to install it.)
 
                         replaced = localUpdatesByMissing.get(replacedInfo, 
                                                              (None, None))
