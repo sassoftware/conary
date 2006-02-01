@@ -23,6 +23,9 @@ from conary.dbstore import idtable
 CACHE_SCHEMA_VERSION = 17
 
 class NullCacheSet:
+    def __init__(self, tmpDir):
+        self.tmpDir = tmpDir
+
     def getEntry(self, item, recurse, withFiles, withFileContents,
                  excludeAutoSource):
         return None
@@ -37,9 +40,6 @@ class NullCacheSet:
     def invalidateEntry(self, name, version, flavor):
         pass
 
-    def __init__(self, tmpDir):
-        self.tmpDir = tmpDir
-
 
 class CacheSet:
     filePattern = "%s/cache-%s.ccs-out"
@@ -48,7 +48,7 @@ class CacheSet:
 	self.tmpDir = tmpDir
         self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
         self.db.loadSchema()
-        
+
         cu = self.db.cursor()
         if "CacheContents" in self.db.tables:
             self.__cleanDatabase(cu)
