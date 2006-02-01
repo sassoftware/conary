@@ -1,4 +1,9 @@
 Changes in 0.94:
+
+  o Redirects no longer point to a specific trove; they now redirect
+    to a branch. The client chooses the latest version on that branch
+    which is compatible with the local system.
+
   o Bug Fixes
     * A bug in getNewTroveList() that could cause duplicate
       troves to be returned has been fixed.
@@ -7,8 +12,8 @@ Changes in 0.94:
       a changeset file that does not exist has been fixed.
     * Conary no longer displays an error when attempting to write to a
       broken pipe.  (bug #474)
-    * Conary respects branch affinity when moving from old-style groups 
-      to new-style groups.
+    * Conary now respects branch affinity when moving from old-style
+      groups to new-style groups.
 
   o Client changes:
     * The query/repquery/showcs command line options have been
@@ -28,10 +33,6 @@ Changes in 0.94:
   o Build changes
     * PythonSetup() no longer passes the --single-version-externally-managed
       argument to setup.py when it uses distutils instead of setuptools.
-
-  o Redirections have changed from pointing to a specific trove to pointing
-    to a branch. The client chooses the latest version on that branch which
-    is compatible with the local system.
 
 Changes in 0.93:
   o Bug Fixes
