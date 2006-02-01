@@ -37,9 +37,9 @@ import errno
 
 from conary.repository import errors
 #conary
-from conary import callbacks, checkin, commit, conarycfg, constants
+from conary import callbacks, commit, conarycfg, constants
 from conary import cscmd, deps, flavorcfg, query
-from conary import queryrep, conaryclient, rollbacks, showchangeset
+from conary import queryrep, conaryclient, rollbacks, showchangeset, state
 from conary import trove, updatecmd, verify, versions
 from conary.lib import cfg,cfgtypes,log, openpgpkey, options, util
 from conary.local import database
@@ -279,9 +279,9 @@ def realMain(cfg, argv=sys.argv):
 
     context = cfg.context
     if os.path.exists('CONARY'):
-        state = checkin.ConaryStateFromFile('CONARY')
-        if state.hasContext():
-            context = state.getContext()
+        conaryState = state.ConaryStateFromFile('CONARY')
+        if conaryState.hasContext():
+            context = conaryState.getContext()
 
     context = os.environ.get('CONARY_CONTEXT', context)
     context = argSet.pop('context', context)
