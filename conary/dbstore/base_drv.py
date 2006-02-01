@@ -248,7 +248,7 @@ class BaseDatabase:
             pass
         self.dbh = self.database = None
         self.closed = True
-        
+
     # the string syntax for database connection is [[user[:password]@]host[:port]/]database
     def _connectData(self, names = ["user", "password", "host", "port", "database"]):
         assert(self.database)

@@ -124,7 +124,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 
     def __init__(self, cfg, basicUrl, db = None):
-        logMe(1, cfg.items())
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
@@ -152,11 +151,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open(connect = False)
 
     def __del__(self):
-        try:
-            self.db.close()
-        except:
-            pass
-        self.db = self.cache = self.troveStore = self.repos = self.auth = None
+        # this is ugly, but for now it is the only way to break the
+        # circular dep created by self.repos back to us
+        self.repos.troveStore = self.repos.reposSet = None
+        self.cache = self.auth = None
+        self.troveStore = self.repos = self.db = None
 
     def open(self, connect = True):
         if connect:
@@ -174,9 +173,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def reopen(self):
         logMe(1)
         if self.db.reopen():
-	    del self.troveStore
-            del self.auth
-            del self.repos
+	    self.troveStore = self.repos = self.auth = None
             self.open(connect=False)
 
     def callWrapper(self, protocol, port, methodname, authToken, args):

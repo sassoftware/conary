@@ -78,10 +78,6 @@ class TroveStore:
 	self.needsCleanup = False
 
     def __del__(self):
-        try:
-            self.db.close()
-        except sqlerrors.DatabaseError:
-            pass
         self.db = None
 
     def getLabelId(self, label):

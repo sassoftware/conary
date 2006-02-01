@@ -279,6 +279,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         trovesource.SearchableTroveSource.__init__(self)
         self.searchAsRepository()
 
+    def __del__(self):
+        self.c = None
+
     def close(self, *args):
         pass
 
