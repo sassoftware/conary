@@ -144,6 +144,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             self.cache = cacheset.NullCacheSet(self.tmpPath)
 
+        self.__delDB = False
         if not db:
             self.open()
         else:
@@ -155,11 +156,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # circular dep created by self.repos back to us
         self.repos.troveStore = self.repos.reposSet = None
         self.cache = self.auth = None
+        try:
+            if self.__delDB: self.db.close()
+        except:
+            pass
         self.troveStore = self.repos = self.db = None
 
     def open(self, connect = True):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
+            self.__delDB = True
         schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
