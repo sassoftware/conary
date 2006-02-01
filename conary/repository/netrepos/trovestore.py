@@ -58,10 +58,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveStore:
     def __init__(self, db):
 	self.db = db
-        self.db.commit()
 
-        # Order matters! Create the simple (leaf) tables first, and
-        # then the ones that have foreign keys
 	self.items = items.Items(self.db)
 	self.flavors = flavors.Flavors(self.db)
         self.branchTable = versionops.BranchTable(self.db)
@@ -77,9 +74,6 @@ class TroveStore:
         self.metadataTable = metadata.MetadataTable(self.db, create = False)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        self.db.analyze()
-        self.db.commit()
-
         self.streamIdCache = {}
 	self.needsCleanup = False
 
@@ -88,7 +82,7 @@ class TroveStore:
             self.db.close()
         except sqlerrors.DatabaseError:
             pass
-        del self.db
+        self.db = None
 
     def getLabelId(self, label):
         self.versionOps.labels.getOrAddId(label)
