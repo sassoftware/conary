@@ -44,6 +44,41 @@ class NullCacheSet:
 class CacheSet:
     filePattern = "%s/cache-%s.ccs-out"
 
+    def __init__(self, cacheDB, tmpDir):
+	self.tmpDir = tmpDir
+        self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
+        self.db.loadSchema()
+        
+        cu = self.db.cursor()
+        if "CacheContents" in self.db.tables:
+            self.__cleanDatabase(cu)
+        # previous one might have dropped it...
+        if "CacheContents" not in self.db.tables:
+            cu.execute("""
+            CREATE TABLE CacheContents(
+               row              %(PRIMARYKEY)s,
+               troveName        VARCHAR(254),
+               oldFlavorId      INTEGER,
+               oldVersionId     INTEGER,
+               newFlavorId      INTEGER,
+               newVersionId     INTEGER,
+               absolute         BOOLEAN,
+               recurse          BOOLEAN,
+               withFiles        BOOLEAN,
+               withFileContents BOOLEAN,
+               excludeAutoSource BOOLEAN,
+               returnValue      BINARY,
+               size             INTEGER
+            ) %(TABLEOPTS)s""" % self.db.keywords)
+            cu.execute("CREATE INDEX CacheContentsIdx "
+                       "ON CacheContents(troveName)")
+        idtable.createIdTable(self.db, "Versions", "versionId", "version")
+        self.versions = versiontable.VersionTable(self.db)
+        schema.createFlavors(self.db)
+        self.flavors = sqldb.Flavors(self.db)
+        self.db.commit()
+        self.db.loadSchema()
+
     def getEntry(self, item, recurse, withFiles, withFileContents,
                  excludeAutoSource):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
@@ -210,37 +245,4 @@ class CacheSet:
                 cu.execute("DROP TABLE %s" % (t,))
             self.db.setVersion(CACHE_SCHEMA_VERSION)
             self.db.loadSchema()
-
-    def __init__(self, cacheDB, tmpDir):
-	self.tmpDir = tmpDir
-        self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
-        cu = self.db.cursor()
-        if "CacheContents" in self.db.tables:
-            self.__cleanDatabase(cu)
-        # previous one might have dropped it...
-        if "CacheContents" not in self.db.tables:
-            cu.execute("""
-            CREATE TABLE CacheContents(
-               row              %(PRIMARYKEY)s,
-               troveName        VARCHAR(254),
-               oldFlavorId      INTEGER,
-               oldVersionId     INTEGER,
-               newFlavorId      INTEGER,
-               newVersionId     INTEGER,
-               absolute         BOOLEAN,
-               recurse          BOOLEAN,
-               withFiles        BOOLEAN,
-               withFileContents BOOLEAN,
-               excludeAutoSource BOOLEAN,
-               returnValue      BINARY,
-               size             INTEGER
-            ) %(TABLEOPTS)s""" % self.db.keywords)
-            cu.execute("CREATE INDEX CacheContentsIdx "
-                       "ON CacheContents(troveName)")
-        idtable.createIdTable(self.db, "Versions", "versionId", "version")
-        self.versions = versiontable.VersionTable(self.db)
-        schema.createFlavors(self.db)
-        self.flavors = sqldb.Flavors(self.db)
-        self.db.commit()
-        self.db.loadSchema()
 
