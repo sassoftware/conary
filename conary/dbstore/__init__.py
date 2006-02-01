@@ -12,9 +12,10 @@
 # full details.
 #
 
+from conary.lib import cfg, cfgtypes
+
 from base_drv import BaseDatabase as Database
 from base_drv import BaseCursor as Cursor
-from base_drv import CfgDriver
 from migration import SchemaMigration
 from sqlerrors import InvalidBackend
 
@@ -77,5 +78,15 @@ def connect(db, driver=None, **kw):
     dbh = driver(db)
     assert(dbh.connect(**kw))
     return dbh
+
+# A class for configuration of a database driver
+class CfgDriver(cfg.CfgType):
+    def parseString(self, str):
+        s = str.split()
+        if len(s) != 2:
+            raise cfgtypes.ParseError("database driver and path expected")
+        return tuple(s)
+    def format(self, val, displayOptions = None):
+        return "%s %s" % val
 
 __all__ = [ "connect", "InvalidBackend", "CfgDriver"]
