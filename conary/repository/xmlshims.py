@@ -63,7 +63,6 @@ class NetworkConvertors(object):
         assert(f is not None)
         if f is 0:
             return None
-        # XXX: flavorId = 0
 	return deps.deps.ThawDependencySet(f)
 
     def fromFlavor(self, f):
