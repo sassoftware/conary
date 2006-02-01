@@ -78,5 +78,4 @@ def connect(db, driver=None, **kw):
     assert(dbh.connect(**kw))
     return dbh
 
-__all__ = [ "connect",
-            "DBStoreError", "DBStoreCursorError", "DBInvalidBackend" ]
+__all__ = [ "connect", "InvalidBackend", "CfgDriver"]
