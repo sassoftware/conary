@@ -431,15 +431,6 @@ class BaseDatabase:
     def use(self, dbName):
         pass
 
-# A class to handle calls to the SQL functions and procedures
-class Callable:
-    def __init__(self, name, call):
-        self.name = name
-        self.call = call
-    def __call__(self, *args):
-        assert(self.call is not None)
-        apply(self.call, args)
-
 # A class for configuration of a database driver
 class CfgDriver(cfg.CfgType):
 
