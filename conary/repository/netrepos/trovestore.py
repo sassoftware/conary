@@ -585,7 +585,6 @@ class TroveStore:
         schema.resetTable(cu, 'gtlInst')
 
         for idx, info in enumerate(troveInfoList):
-            # XXX: flavorId = 0
             flavorStr = "'%s'" % info[2].freeze()
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),

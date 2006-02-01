@@ -54,7 +54,7 @@ class Cursor(BindlessCursor):
         except mysql.ProgrammingError, e:
             if e[0] == 1146:
                 raise sqlerrors.InvalidTable(e)
-            raise sqlerrorrs.CursorError(e.args[1], ("ProgrammingError",) + tuple(e.args))
+            raise sqlerrors.CursorError(e.args[1], ("ProgrammingError",) + tuple(e.args))
         except mysql.MySQLError, e:
             raise sqlerrors.DatabaseError(e.args[1], ("MySQLError",) + tuple(e.args))
         return self

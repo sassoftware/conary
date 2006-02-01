@@ -95,7 +95,6 @@ def createFlavors(db):
             flavorId        %(PRIMARYKEY)s,
             flavor          VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
-        # XXX: flavorId = 0
         cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, '')")
         db.tables["Flavors"] = []
         commit = True
