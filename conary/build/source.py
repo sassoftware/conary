@@ -503,6 +503,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     (rpipe, wpipe) = os.pipe()
     pid = os.fork()
     if not pid:
+        os.close(wpipe)
 	os.dup2(rpipe, 0)
 	os.chdir(directory)
 	os.execl(*cpioArgs)
