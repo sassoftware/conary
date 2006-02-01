@@ -33,6 +33,40 @@ from conary.repository import repository, netclient
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
+    def __init__(self, name, troveStore, contentsDir, repositoryMap,
+                 logFile = None, requireSigs = False):
+	self.name = name
+	map = dict(repositoryMap)
+	map[name] = self
+        # XXX this client needs to die
+        from conary import conarycfg
+        self.reposSet = netclient.NetworkRepositoryClient(map,
+                                    conarycfg.UserInformation())
+
+	self.troveStore = troveStore
+
+        self.requireSigs = requireSigs
+        for dir in contentsDir:
+            util.mkdirChain(dir)
+
+        if len(contentsDir) == 1:
+            store = DataStore(contentsDir[0], logFile = logFile)
+        else:
+            assert(not logFile)
+            storeList = []
+            for dir in contentsDir:
+                storeList.append(DataStore(dir))
+
+            store = DataStoreSet(*storeList)
+
+	DataStoreRepository.__init__(self, dataStore = store)
+	AbstractRepository.__init__(self)
+
+    def close(self):
+	if self.troveStore is not None:
+	    self.troveStore.db.close()
+	    self.troveStore = None
+
     ### Package access functions
 
     def thawFlavor(self, flavor):
@@ -420,40 +454,3 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                        compressed = compressed)
 
 	return (cs, externalTroveList, externalFileList)
-
-    def close(self):
-	if self.troveStore is not None:
-	    self.troveStore.db.close()
-	    self.troveStore = None
-
-    def __del__(self):
-	self.close()
-
-    def __init__(self, name, troveStore, contentsDir, repositoryMap,
-                 logFile = None, requireSigs = False):
-	self.name = name
-	map = dict(repositoryMap)
-	map[name] = self
-        # XXX this client needs to die
-        from conary import conarycfg
-        self.reposSet = netclient.NetworkRepositoryClient(map,
-                                    conarycfg.UserInformation())
-
-	self.troveStore = troveStore
-
-        self.requireSigs = requireSigs
-        for dir in contentsDir:
-            util.mkdirChain(dir)
-
-        if len(contentsDir) == 1:
-            store = DataStore(contentsDir[0], logFile = logFile)
-        else:
-            assert(not logFile)
-            storeList = []
-            for dir in contentsDir:
-                storeList.append(DataStore(dir))
-
-            store = DataStoreSet(*storeList)
-
-	DataStoreRepository.__init__(self, dataStore = store)
-	AbstractRepository.__init__(self)
