@@ -844,7 +844,7 @@ class DependencySet(object):
     def __eq__(self, other):
         if other is None:
             return False
-        if other.members.keys() != self.members.keys():
+        if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
 	    if not self.members.has_key(tag): 
