@@ -707,6 +707,7 @@ order by
         currentTrv = trove.Trove('foo', versions.NewVersion(),
                                   deps.deps.DependencySet(), None)
         instanceDict = {}
+        origIncluded = set()
         for (includedId, name, version, flavor, isPresent,
                                             inPristine, timeStamps) in cu:
             if flavor is None:
@@ -718,6 +719,7 @@ order by
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
             instanceDict[(name, version, flavor)] = includedId
+            origIncluded.add((name, version, flavor))
             if isPresent:
                 currentTrv.addTrove(name, version, flavor)
             if inPristine:
@@ -725,7 +727,6 @@ order by
 
         linkByName = {}
         trvChanges = currentTrv.diff(pristineTrv)[2]
-        makeLink = set()
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), isAbs) \
                                                 in trvChanges:
             if oldVersion is None:
@@ -735,10 +736,10 @@ order by
                 # as a diff
                 cu.execute("DELETE FROM TroveTroves WHERE instanceId=? AND "
                            "includedId=?", instanceId, badInstanceId)
+                origIncluded.discard((name, newVersion, newFlavor))
             elif newVersion is None:
                 # this thing should be linked to something else.
                 linkByName.setdefault(name, set()).add(oldVersion.branch())
-                makeLink.add((name, oldVersion, oldFlavor))
 
         if not linkByName: return
 
@@ -749,10 +750,14 @@ order by
         trvChanges = currentTrv.diff(pristineTrv)[2]
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), isAbs) \
                                                 in trvChanges:
-            if (name, oldVersion, oldFlavor) not in makeLink: continue
             if newVersion is None: continue
+            if (name, newVersion, newFlavor) in origIncluded: continue
+            # don't add this linkage if it's just saying that we should
+            # link to something that's already a part of this linkage.
 
-            oldIncludedId = instanceDict[(name, oldVersion, oldFlavor)]
+            if (name, oldVersion, oldFlavor) not in instanceDict: continue
+            oldIncludedId = instanceDict[name, oldVersion, oldFlavor]
+
             flags = cu.execute("""
                     SELECT flags FROM TroveTroves WHERE
                         instanceId=? and includedId=?""",
@@ -1055,15 +1060,20 @@ order by
 	    # which was included by a trove which was removed; getting that
 	    # closure may have to be iterative?). that process may be faster
 	    # then the full join?
-	    cu = self.db.cursor()
-	    cu.execute("""
-		DELETE FROM Instances WHERE instanceId IN
-		    (SELECT Instances.instanceId FROM
-			Instances LEFT OUTER JOIN TroveTroves
-			ON Instances.instanceId = TroveTroves.includedId
-			WHERE isPresent = 0 AND TroveTroves.includedId is NULL
-		    );
-		""")
+            cu = self.db.cursor()
+            cu.execute("""SELECT Instances.instanceId FROM
+                        Instances LEFT OUTER JOIN TroveTroves
+                        ON Instances.instanceId = TroveTroves.includedId
+                        WHERE isPresent = 0 AND TroveTroves.includedId is NULL
+                      """)
+            instanceIds = [ x[0] for x in cu ]
+
+            for instanceId in instanceIds:
+                cu.execute("DELETE FROM Instances WHERE instanceId=?", 
+                            instanceId)
+                cu.execute("DELETE FROM TroveInfo WHERE instanceId=?", 
+                            instanceId)
+
             cu.execute("""DELETE FROM Versions WHERE Versions.versionId IN
                             (SELECT rmvdVer FROM RemovedVersions
                                 LEFT OUTER JOIN Instances ON
