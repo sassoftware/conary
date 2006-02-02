@@ -1,7 +1,33 @@
 Changes in ***:
+  o Client changes:
+    * The conary verify command now handles contentless files with provides
+      and requires (for example, symlinks to shared libraries that provide
+      sonames).
+    * The conary showchangeset command now takes --recurse and --no-recurse
+      arguments.
+    * All info-* packages are now updated in their own individual jobs;
+      this is required for their dependencies to be reliable.
+    * The conary syncchildren command now will install new packages
+      when appropriate.
+
   o Repository changes:
     * If set in the repository config file, 'traceLog = level logfile_path' is
       now honored by both the standalone and the apache servers.
+    * Conary now detects mysql Database Locked errors and will retry the
+      operation a configurable number of times (deadlockRetry; currently
+      defaults to 5 times)
+
+  o Build changes:
+    * Conary now uses site.py to find all possible correct elements of
+      sys.path when generating python provides and requires.  Previously,
+      new elements added via .pth files in the package being built would
+      be ignored for that package.
+    * The PythonSetup() build action works properly with setup.py files
+      that use "from setuptools import..." instead of "import setuptools"
+
+  o Other changes:
+    * The conarybugz.py script has been restored to functionality by
+      moving to the conaryclient interface for accessing the repository.
 
 Changes in 0.94:
 
