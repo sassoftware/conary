@@ -196,7 +196,8 @@ class Database(BaseDatabase):
         return True
 
     def use(self, dbName):
-        oldDbName = self._connectData()['database']
+        cu = self.cursor()
+        oldDbName = cu.execute("SELECT database()").fetchone()[0]
         self.tempTableStorage[oldDbName] = self.tempTables
 
         try:
@@ -206,9 +207,6 @@ class Database(BaseDatabase):
                 raise sqlerrors.UnknownDatabase(e.args[1], e.args)
             else:
                 raise
-
-        # rewrite the database name on the connection string
-        self.database = self.database.split("/")[0] + "/" + dbName
 
         self.loadSchema()
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
