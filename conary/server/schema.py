@@ -792,8 +792,6 @@ class MigrateTo_4(SchemaMigration):
 
         logMe(1, 'Reading %d instances' % len(instances))
         for i, instanceId in enumerate(instances):
-            logMe(3, "Reading %d of %d..." % (i + 1, len(instances)))
-
             trv = FakeTrove()
             dtbl.get(self.cu, trv, instanceId)
             troves.append(trv)
@@ -804,7 +802,6 @@ class MigrateTo_4(SchemaMigration):
 
         logMe(1, 'Reading %d instances' % len(instances))
         for i, (instanceId, trv) in enumerate(itertools.izip(instances, troves)):
-            logMe(3, 'Writing %d of %d...' % (i + 1, len(instances)))
             dtbl.add(self.cu, trv, instanceId)
 
         return self.Version
@@ -938,7 +935,7 @@ class MigrateTo_8(SchemaMigration):
             try:
                 self.cu.execute("ALTER TABLE %s ADD COLUMN "
                                 "changed NUMERIC(14,0) NOT NULL DEFAULT 0" % table)
-                logMe(3, "add changed column and triggers to", table)
+                logMe(1, "add changed column and triggers to", table)
             except sqlerrors.DuplicateColumnName:
                 # the column already exists, probably because we created
                 # a brand new table.  Then it would use the already-current
@@ -978,7 +975,7 @@ class MigrateTo_9(SchemaMigration):
                 ON DELETE RESTRICT ON UPDATE CASCADE
         )""")
         # now move the data over
-        logMe(3, "Updating the TroveTroves table...")
+        logMe(1, "Updating the TroveTroves table...")
         self.cu.execute("""
         INSERT INTO TroveTroves2
         (instanceId, includedId, flags, changed)
@@ -990,7 +987,7 @@ class MigrateTo_9(SchemaMigration):
         self.cu.execute("ALTER TABLE TroveTroves2 RENAME TO TroveTroves")
         # reload the schema and call createTrove() to fill in the missing triggers and indexes
         self.db.loadSchema()
-        logMe(3, "Updating indexes and triggers...")
+        logMe(1, "Updating indexes and triggers...")
         createTroves(self.db)
         # we changed the Instances update trigger to protect the changed column from changing
         self.db.dropTrigger("Instances", "UPDATE")
@@ -1002,32 +999,32 @@ class MigrateTo_10(SchemaMigration):
     Version = 10
     def migrate(self):
         from  conary import trove
-        logMe(3, "Updating index TroveInfoTypeIdx")
+        logMe(1, "Updating index TroveInfoTypeIdx")
         # redo the troveInfoTypeIndex to be UNIQUE
         self.db.dropIndex("TroveInfo", "TroveInfoTypeIdx")
         self.db.createIndex("TroveInfo", "TroveInfoTypeIdx",
                             "infoType, instanceId", unique = True)
-        logMe(3, "Updating index InstancesChangedIdx")
+        logMe(1, "Updating index InstancesChangedIdx")
         # add instanceId to the InstancesChanged index
         self.db.dropIndex("Instances", "InstancesChangedIdx")
         self.db.createIndex("Instances", "InstancesChangedIdx",
                             "changed, instanceId")
         # add the clonedFrom column to the Instances table
-        logMe(3, "Adding column and index for Instances.clonedFromId")
+        logMe(1, "Adding column and index for Instances.clonedFromId")
         self.cu.execute("ALTER TABLE Instances ADD COLUMN "
                         "clonedFromId INTEGER REFERENCES Versions(versionId) "
                         "ON DELETE RESTRICT ON UPDATE CASCADE")
         self.db.createIndex("Instances", "InstancesClonedFromIdx",
                             "clonedFromId, instanceId")
         # add the sourceItemId to the Nodes table
-        logMe(3, "Adding column and index for Nodes.sourceItemId")
+        logMe(1, "Adding column and index for Nodes.sourceItemId")
         self.cu.execute("ALTER TABLE Nodes ADD COLUMN "
                         "sourceItemId INTEGER REFERENCES Items(itemId) "
                         "ON DELETE RESTRICT ON UPDATE CASCADE")
         self.db.createIndex("Nodes", "NodesSourceItemIdx",
                             "sourceItemId, branchId")
         # update Versions, Instances and clonedFromId
-        logMe(3, "Updating the Versions table...")
+        logMe(1, "Updating the Versions table...")
         # create a temp table first
         self.cu.execute("""
         CREATE TEMPORARY TABLE TItemp(
@@ -1050,7 +1047,7 @@ class MigrateTo_10(SchemaMigration):
         WHERE V.versionId is NULL
         """, trove._TROVEINFO_TAG_CLONEDFROM)
         # update the instances table
-        logMe(3, "Extracting data for Instances.clonedFromId from TroveInfo")
+        logMe(1, "Extracting data for Instances.clonedFromId from TroveInfo")
         self.cu.execute("""
         UPDATE Instances
         SET clonedFromId = (
@@ -1061,7 +1058,7 @@ class MigrateTo_10(SchemaMigration):
             AND TI.infoType = ? )
         """, trove._TROVEINFO_TAG_CLONEDFROM)
         # transfer the sourceItemIds from TroveInfo into the Nodes table
-        logMe(3, "Updating the Items table...")
+        logMe(1, "Updating the Items table...")
         # first, create the missing Items
         self.cu.execute("""
         INSERT INTO Items (item)
@@ -1072,7 +1069,7 @@ class MigrateTo_10(SchemaMigration):
         WHERE AI.itemId is NULL
         """, trove._TROVEINFO_TAG_SOURCENAME)
         # update the nodes table
-        logMe(3, "Extracting data for Nodes.sourceItemId from TroveInfo")
+        logMe(1, "Extracting data for Nodes.sourceItemId from TroveInfo")
         self.cu.execute("""
         UPDATE Nodes
         SET sourceItemId = (
@@ -1095,7 +1092,7 @@ class MigrateTo_11(SchemaMigration):
         cu = self.cu
         cu2 = self.db.cursor()
 
-	logMe(3, "Rebuilding the Latest table...")
+	logMe(1, "Rebuilding the Latest table...")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         createLatest(self.db)
@@ -1139,7 +1136,7 @@ class MigrateTo_11(SchemaMigration):
         """ % self.db.keywords)
         cu.execute("CREATE INDEX hashUpdatesTmpIdx ON "
                    "hashUpdatesTmp(instanceId)")
-        logMe(3, "Finding path hashes needing an update...")
+        logMe(1, "Finding path hashes needing an update...")
         rows = cu2.execute("SELECT instanceId,data from TroveInfo "
                            "WHERE infoType=?", trove._TROVEINFO_TAG_PATH_HASHES)
         neededChanges = []
@@ -1150,14 +1147,14 @@ class MigrateTo_11(SchemaMigration):
                 cu.execute('INSERT INTO hashUpdatesTmp VALUES (?, ?)',
                            (instanceId, cu.binary(frzn)))
 
-        logMe(3, "removing bad signatures due to path hashes...")
+        logMe(1, "removing bad signatures due to path hashes...")
         cu.execute("""
         DELETE FROM TroveInfo
         WHERE infoType=?
           AND instanceId IN (SELECT instanceId from hashUpdatesTmp)
         """, trove._TROVEINFO_TAG_SIGS)
 
-        logMe(3, "updating path hashes...")
+        logMe(1, "updating path hashes...")
 	cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
 	for (instanceId, data) in cu:
             cu2.execute("UPDATE TroveInfo SET data=? WHERE "
@@ -1173,7 +1170,7 @@ class MigrateTo_12(SchemaMigration):
     def migrate(self):
         from  conary import trove
         cu = self.cu
-        logMe(3, "Fixing NULL path hashes...")
+        logMe(1, "Fixing NULL path hashes...")
         cu.execute(
             "SELECT instanceId FROM TroveInfo WHERE data IS NULL and infotype = ?",
             trove._TROVEINFO_TAG_PATH_HASHES)
@@ -1192,7 +1189,7 @@ class MigrateTo_13(SchemaMigration):
     def migrate(self):
         from conary import files
         # fix the duplicate FileStreams.fileId fields
-        logMe(3, "Looking for duplicate fileId entries...")
+        logMe(1, "Looking for duplicate fileId entries...")
         # this takes a bit to execute, especially on sqlite
         self.cu.execute("""
         CREATE TEMPORARY TABLE origs AS
@@ -1207,7 +1204,7 @@ class MigrateTo_13(SchemaMigration):
         # all the duplicate fileIds that have a streamId not in the
         # origs table are dupes
         # First, check that the duplicate streams differ only by the mtime field
-        logMe(3, "Checking duplicate fileId streams...")
+        logMe(1, "Checking duplicate fileId streams...")
         self.cu.execute("""
         SELECT fs.streamId, fs.fileId, fs.stream
         FROM origs JOIN FileStreams AS fs USING(streamId)
@@ -1226,7 +1223,7 @@ class MigrateTo_13(SchemaMigration):
                 file2 = files.ThawFile(cu2.frombinary(dupStream), None)
                 file2.inode.mtime.set(file.inode.mtime())
                 assert (file == file2)
-        logMe(3, "Removing references to duplicate fileId entries...")
+        logMe(1, "Removing references to duplicate fileId entries...")
         self.cu.execute("""
         SELECT fs.streamId, fs.fileId
         FROM origs JOIN FileStreams AS fs USING (fileId)
@@ -1248,15 +1245,15 @@ class MigrateTo_13(SchemaMigration):
             (streamId,))
         self.cu.execute("DROP TABLE origs")
         # force the creation of the new unique index
-        logMe(3, "Droping old fileId index...")
+        logMe(1, "Droping old fileId index...")
         self.db.dropIndex("FileStreams", "FileStreamsIdx")
-        logMe(3, "Recreating the fileId index...")
+        logMe(1, "Recreating the fileId index...")
         createTroves(self.db)
 
         # flavorId = 0 is now ''
         self.cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
 
-        logMe(3, "Changing absolute redirects to branch redirects...")
+        logMe(1, "Changing absolute redirects to branch redirects...")
         self.cu.execute("""
                     SELECT instanceId, item, version FROM Instances 
                         JOIN Items USING (itemId)
@@ -1445,7 +1442,7 @@ def loadSchema(db):
     global VERSION
     version = db.getVersion()
 
-    logMe(3, "current =", version, "required =", VERSION)
+    logMe(1, "current =", version, "required =", VERSION)
     # load the current schema object list
     db.loadSchema()
     # surely there is a more better way of handling this...
@@ -1488,7 +1485,7 @@ def loadSchema(db):
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
-    logMe(3, VERSION, version)
+    logMe(2, VERSION, version)
     if version == VERSION:
         return version
 
