@@ -672,7 +672,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 policyTroves.add((trove.getName(), trove.getVersion(),
                                   trove.getFlavor()))
         else:
-            if 'local@local' in macros['buildlabel']:
+            if not macros['buildlabel'].startswith('local@local:'):
                 unmanagedPolicyFiles.append(policyPath)
             ver = versions.VersionFromString('/local@local:LOCAL/0-0')
             ver.resetTimeStamps()
