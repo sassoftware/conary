@@ -592,14 +592,15 @@ def realMain(cfg, argv=sys.argv):
             else:
                 kw[opt] = argSet.pop(opt, False)
 
-        if argSet or len(otherArgs) < 3:
-            showchangeset.usage()
-            return 1
 
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argset['no-recurse']
+
+        if argSet or len(otherArgs) < 3:
+            showchangeset.usage()
+            return 1
 
         cspath = otherArgs[2]
         component = None
