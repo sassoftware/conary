@@ -159,47 +159,6 @@ class TroveStore:
         except StopIteration:
             raise KeyError, (troveName, branch)
 
-    def getTroveFlavors(self, troveDict):
-	cu = self.db.cursor()
-	vMap = {}
-	outD = {}
-	# I think we might be better of intersecting subqueries rather
-	# then using all of the and's in this join
-
-        schema.resetTable(cu, 'itf')
-
-        for troveName in troveDict.keys():
-            outD[troveName] = {}
-            for version in troveDict[troveName]:
-                outD[troveName][version] = []
-                versionStr = version.asString()
-                vMap[versionStr] = version
-                cu.execute("INSERT INTO itf VALUES (?, ?, ?)",
-                           (troveName, versionStr, versionStr),
-                           start_transaction = False)
-
-        cu.execute("""
-            SELECT aItem, fullVersion, Flavors.flavor FROM
-                (SELECT Items.itemId AS aItemId,
-                        versions.versionId AS aVersionId,
-                        Items.item AS aItem,
-                        fullVersion FROM
-                    itf INNER JOIN Items ON itf.item = Items.item
-                        INNER JOIN versions ON itf.version = versions.version) as ItemVersions
-                INNER JOIN instances ON
-                    aItemId = instances.itemId AND
-                    aVersionId = instances.versionId
-                INNER JOIN flavors ON
-                    instances.flavorId = flavors.flavorId
-                ORDER BY aItem, fullVersion
-        """)
-
-        for (item, verString, flavor) in cu:
-            ver = vMap[verString]
-            outD[item][ver].append(flavor)
-
-	return outD
-
     def iterTroveNames(self):
         cu = self.db.cursor()
         cu.execute("SELECT DISTINCT Items.item as item "

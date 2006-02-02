@@ -1383,14 +1383,6 @@ def setupTempTables(db):
             fileId      %(BINARY20)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["getFilesTbl"] = True
-    if "itf" not in db.tempTables:
-        cu.execute("""
-        CREATE TEMPORARY TABLE itf(
-            item        VARCHAR(254),
-            version     VARCHAR(767),
-            fullVersion VARCHAR(767)
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["itf"] = True
     if "gtvlTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE gtvlTbl(
@@ -1399,6 +1391,7 @@ def setupTempTables(db):
             flavorId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtvlTbl"] = True
+        db.createIndex("gtvlTbl", "gtvlTblItemIdx", "item", check = False)
     if "hasTrovesTmp" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
@@ -1409,6 +1402,8 @@ def setupTempTables(db):
             flavor      VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
+        db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
+                       check = False)
     db.commit()
 
 def resetTable(cu, name):

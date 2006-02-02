@@ -474,7 +474,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "created temporary table ffFlavor", entries)
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
-        self.log(3)
+        self.log(3, "len(troveSpecs)=%s" % len(troveSpecs))
         schema.resetTable(cu, 'gtvlTbl')
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
