@@ -50,6 +50,8 @@ class Cursor(BindlessCursor):
         except mysql.OperationalError, e:
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
+            if e[0] == 1205:
+                raise sqlerrors.DatabaseLocked(e.args[1], (e,) + tuple(e.args))
             raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
         except mysql.ProgrammingError, e:
             if e[0] == 1146:
