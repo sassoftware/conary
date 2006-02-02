@@ -16,7 +16,6 @@ from conary import dbstore
 from conary import versions
 from conary.deps import deps
 from conary.local import schema
-from conary.lib.tracelog import logMe
 
 NO_FLAG_MAGIC = '-*none*-'
 

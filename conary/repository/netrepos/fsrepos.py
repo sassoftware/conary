@@ -349,9 +349,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             getList = []
             newFilesNeeded = []
 
-	    from conary.lib.tracelog import logMe
-	    logMe(3, "filesNeeded", len(filesNeeded))
-
 	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem

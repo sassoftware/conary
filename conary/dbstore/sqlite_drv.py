@@ -17,7 +17,6 @@ import re
 import time
 
 from conary import sqlite3
-from conary.lib.tracelog import logMe
 
 from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseKeywordDict
 import sqlerrors, sqllib
@@ -65,7 +64,6 @@ class Cursor(BaseCursor):
         return s
 
     def execute(self, sql, *params, **kw):
-        #logMe(3, "SQL:", sql, params, kw)
         try:
             ret = self._execute(sql, *params, **kw)
         except sqlite3.ProgrammingError, e:
@@ -89,7 +87,6 @@ class Cursor(BaseCursor):
 
     # deprecated - this breaks programs by commiting stuff before its due time
     def executeWithCommit(self, sql, *params, **kw):
-        #logMe(3, "SQL:", sql, params, kw)
         try:
             inAutoTrans = False
             if not self.dbh.inTransaction:
