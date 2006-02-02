@@ -414,7 +414,10 @@ if __name__ == '__main__':
 
     # start the logging
     if 'add-user' not in argSet:
-        initLog(level=3, trace=1)
+        (l, f) = (3, "stderr")
+        if cfg.traceLog:
+            (l, f) = cfg.traceLog
+        initLog(filename = f, level = l, trace=1)
 
     if not cfg.repositoryDB:
         cfg.repositoryDB = ("sqlite",  "%s/sqldb" % otherArgs[1])
@@ -432,6 +435,7 @@ if __name__ == '__main__':
 
     (driver, database) = cfg.repositoryDB
     db= dbstore.connect(database, driver)
+    logMe(1, "checking schema version")
     schema.loadSchema(db)
 
     if 'migrate' in argSet:
@@ -446,7 +450,7 @@ if __name__ == '__main__':
         if argSet:
             usage()
         sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
-    
+
     if argSet:
         usage()
 
