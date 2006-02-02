@@ -178,6 +178,8 @@ class ClientUpdate:
         # def _resolveDependencies() begins here
 
         troveSource = uJob.getSearchSource()
+        if useRepos:
+            troveSource = trovesource.stack(troveSource, self.repos)
 
         pathIdx = 0
         (depList, cannotResolve, changeSetList, keepList) = \
@@ -192,14 +194,10 @@ class ClientUpdate:
             depList = []
             cannotResolve = []
 
-        resolveSource = uJob.getSearchSource()
-        if useRepos:
-            resolveSource = trovesource.stack(resolveSource, self.repos)
-            
 
         while depList and self.cfg.installLabelPath and pathIdx < len(self.cfg.installLabelPath):
             nextCheck = [ x[1] for x in depList ]
-            sugg = resolveSource.resolveDependencies(
+            sugg = troveSource.resolveDependencies(
                             self.cfg.installLabelPath[pathIdx], 
                             nextCheck)
 
@@ -804,6 +802,9 @@ class ClientUpdate:
                 # this loop).
                 if newInfo in alreadyInstalled:
                     # No need to install it twice
+                    # but count it as 'added' for the purposes of
+                    # whether or not to recurse
+                    jobAdded = True
                     break
                 elif newInfo in ineligible:
                     break
