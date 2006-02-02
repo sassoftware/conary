@@ -179,9 +179,12 @@ class Archive(_Source):
                         not self.dir.startswith('/'))
 
         if guessMainDir:
-            before = set(os.listdir(self.builddir))
+            bd = self.builddir
+            join = os.path.join
+
+            before = set(x for x in os.listdir(bd) if os.path.isdir(join(bd, x)))
             if self.recipe.mainDir() in before:
-                mainDirPath = '/'.join((self.builddir, self.recipe.mainDir()))
+                mainDirPath = '/'.join((bd, self.recipe.mainDir()))
                 mainDirBefore = set(os.listdir(mainDirPath))
 
         util.mkdirChain(destDir)
@@ -225,7 +228,9 @@ class Archive(_Source):
             util.execute("%s < %s | %s" % (_uncompress, f, _unpack))
 
         if guessMainDir:
-            after = set(os.listdir(self.builddir))
+            bd = self.builddir
+            after = set(x for x in os.listdir(bd) if os.path.isdir(join(bd, x)))
+
             if self.recipe.mainDir() in before:
                 mainDirAfter = set(os.listdir(mainDirPath))
                 mainDirDifference = mainDirAfter - mainDirBefore
