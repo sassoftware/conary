@@ -46,17 +46,17 @@ class Cursor(BindlessCursor):
         except mysql.IntegrityError, e:
             if e[0] in (1062,):
                 raise sqlerrors.ColumnNotUnique(e)
-            raise errors.CursorError(e.args[1], ("IntegrityError",) + tuple(e.args))
+            raise errors.CursorError(e.args[1], (e,) + tuple(e.args))
         except mysql.OperationalError, e:
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
-            raise sqlerrors.DatabaseError(e.args[1], ("OperationalError",) + tuple(e.args))
+            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
         except mysql.ProgrammingError, e:
             if e[0] == 1146:
                 raise sqlerrors.InvalidTable(e)
-            raise sqlerrors.CursorError(e.args[1], ("ProgrammingError",) + tuple(e.args))
+            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
         except mysql.MySQLError, e:
-            raise sqlerrors.DatabaseError(e.args[1], ("MySQLError",) + tuple(e.args))
+            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
         return self
 
 # Sequence implementation for mysql

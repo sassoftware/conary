@@ -52,7 +52,7 @@ class Cursor(BindlessCursor):
             msg = e.args[0]
             if msg.find("violates foreign key constraint") > 0:
                 raise sqlerrors.ConstraintViolation(msg)
-            raise sqlerrors.CursorError(msg)
+            raise sqlerrors.CursorError(msg, e)
         return self
 
     # we have "our own" lastrowid
