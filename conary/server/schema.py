@@ -1399,6 +1399,7 @@ def setupTempTables(db):
             flavorId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtvlTbl"] = True
+        db.createIndex("gtvlTbl", "gtvlTblItemIdx", "item", check = False)
     if "hasTrovesTmp" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
@@ -1409,6 +1410,8 @@ def setupTempTables(db):
             flavor      VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
+        db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
+                       check = False)
     db.commit()
 
 def resetTable(cu, name):
