@@ -1388,6 +1388,14 @@ def setupTempTables(db):
             fileId      %(BINARY20)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["getFilesTbl"] = True
+    if "itf" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE itf(
+            item        VARCHAR(254),
+            version     VARCHAR(767),
+            fullVersion VARCHAR(767)
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["itf"] = True
     if "gtvlTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE gtvlTbl(
