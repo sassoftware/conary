@@ -17,8 +17,7 @@ import itertools
 
 from conary import files, metadata, trove, versions, changelog
 from conary.deps import deps
-from conary.lib import util
-from conary.lib.tracelog import logMe
+from conary.lib import util, tracelog
 from conary.local import deptable
 from conary.local import versiontable, sqldb
 from conary.repository import errors
@@ -56,7 +55,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
             raise KeyError, itemId
 
 class TroveStore:
-    def __init__(self, db):
+    def __init__(self, db, log = None):
 	self.db = db
 
 	self.items = items.Items(self.db)
@@ -76,9 +75,10 @@ class TroveStore:
 
         self.streamIdCache = {}
 	self.needsCleanup = False
+        self.log = log or tracelog.getLog(None)
 
     def __del__(self):
-        self.db = None
+        self.db = self.log = None
 
     def getLabelId(self, label):
         self.versionOps.labels.getOrAddId(label)
@@ -222,7 +222,7 @@ class TroveStore:
 	versionCache = {}
 	(cu, trv) = troveInfo
 
-        logMe(3, trv)
+        self.log(3, trv)
 
 	troveVersion = trv.getVersion()
 	troveItemId = self.getItemId(trv.getName())
@@ -544,7 +544,7 @@ class TroveStore:
         return metadata.Metadata(md)
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
-        logMe(3, troveName, troveVersion, troveFlavor)
+        self.log(3, troveName, troveVersion, troveFlavor)
 
 	if not troveVersion:
 	    return self.items.has_key(troveName)
@@ -854,7 +854,7 @@ class TroveStore:
         # this only needs a list of (pathId, fileId) pairs, but it sometimes
         # gets (pathId, fileId, version) pairs instead (which is what
         # the network repository client uses)
-        retr = FileRetriever(self.db)
+        retr = FileRetriever(self.db, self.log)
         d = retr.get(l)
         del retr
         return d
@@ -887,12 +887,13 @@ class TroveStore:
 
 class FileRetriever:
 
-    def __init__(self, db):
+    def __init__(self, db, log = None):
         self.cu = db.cursor()
         schema.resetTable(self.cu, 'getFilesTbl')
+        self.log = log or tracelog.getLog(None)
 
     def get(self, l):
-	logMe(3, "start FileRetriever inserts")
+	self.log(3, "start FileRetriever inserts")
         lookup = range(len(l))
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
@@ -901,7 +902,7 @@ class FileRetriever:
                             start_transaction = False)
             lookup[itemId] = (pathId, fileId)
 
-	logMe(3, "start FileRetriever select")
+	self.log(3, "start FileRetriever select")
         self.cu.execute("""
             SELECT itemId, stream FROM getFilesTbl INNER JOIN FileStreams ON
                     getFilesTbl.fileId = FileStreams.fileId
@@ -917,6 +918,6 @@ class FileRetriever:
             d[(pathId, fileId)] = f
         self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
 
-	logMe(3, "stop FileRetriever")
+	self.log(3, "stop FileRetriever")
 
         return d

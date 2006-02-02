@@ -17,7 +17,7 @@ import re
 import sys
 
 from conary.repository import errors
-from conary.lib.tracelog import logMe
+from conary.lib import tracelog
 from conary.dbstore import sqlerrors
 
 # FIXME: remove these compatibilty error classes later
@@ -25,13 +25,14 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class NetworkAuthorization:
-    def __init__(self, db, name):
+    def __init__(self, db, name, log = None):
         self.name = name
         self.db = db
         self.reCache = {}
+        self.log = log or tracelog.getLog(None)
 
     def getAuthGroups(self, cu, authToken):
-        logMe(3, authToken[0], authToken[2], authToken[3])
+        self.log(3, authToken[0], authToken[2], authToken[3])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
@@ -67,8 +68,9 @@ class NetworkAuthorization:
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):
-        logMe(2, authToken[0], authToken[1], authToken[2], write, admin,
-              label, trove)
+        self.log(2, authToken[0],
+                 "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s" %(
+            authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
 
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
@@ -123,7 +125,7 @@ class NetworkAuthorization:
         if where:
             stmt += "WHERE " + " AND ".join(where)
 
-        logMe(3, stmt, params)
+        self.log(4, stmt, params)
         cu.execute(stmt, params)
 
         for (troveName,) in cu:
@@ -143,45 +145,37 @@ class NetworkAuthorization:
     def checkTrove(self, pattern, trove):
         if pattern=='ALL':
             return True
-
         regExp = self.reCache.get(pattern, None)
         if regExp is None:
             regExp = re.compile(pattern)
             self.reCache[trove] = regExp
-
         if regExp.match(trove):
             return True
-
         return False
 
     def checkPassword(self, salt, password, challenge):
         m = md5.new()
         m.update(salt)
         m.update(challenge)
-
         return m.hexdigest() == password
 
     def checkUserPass(self, authToken, label = None):
-        logMe(2, authToken[0], label)
         if label and label.getHost() != self.name:
             raise errors.RepositoryMismatch
-
+        self.log(3, authToken[0], label)
         cu = self.db.cursor()
-
         stmt = "SELECT salt, password FROM Users WHERE userName=?"
         cu.execute(stmt, authToken[0])
-
         for (salt, password) in cu:
             m = md5.new()
             m.update(salt)
             m.update(authToken[1])
             if m.hexdigest() == password:
                 return True
-
         return False
 
     def checkIsFullAdmin(self, user, password):
-        logMe(3, user)
+        self.log(3, user)
         cu = self.db.cursor()
         cu.execute("""
         SELECT salt, password
@@ -197,6 +191,7 @@ class NetworkAuthorization:
         return False
 
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
+        self.log(3, userGroup, trovePattern, label, write, admin)
         cu = self.db.cursor()
 
         if write:
@@ -328,21 +323,22 @@ class NetworkAuthorization:
         return True
 
     def addUser(self, user, password):
+        self.log(3, user)
         salt = os.urandom(4)
-
         m = md5.new()
         m.update(salt)
         m.update(password)
         return self.addUserByMD5(user, salt, m.hexdigest())
 
     def setMirror(self, userGroup, canMirror):
+        self.log(3, userGroup, canMirror)
         cu = self.db.cursor()
         cu.execute("update userGroups set canMirror=? where userGroup=?",
                    canMirror, userGroup)
         self.db.commit()
 
     def addUserByMD5(self, user, salt, password):
-
+        self.log(3, user)
         #Insert the UserGroup first, but since usergroups can be added
         #and deleted at will, and sqlite uses a MAX(id)+1 approach to
         #sequencing, use max(userId, userGroupId)+1 so that userId and
@@ -378,8 +374,6 @@ class NetworkAuthorization:
                        (ugid, user, cu.binary(salt), cu.binary(password)))
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
-        logMe(3, "salt", salt, len(salt),
-              "dbsalt", cu.execute("select salt from Users where userId = ?", ugid).fetchone()[0])
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
                    "VALUES (?, ?)",
                    (ugid, ugid))
@@ -387,20 +381,19 @@ class NetworkAuthorization:
         return ugid
 
     def deleteUserByName(self, user, commit = True):
+        self.log(3, user)
         cu = self.db.cursor()
-
         sql = "SELECT userId FROM Users WHERE userName=?"
         cu.execute(sql, user)
         try:
             userId = cu.next()[0]
         except StopIteration:
             raise errors.UserNotFound(user)
-
         return self.deleteUser(userId, user, commit)
 
     def deleteUserById(self, userId, commit = True):
+        self.log(3, userId)
         cu = self.db.cursor()
-
         sql = "SELECT userName FROM Users WHERE userId=?"
         cu.execute(sql, userId)
         try:
@@ -413,7 +406,7 @@ class NetworkAuthorization:
     def deleteUser(self, userId, user, commit = True):
         # Need to do a lot of stuff:
         # UserGroups, Users, and all ACLs
-
+        self.log(3, userId, user)
         cu = self.db.cursor()
 
         try:
@@ -445,15 +438,13 @@ class NetworkAuthorization:
         return True
 
     def changePassword(self, user, newPassword):
+        self.log(3, user)
         cu = self.db.cursor()
-
         salt = os.urandom(4)
-
         m = md5.new()
         m.update(salt)
         m.update(newPassword)
         password = m.hexdigest()
-
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
         self.db.commit()
@@ -465,20 +456,17 @@ class NetworkAuthorization:
                       WHERE UserGroups.userGroupId = UserGroupMembers.userGroupId AND
                             UserGroupMembers.userId = Users.userId AND
                             Users.userName = ?""", user)
-
         return [row[0] for row in cu]
 
     def iterUsers(self):
         cu = self.db.cursor()
         cu.execute("SELECT userId, userName FROM Users")
-
         for row in cu:
             yield row
 
     def iterGroups(self):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId, userGroup FROM UserGroups")
-
         for row in cu:
             yield row
 
@@ -488,7 +476,6 @@ class NetworkAuthorization:
                       FROM UserGroups INNER JOIN UserGroupMembers ON
                       UserGroups.userGroupId = UserGroupMembers.userGroupId
                       WHERE UserGroupMembers.userId=?""", userId)
-
         for row in cu:
             yield row
 
@@ -497,7 +484,6 @@ class NetworkAuthorization:
         cu.execute("""SELECT Users.userName FROM UserGroupMembers, Users
                       WHERE Users.userId = UserGroupMembers.userId AND
                       UserGroupMembers.userGroupId=?""", userGroupId)
-
         for row in cu:
             yield row[0]
 
@@ -512,52 +498,41 @@ class NetworkAuthorization:
                       LEFT OUTER JOIN Labels ON
                           Permissions.labelId = Labels.labelId
                       WHERE userGroupId=?""", userGroupId)
-
         for row in cu:
             yield row
 
     def getGroupNameById(self, userGroupId):
         cu = self.db.cursor()
-
         cu.execute("SELECT userGroup from UserGroups WHERE userGroupId=?",
             userGroupId)
-
         return cu.next()[0]
 
     def getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
-
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
             userGroupName)
-
         return cu.next()[0]
 
     def getUserIdByName(self, userName):
         cu = self.db.cursor()
-
         cu.execute("SELECT userId FROM Users WHERE userName=?",
                    userName)
-
         return cu.next()[0]
 
     def addGroup(self, userGroupName):
         cu = self.db.cursor()
-
         #Check to make sure the group is unique
         self._uniqueUserGroup(cu, userGroupName)
-
         try:
             cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "group: %s" % userGroupName
         self.db.commit()
-
         return cu.lastrowid
 
     def renameGroup(self, userGroupId, userGroupName):
         cu = self.db.cursor()
-
         #See if we're actually going to do any work:
         currentGroupName = self.getGroupNameById(userGroupId)
         if currentGroupName != userGroupName:
@@ -577,19 +552,15 @@ class NetworkAuthorization:
     def updateGroupMembers(self, userGroupId, members):
         #Do this in a transaction
         cu = self.db.cursor()
-
         #First drop all the current members
         cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
-
         #now add the new members
         for userId in members:
             self.addGroupMember(userGroupId, userId, False)
-
         self.db.commit()
 
     def addGroupMember(self, userGroupId, userId, commit = True):
         cu = self.db.cursor()
-
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) VALUES(?, ?)",
                    (userGroupId, userId))
         if commit:
@@ -603,7 +574,6 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
-
         #Note, there could be a user left behind with no associated group
         #if the group being deleted was created with a user.  This user is not
         #deleted because it is possible for this user to be a member of
@@ -613,14 +583,12 @@ class NetworkAuthorization:
 
     def iterItems(self):
         cu = self.db.cursor()
-
         cu.execute("SELECT itemId, item FROM Items")
         for row in cu:
             yield row
 
     def iterLabels(self):
         cu = self.db.cursor()
-
         cu.execute("SELECT labelId, label FROM Labels")
         for row in cu:
             yield row
@@ -676,7 +644,6 @@ class NetworkAuthorization:
 
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
-
         # validate the password
         if len(entitlement) > 64 or not self.checkUserPass(authToken):
             return errors.InsufficientPermission
@@ -699,7 +666,6 @@ class NetworkAuthorization:
 
     def addEntitlementGroup(self, authToken, entGroup, userGroup):
         cu = self.db.cursor()
-
         if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
@@ -708,20 +674,16 @@ class NetworkAuthorization:
                    "entGroup = ?", entGroup)
         if cu.next()[0]:
             raise errors.GroupAlreadyExists
-
         cu.execute("SELECT userGroupId FROM userGroups WHERE userGroup=?",
                    userGroup)
         l = [ x for x in cu ]
         if not l:
             raise errors.GroupNotFound
-
         assert(len(l) == 1)
         userGroupId = l[0][0]
-
         cu.execute("INSERT INTO EntitlementGroups (entGroupId, entGroup, userGroupId) "
                    "VALUES (NULL, ?, ?)",
                    (entGroup, userGroupId))
-
         self.db.commit()
 
     def addEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
@@ -731,14 +693,11 @@ class NetworkAuthorization:
         """
         if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
-
         cu = self.db.cursor()
-
         entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
                                 "WHERE entGroup = ?", entGroup).next()[0]
         userGroupId = cu.execute("SELECT userGroupId FROM userGroups "
                                  "WHERE userGroup = ?", userGroup).next()[0]
-
         cu.execute("INSERT INTO EntitlementOwners (entGroupId, ownerGroupId) "
                    "VALUES (?, ?)",
                    (entGroupId, userGroupId))
@@ -747,13 +706,9 @@ class NetworkAuthorization:
         # validate the password
         if not self.checkUserPass(authToken):
             return errors.InsufficientPermission
-
         cu = self.db.cursor()
-
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
-
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
-
         return [ x[0] for x in cu ]
 
