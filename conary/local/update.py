@@ -1172,7 +1172,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
         # these values are not picked up from the local system
         if hasattr(f, 'requires') and hasattr(srcFile, 'requires'):
             f.requires.set(srcFile.requires())
-        if srcFile.hasContents and f.hasContents:
+        if hasattr(f, 'provides') and hasattr(srcFile, 'provides'):
             f.provides.set(srcFile.provides())
         f.flags.set(srcFile.flags())
         if srcFile.hasContents and f.hasContents:
