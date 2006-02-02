@@ -940,6 +940,99 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 
+
+def _mergeDeps(depList, mergeType):
+    """
+    Returns a new Dependency which merges the flags from the two
+    existing dependencies. We don't want to merge in place as this
+    Dependency could be shared between many objects (via a 
+    DependencyGroup).  
+    """
+    name = depList[0].name
+
+    flags = {}
+    for dep in depList:
+        assert(dep.name == name)
+        for flag, sense in dep.flags.iteritems():
+            flags.setdefault(flag, []).append(sense)
+
+    finalFlags = {}
+    for flag, senses in flags.iteritems():
+        if mergeType == DEP_MERGE_TYPE_OVERRIDE:
+            finalFlags[flag] = senses[-1]
+            continue
+
+        if FLAG_SENSE_REQUIRED in senses:
+            posSense = FLAG_SENSE_REQUIRED
+            strongestPos = 2
+        elif FLAG_SENSE_PREFERRED in senses:
+            posSense = FLAG_SENSE_PREFERRED
+            strongestPos = 1
+        else:
+            strongestPos = 0
+            posSense = FLAG_SENSE_UNSPECIFIED
+
+        if FLAG_SENSE_DISALLOWED in senses:
+            negSense = FLAG_SENSE_DISALLOWED
+            strongestNeg = 2
+        elif FLAG_SENSE_PREFERNOT in senses:
+            negSense = FLAG_SENSE_PREFERNOT
+            strongestNeg = 1
+        else:
+            strongestNeg = 0
+            negSense = FLAG_SENSE_UNSPECIFIED
+
+        if strongestNeg == strongestPos:
+            if mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS:
+                continue
+            if mergeType == DEP_MERGE_TYPE_PREFS:
+                for sense in reversed(senses):
+                    if sense in (posSense, negSense):
+                        finalFlags[flag] = sense
+                        break
+                continue
+            else:
+                thisFlag = "%s%s" % (senseMap[negSense], flag)
+                otherFlag = "%s%s" % (senseMap[posSense], flag)
+                raise RuntimeError, ("Invalid flag combination in merge:"
+                                     " %s and %s"  % (thisFlag, otherFlag))
+        elif mergeType == DEP_MERGE_TYPE_PREFS:
+            origSense = senses[0]
+            if (toStrongMap[origSense] == origSense
+                    and FLAG_SENSE_UNSPECIFIED in (posSense, negSense)):
+                finalFlags[flag] = origSense
+            else:
+                finalFlags[flag] = toWeakMap[senses[-1]]
+        else:
+            finalFlags[flag] = max((strongestPos, posSense),
+                                   (strongestNeg, negSense))[1]
+
+    return Dependency(name, finalFlags)
+
+
+
+def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
+    for flavor in flavors:
+        assert(isinstance(flavor, DependencySet))
+    finalDep = DependencySet()
+
+    depClasses = set()
+    for flavor in flavors:
+        depClasses.update([ dependencyClasses[x] for x in flavor.getDepClasses()])
+            
+    for depClass in depClasses:
+        depsByName = {}
+        for flavor in flavors:
+            if flavor.hasDepClass(depClass):
+                for dep in flavor.iterDepsByClass(depClass):
+                    depsByName.setdefault(dep.name, []).append(dep)
+        for depList in depsByName.itervalues():
+            dep = _mergeDeps(depList, mergeType)
+            finalDep.addDep(depClass, dep)
+    return finalDep
+
+
+
 def mergeFlavor(flavor, mergeBase):
     """ 
     Merges the given flavor with the mergeBase - if flavor 
