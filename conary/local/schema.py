@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 17
+VERSION = 18
 
 def resetTable(cu, name):
     try:
@@ -710,6 +710,44 @@ class MigrateTo_17(SchemaMigration):
                        ''', frzn, instanceId, trove._TROVEINFO_TAG_PATH_HASHES)
         return self.Version
 
+class MigrateTo_18(SchemaMigration):
+    Version = 18
+    def migrate(self):
+        cu = self.cu
+        cu.execute("""
+    CREATE TABLE NewInstances(
+        instanceId      %(PRIMARYKEY)s,
+        troveName       STRING,
+        versionId       INTEGER,
+        flavorId        INTEGER,
+        timeStamps      STRING,
+        isPresent       INTEGER,
+        pinned          BOOLEAN
+    )""" % self.db.keywords)
+        cu.execute('INSERT INTO NewInstances SELECT * FROM Instances')
+        cu.execute('DROP TABLE Instances')
+        cu.execute('ALTER TABLE NewInstances RENAME TO Instances')
+        # recreate indexes
+        cu.execute("CREATE INDEX InstancesNameIdx ON Instances(troveName)")
+        cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
+                   "Instances(troveName, versionId, flavorId)")
+
+        cu.execute('''DELETE FROM TroveInfo WHERE instanceId 
+                      NOT IN (SELECT instanceId FROM Instances)''')
+
+        # delete BuildDeps, Loaded troves, label path, and policy tups
+        # from components (they shouldn't have had them in the first place)
+        cu.execute('''DELETE FROM TroveInfo 
+                        WHERE infoType in (4,5,11,12) AND
+                               instanceId IN (
+                                SELECT instanceId FROM Instances 
+                                    WHERE troveName LIKE '%:%')''')
+        return self.Version
+
+
+
+
+
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
@@ -740,6 +778,7 @@ def checkVersion(db):
     if version == 14: version = MigrateTo_15(db)()
     if version == 15: version = MigrateTo_16(db)()
     if version == 16: version = MigrateTo_17(db)()
+    if version == 17: version = MigrateTo_18(db)()
 
     return version
 
