@@ -1779,4 +1779,4 @@ class ServerConfig(ConfigFile):
     serverName              = CfgString
     staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
-    traceLog                = tracelog.CfgLogFile
+    traceLog                = tracelog.CfgTraceLog

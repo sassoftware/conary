@@ -219,7 +219,7 @@ def logErr(*args):
         printErr(" ".join([str(x) for x in args]))
 
 # A class for configuration of a database driver
-class CfgLogFile(cfg.CfgType):
+class CfgTraceLog(cfg.CfgType):
     def parseString(self, str):
         s = str.split()
         if len(s) != 2:
