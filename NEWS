@@ -1,4 +1,4 @@
-Changes in ***:
+Changes in 0.95:
   o Client changes:
     * The conary verify command now handles contentless files with provides
       and requires (for example, symlinks to shared libraries that provide
