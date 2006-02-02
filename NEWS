@@ -1,3 +1,8 @@
+Changes in ***:
+  o Repository changes:
+    * If set in the repository config file, 'traceLog = level logfile_path' is
+      now honored by both the standalone and the apache servers.
+
 Changes in 0.94:
 
   o Redirects no longer point to a specific trove; they now redirect
