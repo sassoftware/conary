@@ -100,6 +100,7 @@ class Database(BaseDatabase):
     driver = "mysql"
 
     keywords = KeywordDict()
+    tempTableStorage = {}
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -195,6 +196,9 @@ class Database(BaseDatabase):
         return True
 
     def use(self, dbName):
+        oldDbName = self._connectData()['database']
+        self.tempTableStorage[oldDbName] = self.tempTables
+
         try:
             self.dbh.select_db(dbName)
         except mysql.OperationalError, e:
@@ -203,6 +207,9 @@ class Database(BaseDatabase):
             else:
                 raise
 
+        # rewrite the database name on the connection string
+        self.database = self.database.split("/")[0] + "/" + dbName
+
         self.loadSchema()
-        self.tempTables = sqllib.CaselessDict()
+        self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
