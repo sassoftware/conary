@@ -27,6 +27,8 @@ import sys
 import traceback
 import time
 
+import cfg, cfgtypes
+
 # needed so we know not to log ourselves
 _thisFile = os.path.basename(sys.modules[__name__].__file__)
 
@@ -48,36 +50,50 @@ def printErr(*args):
             pid, logTime(), arg))
     sys.stderr.flush()
 
-# Base logging class that figures out where it is being called from
-class FileLog:
-    def __init__(self, filename="stderr", level=1):
+# basic class that doesn't log much
+class NullLog:
+    def __init__(self, filename = None, level = 0):
         self.pid = os.getpid()
         self.level = level
         self.filename = filename
-        self.isFile = 0        
-        if filename in ["stderr", "stdout"]:
-            self.fd = getattr(sys, filename)
-            self.reset()
-            return
-
-        mustChmod = not os.path.exists(self.filename)
-        try: # line buffered mode
-            self.fd = open(self.filename, "a+", 1)
-            if mustChmod:
-                os.chmod(self.filename, 0660)
-        except:
-            printErr("ERROR: Couldn't open log file %s" % (self.filename,),
-                   sys.exc_info()[:2])
-            self.filename = "stderr"
-            self.fd = sys.stderr
-        else:
-            self.isFile = 1
-
+    def log(self, *args):
+        pass
     # placeholder for something that can be useful for more complex classes
     def reset(self, level=None):
         if level:
             self.level = level
-    
+    # log arguments if we're called as a function
+    def __call__(self, level, *args):
+        if level <= self.level:
+            self.log(*args)
+
+# Base logging class that figures out where it is being called from
+class FileLog(NullLog):
+    def __init__(self, filename="stderr", level=1):
+        NullLog.__init__(self, filename, level)
+        def __getFD():
+            isFile = 0
+            if self.filename in ["stderr", "stdout"]:
+                return (isFile, getattr(sys, self.filename))
+
+            mustChmod = not os.path.exists(self.filename)
+            try: # line buffered mode
+                fd = open(self.filename, "a+", 1)
+                if mustChmod:
+                    os.chmod(self.filename, 0660)
+            except:
+                printErr("ERROR: Couldn't open log file %s" % (self.filename,),
+                       sys.exc_info()[:2])
+                self.filename = "stderr"
+                fd = sys.stderr
+            else:
+                isFile = 1
+            return (isFile, fd)
+        (self.isFile, self.fd) = __getFD()
+        self.reset()
+        self.log("logging level %d for pid %d on '%s'" % (
+            self.level, self.pid, self.filename))
+
     # python cookbooks are great
     def log(self, *args):
         global _thisFile
@@ -88,7 +104,7 @@ class FileLog:
             # handle .py / .pyc
             if _thisFile.startswith(os.path.basename(tbStack[callid][0])):
                 callid = callid - 1
-                break            
+                break
             callid = callid + 1
         module = ''
         try:
@@ -103,17 +119,20 @@ class FileLog:
             del path
         except:
             module = ''
-        msg = "%s.%s" % (module, tbStack[callid][2])
+        location = tbStack[callid][2]
+        if location == "?":
+            location = "__main__"
+        msg = "%s.%s" % (module, location)
         if len(args):
             msg = "%s %s" % (msg, " ".join([str(x) for x in args]))
         # format for logging
         msg = self.formatLog(msg)
         self.writeLog(msg)
-        
+
     # this function is mainly here so we can subclass it (ie, tracing)
     def formatLog(self, msg):
         return "%s %d %s" % (logTime(), self.pid, msg)
-        
+
     # simply print a message to the log.
     def writeLog(self, msg):
         self.fd.write("%s\n" % msg)
@@ -128,32 +147,24 @@ class FileLog:
 # a class that keeps tabs on the time spend between calls to the log function
 class TraceLog(FileLog):
     lastTime = 0
-    
+
     def formatLog(self, msg):
         t = time.time()
         ret = time.strftime("%H:%M:%S", time.localtime(t))
-        return "%s %+.3f %s" % (ret, t - self.lastTime, msg)
+        return "%d %s %+.3f %s" % (self.pid, ret, t - self.lastTime, msg)
 
     def writeLog(self, msg):
         self.lastTime = time.time()
         FileLog.writeLog(self, msg)
-        
+
     def reset(self, level=None):
         self.lastTime = time.time()
         FileLog.reset(self, level)
 
-# initialize the module global log
-def initLog(filename="stderr", level=0, trace=0):
-    global _LOG
-
-    if _LOG is not None:        
-        if filename is None or _LOG.filename == filename:
-            _LOG.reset(level)
-            return
-        _LOG = None
-    elif filename is None:
-        filename = "/dev/null"
-
+# instantiate a log object
+def getLog(filename = "stderr", level = 0, trace = 0):
+    if filename is None:
+        return NullLog(None, 0)
     path = os.path.dirname(filename)
     # be nice and figure out the permission problems if we're working
     # with a real path
@@ -172,16 +183,29 @@ def initLog(filename="stderr", level=0, trace=0):
             filename = "stderr"
     # all should be sane now
     if trace:
-        _LOG = TraceLog(filename, level)
-    else:
-        _LOG = FileLog(filename, level)
+        return TraceLog(filename, level)
+    return FileLog(filename, level)
+
+
+# initialize the module global log
+def initLog(filename = "stderr", level = 0, trace = 0):
+    global _LOG
+
+    if _LOG is not None:
+        if filename is None or _LOG.filename == filename:
+            _LOG.reset(level)
+            return
+        _LOG = None
+    elif filename is None:
+        filename = "/dev/null"
+    _LOG = getLog(filename, level, trace)
     return 0
 
 # the basic function to log stuff using this module
 def logMe(level, *args):
     global _LOG
     if _LOG and _LOG.level >= level:
-        apply(_LOG.log, args)
+        _LOG.log(*args)
 
 # shortcut for error logging
 def logErr(*args):
@@ -193,3 +217,18 @@ def logErr(*args):
     if _LOG.filename != "stderr":
         # out it on stderr as well
         printErr(" ".join([str(x) for x in args]))
+
+# A class for configuration of a database driver
+class CfgLogFile(cfg.CfgType):
+    def parseString(self, str):
+        s = str.split()
+        if len(s) != 2:
+            raise cfgtypes.ParseError("log level and path expected")
+        try:
+            s = (int(s[0]), cfgtypes.Path(s[1]))
+        except:
+            raise cfgtypes.ParseError(
+                "log level (integer) and path (string) expected")
+        return s
+    def format(self, val, displayOptions = None):
+        return "%s %s" % val
