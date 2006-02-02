@@ -18,6 +18,7 @@ initial packaging.  Also contains error reporting.
 import itertools
 import os
 import re
+import site
 import stat
 import sys
 
@@ -1126,6 +1127,49 @@ class Provides(policy.Policy):
                 self.sonameSubtrees.add(sonameSubtrees)
         policy.Policy.updateArgs(self, **keywords)
 
+    def _generatePythonProvidesSysPath(self):
+        """ Generate a correct sys.path based on both the installed 
+            system (in case a buildreq affects the sys.path) and the
+            destdir (for newly added sys.path directories).  Use site.py
+            to generate a list of such dirs.  Note that this list of dirs
+            should NOT have destdir in front.
+        """
+        oldSysPath = sys.path
+        oldSysPrefix = sys.prefix
+        oldSysExecPrefix = sys.exec_prefix
+        destdir = self.macros.destdir
+
+        try:
+            # 1. determine python dir based on python version and sys.prefix,
+            # just like site.py does
+            pythonDir = os.path.dirname(sys.modules['os'].__file__)
+            systemPaths = set([pythonDir])
+
+            # 2. determine root system site-packages, and add them to the
+            # list of acceptable provide paths
+            sys.path = []
+            site.addsitepackages(None)
+            systemPaths.update(sys.path)
+
+            # 3. determine created destdir site-packages, and add them to
+            # the list of acceptable provide paths
+            sys.path = []
+            sys.prefix = destdir + sys.prefix
+            sys.exec_prefix = destdir + sys.exec_prefix
+            site.addsitepackages(None)
+
+            destDirLen = len(destdir)
+            systemPaths.update(x[destDirLen:] for x in sys.path
+                                                    if x.startswith(destdir))
+
+            # later, we will need to truncate paths using longest path first
+            self.sysPath = sorted(systemPaths, key=len, reverse=True)
+        finally:
+            sys.path = oldSysPath
+            sys.prefix = oldSysPrefix
+            sys.exec_prefix = oldSysExecPrefix
+
+
     def preProcess(self):
 	self.rootdir = self.rootdir % self.macros
 	self.fileFilters = []
@@ -1175,20 +1219,11 @@ class Provides(policy.Policy):
 
     def _addPythonProvides(self, path, m, pkg, macros):
 
-        if self.sysPath is None:
-            self.sysPath = [ x for x in sys.path if x and os.path.exists(x) ]
-            # python does not add directories that do not exist to
-            # sys.path, but architecture-specific directories might
-            # exist in destdir but not on the system; for example,
-            # x86_64 python might not have /usr/lib/python2.4/site-packages
-            # We therefore have to synthesize some more entries.
-            self.sysPath += [ x.replace('lib64', 'lib', 1) 
-                              for x in self.sysPath if 'lib64' in x ]
-            # we will need to truncate paths using longest path first
-            self.sysPath.sort(key=len, reverse=True)
-
         if not (path.endswith('.py') or path.endswith('.so')):
             return
+
+        if self.sysPath is None:
+            self._generatePythonProvidesSysPath()
 
         depPath = None
         for sysPathEntry in self.sysPath:
@@ -1606,18 +1641,70 @@ class Requires(_addInfo):
             depSet.addDep(depClass, dep)
         pkg.requiresMap[path] = depSet
 
+    def _generatePythonRequiresSysPath(self):
+        # Generate the correct sys.path for finding the required modules.
+        # we use the built in site.py to generate a sys.path for the
+        # current system and another one where destdir is the root. 
+        # note the below code is similar to code in Provides, 
+        # but it creates an ordered path list with and without destdir prefix,
+        # while provides only needs a complete list without destdir prefix.
+
+        oldSysPath = sys.path
+        oldSysPrefix = sys.prefix
+        oldSysExecPrefix = sys.exec_prefix
+
+        try:
+            destdir = self.macros.destdir
+
+            # 1. determine python dir based on python version and sys.prefix,
+            # just like site.py does
+            pythonDir = os.path.dirname(sys.modules['os'].__file__)
+            systemPaths = [pythonDir]
+
+
+            # 2. generate site-packages list for /
+            sys.path = []
+            site.addsitepackages(None)
+
+            systemPaths += sys.path
+
+            # 2. generate site-packages list for destdir
+            # (look in python base directory first)
+            sys.path = [destdir + pythonDir]
+
+            sys.prefix = destdir + sys.prefix
+            sys.exec_prefix = destdir + sys.exec_prefix
+            site.addsitepackages(None)
+
+            destDirPaths = sys.path
+
+            # when searching for modules, we search destdir first,
+            # then system.
+            self.sysPath = destDirPaths + systemPaths
+
+            # make an unsorted copy for module finder
+            sysPathForModuleFinder = list(self.sysPath)
+
+            # later, we will need to truncate paths using longest path first
+            self.sysPath.sort(key=len, reverse=True)
+        finally:
+            sys.path = oldSysPath
+            sys.prefix = oldSysPrefix
+            sys.exec_prefix = oldSysExecPrefix
+
+        # load module finder after sys.path is restored
+        # in case delayed importer is installed.
+        self.pythonModuleFinder = pydeps.DirBasedModuleFinder(
+                                            destdir, sysPathForModuleFinder)
+
+
     def _addPythonRequirements(self, path, fullpath, pkg, script=False):
         # FIXME: we really should check for python in destdir and shell
         # out to use that python to discover the dependencies if it exists.
         destdir = self.recipe.macros.destdir
-        if self.sysPath is None:
-            sysPath = [x for x in sys.path if x and os.path.exists(x)]
-            self.sysPath = [x for x in itertools.chain(
-                                [destdir+y for y in sysPath], sysPath)]
-            self.pythonModuleFinder = pydeps.DirBasedModuleFinder(
-                destdir, list(self.sysPath))
-            # now we will need to truncate paths using longest path first
-            self.sysPath.sort(key=len, reverse=True)
+
+        if not self.sysPath:
+            self._generatePythonRequiresSysPath()
 
         try:
             if script:
