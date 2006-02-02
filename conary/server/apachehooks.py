@@ -24,7 +24,7 @@ import traceback
 import xmlrpclib
 import zlib
 
-from conary.lib import log
+from conary.lib import log, tracelog
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
@@ -52,18 +52,20 @@ def post(port, isSecure, repos, req):
         if encoding == 'deflate':
             data = zlib.decompress(data)
 
+        startTime = time.time()
         (params, method) = xmlrpclib.loads(data)
-
+        repos.log(3, "decoding=%s" % method, authToken[0],
+                  "%.3f" % (time.time()-startTime))
         try:
             result = repos.callWrapper(protocol, port, method, authToken,
                                        params)
         except errors.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
-
         usedAnonymous = result[0]
         result = result[1:]
 
         resp = xmlrpclib.dumps((result,), methodresponse=1)
+        repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime, len(resp)))
         req.content_type = "text/xml"
         encoding = req.headers_in.get('Accept-encoding', '')
         if len(resp) > 200 and 'deflate' in encoding:
@@ -325,6 +327,6 @@ def handler(req):
         log.error(''.join(traceback.format_exception(*sys.exc_info())))
 
         return apache.HTTP_INTERNAL_SERVER_ERROR
-        
+
 
 repositories = {}
