@@ -131,7 +131,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.troveStore = None
         self.logFile = cfg.logFile
         self.requireSigs = cfg.requireSigs
-
+        self.deadlockRetry = cfg.deadlockRetry
         self.repDB = cfg.repositoryDB
         self.contentsDir = cfg.contentsDir.split(" ")
 
@@ -204,26 +204,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return (False, True, ("MethodNotSupported", methodname, ""))
         method = self.__getattribute__(methodname)
 
-        try:
-            # the first argument is a version number
-            r = method(authToken, *args)
-            self.db.commit()
-            return (False, False, r)
-        except Exception, e:
-            self.db.rollback()
-
-        if (isinstance(e, errors.InsufficientPermission)
-            and authToken[0] is not None):
-            # When we get InsufficientPermission w/ a user/password, retry
-            # the operation as anonymous
+        attempt = 1
+        # nested try:...except statements.... Yeeee-haaa!
+        while True:
             try:
-                r = method(('anonymous', 'anonymous', None, None), *args)
-                return (True, False, r)
+                # the first argument is a version number
+                try:
+                    r = method(authToken, *args)
+                except sqlerrors.DatabaseLocked:
+                    raise
+                except errors.InsufficientPermission, e:
+                    if authToken[0] is not None:
+                        # When we get InsufficientPermission w/ a user/password, retry
+                        # the operation as anonymous
+                        r = method(('anonymous', 'anonymous', None, None), *args)
+                        self.db.commit()
+                        return (True, False, r)
+                    raise
+                else:
+                    self.db.commit()
+                    return (False, False, r)
+            except sqlerrors.DatabaseLocked, e:
+                # deadlock occured; we rollback and try again
+                log.error("Deadlock id %d while calling %s: %s",
+                          attempt, methodname, str(e,args))
+                self.log(1, "Deadlock id %d while calling %s: %s" %(
+                    attempt, methodname, str(e,args)))
+                if attempt < self.deadlockRetry:
+                    self.db.rollback()
+                    attempt += 1
+                    continue
+                # else fall through
             except Exception, e:
-                # failed once more, handle the exception below
                 pass
+            # fall through for processing below
+            break
 
-        # if there is no exception, we've returned before now
+        # if there wasn't an exception, we would've returned before now.
+        # This means if we reach here, we have an exception in e
         self.db.rollback()
 
         if isinstance(e, errors.TroveMissing):
@@ -1780,3 +1798,4 @@ class ServerConfig(ConfigFile):
     staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
+    deadlockRetry           = (CfgInt, 5)
