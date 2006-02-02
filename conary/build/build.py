@@ -552,7 +552,7 @@ class PythonSetup(BuildCommand):
         macros.action = self.action
 
         # now figure out which kind of setup.py this is
-        if 'import setuptools' in file('%s/%s' %(rundir, macros.setup)).read():
+        if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, macros.setup)).read()):
             macros.pythonsetup = 'python %(setup)s '
             macros.noegg = ' --single-version-externally-managed'
         else:

@@ -65,6 +65,7 @@ import MySQLdb
 import textwrap
 
 from conary import conarycfg
+from conary import conaryclient
 from conary import updatecmd
 from conary import versions
 from conary.deps import deps
@@ -87,7 +88,8 @@ class bugzMine:
         self.db = MySQLdb.connect(host=host, user=user,
                                   passwd=passwd, db=database)
         cfg = conarycfg.ConaryConfiguration()
-        self.repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
+        client = conaryclient.ConaryClient(cfg)
+        self.repos = client.getRepos()
         self.indentWrapper = textwrap.TextWrapper(
             subsequent_indent='    ',
             break_long_words=False
