@@ -137,7 +137,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                 applyList.append((troveName, (versionStr, flavor), 
                                   (None, None), False))
         elif len(l) != 2:
-            log.error("one = expected in '%s' argument to changeset", 
+            log.error("one -- expected in change spec '%s'", 
                       changeSpec)
             return
         else:

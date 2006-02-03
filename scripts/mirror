@@ -34,7 +34,7 @@ from conary.repository import netclient
 from conary.lib import cfg, util, log
 import optparse
 
-sys.excepthook = util.genExcepthook(debug=True)
+#sys.excepthook = util.genExcepthook(debug=True)
 
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
@@ -54,9 +54,13 @@ def parseArgs():
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
-    parser.add_option("--full-sync", dest = "sync", action = "store_true",
+    parser.add_option("--full-sig-sync", dest = "syncSigs", 
+                      action = "store_true", default = False,
+                      help = "replace all of the trove signatures on "
+                             "the target repository")
+    parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
                       default = False,
-                      help = "ignore the last-mirrored information in the "
+                      help = "ignore the last-mirrored timestamp in the "
                              "target repository")
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
@@ -86,6 +90,19 @@ def filterAlreadyPresent(repos, troveList):
     filteredList = [ x for x in troveList if not present[x[1]] ]
 
     return filteredList
+
+def filterSigsWithoutTroves(repos, currentMark, sigList):
+    # Sigs whose mark is the same as currentMark might not have their trove
+    # available on the server (it might be coming as part of this mirror
+    # run). sigList has to be sorted by mark for this to work.
+
+    inQuestion = [ x for x in sigList if x[0] == currentMark ]
+    present = repos.hasTroves([ x[1] for x in inQuestion ])
+    # keep troves whose mark are older than currentMark and troves which
+    # are present on the target
+    sigList = [ x for x in sigList if present.get(x[1], True) ]
+
+    return sigList
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -185,7 +202,14 @@ def buildJobList(repos, groupList):
 
     return jobList
 
-def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
+def mirrorSignatures(sourceRepos, targetRepos, sigList):
+    sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
+    updateCount = targetRepos.setTroveSigs(
+                [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
+
+    return updateCount
+
+def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     if sync:
         currentMark = -1
     else:
@@ -205,11 +229,31 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
         log.debug("adding %d keys to target", len(keyList))
         targetRepos.addPGPKeyList(cfg.host, keyList)
 
+    if syncSigs:
+        log.debug("getting full trove list for signature sync")
+        troveDict = sourceRepos.getTroveVersionList(host, { None : None })
+        sigList = []
+        for name, versionD in troveDict.iterkeys():
+            for version, flavorList in versionD.iterkeys():
+                sigList += [ (name, version, x) for x in flavorList ]
+    else:
+        log.debug("looking for new trove signatures")
+        sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
+
+    log.debug("%d new signatures are available" % len(sigList))
+
     if cfg.labels:
         labelDict = set(cfg.labels)
         troveList = [ x for x in troveList if 
                             x[1][1].branch().label() in cfg.labels ]
-        log.debug("after label filtering %d troves are needed", len(troveList))
+        sigList = [ x for x in sigList if 
+                            x[1][1].branch().label() in cfg.labels ]
+        log.debug("after label filtering %d troves and %d sigs are needed", 
+                  len(troveList), len(sigList))
+
+    log.debug("removing signatures for troves not yet mirrored")
+    sigList = filterSigsWithoutTroves(targetRepos, currentMark, sigList)
+    log.debug("%d signatures need to be mirrored", len(sigList))
 
     log.debug("filtering troves already present on the mirror")
     troveList = filterAlreadyPresent(targetRepos, troveList)
@@ -218,7 +262,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
     log.debug("building grouped job list")
     bundles = buildJobList(targetRepos, groupList)
 
-    trovesCommitted = 0
+    if sigList:
+        updateCount = mirrorSignatures(sourceRepos, targetRepos, sigList)
+    else:
+        updateCount = 0
 
     if len(bundles) > 1:
         # We cut off the last bundle if there is more than one and let the
@@ -226,8 +273,6 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
         # we don't half-commit a package when the server limits the number
         # of responses getNewTroveList() will return
         bundles = bundles[:-1]
-
-    trovesCommitted = 0
 
     for i, bundle in enumerate(bundles):
         (outFd, tmpName) = util.mkstemp()
@@ -244,11 +289,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
-        
-        os.unlink(tmpName)
-        trovesCommitted += len(bundle)
 
-    return trovesCommitted
+        os.unlink(tmpName)
+        updateCount += len(bundle)
+
+    return updateCount
 
 options = parseArgs()
 cfg = MirrorConfiguration()
@@ -268,7 +313,7 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           entitlementDir = cfg.entitlementDirectory)
 
 count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
-                         options.sync)
+                         options.sync, options.syncSigs)
 while not options.test and count:
-    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
-                             options.sync)
+    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test,
+                             options.sync, options.syncSigs)
