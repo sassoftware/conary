@@ -54,9 +54,13 @@ def parseArgs():
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
-    parser.add_option("--full-sync", dest = "sync", action = "store_true",
+    parser.add_option("--full-sig-sync", dest = "syncSigs", 
+                      action = "store_true", default = False,
+                      help = "replace all of the trove signatures on "
+                             "the target repository")
+    parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
                       default = False,
-                      help = "ignore the last-mirrored information in the "
+                      help = "ignore the last-mirrored timestamp in the "
                              "target repository")
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
@@ -205,7 +209,7 @@ def mirrorSignatures(sourceRepos, targetRepos, sigList):
 
     return updateCount
 
-def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
+def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     if sync:
         currentMark = -1
     else:
@@ -225,8 +229,17 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync):
         log.debug("adding %d keys to target", len(keyList))
         targetRepos.addPGPKeyList(cfg.host, keyList)
 
-    log.debug("looking for new trove signatures")
-    sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
+    if syncSigs:
+        log.debug("getting full trove list for signature sync")
+        troveDict = sourceRepos.getTroveVersionList(host, { None : None })
+        sigList = []
+        for name, versionD in troveDict.iterkeys():
+            for version, flavorList in versionD.iterkeys():
+                sigList += [ (name, version, x) for x in flavorList ]
+    else:
+        log.debug("looking for new trove signatures")
+        sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
+
     log.debug("%d new signatures are available" % len(sigList))
 
     if cfg.labels:
@@ -300,7 +313,7 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           entitlementDir = cfg.entitlementDirectory)
 
 count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
-                         options.sync)
+                         options.sync, options.syncSigs)
 while not options.test and count:
-    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
-                             options.sync)
+    count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test,
+                             options.sync, options.syncSigs)
