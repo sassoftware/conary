@@ -7,6 +7,9 @@ Changes in 0.96:
       --available-troves with and without the --affinity flag.
     * conary q now displays installed, not by default troves by default,
       but skips missing troves.
+    * Fixed an update bug where updating an x86 library on an x86_64 system
+      would cause conary to switch other x86_64 components for that library
+      to x86 versions.
 
   o Other changes:
     * Mirroring now mirrors trove signature
