@@ -1777,6 +1777,7 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
         return (False, True, ("RepositoryClosed", self.cfg.closed))
 
     def __init__(self, cfg):
+        self.log = tracelog.getLog(None)
         self.cfg = cfg
 
 class ServerConfig(ConfigFile):
