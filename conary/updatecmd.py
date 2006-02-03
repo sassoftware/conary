@@ -189,15 +189,19 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             showFlavors = cfg.fullFlavors
             showLabels = cfg.showLabels
             baseFlavors = cfg.flavor
+            showComponents = cfg.showComponents
             db = conaryclient.ConaryClient(cfg).db
         else:
             fullVersions = showFlavors = showLabels = db = baseFlavors = None
+            showComponents = None
 
         self.formatter = display.JobTupFormatter(affinityDb=db)
         self.formatter.dcfg.setTroveDisplay(fullVersions=fullVersions,
                                             fullFlavors=showFlavors,
                                             showLabels=showLabels,
-                                            baseFlavors=baseFlavors)
+                                            baseFlavors=baseFlavors,
+                                            showComponents=showComponents)
+        self.formatter.dcfg.setJobDisplay(compressJobs=not showComponents)
 
 def displayUpdateInfo(updJob, cfg):
     jobLists = updJob.getJobs()
@@ -207,7 +211,9 @@ def displayUpdateInfo(updJob, cfg):
     formatter.dcfg.setTroveDisplay(fullVersions=cfg.fullVersions,
                                    fullFlavors=cfg.fullFlavors,
                                    showLabels=cfg.showLabels,
-                                   baseFlavors=cfg.flavor)
+                                   baseFlavors=cfg.flavor,
+                                   showComponents=cfg.showComponents)
+    formatter.dcfg.setJobDisplay(compressJobs=not cfg.showComponents)
     formatter.prepareJobLists(jobLists)
 
     totalJobs = len(jobLists)
