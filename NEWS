@@ -10,6 +10,7 @@ Changes in 0.96:
     * Fixed an update bug where updating an x86 library on an x86_64 system
       would cause conary to switch other x86_64 components for that library
       to x86 versions.
+    * update job output is compressed again
 
   o Other changes:
     * Mirroring now mirrors trove signature
