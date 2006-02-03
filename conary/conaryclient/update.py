@@ -699,8 +699,10 @@ class ClientUpdate:
         # part of this update though, as troves which are referenced and
         # part of the update are handled separately.
 
-        # we discard out of hand local updates that switch architectures.
-        ISD = deps.InstructionSetDependency
+        # we discard out of hand local updates that switch flavors 
+        # FIXME: this is a short-term solution, longer term we need
+        # to determine whether a local update is valid by seeing if its
+        # either it has no parents or all parents are local updates.
 
         # keep track of troves that are changes on the same branch, 
         # since those are still explicit user requests and might 
@@ -710,10 +712,7 @@ class ClientUpdate:
         for job in localUpdates:
             if job[1][0] is not None and job[2][0] is not None:
 
-                oldArches = [ x.name for x in job[1][1].iterDepsByClass(ISD) ]
-                newArches = [ x.name for x in job[2][1].iterDepsByClass(ISD) ]
-
-                if set(newArches) != set(oldArches):
+                if job[1][1] != job[2][1]:
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
 
