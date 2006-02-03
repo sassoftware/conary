@@ -261,6 +261,7 @@ def commit(repos, cfg, message, callback=None):
             sys.exit(1)
 
         recipeObj.populateLcache()
+        recipeObj.sourceVersion = state.getVersion()
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
         recipeObj.setup()
