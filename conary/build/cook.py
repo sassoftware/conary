@@ -654,6 +654,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
+    recipeObj.sourceVersion = sourceVersion
     
     builddir = util.normpath(cfg.buildPath) + "/" + recipeObj.name
     use.track(True)
