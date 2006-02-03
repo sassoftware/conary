@@ -1,4 +1,13 @@
 Changes in 0.96:
+  o Client changes:
+    * conary rq now does not use affinity by default, use --affinity to turn
+      it on.  The rq --compatible-troves flag has disappeared.  Now 
+      you can switch between displaying all troves that match your system 
+      flavor and that match affinity flavor by switching between
+      --available-troves with and without the --affinity flag.
+    * conary q now displays installed, not by default troves by default,
+      but skips missing troves.
+
   o Other changes:
     * Mirroring now mirrors trove signature
 
@@ -13,13 +22,6 @@ Changes in 0.95:
       this is required for their dependencies to be reliable.
     * The conary syncchildren command now will install new packages
       when appropriate.
-    * conary rq now does not use affinity by default, use --affinity to turn
-      it on.  The rq --compatible-troves flag has disappeared.  Now 
-      you can switch between displaying all troves that match your system 
-      flavor and that match affinity flavor by switching between
-      --available-troves with and without the --affinity flag.
-    * conary q now displays installed, not by default troves by default,
-      but skips missing troves.
 
   o Repository changes:
     * Additional logging has been added to the repository server.
