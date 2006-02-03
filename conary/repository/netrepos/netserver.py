@@ -117,6 +117,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getConaryUrl',
                         'getMirrorMark',
                         'setMirrorMark',
+                        'getNewSigList',
+                        'getTroveSigs',
+                        'setTroveSigs',
                         'getNewPGPKeys',
                         'addPGPKeyList',
                         'getNewTroveList',
@@ -1678,6 +1681,152 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                        mark, host)
 
         return ""
+
+    def getNewSigList(self, authToken, clientVersion, mark):
+        # only show troves the user is allowed to see
+        cu = self.db.cursor()
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+
+        query = """
+                SELECT UP.permittedTrove, item, version, flavor, 
+                          Instances.changed FROM Instances
+                    JOIN TroveInfo USING (instanceId)
+                    JOIN Nodes ON
+                        Instances.itemId = Nodes.itemId AND
+                        Instances.versionId = Nodes.versionId
+                    JOIN LabelMap USING (itemId, branchId)
+                    JOIN (SELECT
+                           Permissions.labelId as labelId,
+                           PerItems.item as permittedTrove,
+                           Permissions.permissionId as aclId
+                       FROM
+                           Permissions
+                           join Items as PerItems using (itemId)
+                       WHERE
+                           Permissions.userGroupId in (%s)
+                       ) as UP ON
+                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                    JOIN Items ON
+                        Instances.itemId = Items.itemId
+                    JOIN Versions ON
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = flavors.flavorId
+                    WHERE
+                        Instances.changed <= ? AND
+                        Instances.isPresent = 1 AND
+                        TroveInfo.changed >= ? AND
+                        TroveInfo.infoType = ?
+                    ORDER BY
+                        TroveInfo.changed
+                    LIMIT
+                        1000
+                    """ % ",".join("%d" % x for x in userGroupIds)
+
+        cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
+
+        l = []
+
+        for pattern, name, version, flavor, mark in cu:
+            if self.auth.checkTrove(pattern, name):
+                l.append((mark, (name, version, flavor)))
+
+        return l
+
+    def getTroveSigs(self, authToken, clientVersion, infoList):
+        if not self.auth.check(authToken, write = False, mirror = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        # XXX this should really be batched
+        result = []
+        for (name, version, flavor) in infoList:
+            if not self.auth.check(authToken, write = False, trove = name,
+                       label = self.toVersion(version).branch().label()):
+                raise errors.InsufficientPermission
+            cu.execute("""
+                    SELECT data FROM Items 
+                        JOIN Instances USING (itemId)
+                        JOIN Versions USING (versionId)
+                        JOIN Flavors ON
+                            Instances.flavorId = Flavors.flavorId
+                        JOIN TroveInfo ON
+                            Instances.instanceId = TroveInfo.instanceId
+                        WHERE
+                            TroveInfo.infoType = ? AND
+                            item = ? AND
+                            version = ? AND
+                            flavor = ?
+                    """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
+            try:
+                result.append(cu.next()[0])
+            except:
+                raise errors.TroveMissing(name, version = version)
+
+        return [ base64.encodestring(x) for x in result ]
+
+    def setTroveSigs(self, authToken, clientVersion, infoList):
+        # return the number of signatures which have changed
+
+        # this requires mirror access and write access for that trove
+        if not self.auth.check(authToken, write = False, mirror = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        updateCount = 0
+
+        # XXX this should be batched
+        for (name, version, flavor), sig in infoList:
+            if not self.auth.check(authToken, write = True, trove = name,
+                       label = self.toVersion(version).branch().label()):
+                raise errors.InsufficientPermission
+
+            sig = base64.decodestring(sig)
+
+            cu.execute("""
+                    SELECT instanceId FROM Items
+                        JOIN Instances USING (itemId)
+                        JOIN Versions USING (versionId)
+                        JOIN Flavors ON
+                            Instances.flavorId = Flavors.flavorId
+                        WHERE
+                            item = ? AND
+                            version = ? AND
+                            flavor = ?
+                    """, name, version, flavor)
+            try:
+                instanceId = cu.next()[0]
+            except StopIteration:
+                raise errors.TroveMissing(name, version = version)
+
+            cu.execute("""
+                    SELECT data FROM Instances
+                        JOIN TroveInfo USING (instanceId)
+                        WHERE
+                            instanceId = ? AND
+                            infoType = ?
+            """, instanceId, trove._TROVEINFO_TAG_SIGS)
+            try:
+                currentSig = cu.next()[0]
+            except StopIteration:
+                currentSig = None
+
+            if not currentSig:
+                cu.execute("""
+                    INSERT INTO TroveInfo
+                        (instanceId, infoType, data)
+                        VALUES (?, ?, ?)
+                """, instanceId, trove._TROVEINFO_TAG_SIGS, sig)
+                updateCount += 1
+            elif currentSig != sig:
+                cu.execute("""UPDATE TroveInfo SET data=? WHERE
+                        infoType = ? AND instanceId=?""",
+                        sig, trove._TROVEINFO_TAG_SIGS, instanceId)
+                updateCount += 1
+
+        return updateCount
 
     def getNewPGPKeys(self, authToken, clientVersion, mark):
 	if not self.auth.check(authToken, write = False, mirror = True):

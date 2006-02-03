@@ -1259,11 +1259,48 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
+    def getTroveSigs(self, troveList):
+        byServer = {}
+        results = [ None ] * len(troveList)
+        for i, info in enumerate(troveList):
+            l = byServer.setdefault(info[1].branch().label().getHost(), [])
+            l.append((i, info))
+
+        for host, l in byServer.iteritems():
+            sigs = self.c[host].getTroveSigs([ 
+                       (x[1][0], self.fromVersion(x[1][1]),
+                        self.fromFlavor(x[1][2])) for x in l ])
+            for (i, info), sig in itertools.izip(l, sigs):
+                results[i] = base64.decodestring(sig)
+
+        return results
+
+    def setTroveSigs(self, itemList):
+        # infoList is a set of ((name, version, flavor), sigBlock) tuples
+        byServer = {}
+        for item in itemList:
+            l = byServer.setdefault(item[0][1].branch().label().getHost(), [])
+            l.append(item)
+
+        total = 0
+        for host, itemList in byServer.iteritems():
+            total += self.c[host].setTroveSigs(
+                    [ ((x[0][0], self.fromVersion(x[0][1]),
+                                 self.fromFlavor(x[0][2])),
+                       base64.encodestring(x[1])) for x in itemList ])
+
+        return total
+
     def getMirrorMark(self, host):
         return self.c[host].getMirrorMark(host)
 
     def setMirrorMark(self, host, mark):
         return self.c[host].setMirrorMark(host, mark)
+
+    def getNewSigList(self, host, mark):
+        return [ (x[0], (x[1][0], self.toVersion(x[1][1]), 
+                                  self.toFlavor(x[1][2]))) for
+                    x in self.c[host].getNewSigList(mark) ]
 
     def getNewTroveList(self, host, mark):
         return [ (x[0], (x[1][0], self.thawVersion(x[1][1]), 

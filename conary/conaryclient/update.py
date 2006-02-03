@@ -1627,10 +1627,12 @@ conary erase '%s=%s[%s]'
                     newJob = []
                     startNew = False
                     count = 0
+                    newJobIsInfo = False
 
                 foundCollection = False
 
                 count += len(jobList)
+                isInfo = -1                 # neither true nor false
                 for job in jobList:
                     (name, (oldVersion, oldFlavor),
                            (newVersion, newFlavor), absolute) = job
@@ -1638,7 +1640,26 @@ conary erase '%s=%s[%s]'
                     if newVersion is not None and ':' not in name:
                         foundCollection = True
 
-                    newJob.append(job)
+                    if name.startswith('info-'):
+                        assert(isInfo or isInfo == -1)
+                        isInfo = True
+                    else:
+                        assert(not isInfo or isInfo == -1)
+                        isInfo = False
+
+                if not isInfo and newJobIsInfo is True:
+                    # We switched from installing info components to
+                    # installing fresh components. This has to go into
+                    # a separate job from the last one.
+                    uJob.addJob(newJob)
+                    count = len(jobList)
+                    newJob = jobList[:]             # make a copy
+                    newJobIsInfo = -1
+                    newJobIsInfo = False
+                else:
+                    newJobIsInfo = isInfo
+
+                newJob += jobList
 
                 if (foundCollection or 
                     (updateThreshold and (count >= updateThreshold))): 
