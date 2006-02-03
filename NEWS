@@ -11,6 +11,9 @@ Changes in 0.96:
       would cause conary to switch other x86_64 components for that library
       to x86 versions.
     * update job output is compressed again
+    * Fixed an update bug where if you had made a local change to foo, and then 
+      updated a group that pointed to an earlier version of that trove,
+      the trove could get downgraded
 
   o Other changes:
     * Mirroring now mirrors trove signature

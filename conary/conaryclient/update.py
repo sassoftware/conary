@@ -701,18 +701,30 @@ class ClientUpdate:
 
         # we discard out of hand local updates that switch architectures.
         ISD = deps.InstructionSetDependency
+
+        # keep track of troves that are changes on the same branch, 
+        # since those are still explicit user requests and might 
+        # override implied updates that would downgrade this trove.
+        sameBranchLocalUpdates = set()
+
         for job in localUpdates:
             if job[1][0] is not None and job[2][0] is not None:
+
                 oldArches = [ x.name for x in job[1][1].iterDepsByClass(ISD) ]
                 newArches = [ x.name for x in job[2][1].iterDepsByClass(ISD) ]
+
                 if set(newArches) != set(oldArches):
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
+
                 elif (job[1][0].branch() == job[2][0].branch() and
                       (job[0], job[1][0], job[1][1]) not in avail):
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
                     referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
+                    # track this update for since it means the user
+                    # requested this version explicitly
+                    sameBranchLocalUpdates.add((job[0], job[2][0], job[2][1]))
 
         del installedTrove, referencedTrove, localUpdates
 
@@ -904,7 +916,7 @@ class ClientUpdate:
                             break
 
                         childrenFollowLocalChanges = True
-                            
+
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
 
@@ -927,8 +939,9 @@ class ClientUpdate:
                         installedBranch = replacedInfo[1].branch()
 
                         if replacedInfo in localUpdatesByPresent:
-                            notInstalledBranch = \
-                                localUpdatesByPresent[replacedInfo][0].branch()
+                            notInstalledVer = \
+                                        localUpdatesByPresent[replacedInfo][0]
+                            notInstalledBranch = notInstalledVer.branch()
                             # create alreadyBranchSwitch variable for 
                             # readability
                             alreadyBranchSwitch = True
@@ -936,13 +949,27 @@ class ClientUpdate:
                             notInstalledBranch = None
                             alreadyBranchSwitch = False
 
-                    
+
                         # Check to see if there's reason to be concerned
                         # about branch affinity.
-                        if (notInstalledBranch == installedBranch or
-                                    installedBranch == newBranch):
-                            # if we're moving to 'realign' branches,
-                            # then don't consider it a branch switch.
+                        if installedBranch == newBranch:
+                            # we didn't switch branches.  No branch 
+                            # affinity concerns.  If the user has made
+                            # a local change that would make this new 
+                            # install a downgrade, skip it.
+                            if (newInfo[1] < replaced[0] 
+                                    and not isPrimary 
+                                    and replacedInfo in sameBranchLocalUpdates):
+
+                                # don't let this trove be erased, pretend
+                                # like it was explicitly requested.
+                                alreadyInstalled.add(replacedInfo)
+                                break
+                        elif notInstalledBranch == installedBranch:
+                            # we are reverting back to the branch we were
+                            # on before.  We don't worry about downgrades
+                            # because we're already overriding the user's
+                            # branch choice
                             pass
                         else:
                             # Either a) we've made a local change from branch 1
