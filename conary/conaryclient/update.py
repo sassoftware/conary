@@ -698,13 +698,21 @@ class ClientUpdate:
         # doesn't apply if the trove which was originally installed is
         # part of this update though, as troves which are referenced and
         # part of the update are handled separately.
+
+        # we discard out of hand local updates that switch architectures.
+        ISD = deps.InstructionSetDependency
         for job in localUpdates:
-            if job[1][0] is not None and job[2][0] is not None and \
-                     job[1][0].branch() == job[2][0].branch() and \
-                     (job[0], job[1][0], job[1][1]) not in avail:
-                del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
-                del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
-                referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
+            if job[1][0] is not None and job[2][0] is not None:
+                oldArches = [ x.name for x in job[1][1].iterDepsByClass(ISD) ]
+                newArches = [ x.name for x in job[2][1].iterDepsByClass(ISD) ]
+                if set(newArches) != set(oldArches):
+                    del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
+                    del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
+                elif (job[1][0].branch() == job[2][0].branch() and
+                      (job[0], job[1][0], job[1][1]) not in avail):
+                    del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
+                    del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
+                    referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
 
         del installedTrove, referencedTrove, localUpdates
 
