@@ -436,19 +436,18 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     _callSetup(cfg, recipeObj)
     use.track(False)
 
-    grpFlavor = deps.DependencySet()
-    grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
+    flavors = [buildpackage._getUseDependencySet(recipeObj)]
 
     grouprecipe.buildGroups(recipeObj, cfg, repos)
 
     for group in recipeObj.iterGroupList():
-        for (name, ver, flavor) in group.iterTroveList():
-            grpFlavor.union(flavor,
-                        mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
+        flavors.extend(x[2] for x in group.iterTroveList())
+    grpFlavor = deps.mergeFlavorList(flavors,
+                                     deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
     groupNames = recipeObj.getGroupNames()
     targetVersion = nextVersion(repos, db, groupNames, sourceVersion, 
-                                grpFlavor, targetLabel, 
+                                grpFlavor, targetLabel,
                                 alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
