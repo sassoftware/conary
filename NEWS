@@ -1,3 +1,7 @@
+Changes in 0.96:
+  o Other changes:
+    * Mirroring now mirrors trove signature
+
 Changes in 0.95:
   o Client changes:
     * The "conary verify" command now handles non-regular files with
@@ -11,7 +15,6 @@ Changes in 0.95:
       when appropriate.
 
   o Repository changes:
-
     * Additional logging has been added to the repository server.
       Logging is controlled by the "traceLog" config file variable,
       which takes a logging level and log path as arguments.
