@@ -39,7 +39,7 @@ _LOG = None
 def logTime():
     t = time.time()
     ret = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(t))
-    ret = ret + ".%.3f" % (t - int(t),)
+    ret = ret + ".%03d" % (int((t-int(t))*1000),)
     return ret
 
 # this is used to dump a line to stderr
