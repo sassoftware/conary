@@ -68,7 +68,7 @@ class NetworkAuthorization:
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):
-        self.log(2, authToken[0],
+        self.log(3, authToken[0],
                  "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
 
