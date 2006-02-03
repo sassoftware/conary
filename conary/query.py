@@ -35,7 +35,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
                   weakRefs = False, showTroveFlags = False,
-                  pristine = False, alwaysDisplayHeaders = False):
+                  pristine = True, alwaysDisplayHeaders = False):
     """Displays troves after finding them on the local system
 
        @param db: Database instance to search for troves in
@@ -108,7 +108,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                         fileDeps=fileDeps, fileVersions=fileVersions)
 
 
-    recurseOne = showTroves or showAllTroves or weakRefs or pristine or showTroveFlags
+    recurseOne = showTroves or showAllTroves or weakRefs or showTroveFlags
 
     if recurse is None and not recurseOne and primary:
         # if we didn't explicitly set recurse and we're not recursing one
@@ -120,12 +120,13 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
 
     dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
-                         showNotByDefault = showAllTroves,
+                         showNotByDefault = True,
+                         showNotExists = showAllTroves,
                          showWeakRefs = weakRefs,
                          showTroveFlags = showTroveFlags,
                          displayHeaders = displayHeaders,
                          checkExists = True)
-    dcfg.setShowPristine(showAllTroves)
+    dcfg.setShowPristine(pristine)
 
     if primary:
         dcfg.setPrimaryTroves(set(troveTups))

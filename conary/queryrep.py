@@ -32,14 +32,13 @@ VERSION_FILTER_LEAVES = 2
 
 FLAVOR_FILTER_ALL    = 0
 FLAVOR_FILTER_AVAIL  = 1
-FLAVOR_FILTER_COMPAT = 2
-FLAVOR_FILTER_BEST   = 3
+FLAVOR_FILTER_BEST   = 2
 
 
 def displayTroves(cfg, troveSpecs=[], 
                   # query options
                   versionFilter=VERSION_FILTER_LATEST, 
-                  flavorFilter=FLAVOR_FILTER_BEST, useAffinity = True,
+                  flavorFilter=FLAVOR_FILTER_BEST, useAffinity = False,
                   # trove options
                   info = False, digSigs = False, deps = False,
                   showBuildReqs = False, 
@@ -230,14 +229,8 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                 newSpecs.append((n, vS, None))
             troveSpecs = newSpecs
             affinityDb = None
-        elif flavorFilter == FLAVOR_FILTER_COMPAT:
-            # match install flavor but don't match affinity,
-            # return all flavors that match.
-            affinityDb = None
-            bestFlavor = False
-            acrossFlavors = True
         elif flavorFilter == FLAVOR_FILTER_AVAIL:
-            # match install flavor + affinity, could affect rq branch,
+            # match install flavor + maybe affinity, could affect rq branch,
             # return all flavors that match.
             bestFlavor = False
             acrossFlavors = True
@@ -298,16 +291,12 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
             flavor = None
             bestFlavor = False
             affinityDb = None
-        elif flavorFilter == FLAVOR_FILTER_COMPAT:
-            flavor = defaultFlavor
-            bestFlavor = False
-            affinityDb = None 
         elif flavorFilter == FLAVOR_FILTER_AVAIL:
             # match affinity flavors
             # must be done client side...
             flavor = None
             bestFlavor = False
-            affinityDb = None 
+            affinityDb = None # for now turn off
         elif flavorFilter == FLAVOR_FILTER_BEST:
             # match affinity flavors
             # must be done client side...

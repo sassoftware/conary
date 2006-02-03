@@ -379,19 +379,17 @@ For each trove specifier, return all the troves with the latest version.
 .TP
 .B \-\-all-flavors
 Do not filter by flavor -- return all troves that match the version filter.
-.TP
 .B \-\-available-flavors
-Filter using flavor and branch affinity (see section below), and return all troves that match.
+Return all troves that match the system flavor + any specified flavors 
+(+ affinity if it is specified)
 .TP
 .B \-\-best-flavors [default]
-Filter using flavor and branch affinity (see section below), and return the best trove that matches.  Note that affinity is not used when no trove specifiers are given.
+Return the best trove flavor based on your system flavor,
 .TP
-.B \-\-compatible-flavors
-Filter the install flavors without affinity, and return all troves that match.
-.TP
-.B \-\-no-affinity
-Turn off flavor and branch affinity.  For example, when  using --best-flavors 
+.B \-\-affinity
+Turn on flavor and branch affinity.  For example, when  using --best-flavors 
 (the default), the best flavor that matches your install flavor is used.
+Note that affinity is not used when no trove specifiers are given.
 .RE
 .TP 4
 .B Flavor and Branch affinity

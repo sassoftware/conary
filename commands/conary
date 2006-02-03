@@ -132,7 +132,7 @@ def usage(rc = 1):
     print "                 --all-versions"
     print "                 --latest-versions"
     print "                 --leaves"
-    print "                 --no-affinity"
+    print "                 --affinity"
     print ""
     print "                 --all-flavors"
     print "                 --available-flavors"
@@ -230,14 +230,14 @@ def realMain(cfg, argv=sys.argv):
     argDef["leaves"] = NO_PARAM
     argDef["ls"] = NO_PARAM
     argDef["lsl"] = NO_PARAM
-    argDef["no-affinity"] = NO_PARAM
+    argDef["affinity"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
     argDef["no-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
     argDef["no-conflict-check"] = NO_PARAM
     argDef["path"] = MULT_PARAM
-    argDef["pristine"] = NO_PARAM
+    argDef["no-pristine"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
     argDef["recurse"] = NO_PARAM
@@ -455,12 +455,13 @@ def realMain(cfg, argv=sys.argv):
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
                 ('trove-flags', 'showTroveFlags'),
-                'deps', 'info', 'pristine'):
+                'deps', 'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
                 kw[opt] = argSet.pop(opt, False)
         kw['pathList'] = argSet.pop('path', [])
+        kw['pristine'] = not argSet.pop('no-pristine', False)
 
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
@@ -491,19 +492,17 @@ def realMain(cfg, argv=sys.argv):
 
         flavorOpts = [argSet.pop(x, False) for x in ['all-flavors',
                                                      'available-flavors',
-                                                     'compatible-flavors', 
                                                      'best-flavors']]
 
         if flavorOpts.count(True) > 1:
             log.error('only one of --all-flavors, --available-flavors, '
-                      '--compatible-flavors, --best-flavors may be'
+                      ' --best-flavors may be'
                       ' specified')
             return 1
         if True in flavorOpts:
             flavorFilterIdx = flavorOpts.index(True)
             flavorFilter = [queryrep.FLAVOR_FILTER_ALL,
                             queryrep.FLAVOR_FILTER_AVAIL,
-                            queryrep.FLAVOR_FILTER_COMPAT,
                             queryrep.FLAVOR_FILTER_BEST][flavorFilterIdx]
         else: # default
             flavorFilter = queryrep.FLAVOR_FILTER_BEST
@@ -518,6 +517,7 @@ def realMain(cfg, argv=sys.argv):
                 ('troves', 'showTroves'),
                 ('trove-flags', 'showTroveFlags'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
+                ('affinity', 'useAffinity'),
                 'deps', 'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
@@ -528,7 +528,6 @@ def realMain(cfg, argv=sys.argv):
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argset['no-recurse']
-        kw['useAffinity'] = not argSet.pop('no-affinity', False)
 
         if argSet: return usage()
         troveList = otherArgs[2:]

@@ -49,7 +49,8 @@ def displayTroves(dcfg, formatter, troveTups):
                          getPristine = dcfg.getPristine(),
                          showNotByDefault = dcfg.showNotByDefault,
                          showWeakRefs = dcfg.showWeakRefs,
-                         checkExists = dcfg.checkExists)
+                         checkExists = dcfg.checkExists,
+                         showNotExists = dcfg.showNotExists)
 
     if dcfg.hideComponents():
         iter = skipComponents(iter, dcfg.getPrimaryTroves())
@@ -92,7 +93,7 @@ TROVE_HASTROVE  = 1 << 2
 def iterTroveList(troveSource, troveTups, recurseAll=False,
                   recurseOne=False, needTroves=False, getPristine=True,
                   showNotByDefault=False, showWeakRefs=False,
-                  checkExists=False):
+                  checkExists=False, showNotExists=False):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
@@ -115,6 +116,11 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     @param checkExists: if True, add flag MISSING for troves that do not
     exist (but are referenced) in this troveSource
     @type checkExists: bool
+    @param showNotExists: if True, show troves that do not exist (but are 
+    referenced) in this troveSource
+    @type showNotExists: bool
+
+
 
     @rtype: yields (troveTup, troveObj, flags, indent) tuples
     """
@@ -233,6 +239,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                         flags |= TROVE_BYDEFAULT
                     if troveTup not in missing:
                         flags |= TROVE_HASTROVE
+                    elif not showNotExists:
+                        continue
 
                     newTrove = troveCache.get(troveTup, None)
                     if trove.troveIsCollection(troveTup[0]):
@@ -277,6 +285,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                         flags |= TROVE_BYDEFAULT
                     if hasTrove:
                         flags |= TROVE_HASTROVE
+                    elif not showNotExists:
+                        continue
                     yield troveTup, trv, flags, 1
 
 
@@ -324,13 +334,14 @@ class DisplayConfig:
     def setChildDisplay(self, recurseAll = False, recurseOne = False,
                         showNotByDefault = False, showWeakRefs = False,
                         showTroveFlags = False, displayHeaders = False, 
-                        checkExists = False):
+                        checkExists = False, showNotExists = False):
         self.recurseAll = recurseAll
         self.recurseOne = recurseOne
         self.showNotByDefault = showNotByDefault
         self.showWeakRefs = showWeakRefs
         self.showTroveFlags = showTroveFlags
         self.displayHeaders = displayHeaders
+        self.showNotExists = showNotExists
         self.checkExists = checkExists
 
     def setPrimaryTroves(self, pTroves):
