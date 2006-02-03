@@ -232,7 +232,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 log.error("Deadlock id %d while calling %s: %s",
                           attempt, methodname, str(e.args))
                 self.log(1, "Deadlock id %d while calling %s: %s" %(
-                    attempt, methodname, str(e,args)))
+                    attempt, methodname, str(e.args)))
                 if attempt < self.deadlockRetry:
                     self.db.rollback()
                     attempt += 1
