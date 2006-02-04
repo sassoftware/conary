@@ -1430,7 +1430,7 @@ order by
         cu = self.db.cursor()
 
         if flavor:
-            flavorStr = 'flavor = ? AND'
+            flavorStr = 'flavor = ?'
             flavorArgs = [flavor.freeze()]
         else:
             flavorStr = 'flavor IS NULL'
