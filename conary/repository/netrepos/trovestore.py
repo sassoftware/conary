@@ -212,6 +212,9 @@ class TroveStore:
     def addTrove(self, trv):
 	cu = self.db.cursor()
 
+        if not trv.troveInfo.sigs.sha1():
+            raise errors.UnsignedTrove
+
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 

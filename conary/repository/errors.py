@@ -104,6 +104,9 @@ class GroupNotFound(RepositoryError):
 class UnknownEntitlementGroup(RepositoryError):
     pass
 
+class UnsignedTrove(RepositoryError):
+    pass
+
 class PermissionAlreadyExists(RepositoryError):
     pass
 
@@ -180,5 +183,6 @@ simpleExceptions = (
     (CommitError,                'CommitError'),
     (DuplicateBranch,            'DuplicateBranch'),
     (TroveIntegrityError,        'TroveIntegrityError'),
+    (UnsignedTrove,              'UnsignedTrove'),
     (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
     )

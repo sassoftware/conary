@@ -35,6 +35,7 @@ import build.errors
 from conary.build import recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
+from conary.build.cook import signAbsoluteChangeset
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
 from conary.lib import log
@@ -441,7 +442,7 @@ def commit(repos, cfg, message, callback=None):
             log.debug('creating shadow of %s for merging...' % state.getLastMerged())
             shadowCs = client.createShadowChangeSet(str(shadowLabel),
                                 [(troveName, state.getLastMerged(), noDeps)])[1]
-
+            signAbsoluteChangeset(shadowCs, signatureKey)
 
             # writable changesets can't do merging, so create a parent
             # readonly one
