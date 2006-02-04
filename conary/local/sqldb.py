@@ -1426,6 +1426,22 @@ order by
 
         return l
 
+    def troveIsTainted(self, name, version, flavor):
+        cu = self.db.cursor()
+
+        cu.execute("""
+                SELECT data FROM Instances 
+                    JOIN Versions USING (versionId) 
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                WHERE
+                    troveName = ? AND
+                    version = ? AND
+                    flavor = ?""", name, str(version), flavor.freeze())
+
+        frzTainted = cu.next()[0]
+        return streams.ByteStream(frzTainted) != 0
+                    
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 

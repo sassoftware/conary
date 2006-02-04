@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 18
+VERSION = 19
 
 def resetTable(cu, name):
     try:
@@ -744,9 +744,26 @@ class MigrateTo_18(SchemaMigration):
                                     WHERE troveName LIKE '%:%')''')
         return self.Version
 
+class MigrateTo_19(SchemaMigration):
+    Version = 19
+    def migrate(self):
+        cu = self.cu
 
+        versionStream = streams.IntStream()
+        versionStream.set(0)
 
+        taintedStream = streams.ByteStream()
+        taintedStream.set(0)
 
+        for tag, data in [
+                (trove._TROVEINFO_TAG_VERSION, versionStream.freeze()),
+                (trove._TROVEINFO_TAG_TAINTED, taintedStream.freeze()) ]:
+            cu.execute("""
+                INSERT INTO TroveInfo
+                    SELECT (instanceId, %s, %s) FROM Instanes
+                """ % tag, data)
+
+        return self.Version
 
 def checkVersion(db):
     global VERSION
@@ -779,6 +796,7 @@ def checkVersion(db):
     if version == 15: version = MigrateTo_16(db)()
     if version == 16: version = MigrateTo_17(db)()
     if version == 17: version = MigrateTo_18(db)()
+    if version == 18: version = MigrateTo_19(db)()
 
     return version
 
