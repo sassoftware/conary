@@ -1451,7 +1451,7 @@ order by
                         [trove._TROVEINFO_TAG_TAINTED,
                          name, str(version)] + flavorArgs)
         frzTainted = cu.next()[0]
-        return streams.ByteStream(frzTainted) != 0
+        return streams.ByteStream(frzTainted)() != 0
                     
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
