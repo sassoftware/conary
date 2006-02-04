@@ -1259,17 +1259,23 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 
-    (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
+    # compute new signatures -- the old ones are invalid because of
+    # the version change
+    newTrove.invalidateSignatures()
+    newTrove.computeSignatures()
+
+    (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove, absolute = srcTrove is None)
+
+    if srcTrove:
+        t = srcTrove.copy()
+        t.applyChangeSet(csTrove)
+    else:
+        t = trove.Trove(csTrove)
 
     if (csTrove.getOldFileList() or csTrove.getChangedFileList()
         or csTrove.getNewFileList()
         or [ x for x in csTrove.iterChangedTroves()]):
         foundDifference = True
-        # This doesn't match the original trove, so we need to recompute
-        # any signatures.
-        newTrove.invalidateSignatures()
-        newTrove.computeSignatures()
-        (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
     else:
         foundDifference = False
 
@@ -1353,6 +1359,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                 
         if changed:
             newTrove.changeVersion(newVersion)
+            newTrove.invalidateSignatures()
+            newTrove.computeSignatures()
             trvCs = newTrove.diff(curTrove)[0]
             returnList[i] = (True, newTrove)
             changeSet.newTrove(trvCs)

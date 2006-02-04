@@ -183,7 +183,10 @@ class RedirectRecipe(Recipe):
                             # setup the redirect for it, and add any troves
                             # it references to the todo list
                             trvCs = trvCsDict[(name, version, sourceFlavor)]
-                            trv = trove.Trove(trvCs)
+
+                            # we can't integrity check here because we got
+                            # the trove w/o files
+                            trv = trove.Trove(trvCs, skipIntegrityChecks = True)
 
                             for info in trv.iterTroveList(strongRefs = True):
                                 assert(info[1] == version)

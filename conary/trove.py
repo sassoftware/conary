@@ -1515,14 +1515,15 @@ class Trove(streams.StreamSet):
         return self.troveInfo.pathHashes
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
-                 isRedirect = False):
+                 isRedirect = False, skipIntegrityChecks = False):
         streams.StreamSet.__init__(self)
 
         if isinstance(name, AbstractTroveChangeSet):
             trvCs = name
             assert(trvCs.isAbsolute())
             self.name.set(trvCs.getName())
-            self.applyChangeSet(trvCs)
+            self.applyChangeSet(trvCs, skipIntegrityChecks = 
+                                            skipIntegrityChecks)
         else:
             if name.count(':') > 1:
                 raise TroveError, \
