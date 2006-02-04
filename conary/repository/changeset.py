@@ -620,6 +620,8 @@ class ChangeSet(streams.StreamSet):
             newTrv.applyChangeSet(troveCs)
 
             newTrv.changeVersion(newVer)
+            newTrv.invalidateSignatures()
+            newTrv.computeSignatures()
 
             assert(not troveVersions.has_key(name))
             troveVersions[(name, troveCs.getNewFlavor())] = \
