@@ -214,6 +214,7 @@ class TroveStore:
 
         if not trv.troveInfo.sigs.sha1():
             raise errors.UnsignedTrove
+        assert(not trv.troveInfo.tainted())
 
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
