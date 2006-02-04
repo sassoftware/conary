@@ -1781,9 +1781,10 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     threshold = 0):
 
-        def _createCs(repos, job, uJob, standalone = False):
+        def _createCs(repos, db, jobSet, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
-            cs, remainder = uJob.getTroveSource().createChangeSet(job, 
+
+            cs, remainder = uJob.getTroveSource().createChangeSet(jobSet,
                                         recurse = False, withFiles = True,
                                         withFileContents = True,
                                         useDatabase = False)
@@ -1792,6 +1793,19 @@ conary erase '%s=%s[%s]'
                 newCs = repos.createChangeSet(remainder, recurse = False,
                                               callback = callback)
                 baseCs.merge(newCs)
+
+            taintedJobs = [ x for x in jobSet 
+                            if x[1][0] and db.troveIsTainted(x[0], *x[1])]
+            if taintedJobs:
+                newTroves = repos.getTroves([(x[0], x[2][0], x[2][1])
+                                             for x in taintedJobs])
+                oldTroves = db.getTroves([(x[0], x[1][0], x[1][1])
+                                          for x in taintedJobs])
+                cs = changeset.ChangeSet()
+                for newT, oldT in itertools.izip(newTroves, oldTroves):
+                    cs.newTrove(newT.diff(oldT)[0])
+
+                baseCs.merge(cs)
 
             return baseCs
 
@@ -1842,7 +1856,7 @@ conary erase '%s=%s[%s]'
                     return
 
                 callback.setChangesetHunk(i + 1, len(allJobs))
-                newCs = _createCs(repos, job, uJob)
+                newCs = _createCs(repos, db, job, uJob)
 
                 while True:
                     # block for no more than 5 seconds so we can
@@ -1867,7 +1881,8 @@ conary erase '%s=%s[%s]'
         if len(allJobs) == 1:
             # this handles change sets which include change set files
             callback.setChangesetHunk(0, 0)
-            newCs = _createCs(self.repos, allJobs[0], uJob, standalone = True)
+            newCs = _createCs(self.repos, self.db, allJobs[0], uJob, 
+                              standalone = True)
             callback.setUpdateHunk(0, 0)
             callback.setUpdateJob(allJobs[0])
             _applyCs(newCs, uJob)
@@ -1882,7 +1897,7 @@ conary erase '%s=%s[%s]'
             if not self.cfg.threaded:
                 for i, job in enumerate(allJobs):
                     callback.setChangesetHunk(i + 1, len(allJobs))
-                    newCs = _createCs(self.repos, job, uJob)
+                    newCs = _createCs(self.repos, db, job, uJob)
                     callback.setUpdateHunk(i + 1, len(allJobs))
                     callback.setUpdateJob(job)
                     _applyCs(newCs, uJob, removeHints = removeHints)

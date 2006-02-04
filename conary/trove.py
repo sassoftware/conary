@@ -33,7 +33,7 @@ from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
-TROVE_VERSION=1
+TROVE_VERSION=10
 
 def troveIsCollection(str):
     return not(":" in str or str.startswith("fileset-"))
