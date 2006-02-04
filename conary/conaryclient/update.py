@@ -1803,6 +1803,7 @@ conary erase '%s=%s[%s]'
                                           for x in taintedJobs])
                 cs = changeset.ChangeSet()
                 for newT, oldT in itertools.izip(newTroves, oldTroves):
+                    newT.troveInfo.tainted.set(0)
                     cs.newTrove(newT.diff(oldT)[0])
 
                 baseCs.merge(cs)

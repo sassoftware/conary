@@ -1266,12 +1266,6 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove, absolute = srcTrove is None)
 
-    if srcTrove:
-        t = srcTrove.copy()
-        t.applyChangeSet(csTrove)
-    else:
-        t = trove.Trove(csTrove)
-
     if (csTrove.getOldFileList() or csTrove.getChangedFileList()
         or csTrove.getNewFileList()
         or [ x for x in csTrove.iterChangedTroves()]):
