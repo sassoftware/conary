@@ -618,12 +618,16 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     @rtype: tuple
     """
     # 1. create the desired files in destdir and package info
+    enforceManagedPolicy = (cfg.enforceManagedPolicy
+                            and targetLabel != versions.CookLabel())
+
     result  = _cookPackageObject(repos, cfg, recipeClass, 
                                  sourceVersion, prep=prep,
                                  macros=macros, resume=resume,
                                  ignoreDeps=ignoreDeps, 
                                  logBuild=logBuild, 
-                                 crossCompile=crossCompile)
+                                 crossCompile=crossCompile,
+                                 enforceManagedPolicy=enforceManagedPolicy)
     if not result:
         return
 
@@ -640,7 +644,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
 
 def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		       macros={}, resume = None, ignoreDeps=False, 
-                       logBuild=False, crossCompile=None):
+                       logBuild=False, crossCompile=None, 
+                       enforceManagedPolicy=False):
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
@@ -672,13 +677,12 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 policyTroves.add((trove.getName(), trove.getVersion(),
                                   trove.getFlavor()))
         else:
-            if not macros['buildlabel'].startswith('local@local:'):
-                unmanagedPolicyFiles.append(policyPath)
+            unmanagedPolicyFiles.append(policyPath)
             ver = versions.VersionFromString('/local@local:LOCAL/0-0')
             ver.resetTimeStamps()
             policyTroves.add((policyPath, ver, deps.DependencySet()))
     del db
-    if unmanagedPolicyFiles and cfg.enforceManagedPolicy:
+    if unmanagedPolicyFiles and enforceManagedPolicy:
         raise CookError, ('Cannot cook into repository with'
             ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
 
