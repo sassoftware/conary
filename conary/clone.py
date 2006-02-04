@@ -58,9 +58,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
         if not okay:
             return
 
-    sigKey = selectSignatureKey(cfg, targetBranch.label().asString())
-    if sigKey:
-        signAbsoluteChangeset(cs, sigKey)
+    sigKey = selectSignatureKey(cfg, str(targetBranch.label()))
+    signAbsoluteChangeset(cs, sigKey)
 
     if not info:
         client.repos.commitChangeSet(cs)

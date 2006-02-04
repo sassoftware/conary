@@ -112,8 +112,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
         return 1
 
     sigKey = selectSignatureKey(cfg, newLabel)
-    if sigKey:
-        signAbsoluteChangeset(cs, sigKey)
+    signAbsoluteChangeset(cs, sigKey)
 
     if not info:
         client.repos.commitChangeSet(cs)
