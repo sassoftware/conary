@@ -147,7 +147,10 @@ class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
         callbacks.LineOutput.__init__(self, *args, **kw)
         callbacks.CookCallback.__init__(self, *args, **kw)
 
-def signAbsoluteChangeset(cs, fingerprint):
+def signAbsoluteChangeset(cs, fingerprint=None):
+    # adds signatures or at least sha1s (if fingerprint is None)
+    # to an absolute changeset
+
     # go through all the trove change sets we have in this changeset.
     # use a list comprehension here as we will be modifying the newTroves
     # dictionary inside the changeset
@@ -155,7 +158,11 @@ def signAbsoluteChangeset(cs, fingerprint):
         # instantiate each trove from the troveCs so we can generate
         # the signature
         t = trove.Trove(troveCs)
-        t.addDigitalSignature(fingerprint)
+        if fingerprint is not None:
+            t.addDigitalSignature(fingerprint)
+        else:
+            # if no fingerprint, just add sha1s
+            t.computeSignatures()
         # create a new troveCs that has the new signature included in it
         newTroveCs = t.diff(None, absolute = 1)[0]
         # replace the old troveCs with the new one in the changeset
@@ -311,6 +318,10 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         return []
     
     (cs, built, cleanup) = ret
+
+    # sign the changeset
+    signatureKey = selectSignatureKey(cfg, sourceVersion.branch().label())
+    signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
@@ -925,10 +936,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
-
-    signatureKey = selectSignatureKey(cfg, targetVersion.branch().label().asString())
-    if signatureKey:
-        signAbsoluteChangeset(changeSet, signatureKey)
 
     return changeSet, built
 

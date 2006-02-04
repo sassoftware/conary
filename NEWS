@@ -1,3 +1,8 @@
+Changes in 0.97:
+  o Client changes:
+    * All troves that are committed to repository through commits, cooks, 
+      branches, shadows, and clones, now always have sha1s calculated for them.
+
 Changes in 0.96:
   o Client changes:
     * conary rq now does not use affinity by default, use --affinity to turn
