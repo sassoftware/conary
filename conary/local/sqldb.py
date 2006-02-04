@@ -12,7 +12,7 @@
 # full details.
 #
 
-from conary import deps, files, sqlite3, trove, versions
+from conary import deps, files, sqlite3, streams, trove, versions
 from conary import dbstore
 from conary.dbstore import idtable, migration, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
@@ -1429,16 +1429,27 @@ order by
     def troveIsTainted(self, name, version, flavor):
         cu = self.db.cursor()
 
+        if flavor:
+            flavorStr = 'flavor = ? AND'
+            flavorArgs = [flavor.freeze()]
+        else:
+            flavorStr = 'flavor IS NULL'
+            flavorArgs = []
+
         cu.execute("""
                 SELECT data FROM Instances 
                     JOIN Versions USING (versionId) 
                     JOIN Flavors ON
                         Instances.flavorId = Flavors.flavorId
+                    JOIN TroveInfo ON
+                        Instances.instanceId = TroveInfo.instanceId
                 WHERE
+                    infoType = ? AND
                     troveName = ? AND
                     version = ? AND
-                    flavor = ?""", name, str(version), flavor.freeze())
-
+                    %s""" % flavorStr, 
+                        [trove._TROVEINFO_TAG_TAINTED,
+                         name, str(version)] + flavorArgs)
         frzTainted = cu.next()[0]
         return streams.ByteStream(frzTainted) != 0
                     
