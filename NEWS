@@ -2,6 +2,10 @@ Changes in 0.97:
   o Client changes:
     * All troves that are committed to repository through commits, cooks, 
       branches, shadows, and clones, now always have sha1s calculated for them.
+  
+  o Repository changes:
+    * Repositories will now reject commits whose troves do not have correct
+      sha1 signatures.
 
 Changes in 0.96:
   o Client changes:
