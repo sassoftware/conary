@@ -149,6 +149,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)
 
+    def troveIsTainted(self, name, version, flavor):
+        return self.db.troveIsTainted(name, version, flavor)
+
     def findTroveReferences(self, names):
         """ Return references to a trove on the system, whether or not
             that trove is actually installed

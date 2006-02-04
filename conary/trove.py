@@ -33,6 +33,8 @@ from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
+TROVE_VERSION=1
+
 def troveIsCollection(str):
     return not(":" in str or str.startswith("fileset-"))
 
@@ -350,6 +352,8 @@ _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10 
 _TROVEINFO_TAG_LABEL_PATH     = 11 
 _TROVEINFO_TAG_POLICY_PROV    = 12
+_TROVEINFO_TAG_TROVEVERSION   = 13
+_TROVEINFO_TAG_TAINTED        = 14
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -366,8 +370,11 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SIGS          : (LARGE, TroveSignatures,      'sigs'         ),
         _TROVEINFO_TAG_PATH_HASHES   : (LARGE, PathHashes,           'pathHashes'   ),
         _TROVEINFO_TAG_LABEL_PATH    : (SMALL, LabelPath,            'labelPath'   ),
-        _TROVEINFO_TAG_POLICY_PROV   : (LARGE, PolicyProviders, 'policyProviders'),
+        _TROVEINFO_TAG_POLICY_PROV   : (LARGE, PolicyProviders,      'policyProviders'),
+        _TROVEINFO_TAG_TROVEVERSION  : (SMALL, streams.IntStream,    'troveVersion'   ),
+        _TROVEINFO_TAG_TAINTED       : (SMALL, streams.ByteStream,   'tainted'   )
     }
+
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -534,6 +541,7 @@ class Trove(streams.StreamSet):
         return streams.StreamSet.freeze(self,
                                         skipSet = { 'sigs' : True,
                                                     'versionStrings' : True,
+                                                    'tainted' : True,
                                                     'pathHashes' : True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
@@ -921,6 +929,15 @@ class Trove(streams.StreamSet):
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
             self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
+
+        # We can't be tainted after a merge. If we were, it means we
+        # merged something tainted against something untainted (which is
+        # bad) or something tainted against something tainted (which, again,
+        # is bad)
+        assert(not self.troveInfo.tainted())
+
+        if TROVE_VERSION < self.troveInfo.troveVersion():
+            self.troveInfo.tainted.set(1)
 
         if not skipIntegrityChecks:
             # if we have a sha1 in our troveinfo, verify it
@@ -1532,6 +1549,8 @@ class Trove(streams.StreamSet):
             self.name.set(name)
             self.version.set(version)
             self.flavor.set(flavor)
+            self.troveInfo.troveVersion.set(TROVE_VERSION)
+            self.troveInfo.tainted.set(0)
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())
             self.redirect.set(isRedirect)
