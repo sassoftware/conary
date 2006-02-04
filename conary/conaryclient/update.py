@@ -593,6 +593,16 @@ class ClientUpdate:
                                     if x[3])
         assert(len(relativePrimaries) + len(absolutePrimaries) +
                len(erasePrimaries) == len(primaryJobList))
+        
+        log.debug('_mergeGroupChanges(recurse=%s,'
+                      ' checkPrimaryPins=%s,'
+                      ' installMissingRefs=%s, '
+                      ' updateOnly=%s, '
+                      ' respectBranchAffinity=%s,'
+                      ' alwaysFollowLocalChanges=%s)' % 
+                      (recurse, checkPrimaryPins, installMissingRefs,
+                       updateOnly, respectBranchAffinity, 
+                       alwaysFollowLocalChanges))
 
         troveSource = uJob.getTroveSource()
 
@@ -715,15 +725,18 @@ class ClientUpdate:
                 if job[1][1] != job[2][1]:
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
-
+                    log.debug('ignoring cross-flavor local update: %s' % (job,))
                 elif (job[1][0].branch() == job[2][0].branch() and
                       (job[0], job[1][0], job[1][1]) not in avail):
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
                     referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
+                    log.debug('reworking same-branch local update: %s' % (job,))
                     # track this update for since it means the user
                     # requested this version explicitly
                     sameBranchLocalUpdates.add((job[0], job[2][0], job[2][1]))
+                else:
+                    log.debug('local update: %s' % (job,))
 
         del installedTrove, referencedTrove, localUpdates
 
@@ -808,6 +821,18 @@ class ClientUpdate:
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
+            log.debug('''\
+*******
+%s=%s[%s]
+primary: %s  byDefault:%s  parentInstalled: %s  updateOnly: %s
+branchHint: %s
+branchAffinity: %s   installRedirects: %s
+followLocalChanges: %s
+
+''' % (newInfo[0], newInfo[1], newInfo[2], isPrimary, byDefault, 
+       parentInstalled, updateOnly, branchHint, respectBranchAffinity,
+       installRedirects, followLocalChanges))
+
             trv = None
             jobAdded = False
             replaced = (None, None)
@@ -824,10 +849,13 @@ class ClientUpdate:
                     # but count it as 'added' for the purposes of
                     # whether or not to recurse
                     jobAdded = True
+                    log.debug('SKIP: already installed')
                     break
                 elif newInfo in ineligible:
+                    log.debug('SKIP: ineligible')
                     break
                 elif newInfo in alreadyReferenced:
+                    log.debug('new trove in alreadyReferenced')
                     # meaning: this trove is referenced by something 
                     # installed, but is not installed itself.
 
@@ -851,10 +879,15 @@ class ClientUpdate:
                             info = ((newInfo[0],) 
                                      + localUpdatesByMissing[newInfo])
                             alreadyInstalled.add(info)
+                            log.debug('local update - marking present part %s'
+                                      'as already installed' % (info,))
+                        log.debug('SKIP: already referenced')
                         break
 
                 replaced, pinned = jobByNew[newInfo]
                 replacedInfo = (newInfo[0], replaced[0], replaced[1])
+
+                log.debug('replaces: %s' % (replacedInfo,))
 
                 if replaced[0] is not None:
                     if newInfo in alreadyReferenced:
@@ -871,9 +904,15 @@ class ClientUpdate:
                                                                  (None, None))
                             replacedInfo = (replacedInfo[0], replaced[0], 
                                             replaced[1])
+                            log.debug('replaced is not installed, using local update %s instead' % (replacedInfo,))
                             if replaced[0]:
+                                log.debug('following local changes')
                                 childrenFollowLocalChanges = True
-                            elif not byDefault or updateOnly:
+                            elif not byDefault:
+                                log.debug('SKIP: skipping not-by-default fresh install')
+                                break
+                            elif updateOnly:
+                                log.debug('SKIP: skipping fresh install with updateOnly')
                                 break
                     elif replacedInfo in referencedNotInstalled:
                         # the trove on the local system is one that's referenced
@@ -886,6 +925,7 @@ class ClientUpdate:
                         # on the the system (by a localUpdate) then we remove 
                         # that trove instead.  If not, we just install this 
                         # trove as a fresh update. 
+                        log.debug('replaced trove is not installed')
 
                         if not followLocalChanges:
                             # followLocalChanges states that, even though
@@ -897,6 +937,7 @@ class ClientUpdate:
                             # to an installed trove or b) its passed in to
                             # the function that we _always_ follow local 
                             # changes.
+                            log.debug('SKIP: not following local changes')
                             break
 
                         freshInstallOkay = (isPrimary or parentInstalled)
@@ -912,26 +953,33 @@ class ClientUpdate:
 
 
                         if (replaced[0] is None and not freshInstallOkay):
+                            log.debug('SKIP: not allowing fresh install')
                             break
 
                         childrenFollowLocalChanges = True
 
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
+                        log.debug('using local update to replace %s, following local changes' % (replacedInfo,))
 
                     elif not installRedirects:
                         if not redirectHack.get(newInfo, True):
                             # a parent redirect was added as an upgrade
                             # but this would be a new install of this child
                             # trove.  Skip it.
+                            log.debug('SKIP: is a redirect that would be'
+                                      ' a fresh install, but '
+                                      ' installRedirects=False')
                             break
                     elif redirectHack.get(newInfo, False):
                         # we are upgrading a redirect, so don't allow any child
                         # redirects to be installed unless they have a matching
                         # trove to redirect on the system.
+                        log.debug('INSTALL: upgrading redirect')
                         installRedirects = False
-                    
+
                     if replaced[0] and respectBranchAffinity: 
+                        log.debug('checking branch affinity')
                         # do branch affinity checks
 
                         newBranch = newInfo[1].branch()
@@ -952,6 +1000,7 @@ class ClientUpdate:
                         # Check to see if there's reason to be concerned
                         # about branch affinity.
                         if installedBranch == newBranch:
+                            log.debug('not branch switch')
                             # we didn't switch branches.  No branch 
                             # affinity concerns.  If the user has made
                             # a local change that would make this new 
@@ -959,18 +1008,21 @@ class ClientUpdate:
                             if (newInfo[1] < replaced[0] 
                                     and not isPrimary 
                                     and replacedInfo in sameBranchLocalUpdates):
+                                log.debug('SKIP: avoiding downgrade')
 
                                 # don't let this trove be erased, pretend
                                 # like it was explicitly requested.
                                 alreadyInstalled.add(replacedInfo)
                                 break
                         elif notInstalledBranch == installedBranch:
+                            log.debug('INSTALL: branch switch is reversion')
                             # we are reverting back to the branch we were
                             # on before.  We don't worry about downgrades
                             # because we're already overriding the user's
                             # branch choice
                             pass
                         else:
+                            log.debug('is a new branch switch')
                             # Either a) we've made a local change from branch 1
                             # to branch 2 and now we're updating to branch 3,
                             # or b) there's no local change but we're switching
@@ -989,10 +1041,13 @@ class ClientUpdate:
                                     # is messing with branches too much -
                                     # don't bother with branch affinity.
                                     respectBranchAffinity = False
-                                    pass
+                                    log.debug('INSTALL: is a branch switch on top of a branch switch and is primary')
+                                else:
+                                    log.debug('INSTALL: is a new branch switch and is primary')
                             elif (installedBranch, newBranch) == branchHint:
                                 # Exception: if the parent trove
                                 # just made this move, then allow it.
+                                log.debug('INSTALL: matches parent\'s branch switch')
                                 pass
                             elif (replacedInfo in installedAndReferenced
                                   and not alreadyBranchSwitch
@@ -1001,6 +1056,7 @@ class ClientUpdate:
                                 # trove's branch explicitly, and now
                                 # we have an implicit request to switch 
                                 # the branch.
+                                log.debug('INSTALL: implicit branch switch, parent installed')
                                 pass
                             else:
                                 # we're not installing this trove - 
@@ -1013,42 +1069,51 @@ class ClientUpdate:
                                 # Since we're rejecting the update due to 
                                 # branch affinity, we don't consider any of its 
                                 # child troves for updates either.
+                                log.debug('SKIP: not installing branch switch')
                                 recurseThis = False 
                                 break
                 elif not byDefault:
                     # This trove is being newly installed, but it's not 
                     # supposed to be installed by default
+                    log.debug('SKIP: not doing not-by-default fresh install')
                     break
                 elif updateOnly:
                     # we're not installing trove, only updating installed
                     # troves.
+                    log.debug('SKIP: not doing install due to updateOnly')
                     break
                 elif not isPrimary and self.cfg.excludeTroves.match(newInfo[0]):
                     # New trove matches excludeTroves
+                    log.debug('SKIP: trove matches excludeTroves')
                     break
                 elif not installRedirects:
                     if not redirectHack.get(newInfo, True):
                         # a parent redirect was added as an upgrade
                         # but this would be a new install of this child
                         # trove.  Skip it.
+                        log.debug('SKIP: redirect would be a fresh install')
                         break
                 elif redirectHack.get(newInfo, False):
                     # we are upgrading a redirect, so don't allow any child
                     # redirects to be installed unless they have a matching
                     # trove to redirect on the system.
+                    log.debug('installing redirect')
                     installRedirects = False
                 
                 if pinned:
                     if replaced[0] is not None:
+                        log.debug('looking at pinned replaced trove')
                         try:
                             trv = troveSource.getTrove(withFiles = False, 
                                                        *newInfo)
                         except TroveMissing:
                             # we don't even actually have this trove available,
                             # making it difficult to install.
+                            log.debug('SKIP: new trove is not in source,'
+                                      ' cannot compare path hashes!')
                             recurseThis = False
                             break
-                            
+
                         # try and install the two troves next to each other
                         assert(replacedInfo[1] is not None)
                         oldTrv = self.db.getTrove(withFiles = False, 
@@ -1060,6 +1125,7 @@ class ClientUpdate:
                                                    self.db, trv, inDb = False)
 
                         if newHashes.compatibleWith(oldHashes):
+                            log.debug('old and new versions are compatible')
                             replaced = (None, None)
                             if isPrimary and checkPrimaryPins:
                                 name = replacedInfo[0]
@@ -1080,11 +1146,13 @@ conary erase '%s=%s[%s]'
                                 raise UpdatePinnedTroveError(replacedInfo, 
                                                              newInfo)
 
-                newJob.add((newInfo[0], replaced, (newInfo[1], newInfo[2]), 
-                           False))
+                job = (newInfo[0], replaced, (newInfo[1], newInfo[2]), False)
+                log.debug('JOB ADDED: %s' % (job,))
+                newJob.add(job)
                 jobAdded = True
                 break
 
+            log.debug('recurseThis: %s\nrecurse: %s' % (recurseThis, recurse))
 
             if not recurseThis: continue
             if not recurse: continue
@@ -1096,6 +1164,7 @@ conary erase '%s=%s[%s]'
                 # affinity for all child troves even the primary trove above us
                 # did switch.  We assume the user at some point switched this 
                 # trove to the desired branch by hand already.
+                log.debug('respecting branch affinity for children')
                 respectBranchAffinity = True
             elif replaced[0]:
                 branchHint = (replaced[0].branch(), newInfo[1].branch())
@@ -1131,11 +1200,11 @@ conary erase '%s=%s[%s]'
                 if not isPrimary:
                     if not jobAdded and info not in byDefaultDict:
                         continue
-                    
+
                     # support old-style collections.  _If_ this trove was not
                     # mentioned in its parent trove, then set its default
                     # value here. 
-                    childByDefault = (trv.includeTroveByDefault(*info) 
+                    childByDefault = (trv.includeTroveByDefault(*info)
                                       and jobAdded)
                     byDefaultDict.setdefault(info, childByDefault)
 
