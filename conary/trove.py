@@ -24,6 +24,7 @@ from conary import files
 from conary import streams
 from conary import versions
 from conary.deps import deps
+from conary.lib import log
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 from conary.lib import openpgpkey
@@ -939,7 +940,15 @@ class Trove(streams.StreamSet):
         if TROVE_VERSION < self.troveInfo.troveVersion():
             self.troveInfo.tainted.set(1)
 
-        if not skipIntegrityChecks:
+        # NOTE: Checking for tainted here is very wrong. It works because
+        # tainted troves can't appear on the server (thanks to an assertion
+        # keeping them off).
+        if self.troveInfo.tainted():
+            pass
+            # we don't warn here because the warning would show up 
+            # everywhere we call getTrove as opposed to only when installing
+            #log.warning('Not checking integrity of trove %s with new schema version %s' % (self.getName(), self.troveInfo.troveVersion()))
+        elif not skipIntegrityChecks:
             # if we have a sha1 in our troveinfo, verify it
             if self.troveInfo.sigs.sha1():
                 if not self.verifySignatures():

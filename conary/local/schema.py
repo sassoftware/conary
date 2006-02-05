@@ -14,7 +14,7 @@
 
 import sys
 import itertools
-from conary import trove, deps, errors, files
+from conary import trove, deps, errors, files, streams
 from conary.dbstore import idtable, migration
 
 # Stuff related to SQL schema maintenance and migration
@@ -753,15 +753,15 @@ class MigrateTo_19(SchemaMigration):
         versionStream.set(0)
 
         taintedStream = streams.ByteStream()
-        taintedStream.set(0)
+        taintedStream.set(1)
 
         for tag, data in [
-                (trove._TROVEINFO_TAG_VERSION, versionStream.freeze()),
-                (trove._TROVEINFO_TAG_TAINTED, taintedStream.freeze()) ]:
+                (trove._TROVEINFO_TAG_TROVEVERSION, versionStream.freeze()),
+                (trove._TROVEINFO_TAG_TAINTED,      taintedStream.freeze()) ]:
             cu.execute("""
                 INSERT INTO TroveInfo
-                    SELECT (instanceId, %s, %s) FROM Instanes
-                """ % tag, data)
+                    SELECT instanceId, ?, ? FROM Instances
+                """, (tag, data))
 
         return self.Version
 
