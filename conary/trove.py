@@ -938,11 +938,6 @@ class Trove(streams.StreamSet):
         assert(not self.troveInfo.tainted())
 
         if TROVE_VERSION < self.troveInfo.troveVersion():
-            log.warning('trove %s has schema version %s, which contains '
-                        ' information not handled by this client, which '
-                        ' is version %s.  Dropping extra information.  '
-                        ' Please upgrade conary.', self.getName(),
-                        self.troveInfo.troveVersion(), TROVE_VERSION)
             self.troveInfo.tainted.set(1)
 
         # NOTE: Checking for tainted here is very wrong. It works because
@@ -950,6 +945,9 @@ class Trove(streams.StreamSet):
         # keeping them off).
         if self.troveInfo.tainted():
             pass
+            # we don't warn here because the warning would show up 
+            # everywhere we call getTrove as opposed to only when installing
+            #log.warning('Not checking integrity of trove %s with new schema version %s' % (self.getName(), self.troveInfo.troveVersion()))
         elif not skipIntegrityChecks:
             # if we have a sha1 in our troveinfo, verify it
             if self.troveInfo.sigs.sha1():

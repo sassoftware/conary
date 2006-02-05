@@ -18,7 +18,7 @@ import tempfile
 
 from conary.repository import changeset, errors, filecontents
 from conary import deps, files, trove, versions
-from conary.lib import patch, sha1helper, util, openpgpkey, openpgpfile
+from conary.lib import log, patch, sha1helper, util, openpgpkey, openpgpfile
 
 class AbstractTroveDatabase:
 
@@ -360,6 +360,13 @@ class ChangeSetJob:
                                         troveFlavor, csTrove.getChangeLog())
 
 	    newFileMap = newTrove.applyChangeSet(csTrove)
+            if newTrove.troveInfo.tainted():
+                log.warning('trove %s has schema version %s, which contains'
+                        ' information not handled by this client.  This'
+                        ' understands schema version %s.  Dropping extra'
+                        ' information.  Please upgrade conary.', 
+                        newTrove.getName(), newTrove.troveInfo.troveVersion(), 
+                        trove.TROVE_VERSION)
             self.checkTroveSignatures(newTrove, threshold, keyCache=keyCache)
 
 	    troveInfo = self.addTrove(
