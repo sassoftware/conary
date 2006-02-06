@@ -1,0 +1,11 @@
+#!/usr/bin/python
+""" Returns the differences between a list of flavors """
+import sys
+from conary.deps import deps
+
+flavors = [ deps.parseFlavor(x) for x in sys.argv[1:] ]
+
+flavorDict = deps.flavorDifferences(flavors, strict=True)
+for int, flavor in enumerate(flavors):
+    print '%s: %s' % (int, flavorDict[flavor])
+
