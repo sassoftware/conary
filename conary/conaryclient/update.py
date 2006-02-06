@@ -1072,6 +1072,15 @@ followLocalChanges: %s
                                 log.debug('SKIP: not installing branch switch')
                                 recurseThis = False 
                                 break
+
+                # below are checks to see if a fresh install should completed.
+                # Since its possible that an update from above could be 
+                # converted into a fresh install, we start a new if/elif 
+                # branch here.
+                if replaced[0]:
+                    # we are dealing with a replacement, we've already 
+                    # decided it was okay above.
+                    pass
                 elif not byDefault:
                     # This trove is being newly installed, but it's not 
                     # supposed to be installed by default
