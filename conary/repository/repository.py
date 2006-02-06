@@ -304,7 +304,8 @@ class ChangeSetJob:
                                           'key: %s'% res[1][0])
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
-                 resetTimestamps = False, keyCache = None, threshold = 0):
+                 resetTimestamps = False, keyCache = None, threshold = 0,
+                 allowTainted = False):
 	self.repos = repos
 	self.cs = cs
 
@@ -358,8 +359,10 @@ class ChangeSetJob:
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
                                         troveFlavor, csTrove.getChangeLog())
+                allowTainted = True
 
-	    newFileMap = newTrove.applyChangeSet(csTrove)
+	    newFileMap = newTrove.applyChangeSet(csTrove,
+                                                 allowTainted=allowTainted)
             if newTrove.troveInfo.tainted():
                 log.warning('trove %s has schema version %s, which contains'
                         ' information not handled by this client.  This'
