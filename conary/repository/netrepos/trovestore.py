@@ -216,7 +216,7 @@ class TroveStore:
             raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
                                               trv.getFlavor())
         if trv.troveInfo.incomplete():
-            if trv.troveInfo.troveVersion() < trove.TROVE_VERSION:
+            if trv.troveInfo.troveVersion() > trove.TROVE_VERSION:
                 raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
                                               trv.getFlavor(),
                                               trv.troveInfo.troveVersion(),
