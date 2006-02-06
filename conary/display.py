@@ -590,7 +590,8 @@ class TroveFormatter(TroveTupFormatter):
                  ("Label     : %s" % 
                             v.branch().label().asString()))
 
-        yield '%-30s' % ("Size      : %s" % size)
+        yield '%-30s %s' % (("Size      : %s" % size), 
+                            ("Schema    : %s" % trove.troveInfo.troveVersion()))
         if hasattr(troveSource, 'trovesArePinned'):
             yield "Pinned    : %s" % troveSource.trovesArePinned(
                                                             [ (n, v, f) ])[0]
