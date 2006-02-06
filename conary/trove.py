@@ -2089,9 +2089,11 @@ class TroveIntegrityError(TroveError):
     """
     _error = "Trove Integrity Error: %s=%s[%s] checksum does not match precalculated value"
     def __init__(self, name=None, version=None, flavor=None):
+        self.nvf = None
         if not name:
             TroveError.__init__(self)
-            self.nvf = None
+        elif not version:
+            TroveError.__init__(self, name)
         else:
             self.nvf = (name, version, flavor)
             TroveError.__init__(self, self._error % self.nvf)

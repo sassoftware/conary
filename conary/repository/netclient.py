@@ -122,10 +122,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == "IntegrityError":
 	    raise errors.IntegrityError(exceptionArgs[0])
         elif exceptionName == "TroveIntegrityError":
-            if len(exceptionArgs) > 1: # old repositories give TIE w/ no
-                                       # trove information
-                # exceptionArgs[0] is empty for older clients that 
-                # ex
+            if len(exceptionArgs) > 1 and exceptionArgs[1]: 
+                # old repositories give TIE w/ no
+                # trove information or with a string error message.
+                # exceptionArgs[0] is that message if exceptionArgs[1]
+                # is not set or is empty.
                 raise errors.TroveIntegrityError(*self.toTroveTup(exceptionArgs[1]))
             else:
                 raise errors.TroveIntegrityError(exceptionArgs[0])
