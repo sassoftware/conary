@@ -55,6 +55,9 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         if ls:
             fileDeps = lsl = True
 
+    if showChanges:
+        lsl = True
+
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
