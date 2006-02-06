@@ -266,8 +266,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
         elif isinstance(e, errors.TroveIntegrityError):
-            import epdb
-            epdb.st()
             return (False, True, (e.__class__.__name__, str(e),
                                   e.nvf and self.fromTroveTup(e.nvf) or ''))
         elif isinstance(e, errors.TroveChecksumMissing):
