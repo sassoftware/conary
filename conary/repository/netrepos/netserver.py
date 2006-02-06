@@ -267,7 +267,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return (False, True, ('RepositoryLocked'))
         elif isinstance(e, errors.TroveIntegrityError):
             return (False, True, (e.__class__.__name__, str(e),
-                                  e.nvf and self.fromTroveTup(e.nvf) or ''))
+                                  self.fromTroveTup(e.nvf)))
         elif isinstance(e, errors.TroveChecksumMissing):
             return (False, True, (e.__class__.__name__, str(e),
                                   self.fromTroveTup(e.nvf)))

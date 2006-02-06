@@ -431,8 +431,9 @@ class ChangeSetJob:
                             oldfile = None
 
                 if fileObj and fileObj.fileId() != fileId:
-                    raise trove.TroveIntegrityError, \
-                          "fileObj.fileId() != fileId in changeset"
+                    raise trove.TroveIntegrityError(csTrove.getName(),
+                          csTrove.getNewVersion(), csTrove.getNewFlavor(),
+                          "fileObj.fileId() != fileId in changeset")
                 self.repos.addFileVersion(troveInfo, pathId, fileObj, path, 
                                           fileId, newVersion, 
                                           fileStream = fileStream)

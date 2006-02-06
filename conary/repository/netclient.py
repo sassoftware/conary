@@ -122,14 +122,15 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == "IntegrityError":
 	    raise errors.IntegrityError(exceptionArgs[0])
         elif exceptionName == "TroveIntegrityError":
-            if len(exceptionArgs) > 1 and exceptionArgs[1]: 
+            if len(exceptionArgs) > 1:
                 # old repositories give TIE w/ no
                 # trove information or with a string error message.
                 # exceptionArgs[0] is that message if exceptionArgs[1]
                 # is not set or is empty.
-                raise errors.TroveIntegrityError(*self.toTroveTup(exceptionArgs[1]))
+                raise errors.TroveIntegrityError(error=exceptionArgs[0], 
+                                            *self.toTroveTup(exceptionArgs[1]))
             else:
-                raise errors.TroveIntegrityError(exceptionArgs[0])
+                raise errors.TroveIntegrityError(error=exceptionArgs[0])
         elif exceptionName == "TroveSchemaError":
             # value 0 is the full message, for older clients that don't
             # know about this exception

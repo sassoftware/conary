@@ -2088,12 +2088,13 @@ class TroveIntegrityError(TroveError):
     Indicates that a checksum did not match
     """
     _error = "Trove Integrity Error: %s=%s[%s] checksum does not match precalculated value"
-    def __init__(self, name=None, version=None, flavor=None):
-        self.nvf = None
-        if not name:
-            TroveError.__init__(self)
-        elif not version:
-            TroveError.__init__(self, name)
-        else:
+    def __init__(self, name=None, version=None, flavor=None, error=None):
+        if name:
             self.nvf = (name, version, flavor)
-            TroveError.__init__(self, self._error % self.nvf)
+            if error is None:
+                error = self._error % self.nvf
+        else:
+            self.nvf = None
+
+
+        TroveError.__init__(self, error)
