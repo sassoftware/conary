@@ -333,7 +333,10 @@ def copyfileobj(source, dest, callback = None, digest = None,
         write(buf)
 
         now = time.time()
-        rate = total / (now - starttime)
+        if now == starttime:
+            rate = 0 # don't bother limiting download until now > starttime.
+        else:
+            rate = total / ((now - starttime)) 
 
         if rateLimit > 0 and rate > rateLimit:
             time.sleep((total / rateLimit) - (total / rate))
