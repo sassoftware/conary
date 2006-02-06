@@ -260,9 +260,13 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                 if not tups:
                     continue
                 if versionFilter == VERSION_FILTER_LATEST:
-                    # only look at latest leaf.
-                    maxVersion = max(x[1] for x in tups)
-                    tups = [ x for x in tups if x[1] == maxVersion ]
+                    # only look at latest leaves (1 per branch).
+                    versionsByBranch = {}
+                    for tup in tups:
+                        versionsByBranch.setdefault(tup[1].branch(),
+                                                    []).append(tup[1])
+                    maxVersions = set(max(x) for x in versionsByBranch.values())
+                    tups = [ x for x in tups if x[1] in maxVersions ]
                 for (_, v, f) in tups:
                     if flavorFilter == FLAVOR_FILTER_ALL:
                         # only look at latest leaf.
