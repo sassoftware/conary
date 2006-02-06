@@ -265,6 +265,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            self.fromVersion(e.fileVer)))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
+        elif isinstance(e, errors.TroveIntegrityError):
+            return (False, True, (e.__class__.__name__, str(e),
+                                  self.fromTroveTup(e.nvf)))
+        elif isinstance(e, errors.TroveChecksumMissing):
+            return (False, True, (e.__class__.__name__, str(e),
+                                  self.fromTroveTup(e.nvf)))
+
+        elif isinstance(e, errors.TroveSchemaError):
+            return (False, True, (errors.TroveSchemaError.__name__, str(e),
+                                  self.fromTroveTup(e.nvf),
+                                  e.troveSchema,
+                                  e.supportedSchema))
 	else:
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):

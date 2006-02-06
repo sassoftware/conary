@@ -121,6 +121,22 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 	    raise errors.MethodNotSupported(exceptionArgs[0])
         elif exceptionName == "IntegrityError":
 	    raise errors.IntegrityError(exceptionArgs[0])
+        elif exceptionName == "TroveIntegrityError":
+            if len(exceptionArgs) > 1: # old repositories give TIE w/ no
+                                       # trove information
+                # exceptionArgs[0] is empty for older clients that 
+                # ex
+                raise errors.TroveIntegrityError(*self.toTroveTup(exceptionArgs[1]))
+            else:
+                raise errors.TroveIntegrityError(exceptionArgs[0])
+        elif exceptionName == "TroveSchemaError":
+            # value 0 is the full message, for older clients that don't
+            # know about this exception
+            n, v, f = self.toTroveTup(exceptionArgs[1])
+            raise errors.TroveSchemaError(n, v, f,
+                                          exceptionArgs[2], exceptionArgs[3])
+        elif exceptionName == errors.TroveChecksumMissing.__name__:
+            raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
         elif exceptionName == 'FileContentsNotFound':
             raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
                                                self.toVersion(exceptionArgs[1])))

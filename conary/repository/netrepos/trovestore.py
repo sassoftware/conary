@@ -213,8 +213,13 @@ class TroveStore:
 	cu = self.db.cursor()
 
         if not trv.troveInfo.sigs.sha1():
-            raise errors.UnsignedTrove
-        assert(not trv.troveInfo.tainted())
+            raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
+                                              trv.getFlavor())
+        if trv.troveInfo.tainted():
+            raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
+                                          trv.getFlavor(),
+                                          trv.troveInfo.troveVersion(),
+                                          trove.TROVE_VERSION)
 
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')

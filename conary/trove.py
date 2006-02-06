@@ -954,7 +954,8 @@ class Trove(streams.StreamSet):
             # if we have a sha1 in our troveinfo, verify it
             if self.troveInfo.sigs.sha1():
                 if not self.verifySignatures():
-                    raise TroveIntegrityError
+                    raise TroveIntegrityError(self.getName(), self.getVersion(),
+                                              self.getFlavor())
             else:
                 #log.warning('changeset does not contain a sha1 checksum')
                 pass
@@ -2086,4 +2087,11 @@ class TroveIntegrityError(TroveError):
     """
     Indicates that a checksum did not match
     """
-    pass
+    _error = "Trove Integrity Error: %s=%s[%s] checksum does not match precalculated value"
+    def __init__(self, name=None, version=None, flavor=None):
+        if not name:
+            TroveError.__init__(self)
+            self.nvf = None
+        else:
+            self.nvf = (name, version, flavor)
+            TroveError.__init__(self, self._error % self.nvf)

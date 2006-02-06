@@ -13,6 +13,9 @@
 #
 from conary.errors import ConaryError, InternalConaryError
 from conary.errors import RepositoryError, TroveNotFound
+from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
+from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
+from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
 
 class RepositoryMismatch(RepositoryError):
@@ -104,8 +107,24 @@ class GroupNotFound(RepositoryError):
 class UnknownEntitlementGroup(RepositoryError):
     pass
 
-class UnsignedTrove(RepositoryError):
-    pass
+class TroveChecksumMissing(RepositoryError):
+    _error = ('Checksum Missing Error: Trove %s=%s[%s] has no sha1 checksum'
+              ' calculated, so it was rejected.  Please upgrade conary.')
+
+    def __init__(self, name, version, flavor):
+        self.nvf = (name, version, flavor)
+        RepositoryError.__init__(self, self._error % self.nvf)
+
+class TroveSchemaError(RepositoryError):
+    _error = ("Trove Schema Error: attempted to commit %s=%s[%s] with version"
+              " %s, but repository only supports %s")
+
+    def __init__(self, name, version, flavor, troveSchema, supportedSchema):
+        self.nvf = (name, version, flavor)
+        self.troveSchema = troveSchema
+        self.supportedSchema = supportedSchema
+        RepositoryError.__init__(self, self._error % (name, version, flavor, 
+                                                 troveSchema, supportedSchema))
 
 class PermissionAlreadyExists(RepositoryError):
     pass
@@ -161,8 +180,6 @@ configured incorrectly or the request you sent to the server was invalid.
 %s
 ''' % (err,))
 
-from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
-from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
 
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that
@@ -182,7 +199,5 @@ simpleExceptions = (
     (GroupNotFound,              'GroupNotFound'),
     (CommitError,                'CommitError'),
     (DuplicateBranch,            'DuplicateBranch'),
-    (TroveIntegrityError,        'TroveIntegrityError'),
-    (UnsignedTrove,              'UnsignedTrove'),
     (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
     )

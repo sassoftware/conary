@@ -96,3 +96,10 @@ class NetworkConvertors(object):
 
     def toEntitlement(self, ent):
         return base64.decodestring(ent)
+
+    def fromTroveTup(self, tuple):
+        return (tuple[0], self.fromVersion(tuple[1]), self.fromFlavor(tuple[2]))
+
+    def toTroveTup(self, tuple):
+        return (tuple[0], self.toVersion(tuple[1]), self.toFlavor(tuple[2]))
+        
