@@ -80,7 +80,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, callback, autoPinList, threshold = 0):
+    def __init__(self, repos, cs, callback, autoPinList, threshold = 0,
+                 allowTainted = False):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -123,7 +124,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 		(oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
-                                         threshold = threshold)
+                                         threshold = threshold, 
+                                         allowTainted=allowTainted)
 
         for trove in self.oldTroveList():
             self.repos.eraseTrove(trove.getName(), trove.getVersion(),
