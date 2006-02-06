@@ -873,7 +873,8 @@ class Trove(streams.StreamSet):
 	return (key in self.strongTroves) or (key in self.weakTroves)
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
-    def applyChangeSet(self, trvCs, skipIntegrityChecks = False):
+    def applyChangeSet(self, trvCs, skipIntegrityChecks = False, 
+                       allowTainted = False):
 	"""
 	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
@@ -935,7 +936,8 @@ class Trove(streams.StreamSet):
         # merged something tainted against something untainted (which is
         # bad) or something tainted against something tainted (which, again,
         # is bad)
-        assert(not self.troveInfo.tainted())
+        if not allowTainted and not self.getVersion().isOnLocalHost():
+            assert(not self.troveInfo.tainted())
 
         if TROVE_VERSION < self.troveInfo.troveVersion():
             self.troveInfo.tainted.set(1)
