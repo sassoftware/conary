@@ -1426,7 +1426,7 @@ order by
 
         return l
 
-    def troveIsTainted(self, name, version, flavor):
+    def troveIsIncomplete(self, name, version, flavor):
         cu = self.db.cursor()
 
         if flavor:
@@ -1448,10 +1448,10 @@ order by
                     troveName = ? AND
                     version = ? AND
                     %s""" % flavorStr, 
-                        [trove._TROVEINFO_TAG_TAINTED,
+                        [trove._TROVEINFO_TAG_INCOMPLETE,
                          name, str(version)] + flavorArgs)
-        frzTainted = cu.next()[0]
-        return streams.ByteStream(frzTainted)() != 0
+        frzIncomplete = cu.next()[0]
+        return streams.ByteStream(frzIncomplete)() != 0
                     
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)

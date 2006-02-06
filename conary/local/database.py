@@ -149,8 +149,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)
 
-    def troveIsTainted(self, name, version, flavor):
-        return self.db.troveIsTainted(name, version, flavor)
+    def troveIsIncomplete(self, name, version, flavor):
+        return self.db.troveIsIncomplete(name, version, flavor)
 
     def findTroveReferences(self, names):
         """ Return references to a trove on the system, whether or not
@@ -547,7 +547,7 @@ class Database(SqlDbRepository):
             # an object for historical reasons
             localrep.LocalRepositoryChangeSetJob(
                 self, cs, callback, autoPinList, threshold = threshold,
-                allowTainted=isRollback)
+                allowIncomplete=isRollback)
             self.db.mapPinnedTroves(uJob.getPinMaps())
 
         errList = fsJob.getErrorList()

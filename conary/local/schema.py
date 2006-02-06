@@ -752,12 +752,12 @@ class MigrateTo_19(SchemaMigration):
         versionStream = streams.IntStream()
         versionStream.set(0)
 
-        taintedStream = streams.ByteStream()
-        taintedStream.set(1)
+        incompleteStream = streams.ByteStream()
+        incompleteStream.set(1)
 
         for tag, data in [
-                (trove._TROVEINFO_TAG_TROVEVERSION, versionStream.freeze()),
-                (trove._TROVEINFO_TAG_TAINTED,      taintedStream.freeze()) ]:
+              (trove._TROVEINFO_TAG_TROVEVERSION, versionStream.freeze()),
+              (trove._TROVEINFO_TAG_INCOMPLETE,   incompleteStream.freeze()) ]:
             cu.execute("""
                 INSERT INTO TroveInfo
                     SELECT instanceId, ?, ? FROM Instances
