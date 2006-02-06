@@ -1453,8 +1453,8 @@ conary erase '%s=%s[%s]'
         cs, notFound = csSource.createChangeSet(reposChangeSetList, 
                                                 withFiles = False,
                                                 recurse = recurse)
-        self._replaceTainted(cs, csSource, 
-                             self.db, self.repos)
+        self._replaceIncomplete(cs, csSource, 
+                                self.db, self.repos)
 
         assert(not notFound)
         uJob.getTroveSource().addChangeSet(cs)
@@ -1489,7 +1489,7 @@ conary erase '%s=%s[%s]'
             cs, notFound = csSource.createChangeSet(reposChangeSetList, 
                                                     withFiles = False,
                                                     recurse = recurse)
-            self._replaceTainted(cs, csSource, self.db, self.repos)
+            self._replaceIncomplete(cs, csSource, self.db, self.repos)
             #NOTE: we allow any missing recursive bits to be skipped.
             #They'll show up in notFound.
             #assert(not notFound)
@@ -1559,23 +1559,24 @@ conary erase '%s=%s[%s]'
 
         return updateItems
 
-    def _replaceTainted(self, cs, localSource, db, repos):
+    def _replaceIncomplete(self, cs, localSource, db, repos):
         jobSet = [ (x.getName(), (x.getOldVersion(), x.getOldFlavor()),
                                  (x.getNewVersion(), x.getNewFlavor()))
                     for x in cs.iterNewTroveList() ]
     
-        taintedJobs = [ x for x in jobSet 
-                        if x[1][0] and x[2][0] and not x[2][0].isOnLocalHost()
-                            and db.hasTrove(x[0], *x[1]) 
-                            and db.troveIsTainted(x[0], *x[1])]
-        if taintedJobs:
+        incompleteJobs = [ x for x in jobSet 
+                           if x[1][0] and x[2][0]
+                              and not x[2][0].isOnLocalHost()
+                              and db.hasTrove(x[0], *x[1]) 
+                              and db.troveIsIncomplete(x[0], *x[1]) ]
+        if incompleteJobs:
             newTroves = repos.getTroves([(x[0], x[2][0], x[2][1])
-                                              for x in taintedJobs])
+                                         for x in incompleteJobs])
             oldTroves = localSource.getTroves([(x[0], x[1][0], x[1][1])
-                                              for x in taintedJobs])
+                                               for x in incompleteJobs])
             newCs = changeset.ChangeSet()
             for newT, oldT in itertools.izip(newTroves, oldTroves):
-                newT.troveInfo.tainted.set(0)
+                newT.troveInfo.incomplete.set(0)
                 newCs.newTrove(newT.diff(oldT)[0])
 
             cs.merge(newCs)
@@ -1659,7 +1660,7 @@ conary erase '%s=%s[%s]'
 
             csSource = trovesource.ChangesetFilesTroveSource(self.db)
             for cs in fromChangesets:
-                self._replaceTainted(cs, self.db, self.db, self.repos)
+                self._replaceIncomplete(cs, self.db, self.db, self.repos)
                 csSource.addChangeSet(cs, includesFileContents = True)
                 # FIXME ChangeSetSource: We shouldn't have to add this to 
                 # uJob.troveSource() at this point, since the 
@@ -1821,7 +1822,7 @@ conary erase '%s=%s[%s]'
                                               callback = callback)
                 baseCs.merge(newCs)
 
-            self._replaceTainted(baseCs, db, db, repos)
+            self._replaceIncomplete(baseCs, db, db, repos)
 
             return baseCs
 

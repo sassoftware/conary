@@ -215,7 +215,7 @@ class TroveStore:
         if not trv.troveInfo.sigs.sha1():
             raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
                                               trv.getFlavor())
-        if trv.troveInfo.tainted():
+        if trv.troveInfo.incomplete():
             if trv.troveInfo.troveVersion() < trove.TROVE_VERSION:
                 raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
                                               trv.getFlavor(),
@@ -223,7 +223,7 @@ class TroveStore:
                                               trove.TROVE_VERSION)
             else:
                 nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
-                err =  'Attempted to commit tainted trove %s=%s[%s]' % nvf
+                err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
                 raise errors.TroveIntegrityError(error=err, *nvf)
 
         schema.resetTable(cu, 'NewFiles')

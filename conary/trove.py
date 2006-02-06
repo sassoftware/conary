@@ -354,7 +354,7 @@ _TROVEINFO_TAG_PATH_HASHES    = 10
 _TROVEINFO_TAG_LABEL_PATH     = 11 
 _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
-_TROVEINFO_TAG_TAINTED        = 14
+_TROVEINFO_TAG_INCOMPLETE     = 14
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -373,7 +373,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_LABEL_PATH    : (SMALL, LabelPath,            'labelPath'   ),
         _TROVEINFO_TAG_POLICY_PROV   : (LARGE, PolicyProviders,      'policyProviders'),
         _TROVEINFO_TAG_TROVEVERSION  : (SMALL, streams.IntStream,    'troveVersion'   ),
-        _TROVEINFO_TAG_TAINTED       : (SMALL, streams.ByteStream,   'tainted'   )
+        _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   )
     }
 
 
@@ -542,7 +542,7 @@ class Trove(streams.StreamSet):
         return streams.StreamSet.freeze(self,
                                         skipSet = { 'sigs' : True,
                                                     'versionStrings' : True,
-                                                    'tainted' : True,
+                                                    'incomplete' : True,
                                                     'pathHashes' : True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
@@ -874,7 +874,7 @@ class Trove(streams.StreamSet):
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False, 
-                       allowTainted = False):
+                       allowIncomplete = False):
 	"""
 	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
@@ -932,20 +932,20 @@ class Trove(streams.StreamSet):
         else:
             self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
 
-        # We can't be tainted after a merge. If we were, it means we
-        # merged something tainted against something untainted (which is
-        # bad) or something tainted against something tainted (which, again,
-        # is bad)
-        if not allowTainted and not self.getVersion().isOnLocalHost():
-            assert(not self.troveInfo.tainted())
+        # We can't be incomplete after a merge. If we were, it means
+        # we merged something incomplete against something complete
+        # (which is bad) or something incomplete against something
+        # incomplete (which, again, is bad)
+        if not allowIncomplete and not self.getVersion().isOnLocalHost():
+            assert(not self.troveInfo.incomplete())
 
         if TROVE_VERSION < self.troveInfo.troveVersion():
-            self.troveInfo.tainted.set(1)
+            self.troveInfo.incomplete.set(1)
 
-        # NOTE: Checking for tainted here is very wrong. It works because
-        # tainted troves can't appear on the server (thanks to an assertion
+        # NOTE: Checking for incomplete here is very wrong. It works because
+        # incomplete troves can't appear on the server (thanks to an assertion
         # keeping them off).
-        if self.troveInfo.tainted():
+        if self.troveInfo.incomplete():
             pass
             # we don't warn here because the warning would show up 
             # everywhere we call getTrove as opposed to only when installing
@@ -1562,7 +1562,7 @@ class Trove(streams.StreamSet):
             self.version.set(version)
             self.flavor.set(flavor)
             self.troveInfo.troveVersion.set(TROVE_VERSION)
-            self.troveInfo.tainted.set(0)
+            self.troveInfo.incomplete.set(0)
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())
             self.redirect.set(isRedirect)
