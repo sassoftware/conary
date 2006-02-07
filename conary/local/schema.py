@@ -770,7 +770,8 @@ def checkVersion(db):
     version = db.getVersion()
     if version == VERSION:
         return version
-
+    if version > VERSION:
+        raise NewDatabaseSchema
     if version == 0:
         # assume we're setting up a new environment
         if "DatabaseVersion" not in db.tables:
@@ -811,3 +812,9 @@ class OldDatabaseSchema(errors.DatabaseError):
             self.msg = "The Conary database on this system is too old. "    \
                        "For information on how to\nconvert this database, " \
                        "please visit http://wiki.rpath.com/ConaryConversion."
+
+class NewDatabaseSchema(errors.DatabaseError):
+    msg = """The conary database on this system is too new.  You may have multiple versions of conary installed and be running the wrong one, or your conary may have been downgraded.  Please visit http://wiki.rpath.com for information on how to get support."""
+
+    def __init__(self):
+        errors.DatabaseError.__init__(self, self.msg)
