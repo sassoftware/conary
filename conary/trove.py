@@ -941,6 +941,10 @@ class Trove(streams.StreamSet):
 
         if TROVE_VERSION < self.troveInfo.troveVersion():
             self.troveInfo.incomplete.set(1)
+        elif self.troveInfo.incomplete() is None:
+            # old troves don't have an incomplete flag - we want it to 
+            # be set to either 1 or 0 for all troves.
+            self.troveInfo.incomplete.set(0)
 
         # NOTE: Checking for incomplete here is very wrong. It works because
         # incomplete troves can't appear on the server (thanks to an assertion
