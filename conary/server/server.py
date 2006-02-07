@@ -435,10 +435,11 @@ if __name__ == '__main__':
         util.mkdirChain(os.path.dirname(cfg.repositoryDB[1]))
 
     (driver, database) = cfg.repositoryDB
-    db= dbstore.connect(database, driver)
+    db = dbstore.connect(database, driver)
     logMe(1, "checking schema version")
-    schema.loadSchema(db)
-
+    # if there is no schema or we're asked to migrate, loadSchema
+    if db.getVersion() == 0 or 'migrate' in argSet:
+        schema.loadSchema(db)
     if 'migrate' in argSet:
         sys.exit(0)
 
