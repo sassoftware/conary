@@ -338,12 +338,14 @@ class Database:
         else:
             readOnly = False
             self.db.rollback()
-        if readOnly and self.schemaVersion != schema.VERSION:
+        if readOnly and self.schemaVersion < schema.VERSION:
             raise OldDatabaseSchema(
                 "The Conary database on this system is too old.  It will be \n"
                 "automatically converted as soon as you run Conary with \n"
                 "write permissions for the database (which normally means \n"
                 "as root). \n")
+        elif self.schemaVersion > schema.VERSION:
+            raise schema.NewDatabaseSchema()
         self.db.loadSchema()
         schema.checkVersion(self.db)
 
