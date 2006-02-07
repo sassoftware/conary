@@ -358,7 +358,11 @@ class ChangeSetJob:
 		newTrove.changeVersion(newVersion)
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
-                                        troveFlavor, csTrove.getChangeLog())
+                                       troveFlavor, csTrove.getChangeLog(),
+                                       setVersion = False)
+                # FIXME: we reset the trove version
+                # since in this case we need to use the fileMap returned
+                # from applyChangeSet
                 allowIncomplete = True
 
 	    newFileMap = newTrove.applyChangeSet(csTrove,

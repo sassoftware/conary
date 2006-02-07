@@ -489,10 +489,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             trvCs = cs.getNewTroveVersion(troveName, version, flavor)
         except KeyError:
             raise StopIteration
-        
-        t = trove.Trove(trvCs.getName(), trvCs.getOldVersion(),
-                        trvCs.getNewFlavor(), trvCs.getChangeLog())
-        t.applyChangeSet(trvCs, skipIntegrityChecks = not withFiles)
+
+        t = trove.Trove(trvCs, skipIntegrityChecks = not withFiles)
         # if we're sorting, we'll need to pull out all the paths ahead
         # of time.  We'll use a generator that returns the items
         # in the same order as iterFileList() to reuse code.
@@ -677,11 +675,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 l.append(None)
                 continue
 
-            t = trove.Trove(troveCs.getName(), troveCs.getOldVersion(),
-                            troveCs.getNewFlavor(), troveCs.getChangeLog())
             # trove integrity checks don't work when file information is
             # excluded
-            t.applyChangeSet(troveCs, skipIntegrityChecks = not withFiles)
+            t = trove.Trove(troveCs, skipIntegrityChecks = not withFiles) 
             l.append(t)
 
 	return l

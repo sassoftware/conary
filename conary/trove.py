@@ -1544,12 +1544,13 @@ class Trove(streams.StreamSet):
         return self.troveInfo.pathHashes
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
-                 isRedirect = False, skipIntegrityChecks = False):
+                 isRedirect = False, skipIntegrityChecks = False,
+                 setVersion = True):
         streams.StreamSet.__init__(self)
 
         if isinstance(name, AbstractTroveChangeSet):
             trvCs = name
-            assert(trvCs.isAbsolute())
+            assert(not trvCs.getOldVersion())
             self.name.set(trvCs.getName())
             self.applyChangeSet(trvCs, skipIntegrityChecks = 
                                             skipIntegrityChecks)
@@ -1561,7 +1562,8 @@ class Trove(streams.StreamSet):
             self.name.set(name)
             self.version.set(version)
             self.flavor.set(flavor)
-            self.troveInfo.troveVersion.set(TROVE_VERSION)
+            if setVersion:
+                self.troveInfo.troveVersion.set(TROVE_VERSION)
             self.troveInfo.incomplete.set(0)
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())

@@ -951,8 +951,7 @@ class ReadOnlyChangeSet(ChangeSet):
 	    else:
 		old = db.getTrove(troveName, oldVersion, oldFlavor,
 					     pristine = True)
-	    newTrove = trove.Trove(troveName, None, deps.DependencySet(), None)
-	    newTrove.applyChangeSet(troveCs)
+	    newTrove = trove.Trove(troveCs)
 
 	    # we ignore trovesNeeded; it doesn't mean much in this case
 	    (troveChgSet, filesNeeded, trovesNeeded) = \

@@ -563,9 +563,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
             if trvCs.getOldVersion() is None:
-		newTrove = trove.Trove(trvCs.getName(), trvCs.getNewVersion(),
-                                       trvCs.getNewFlavor(), 
-                                       trvCs.getChangeLog())
+                newTrove = trove.Trove(trvCs,
+                                       skipIntegrityChecks = not withFiles)
                 if withFiles:
                     for pathId, path, fileId, version in trvCs.getNewFileList():
                         newTrove.addFile(pathId, path, version, fileId)
@@ -575,7 +574,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                             trvCs.getOldFlavor(),
                                             withFiles=withFiles)
 
-            newTrove.applyChangeSet(trvCs, skipIntegrityChecks = not withFiles)
+                newTrove.applyChangeSet(trvCs,
+                                        skipIntegrityChecks = not withFiles)
             retList.append(newTrove)
 
         return retList

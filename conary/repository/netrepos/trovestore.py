@@ -721,7 +721,8 @@ class TroveStore:
 
             trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
                               singleTroveInfo[2], changeLog,
-                              isRedirect = isRedirect)
+                              isRedirect = isRedirect,
+                              setVersion = False)
 
             try:
                 while troveTrovesCursor.peek()[0] == idx:

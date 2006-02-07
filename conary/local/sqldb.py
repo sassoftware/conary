@@ -949,7 +949,8 @@ order by
 	if not troveVersion or min(troveVersion.timeStamps()) == 0:
 	    troveVersion = self.instances.getVersion(troveInstanceId)
 
-	trv = trove.Trove(troveName, troveVersion, troveFlavor, None)
+	trv = trove.Trove(troveName, troveVersion, troveFlavor, None,
+                          setVersion = False)
 
 	flavorCache = {}
 

@@ -92,9 +92,7 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0):
     for troveCs in [ x for x in cs.iterNewTroveList() ]:
         # instantiate each trove from the troveCs so we can verify
         # the signature
-        t = trove.Trove(troveCs.getName(), troveCs.getNewVersion(),
-                        troveCs.getNewFlavor(), troveCs.getChangeLog())
-        t.applyChangeSet(troveCs, skipIntegrityChecks = True)
+        t = trove.Trove(troveCs)
         verTuple = t.verifyDigitalSignatures(trustThreshold)
         missingKeys.extend(verTuple[1])
         r = min(verTuple[0], r)
