@@ -747,10 +747,6 @@ class ClientUpdate:
 
         del avail
 
-        # Remove the alreadyReferenced set from both the troves which are
-        # already installed. This lets us get a good match for such troves
-        # if we decide to install them later.
-        referencedNotInstalled.difference_update(alreadyReferenced)
 
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
@@ -758,6 +754,10 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
         jobList = availableTrove.diff(existsTrv)[2]
+
+        # alreadyReferenced troves are in both the update set 
+        # and the installed set.  They are a good match for themselves.
+        jobList += [(x[0], (x[1], x[2]), (x[1], x[2]), 0) for x in alreadyReferenced ]
 
         installJobs = [ x for x in jobList if x[1][0] is     None and
                                               x[2][0] is not None ]
@@ -862,7 +862,7 @@ followLocalChanges: %s
                     if isPrimary or installMissingRefs:
                         # They really want it installed this time. We removed
                         # this entry from the already-installed @update trove
-                        # so byJob already tells us the best match for it.
+                        # so localUpdates already tells us the best match for it.
                         pass
                     elif parentInstalled and newInfo in referencedWeak:
                         # The only link to this trove is a weak reference.
@@ -908,12 +908,6 @@ followLocalChanges: %s
                             if replaced[0]:
                                 log.debug('following local changes')
                                 childrenFollowLocalChanges = True
-                            elif not byDefault:
-                                log.debug('SKIP: skipping not-by-default fresh install')
-                                break
-                            elif updateOnly:
-                                log.debug('SKIP: skipping fresh install with updateOnly')
-                                break
                     elif replacedInfo in referencedNotInstalled:
                         # the trove on the local system is one that's referenced
                         # but not installed, so, normally we would not install
