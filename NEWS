@@ -1,3 +1,12 @@
+Changes in 0.97.1:
+  o Bugfixes
+    * A bug has been fixed that allowed the "incomplete" flag to be
+      unset in the database when applying changesets of troves that
+      have no "incomplete" flag.  This resulted in "StopIteration"
+      exceptions when updating the trove.
+    * A bug has been fixed in the code that selects the OpenPGP key
+      to be used for signing changesets at cook time.
+
 Changes in 0.97:
   o Client changes:
     * All troves that are committed to repository through commits,
