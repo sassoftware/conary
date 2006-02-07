@@ -1,11 +1,25 @@
 Changes in 0.97:
   o Client changes:
-    * All troves that are committed to repository through commits, cooks, 
-      branches, shadows, and clones, now always have sha1s calculated for them.
-  
+    * All troves that are committed to repository through commits,
+      cooks, branches, shadows, and clones, now always have SHA1
+      checksums calculated for them.
+    * Trove objects now have a version number set in them.  The
+      version number is increased when the data types in the Trove
+      object are modified.  This is required to ensure that a Conary
+      database or repository has the capability of storing all the
+      information in a Trove.  All trove data must be present in order
+      to re-calculate SHA1 checksums.  If a local system understands
+      version 1 of the Trove object, and a repository server sends a
+      changeset that contains a version 2 Trove, an "incomplete" flag
+      will be set for trove's entry in the database.  When accessing
+      that trove later for merging in an update, the client will go
+      back and retrieve the pristine Trove data from the repository
+      server so it will have all the data needed to preform three way
+      merges and signature verification.
+
   o Repository changes:
-    * Repositories will now reject commits whose troves do not have correct
-      sha1 signatures.
+    * Repositories will now reject commits whose troves do not have
+      correct SHA1 checksums.
 
 Changes in 0.96:
   o Client changes:
