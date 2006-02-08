@@ -182,8 +182,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.name, self.troveStore, self.contentsDir, self.map,
             logFile = self.logFile, requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name, self.log)
+        self.log.reset()
 
     def reopen(self):
+        self.log.reset()
         self.log(3)
         if self.db.reopen():
             # help the garbage collector with the magic from __del__
