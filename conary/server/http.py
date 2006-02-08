@@ -229,16 +229,18 @@ class HttpHandler(WebHandler):
     def files(self, auth, t, v, f):
         v = versions.ThawVersion(v)
         f = deps.ThawDependencySet(f)
-
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
-
         # non-source group troves only show contained troves
         if t.startswith('group-') and not t.endswith(':source'):
             troves = sorted(parentTrove.iterTroveList(strongRefs=True))
             return self._write("group_contents", troveName = t, troves = troves)
         else: # source troves and non-group troves
             fileIters = []
-            for trove in self.repos.walkTroveSet(parentTrove):
+            # XXX: Needs to be optimized
+            # the walkTroveSet() will request a changeset for every
+            # trove in the chain.  then iterFilesInTrove() will
+            # request it again just to retrieve the filelist.
+            for trove in self.repos.walkTroveSet(parentTrove, withFiles = False):
                 files = self.repos.iterFilesInTrove(
                     trove.getName(),
                     trove.getVersion(),
@@ -246,7 +248,6 @@ class HttpHandler(WebHandler):
                     withFiles = True,
                     sortByPath = True)
                 fileIters.append(files)
-
             return self._write("files",
                 troveName = t,
                 fileIters = itertools.chain(*fileIters))
