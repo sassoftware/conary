@@ -857,14 +857,16 @@ class DependencyTables:
 
             # Create dependencies from collections to the things they include.
             # This forces collections to be installed after all of their
-            # elements
+            # elements.  We include weak references in case the intermediate
+            # trove is not part of the update job.
             i = 0
             for job in jobSet:
                 if job[2][0] is None: continue
                 trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
                                            withFiles = False)
 
-                for name, version, flavor in trv.iterTroveList(strongRefs=True):
+                for name, version, flavor in trv.iterTroveList(strongRefs=True,
+                                                               weakRefs=True):
                     targetTrove = troveInfo.get((name, version, flavor), -1)
                     if targetTrove >= 0:
                         newNewEdges.add((i + 1, targetTrove, None))

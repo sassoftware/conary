@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bugfixes
+    * A bug that allowed group-os to be installed before children of its 
+      children were installed has been fixed.  This ensures this if a 
+      an update is partially completed, it can be restarted from where
+      it left off.
+
 Changes in 0.97.1:
   o Bugfixes
     * A bug has been fixed that allowed the "incomplete" flag to be
