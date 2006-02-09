@@ -839,6 +839,10 @@ class ReadOnlyChangeSet(ChangeSet):
 	# proper stream and contents
 	for trv, troveCs in itertools.izip(oldTroves,
                                            self.newTroves.itervalues()):
+            if trv.troveInfo.incomplete():
+                raise errors.TroveError('''\
+Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary and/or reinstall %s=%s[%s].''' % (trv.getName(), trv.getVersion(),
+                                   trv.getFlavor()))
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
 	    newFlavor = troveCs.getNewFlavor()

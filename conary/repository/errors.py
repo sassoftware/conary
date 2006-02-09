@@ -14,6 +14,7 @@
 from conary.errors import ConaryError, InternalConaryError
 from conary.errors import RepositoryError, TroveNotFound
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
+from conary.trove import TroveError
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
 from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions

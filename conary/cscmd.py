@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
 
 from conary import conaryclient
 from conary import versions
@@ -97,7 +98,17 @@ def LocalChangeSetCommand(db, cfg, item, outFileName):
                                     pristine = True)
 	    ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
 	    list.append((trove, origTrove, ver, 0))
-	    
+
+    incomplete = [ db.troveIsIncomplete(x[1].getName(), x[1].getVersion(), 
+                                        x[1].getFlavor()) for x in list ]
+    incomplete = [ x[0][1] for x in itertools.izip(list, incomplete) if x[1] ]
+    if incomplete:
+        raise errors.ConaryError('''\
+Cannot create a local changeset using an incomplete troves:  Please ensure 
+you have the latest conary and then reinstall these troves:
+     %s
+'''   % '\n    '.join('%s=%s[%s]' % (x.getName(),x.getVersion(),x.getFlavor()) for x in incomplete))
+
     result = update.buildLocalChanges(db, list, root = cfg.root,
                                       updateContainers = True)
     if not result: return
