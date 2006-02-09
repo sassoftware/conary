@@ -860,7 +860,7 @@ class _Utilize(_UserGroup):
 	for (f, item) in self.fileFilters:
 	    if f.match(path):
 		self._markItem(path, item)
-		return
+        return
 
     def _markItem(self, path, item):
         # pure virtual
