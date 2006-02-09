@@ -1768,6 +1768,7 @@ conary erase '%s=%s[%s]'
 
                 count += len(jobList)
                 isInfo = None                 # neither true nor false
+                infoName = None
                 for job in jobList:
                     (name, (oldVersion, oldFlavor),
                            (newVersion, newFlavor), absolute) = job
@@ -1778,14 +1779,21 @@ conary erase '%s=%s[%s]'
                     if name.startswith('info-'):
                         assert(isInfo is True or isInfo is None)
                         isInfo = True
+                        if not isInfo:
+                            infoName = name.split(':')[0]
                     else:
                         assert(isInfo is False or isInfo is None)
                         isInfo = False
 
-                if not isInfo and newJobIsInfo is True:
+                if (not isInfo or infoName != name) and newJobIsInfo is True:
                     # We switched from installing info components to
                     # installing fresh components. This has to go into
                     # a separate job from the last one.
+                    # FIXME: We also require currently that each info 
+                    # job be for the same info trove - that is, can't
+                    # have info-foo and info-bar in the same update job
+                    # because info-foo might depend on info-bar being
+                    # installed already.  This should be fixed.
                     uJob.addJob(newJob)
                     count = len(jobList)
                     newJob = list(jobList)             # make a copy
