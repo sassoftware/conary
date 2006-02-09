@@ -1228,8 +1228,13 @@ class Provides(policy.Policy):
         depPath = None
         for sysPathEntry in self.sysPath:
             if path.startswith(sysPathEntry):
-                depPath = path[len(sysPathEntry)+1:]
-                break
+                newDepPath = path[len(sysPathEntry)+1:]
+                if newDepPath not in ('__init__.py', '__init__'):
+                    # we don't allow bare __init__ as a python import
+                    # hopefully we'll find this init as a deeper import at some
+                    # other point in the sysPath
+                    depPath = newDepPath
+                    break
 
         if not depPath:
             return
@@ -1719,8 +1724,13 @@ class Requires(_addInfo):
         for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
             for sysPathEntry in self.sysPath:
                 if depPath.startswith(sysPathEntry):
-                    depPath = depPath[len(sysPathEntry)+1:]
-                    break
+                    newDepPath = depPath[len(sysPathEntry)+1:]
+                    if newDepPath not in ('__init__', '__init__.py'):
+                        # we don't allow bare __init__'s as dependencies.
+                        # hopefully we'll find this at deeper level in 
+                        # in the sysPath
+                        depPath = newDepPath
+                        break
 
             if depPath.startswith('/'):
                 # a python file not found in sys.path will not have been
