@@ -6,6 +6,8 @@ Changes in @NEW@:
       it left off.
     * A bug in python dependencies that sometimes resulted in a plain 
       python: __init__ dependency has been fixed.
+    * A bug that dropped additional r.UtilizeUser matches for a file after
+      the first one has been fixed.
 
 Changes in 0.97.1:
   o Bugfixes
