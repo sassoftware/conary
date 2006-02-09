@@ -213,6 +213,9 @@ def realMain(cfg, argv=sys.argv):
     for line in argSet.pop('config', []):
         cfg.configLine(line)
 
+    if not cfg.buildLabel and cfg.installLabelPath:
+        cfg.buildLabel = cfg.installLabelPath[0]
+
     sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
 
     cfg.initializeFlavors()

@@ -303,6 +303,9 @@ def realMain(cfg, argv=sys.argv):
     for line in argSet.pop('config', []):
         cfg.configLine(line)
 
+    if not cfg.buildLabel and cfg.installLabelPath:
+        cfg.buildLabel = cfg.installLabelPath[0]
+
     # now set the debug hook using the potentially new cfg.debugExceptions value
     sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
 
