@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0:
   o Bugfixes
     * A bug that allowed a group to be installed before children of
       its children were installed has been fixed.  This ensures this
