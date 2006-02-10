@@ -360,7 +360,6 @@ def createSchema(db):
     createDependencies(db)
     createTroveInfo(db)
     createDataStore(db)
-    createMetadata(db)
 
 # SCHEMA Migration
 
