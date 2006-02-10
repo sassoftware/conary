@@ -85,6 +85,9 @@ class NetworkAuthorization:
         except errors.InsufficientPermission:
             return False
 
+        if len(groupIds) < 1:
+            return False
+
         if mirror:
             # admin access includes mirror access
             cu.execute("""
