@@ -780,7 +780,7 @@ class MigrateTo_20(SchemaMigration):
         dbPath = self.db.database
         assert(isinstance(dbPath, str))
         # make a new database file
-        fd, fn = tempfile.mkstemp(prefix=os.path.basename(dbPath),
+        fd, fn = tempfile.mkstemp(prefix=os.path.basename(dbPath) + '-new-',
                                   dir=os.path.dirname(dbPath))
         os.close(fd)
         newdb = dbstore.connect(fn, driver='sqlite')
