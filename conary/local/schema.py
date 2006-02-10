@@ -792,19 +792,19 @@ class MigrateTo_20(SchemaMigration):
         self.db.commit()
         cu.execute("ATTACH '%s' AS newdb" %fn, start_transaction=False)
 
-        # fix up some potentially bad entries we know about
-        cu.execute("""UPDATE TroveInfo
-                      SET data='1.0'
-                      WHERE hex(data)='31' AND infotype=3""")
-        cu.execute("""UPDATE Dependencies
-                      SET flag='1.0'
-                      WHERE name LIKE 'conary%' AND flag='1'""");
-
         for t in newdb.tables.keys():
             self.message('Converting database schema to version 20 '
                          '- current table: %s' %t)
             cu.execute('INSERT OR REPLACE INTO newdb.%s '
                        'SELECT * FROM %s' % (t, t))
+
+        # fix up some potentially bad entries we know about
+        cu.execute("""UPDATE newdb.TroveInfo
+                      SET data='1.0'
+                      WHERE hex(data)='31' AND infotype=3""")
+        cu.execute("""UPDATE newdb.Dependencies
+                      SET flag='1.0'
+                      WHERE name LIKE 'conary%' AND flag='1'""");
 
         self.message('Converting database schema to version 20 '
                      '- committing')
