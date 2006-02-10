@@ -359,6 +359,7 @@ def createSchema(db):
     createFlavors(db)
     createDependencies(db)
     createTroveInfo(db)
+    createDataStore(db)
 
 # SCHEMA Migration
 
@@ -785,7 +786,9 @@ class MigrateTo_20(SchemaMigration):
         # create the schema in the new db
         newdb.loadSchema()
         createSchema(newdb)
+        # make sure we have a good view of the new schema
         newdb.commit()
+        newdb.loadSchema()
 
         cu = self.cu
         # have to commit in order to attach
@@ -804,7 +807,7 @@ class MigrateTo_20(SchemaMigration):
                       WHERE hex(data)='31' AND infotype=3""")
         cu.execute("""UPDATE newdb.Dependencies
                       SET flag='1.0'
-                      WHERE name LIKE 'conary%' AND flag='1'""");
+                      WHERE name LIKE 'conary:%' AND flag='1'""");
 
         self.message('Converting database schema to version 20 '
                      '- committing')
