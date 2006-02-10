@@ -139,6 +139,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                                           exceptionArgs[2], exceptionArgs[3])
         elif exceptionName == errors.TroveChecksumMissing.__name__:
             raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
+        elif exceptionName == errors.RepositoryMismatch.__name__:
+            raise errors.RepositoryMismatch(*exceptionArgs)
         elif exceptionName == 'FileContentsNotFound':
             raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
                                                self.toVersion(exceptionArgs[1])))

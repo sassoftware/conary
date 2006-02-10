@@ -20,7 +20,19 @@ from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
 
 class RepositoryMismatch(RepositoryError):
-    pass
+    def __init__(self, right = None, wrong = None):
+        self.right = right
+        self.wrong = wrong
+        if right and wrong:
+            msg = ('Repository name mismatch.  The correct repository name '
+                   'is "%s", but it was accessed as "%s".  Check for '
+                   'incorrect repositoryMap configuration entries.'
+                   % (right, wrong))
+        else:
+            msg = ('Repository name mismatch.  Check for incorrect '
+                   'repositoryMap entries.')
+        ConaryError.__init__(self, msg)
+
 
 class InsufficientPermission(ConaryError):
 

@@ -1,13 +1,16 @@
 Changes in @NEW@:
   o Bugfixes
-    * A bug that allowed group-os to be installed before children of its 
-      children were installed has been fixed.  This ensures this if a 
-      an update is partially completed, it can be restarted from where
-      it left off.
+    * A bug that allowed a group to be installed before children of
+      its children were installed has been fixed.  This ensures this
+      if a an update is partially completed, it can be restarted from
+      where it left off.
     * A bug in python dependencies that sometimes resulted in a plain 
       python: __init__ dependency has been fixed.
     * A bug that dropped additional r.UtilizeUser matches for a file after
       the first one has been fixed.
+    * Accessing a repository with the wrong server name no longer
+      results in an Internal Server Error.  The error is marshaled
+      back to the client.
 
 Changes in 0.97.1:
   o Bugfixes

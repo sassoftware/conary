@@ -273,7 +273,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         elif isinstance(e, errors.TroveChecksumMissing):
             return (False, True, (e.__class__.__name__, str(e),
                                   self.fromTroveTup(e.nvf)))
-
+        elif isinstance(e, errors.RepositoryMismatch):
+            return (False, True, (e.__class__.__name__,
+                                  e.right, e.wrong))
         elif isinstance(e, errors.TroveSchemaError):
             return (False, True, (errors.TroveSchemaError.__name__, str(e),
                                   self.fromTroveTup(e.nvf),

@@ -73,7 +73,7 @@ class NetworkAuthorization:
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
 
         if label and label.getHost() != self.name:
-            raise errors.RepositoryMismatch
+            raise errors.RepositoryMismatch(self.name, label.getHost())
 
         if not authToken[0]:
             return False
@@ -161,7 +161,7 @@ class NetworkAuthorization:
 
     def checkUserPass(self, authToken, label = None):
         if label and label.getHost() != self.name:
-            raise errors.RepositoryMismatch
+            raise errors.RepositoryMismatch(self.name, label.getHost())
         self.log(3, authToken[0], label)
         cu = self.db.cursor()
         stmt = "SELECT salt, password FROM Users WHERE userName=?"
