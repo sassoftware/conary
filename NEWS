@@ -1,3 +1,14 @@
+Changes in 1.0.1:
+  o Database schema migration
+    * Over time, the Conary system database schema has undergone
+      several revisions.  Conary has done incremental schema
+      migrations to bring old databases in line with the new schema as
+      much as possible, but some remnants of the old schema remain.
+      When Conary 1.0.1 runs for the first time, the database will be
+      reloaded with a fresh schema.  This corrects errors that can
+      occur due to incorrect SQL data types in table definitions.  An
+      old copy of the database will be saved as "conarydb-pre-schema-update".
+
 Changes in 1.0:
   o Bugfixes
     * A bug that allowed a group to be installed before children of

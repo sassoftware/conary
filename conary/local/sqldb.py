@@ -347,7 +347,11 @@ class Database:
         elif self.schemaVersion > schema.VERSION:
             raise schema.NewDatabaseSchema()
         self.db.loadSchema()
+
+        newCursor = self.schemaVersion < schema.VERSION
         schema.checkVersion(self.db)
+        if newCursor:
+            cu = self.db.cursor()
 
         schema.createSchema(self.db)
         schema.setupTempDepTables(self.db, cu)

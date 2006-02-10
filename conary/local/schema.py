@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 19
+VERSION = 20
 
 def resetTable(cu, name):
     try:
@@ -369,7 +369,7 @@ class SchemaMigration(migration.SchemaMigration):
             msg = self.msg
         print "\r%s\r" %(' '*len(self.msg)),
         self.msg = msg
-        print msg,
+        sys.stdout.write(msg)
         sys.stdout.flush()
 
 class MigrateTo_5(SchemaMigration):
@@ -765,6 +765,59 @@ class MigrateTo_19(SchemaMigration):
 
         return self.Version
 
+class MigrateTo_20(SchemaMigration):
+    Version = 20
+
+    def migrate(self):
+        import tempfile
+        import os
+        from conary import dbstore
+
+        # figure out where the database lives currently
+        assert(self.db.driver == 'sqlite')
+        dbPath = self.db.database
+        assert(isinstance(dbPath, str))
+        # make a new database file
+        fd, fn = tempfile.mkstemp(prefix=os.path.basename(dbPath),
+                                  dir=os.path.dirname(dbPath))
+        os.close(fd)
+        newdb = dbstore.connect(fn, driver='sqlite')
+        # create the schema in the new db
+        newdb.loadSchema()
+        createSchema(newdb)
+        newdb.commit()
+
+        cu = self.cu
+        # have to commit in order to attach
+        self.db.commit()
+        cu.execute("ATTACH '%s' AS newdb" %fn, start_transaction=False)
+
+        # fix up some potentially bad entries we know about
+        cu.execute("""UPDATE TroveInfo
+                      SET data='1.0'
+                      WHERE hex(data)='31' AND infotype=3""")
+        cu.execute("""UPDATE Dependencies
+                      SET flag='1.0'
+                      WHERE name LIKE 'conary%' AND flag='1'""");
+
+        for t in newdb.tables.keys():
+            self.message('Converting database schema to version 20 '
+                         '- current table: %s' %t)
+            cu.execute('INSERT OR REPLACE INTO newdb.%s '
+                       'SELECT * FROM %s' % (t, t))
+
+        self.message('Converting database schema to version 20 '
+                     '- committing')
+        self.db.commit()
+        self.message('')
+        newdb.close()
+        os.chmod(fn, 0644)
+        os.rename(dbPath, dbPath + '-pre-schema-update')
+        os.rename(fn, dbPath)
+        self.db.reopen()
+        self.db.loadSchema()
+        return self.Version
+
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
@@ -798,6 +851,7 @@ def checkVersion(db):
     if version == 16: version = MigrateTo_17(db)()
     if version == 17: version = MigrateTo_18(db)()
     if version == 18: version = MigrateTo_19(db)()
+    if version == 19: version = MigrateTo_20(db)()
 
     return version
 
