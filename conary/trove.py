@@ -1821,8 +1821,14 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getOldVersion(self):
 	return self.oldVersion()
 
+    def getOldNameVersionFlavor(self):
+        return self.name(), self.oldVersion(), self.oldFlavor()
+
     def getNewVersion(self):
 	return self.newVersion()
+
+    def getNewNameVersionFlavor(self):
+        return self.name(), self.newVersion(), self.newFlavor()
 
     def __cmp__(self, other):
         first = self.name()
