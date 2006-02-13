@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # - but don't impose it on others!  They can load it on their own if they
     # want.
     from conary.lib import importer
-    importer.install()
+    #importer.install()
 
 #stdlib
 import os

@@ -36,7 +36,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	return self.repos.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveId):
-	pass
+        self.repos.addTroveDone(troveId)
 
     def oldTrove(self, trove):
 	self.oldTroves.append(trove)
