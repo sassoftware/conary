@@ -3,6 +3,7 @@ Changes in @NEW@:
     * A bug that caused redirects to fail to build when multiple flavors of a 
       trove exist has been fixed.
     * A bug with cooking flavored redirects has been fixed.
+    * The cvc command no longer enforces managed policy with --prep.
 
 Changes in 1.0.1:
   o Database schema migration

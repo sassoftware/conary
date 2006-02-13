@@ -630,7 +630,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     """
     # 1. create the desired files in destdir and package info
     enforceManagedPolicy = (cfg.enforceManagedPolicy
-                            and targetLabel != versions.CookLabel())
+                            and targetLabel != versions.CookLabel()
+                            and not prep)
 
     result  = _cookPackageObject(repos, cfg, recipeClass, 
                                  sourceVersion, prep=prep,
