@@ -68,8 +68,9 @@ class SysLog:
     def open(self):
         from conary.lib import util
         self.f = None
-        sep = os.path.sep
-        for pathElement in [sep.join((self.root, x)) for x in self.path]:
+        logList = [ os.path.normpath(os.path.sep.join((self.root, x))) 
+                                for x in self.path ]
+        for pathElement in logList:
             try:
                 util.mkdirChain(os.path.dirname(pathElement))
                 self.f = open(pathElement, "a")
@@ -77,8 +78,7 @@ class SysLog:
             except:
                 pass
         if not self.f:
-            raise IOError, 'could not open any of: ' + ', '.join(self.path)
-
+            raise IOError, 'could not open any of: ' + ', '.join(logList)
 
     def __init__(self, root, path):
         self.root = root

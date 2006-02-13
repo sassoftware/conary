@@ -1,3 +1,9 @@
+Changes in 1.0.2:
+  o Bugfixes
+    * Conary displays full paths when in the error message generated
+      when it can't open a log file rather than leaving out the root 
+      directory
+
 Changes in 1.0.1:
   o Database schema migration
     * Over time, the Conary system database schema has undergone
