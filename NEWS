@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bugfixes:
+    * A bug that caused redirects to fail to build when multiple flavors of a 
+      trove exist has been fixed.
+    * A bug with cooking flavored redirects has been fixed.
+
 Changes in 1.0.1:
   o Database schema migration
     * Over time, the Conary system database schema has undergone
