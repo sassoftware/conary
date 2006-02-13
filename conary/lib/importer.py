@@ -54,12 +54,23 @@ def makeImportedModule(name, pathname, desc, scope):
         global_scope = frame.f_globals
         local_scope = frame.f_locals
 
-        if name in local_scope:
-            if name.__class__.__name__ == 'ModuleProxy': 
-                local_scope[name] = mod
-        elif name in global_scope:
-            if name.__class__.__name__ == 'ModuleProxy': 
-                global_scope[name] = mod
+        # check to see if this module exists for any part of the name
+        # we are importing, e.g. if you are importing foo.bar.baz,
+        # look for foo.bar.baz, bar.baz, and baz.
+        moduleParts = name.split('.')
+        names = [ '.'.join(moduleParts[-x:]) for x in range(len(moduleParts)) ]
+        for modulePart in names:
+            if modulePart in local_scope:
+                if local_scope[modulePart].__class__.__name__ == 'ModuleProxy':
+                    # FIXME: this makes me cringe, but I haven't figured out a
+                    # better way to ensure that the module proxy we're 
+                    # looking at is actually a proxy for this module
+                    if pathname in repr(local_scope[modulePart]):
+                        local_scope[modulePart] = mod
+            if modulePart in global_scope:
+                if global_scope[modulePart].__class__.__name__ == 'ModuleProxy':
+                    if pathname in repr(global_scope[modulePart]):
+                        global_scope[modulePart] = mod
 
         return mod
 
@@ -80,7 +91,7 @@ def makeImportedModule(name, pathname, desc, scope):
             return setattr(mod, key, value)
 
         def __repr__(self):
-            return "<moduleProxy '%s' from '%s'>" % (name, data[1])
+            return "<moduleProxy '%s' from '%s'>" % (name, pathname)
 
     return ModuleProxy()
 
