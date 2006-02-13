@@ -1033,7 +1033,7 @@ class FilesystemJob:
                 troveCs.iterChangedTroves(strongRefs = False, weakRefs = True),
                                            redundantOkay = True)
 
-        self.newTroves = [ x[1] for x in troveList ]
+        self.newTroves = [ x[2] for x in troveList ]
 
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False, 
