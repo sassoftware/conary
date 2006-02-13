@@ -14,6 +14,7 @@
 
 all: subdirs
 
+
 export VERSION = 1.0.1
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
@@ -27,6 +28,10 @@ export sitedir = $(libdir)/python$(PYVERSION)/site-packages/
 export conarydir = $(sitedir)/conary
 export conarylibdir = $(libdir)/conary
 export conarylibexecdir = $(libexecdir)/conary
+
+minimal:
+	NO_KID=1 $(MAKE) all 
+
 
 SUBDIRS=commands conary config man scripts
 

@@ -39,7 +39,7 @@ python_files = __init__.py
 dist_files = $(python_files) $(extra_dist) $(kid_files)
 
 all:
-	kidc --strip-dest-dir= $(kid_files)
+	if [ -z "$(NO_KID)" ] ; then kidc --strip-dest-dir= $(kid_files); fi
 
 install: pyfiles-install kidfiles-install
 
