@@ -98,6 +98,12 @@ class BaseCursor:
             return self._cursor.execute(sql, args[0])
         return self._cursor.execute(sql, *args)
 
+    def compile(self, sql):
+        return sql
+
+    def execstmt(self, sql, *args):
+        return self.execute(sql, *args)
+
     # return a list of the field names for the last select (if any)
     def fields(self):
         if not self._cursor.description:

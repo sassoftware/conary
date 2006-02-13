@@ -108,6 +108,12 @@ class Cursor(BaseCursor):
             raise
         return ret
 
+    def compile(self, sql):
+        return self._cursor.compile(sql)
+
+    def execstmt(self, stmt, *args):
+        return self._cursor.execstmt(stmt, *args)
+
 # Sequence implementation for sqlite
 class Sequence(BaseSequence):
     def __init__(self, db, name, cu = None):
