@@ -1034,6 +1034,12 @@ order by
 	    trv.addTrove(name, version, flavor, byDefault = byDefault,
                          weakRef = weakRef)
 
+        self.depTables.get(cu, trv, troveInstanceId)
+        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
+
+        if not withFiles:
+            return trv
+
         cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
                    "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
 	for (pathId, path, versionId, fileId, isPresent) in cu:
@@ -1045,9 +1051,6 @@ order by
 		versionCache[versionId] = version
 
 	    trv.addFile(pathId, path, version, fileId)
-
-        self.depTables.get(cu, trv, troveInstanceId)
-        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
 	return trv
 
