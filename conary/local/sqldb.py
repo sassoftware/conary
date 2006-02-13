@@ -683,7 +683,22 @@ order by
 
         self._sanitizeTroveCollection(cu, troveInstanceId)
 
-	return (cu, troveInstanceId, self.troveFiles.addItemStmt)
+        cu.execute("""CREATE TEMPORARY TABLE NewFiles (
+                        pathId BLOB,
+                        versionId INTEGER,
+                        path VARCHAR(768),
+                        fileId BLOB,
+                        stream BLOB)""")
+
+        cu.execute("""CREATE TEMPORARY TABLE NewFileTags (
+                        pathId BLOB,
+                        tag VARCHAR(767))""")
+
+        stmt = cu.compile("""
+                INSERT INTO NewFiles (pathId, versionId, path, fileId, stream)
+                        VALUES (?, ?, ?, ?, ?)""")
+
+	return (cu, troveInstanceId, stmt)
 
     def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
         # examine the list of present, missing, and not inPristine troves
@@ -796,16 +811,40 @@ order by
             if fileStream is None:
                 fileStream = fileObj.freeze()
 
-	    self.troveFiles.addItem(cu, fileObj.pathId(),
-                                    versionId, path,
-                                    fileId, troveInstanceId,
-                                    fileStream, fileObj.tags,
-                                    addItemSql = addFileStmt)
+            cu.execstmt(addFileStmt, fileObj.pathId(), versionId, path,
+                        fileId, fileStream)
+
+            for tag in fileObj.tags:
+                cu.execute("INSERT INTO NewFileTags VALUES (?, ?)",
+                           pathId, tag)
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE
 		    fileId=? AND pathId=? AND versionId=?""",
                     troveInstanceId, fileId, pathId, versionId)
+
+    def addTroveDone(self, troveInfo):
+	(cu, troveInstanceId, addFileStmt) = troveInfo
+        cu.execute("""
+            INSERT INTO DBTroveFiles (pathId, versionId, path, fileId,
+                                      instanceId, isPresent, stream)
+                        SELECT pathId, versionId, path, fileId, %d,
+                               1, stream FROM NewFiles""" % troveInstanceId)
+        cu.execute("""
+            INSERT INTO Tags (tag) SELECT DISTINCT
+                NewFileTags.tag FROM NewFileTags 
+                LEFT OUTER JOIN Tags USING (tag)
+                WHERE Tags.tag is NULL
+        """)
+        cu.execute("""
+            INSERT INTO DBFileTags (streamId, tagId)
+                SELECT streamId, tagId FROM
+                    DBTroveFiles JOIN NewFileTags USING (pathId)
+                    JOIN Tags USING (tag)
+                    WHERE instanceId = ?""", troveInstanceId)
+
+        cu.execute("DROP TABLE NewFiles")
+        cu.execute("DROP TABLE NewFileTags")
 
     def getFile(self, pathId, fileId, pristine = False):
 	stream = self.troveFiles.getFileByFileId(fileId,

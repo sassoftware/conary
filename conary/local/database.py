@@ -299,7 +299,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	return self.db.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
-	pass
+        self.db.addTroveDone(troveInfo)
 
     def pinTroves(self, troveList, pin):
         troves = self.getTroves(troveList)
