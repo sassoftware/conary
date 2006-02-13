@@ -995,7 +995,7 @@ class FilesystemJob:
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
                 self._remove(fileObj, root + path, "removing %s")
 
-        pkgList = []
+        troveList = []
 
 	for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
@@ -1003,38 +1003,27 @@ class FilesystemJob:
 		localVer = old.createBranch(versions.LocalLabel(), 
                                             withVerRel = 1)
                 newFsTrove = fsTroveDict[(troveCs.getName(), localVer)].copy()
+                baseTrove = db.getTrove(troveCs.getName(), old, 
+                                         troveCs.getOldFlavor())
             else:
                 newFsTrove = trove.Trove(troveCs.getName(), versions.NewVersion(),
                                     troveCs.getNewFlavor(), troveCs.getChangeLog())
-
-            pkgList.append((troveCs, newFsTrove))
-
-	for (troveCs, newFsTrove) in pkgList:
-	    old = troveCs.getOldVersion()
-
-	    if old:
-		baseTrove = db.getTrove(troveCs.getName(), old, 
-                                         troveCs.getOldFlavor())
-	    else:
                 baseTrove = None
 
+            troveList.append((troveCs, baseTrove, newFsTrove))
+
+	for (troveCs, baseTrove, newFsTrove) in troveList:
             self._setupRemoves(db, troveCs, changeSet, baseTrove,
                                newFsTrove, root, flags)
 
-	for i, (troveCs, newFsTrove) in enumerate(pkgList):
+	for i, (troveCs, baseTrove, newFsTrove) in enumerate(troveList):
 	    if callback:
-		callback.preparingUpdate(i + 1, len(pkgList))
+		callback.preparingUpdate(i + 1, len(troveList))
 
-	    old = troveCs.getOldVersion()
-
-	    if old:
-		baseTrove = db.getTrove(troveCs.getName(), old, 
-                                         troveCs.getOldFlavor())
+	    if baseTrove:
 		self.oldTroves.append((baseTrove.getName(), 
 					 baseTrove.getVersion(),
 					 baseTrove.getFlavor()))
-	    else:
-                baseTrove = None
 
             self._singleTrove(db, troveCs, changeSet, baseTrove,
                                       newFsTrove, root, removeHints, flags)
@@ -1044,8 +1033,7 @@ class FilesystemJob:
                 troveCs.iterChangedTroves(strongRefs = False, weakRefs = True),
                                            redundantOkay = True)
 
-        pkgList = [ x[1] for x in pkgList ]
-        self.newTroves = pkgList
+        self.newTroves = [ x[1] for x in troveList ]
 
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False, 
