@@ -698,6 +698,9 @@ class Trove(streams.StreamSet):
     
     def getVersion(self):
         return self.version()
+
+    def getNameVersionFlavor(self):
+        return self.name(), self.version(), self.flavor()
     
     def changeVersion(self, version):
         self.version.set(version)
