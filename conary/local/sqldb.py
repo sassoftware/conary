@@ -871,9 +871,9 @@ order by
                                                fileId BINARY)
 	""" % self.db.keywords, start_transaction = False)
 
+        stmt = cu.compile("INSERT INTO getFilesTbl VALUES (?, ?)")
 	for (i, (pathId, fileId, version)) in enumerate(l):
-	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)",
-		       i, fileId, start_transaction = False)
+            cu.execstmt(stmt, i, fileId)
 
 	cu.execute("""
 	    SELECT DISTINCT row, stream FROM getFilesTbl
