@@ -260,7 +260,7 @@ class ChangeSetJob:
     remappings should have been applied to the change set before it gets
     this far. Derivative classes can override these methods to change the
     behavior; for example, if addTrove is overridden no pacakges will
-    make it to the database. The same holds for oldFile.
+    make it to the database. The same holds for oldTrove.
     """
 
     storeOnlyConfigFiles = False
@@ -271,10 +271,7 @@ class ChangeSetJob:
     def addTroveDone(self, troveId):
 	self.repos.addTroveDone(troveId)
 
-    def oldTrove(self, trove):
-	pass
-
-    def oldFile(self, pathId, fileVersion, fileObj):
+    def oldTrove(self, name, version, flavor):
 	pass
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
@@ -353,9 +350,10 @@ class ChangeSetJob:
 
 	    if oldTroveVersion:
 		newTrove = repos.getTrove(troveName, oldTroveVersion, 
-                                          csTrove.getOldFlavor(), 
+                                          oldTroveFlavor,
                                           pristine = True)
-		newTrove.changeVersion(newVersion)
+                self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
+                              oldTroveFlavor)
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
                                        troveFlavor, csTrove.getChangeLog(),
@@ -537,9 +535,4 @@ class ChangeSetJob:
 
 	for (troveName, version, flavor) in cs.getOldTroveList():
 	    trv = self.repos.getTrove(troveName, version, flavor)
-	    self.oldTrove(trv)
-
-	    for (pathId, path, fileId, version) in trv.iterFileList():
-		file = self.repos.getFileVersion(pathId, fileId, version)
-		self.oldFile(pathId, version, file)
-
+	    self.oldTrove(trv, None, troveName, version, flavor)

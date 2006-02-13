@@ -38,8 +38,28 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def addTroveDone(self, troveId):
         self.repos.addTroveDone(troveId)
 
-    def oldTrove(self, trove):
-	self.oldTroves.append(trove)
+    def oldTrove(self, oldTrove, trvCs, name, version, flavor):
+        # trvCs is None for an erase, !None for an update
+        self.oldTroves.append((name, version, flavor))
+
+        # while we're here, trove change sets may mark some files as removed;
+        # we need to remember to remove those files, and make the paths for
+        # those files candidates for removal. trove change sets also know 
+        # when file paths have changed, and those old paths are also candidates
+        # for removal
+        if trvCs:
+            for pathId in trvCs.getOldFileList():
+                if not oldTrove.hasFile(pathId):
+                    # the file has already been removed from the non-pristine
+                    # version of this trove in the database, so there is
+                    # nothing to do
+                    continue
+                (oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
+                self.removeFile(pathId, oldFileId)
+        else:
+            # a pure erasure; remove all of the files
+            for (pathId, path, fileId, version) in oldTrove.iterFileList():
+                self.removeFile(pathId, fileId)
 
     def oldTroveList(self):
 	return self.oldTroves
@@ -90,46 +110,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
         self.autoPinList = autoPinList
 
-	# remove old versions of the packages which are being added. this has
-	# to be done before FilesystemRepository.__init__() is called, as
-	# it munges the database so we can no longer get to the old packages
-	# 
-	# while we're here, package change sets may mark some files as removed;
-	# we need to remember to remove those files, and make the paths for
-	# those files candidates for removal. package change sets also know 
-	# when file paths have changed, and those old paths are also candidates
-	# for removal
-	for csTrove in cs.iterNewTroveList():
-	    name = csTrove.getName()
-	    oldVersion = csTrove.getOldVersion()
-
-	    if not oldVersion:
-		# we know this isn't an absolute change set (since this
-		# class can't handle absolute change sets, and asserts
-		# the away at the top of __init__() ), so this must be
-		# a new package. no need to erase any old stuff then!
-		continue
-
-	    assert(repos.hasTrove(name, oldVersion, csTrove.getOldFlavor()))
-
-	    oldTrove = repos.getTrove(name, oldVersion, csTrove.getOldFlavor())
-	    self.oldTrove(oldTrove)
-
-	    for pathId in csTrove.getOldFileList():
-                if not oldTrove.hasFile(pathId):
-                    # the file has already been removed from the non-pristine
-                    # version of this trove in the database, so there is
-                    # nothing to do
-                    continue
-		(oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
-		self.removeFile(pathId, oldFileId)
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
                                          threshold = threshold, 
                                          allowIncomplete=allowIncomplete)
 
-        for trove in self.oldTroveList():
-            self.repos.eraseTrove(trove.getName(), trove.getVersion(),
-                                  trove.getFlavor())
+        for name, version, flavor in self.oldTroveList():
+            self.repos.eraseTrove(name, version, flavor)
 
 	for (pathId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)
