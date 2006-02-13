@@ -271,7 +271,7 @@ class ChangeSetJob:
     def addTroveDone(self, troveId):
 	self.repos.addTroveDone(troveId)
 
-    def oldTrove(self, name, version, flavor):
+    def oldTrove(self, *args):
 	pass
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
