@@ -1182,10 +1182,11 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 		os.close(fd)
 
 	if not f.eq(srcFile, ignoreOwnerGroup = noIds):
-	    newTrove.addFile(pathId, path, newVersion, f.fileId())
+            newFileId = f.fileId()
+	    newTrove.addFile(pathId, path, newVersion, newFileId)
 
 	    (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
-	    changeSet.addFile(srcFileId, f.fileId(), filecs)
+	    changeSet.addFile(srcFileId, newFileId, filecs)
 	    if hash and withFileContents:
 		newCont = filecontents.FromFilesystem(realPath)
 
