@@ -39,13 +39,13 @@ def makeImportedModule(name, pathname, desc, scope):
                 file = open(pathname, 'U')
             except:
                 file = None
-            
+
             try:
                 mod = imp.load_module(name, file, pathname, desc)
             finally:
                 if file is not None:
                     file.close()
-            
+
             sys.modules[name] = mod
 
         scope[name] = mod
@@ -106,16 +106,16 @@ class OnDemandLoader(object):
         self.pathname = pathname
         self.desc = desc
         self.scope = scope
-        
+
     def load_module(self, fullname):
-	if fullname in __builtins__:
+        if fullname in __builtins__:
             try:
                 mod = imp.load_module(self.name, self.file, 
                                       self.pathname, self.desc)
             finally:
                 if self.file:
                     self.file.close()
-	    sys.modules[fullname] = mod
+            sys.modules[fullname] = mod
         else:
             if self.file:
                 self.file.close()
@@ -136,7 +136,7 @@ class OnDemandImporter(object):
             mod = sys.modules.get(fullname, False)
             if mod is None or mod and isinstance(mod, types.ModuleType):
                 return mod
-        
+
         frame = sys._getframe(1)
         global_scope = frame.f_globals
         # this is the scope in which import <fullname> was called
