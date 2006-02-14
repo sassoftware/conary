@@ -4,6 +4,8 @@ Changes in @NEW@:
       trove exist has been fixed.
     * A bug with cooking flavored redirects has been fixed.
     * The cvc command no longer enforces managed policy with --prep.
+    * Fixed a bug that caused disttools based python packages to be built as
+      .egg files.  This bug was introduced in conary 0.94.
 
 Changes in 1.0.1:
   o Database schema migration
