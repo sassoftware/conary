@@ -41,7 +41,7 @@ wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
-cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
+cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o streamcoll.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
              stringstream.c cstreams.h filename_wrapper.c Makefile

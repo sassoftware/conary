@@ -427,14 +427,12 @@ class StreamCollection(InfoStream):
     def thaw(self, data):
         i = 0
         self._items = dict([ (x, {}) for x in self.streamDict ])
+
         while (i < len(data)):
-            typeId, length = struct.unpack("!BH", data[i:i+3])
-            i += 3
-            s = data[i:i+length]
+            typeId, s, i = cstreams.collYank(i, data)
             item = self.streamDict[typeId](s)
             self._items[typeId][item] = True
-            i += length
-        
+
         assert(i == len(data))
 
     def addStream(self, typeId, item):

@@ -28,7 +28,10 @@
 /* ------------------------------------- */
 /* Module initialization                 */
 
+extern PyObject * collYank(PyObject *self, PyObject *args);
+
 static PyMethodDef CStreamsMethods[] = {
+    { "collYank", collYank, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
