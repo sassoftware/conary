@@ -24,8 +24,7 @@ from conary import files
 from conary import streams
 from conary import versions
 from conary.deps import deps
-from conary.lib import log
-from conary.lib import sha1helper
+from conary.lib import log, misc, sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 from conary.lib import openpgpkey
 from conary.streams import ByteStream
@@ -1691,35 +1690,17 @@ class ReferencedFileList(list, streams.InfoStream):
 	if not data:
 	    return
 
-	i = 0
-	while i < len(data):
-	    pathId = data[i:i+16]
-	    i += 16
+        i = 0
+        while i < len(data):
+            i, (pathId, path, fileId, verStr) = misc.unpack("!S16SHSHSH", i, 
+                                                            data)
+            if not path: path = None
+            if not fileId: fileId = None
 
-	    pathLen = struct.unpack("!H", data[i:i+2])[0]
-	    i += 2
-	    if pathLen:
-		path = data[i:i + pathLen]
-		i += pathLen
-	    else:
-		path = None
-
-	    fileIdLen = struct.unpack("!H", data[i:i+2])[0]
-	    i += 2
-	    if fileIdLen:
-                assert(fileIdLen == 20)
-		fileId = data[i:i+20]
-		i += fileIdLen
-	    else:
-		fileId = None
-
-	    versionLen = struct.unpack("!H", data[i:i+2])[0]
-	    i += 2
-	    if versionLen:
-		version = versions.VersionFromString(data[i:i + versionLen])
-		i += versionLen
-	    else:
-		version = None
+            if verStr:
+                version = versions.VersionFromString(verStr)
+            else:
+                version = None
 
 	    self.append((pathId, path, fileId, version))
 

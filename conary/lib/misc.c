@@ -16,13 +16,21 @@
 
 #include <Python.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <malloc.h>
+#include <netinet/in.h>
 #include <sys/stat.h>
+
+/* debugging aid */
+#if defined(__i386__) || defined(__x86_64__)
+# define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
+#endif
 
 static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
+static PyObject * unpack(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "exists", exists, METH_VARARGS,
@@ -33,6 +41,7 @@ static PyMethodDef MiscMethods[] = {
     { "removeIfExists", removeIfExists, METH_VARARGS, 
 	"unlinks a file if it exists; silently fails if it does not exist. "
 	"returns a boolean indicating whether or not a file was removed" },
+    { "unpack", unpack, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -84,6 +93,92 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args) {
 
     Py_INCREF(Py_True);
     return Py_True;
+}
+
+static PyObject * unpack(PyObject *self, PyObject *args) {
+    char * data, * format;
+    int dataLen;
+    char * dataPtr, * formatPtr;
+    int offset;
+    PyObject * retList, * dataObj;
+    int intVal;
+
+    //breakpoint;
+
+    if (!PyArg_ParseTuple(args, "sis#", &format, &offset, &data, &dataLen))
+        return NULL;
+
+    formatPtr = format;
+
+    if (*formatPtr != '!') {
+        PyErr_SetString(PyExc_ValueError, "format must begin with !");
+        return NULL;
+    }
+    formatPtr++;
+
+    retList = PyList_New(0);
+    dataPtr = data + offset;
+
+    while (*formatPtr) {
+        switch (*formatPtr) {
+          case 'H':
+            intVal = ntohs(*((short *) dataPtr));
+            dataObj = PyInt_FromLong(intVal);
+            PyList_Append(retList, dataObj);
+            Py_DECREF(dataObj);
+            dataPtr += 2;
+            formatPtr++;
+            break;
+
+          case 'S':
+            /* extension -- extract a string based on the length which
+               preceeds it */
+            formatPtr++;
+
+            if (*formatPtr == 'H') {
+                intVal = ntohs(*((short *) dataPtr));
+                dataPtr += 2;
+                formatPtr++;
+            } else if (isdigit(*formatPtr)) {
+                char lenStr[10];
+                char * lenPtr = lenStr;
+
+                /* '\0' isn't a digit, so this check stops at the end */
+                while (isdigit(*formatPtr) &&
+                       (lenPtr - lenStr) < sizeof(lenStr))
+                    *lenPtr++ = *formatPtr++;
+
+                if ((lenPtr - lenStr) == sizeof(lenStr)) {
+                    Py_DECREF(retList);
+                    PyErr_SetString(PyExc_ValueError, 
+                                    "length too long for S format");
+                    return NULL;
+                }
+
+                *lenPtr = '\0';
+
+                intVal = atoi(lenStr);
+            } else {
+                Py_DECREF(retList);
+                PyErr_SetString(PyExc_ValueError, 
+                                "# must be followed by H in format");
+                return NULL;
+            }
+
+            dataObj = PyString_FromStringAndSize(dataPtr, intVal);
+            PyList_Append(retList, dataObj);
+            Py_DECREF(dataObj);
+            dataPtr += intVal;
+            break;
+
+          default:
+            Py_DECREF(retList);
+            PyErr_SetString(PyExc_ValueError, "unknown character in format");
+            return NULL;
+        }
+    }
+
+    return Py_BuildValue("iO", dataPtr - data, retList);
 }
 
 PyMODINIT_FUNC
