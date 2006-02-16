@@ -6,6 +6,8 @@ Changes in @NEW@:
     * The cvc command no longer enforces managed policy with --prep.
     * Fixed a bug that caused disttools based python packages to be built as
       .egg files.  This bug was introduced in conary 0.94.
+    * Fixed a bug that prevented checking in a recipe that deleted
+      policy.
 
 Changes in 1.0.1:
   o Database schema migration
