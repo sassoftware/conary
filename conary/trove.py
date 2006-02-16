@@ -1687,8 +1687,11 @@ class ReferencedFileList(list, streams.InfoStream):
 
     def thaw(self, data):
 	del self[:]
-	if not data:
-	    return
+
+        # this lastVerStr check bypasses the normal version cache whenever
+        # there are two sequential versions which are the same; this is a
+        # massive speedup for troves with many files (90% or better)
+        lastVerStr = None;
 
         i = 0
         while i < len(data):
@@ -1697,8 +1700,12 @@ class ReferencedFileList(list, streams.InfoStream):
             if not path: path = None
             if not fileId: fileId = None
 
-            if verStr:
+            if verStr == lastVerStr:
+                version = lastVer
+            elif verStr:
                 version = versions.VersionFromString(verStr)
+                lastVer = version
+                lastVerStr = verStr
             else:
                 version = None
 
