@@ -24,7 +24,8 @@ if os.path.dirname(sys.argv[0]) != ".":
 else:
     fullPath = os.getcwd()
 
-sys.path.insert(0, os.path.dirname(fullPath))
+from conary.lib import util
+sys.excepthook = util.genExcepthook(debug=True)
 
 def usage():
     print "manageents [--config <value>] add-entitlement <server> <class> <entitlement>"
@@ -40,7 +41,7 @@ cfgMap = {}
 
 argDef["config"] = options.MULT_PARAM
 
-cfg = conarycfg.ConaryConfiguration()
+cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
 
 try:
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
