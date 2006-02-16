@@ -1711,7 +1711,7 @@ class ReferencedFileList(list, streams.InfoStream):
 		fileId = data[i:i+20]
 		i += fileIdLen
 	    else:
-		fileIdLen = None
+		fileId = None
 
 	    versionLen = struct.unpack("!H", data[i:i+2])[0]
 	    i += 2
