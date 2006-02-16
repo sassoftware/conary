@@ -23,7 +23,7 @@ import os
 
 from conary import files, streams, trove, versions
 from conary.deps import deps
-from conary.lib import enum, log, patch, sha1helper, util
+from conary.lib import enum, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
 
 # "refr" being the same length as "file" matters
@@ -106,10 +106,8 @@ class ChangeSetFileDict(dict, streams.InfoStream):
     def thaw(self ,data):
 	i = 0
 	while i < len(data):
-	    size = struct.unpack("!I", data[i:i+4])[0]
-	    i += 4
-	    info = FileInfo(data[i:i+size])
-	    i += size
+            i, ( frzFile, ) = misc.unpack("!SI", i, data)
+            info = FileInfo(frzFile)
 
             oldFileId = info.oldFileId()
             if oldFileId == "":
