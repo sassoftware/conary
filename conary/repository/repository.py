@@ -428,7 +428,8 @@ class ChangeSetJob:
                                                         oldfile.flags.isConfig()):
                                 restoreContents = 0
                         else:
-                            fileObj = files.ThawFile(diff, pathId)
+                            #fileObj = files.ThawFile(diff, pathId)
+                            fileObj = None
                             fileStream = diff
                             oldfile = None
 
@@ -444,32 +445,38 @@ class ChangeSetJob:
 		# there contents in the archive "soon"; config files need
 		# extra magic for tracking since we may have to merge
 		# contents
-		if not fileObj or not fileObj.hasContents or		\
-			    not restoreContents:
-		    # this means there are no contents to restore
+                if not fileStream or not restoreContents:
+		    # empty fileStream means there are no contents to restore
+                    continue
+                hasContents = files.frozenFileHasContents(fileStream)
+                if not hasContents:
 		    continue
-		if self.storeOnlyConfigFiles and not fileObj.flags.isConfig():
-		    continue
+
+                fileFlags = files.frozenFileFlags(fileStream)
+                if self.storeOnlyConfigFiles and not fileFlags.isConfig():
+                    continue
+
+                contentInfo = files.frozenFileContentInfo(fileStream)
 
 		# we already have the contents of this file... we can go
 		# ahead and restore it reusing those contents
-		if repos._hasFileContents(fileObj.contents.sha1()):
+                if repos._hasFileContents(contentInfo.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
    		    fileContents = filecontents.FromDataStore(
  				     repos.contentsStore, 
- 				     fileObj.contents.sha1())
+                                     contentInfo.sha1())
  		    contType = changeset.ChangedFileTypes.file
- 		    self.addFileContents(fileObj.contents.sha1(), newVersion, 
+                    self.addFileContents(contentInfo.sha1(), newVersion, 
  					 fileContents, restoreContents, 
- 					 fileObj.flags.isConfig())
-		elif fileObj.flags.isConfig():
-		    tup = (pathId, fileObj, oldPath, oldfile, troveName,
-			   oldTroveVersion, troveFlavor, newVersion, 
+                                         fileFlags.isConfig())
+                elif fileFlags.isConfig():
+                    tup = (pathId, contentInfo.sha1(), oldPath, oldfile, 
+                           troveName, oldTroveVersion, troveFlavor, newVersion, 
                            fileId, oldVersion, oldFileId, restoreContents)
 		    configRestoreList.append(tup)
 		else:
-		    tup = (pathId, fileObj.contents.sha1(), newVersion, 
+                    tup = (pathId, contentInfo.sha1(), newVersion, 
 			   restoreContents)
 		    normalRestoreList.append(tup)
 
@@ -479,18 +486,17 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
-	for (pathId, fileObj, oldPath, oldfile, troveName, oldTroveVersion,
+	for (pathId, sha1, oldPath, oldfile, troveName, oldTroveVersion,
 	     troveFlavor, newVersion, newFileId, oldVersion, 
              oldFileId, restoreContents) in configRestoreList:
             if cs.configFileIsDiff(pathId):
                 (contType, fileContents) = cs.getFileContents(pathId)
 
-		assert(fileObj.flags.isConfig())
 		# the content for this file is in the form of a
 		# diff, which we need to apply against the file in
 		# the repository
 		assert(oldVersion)
-		sha1 = oldfile.contents.sha1()
+		oldSha1 = oldfile.contents.sha1()
 
 		f = self.repos.getFileContents(
                                 [(oldFileId, oldVersion, oldfile)])[0].get()
@@ -510,8 +516,8 @@ class ChangeSetJob:
                 # to the config file cache)
                 fileContents = filecontents.FromChangeSet(cs, pathId)
 
-	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
-				 fileContents, restoreContents, 1)
+	    self.addFileContents(sha1, newVersion, fileContents, 
+                                 restoreContents, 1)
 
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()

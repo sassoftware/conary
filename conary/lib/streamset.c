@@ -402,6 +402,53 @@ static PyObject * StreamSet_Eq(PyObject * self,
     return Py_False;
 }
 
+/* this is a python class method */
+static PyObject * StreamSet_Find(PyObject * objClass, PyObject * args) {
+    char * data;
+    int dataLen;
+    char * chptr, * end;
+    int targetStreamId, streamId, size;
+    int ssdIdx;
+    StreamSetDefObject * ssd;
+
+    if (!PyArg_ParseTuple(args, "is#", &targetStreamId, 
+                          &data, &dataLen))
+        return NULL;
+
+    ssd = (void *) PyObject_GetAttrString((PyObject *) objClass, "_streamDict");
+
+    /* find the target stream from our stream definition */
+    for (ssdIdx = 0; ssdIdx < ssd->tagCount; ssdIdx++)
+        if (ssd->tags[ssdIdx].tag == targetStreamId) break;
+
+    if (ssdIdx == ssd->tagCount) {
+        PyErr_SetString(PyExc_ValueError, "unknown tag in stream set");
+        return NULL;
+    }
+
+    chptr = data;
+    end = data + dataLen;
+
+    while (chptr < end) {
+        PyObject * obj;
+
+        getTag(&chptr, &streamId, &size);
+        if (streamId != targetStreamId) {
+            chptr += size;
+            continue;
+        }
+
+        if (!(obj = PyObject_CallFunction(ssd->tags[ssdIdx].type, "s#",
+                                          chptr, size)))
+            return NULL;
+
+        return obj;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyObject * StreamSet_Freeze(StreamSetObject * self, 
                                    PyObject * args,
                                    PyObject * kwargs) {
@@ -763,6 +810,7 @@ static PyMethodDef StreamSetMethods[] = {
     { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS         },
     { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS                 },
     { "__eq__", (PyCFunction) StreamSet_Eq,     METH_VARARGS | METH_KEYWORDS },
+    { "find",   (PyCFunction) StreamSet_Find,   METH_VARARGS | METH_CLASS    },
     { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
     { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
     { "twm",    (PyCFunction) StreamSet_Twm,    METH_VARARGS | METH_KEYWORDS },

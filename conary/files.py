@@ -260,6 +260,10 @@ class File(streams.StreamSet):
         FILE_STREAM_FLAVOR   : (SMALL, streams.DependenciesStream, 'flavor'),
         FILE_STREAM_TAGS     : (SMALL, streams.StringsStream, "tags")
         }
+
+    # this class, and others which derive from it, need to explicitly define
+    # _streamDict to allow the find() method to work properly
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "thePathId", "inode", "flags", "tags",
                   'provides', 'requires', 'flavor' ]
 
@@ -368,6 +372,7 @@ class SymbolicLink(File):
         FILE_STREAM_TARGET :   (SMALL, streams.StringStream, "target"),
     }
     streamDict.update(File.streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     # chmod() on a symlink follows the symlink
     skipChmod = True
     __slots__ = [ "target", ]
@@ -425,6 +430,7 @@ class DeviceFile(File):
 
     streamDict = { FILE_STREAM_DEVICE : (SMALL, DeviceStream, "devt") }
     streamDict.update(File.streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -469,6 +475,7 @@ class RegularFile(File):
     }
 
     streamDict.update(File.streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = ('contents', 'linkGroup')
 
     lsTag = "-"
@@ -629,6 +636,16 @@ def contentsChanged(diff):
 	i += size
         
     return False
+
+# shortcuts to get items directly from frozen files
+def frozenFileHasContents(frz):
+    return frz[0] == '-'
+
+def frozenFileFlags(frz):
+    return File.find(FILE_STREAM_FLAGS, frz[1:])
+
+def frozenFileContentInfo(frz):
+    return RegularFile.find(FILE_STREAM_CONTENTS, frz[1:])
 
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])

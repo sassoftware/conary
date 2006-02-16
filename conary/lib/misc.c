@@ -139,6 +139,10 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
                 intVal = ntohs(*((short *) dataPtr));
                 dataPtr += 2;
                 formatPtr++;
+            } else if (*formatPtr == 'I') {
+                intVal = ntohl(*((int *) dataPtr));
+                dataPtr += 4;
+                formatPtr++;
             } else if (isdigit(*formatPtr)) {
                 char lenStr[10];
                 char * lenPtr = lenStr;
@@ -161,7 +165,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
             } else {
                 Py_DECREF(retList);
                 PyErr_SetString(PyExc_ValueError, 
-                                "# must be followed by H in format");
+                                "# must be followed by H or I in format");
                 return NULL;
             }
 

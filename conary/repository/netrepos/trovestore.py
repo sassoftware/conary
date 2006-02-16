@@ -841,7 +841,7 @@ class TroveStore:
 	cu = troveInfo[0]
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
-	if fileObj:
+        if fileObj or fileStream:
             if fileStream is None:
                 fileStream = fileObj.freeze()
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",

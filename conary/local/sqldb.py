@@ -807,16 +807,22 @@ order by
 	(cu, troveInstanceId, addFileStmt) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
-	if fileObj:
+	if fileObj or fileStream:
             if fileStream is None:
                 fileStream = fileObj.freeze()
 
-            cu.execstmt(addFileStmt, fileObj.pathId(), versionId, path,
-                        fileId, fileStream)
+            cu.execstmt(addFileStmt, pathId, versionId, path, fileId, 
+                        fileStream)
 
-            for tag in fileObj.tags:
-                cu.execute("INSERT INTO NewFileTags VALUES (?, ?)",
-                           pathId, tag)
+            if fileObj:
+                tags = fileObj.tags
+            else:
+                tags = files.File.find(files.FILE_STREAM_TAGS, fileStream)
+
+            if tags:
+                for tag in fileObj.tags:
+                    cu.execute("INSERT INTO NewFileTags VALUES (?, ?)",
+                               pathId, tag)
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE
