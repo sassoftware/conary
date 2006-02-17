@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.2:
   o Bugfixes:
     * A bug that caused redirects to fail to build when multiple flavors of a 
       trove exist has been fixed.
