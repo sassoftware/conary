@@ -1892,7 +1892,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
            HAVING c>1
         ) AS lims""")
         lim = cu.fetchall()[0][0]
-        if lim is None:
+        if lim is None or lim < 1000:
             lim = 1000 # for safety
         query = """
                 SELECT DISTINCT UP.permittedTrove, item, version, flavor,
