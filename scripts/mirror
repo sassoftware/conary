@@ -54,7 +54,7 @@ def parseArgs():
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
-    parser.add_option("--full-sig-sync", dest = "syncSigs", 
+    parser.add_option("--full-sig-sync", dest = "syncSigs",
                       action = "store_true", default = False,
                       help = "replace all of the trove signatures on "
                              "the target repository")
@@ -65,7 +65,7 @@ def parseArgs():
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
                       help = "skip commiting changes to the target repository")
-    parser.add_option("-v", "--verbose", dest = "verbose", 
+    parser.add_option("-v", "--verbose", dest = "verbose",
                       action = "store_true", default = False,
                       help = "display information on what is going on")
 
@@ -82,7 +82,7 @@ def parseArgs():
 
 def filterAlreadyPresent(repos, troveList):
     # Filter out troves which are already in the local repository. Since
-    # the marks aren't distinct (they increase, but not monotonially), it's 
+    # the marks aren't distinct (they increase, but not monotonially), it's
     # possible that something new got committed with the same mark we
     # last updated to, so we have to look again at all of the troves in the
     # source repository with the last mark which made it into our target.
@@ -106,7 +106,7 @@ def filterSigsWithoutTroves(repos, currentMark, sigList):
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
-    # flavor; it's assumed that adjacent troves with the same version/flavor 
+    # flavor; it's assumed that adjacent troves with the same version/flavor
     # must be in a single commit
     grouping = []
     currentGroup = []
@@ -128,7 +128,7 @@ def groupTroves(troveList):
 def buildJobList(repos, groupList):
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
-    # absolute ones. 
+    # absolute ones.
     q = {}
     for group in groupList:
         for mark, (name, version, flavor) in group:
@@ -163,15 +163,15 @@ def buildJobList(repos, groupList):
                             closeness = version.closeness(repVersion)
 
                         if score is False: continue
-                        if score < currentMatch[3]: 
+                        if score < currentMatch[3]:
                             continue
                         elif score > currentMatch[3]:
-                            currentMatch = (repVersion, repFlavor, closeness, 
+                            currentMatch = (repVersion, repFlavor, closeness,
                                             score)
                         elif closeness < currentMatch[2]:
                             continue
                         else:
-                            currentMatch = (repVersion, repFlavor, closeness, 
+                            currentMatch = (repVersion, repFlavor, closeness,
                                             score)
 
                 job = (name, (currentMatch[0], currentMatch[1]),
@@ -221,6 +221,32 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
     log.debug("%d new troves are available", len(troveList))
 
+    # FIXME: getnewTroveList should accept and only return troves on
+    # the labels we're interested in
+    if cfg.labels and len(troveList):
+        # XXX: temporary fix: we're trying to "weed out" troves that don't
+        # belong on the configured labels. If we're left with no troves after
+        # filtering, we need to force the target mark to the max of the current
+        # set in order to be able to move on - otherwise the next call to
+        # getNewTroveList will return the same data set
+        crtMaxMark = max(x[0] for x in troveList)
+        crtTroveLen = len(troveList)
+        if currentMark > 0 and crtMaxMark == currentMark:
+            # if we're hung on the current max then we need to
+            # forcibly advance the mark in case we're stuck
+            crtMaxMark += 1 # only used if we filter out all troves below
+        labelDict = set(cfg.labels)
+        troveList = [ x for x in troveList if
+                            x[1][1].branch().label() in cfg.labels ]
+        log.debug("after label filtering %d troves are needed", len(troveList))
+        if len(troveList) == 0 and crtTroveLen:
+            # we had troves and now we don't
+            log.debug("getNewTroveList did not return any troves for our label %s" % cfg.labels)
+            log.debug("setting newMark to %s" % crtMaxMark)
+            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+            # try again
+            return -1
+
     log.debug("looking for new pgp keys")
     keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
     if test:
@@ -242,20 +268,19 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
 
     log.debug("%d new signatures are available" % len(sigList))
 
-    if cfg.labels:
-        labelDict = set(cfg.labels)
-        troveList = [ x for x in troveList if 
+    # also weed out the signatures that don't belong on our label. Having none
+    # left after this isn't that big a deal, so we  don't have to return
+    if cfg.labels and len(sigList):
+        sigList = [ x for x in sigList if
                             x[1][1].branch().label() in cfg.labels ]
-        sigList = [ x for x in sigList if 
-                            x[1][1].branch().label() in cfg.labels ]
-        log.debug("after label filtering %d troves and %d sigs are needed", 
-                  len(troveList), len(sigList))
+        log.debug("after label filtering %d sigs are needed", len(sigList))
 
     log.debug("removing signatures for troves not yet mirrored")
     sigList = filterSigsWithoutTroves(targetRepos, currentMark, sigList)
     log.debug("%d signatures need to be mirrored", len(sigList))
 
     log.debug("filtering troves already present on the mirror")
+
     troveList = filterAlreadyPresent(targetRepos, troveList)
     log.debug("grouping %d troves based on version and flavor", len(troveList))
     groupList = groupTroves(troveList)
@@ -304,15 +329,15 @@ if options.verbose:
 
 # We need two repos clients, one for the server and one for the client. Since
 # they have the same name (the repositorymap gets us to the right hosts).
-sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap, 
+sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
                           cfg.source.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap, 
+targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test, 
+count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test,
                          options.sync, options.syncSigs)
 while not options.test and count:
     count = mirrorRepository(sourceRepos, targetRepos, cfg, options.test,

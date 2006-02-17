@@ -1661,7 +1661,8 @@ conary erase '%s=%s[%s]'
             forceJobClosure = True
             splitabble = False
 
-            csSource = trovesource.ChangesetFilesTroveSource(self.db)
+            csSource = trovesource.ChangesetFilesTroveSource(self.db,
+                                                             storeDeps=True)
             for cs in fromChangesets:
                 self._replaceIncomplete(cs, self.db, self.db, self.repos)
                 csSource.addChangeSet(cs, includesFileContents = True)

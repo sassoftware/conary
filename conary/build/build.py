@@ -516,7 +516,7 @@ class PythonSetup(BuildCommand):
         '%%(cdcmd)s'
         '%%(pythonsetup)s'
         ' %%(action)s'
-        ' %%(noegg)s'
+        ' --single-version-externally-managed'
         ' --root=%%(rootdir)s'
     )
     keywords = {
@@ -554,12 +554,10 @@ class PythonSetup(BuildCommand):
         # now figure out which kind of setup.py this is
         if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, macros.setup)).read()):
             macros.pythonsetup = 'python %(setup)s '
-            macros.noegg = ' --single-version-externally-managed'
         else:
             # hack to use setuptools instead of disttools
             macros.pythonsetup = (
                 '''python -c "import setuptools;execfile('%(setup)s')"''')
-            macros.noegg = ''
 
         util.execute(self.command %macros)
 

@@ -1,5 +1,23 @@
-Changes in 1.0.2:
-  o Bugfixes
+Changes in @NEW@:
+  o Bugfixes:
+    * A bug that caused redirects to fail to build when multiple flavors of a 
+      trove exist has been fixed.
+    * A bug with cooking flavored redirects has been fixed.
+    * The cvc command no longer enforces managed policy with --prep.
+    * A bug that caused disttools based python packages to be built as
+      .egg files has been fixed.  This bug was introduced in conary
+      0.94.
+    * A bug that prevented checking in a recipe that deleted policy
+      has been fixed.
+    * A bug that prevented entitlements from being recognized by an
+      Apache conary repository server when no username and password
+      were set for a server.
+    * A bug that prevented errors from being returned to the client
+      if it attempts to add an invalid entitlement key or has
+      insufficient permission to add the entitlement key.  An
+      InvalidEntitlement exception has been added.
+    * A repository bug prevented the mirror client from obtaining a
+      full list of new troves available for mirorring
     * Conary displays full paths when in the error message generated
       when it can't open a log file rather than leaving out the root 
       directory

@@ -50,7 +50,8 @@ class RedirectRecipe(Recipe):
             fromTrove = self.name
         elif fromTrove.find(":") != -1:
             raise ValueError, 'components cannot be individually redirected'
-        elif fromTrove.startswith("group-"):
+
+        if fromTrove.startswith("group-"):
             # how sad
             raise ValueError, "groups cannot be redirected"
 
@@ -139,10 +140,12 @@ class RedirectRecipe(Recipe):
                     matches = self.repos.getTroveLeavesByLabel(
                                     { destName : { label : None } })
                     # if there are multiple versions returned, the label
-                    # specified multiple branches
-                    if matches and len(matches[destName]) > 1:
-                        raise builderrors.RecipeFileError, \
-                            "Label %s matched multiple branches." % str(label)
+                    # may have matched multiple branches
+                    if matches:
+                        branches = set(x.branch() for x in matches[destName])
+                        if len(branches) > 1:
+                            raise builderrors.RecipeFileError, \
+                                "Label %s matched multiple branches." % str(label)
 
                 # use an empty list to indicate notexistance
                 if destName not in matches:
@@ -152,7 +155,7 @@ class RedirectRecipe(Recipe):
                     # redirect if it's for a component.
                     if name in names:
                         raise builderrors.RecipeFileError, \
-                            "Trove %s does not exist" % (destName, targetFlavor)
+                            "Trove %s does not exist" % (destName)
 
                     redirMap[(name, sourceFlavor)] = (None, None, None, [])
                     continue
@@ -174,7 +177,8 @@ class RedirectRecipe(Recipe):
                                targetFlavor != targetFlavorRestriction:
                                 continue
 
-                            if sourceFlavor.score(targetFlavor) is not None:
+                            if (sourceFlavorRestriction 
+                                or sourceFlavor.score(targetFlavor) is not False):
                                 match = targetVersion
                                 break
 

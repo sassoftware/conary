@@ -39,13 +39,13 @@ def makeImportedModule(name, pathname, desc, scope):
                 file = open(pathname, 'U')
             except:
                 file = None
-            
+
             try:
                 mod = imp.load_module(name, file, pathname, desc)
             finally:
                 if file is not None:
                     file.close()
-            
+
             sys.modules[name] = mod
 
         scope[name] = mod
@@ -54,12 +54,25 @@ def makeImportedModule(name, pathname, desc, scope):
         global_scope = frame.f_globals
         local_scope = frame.f_locals
 
-        if name in local_scope:
-            if name.__class__.__name__ == 'ModuleProxy': 
-                local_scope[name] = mod
-        elif name in global_scope:
-            if name.__class__.__name__ == 'ModuleProxy': 
-                global_scope[name] = mod
+        # check to see if this module exists for any part of the name
+        # we are importing, e.g. if you are importing foo.bar.baz,
+        # look for foo.bar.baz, bar.baz, and baz.
+        moduleParts = name.split('.')
+        names = [ '.'.join(moduleParts[-x:]) for x in range(len(moduleParts)) ]
+        for modulePart in names:
+            if modulePart in local_scope:
+                if (hasattr(local_scope[modulePart], '__class__') 
+                    and local_scope[modulePart].__class__.__name__ == 'ModuleProxy'):
+                    # FIXME: this makes me cringe, but I haven't figured out a
+                    # better way to ensure that the module proxy we're 
+                    # looking at is actually a proxy for this module
+                    if pathname in repr(local_scope[modulePart]):
+                        local_scope[modulePart] = mod
+            if modulePart in global_scope:
+                if (hasattr(global_scope[modulePart], '__class__')
+                    and global_scope[modulePart].__class__.__name__ == 'ModuleProxy'):
+                    if pathname in repr(global_scope[modulePart]):
+                        global_scope[modulePart] = mod
 
         return mod
 
@@ -80,7 +93,7 @@ def makeImportedModule(name, pathname, desc, scope):
             return setattr(mod, key, value)
 
         def __repr__(self):
-            return "<moduleProxy '%s' from '%s'>" % (name, data[1])
+            return "<moduleProxy '%s' from '%s'>" % (name, pathname)
 
     return ModuleProxy()
 
@@ -95,16 +108,16 @@ class OnDemandLoader(object):
         self.pathname = pathname
         self.desc = desc
         self.scope = scope
-        
+
     def load_module(self, fullname):
-	if fullname in __builtins__:
+        if fullname in __builtins__:
             try:
                 mod = imp.load_module(self.name, self.file, 
                                       self.pathname, self.desc)
             finally:
                 if self.file:
                     self.file.close()
-	    sys.modules[fullname] = mod
+            sys.modules[fullname] = mod
         else:
             if self.file:
                 self.file.close()
@@ -125,7 +138,7 @@ class OnDemandImporter(object):
             mod = sys.modules.get(fullname, False)
             if mod is None or mod and isinstance(mod, types.ModuleType):
                 return mod
-        
+
         frame = sys._getframe(1)
         global_scope = frame.f_globals
         # this is the scope in which import <fullname> was called

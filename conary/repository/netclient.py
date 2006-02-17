@@ -59,10 +59,11 @@ quote = lambda s: urllib.quote(s, safe='')
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
-    def __init__(self, send, name, host, pwCallback):
+    def __init__(self, send, name, host, pwCallback, anonymousCallback):
         xmlrpclib._Method.__init__(self, send, name)
         self.__host = host
         self.__pwCallback = pwCallback
+        self.__anonymousCallback = anonymousCallback
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -83,6 +84,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             if e.errcode == 403:
                 raise errors.InsufficientPermission(e.url.split("/")[2])
             raise
+        if usedAnonymous:
+            self.__anonymousCallback()
 
 	if not isException:
 	    return result
@@ -172,10 +175,13 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
         return True
 
+    def __usedAnonymousCallback(self):
+        self.__host = self.__host.split('@')[-1]
+
     def __getattr__(self, name):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
-                       self.__passwordCallback)
+                       self.__passwordCallback, self.__usedAnonymousCallback)
 
     def __init__(self, url, transporter, pwCallback):
         xmlrpclib.ServerProxy.__init__(self, url, transporter)

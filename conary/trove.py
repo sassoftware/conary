@@ -697,6 +697,9 @@ class Trove(streams.StreamSet):
     
     def getVersion(self):
         return self.version()
+
+    def getNameVersionFlavor(self):
+        return self.name(), self.version(), self.flavor()
     
     def changeVersion(self, version):
         self.version.set(version)
@@ -1806,8 +1809,14 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getOldVersion(self):
 	return self.oldVersion()
 
+    def getOldNameVersionFlavor(self):
+        return self.name(), self.oldVersion(), self.oldFlavor()
+
     def getNewVersion(self):
 	return self.newVersion()
+
+    def getNewNameVersionFlavor(self):
+        return self.name(), self.newVersion(), self.newFlavor()
 
     def __cmp__(self, other):
         first = self.name()
