@@ -18,7 +18,8 @@ Changes in @NEW@:
       InvalidEntitlement exception has been added.
     * A repository bug prevented the mirror client from obtaining a
       full list of new troves available for mirorring
-
+    * A bug in cooking groups caused the groups resulting from an r.addAll() 
+      to not respect the original group's byDefault settings in some cases
 
 Changes in 1.0.1:
   o Database schema migration
