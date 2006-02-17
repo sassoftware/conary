@@ -1884,7 +1884,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # first off, compute the max number of troves with the same mark for dynamic sizing;
         # the client can get stuck if we keep returning a (same) subset
         cu.execute("""
-        SELECT MAX(c) AS lim
+        SELECT MAX(c) + 1 AS lim
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
@@ -1893,7 +1893,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ) AS lims""")
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
-            lim = 1000 # for safety
+            lim = 1000 # for safety and efficiency
         query = """
                 SELECT DISTINCT UP.permittedTrove, item, version, flavor,
                           timeStamps, Instances.changed FROM Instances
