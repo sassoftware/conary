@@ -256,6 +256,7 @@ class SingleGroup(object):
         self.addReferenceList = []
         self.replaceTroveList = []
         self.newGroupList = {}
+        self.addAllTroveList = []
 
         self.requires = deps.DependencySet()
 
@@ -306,16 +307,32 @@ class SingleGroup(object):
     def iterAddAllSpecs(self):
         return iter(self.addReferenceList)
 
-    def addNewGroup(self, name, byDefault = None, explicit = True):
+    def addNewGroup(self, name, byDefault = None, explicit = True, 
+                    childDefaults=None):
+        """
+           Add a new group as a child group of this group.
+           childDefaults is a list of troves to use to determine whether
+           to include child implicit troves with a byDefault True.  Used
+           with addAll
+        """
+
+        if not childDefaults:
+            childDefaults = []
+        elif not isinstance(childDefaults, list):
+            childDefaults = [ childDefaults ]
+
         if name in self.newGroupList:
-            oldByDefault, oldExplicit = self.newGroupList[name]
+            (oldByDefault, oldExplicit, 
+             oldChildDefaults) = self.newGroupList[name]
             byDefault = oldByDefault or byDefault
             explicit = oldExplicit or explicit
+            childDefaults = childDefaults + oldChildDefaults
 
-        self.newGroupList[name] = (byDefault, explicit)
+        self.newGroupList[name] = (byDefault, explicit, childDefaults)
 
     def iterNewGroupList(self):
-        for name, (byDefault, explicit) in self.newGroupList.iteritems():
+        for (name, (byDefault, explicit, childDefaults)) \
+                                            in self.newGroupList.iteritems():
             yield name, byDefault, explicit
 
     def hasNewGroup(self, name):
@@ -327,30 +344,67 @@ class SingleGroup(object):
     def getByDefault(self):
         return self.byDefault
 
+    def checkAddAllForByDefault(self, parent, troveTup):
+        """ 
+            @param parent: name of parent new group or troveTup of the
+            parent trove that may have been added using addAll()
+            @param troveTup: child (n,v,f) tuple to be checked for a byDefault
+            settings.
+            @return True, None, or False, depending on whether an addAll
+            function has a byDefault True or False setting for troveTup.
+        """
+        # parent is a troveTup or a new group that may have been
+        # added/created with r.addAll().  When r.addAll() is used,
+        # the original version of the trove may have settings related
+        # to child weak references.  We want to duplicate those in the 
+        # new group.  This function returns
+
+        includeByDefault = None
+        if isinstance(parent, str) and parent.startswith('group-'):
+            byDefaultTroves = self.newGroupList[parent][2]
+        else:
+            byDefaultTroves = self.troves[parent][3]
+
+        for trv in byDefaultTroves:
+            if trv.hasTrove(*troveTup):
+                includeByDefault = trv.includeTroveByDefault(*troveTup)
+                if includeByDefault:
+                    return True
+        return includeByDefault
+
     # below here are function used to get/set the troves found 
     #  
 
-    def addTrove(self, troveTup, explicit, byDefault, components):
+    def addTrove(self, troveTup, explicit, byDefault, components, 
+                 childDefaults=None):
         assert(isinstance(byDefault, bool))
+        if not childDefaults:
+            childDefaults = []
+        elif not isinstance(childDefaults, list):
+            childDefaults = [childDefaults]
+         
 
         if troveTup in self.troves:
             # if you add a trove twice, once as explicit and once 
             # as implict, make sure it stays explicit, same w/ 
             # byDefault.
-            (oldExplicit, oldByDefault, oldComponents) = self.troves[troveTup]
+            (oldExplicit, oldByDefault, oldComponents, oldChildDefaults) = self.troves[troveTup]
             explicit = explicit or oldExplicit
             byDefault = byDefault or oldByDefault
             if oldComponents:
                 components = components + oldComponents
-
-        self.troves[troveTup] = (explicit, byDefault, components)
+            childDefaults = oldChildDefaults + childDefaults
+               
+        self.troves[troveTup] = (explicit, byDefault, components, childDefaults)
 
     def delTrove(self, name, version, flavor):
-        (explicit, byDefault, comps) = self.troves[name, version, flavor]
+        (explicit, byDefault, comps, childByDefaults) \
+                                        = self.troves[name, version, flavor]
         if explicit: 
             del self.troves[name, version, flavor]
         else:
-            self.troves[name, version, flavor] = (False, False, comps)
+            self.troves[name, version, flavor] = (False, False, comps, 
+                                                  childByDefaults)
 
     def setSize(self, size):
         self.size = size
@@ -362,7 +416,8 @@ class SingleGroup(object):
         if not (strongRefs or weakRefs):
             strongRefs = weakRefs = True
 
-        for troveTup, (explicit, byDefault, comps) in self.troves.iteritems():
+        for troveTup, (explicit, byDefault, 
+                        comps, childByDefaults) in self.troves.iteritems():
             if explicit and strongRefs:
                 yield troveTup
             elif not explicit and weakRefs:
@@ -378,11 +433,13 @@ class SingleGroup(object):
         return self.troves[name, version, flavor][2]
 
     def iterTroveListInfo(self):
-        for troveTup, (explicit, byDefault, comps) in self.troves.iteritems():
+        for troveTup, (explicit, byDefault, comps, 
+                                 childByDefaults) in self.troves.iteritems():
             yield troveTup, explicit, byDefault, comps
 
     def iterDefaultTroveList(self):
-        for troveTup, (explicit, byDefault, comps) in self.troves.iteritems():
+        for troveTup, (explicit, byDefault, comps, childByDefaults) \
+                                                  in self.troves.iteritems():
             if byDefault:
                 yield troveTup
 
@@ -577,7 +634,7 @@ def buildGroups(recipeObj, cfg, repos):
         # bound to have a conflict as well.
         badGroup = False
         for childGroup, byDefault, isExplicit in childGroups:
-            if childGroup.name in groupsWithConflicts:
+            if byDefault and childGroup.name in groupsWithConflicts:
                 badGroup = True
                 # mark this group as having a conflict
                 groupsWithConflicts[group.name] = []
@@ -700,13 +757,14 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
 
 
                 parentGroup.addNewGroup(name, byDefault=byDefault, 
-                                        explicit = True)
+                                        explicit = True, childDefaults = trv)
 
                 if troveTup not in createdGroups:
                     stack.append((groupTrvDict[troveTup], childGroup))
                     createdGroups.add(troveTup)
             else:
-                parentGroup.addTrove(troveTup, True, byDefault, [])
+                parentGroup.addTrove(troveTup, True, byDefault, [], 
+                                     childDefaults=trv)
                 troveTups.append(troveTup)
 
     cache.cacheTroves(troveTups)
@@ -759,6 +817,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     # add implicit troves
     # first from children of explicit troves.
     componentsToRemove = group.getComponentsToRemove()
+
+    
     for (troveTup, explicit, 
          byDefault, components) in list(group.iterTroveListInfo()):
         assert(explicit)
@@ -769,6 +829,11 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
 
         for (childTup, byDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
+
+            addAllDefault = group.checkAddAllForByDefault(troveTup, childTup)
+            if addAllDefault is not None:
+                byDefault = addAllDefault
+
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):
                 byDefault = False
@@ -786,7 +851,13 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         if grpIsExplicit:
             for (troveTup, explicit, childChildByDefault, comps) \
                                         in childGroup.iterTroveListInfo():
-                childChildByDefault = childByDefault and childChildByDefault
+                addAllByDefault = group.checkAddAllForByDefault(childGroup.name,
+                                                                troveTup)
+                if addAllByDefault is not None:
+                    childChildByDefault = addAllByDefault
+                else:
+                    childChildByDefault = childByDefault and childChildByDefault
+
                 if childChildByDefault and componentsToRemove:
                     if _componentMatches(troveTup[0], componentsToRemove):
                         childChildByDefault = False

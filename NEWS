@@ -1,7 +1,7 @@
-Changes in @NEW@:
+Changes in 1.0.2:
   o Bugfixes:
-    * A bug that caused redirects to fail to build when multiple flavors of a 
-      trove exist has been fixed.
+    * A bug that caused redirects to fail to build when multiple
+      flavors of a trove exist has been fixed.
     * A bug with cooking flavored redirects has been fixed.
     * The cvc command no longer enforces managed policy with --prep.
     * A bug that caused disttools based python packages to be built as
@@ -21,6 +21,10 @@ Changes in @NEW@:
     * Conary displays full paths when in the error message generated
       when it can't open a log file rather than leaving out the root 
       directory
+      full list of new troves available for mirroring.
+    * A bug in cooking groups caused the groups resulting from an
+      r.addAll() to not respect the original group's byDefault
+      settings in some cases.
 
 Changes in 1.0.1:
   o Database schema migration
