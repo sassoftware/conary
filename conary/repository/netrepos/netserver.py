@@ -1881,6 +1881,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
+        # first off, compute the max number of troves with the same mark for dynamic sizing;
+        # the client can get stuck if we keep returning a (same) subset
+        cu.execute("""
+        SELECT MAX(c) AS lim
+        FROM (
+           SELECT COUNT(instanceId) AS c
+           FROM Instances
+           GROUP BY changed
+           HAVING c>1
+        ) AS lims""")
+        lim = cu.fetchall()[0][0]
+        if lim is None:
+            lim = 1000 # for safety
         query = """
                 SELECT DISTINCT UP.permittedTrove, item, version, flavor,
                           timeStamps, Instances.changed FROM Instances
@@ -1909,8 +1922,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     ORDER BY
                         Instances.changed
                     LIMIT
-                        1000
-                    """ % ",".join("%d" % x for x in userGroupIds)
+                        %d
+                    """ % (",".join("%d" % x for x in userGroupIds), lim)
 
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
