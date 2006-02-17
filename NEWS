@@ -16,6 +16,8 @@ Changes in @NEW@:
       if it attempts to add an invalid entitlement key or has
       insufficient permission to add the entitlement key.  An
       InvalidEntitlement exception has been added.
+    * A repository bug prevented the mirror client from obtaining a
+      full list of new troves available for mirorring
 
 
 Changes in 1.0.1:
