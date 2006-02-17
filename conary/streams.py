@@ -429,7 +429,7 @@ class StreamCollection(InfoStream):
         self._items = dict([ (x, {}) for x in self.streamDict ])
 
         while (i < len(data)):
-            i1, (typeId1, s1) = misc.unpack("!BSH", i, data)
+            i, (typeId, s) = misc.unpack("!BSH", i, data)
             item = self.streamDict[typeId](s)
             self._items[typeId][item] = True
 

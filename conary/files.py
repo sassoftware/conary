@@ -647,6 +647,9 @@ def frozenFileFlags(frz):
 def frozenFileContentInfo(frz):
     return RegularFile.find(FILE_STREAM_CONTENTS, frz[1:])
 
+def frozenFileTags(frz):
+    return File.find(FILE_STREAM_TAGS, frz[1:])
+
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:

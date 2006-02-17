@@ -498,8 +498,11 @@ class ChangeSetJob:
 		assert(oldVersion)
 		oldSha1 = oldfile.contents.sha1()
 
-		f = self.repos.getFileContents(
-                                [(oldFileId, oldVersion, oldfile)])[0].get()
+                try:
+                    f = self.repos.getFileContents(
+                                    [(oldFileId, oldVersion, oldfile)])[0].get()
+                except KeyError:
+                    raise errors.IntegrityError
 
 		oldLines = f.readlines()
                 f.close()
@@ -523,8 +526,11 @@ class ChangeSetJob:
 	normalRestoreList.sort()
         ptrRestores = []
 	for (pathId, sha1, version, restoreContents) in normalRestoreList:
-	    (contType, fileContents) = cs.getFileContents(pathId,
-                                                          compressed = True)
+            try:
+                (contType, fileContents) = cs.getFileContents(pathId,
+                                                              compressed = True)
+            except KeyError:
+                raise errors.IntegrityError
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
                 continue

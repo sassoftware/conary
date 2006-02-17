@@ -817,10 +817,10 @@ order by
             if fileObj:
                 tags = fileObj.tags
             else:
-                tags = files.File.find(files.FILE_STREAM_TAGS, fileStream)
+                tags = files.frozenFileTags(fileStream)
 
             if tags:
-                for tag in fileObj.tags:
+                for tag in tags:
                     cu.execute("INSERT INTO NewFileTags VALUES (?, ?)",
                                pathId, tag)
 	else:
