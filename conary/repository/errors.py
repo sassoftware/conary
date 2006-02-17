@@ -120,6 +120,9 @@ class GroupNotFound(RepositoryError):
 class UnknownEntitlementGroup(RepositoryError):
     pass
 
+class InvalidEntitlement(RepositoryError):
+    pass
+
 class TroveChecksumMissing(RepositoryError):
     _error = ('Checksum Missing Error: Trove %s=%s[%s] has no sha1 checksum'
               ' calculated, so it was rejected.  Please upgrade conary.')
@@ -213,4 +216,5 @@ simpleExceptions = (
     (CommitError,                'CommitError'),
     (DuplicateBranch,            'DuplicateBranch'),
     (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
+    (InvalidEntitlement,         'InvalidEntitlement'),
     )

@@ -61,14 +61,16 @@ def makeImportedModule(name, pathname, desc, scope):
         names = [ '.'.join(moduleParts[-x:]) for x in range(len(moduleParts)) ]
         for modulePart in names:
             if modulePart in local_scope:
-                if local_scope[modulePart].__class__.__name__ == 'ModuleProxy':
+                if (hasattr(local_scope[modulePart], '__class__') 
+                    and local_scope[modulePart].__class__.__name__ == 'ModuleProxy'):
                     # FIXME: this makes me cringe, but I haven't figured out a
                     # better way to ensure that the module proxy we're 
                     # looking at is actually a proxy for this module
                     if pathname in repr(local_scope[modulePart]):
                         local_scope[modulePart] = mod
             if modulePart in global_scope:
-                if global_scope[modulePart].__class__.__name__ == 'ModuleProxy':
+                if (hasattr(global_scope[modulePart], '__class__')
+                    and global_scope[modulePart].__class__.__name__ == 'ModuleProxy'):
                     if pathname in repr(global_scope[modulePart]):
                         global_scope[modulePart] = mod
 

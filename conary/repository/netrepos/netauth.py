@@ -648,8 +648,11 @@ class NetworkAuthorization:
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
-        if len(entitlement) > 64 or not self.checkUserPass(authToken):
-            return errors.InsufficientPermission
+        if not self.checkUserPass(authToken):
+            raise errors.InsufficientPermission
+
+        if len(entitlement) > 64:
+            raise errors.InvalidEntitlement
 
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
 
