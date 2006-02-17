@@ -22,7 +22,7 @@ from conary import versions
 
 from conary.deps import deps
 
-from conary.lib import cstreams
+from conary.lib import cstreams, misc
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
@@ -429,7 +429,7 @@ class StreamCollection(InfoStream):
         self._items = dict([ (x, {}) for x in self.streamDict ])
 
         while (i < len(data)):
-            typeId, s, i = cstreams.collYank(i, data)
+            i1, (typeId1, s1) = misc.unpack("!BSH", i, data)
             item = self.streamDict[typeId](s)
             self._items[typeId][item] = True
 

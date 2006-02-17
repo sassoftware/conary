@@ -121,6 +121,14 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 
     while (*formatPtr) {
         switch (*formatPtr) {
+          case 'B':
+            intVal = (int) *dataPtr++;
+            dataObj = PyInt_FromLong(intVal);
+            PyList_Append(retList, dataObj);
+            Py_DECREF(dataObj);
+            formatPtr++;
+            break;
+
           case 'H':
             intVal = ntohs(*((short *) dataPtr));
             dataObj = PyInt_FromLong(intVal);
