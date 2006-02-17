@@ -231,7 +231,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
         # getNewTroveList will return the same data set
         crtMaxMark = max(x[0] for x in troveList)
         crtTroveLen = len(troveList)
-
+        if currentMark > 0 and crtMaxMark == currentMark:
+            # if we're hung on the current max then we need to
+            # forcibly advance the mark in case we're stuck
+            crtMaxMark += 1 # only used if we filter out all troves below
         labelDict = set(cfg.labels)
         troveList = [ x for x in troveList if
                             x[1][1].branch().label() in cfg.labels ]
