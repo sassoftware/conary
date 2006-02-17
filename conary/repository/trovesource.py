@@ -444,7 +444,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
     # it's likely this should all be indexed by troveName instead of
     # full tuples
 
-    def __init__(self, db):
+    def __init__(self, db, storeDeps=False):
         SearchableTroveSource.__init__(self)
         self.db = db
         self.troveCsMap = {}
@@ -454,8 +454,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.invalidated = False
         self.erasuresMap = {}
         self.rooted = {}
+        self.storeDeps = storeDeps
 
-        self.depDb = deptable.DependencyDatabase()
+        if storeDeps:
+            self.depDb = deptable.DependencyDatabase()
 
     def addChangeSet(self, cs, includesFileContents = False):
         relative = []
@@ -464,7 +466,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             info = (trvCs.getName(), trvCs.getNewVersion(), 
                     trvCs.getNewFlavor())
             self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
-            self.depDb.add(idx, trvCs.getProvides(), trvCs.getRequires())
+            if self.storeDeps:
+                self.depDb.add(idx, trvCs.getProvides(), trvCs.getRequires())
             self.idMap[idx] = info
 
             if trvCs.getOldVersion() is None:
@@ -482,7 +485,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for info in cs.getOldTroveList():
             self.erasuresMap[info] = cs
             
-        self.depDb.commit()
+        if self.storeDeps:
+            self.depDb.commit()
 
         if relative:
             for (trvCs, info) in relative:
@@ -611,6 +615,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             return self.erasuresMap[info]
 
     def resolveDependencies(self, label, depList):
+        assert(self.storeDeps)
         suggMap = self.depDb.resolve(label, depList)
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
