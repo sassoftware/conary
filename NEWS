@@ -1,7 +1,7 @@
 Changes in 1.0.2:
   o Bugfixes:
-    * A bug that caused redirects to fail to build when multiple flavors of a 
-      trove exist has been fixed.
+    * A bug that caused redirects to fail to build when multiple
+      flavors of a trove exist has been fixed.
     * A bug with cooking flavored redirects has been fixed.
     * The cvc command no longer enforces managed policy with --prep.
     * A bug that caused disttools based python packages to be built as
@@ -17,9 +17,10 @@ Changes in 1.0.2:
       insufficient permission to add the entitlement key.  An
       InvalidEntitlement exception has been added.
     * A repository bug prevented the mirror client from obtaining a
-      full list of new troves available for mirorring
-    * A bug in cooking groups caused the groups resulting from an r.addAll() 
-      to not respect the original group's byDefault settings in some cases
+      full list of new troves available for mirroring.
+    * A bug in cooking groups caused the groups resulting from an
+      r.addAll() to not respect the original group's byDefault
+      settings in some cases.
 
 Changes in 1.0.1:
   o Database schema migration
