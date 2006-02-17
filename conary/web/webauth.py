@@ -22,21 +22,21 @@ class PermissionDenied(errors.WebError):
 
 def getAuth(req):
     if not 'Authorization' in req.headers_in:
-        return ('anonymous', 'anonymous', None, None)
+        authToken = ['anonymous', 'anonymous']
+    else:
+        info = req.headers_in['Authorization'].split()
+        if len(info) != 2 or info[0] != "Basic":
+            return apache.HTTP_BAD_REQUEST
 
-    info = req.headers_in['Authorization'].split()
-    if len(info) != 2 or info[0] != "Basic":
-        return apache.HTTP_BAD_REQUEST
+        try:
+            authString = base64.decodestring(info[1])
+        except:
+            return apache.HTTP_BAD_REQUEST
 
-    try:
-        authString = base64.decodestring(info[1])
-    except:
-        return apache.HTTP_BAD_REQUEST
+        if authString.count(":") != 1:
+            return apache.HTTP_BAD_REQUEST
 
-    if authString.count(":") != 1:
-        return apache.HTTP_BAD_REQUEST
-
-    authToken = authString.split(":")
+        authToken = authString.split(":")
 
     entitlement = req.headers_in.get('X-Conary-Entitlement', None)
     if entitlement is not None:
