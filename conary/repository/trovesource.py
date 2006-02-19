@@ -814,10 +814,12 @@ class TroveSourceStack(SearchableTroveSource):
         for source in self.sources:
             newTroveList = []
             hasTroves = source.hasTroves([x[1] for x in troveList])
+            if isinstance(hasTroves, list):
+                hasTroves = dict(itertools.izip([x[1] for x in troveList], 
+                                                hasTroves))
 
-            for ((index, troveTup), hasTrove) in itertools.izip(troveList, 
-                                                                hasTroves):
-                if not hasTrove:
+            for (index, troveTup) in troveList:
+                if not hasTroves[troveTup]:
                     newTroveList.append((index, troveTup))
                 else:
                     results[index] = True
