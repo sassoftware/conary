@@ -2,6 +2,22 @@ Changes in @NEW@
     * Conary displays full paths when in the error message generated
       when it can't open a log file rather than leaving out the root 
       directory
+    * dbstore supports precompiled statements for sqlite
+    * Added a find method for stream sets to enable member lookups without
+      complete thawing
+  
+  o Client changes
+    * Getting troves from the local system always no longer returns file
+      information when file information is not requested
+
+  o Performance improvements:
+    * Dependencies, dependency sets, StreamCollections, file dictionaries,
+      and referenced file lists now use C parsing code for stream thawing
+    * The path for committing filestreams to repositories uses find to
+      minimize file stream thaws
+    * Removed extra trove instantiations on the system update path
+    * Adding troves to the local database uses temporary tables to batch
+      the insertion
 
 Changes in 1.0.2:
   o Bugfixes:
