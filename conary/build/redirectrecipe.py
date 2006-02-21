@@ -28,7 +28,8 @@ class RedirectRecipe(Recipe):
     ignore = 1
 
     def addRedirect(self, name, branchStr = None, sourceFlavor = None,
-                    targetFlavor = None, fromTrove = None):
+                    targetFlavor = None, fromTrove = None, 
+                    skipTargetMatching = False):
         if (sourceFlavor and not targetFlavor) or \
            (targetFlavor and not sourceFlavor):
             raise builderrors.RecipeFileError, \
@@ -56,7 +57,7 @@ class RedirectRecipe(Recipe):
             raise ValueError, "groups cannot be redirected"
 
         self.addTroveList.append((name, branchStr, sourceFlavor, 
-                                  targetFlavor, fromTrove))
+                                  targetFlavor, fromTrove, skipTargetMatching))
 
     def findTroves(self):
         self.size = 0
@@ -68,14 +69,16 @@ class RedirectRecipe(Recipe):
 
         sourceSearch = {}
         fromRule = {}
-        for (name, branchStr, sourceFlavor, targetFlavor, fromTrove) in \
-                                self.addTroveList:
+        for (name, branchStr, sourceFlavor, targetFlavor,
+             fromTrove, skipTargetMatching) in self.addTroveList:
             l = fromRule.setdefault(fromTrove, list())
             # the catch-all (with no sourceFlavor) has to be at the end
             if not sourceFlavor:
-                l.append((name, branchStr, sourceFlavor, targetFlavor))
+                l.append((name, branchStr, sourceFlavor, targetFlavor,
+                          skipTargetMatching))
             else:
-                l.insert(0, (name, branchStr, sourceFlavor, targetFlavor))
+                l.insert(0, (name, branchStr, sourceFlavor, targetFlavor,
+                             skipTargetMatching))
 
             d = sourceSearch.setdefault(fromTrove, { self.branch : None })
 
@@ -124,8 +127,8 @@ class RedirectRecipe(Recipe):
             # XXX the repository operations should be pulled out of all of
             # these loops
             additionalNames = set()
-            for (destName, branchStr, sourceFlavorRestriction, 
-                                      targetFlavorRestriction) in destSet:
+            for (destName, branchStr, sourceFlavorRestriction,
+                targetFlavorRestriction, skipTargetMatching) in destSet:
                 if branchStr[0] == '/':
                     branch = versions.VersionFromString(branchStr)
                     if not isinstance(branch, versions.Branch):
@@ -166,6 +169,7 @@ class RedirectRecipe(Recipe):
                     targetFlavors.update((version, x) for x in flavorList)
                 del matches
 
+                foundMatch = False
                 for version, flavorList in versionDict.items():
                     for sourceFlavor in flavorList:
                         if sourceFlavorRestriction is not None and \
@@ -173,16 +177,19 @@ class RedirectRecipe(Recipe):
 
                         match = None
                         for targetVersion, targetFlavor in targetFlavors:
-                            if targetFlavorRestriction is not None and \
-                               targetFlavor != targetFlavorRestriction:
+                            if (not skipTargetMatching and 
+                                targetFlavorRestriction is not None and
+                                targetFlavor != targetFlavorRestriction):
                                 continue
 
-                            if (sourceFlavorRestriction 
+                            if (sourceFlavorRestriction
+                                or skipTargetMatching
                                 or sourceFlavor.score(targetFlavor) is not False):
                                 match = targetVersion
                                 break
 
                         if match is not None:
+                            foundMatch = True
                             # we can redirect this trove. go ahead and
                             # setup the redirect for it, and add any troves
                             # it references to the todo list
@@ -210,6 +217,12 @@ class RedirectRecipe(Recipe):
                             raise builderrors.RecipeFileError, \
                                 "Trove %s does not exist for flavor %s" \
                                 % (name, targetFlavor)
+                if not foundMatch:
+                    raise builderrors.CookError(
+                    "Could not find target with satisfying flavor"
+                    " for redirect %s - either create a redirect"
+                    " with targetFlavor and sourceFlavor set, or"
+                    " create a redirect with skipTargetMatching = True" % name)
 
             for name in additionalNames:
                 additionalNameQueue.add(name)
