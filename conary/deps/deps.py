@@ -530,13 +530,7 @@ class DependencyClass(object):
             yield dep
 
     def thawDependency(frozen):
-        frozen = frozen.replace(':', '\0')
-        frozen = frozen.replace('\0\0', ':')
-        l = frozen.split('\0')
-        # that version is a third faster than:
-        # frozen = frozen.replace('::', '\0')
-        # l = [ x.replace('\0', ':') for x in frozen.split(':') ]
-        flags = l[1:]
+        name, flags = misc.depSplit(frozen)
 
         for i, flag in enumerate(flags):
             kind = flag[0:2]
@@ -550,7 +544,7 @@ class DependencyClass(object):
             else:
                 flags[i] = (flag, FLAG_SENSE_REQUIRED)
 
-        d = Dependency(l[0], flags)
+        d = Dependency(name, flags)
         cached = dependencyCache.setdefault(d, d)
 
         return cached
