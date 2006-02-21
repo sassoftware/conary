@@ -14,7 +14,7 @@
 
 import copy
 import re
-from conary.lib import util
+from conary.lib import misc, util
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1
@@ -903,14 +903,13 @@ def ThawDependencySet(frz):
     depSet = DependencySet()
     if not frz:
         return depSet
-    l = frz.split('|')
-    for line in l:
-        if not line:
-            continue
-        tag, frozen = line.split('#', 1)
-        tag = int(tag)
+
+    i = 0
+    while i < len(frz):
+        (i, tag, frozen) = misc.depSetSplit(i, frz)
         depClass = dependencyClasses[tag]
         depSet.addDep(depClass, depClass.thawDependency(frozen))
+
     return depSet
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
