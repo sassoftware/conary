@@ -1,3 +1,8 @@
+Changes in @NEW@
+    * Conary displays full paths when in the error message generated
+      when it can't open a log file rather than leaving out the root 
+      directory
+
 Changes in 1.0.2:
   o Bugfixes:
     * A bug that caused redirects to fail to build when multiple
@@ -11,20 +16,16 @@ Changes in 1.0.2:
       has been fixed.
     * A bug that prevented entitlements from being recognized by an
       Apache conary repository server when no username and password
-      were set for a server.
+      were set for a server has been fixed.
     * A bug that prevented errors from being returned to the client
       if it attempts to add an invalid entitlement key or has
-      insufficient permission to add the entitlement key.  An
-      InvalidEntitlement exception has been added.
+      insufficient permission to add the entitlement key has been
+      fixed.  An InvalidEntitlement exception has been added.
     * A repository bug prevented the mirror client from obtaining a
-      full list of new troves available for mirorring
-    * Conary displays full paths when in the error message generated
-      when it can't open a log file rather than leaving out the root 
-      directory
-      full list of new troves available for mirroring.
+      full list of new troves available for mirorring has been fixed.
     * A bug in cooking groups caused the groups resulting from an
       r.addAll() to not respect the original group's byDefault
-      settings in some cases.
+      settings in some cases has been fixed.
 
 Changes in 1.0.1:
   o Database schema migration
