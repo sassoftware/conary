@@ -1429,6 +1429,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _commit(self, chgSet, fName, callback = None, mirror = False):
 	serverName = None
+        if chgSet.isEmpty():
+            raise errors.CommitError('Attempted to commit an empty changeset')
+            
 	for trove in chgSet.iterNewTroveList():
 	    v = trove.getOldVersion()
 	    if v:

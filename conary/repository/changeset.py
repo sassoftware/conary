@@ -139,6 +139,9 @@ class ChangeSet(streams.StreamSet):
         self.newTroves = ChangeSetNewTroveList()
         self.oldTroves = streams.ReferencedTroveList()
 
+    def isEmpty(self):
+        return not bool(self.newTroves) and not bool(self.oldTroves)
+
     def isAbsolute(self):
 	return self.absolute
 
