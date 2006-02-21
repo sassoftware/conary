@@ -512,6 +512,7 @@ class ClientClone:
             # reset the signatures, because all the versions have now
             # changed, thus invalidating the old sha1 hash
             trv.troveInfo.sigs.reset()
+            trv.computeSignatures()
             trvCs = trv.diff(None, absolute = True)[0]
             cs.newTrove(trvCs)
 
