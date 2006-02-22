@@ -11,8 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-
 """General graph algorithms"""
+import copy
 
 class NodeData(object):
     """Stores data associated with nodes.  Subclasses can determine
@@ -25,12 +25,9 @@ class NodeData(object):
         self.index = 0
         self.data = []
 
-    def isEmpty(self):
-        return not self.data
-
     def copy(self):
         new = self.__class__()
-        new.data = list(self.data)
+        new.data = copy.copy(self.data)
         new.index = self.index
         return new
 
@@ -65,20 +62,32 @@ class NodeDataByHash(NodeData):
     def __init__(self):
         NodeData.__init__(self)
         self.hashedData = {}
+        self.data = {}
+
+    def sort(self, sortAlg=None):
+        return sorted(self.data.iteritems(), sortAlg)
 
     def copy(self):
-        new = NodeData.copy(self)
+        new = self.__class__()
+        new.data = self.data.copy()
         new.hashedData = self.hashedData.copy()
+        new.index = self.index
         return new
 
     def getIndex(self, item):
         idx = self.hashedData.setdefault(item, self.index)
         if idx == self.index:
+            self.data[self.index] = item
             self.index += 1
-            self.data.append(item)
         return idx
-       
-            
+
+    def isEmpty(self):
+        return not self.data
+
+    def delete(self, item):
+        idx = self.hashedData.pop(item)
+        del self.data[idx]
+
 class DirectedGraph:
     def __init__(self, dataSearchMethod=NodeDataByHash):
         self.data = dataSearchMethod()
@@ -88,7 +97,7 @@ class DirectedGraph:
         nodeId = self.data.getIndex(item)
         self.edges.setdefault(nodeId, set())
         return nodeId
-    
+
     def isEmpty(self):
         return self.data.isEmpty()
 
@@ -99,6 +108,16 @@ class DirectedGraph:
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
         self.edges.setdefault(fromIdx, set()).add(toIdx)
+        self.edges.setdefault(toIdx, set())
+
+    def delete(self, item):
+        idx = self.data.getIndex(item)
+        self.data.delete(item)
+        del self.edges[item]
+        [ x.discard(idx) for x in self.edges.itervalues() ]
+
+    def deleteEdges(self, item):
+        del self.edges[self.data.getIndex(item)]
 
     def getReversedEdges(self):
         newEdges = {}
