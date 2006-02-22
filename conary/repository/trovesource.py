@@ -469,14 +469,14 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             startId = max(self.idMap) + 1
 
         for idx, trvCs in enumerate(cs.iterNewTroveList()):
-            id = idx + startId
+            troveId = idx + startId
             info = (trvCs.getName(), trvCs.getNewVersion(), 
                     trvCs.getNewFlavor())
             self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
             if self.storeDeps:
-                self.depDb.add(startId, trvCs.getProvides(), 
+                self.depDb.add(troveId, trvCs.getProvides(), 
                                trvCs.getRequires())
-            self.idMap[startId] = info
+            self.idMap[troveId] = info
 
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
