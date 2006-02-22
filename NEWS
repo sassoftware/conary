@@ -7,6 +7,8 @@ Changes in @NEW@
       complete thawing
   
   o Client changes
+    * Cloned troves didn't always match the file objects to the fileids
+      properly
     * Getting troves from the local system always no longer returns file
       information when file information is not requested
 
