@@ -113,11 +113,11 @@ class DirectedGraph:
     def delete(self, item):
         idx = self.data.getIndex(item)
         self.data.delete(item)
-        del self.edges[item]
+        del self.edges[idx]
         [ x.discard(idx) for x in self.edges.itervalues() ]
 
     def deleteEdges(self, item):
-        del self.edges[self.data.getIndex(item)]
+        self.edges[self.data.getIndex(item)] = set()
 
     def getReversedEdges(self):
         newEdges = {}
