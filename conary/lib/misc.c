@@ -27,12 +27,16 @@
 # define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
 #endif
 
+static PyObject * depSetSplit(PyObject *self, PyObject *args);
+static PyObject * depSplit(PyObject *self, PyObject *args);
 static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
+    { "depSetSplit", depSetSplit, METH_VARARGS },
+    { "depSplit", depSplit, METH_VARARGS },
     { "exists", exists, METH_VARARGS,
         "returns a boolean reflecting whether a file (even a broken symlink) "
         "exists in the filesystem" },
@@ -52,6 +56,91 @@ static PyObject * malloced(PyObject *self, PyObject *args) {
 
     /* worked */
     return Py_BuildValue("i", ma.uordblks);
+}
+
+static PyObject * depSetSplit(PyObject *self, PyObject *args) {
+    char * data, * dataPtr, * endPtr;
+    int offset, tag;
+    PyObject * retVal;
+
+    if (!PyArg_ParseTuple(args, "is", &offset, &data))
+        return NULL;
+
+    dataPtr = data + offset;
+    /* this while is a cheap goto for the error case */
+    while (*dataPtr) {
+        endPtr = dataPtr;
+
+        tag = 0;
+        /* Grab the tag first. Go ahead an convert it to an int while we're
+           grabbing it. */
+        while (*endPtr && *endPtr != '#') {
+            tag *= 10;
+            tag += *endPtr - '0';
+            endPtr++;
+        }
+        dataPtr = endPtr + 1;
+
+        /* Now look for the frozen dependency */
+        /* Grab the tag first */
+        while (*endPtr && *endPtr != '|')
+            endPtr++;
+
+        retVal = Py_BuildValue("iis#", endPtr - data + 1, tag, dataPtr,
+                                endPtr - dataPtr);
+        return retVal;
+    }
+
+    PyErr_SetString(PyExc_ValueError, "invalid frozen dependency");
+    return NULL;
+}
+
+static PyObject * depSplit(PyObject *self, PyObject *args) {
+    char * origData, * data, * chptr, * endPtr;
+    PyObject * flags, * flag, * name, * ret;
+
+    if (!PyArg_ParseTuple(args, "s", &origData))
+        return NULL;
+
+    /* Copy the original string over, replace single : with a '\0' and
+       double :: with a single : */
+    endPtr = data = malloc(strlen(origData) + 1);
+    chptr = origData;
+    while (*chptr) {
+        if (*chptr == ':') {
+            chptr++;
+            if (*chptr == ':') {
+                *endPtr++ = ':';
+                chptr++;
+            } else {
+                *endPtr++ = '\0';
+            }
+        } else { 
+            *endPtr++ = *chptr++;
+        }
+    }
+
+    *endPtr++ = '\0';
+
+    /* We're left with a '\0' separated list of name, flag1, ..., flagN. Get
+       the name first. */
+    name = PyString_FromString(data);
+    chptr = data + strlen(data) + 1;
+
+    flags = PyList_New(0);
+
+    while (chptr < endPtr) {
+        flag = PyString_FromString(chptr);
+        PyList_Append(flags, flag);
+        Py_DECREF(flag);
+        chptr += strlen(chptr) + 1;
+    }
+
+    ret = PyTuple_Pack(2, name, flags);
+    Py_DECREF(name);
+    Py_DECREF(flags);
+
+    return ret;
 }
 
 static PyObject * exists(PyObject *self, PyObject *args) {
@@ -102,8 +191,6 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     int offset;
     PyObject * retList, * dataObj;
     int intVal;
-
-    //breakpoint;
 
     if (!PyArg_ParseTuple(args, "sis#", &format, &offset, &data, &dataLen))
         return NULL;

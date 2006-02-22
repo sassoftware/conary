@@ -14,7 +14,7 @@
 
 import copy
 import re
-from conary.lib import util
+from conary.lib import misc, util
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1
@@ -530,13 +530,7 @@ class DependencyClass(object):
             yield dep
 
     def thawDependency(frozen):
-        frozen = frozen.replace(':', '\0')
-        frozen = frozen.replace('\0\0', ':')
-        l = frozen.split('\0')
-        # that version is a third faster than:
-        # frozen = frozen.replace('::', '\0')
-        # l = [ x.replace('\0', ':') for x in frozen.split(':') ]
-        flags = l[1:]
+        name, flags = misc.depSplit(frozen)
 
         for i, flag in enumerate(flags):
             kind = flag[0:2]
@@ -550,7 +544,7 @@ class DependencyClass(object):
             else:
                 flags[i] = (flag, FLAG_SENSE_REQUIRED)
 
-        d = Dependency(l[0], flags)
+        d = Dependency(name, flags)
         cached = dependencyCache.setdefault(d, d)
 
         return cached
@@ -903,14 +897,13 @@ def ThawDependencySet(frz):
     depSet = DependencySet()
     if not frz:
         return depSet
-    l = frz.split('|')
-    for line in l:
-        if not line:
-            continue
-        tag, frozen = line.split('#', 1)
-        tag = int(tag)
+
+    i = 0
+    while i < len(frz):
+        (i, tag, frozen) = misc.depSetSplit(i, frz)
         depClass = dependencyClasses[tag]
         depSet.addDep(depClass, depClass.thawDependency(frozen))
+
     return depSet
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
