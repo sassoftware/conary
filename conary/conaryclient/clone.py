@@ -534,6 +534,7 @@ class ClientClone:
         fileObjs = self.repos.getFileVersions(newFilesNeeded)
         contentsNeeded = []
         pathIdsNeeded = []
+        fileObjsNeeded = []
         
         for (pathId, newFileId, newFileVersion), fileObj in \
                             itertools.izip(newFilesNeeded, fileObjs):
@@ -544,11 +545,12 @@ class ClientClone:
             if fileObj.hasContents:
                 contentsNeeded.append((newFileId, newFileVersion))
                 pathIdsNeeded.append(pathId)
+                fileObjsNeeded.append(fileObj)
 
         contents = self.repos.getFileContents(contentsNeeded)
         for pathId, (fileId, fileVersion), fileCont, fileObj in \
                 itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
-                               fileObjs):
+                               fileObjsNeeded):
             cs.addFileContents(pathId, changeset.ChangedFileTypes.file, 
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
