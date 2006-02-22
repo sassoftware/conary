@@ -5,6 +5,8 @@ Changes in @NEW@:
       data is sent.
     * A bug that caused cross repository commits of changesets that involved
       a branched trove to fail in some cases has been fixed.
+    * If an entitlement is used for repository access, it is now sent
+      over HTTPS instead of HTTP by default.
 
 Changes in 1.0.3
   o Client changes:

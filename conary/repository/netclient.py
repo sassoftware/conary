@@ -219,10 +219,18 @@ class ServerCache:
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
 
+        # check for an entitlement for this server
+        ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
+
         if url is None:
-            if userInfo is None:
+            # if we have entitlement data to send, send it over https
+            if ent is not None:
+                url = 'https://%s/conary/' % serverName
+            elif userInfo is None:
+                # if we are using anonymous, use http
                 url = "http://%s/conary/" % serverName
             else:
+                # if we have a username/password, use https
                 url = "https://%s:%s@%s/conary/" % (quote(userInfo[0]),
                                                     quote(userInfo[1]),
                                                     serverName)
@@ -231,9 +239,6 @@ class ServerCache:
             assert(not s[1])
             s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
             url = '/'.join(s)
-
-        # check for an entitlement for this server
-        ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
