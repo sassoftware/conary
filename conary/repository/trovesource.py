@@ -454,6 +454,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.invalidated = False
         self.erasuresMap = {}
         self.rooted = {}
+        self.idMap = {}
         self.storeDeps = storeDeps
 
         if storeDeps:
@@ -461,14 +462,21 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
     def addChangeSet(self, cs, includesFileContents = False):
         relative = []
-        self.idMap = {}
+
+        if not self.idMap:
+            startId = 0
+        else:
+            startId = max(self.idMap) + 1
+
         for idx, trvCs in enumerate(cs.iterNewTroveList()):
+            troveId = idx + startId
             info = (trvCs.getName(), trvCs.getNewVersion(), 
                     trvCs.getNewFlavor())
             self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
             if self.storeDeps:
-                self.depDb.add(idx, trvCs.getProvides(), trvCs.getRequires())
-            self.idMap[idx] = info
+                self.depDb.add(troveId, trvCs.getProvides(), 
+                               trvCs.getRequires())
+            self.idMap[troveId] = info
 
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
@@ -635,7 +643,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             if fromCs:
                 [ trv ] = self.getTroves([info], withFiles = False)
-            elif inDb:
+            elif inDb and self.db:
                 # XXX this should be parallelized...
                 trv = self.db.getTrove(withFiles = False, *info)
             else:
@@ -659,7 +667,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             if job[2][0] is not None:
                 troves.append((job[0], job[2][0], job[2][1]))
 
-        if useDatabase:
+        if useDatabase and self.db:
             inDatabase = self.db.hasTroves(troves)
         else:
             inDatabase = [ False ] * len(troves)
