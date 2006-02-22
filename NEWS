@@ -3,6 +3,8 @@ Changes in @NEW@:
     * An Apache-based conary repository server no longer logs
       tracebacks in error_log when a client disconnects before all
       data is sent.
+    * A bug that caused cross repository commits of changesets that involved
+      a branched trove to fail in some cases has been fixed.
 
 Changes in 1.0.3
   o Client changes:
