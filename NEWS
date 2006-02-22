@@ -1,25 +1,28 @@
-Changes in @NEW@
+Changes in 1.0.3
+  o Client changes:
     * Conary displays full paths when in the error message generated
       when it can't open a log file rather than leaving out the root 
-      directory
-    * dbstore supports precompiled statements for sqlite
-    * Added a find method for stream sets to enable member lookups without
-      complete thawing
-  
-  o Client changes
-    * Cloned troves didn't always match the file objects to the fileids
-      properly
-    * Getting troves from the local system always no longer returns file
-      information when file information is not requested
+      directory.
 
   o Performance improvements:
-    * Dependencies, dependency sets, StreamCollections, file dictionaries,
-      and referenced file lists now use C parsing code for stream thawing
-    * The path for committing filestreams to repositories uses find to
-      minimize file stream thaws
-    * Removed extra trove instantiations on the system update path
-    * Adding troves to the local database uses temporary tables to batch
-      the insertion
+    * A find() class method has been added to StreamSet which enables
+      member lookups without complete thawing.
+    * The code path for committing filestreams to repositories now
+      uses find() to minimize file stream thaws.
+    * DBstore now supports precompiled SQL statements for SQLite.
+    * Retrieving troves from the local system database no longer
+      returns file information when file information is not requested.
+    * Dependencies, dependency sets, StreamCollections, file
+      dictionaries, and referenced file lists now use C parsing code
+      for stream thawing.
+    * Extraneous trove instantiations on the system update path have
+      been eliminated.
+    * Adding troves to the local database now uses temporary tables to
+      batch the insertions.
+
+  o Bugfixes:
+    * A bug that caused a mismatch between file objects and fileIds
+      when cloning a trove has been fixed.
 
 Changes in 1.0.2:
   o Bugfixes:
