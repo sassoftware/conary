@@ -3,6 +3,8 @@ Changes in @NEW@:
     * An Apache-based conary repository server no longer logs
       tracebacks in error_log when a client disconnects before all
       data is sent.
+    * If an entitlement is used for repository access, it is now sent
+      over HTTPS instead of HTTP by default.
 
 Changes in 1.0.3
   o Client changes:
