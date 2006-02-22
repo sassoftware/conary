@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bugfixes:
+    * An Apache-based conary repository server no longer logs
+      tracebacks in error_log when a client disconnects before all
+      data is sent.
+
 Changes in 1.0.3
   o Client changes:
     * Conary displays full paths when in the error message generated
