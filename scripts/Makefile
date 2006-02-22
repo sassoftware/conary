@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio changemail changemail.py commitaction conary-debug perlreqs.pl dbsh dumpcontainer showchangeset
+extra_dist = Makefile rpm2cpio changemail changemail.py commitaction conary-debug perlreqs.pl dbsh dumpcontainer showchangeset mirror
 
 dist_files = $(python_files) $(extra_dist)
 
@@ -34,6 +34,7 @@ install:
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
 	install -m 755 dumpcontainer $(DESTDIR)$(datadir)/conary
+	install -m 755 mirror $(DESTDIR)$(datadir)/conary
 	install -m 755 showchangeset $(DESTDIR)$(datadir)/conary
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
 	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
