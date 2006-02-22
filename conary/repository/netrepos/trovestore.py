@@ -356,12 +356,20 @@ class TroveStore:
 
         self.depTables.add(cu, trv, troveInstanceId)
 
+        # NOTE: the use of MIN here is a bit of a hack. 
+        # It is possible that NewFiles could have two entries for the same
+        # fileId - one NULL and one with stream data.  In that case, we want
+        # to insert the one with stream data - and MIN(NULL, data) always
+        # returns data.  
+        # TODO: rework so that fileId in NewFiles is uniquely indexed, and
+        # catch an exception when trying to insert a second item with the same
+        # fileId.  Then, remove the GROUP BY and MIN bits here.
         cu.execute("""
         INSERT INTO FileStreams
             (fileId, stream)
-        SELECT DISTINCT NewFiles.fileId, NewFiles.stream
+        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream)
         FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
-        WHERE FileStreams.streamId is NULL
+        WHERE FileStreams.streamId is NULL GROUP BY fileId
         """)
 
         # this updates the stream for streams where stream is NULL
