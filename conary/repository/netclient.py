@@ -228,7 +228,7 @@ class ServerCache:
             else:
                 protocol = 'http'
 
-            elif userInfo is None:
+            if userInfo is None:
                 # if we are using anonymous, use http
                 url = "%s://%s/conary/" % (protocol, serverName)
             else:
