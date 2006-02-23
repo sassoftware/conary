@@ -19,6 +19,143 @@ from conary.local import schema
 
 NO_FLAG_MAGIC = '-*none*-'
 
+class DependencyWorkTables:
+
+    def _mergeTmpTable(self, tmpName, depTable, reqTable, provTable,
+                       dependencyTables, multiplier = 1):
+        substDict = { 'tmpName'   : tmpName,
+                      'depTable'  : depTable,
+                      'reqTable'  : reqTable,
+                      'provTable' : provTable }
+
+        self.cu.execute("""
+        INSERT INTO %(depTable)s
+            (class, name, flag)
+        SELECT DISTINCT
+            %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
+        FROM %(tmpName)s
+        LEFT OUTER JOIN Dependencies USING (class, name, flag)
+        WHERE Dependencies.depId is NULL
+        """ % substDict, start_transaction = False)
+
+        if multiplier != 1:
+            self.cu.execute("UPDATE %s SET depId=depId * %d"
+                           % (depTable, multiplier), start_transaction = False)
+
+        self.cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
+        base = self.cu.next()[0]
+        if base is None:
+            base = 0
+        substDict['baseReqNum'] = base + 1
+
+        if len(dependencyTables) == 1:
+            substDict['depId'] = "%s.depId" % dependencyTables
+        else:
+            substDict['depId'] = "COALESCE(%s)" % \
+                ",".join(["%s.depId" % x for x in dependencyTables])
+
+        selectClause = """\
+""" % substDict
+        selectClause = ""
+        for depTable in dependencyTables:
+            d = { 'tmpName' : substDict['tmpName'],
+                  'depTable' : depTable }
+            selectClause += """\
+                        LEFT OUTER JOIN %(depTable)s ON
+                            %(tmpName)s.class = %(depTable)s.class AND
+                            %(tmpName)s.name = %(depTable)s.name AND
+                            %(tmpName)s.flag = %(depTable)s.flag
+""" % d
+
+        repQuery = """\
+                INSERT INTO %(reqTable)s
+                    (instanceId, depId, depNum, depCount)
+                    SELECT %(tmpName)s.troveId,
+                           %(depId)s,
+                           %(baseReqNum)d + %(tmpName)s.depNum,
+                           %(tmpName)s.flagCount
+                        FROM %(tmpName)s
+""" % substDict
+        repQuery += selectClause
+        repQuery += """\
+                        WHERE
+                            %(tmpName)s.isProvides = 0""" % substDict
+        self.cu.execute(repQuery, start_transaction = False)
+
+        if provTable is None:
+            return
+
+        repQuery = """\
+                INSERT INTO %(provTable)s
+                    SELECT %(tmpName)s.troveId,
+                           %(depId)s
+                        FROM %(tmpName)s
+""" % substDict
+        repQuery += selectClause
+        repQuery += """\
+                        WHERE
+                            %(tmpName)s.isProvides = 1""" % substDict
+        self.cu.execute(repQuery, start_transaction = False)
+
+    def _populateTmpTable(self, depList, troveNum, requires,
+                          provides, multiplier = 1):
+        # FIXME: switch back to preparsed statments when dbstore supports it
+        allDeps = []
+        if requires:
+            allDeps += [ (0, x) for x in
+                            requires.getDepClasses().iteritems() ]
+        if provides:
+            allDeps += [ (1,  x) for x in
+                            provides.getDepClasses().iteritems() ]
+
+        for (isProvides, (classId, depClass)) in allDeps:
+            for dep in depClass.getDeps():
+                for (depName, flags) in zip(dep.getName(), dep.getFlags()):
+                    self.cu.execstmt(self.populateStmt,
+                                   troveNum, multiplier * len(depList),
+                                    1 + len(flags), isProvides, classId,
+                                    depName, NO_FLAG_MAGIC)
+                    if flags:
+                        for (flag, sense) in flags:
+                            # conary 0.12.0 had mangled flags; this check
+                            # prevents them from making it into any repository
+                            assert("'" not in flag)
+                            assert(sense == deps.FLAG_SENSE_REQUIRED)
+                            self.cu.execstmt(self.populateStmt,
+                                        troveNum, multiplier * len(depList),
+                                        1 + len(flags), isProvides, classId,
+                                        depName, flag)
+
+                if not isProvides:
+                    depList.append((troveNum, classId, dep))
+
+    def merge(self, intoDatabase = False, skipProvides = False):
+        if intoDatabase:
+            assert(not skipProvides)
+            self._mergeTmpTable("DepCheck", "Dependencies", "Requires",
+                                "Provides", ("Dependencies",))
+        elif skipProvides:
+            self._mergeTmpTable("DepCheck", "TmpDependencies", "TmpRequires",
+                                None, ("Dependencies", "TmpDependencies"),
+                                multiplier = -1)
+        else:
+            self._mergeTmpTable("DepCheck", "TmpDependencies", "TmpRequires",
+                                "TmpProvides",
+                                ("Dependencies", "TmpDependencies"),
+                                multiplier = -1)
+
+    def __init__(self, cu):
+        self.cu = cu
+	self.populateStmt = self.cu.compile("""
+            INSERT INTO DepCheck
+            (troveId, depNum, flagCount, isProvides, class, name, flag)
+            VALUES(?, ?, ?, ?, ?, ?, ?)
+            """)
+        schema.resetTable(self.cu, "TmpDependencies")
+        schema.resetTable(self.cu, "TmpRequires")
+        schema.resetTable(self.cu, "TmpProvides")
+        schema.resetTable(self.cu, "DepCheck")
+
 class DependencyChecker:
 
     def _addJob(self, job):
@@ -190,115 +327,6 @@ class DependencyChecker:
         self.newInfoToNodeId = {}
 
 class DependencyTables:
-    def _populateTmpTable(self, cu, stmt, depList, troveNum, requires,
-                          provides, multiplier = 1):
-        # FIXME: switch back to preparsed statments when dbstore supports it
-        assert(type(stmt) == type(""))
-        allDeps = []
-        if requires:
-            allDeps += [ (0, x) for x in
-                            requires.getDepClasses().iteritems() ]
-        if provides:
-            allDeps += [ (1,  x) for x in
-                            provides.getDepClasses().iteritems() ]
-
-        for (isProvides, (classId, depClass)) in allDeps:
-            for dep in depClass.getDeps():
-                for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                    cu.execute(stmt,
-                                   troveNum, multiplier * len(depList),
-                                    1 + len(flags), isProvides, classId,
-                                    depName, NO_FLAG_MAGIC)
-                    if flags:
-                        for (flag, sense) in flags:
-                            # conary 0.12.0 had mangled flags; this check
-                            # prevents them from making it into any repository
-                            assert("'" not in flag)
-                            assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            cu.execute(stmt,
-                                        troveNum, multiplier * len(depList),
-                                        1 + len(flags), isProvides, classId,
-                                        depName, flag)
-
-                if not isProvides:
-                    depList.append((troveNum, classId, dep))
-
-    def _mergeTmpTable(self, cu, tmpName, depTable, reqTable, provTable,
-                       dependencyTables, multiplier = 1):
-        substDict = { 'tmpName'   : tmpName,
-                      'depTable'  : depTable,
-                      'reqTable'  : reqTable,
-                      'provTable' : provTable }
-
-        cu.execute("""
-        INSERT INTO %(depTable)s
-            (class, name, flag)
-        SELECT DISTINCT
-            %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
-        FROM %(tmpName)s
-        LEFT OUTER JOIN Dependencies USING (class, name, flag)
-        WHERE Dependencies.depId is NULL
-        """ % substDict, start_transaction = False)
-
-        if multiplier != 1:
-            cu.execute("UPDATE %s SET depId=depId * %d"
-                           % (depTable, multiplier), start_transaction = False)
-
-        cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
-        base = cu.next()[0]
-        if base is None:
-            base = 0
-        substDict['baseReqNum'] = base + 1
-
-        if len(dependencyTables) == 1:
-            substDict['depId'] = "%s.depId" % dependencyTables
-        else:
-            substDict['depId'] = "COALESCE(%s)" % \
-                ",".join(["%s.depId" % x for x in dependencyTables])
-
-        selectClause = """\
-""" % substDict
-        selectClause = ""
-        for depTable in dependencyTables:
-            d = { 'tmpName' : substDict['tmpName'],
-                  'depTable' : depTable }
-            selectClause += """\
-                        LEFT OUTER JOIN %(depTable)s ON
-                            %(tmpName)s.class = %(depTable)s.class AND
-                            %(tmpName)s.name = %(depTable)s.name AND
-                            %(tmpName)s.flag = %(depTable)s.flag
-""" % d
-
-        repQuery = """\
-                INSERT INTO %(reqTable)s
-                    (instanceId, depId, depNum, depCount)
-                    SELECT %(tmpName)s.troveId,
-                           %(depId)s,
-                           %(baseReqNum)d + %(tmpName)s.depNum,
-                           %(tmpName)s.flagCount
-                        FROM %(tmpName)s
-""" % substDict
-        repQuery += selectClause
-        repQuery += """\
-                        WHERE
-                            %(tmpName)s.isProvides = 0""" % substDict
-        cu.execute(repQuery, start_transaction = False)
-
-        if provTable is None:
-            return
-
-        repQuery = """\
-                INSERT INTO %(provTable)s
-                    SELECT %(tmpName)s.troveId,
-                           %(depId)s
-                        FROM %(tmpName)s
-""" % substDict
-        repQuery += selectClause
-        repQuery += """\
-                        WHERE
-                            %(tmpName)s.isProvides = 1""" % substDict
-        cu.execute(repQuery, start_transaction = False)
-
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),
                                  ('Provides', trv.setProvides)):
@@ -334,12 +362,10 @@ class DependencyTables:
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
-        schema.resetTable(cu, "DepCheck")
+        workTables = DependencyWorkTables(cu)
 
-	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
-        self._populateTmpTable(cu, stmt, [], troveId, requires, provides)
-        self._mergeTmpTable(cu, "DepCheck", "Dependencies", "Requires",
-                            "Provides", ("Dependencies",))
+        workTables._populateTmpTable([], troveId, requires, provides)
+        workTables.merge(intoDatabase = True)
 
     def delete(self, cu, troveId):
         schema.resetTable(cu, "suspectDepsOrig")
@@ -588,10 +614,7 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        schema.resetTable(cu, "TmpDependencies")
-        schema.resetTable(cu, "TmpRequires")
-        schema.resetTable(cu, "TmpProvides")
-        schema.resetTable(cu, "DepCheck")
+        workTables = DependencyWorkTables(cu)
 
 	# this begins a transaction. we do this explicitly to keep from
 	# grabbing any exclusive locks (when the python binding autostarts
@@ -606,12 +629,6 @@ class DependencyTables:
         depList = [ None ]
         oldTroves = []
         troveNames = []
-
-	stmt = """
-        INSERT INTO DepCheck
-        (troveId, depNum, flagCount, isProvides, class, name, flag)
-        VALUES(?, ?, ?, ?, ?, ?, ?)
-        """
 
         # We build up a graph to let us split the changeset into pieces.
         # Each node in the graph represents a remove/add pair. Note that
@@ -642,12 +659,11 @@ class DependencyTables:
 
             troveNum = -newNodeId
             troveNames.append(newInfo)
-            self._populateTmpTable(cu, stmt,
-                                   depList = depList,
-                                   troveNum = troveNum,
-                                   requires = trv.getRequires(),
-                                   provides = trv.getProvides(),
-                                   multiplier = -1)
+            workTables._populateTmpTable(depList = depList,
+                                         troveNum = troveNum,
+                                         requires = trv.getRequires(),
+                                         provides = trv.getProvides(),
+                                         multiplier = -1)
 
             if job[1][0] is not None:
 		oldInfo = (job[0], job[1][0], job[1][1])
@@ -658,10 +674,7 @@ class DependencyTables:
             i += 1
 
         # merge everything into TmpDependencies, TmpRequires, and tmpProvides
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            "TmpProvides",
-                            ("Dependencies", "TmpDependencies"),
-                            multiplier = -1)
+        workTables.merge()
 
         # now build a table of all the troves which are being erased
         schema.resetTable(cu, "RemovedTroveIds")
@@ -915,23 +928,16 @@ class DependencyTables:
                  restrictBy=None):
 
         cu = self.db.cursor()
-
-        schema.resetTable(cu, "TmpDependencies")
-        schema.resetTable(cu, 'TmpRequires')
-        schema.resetTable(cu, "DepCheck")
+        workTables = DependencyWorkTables(cu)
 
 	cu.execute("BEGIN")
 
         depList = [ None ]
-	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, stmt, depList, -i - 1,
-                                   depSet, None, multiplier = -1)
+            workTables._populateTmpTable(depList, -i - 1,
+                                         depSet, None, multiplier = -1)
 
-
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, ("Dependencies", "TmpDependencies"),
-                            multiplier = -1)
+        workTables.merge(skipProvides = True)
 
         full = selectTemplate % self._resolveStmt( "TmpRequires",
                                 ("Provides",), ("Dependencies",),
@@ -1020,21 +1026,16 @@ class DependencyTables:
     def getLocalProvides(self, depSetList):
         cu = self.db.cursor()
 
-        schema.resetTable(cu, "TmpDependencies")
-        schema.resetTable(cu, 'TmpRequires')
-        schema.resetTable(cu, "DepCheck")
+        workTables = DependencyWorkTables(cu)
 
 	cu.execute("BEGIN")
 
         depList = [ None ]
-	stmt = "INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)"
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, stmt, depList, -i - 1,
-                                   depSet, None, multiplier = -1)
+            workTables._populateTmpTable(depList, -i - 1,
+                                         depSet, None, multiplier = -1)
 
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, ("Dependencies", "TmpDependencies"),
-                            multiplier = -1)
+        workTables.merge(skipProvides = True)
 
         full = """SELECT depNum, troveName, Versions.version,
                          timeStamps, Flavors.flavor FROM
