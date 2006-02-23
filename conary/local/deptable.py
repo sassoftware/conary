@@ -12,13 +12,182 @@
 # full details.
 #
 
-from conary import dbstore
-from conary import versions
+from conary import dbstore, trove, versions
 from conary.deps import deps
 from conary.lib import graph
 from conary.local import schema
 
 NO_FLAG_MAGIC = '-*none*-'
+
+class DependencyChecker:
+
+    def _addJob(self, job):
+        nodeId = len(self.nodes)
+        self.g.addNode(nodeId)
+        self.nodes.append((job, set(), set()))
+
+        if job[2][0] is not None:
+            self.newInfoToNodeId[(job[0], job[2][0], job[2][1])] = nodeId
+
+        return nodeId
+
+    def _buildEdges(self, oldOldEdges, newNewEdges):
+        for (reqNodeId, provNodeId, depId) in oldOldEdges:
+            # remove the provider after removing the requirer
+            self.g.addEdge(reqNodeId, provNodeId)
+
+        for (reqNodeId, provNodeId, depId) in newNewEdges:
+            self.g.addEdge(provNodeId, reqNodeId)
+
+    def _collapseEdges(self, oldOldEdges, oldNewEdges, newOldEdges, 
+                       newNewEdges):
+        # these edges cancel each other out -- for example, if Foo
+        # requires both the old and new versions of Bar the order between
+        # Foo and Bar is irrelevant
+        oldOldEdges.difference_update(oldNewEdges)
+        newNewEdges.difference_update(newOldEdges)
+
+    def _createCollectionEdges(self, jobSet, troveSource):
+        edges = set()
+        i = 0
+        for job in jobSet:
+            if job[2][0] is None: continue
+            if not trove.troveIsCollection(job[0]): continue
+
+            trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                       withFiles = False)
+
+            for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                targetTrove = self.newInfoToNodeId.get(info, -1)
+                if targetTrove >= 0:
+                    edges.add((i + 1, targetTrove, None))
+
+            i += 1
+
+        return edges
+
+    def _createDependencyEdges(self, result, depList):
+        oldNewEdges = set()
+        oldOldEdges = set()
+        newNewEdges = set()
+        newOldEdges = set()
+
+        for (depId, depNum, reqInstId, reqNodeIdx,
+             provInstId, provNodeIdx) in result:
+            if depNum < 0:
+                fromNodeId = -depList[-depNum][0]
+                assert(fromNodeId > 0)
+
+                if provNodeIdx is not None:
+                    # new trove depends on something old
+                    toNodeId = provNodeIdx
+                    if fromNodeId == toNodeId:
+                        continue
+                    newOldEdges.add((fromNodeId, toNodeId, depId))
+                elif provInstId > 0:
+                    # new trove depends on something already installed
+                    # which is not being removed. not interesting.
+                    pass
+                else:
+                    # new trove depends on something new
+                    toNodeId = -provInstId
+                    if fromNodeId == toNodeId:
+                        continue
+                    newNewEdges.add((fromNodeId, toNodeId, depId))
+            else: # dependency was provided by something before this
+                  # update occurred
+                if reqNodeIdx is not None:
+                    fromNodeId = reqNodeIdx
+                    # requirement is old
+                    if provNodeIdx is not None:
+                        # provider is old
+                        toNodeId = provNodeIdx
+                        if fromNodeId == toNodeId:
+                            continue
+                        oldOldEdges.add((fromNodeId, toNodeId, depId))
+                    else:
+                        # provider is new
+                        toNodeId = -provInstId
+                        if fromNodeId == toNodeId:
+                            continue
+                        oldNewEdges.add((fromNodeId, toNodeId, depId))
+                else:
+                    # trove with the requirement is not being removed.
+                    if provNodeIdx is None:
+                        # the trove that provides this requirement is being
+                        # installed.  We probably don't care.
+                        continue
+                    else:
+                        # the trove that provides this requirement is being
+                        # removed.  We probably care -- if this dep is
+                        # being provided by some other package, we need
+                        # to connect these two packages
+                        # XXX fix this
+                        continue
+
+        return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
+
+    def _stronglyConnect(self):
+        def orderJobSets(jobSetA, jobSetB):
+            AHasInfo = 0
+            BHasInfo = 0
+            for comp, idx in jobSetA:
+                if comp[0].startswith('info-'):
+                    AHasInfo = 1
+                    break
+            for comp, idx in jobSetB:
+                if comp[0].startswith('info-'):
+                    BHasInfo = 1
+                    break
+
+            # if A has info- components and B doesn't, we want A
+            # to be first.  Otherwise, sort by the components in the jobSets
+            # (which should already be internally sorted)
+            return cmp((-AHasInfo, jobSetA), (-BHasInfo, jobSetB))
+
+        # get sets of strongly connected components - each component has
+        # a cycle where something at the beginning requires something at the
+        # end.
+        compSets = self.g.getStronglyConnectedComponents()
+
+        # expand the job indexes to the actual jobs, so we can sort the
+        # strongly connected components as we would if there were no
+        # required ordering between them.  We'll use this preferred ordering to
+        # help create a repeatable total ordering.
+        # We sort them so that info- packages are first, then we sort them
+        # alphabetically.
+        jobSets = [ sorted((self.nodes[x][0], x) for x in idxSet)
+                                            for idxSet in compSets ]
+        jobSets.sort(cmp=orderJobSets)
+
+        # create index from jobIdx -> jobSetIdx for creating a SCC graph.
+        jobSetsByJob = {}
+        for jobSetIdx, jobSet in enumerate(jobSets):
+            for job, jobIdx in jobSet:
+                jobSetsByJob[jobIdx] = jobSetIdx
+
+        sccGraph = graph.DirectedGraph()
+        for jobSetIdx, jobSet in enumerate(jobSets):
+            sccGraph.addNode(jobSetIdx)
+            for job, jobIdx in jobSet:
+                for childIdx in self.g.getChildren(jobIdx):
+                    childJobSetIdx = jobSetsByJob[childIdx]
+                    sccGraph.addEdge(jobSetIdx, childJobSetIdx)
+
+        # create an ordering based on dependencies, and then, when forced
+        # to choose between several choices, use the index order for jobSets
+        # - that's the order we created by our sort() above.
+        orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
+        return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
+
+    def __init__(self):
+        self.g = graph.DirectedGraph()
+        # adding None to the front prevents us from using nodeId's of 0, which
+        # would be a problem since we use negative nodeIds in the SQL
+        # to differentiate troves added by this job from troves already
+        # present, and -1 * 0 == 0
+        self.nodes = [ None ]
+        self.newInfoToNodeId = {}
 
 class DependencyTables:
     def _populateTmpTable(self, cu, stmt, depList, troveNum, requires,
@@ -416,143 +585,6 @@ class DependencyTables:
                                         versions.VersionFromString(version),
                                         deps.ThawDependencySet(flavor)))
 
-        def _createEdges(result, depList):
-            oldNewEdges = set()
-            oldOldEdges = set()
-            newNewEdges = set()
-            newOldEdges = set()
-
-            for (depId, depNum, reqInstId, reqNodeIdx,
-                 provInstId, provNodeIdx) in result:
-                if depNum < 0:
-                    fromNodeId = -depList[-depNum][0]
-                    assert(fromNodeId > 0)
-
-                    if provNodeIdx is not None:
-                        # new trove depends on something old
-                        toNodeId = provNodeIdx
-                        if fromNodeId == toNodeId:
-                            continue
-                        newOldEdges.add((fromNodeId, toNodeId, depId))
-                    elif provInstId > 0:
-                        # new trove depends on something already installed
-                        # which is not being removed. not interesting.
-                        pass
-                    else:
-                        # new trove depends on something new
-                        toNodeId = -provInstId
-                        if fromNodeId == toNodeId:
-                            continue
-                        newNewEdges.add((fromNodeId, toNodeId, depId))
-                else: # dependency was provided by something before this
-                      # update occurred
-                    if reqNodeIdx is not None:
-                        fromNodeId = reqNodeIdx
-                        # requirement is old
-                        if provNodeIdx is not None:
-                            # provider is old
-                            toNodeId = provNodeIdx
-                            if fromNodeId == toNodeId:
-                                continue
-                            oldOldEdges.add((fromNodeId, toNodeId, depId))
-                        else:
-                            # provider is new
-                            toNodeId = -provInstId
-                            if fromNodeId == toNodeId:
-                                continue
-                            oldNewEdges.add((fromNodeId, toNodeId, depId))
-                    else:
-                        # trove with the requirement is not being removed.
-                        if provNodeIdx is None:
-                            # the trove that provides this requirement is being
-                            # installed.  We probably don't care.
-                            continue
-                        else:
-                            # the trove that provides this requirement is being
-                            # removed.  We probably care -- if this dep is
-                            # being provided by some other package, we need
-                            # to connect these two packages
-                            # XXX fix this
-                            continue
-
-            return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
-
-        def _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges):
-            # these edges cancel each other out -- for example, if Foo
-            # requires both the old and new versions of Bar the order between
-            # Foo and Bar is irrelevant
-            oldOldEdges.difference_update(oldNewEdges)
-            newNewEdges.difference_update(newOldEdges)
-
-        def _buildGraph(nodes, oldOldEdges, newNewEdges):
-            g = graph.DirectedGraph()
-            for nodeId in xrange(1, len(nodes)):
-                g.addNode(nodeId)
-
-            for (reqNodeId, provNodeId, depId) in oldOldEdges:
-                # remove the provider after removing the requirer
-                g.addEdge(reqNodeId, provNodeId)
-
-            for (reqNodeId, provNodeId, depId) in newNewEdges:
-                g.addEdge(provNodeId, reqNodeId)
-
-            return g
-
-        def _stronglyConnect(compGraph, nodes):
-            def orderJobSets(jobSetA, jobSetB):
-                AHasInfo = 0
-                BHasInfo = 0
-                for comp, idx in jobSetA:
-                    if comp[0].startswith('info-'):
-                        AHasInfo = 1
-                        break
-                for comp, idx in jobSetB:
-                    if comp[0].startswith('info-'):
-                        BHasInfo = 1
-                        break
-
-                # if A has info- components and B doesn't, we want A
-                # to be first.  Otherwise, sort by the components in the jobSets
-                # (which should already be internally sorted)
-                return cmp((-AHasInfo, jobSetA), (-BHasInfo, jobSetB))
-
-
-            # get sets of strongly connected components - each component has
-            # a cycle where something at the beginning requires something at the
-            # end.
-            compSets = compGraph.getStronglyConnectedComponents()
-
-
-            # expand the job indexes to the actual jobs, so we can sort the
-            # strongly connected components as we would if there were no
-            # required ordering between them.  We'll use this preferred ordering to
-            # help create a repeatable total ordering.
-            # We sort them so that info- packages are first, then we sort them
-            # alphabetically.
-            jobSets = [ sorted((nodes[x][0], x) for x in idxSet)
-                                                for idxSet in compSets ]
-            jobSets.sort(cmp=orderJobSets)
-
-            # create index from jobIdx -> jobSetIdx for creating a SCC graph.
-            jobSetsByJob = {}
-            for jobSetIdx, jobSet in enumerate(jobSets):
-                for job, jobIdx in jobSet:
-                    jobSetsByJob[jobIdx] = jobSetIdx
-
-            sccGraph = graph.DirectedGraph()
-            for jobSetIdx, jobSet in enumerate(jobSets):
-                sccGraph.addNode(jobSetIdx)
-                for job, jobIdx in jobSet:
-                    for childIdx in compGraph.getChildren(jobIdx):
-                        childJobSetIdx = jobSetsByJob[childIdx]
-                        sccGraph.addEdge(jobSetIdx, childJobSetIdx)
-
-            # create an ordering based on dependencies, and then, when forced
-            # to choose between several choices, use the index order for jobSets
-            # - that's the order we created by our sort() above.
-            orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
-            return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
-
         # this works against a database, not a repository
         cu = self.db.cursor()
 
@@ -590,9 +622,7 @@ class DependencyTables:
         # need to occur before this nodes, and a list of nodes whose
         # operations should occur after this nodes (the two lists form
         # the ordering graph and it's transpose)
-        nodes = [ None ]
-
-        troveInfo = {}
+        checker = DependencyChecker()
 
 	# This sets up negative depNum entries for the requirements we're
 	# checking (multiplier = -1 makes them negative), with (-1 * depNum)
@@ -608,7 +638,9 @@ class DependencyTables:
 
             trv = troveSource.getTrove(withFiles = False, *newInfo)
 
-            troveNum = -i - 1
+            newNodeId = checker._addJob(job)
+
+            troveNum = -newNodeId
             troveNames.append(newInfo)
             self._populateTmpTable(cu, stmt,
                                    depList = depList,
@@ -617,15 +649,11 @@ class DependencyTables:
                                    provides = trv.getProvides(),
                                    multiplier = -1)
 
-            troveInfo[newInfo] = i + 1
-
             if job[1][0] is not None:
 		oldInfo = (job[0], job[1][0], job[1][1])
-                oldTroves.append((oldInfo, len(nodes)))
+                oldTroves.append((oldInfo, newNodeId))
 	    else:
 		oldInfo = None
-
-            nodes.append((job, set(), set()))
 
             i += 1
 
@@ -641,8 +669,8 @@ class DependencyTables:
         for job in jobSet:
             if job[2][0] is not None: continue
             oldInfo = (job[0], job[1][0], job[1][1])
-            oldTroves.append((oldInfo, len(nodes)))
-            nodes.append((job, set(), set()))
+            nodeId = checker._addJob(job)
+            oldTroves.append((oldInfo, nodeId))
 
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
@@ -793,25 +821,14 @@ class DependencyTables:
             # to aid in cancelling them out. Our initial edge representation
             # is a simple set of edges.
             oldNewEdges, oldOldEdges, newNewEdges, newOldEdges = \
-                        _createEdges(result, depList)
+                        checker._createDependencyEdges(result, depList)
 
             # Create dependencies from collections to the things they include.
             # This forces collections to be installed after all of their
             # elements.  We include weak references in case the intermediate
             # trove is not part of the update job.
-            i = 0
-            for job in jobSet:
-                if job[2][0] is None: continue
-                trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                           withFiles = False)
-
-                for name, version, flavor in trv.iterTroveList(strongRefs=True,
-                                                               weakRefs=True):
-                    targetTrove = troveInfo.get((name, version, flavor), -1)
-                    if targetTrove >= 0:
-                        newNewEdges.add((i + 1, targetTrove, None))
-
-                i += 1
+            newNewEdges.update(
+                    checker._createCollectionEdges(jobSet, troveSource))
 
             resatisfied = set(brokenByErase) & set(satisfied)
             if resatisfied:
@@ -833,7 +850,7 @@ class DependencyTables:
                         newNewEdges.add((oldNodeId, newNodeId, depId))
 
             # Remove nodes which cancel each other
-            _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
+            checker._collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
             # the edges left in oldNewEdges represent dependencies which troves
             # slated for removal have on troves being installed. either those
@@ -852,17 +869,14 @@ class DependencyTables:
             # and the particular depId no longer matter. The direction here is
             # a bit different, and defines the ordering for the operation, not
             # the order of the dependency
-            g= _buildGraph(nodes, oldOldEdges, newNewEdges)
+            checker._buildEdges(oldOldEdges, newNewEdges)
             del oldOldEdges
             del newNewEdges
 
-            componentLists = _stronglyConnect(g, nodes)
-            del nodes
+            componentLists = checker._stronglyConnect()
 
             for componentList in componentLists:
                 changeSetList.append(list(componentList))
-
-        del troveInfo
 
         satisfied = set(satisfied)
         brokenByErase = set(brokenByErase)
