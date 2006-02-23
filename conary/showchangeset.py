@@ -51,7 +51,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                      showChanges = False, asJob = False):
 
     if all:
-        deps = tags = recurse = showTroveFlags = True
+        deps = tags = recurse = showTroveFlags = showAllTroves = True
         if ls:
             fileDeps = lsl = True
 

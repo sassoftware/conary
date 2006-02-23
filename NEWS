@@ -7,6 +7,7 @@ Changes in @NEW@:
       a branched trove to fail in some cases has been fixed.
     * If an entitlement is used for repository access, it is now sent
       over HTTPS instead of HTTP by default.
+    * conary showcs --all now shows not by default troves
 
  o Performance improvements:
     * Significantly improved the speed of erasing troves with many dependencies
