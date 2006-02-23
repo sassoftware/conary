@@ -7,6 +7,8 @@ Changes in @NEW@:
       a branched trove to fail in some cases has been fixed.
     * If an entitlement is used for repository access, it is now sent
       over HTTPS instead of HTTP by default.
+    * The conary emerge command no longer attempts to write to the root
+      user's conary log file.
     * conary showcs --all now shows not by default troves
 
  o Performance improvements:
