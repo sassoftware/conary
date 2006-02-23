@@ -119,6 +119,9 @@ class DirectedGraph:
     def deleteEdges(self, item):
         self.edges[self.data.getIndex(item)] = set()
 
+    def getChildren(self, item):
+        return self.data.getItemsByIndex(self.edges[self.data.getIndex(item)])
+
     def getReversedEdges(self):
         newEdges = {}
         for fromId, toIdList in self.edges.iteritems():
@@ -147,13 +150,9 @@ class DirectedGraph:
         if start is not None:
             startId = nodeData.getIndex(start)
             nodeIds.remove(startId)
+            nodeIds.insert(0, startId)
 
-            nodeStack = [(startId,False)]
-            nodeId = startId
-            parent = nodeId
-            trees[nodeId] = []
-        else:
-            nodeStack = []
+        nodeStack = []
 
         while nodeIds:
             if not nodeStack:
