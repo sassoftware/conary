@@ -8,6 +8,9 @@ Changes in @NEW@:
     * If an entitlement is used for repository access, it is now sent
       over HTTPS instead of HTTP by default.
 
+ o Performance improvements:
+    * Significantly improved the speed of erasing troves with many dependencies
+
 Changes in 1.0.3
   o Client changes:
     * Conary displays full paths when in the error message generated

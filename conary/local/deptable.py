@@ -183,15 +183,13 @@ class DependencyTables:
         cu.execute("INSERT INTO suspectDeps SELECT DISTINCT depId "
                    "FROM suspectDepsOrig")
 
-        cu.execute("""DELETE FROM Dependencies WHERE depId IN
-                (SELECT DISTINCT suspectDeps.depId FROM suspectDeps
-                 LEFT OUTER JOIN
-                    (SELECT depId AS depId1,
-                            instanceId AS instanceId1 FROM Requires UNION
-                     SELECT depId AS depId1,
-                            instanceId AS instanceId1 FROM Provides)
-                    ON suspectDeps.depId = depId1
-                 WHERE instanceId1 IS NULL)""")
+        cu.execute("""
+                DELETE FROM Dependencies WHERE depId IN
+                (SELECT suspectDeps.depId FROM suspectDeps WHERE depId NOT IN
+                    (SELECT distinct depId AS depId1 FROM Requires UNION
+                     SELECT distinct depId AS depId1 FROM Provides))
+                 """)
+
 
     def _restrictResolveByLabel(self, label):
         """ Restrict resolution by label
