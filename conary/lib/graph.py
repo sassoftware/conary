@@ -62,14 +62,14 @@ class NodeDataByHash(NodeData):
     def __init__(self):
         NodeData.__init__(self)
         self.hashedData = {}
-        self.data = {}
+        self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(self.data.iteritems(), sortAlg)
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), sortAlg)
 
     def copy(self):
         new = self.__class__()
-        new.data = self.data.copy()
+        new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
         new.index = self.index
         return new
@@ -77,16 +77,18 @@ class NodeDataByHash(NodeData):
     def getIndex(self, item):
         idx = self.hashedData.setdefault(item, self.index)
         if idx == self.index:
-            self.data[self.index] = item
+            self.data.append(item)
             self.index += 1
         return idx
 
     def isEmpty(self):
-        return not self.data
+        return not self.hashedData
 
     def delete(self, item):
         idx = self.hashedData.pop(item)
-        del self.data[idx]
+        # we can't delete from self.data, since that array position is how
+        # things are indexed.
+        self.data[idx] = None
 
 class DirectedGraph:
     def __init__(self, dataSearchMethod=NodeDataByHash):
