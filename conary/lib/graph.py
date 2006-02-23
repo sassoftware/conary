@@ -62,23 +62,21 @@ class NodeDataByHash(NodeData):
     def __init__(self):
         NodeData.__init__(self)
         self.hashedData = {}
-        self.data = {}
+        self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(self.data.iteritems(), sortAlg)
+        return sorted(enumerate(self.data), sortAlg)
 
     def copy(self):
         new = self.__class__()
-        new.data = self.data.copy()
+        new.data = self.data[:]
         new.hashedData = self.hashedData.copy()
-        new.index = self.index
         return new
 
     def getIndex(self, item):
-        idx = self.hashedData.setdefault(item, self.index)
-        if idx == self.index:
-            self.data[self.index] = item
-            self.index += 1
+        idx = self.hashedData.setdefault(item, len(self.data))
+        if idx == len(self.data):
+            self.data.append(item)
         return idx
 
     def isEmpty(self):
