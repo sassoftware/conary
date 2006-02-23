@@ -15,6 +15,7 @@
 from conary import dbstore
 from conary import versions
 from conary.deps import deps
+from conary.lib import graph
 from conary.local import schema
 
 NO_FLAG_MAGIC = '-*none*-'
@@ -484,134 +485,73 @@ class DependencyTables:
             newNewEdges.difference_update(newOldEdges)
 
         def _buildGraph(nodes, oldOldEdges, newNewEdges):
+            g = graph.DirectedGraph()
+            for nodeId in xrange(1, len(nodes)):
+                g.addNode(nodeId)
+
             for (reqNodeId, provNodeId, depId) in oldOldEdges:
                 # remove the provider after removing the requirer
-                nodes[provNodeId][1].add(reqNodeId)
-                nodes[reqNodeId][2].add(provNodeId)
+                g.addEdge(reqNodeId, provNodeId)
 
             for (reqNodeId, provNodeId, depId) in newNewEdges:
-                nodes[reqNodeId][1].add(provNodeId)
-                nodes[provNodeId][2].add(reqNodeId)
+                g.addEdge(provNodeId, reqNodeId)
 
-        def _treeDFS(nodes, nodeIdx, seen, finishes, timeCount):
-            seen[nodeIdx] = True
+            return g
 
-            for nodeId in nodes[nodeIdx][1]:
-                if not seen[nodeId]:
-                    timeCount = _treeDFS(nodes, nodeId, seen, finishes,
-                                         timeCount)
+        def _stronglyConnect(compGraph, nodes):
+            def orderJobSets(jobSetA, jobSetB):
+                AHasInfo = 0
+                BHasInfo = 0
+                for comp, idx in jobSetA:
+                    if comp[0].startswith('info-'):
+                        AHasInfo = 1
+                        break
+                for comp, idx in jobSetB:
+                    if comp[0].startswith('info-'):
+                        BHasInfo = 1
+                        break
 
-            finishes[nodeIdx] = timeCount
-            timeCount += 1
-            return timeCount
+                # if A has info- components and B doesn't, we want A
+                # to be first.  Otherwise, sort by the components in the jobSets
+                # (which should already be internally sorted)
+                return cmp((-AHasInfo, jobSetA), (-BHasInfo, jobSetB))
 
-        def _connectDFS(nodes, compList, nodeIdx, seen, finishes):
-            seen[nodeIdx] = True
-            edges = [ (finishes[x], x) for x in nodes[nodeIdx][2] ]
-            edges.sort()
-            edges.reverse()
 
-            compList.append(nodeIdx)
+            # get sets of strongly connected components - each component has
+            # a cycle where something at the beginning requires something at the
+            # end.
+            compSets = compGraph.getStronglyConnectedComponents()
 
-            for finishTime, nodeId in edges:
-                if not seen[nodeId]:
-                    _connectDFS(nodes, compList, nodeId, seen, finishes)
 
-        def _stronglyConnect(nodes):
-            # Converts the graph to a graph of strongly connected components.
-            # We return a list of lists, where each sublist represents a
-            # single components. All of the edges for that component are
-            # in the nodes list, and are from or two the first node in the
-            # sublist for that component
+            # expand the job indexes to the actual jobs, so we can sort the
+            # strongly connected components as we would if there were no
+            # required ordering between them.  We'll use this preferred ordering to
+            # help create a repeatable total ordering.
+            # We sort them so that info- packages are first, then we sort them
+            # alphabetically.
+            jobSets = [ sorted((nodes[x][0], x) for x in idxSet)
+                                                for idxSet in compSets ]
+            jobSets.sort(cmp=orderJobSets)
 
-            # Now for a nice, simple strongly connected componenet algorithm.
-            # If you don't understand this, try _Introductions_To_Algorithms_
-            # by Cormen, Leiserson and Rivest. If you google for "strongly
-            # connected components" (as of 4/2005) you'll find lots of snippets
-            # from it
-            finishes = [ -1 ] * len(nodes)
-            seen = [ False ] * len(nodes)
-            nextStart = 1
-            timeCount = 0
-            while nextStart != len(nodes):
-                if not seen[nextStart]:
-                    timeCount = _treeDFS(nodes, nextStart, seen, finishes,
-                                         timeCount)
+            # create index from jobIdx -> jobSetIdx for creating a SCC graph.
+            jobSetsByJob = {}
+            for jobSetIdx, jobSet in enumerate(jobSets):
+                for job, jobIdx in jobSet:
+                    jobSetsByJob[jobIdx] = jobSetIdx
 
-                nextStart += 1
+            sccGraph = graph.DirectedGraph()
+            for jobSetIdx, jobSet in enumerate(jobSets):
+                sccGraph.addNode(jobSetIdx)
+                for job, jobIdx in jobSet:
+                    for childIdx in compGraph.getChildren(jobIdx):
+                        childJobSetIdx = jobSetsByJob[childIdx]
+                        sccGraph.addEdge(jobSetIdx, childJobSetIdx)
 
-            nodeOrders = [ (f, i) for i, f in enumerate(finishes) ]
-            nodeOrders.sort()
-            nodeOrders.reverse()
-            # get rid of the placekeeper "None" node
-            del nodeOrders[-1]
-
-            nextStart = 0
-            seen = [ False ] * len(nodes)
-            allSets = []
-            while nextStart != len(nodeOrders):
-                nodeId = nodeOrders[nextStart][1]
-                if not seen[nodeId]:
-                    compSet = []
-                    _connectDFS(nodes, compSet, nodeId, seen, finishes)
-                    allSets.append(compSet)
-
-                nextStart += 1
-
-            # map node indexes to nodes in the component graph
-            componentMap = {}
-            for i, nodeSet in enumerate(allSets):
-                componentMap.update(dict.fromkeys(nodeSet, i))
-
-            componentGraph = []
-            for i, nodeSet in enumerate(allSets):
-                edges = {}
-                componentNodes = []
-                for nodeId in nodeSet:
-                    componentNodes.append(nodes[nodeId][0])
-                    edges.update(dict.fromkeys(
-                            [ componentMap[targetId]
-                                        for targetId in nodes[nodeId][1] ]
-                                ))
-                componentGraph.append((componentNodes, edges))
-
-            return componentGraph
-
-        def _orderDFS(compGraph, nodeIdx, seen, order):
-            seen[nodeIdx] = True
-            for otherNode in compGraph[nodeIdx][1]:
-                if not seen[otherNode]:
-                    _orderDFS(compGraph, otherNode, seen, order)
-
-            order.append(nodeIdx)
-
-        def _orderComponents(compGraph):
-	    # Returns a topological sort of compGraph. It's biased to
-	    # putting info-*: first in the list.
-            order = []
-            seen = [ False ] * len(compGraph)
-            nextIndex = 0
-
-            while (nextIndex < len(compGraph)):
-                if not seen[nextIndex]:
-		    # if any item in this component is an info- trove, go
-		    # ahead and process this component now
-		    for component in compGraph[nextIndex][0]:
-                        name = component[0]
-			if name.startswith("info-"):
-			    _orderDFS(compGraph, nextIndex, seen, order)
-			    break
-
-		nextIndex += 1
-
-            nextIndex = 0
-            while (nextIndex < len(compGraph)):
-                if not seen[nextIndex]:
-                    _orderDFS(compGraph, nextIndex, seen, order)
-
-                nextIndex += 1
-
-            return [ compGraph[x][0] for x in order ]
+            # create an ordering based on dependencies, and then, when forced
+            # to choose between several choices, use the index order for jobSets
+            # - that's the order we created by our sort() above.
+            orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
+            return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
 
         # this works against a database, not a repository
         cu = self.db.cursor()
@@ -912,19 +852,15 @@ class DependencyTables:
             # and the particular depId no longer matter. The direction here is
             # a bit different, and defines the ordering for the operation, not
             # the order of the dependency
-            _buildGraph(nodes, oldOldEdges, newNewEdges)
+            g= _buildGraph(nodes, oldOldEdges, newNewEdges)
             del oldOldEdges
             del newNewEdges
 
-            componentGraph = _stronglyConnect(nodes)
+            componentLists = _stronglyConnect(g, nodes)
             del nodes
-            ordering = _orderComponents(componentGraph)
-            for component in ordering:
-                oneList = []
-                for job in component:
-                    oneList.append(job)
 
-                changeSetList.append(oneList)
+            for componentList in componentLists:
+                changeSetList.append(list(componentList))
 
         del troveInfo
 
