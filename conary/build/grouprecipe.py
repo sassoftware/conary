@@ -799,6 +799,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
             group.delTrove(*troveTup)
+            groupAsSource.delTrove(*troveTup)
 
         # replace troves
         for troveSpec, ref in replaceSpecs:
@@ -811,9 +812,10 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                 components = group.getComponents(*troveTup)
 
                 group.delTrove(*troveTup)
+                groupAsSource.delTrove(*troveTup)
                 for newTup in troveMap[ref][troveSpec]:
                     group.addTrove(newTup, True, byDefault, [])
-
+                    groupAsSource.addTrove(*newTup)
     # add implicit troves
     # first from children of explicit troves.
     componentsToRemove = group.getComponentsToRemove()

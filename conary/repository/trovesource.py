@@ -419,6 +419,12 @@ class GroupRecipeSource(SearchableTroveSource):
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
 
+    def delTrove(self, name, version, flavor):
+        self._trovesByName[name].remove((name, version, flavor))
+
+    def addTrove(self, name, version, flavor):
+        self._trovesByName.setdefault(name, []).append((name, version, flavor))
+
 class ReferencedTrovesSource(SearchableTroveSource):
     """ A TroveSource that only (n,v,f) pairs for troves that are
         referenced by other, installed troves.
