@@ -426,14 +426,20 @@ Displays information about the trove that owns the path <path>, if any.
 .B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
 The \fBshowcs\fP command lists the contents of the provided 
 \fBchangeset\fP.  If a trove is specified, and that trove is within the 
-changeset, only that trove is displayed.  
+changeset, only that trove is displayed.  If no trove is specified, the \fBprimary troves\fP in changeset are displayed.  Primary troves are defined in the jargon section below.
 .RS 4
 .TP 4
 .B \-\-show-changes
 For files that have been modified, lists the old version of the file above the
 new version of the file for easy comparison.  Implies --ls
 is specified.  
+.TP 4
+.B \-\-recurse-repos
+When recursing, use the repository to download information about troves not in 
+the changeset but referenced by the changeset.  This allows you to perform a 
+--ls of all the files in a group changeset, for example.
 .RE
+
 .RE
 .\"
 .\"
@@ -545,6 +551,10 @@ A \fBchangeset\fP is a representation of the changes between two versions
 (an \fBabsolute changeset\fP).  Changesets are used internally as the
 main form of communication between the Conary client and the repository,
 and can also live independently as files.
+.RE
+.TP
+.B Primary Troves in a Changeset
+The \fBprimary troves\fP in a changeset are generally the top-level troves in that changeset.  If a changeset was created by cooking a package, then the packages in the changeset are primary, but the components are not.  Similary, if looking a group changeset, then groups in that changeset that are not included in any other groups will be primary.  If the changeset was created by running \fIconary changeset foo:runtime\fP, then \fIfoo:runtime\fP will be a primary trove.
 .\"
 .\"
 .\"
