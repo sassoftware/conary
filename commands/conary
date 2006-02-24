@@ -141,7 +141,9 @@ def usage(rc = 1):
     print ""
     print
     print "     showcs flags:"
+    print "                 --all"
     print "                 --show-changes"
+    print "                 --recurse-repository"
     print
     print "rollback flags:  --replace-files"
     print "syncchildren flags:"
@@ -241,10 +243,14 @@ def realMain(cfg, argv=sys.argv):
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
     argDef["recurse"] = NO_PARAM
+    argDef["recurse-repository"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
+    argDef["show-contexts"] = NO_PARAM
+    argDef["show-passwords"] = NO_PARAM
+    argDef["signatures"] = NO_PARAM
     argDef["sync-to-parents"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
@@ -256,9 +262,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["update-only"] = NO_PARAM
     argDef["weak-refs"] = NO_PARAM
     argDef["version"] = NO_PARAM
-    argDef["show-passwords"] = NO_PARAM
-    argDef["show-contexts"] = NO_PARAM
-    argDef["signatures"] = NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, {}, cfg, usage,
@@ -590,6 +593,7 @@ def realMain(cfg, argv=sys.argv):
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
                 ('trove-flags', 'showTroveFlags'),
+                ('recurse-repository', 'recurseRepos'),
                 'deps', 'info', 'all', ('show-changes', 'showChanges')):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
