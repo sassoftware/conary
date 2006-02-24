@@ -60,7 +60,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
     if showChanges:
         lsl = True
     
-    if recurseRepository:
+    if recurseRepos:
         recurse = True
 
     client = conaryclient.ConaryClient(cfg)
