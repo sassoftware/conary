@@ -229,8 +229,10 @@ class ServerCache:
                 protocol = 'http'
 
             if userInfo is None:
+                # if we are using anonymous, use http
                 url = "%s://%s/conary/" % (protocol, serverName)
             else:
+                # if we have a username/password, use https
                 url = "%s://%s:%s@%s/conary/" % (protocol,
                                                  quote(userInfo[0]),
                                                  quote(userInfo[1]),
