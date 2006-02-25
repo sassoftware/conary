@@ -30,7 +30,6 @@ from conary import errors
 from conary import files
 from conary import trove
 from conary import versions
-import build.errors
 from conary.build import recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors

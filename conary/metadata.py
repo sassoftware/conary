@@ -19,10 +19,7 @@ import urlparse
 import xml.dom.minidom
 import xml.parsers.expat
 
-from conary import versions
-from conary.dbstore import idtable
 from conary.fmtroves import TroveCategories, LicenseCategories
-from conary.lib import log
 from conary.local import schema
 
 class MDClass:

@@ -24,7 +24,7 @@ from conary import files
 from conary import streams
 from conary import versions
 from conary.deps import deps
-from conary.lib import log, misc, sha1helper
+from conary.lib import misc, sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 from conary.lib import openpgpkey
 from conary.streams import ByteStream
@@ -955,6 +955,7 @@ class Trove(streams.StreamSet):
             pass
             # we don't warn here because the warning would show up 
             # everywhere we call getTrove as opposed to only when installing
+            # from conary.util import log
             #log.warning('Not checking integrity of trove %s with new schema version %s' % (self.getName(), self.troveInfo.troveVersion()))
         elif not skipIntegrityChecks:
             # if we have a sha1 in our troveinfo, verify it
@@ -963,6 +964,7 @@ class Trove(streams.StreamSet):
                     raise TroveIntegrityError(self.getName(), self.getVersion(),
                                               self.getFlavor())
             else:
+                # from conary.util import log
                 #log.warning('changeset does not contain a sha1 checksum')
                 pass
 

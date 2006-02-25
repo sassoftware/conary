@@ -26,8 +26,7 @@ from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, util
 from conary.local import localrep, sqldb, schema, update
-from conary.repository import changeset, datastore, errors, filecontents, \
-                              filecontainer
+from conary.repository import changeset, datastore, errors, filecontents
 from conary.repository import repository, trovesource
 
 OldDatabaseSchema = schema.OldDatabaseSchema

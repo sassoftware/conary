@@ -17,11 +17,9 @@ Implements conaryrc handling.
 import fnmatch
 import os
 import sys
-import copy
 
-from conary.build import use
 from conary.deps import deps, arch
-from conary.lib import log, util
+from conary.lib import util
 from conary.lib.cfg import *
 from conary import versions
 from conary import flavorcfg

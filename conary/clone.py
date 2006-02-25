@@ -15,7 +15,6 @@ import itertools
 
 from conary import versions
 from conary.conaryclient import ConaryClient, cmdline
-from conary.repository import netclient
 from conary.build.cook import signAbsoluteChangeset
 from conary.conarycfg import selectSignatureKey
 
