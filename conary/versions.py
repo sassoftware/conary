@@ -606,10 +606,6 @@ class VersionSequence(AbstractVersion):
 
 	return self.hash
 
-    def iterElements(self):
-        if isinstance(item, AbstractLabel):
-            yield item
-
     def iterLabels(self):
         for item in self.versions:
             if isinstance(item, AbstractLabel):
