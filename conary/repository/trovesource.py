@@ -857,7 +857,7 @@ class TroveSourceStack(SearchableTroveSource):
         return False
 
     def trovesByName(self, name):
-        return list(chain(*(x.trovesByName(name) for x in self.sources)))
+        return list(itertools.chain(*(x.trovesByName(name) for x in self.sources)))
         
     def getTroves(self, troveList, withFiles = True):
         troveList = list(enumerate(troveList)) # make a copy and add indexes
