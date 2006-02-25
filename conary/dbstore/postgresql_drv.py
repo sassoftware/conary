@@ -12,10 +12,9 @@
 # full details.
 #
 
-import re
 import pgdb
 
-from base_drv import BaseDatabase, BindlessCursor, BaseCursor, BaseBinary
+from base_drv import BaseDatabase, BindlessCursor, BaseBinary
 from base_drv import BaseKeywordDict
 import sqlerrors
 import sqllib

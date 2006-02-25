@@ -15,21 +15,18 @@
 # implements a db-based repository
 
 import traceback
-import os
 import sys
 
-from conary import files, versions
+from conary import files
 from conary.deps import deps
-from conary.lib import util, stackutil, log, openpgpfile
+from conary.lib import util, openpgpfile
 from conary.repository import changeset, errors, filecontents
-from conary.repository.netrepos import trovestore
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
 from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
-from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
-from conary.repository import repository, netclient
+from conary.repository import netclient
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 

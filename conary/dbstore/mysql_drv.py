@@ -12,7 +12,6 @@
 # full details.
 #
 
-import re
 import MySQLdb as mysql
 from MySQLdb import converters
 from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary

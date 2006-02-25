@@ -15,14 +15,11 @@
 #
 
 import base64
-import cgi
 import errno
 import os
 import posixpath
 import select
 import sys
-import tempfile
-import traceback
 import xmlrpclib
 import urllib
 import zlib
@@ -39,15 +36,13 @@ mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
 
 from conary import dbstore
-from conary.conarycfg import CfgRepoMap
 from conary.lib import options
 from conary.lib import util
-from conary.lib.cfg import ConfigFile,CfgPath,CfgInt,CfgBool
+from conary.lib.cfg import CfgInt
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
-from conary.repository.netrepos import netauth
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema

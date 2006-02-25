@@ -23,16 +23,13 @@ from conary.lib.util import log
 from Crypto.PublicKey import DSA
 from openpgpfile import getPrivateKey
 from openpgpfile import getPublicKey
-from openpgpfile import getPublicKeyFromString
 from openpgpfile import getFingerprint
 from openpgpfile import getKeyEndOfLife
 from openpgpfile import getKeyTrust
-from openpgpfile import seekNextKey
 from openpgpfile import seekKeyById
-from openpgpfile import IncompatibleKey
 from openpgpfile import BadPassPhrase
 from openpgpfile import KeyNotFound
-from openpgpfile import SEEK_SET, SEEK_CUR, SEEK_END
+from openpgpfile import SEEK_SET, SEEK_END
 
 #-----#
 #OpenPGPKey structure:

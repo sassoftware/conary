@@ -12,7 +12,6 @@
 # full details.
 #
 
-import os
 from StringIO import StringIO
 
 from conary.lib import sha1helper

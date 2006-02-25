@@ -13,12 +13,10 @@
 #
 
 # defines the Conary repository
-import sha
-import tempfile
 
 from conary.repository import changeset, errors, filecontents
-from conary import deps, files, trove, versions
-from conary.lib import log, patch, sha1helper, util, openpgpkey, openpgpfile
+from conary import files, trove
+from conary.lib import log, patch, openpgpkey, openpgpfile
 
 class AbstractTroveDatabase:
 

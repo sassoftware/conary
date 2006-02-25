@@ -17,7 +17,6 @@ import sha
 import zlib
 from StringIO import StringIO
 
-from conary.lib import openpgpfile, openpgpkey
 from conary.repository import errors, repository, datastore
 from conary.local import schema
 

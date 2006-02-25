@@ -17,14 +17,14 @@ Generates an XML trove description file.
 """
 
 import sys
-import xmlrpclib
 
 from conary import conarycfg
+from conary import constants
 from conary import metadata
 from conary.lib import log
 from conary.lib import options
 from conary.lib import util
-from conary.repository import netclient
+from conary import versions
 
 argDef = {}
 argDef['dir'] = 1

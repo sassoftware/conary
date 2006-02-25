@@ -54,7 +54,6 @@ Each file table entry looks like::
 """
 
 import gzip
-import os
 import struct
 
 from conary.lib import util

@@ -14,23 +14,19 @@
 
 import base64
 import os
-import re
 import sys
 import tempfile
 import time
 
-from conary import files, trove, versions
+from conary import trove, versions
 from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, trovestore
-from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature, IncompatibleKey
-from conary.lib.openpgpfile import TRUST_FULL
-from conary.lib.openpgpkey import getKeyCache
+from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.repository import repository
 from conary.trove import DigitalSignature
 from conary.repository.netrepos import cacheset
 from conary import dbstore

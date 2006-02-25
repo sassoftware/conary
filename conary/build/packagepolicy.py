@@ -25,7 +25,6 @@ import sys
 from conary import files
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
-from conary.build.use import Use
 from conary.deps import deps
 from conary.lib import elf, util, log, pydeps
 from conary.local import database

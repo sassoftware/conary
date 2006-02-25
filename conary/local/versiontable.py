@@ -1,4 +1,4 @@
-#
+
 # Copyright (c) 2004, 2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -13,8 +13,6 @@
 #
 
 from conary import versions
-from conary.local import schema
-from conary.dbstore import idtable
 
 # XXX: this looks awfully similar to an idtable...
 class VersionTable:

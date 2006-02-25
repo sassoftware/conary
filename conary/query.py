@@ -15,14 +15,10 @@
 Provides the output for the "conary query" command
 """
 
-
-import itertools
 import os
-import time
 
 from conary import display
 from conary.conaryclient import cmdline
-from conary.deps import deps
 from conary.lib import util
 
 def displayTroves(db, cfg, troveSpecs = [], pathList = [],

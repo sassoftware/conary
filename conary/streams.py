@@ -15,7 +15,6 @@
 Defines the datastreams stored in a changeset
 """
 
-import copy
 import itertools
 import struct
 from conary import versions

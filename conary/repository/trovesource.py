@@ -16,7 +16,6 @@ import itertools
 
 from conary import files
 from conary import trove
-from conary.deps import deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
 

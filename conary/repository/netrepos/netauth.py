@@ -14,7 +14,6 @@
 import md5
 import os
 import re
-import sys
 
 from conary.repository import errors
 from conary.lib import tracelog

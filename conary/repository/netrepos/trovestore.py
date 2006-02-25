@@ -12,18 +12,16 @@
 # full details.
 #
 
-import copy
 import itertools
 
 from conary import files, metadata, trove, versions, changelog
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable
-from conary.local import versiontable, sqldb
+from conary.local import versiontable
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
 from conary.repository.netrepos import troveinfo, versionops, cltable
-from conary.dbstore import sqlerrors
 from conary.server import schema
 
 class LocalRepVersionTable(versiontable.VersionTable):

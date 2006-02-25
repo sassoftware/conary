@@ -12,7 +12,6 @@
 # full details.
 #
 import itertools
-import sys
 
 from conary import versions
 from conary.conaryclient import ConaryClient, cmdline

@@ -13,7 +13,6 @@
 
 import itertools
 import os
-import time
 import traceback
 import sys
 
@@ -22,7 +21,6 @@ from conary import conarycfg
 from conary.deps import deps
 from conary.errors import ClientError
 from conary.lib import log, util
-from conary.lib import openpgpkey, openpgpfile
 from conary.local import database
 from conary.repository import changeset, trovesource
 from conary.repository.errors import TroveMissing

@@ -16,17 +16,13 @@ Provides the output for the "conary showcs" command
 """
 
 import itertools
-import time
-import sys
 
 #conary
 from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display, query
-from conary import files
 from conary.lib import log
-from conary.lib.sha1helper import sha1ToString
-from conary.repository import repository, trovesource
+from conary.repository import trovesource
 
 def usage():
     print "conary showcs   <changeset> [trove[=version]]"

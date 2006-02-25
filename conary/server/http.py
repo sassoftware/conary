@@ -13,7 +13,6 @@
 #
 
 from mod_python import apache
-from mod_python.util import FieldStorage
 from urllib import unquote
 import itertools
 import kid
@@ -28,7 +27,7 @@ from conary import versions
 from conary import conarycfg
 from conary.deps import deps
 from conary.repository import shimclient
-from conary.repository.errors import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
+from conary.repository.errors import GroupAlreadyExists, PermissionAlreadyExists, InsufficientPermission
 from conary.repository.netrepos import netserver
 from conary.server import templates
 from conary.web.fields import strFields, intFields, listFields, boolFields

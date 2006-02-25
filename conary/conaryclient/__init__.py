@@ -17,7 +17,6 @@ import pickle
 #conary imports
 from conary import conarycfg, metadata
 from conary.conaryclient import clone, update
-from conary.deps import deps
 from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient

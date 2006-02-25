@@ -16,15 +16,12 @@ Provides output methods for displaying troves
 """
 
 import itertools
-import os
 import time
 
 #conary
 from conary import files
 from conary import trove
 from conary.deps import deps
-from conary.lib import log
-from conary.lib import util
 from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary import metadata
 from conary.repository import errors

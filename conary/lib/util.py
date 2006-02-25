@@ -21,10 +21,8 @@ import misc
 import os
 import select
 import shutil
-import stackutil
 import stat
 import string
-import struct
 import sys
 import tempfile
 import time

@@ -23,7 +23,7 @@ from conary.build import use
 from conary import conaryclient
 from conary.deps import deps
 from conary import errors
-from conary.lib import graph, log, util
+from conary.lib import graph, util
 from conary.repository import trovesource
 from conary import trove
 from conary import versions

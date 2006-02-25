@@ -17,10 +17,8 @@
 
 import itertools
 import os
-import sys
 
 from conary import conarycfg
-from conary.repository import netclient
 from conary.lib import cfg, util, log
 
 class MirrorConfigurationSection(cfg.ConfigSection):

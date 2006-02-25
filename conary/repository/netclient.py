@@ -30,9 +30,7 @@ from conary import files
 from conary import metadata
 from conary import trove
 from conary import versions
-from conary.deps import deps
-from conary.lib import log, util
-from conary.lib import openpgpfile
+from conary.lib import util
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontents

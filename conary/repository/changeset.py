@@ -12,7 +12,6 @@
 # full details.
 #
 
-from StringIO import StringIO
 import struct
 import tempfile
 import difflib
@@ -22,7 +21,6 @@ import itertools
 import os
 
 from conary import files, streams, trove, versions
-from conary.deps import deps
 from conary.lib import enum, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
 

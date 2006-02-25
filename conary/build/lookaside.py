@@ -24,7 +24,6 @@ from conary.lib import util
 from conary import callbacks
 import os
 import socket
-import sys
 import time
 import urllib2
 

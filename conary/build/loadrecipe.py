@@ -20,7 +20,6 @@ import string
 import sys
 import tempfile
 import traceback
-import types
 
 from conary.repository import errors
 from conary.build import recipe,use

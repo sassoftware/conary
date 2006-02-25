@@ -20,7 +20,6 @@ import itertools
 from conary import conaryclient
 from conary import errors
 from conary import updatecmd
-from conary import versions
 from conary.lib import log
 from conaryclient import cmdline
 from conary.build.cook import signAbsoluteChangeset

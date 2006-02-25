@@ -12,12 +12,10 @@
 # full details.
 #
 
-from conary import deps, files, sqlite3, streams, trove, versions
+from conary import deps, files, streams, trove, versions
 from conary import dbstore
-from conary.dbstore import idtable, migration, sqlerrors
+from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
-
-import itertools
 
 OldDatabaseSchema = schema.OldDatabaseSchema
 

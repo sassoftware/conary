@@ -28,7 +28,6 @@ import tempfile
 import textwrap
 import time
 import traceback
-import types
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
@@ -40,9 +39,8 @@ from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util
 from conary.local import database
-from conary.repository import changeset, errors, filecontents
+from conary.repository import changeset, errors
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.repository.netclient import NetworkRepositoryClient
 from conary.state import ConaryStateFromFile
 
 CookError = builderrors.CookError

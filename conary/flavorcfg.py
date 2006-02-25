@@ -18,7 +18,6 @@ import os.path
 #conary
 from conary.build import use
 from conary.deps import deps
-from conary.lib import log
 from conary.lib.cfg import *
 
 class CfgFlagSense(CfgType):
