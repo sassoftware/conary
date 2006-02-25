@@ -142,7 +142,7 @@ class RecipeLoader:
         self.recipes = {}
         
         if filename[0] != "/":
-            raise LoadRecipeError("recipe file names must be absolute paths")
+            raise builderrors.LoadRecipeError("recipe file names must be absolute paths")
 
         if component:
             pkgname = component.split(':')[0]

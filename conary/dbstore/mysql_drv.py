@@ -45,7 +45,7 @@ class Cursor(BindlessCursor):
         except mysql.IntegrityError, e:
             if e[0] in (1062,):
                 raise sqlerrors.ColumnNotUnique(e)
-            raise errors.CursorError(e.args[1], (e,) + tuple(e.args))
+            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
         except mysql.OperationalError, e:
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
