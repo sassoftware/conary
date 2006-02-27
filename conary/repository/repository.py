@@ -281,6 +281,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
+    def checkTroveCompleteness(self, trv):
+        pass
+    
     def checkTroveSignatures(self, trv, threshold, keyCache = None):
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
@@ -370,6 +373,9 @@ class ChangeSetJob:
                         ' information.  Please upgrade conary.', 
                         newTrove.getName(), newTrove.troveInfo.troveVersion(), 
                         trove.TROVE_VERSION)
+
+            self.checkTroveCompleteness(newTrove)
+
             self.checkTroveSignatures(newTrove, threshold, keyCache=keyCache)
 
 	    troveInfo = self.addTrove(

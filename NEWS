@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.4:
   o Bugfixes:
     * An Apache-based conary repository server no longer logs
       tracebacks in error_log when a client disconnects before all
@@ -18,6 +18,9 @@ Changes in @NEW@:
       trove is missing in a changeset.
     * A bug that caused showcs --all to display file lists even when --ls 
       was not specified has been fixed.
+    * When mirroring, you are now allowed to commit a trove that does
+      not have a SHA1 checksum set.  This is an accurate
+      representation of the data coming from the source repository.
 
  o Performance improvements:
     * Significantly improved the speed of erasing troves with many dependencies
