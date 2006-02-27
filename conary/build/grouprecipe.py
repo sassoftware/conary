@@ -90,7 +90,47 @@ class _BaseGroupRecipe(Recipe):
 
 class GroupRecipe(_BaseGroupRecipe):
     """
-        Provides the recipe interface for creating a group.
+        Provides the recipe interface for creating a group.  Commands not meant 
+        to be used in recipes have an underscore in front of them.  
+
+        Most user commands take a groupName parameter.  This parameter 
+        specifies the group that a particular command applies to.  For example,
+        r.add('foo', groupName='group-bar') tries to add 'foo' to 'group-bar'.
+        The group specified must have been created before it may be added to.
+        groupName may also be a list of groups, in which case the command will
+        be applied to all groups.  If groupName is not supplied or is None,
+        then the command applies to the current default group.
+
+        There are several parameters to groups that are set at the time of 
+        group creation.  Although they are normally passed as parameters
+        to r.createNewGroup(), for the base group, they are set as variables
+        in the recipe class.  
+
+        Note that setting these parameters affects not only the value for 
+        the base group, but also the default value for newly created groups.
+        So, for example, if you turn on autoResolve in the base group,
+        all other groups created will have autoResolve turned on by default.
+
+        The following parameters are settable:
+
+            depCheck (default False): if set to True, then conary will check
+                for dependency closure in this group, and raise an error if 
+                it is not found.
+
+            autoResolve (default False): if set to True, then conary will
+                include any extra troves needed to make this group dependency
+                complete.  
+
+            checkOnlyByDefaultDeps (default True): By default, conary
+                checks only the dependencies of the troves in a group that
+                are installed by default.  By setting this option to False,
+                conary will check the dependencies of byDefault False troves
+                as well.
+
+            checkPathConflicts (default True): By default, conary checks for
+                path conflicts in each group, to ensure that the group can
+                be installed without path conflicts.  Setting this to False
+                will disable that check.
     """
     Flags = use.LocalFlags
     ignore = 1
@@ -129,11 +169,38 @@ class GroupRecipe(_BaseGroupRecipe):
         return flavorObj
 
     def Requires(self, requirement, groupName = None):
+        """
+        Cause a group to have a runtime requirement of the trove requirement.
+        """
         for group in self._getGroups(groupName):
             group.addRequires(requirement)
     
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None):
+        """
+            Adds a trove to the specified groups.
+
+            Params:
+
+            name (required): the name of the trove to add
+            versionStr: a version specifier like that passed to 
+                repquery that determines the trove returned.  
+            flavor: a flavor limiter like that passed to repquery
+                that determines the trove returned.
+            source: a piece of data used by some programs that 
+                read group recipes.  Specifies the source from which this
+                trove originates.  Generally not necessary.
+            byDefault: whether to include this trove byDefault or not.  
+                defaults to the byDefault setting for troves, as specified
+                in createNewGroup.
+            ref: trove reference to search for this trove in.  See addReference
+                for more information.
+            components: Specify a set of components of this trove to include.
+                Only relevant when adding packages.  Specified as a list,
+                such as r.add('foo', components=['runtime', 'lib'])
+            groupName: group to add this trove to.
+        """
+
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
@@ -145,26 +212,62 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def remove(self, name, versionStr = None, flavor = None, groupName = None):
         """ Remove a trove added to this group, either by an addAll
-            line or by an addTrove line. 
+            line or by an addTrove line.  
+
+            Note that if the trove is not included explicitly, by an add()
+            line, but rather implicitly, perhaps because it is a component in 
+            a package that you have added, then removing the trove only
+            changes its byDefault setting, so that installing this group
+            will not install the trove.
+
+            You can remove troves from a super group that are included due to
+            a sub group you include.  For example, suppose group have 
+            group-os, which is your top level group, and it includes
+            group-dist, which includes a package foo.
+
+            You can add r.remove('foo', groupName='group-os'), and if you
+            install group-os, 'foo' will not be installed.
+
+            name (required): the name of the trove to add
+            versionStr: a version specifier like that passed to 
+                repquery that determines the trove returned.  
+            flavor: a flavor limiter like that passed to repquery
+                that determines the trove returned.
+            groupName: group to add this trove to.
         """
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
             group.removeSpec(name, versionStr = versionStr, flavor = flavor)
 
     def removeComponents(self, componentList, groupName = None):
+        """
+            Specify a set of components that should, by default not be 
+            included when installing this group.
+
+            Example:
+                r.removeComponents(['devel', 'devellib'])
+        """
         if not isinstance(componentList, (list, tuple)):
             componentList = [ componentList ]
         for group in self._getGroups(groupName):
             group.removeComponents(componentList)
 
     def setByDefault(self, byDefault = True, groupName = None):
+        """
+            Set whether troves are added to this group with byDefault True
+            or not.
+
+            example:
+            r.setByDefault(False, groupName='group-os')
+        """
         for group in self._getGroups(groupName):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
                                                             recurse=True, 
                                                             groupName = None):
-        """ Add all of the troves directly contained in the given 
+        """ 
+            Add all of the troves directly contained in the given 
             reference to groupName.  For example, if the cooked group-foo 
             contains references to the troves 
             foo1=<version>[flavor] and foo2=<version>[flavor],
@@ -173,12 +276,36 @@ class GroupRecipe(_BaseGroupRecipe):
             would be equivalent to you having added the addTrove lines
             r.add('foo1', <version>) 
             r.add('foo2', <version>) 
+
+            parameters:
+            ref: trove reference to search for this trove in.  See addReference
+                 for more information.
+            recurse (default True): If True, then if the trove you specify in
+                addAll contains groups, new groups are created in your recipe
+                that match those contained groups, and the addAll command is
+                recursed on those groups.  Note that if those subgroups are
+                already created in your group, those already created groups
+                will be used.  Otherwise, the default settings will be used
+                when creating any new groups.
+            groupName: group to add these troves to
         """
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
+        """
+        Add one newly created group to another newly created group.
+
+        Params:
+            name: name of group to add
+            groupName: name of group(s) to add this group to.  Defaults to 
+                current group.
+            byDefault: Whether to add this group byDefault True.  Defaults to
+            True.
+        """
+        #FIXME: this should default to whatever the current byDefault default
+        # is!
         if not self._hasGroup(name):
             raise RecipeFileError, 'group %s has not been created' % name
 
@@ -186,14 +313,42 @@ class GroupRecipe(_BaseGroupRecipe):
             group.addNewGroup(name, byDefault, explicit = True)
 
     def setDefaultGroup(self, groupName):
+        """
+            Sets the current group that all commands apply to if no group
+            is specified with the command.
+        """
         self._setDefaultGroup(self._getGroup(groupName))
 
     def addReference(self, name, versionStr = None, flavor = None, ref = None):
+        """
+            Returns a reference to a trove, usually a group trove, that can
+            then be passed in to future r.add/addAll command as the ref 
+            parameter.  Passing in a ref  will cause those commands to search 
+            for the trove to be added in the reference.
+
+            For example, if there is an already existing trove group-foo,
+            which contains foo version 1.0, and there is another foo that
+            is version 2.0.
+        """
         flavor = self._parseFlavor(flavor)
         return GroupReference(((name, versionStr, flavor),), ref)
 
     def replace(self, name, newVersionStr = None, newFlavor = None, ref = None, 
                 groupName = None):
+        """
+            Replace all troves with a particular name with a new version of the
+            trove.
+
+            Parameters:
+            name: the name of the trove to replace
+            newVersionStr: the new version to add, like in r.add
+            newFlavor: the new flavor to add, like in r.add
+            ref: the reference to search for the new trove in, like in r.add
+            groupName: the group to limit this replace to.
+
+            Note that by default, r.replace affects _all_ groups.  This is
+            different from other group commands.
+        """
         newFlavor = self._parseFlavor(newFlavor)
         if groupName is None:
             self.replaceSpecs.append(((name, newVersionStr, newFlavor), ref))
@@ -205,6 +360,7 @@ class GroupRecipe(_BaseGroupRecipe):
         return iter(self.replaceSpecs)
 
     def setLabelPath(self, *path):
+        """ Set the labelPath to search for troves on. """
         self.labelPath = [ versions.Label(x) for x in path ]
 
     def getLabelPath(self):
@@ -219,6 +375,25 @@ class GroupRecipe(_BaseGroupRecipe):
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
                     checkPathConflicts = None):
+        """
+            Creates a new group.
+
+            Params:
+            
+            groupName:  The name of the group to created.  Must start with 
+                group-.
+            depCheck: whether to check for dependency closure for this group.  
+                Defaults to the setting for the current group.
+            autoResolve: whether to resolve dependencies for this group. 
+                Defaults to the setting for the current group.
+            byDefault: whether to add troves to this group byDefault True 
+                or byDefault False by default.  Defaults to the setting for
+                the current group.
+            checkOnlyByDefaultDeps:  whether to include byDefault False troves
+                in this group.  Defaults to the setting for the current group.
+            checkPathConflicts:  whether to check path conflicts for this
+                group.  Defaults to the setting for the current group.
+        """
         if self._hasGroup(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
         elif not groupName.startswith('group-'):
