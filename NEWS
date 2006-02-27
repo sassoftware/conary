@@ -1,4 +1,15 @@
 Changes in 1.0.4:
+ o Performance improvements:
+    * The speed of erasing troves with many dependencies has been
+      significantly improved.
+    * The join order of tables is forced through the use of
+      STRAIGHT_JOIN in TroveStore.iterTroves() to work around some
+      MySQL optimizer shortcomings.
+    * An --analyze command line option has been added to the stand
+      alone server (server.py) to re-ANALYZE the SQL tables for MySQL
+      and SQLite.  This can significantly improve repository
+      performance in some cases.
+
   o Bugfixes:
     * An Apache-based conary repository server no longer logs
       tracebacks in error_log when a client disconnects before all
@@ -21,17 +32,6 @@ Changes in 1.0.4:
     * When mirroring, you are now allowed to commit a trove that does
       not have a SHA1 checksum set.  This is an accurate replication
       of the data coming from the source repository.
-
- o Performance improvements:
-    * The speed of erasing troves with many dependencies has been
-      significantly improved.
-    * The join order of tables is forced through the use of
-      STRAIGHT_JOIN in TroveStore.iterTroves() to work around some
-      MySQL optimizer shortcomings.
-    * An --analyze command line option has been added to the stand
-      alone server (server.py) to re-ANALYZE the SQL tables for MySQL
-      and SQLite.  This can significantly improve repository
-      performance in some cases.
 
 Changes in 1.0.3
   o Client changes:
