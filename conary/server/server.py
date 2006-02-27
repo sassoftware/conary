@@ -449,7 +449,7 @@ if __name__ == '__main__':
         if argSet:
             usage()
         sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
-    elif argSet.pop('analyze', True):
+    elif argSet.pop('analyze', False):
         if argSet:
             usage()
         netRepos.db.analyze()
