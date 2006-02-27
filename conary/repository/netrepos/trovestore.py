@@ -701,11 +701,11 @@ class TroveStore:
                     """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
 
+
         neededIdx = 0
         while troveIdList:
-            # [0:4] because we don't need the changelog information
-            (idx, troveInstanceId, isRedirect, timeStamps) =  \
-                        troveIdList.pop(0)[0:4]
+            (idx, troveInstanceId, isRedirect, timeStamps,
+             clName, clVersion, clMessage) =  troveIdList.pop(0)
 
             # make sure we've returned something for everything up to this
             # point
@@ -716,10 +716,10 @@ class TroveStore:
             # we need the one after this next time through
             neededIdx += 1
 
-            singleTroveInfo = troveIdList[idx]
+            singleTroveInfo = troveInfoList[idx]
 
-            if singleTroveInfo[4] is not None:
-                changeLog = changelog.ChangeLog(*singleTroveIds[4:7])
+            if clName is not None:
+                changeLog = changelog.ChangeLog(clName, clVersion, clMessage)
             else:
                 changeLog = None
 
