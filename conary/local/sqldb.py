@@ -1315,7 +1315,7 @@ order by
             result.append([])
 
         cu.execute("""SELECT idx, Instances.troveName, Versions.version,
-                             Flavors.flavor
+                             Flavors.flavor, flags
                         FROM ftc JOIN Versions AS IncVersion ON
                             ftc.version = IncVersion.version
                         JOIN Flavors AS IncFlavor ON
@@ -1334,7 +1334,12 @@ order by
                         JOIN Versions ON
                             Instances.versionId = Versions.versionId
                 """)
-        for (idx, name, version, flavor) in cu:
+        for (idx, name, version, flavor, flags) in cu:
+            if flags & schema.TROVE_TROVES_WEAKREF:
+                # don't include weak references, they are not direct
+                # containers
+                continue
+
             result[idx].append((name, versions.VersionFromString(version),
                                 deps.deps.ThawDependencySet(flavor)))
 
