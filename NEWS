@@ -9,27 +9,29 @@ Changes in 1.0.4:
       over HTTPS instead of HTTP by default.
     * The conary emerge command no longer attempts to write to the root
       user's conary log file.
-    * conary showcs --all now shows not by default troves
-    * Previously, there was no way using showcs to display only the troves 
-      actually in a changeset - conary would by default access the repository 
+    * conary showcs --all now shows not-by-default troves.
+    * Previously, there was no way using showcs to display only the troves
+      actually in a changeset - conary would by default access the repository
       to fill in any missing troves.  Now, you must specify the
       --recurse-repository option to cause conary to search the repository
       for missing troves.  The --trove-flags option will now display when a
       trove is missing in a changeset.
-    * A bug that caused showcs --all to display file lists even when --ls 
+    * A bug that caused showcs --all to display file lists even when --ls
       was not specified has been fixed.
     * When mirroring, you are now allowed to commit a trove that does
-      not have a SHA1 checksum set.  This is an accurate
-      representation of the data coming from the source repository.
+      not have a SHA1 checksum set.  This is an accurate replication
+      of the data coming from the source repository.
 
  o Performance improvements:
-    * Significantly improved the speed of erasing troves with many dependencies
-    * Use straight join in itertroves to work around some mysql optimizer
-      shortcomings
-
- o Server changes:
-    * Added --analyze to stand alone server to reanalyze the sql tables for
-      mysql and sqlite
+    * The speed of erasing troves with many dependencies has been
+      significantly improved.
+    * The join order of tables is forced through the use of
+      STRAIGHT_JOIN in TroveStore.iterTroves() to work around some
+      MySQL optimizer shortcomings.
+    * An --analyze command line option has been added to the stand
+      alone server (server.py) to re-ANALYZE the SQL tables for MySQL
+      and SQLite.  This can significantly improve repository
+      performance in some cases.
 
 Changes in 1.0.3
   o Client changes:
