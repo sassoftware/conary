@@ -325,6 +325,7 @@ class ServerConfig(netserver.ServerConfig):
 def usage():
     print "usage: %s" % sys.argv[0]
     print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
+    print "       %s --analyze" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
     print '              --db "driver <path>"'
@@ -376,6 +377,7 @@ if __name__ == '__main__':
 
     argDef['add-user'] = options.ONE_PARAM
     argDef['admin'] = options.NO_PARAM
+    argDef['analyze'] = options.NO_PARAM
     argDef['help'] = options.NO_PARAM
     argDef['migrate'] = options.NO_PARAM
     argDef['mirror'] = options.NO_PARAM
@@ -409,7 +411,7 @@ if __name__ == '__main__':
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     # start the logging
-    if 'add-user' not in argSet:
+    if 'add-user' not in argSet and 'analyze' not in argSet:
         (l, f) = (3, "stderr")
         if cfg.traceLog:
             (l, f) = cfg.traceLog
@@ -447,6 +449,11 @@ if __name__ == '__main__':
         if argSet:
             usage()
         sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
+    elif argSet.pop('analyze', True):
+        if argSet:
+            usage()
+        netRepos.db.analyze()
+        sys.exit(0)
 
     if argSet:
         usage()

@@ -31,6 +31,7 @@ class KeywordDict(BaseKeywordDict):
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
     keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
     keys['TABLEOPTS'] = 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin'
+    keys['STRAIGHTJOIN'] = 'STRAIGHT_JOIN'
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 
@@ -137,7 +138,7 @@ class Database(BaseDatabase):
             return self.connect()
         return False
 
-    # Important: MySQL can not report back a list of temporray tables
+    # Important: MySQL can not report back a list of temporary tables
     # created in the current connection, therefore the self.tempTables
     # is managed separately outside of the loadSchema() calls.
     def loadSchema(self, cu = None):
@@ -210,3 +211,9 @@ class Database(BaseDatabase):
         self.loadSchema()
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
+
+    def analyze(self):
+        self.loadSchema()
+        cu = self.cursor()
+        for table in self.tables:
+            cu.execute("ANALYZE TABLE %s" % table)

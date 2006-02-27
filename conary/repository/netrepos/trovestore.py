@@ -604,14 +604,15 @@ class TroveStore:
         schema.resetTable(cu, 'gtl')
         schema.resetTable(cu, 'gtlInst')
 
+
         for idx, info in enumerate(troveInfoList):
             flavorStr = "'%s'" % info[2].freeze()
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
 
-        cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect,
-                             Nodes.timeStamps, Changelogs.name,
+        cu.execute("""SELECT %(STRAIGHTJOIN)s gtl.idx, I.instanceId, 
+                             I.isRedirect, Nodes.timeStamps, Changelogs.name,
                              ChangeLogs.contact, ChangeLogs.message
                             FROM
                                 gtl, Items, Versions, Flavors, Instances as I,
@@ -628,7 +629,7 @@ class TroveStore:
                                 I.itemId = Nodes.itemId AND
                                 I.versionId = Nodes.versionId
                             ORDER BY
-                                gtl.idx""")
+                                gtl.idx""" % self.db.keywords)
 
         troveIdList = [ x for x in cu ]
 
@@ -636,11 +637,10 @@ class TroveStore:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
                        start_transaction = False)
-
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-                        SELECT idx, item, version, flavor, flags,
-                               Nodes.timeStamps
+                        SELECT %(STRAIGHTJOIN)s idx, item, version, flavor, 
+                               flags, Nodes.timeStamps
                         FROM
                             gtlInst, TroveTroves, Instances, Items,
                             Versions, Flavors, Nodes
@@ -654,7 +654,8 @@ class TroveStore:
                             Instances.versionId = Nodes.versionId
                         ORDER BY
                             gtlInst.idx
-                   """)
+                   """ % self.db.keywords)
+
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
         troveFilesCursor = self.db.cursor()
@@ -715,9 +716,9 @@ class TroveStore:
             # we need the one after this next time through
             neededIdx += 1
 
-            singleTroveInfo = troveInfoList[idx]
+            singleTroveInfo = troveIdList[idx]
 
-            if singleTroveIds[4] is not None:
+            if singleTroveInfo[4] is not None:
                 changeLog = changelog.ChangeLog(*singleTroveIds[4:7])
             else:
                 changeLog = None

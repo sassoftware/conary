@@ -21,6 +21,12 @@ Changes in @NEW@:
 
  o Performance improvements:
     * Significantly improved the speed of erasing troves with many dependencies
+    * Use straight join in itertroves to work around some mysql optimizer
+      shortcomings
+
+ o Server changes:
+    * Added --analyze to stand alone server to reanalyze the sql tables for
+      mysql and sqlite
 
 Changes in 1.0.3
   o Client changes:
