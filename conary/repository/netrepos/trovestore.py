@@ -210,20 +210,6 @@ class TroveStore:
     def addTrove(self, trv):
 	cu = self.db.cursor()
 
-        if not trv.troveInfo.sigs.sha1():
-            raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
-                                              trv.getFlavor())
-        if trv.troveInfo.incomplete():
-            if trv.troveInfo.troveVersion() > trove.TROVE_VERSION:
-                raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
-                                              trv.getFlavor(),
-                                              trv.troveInfo.troveVersion(),
-                                              trove.TROVE_VERSION)
-            else:
-                nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
-                err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
-                raise errors.TroveIntegrityError(error=err, *nvf)
-
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 
