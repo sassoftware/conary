@@ -977,20 +977,40 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             groupAsSource.delTrove(*troveTup)
 
         # replace troves
-        for troveSpec, ref in replaceSpecs:
-            toRemove = dict(((x[0][0], None, None), x) for x in replaceSpecs)
-            results = groupAsSource.findTroves(None, toRemove, 
-                                                allowMissing=True)
-            troveTups = chain(*results.itervalues())
-            for troveTup in troveTups:
-                byDefault = group.includeTroveByDefault(*troveTup)
-                components = group.getComponents(*troveTup)
+        toRemoveSpecs = dict(((x[0][0], None, None), x) for x in replaceSpecs)
 
+        toRemove = groupAsSource.findTroves(None, toRemoveSpecs, 
+                                            allowMissing=True)
+        replaceSpecsByName = {}
+        for troveSpec, ref in replaceSpecs:
+            replaceSpecsByName.setdefault(troveSpec[0], []).append((troveSpec, 
+                                                                    ref))
+
+        for troveName, replaceSpecs in replaceSpecsByName.iteritems():
+            troveTups = toRemove.get((troveName, None, None), [])
+            
+            if not troveTups:
+                continue
+
+            allComponents = set()
+            byDefault = False
+            for troveTup in troveTups:
+                if allComponents is not None:
+                    components = group.getComponents(*troveTup)
+                    if not components:
+                        allComponents = None
+                    else:
+                        allComponents.update(components)
+
+                byDefault = byDefault or group.includeTroveByDefault(*troveTup)
                 group.delTrove(*troveTup)
                 groupAsSource.delTrove(*troveTup)
+
+            for troveSpec, ref in replaceSpecs:
                 for newTup in troveMap[ref][troveSpec]:
-                    group.addTrove(newTup, True, byDefault, [])
+                    group.addTrove(newTup, True, byDefault, allComponents)
                     groupAsSource.addTrove(*newTup)
+
     # add implicit troves
     # first from children of explicit troves.
     componentsToRemove = group.getComponentsToRemove()
