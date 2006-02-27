@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.4:
   o Bugfixes:
     * An Apache-based conary repository server no longer logs
       tracebacks in error_log when a client disconnects before all
