@@ -32,6 +32,11 @@ Changes in 1.0.4:
     * When mirroring, you are now allowed to commit a trove that does
       not have a SHA1 checksum set.  This is an accurate replication
       of the data coming from the source repository.
+    * A bug affecting multiple uses of r.replace() in a group recipe has been
+      fixed.
+    * A bug that caused components not to be erased when their packages were 
+      erased when a group referencing those packages was installed has been 
+      fixed.
 
 Changes in 1.0.3
   o Client changes:
