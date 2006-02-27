@@ -528,7 +528,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 version, flavor = parts
                 while version.isOnLocalHost():
                     version = version.parentVersion()
-                versionStr = version.getSourceVersion().asString()
+                versionStr = str(version)
         if flavor:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
