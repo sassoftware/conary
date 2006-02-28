@@ -593,6 +593,7 @@ def realMain(cfg, argv=sys.argv):
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
                 ('trove-flags', 'showTroveFlags'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
                 ('recurse-repository', 'recurseRepos'),
                 'deps', 'info', 'all', ('show-changes', 'showChanges')):
             if isinstance(opt, tuple):
