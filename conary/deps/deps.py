@@ -470,8 +470,9 @@ class DependencyClass(object):
 
     def toStrongFlavor(self):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         for dep in self.members.values():
-            newDepClass.addDep(dep.toStrongFlavor())
+            a(dep.toStrongFlavor())
         return newDepClass
 
     def satisfies(self, requirements):
@@ -479,23 +480,25 @@ class DependencyClass(object):
 
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	if other is None: return
+        a = self.addDep
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
-	    self.addDep(otherdep, mergeType = mergeType)
+	    a(otherdep, mergeType = mergeType)
 
     def __and__(self, other):
         return self.intersection(other)
 
     def intersection(self, other, strict=True):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
                 dep = dep.intersection(other.members[tag], strict=strict)
                 if dep is None:
-                    newDepClass.addDep(Dependency(tag))
+                    a(Dependency(tag))
                 else:
-                    newDepClass.addDep(dep)
+                    a(dep)
                 found = True
         if found:
             return newDepClass
@@ -503,13 +506,14 @@ class DependencyClass(object):
 
     def difference(self, other, strict=True):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
                 diff = dep.difference(other.members[tag], strict=strict)
                 if diff is None:
                     continue
-                newDepClass.addDep(diff)
+                a(diff)
             else:
                 newDepClass.addDep(dep)
             found = True
@@ -758,9 +762,11 @@ class DependencySet(object):
 
     def copy(self):
         new = DependencySet()
+        a = new.addDep
         for tag, depClass in self.members.iteritems():
+            c = depClass.__class__
             for dep in depClass.getDeps():
-                new.addDep(depClass.__class__, dep)
+                a(c, dep)
         return new
 
     def toStrongFlavor(self):
@@ -801,13 +807,14 @@ class DependencySet(object):
             return
 
         self.hash = None
-
+        a = self.addDep
 	for tag, members in other.members.iteritems():
+            c = members.__class__
             if tag in self.members:
 		self.members[tag].union(members, mergeType = mergeType)
 	    else:
                 for dep in members.getDeps():
-                    self.addDep(members.__class__, dep)
+                    a(c, dep)
 
     def intersection(self, other, strict=True):
         newDep = DependencySet()
@@ -824,14 +831,16 @@ class DependencySet(object):
 
     def difference(self, other, strict=True):
         newDep = DependencySet()
+        a = newDep.addDep
         for tag, depClass in self.members.iteritems():
+            c = depClass.__class__
             if tag in other.members:
                 dep = depClass.difference(other.members[tag], strict=strict)
                 if dep is not None:
                     newDep.members[tag] = dep
             else:
                 for dep in depClass.getDeps():
-                    newDep.addDep(depClass.__class__, dep)
+                    a(c, dep)
         return newDep
 
     def __sub__(self, other):
@@ -901,10 +910,12 @@ def ThawDependencySet(frz):
         return depSet
 
     i = 0
+    a = depSet.addDep
+    depSetSplit = misc.depSetSplit
     while i < len(frz):
-        (i, tag, frozen) = misc.depSetSplit(i, frz)
+        (i, tag, frozen) = depSetSplit(i, frz)
         depClass = dependencyClasses[tag]
-        depSet.addDep(depClass, depClass.thawDependency(frozen))
+        a(depClass, depClass.thawDependency(frozen))
 
     return depSet
 
@@ -1013,7 +1024,8 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
     depClasses = set()
     for flavor in flavors:
         depClasses.update([ dependencyClasses[x] for x in flavor.getDepClasses()])
-            
+
+    a = finalDep.addDep
     for depClass in depClasses:
         depsByName = {}
         for flavor in flavors:
@@ -1022,7 +1034,7 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
                     depsByName.setdefault(dep.name, []).append(dep)
         for depList in depsByName.itervalues():
             dep = _mergeDeps(depList, mergeType)
-            finalDep.addDep(depClass, dep)
+            a(depClass, dep)
     return finalDep
 
 
