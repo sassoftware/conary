@@ -526,10 +526,8 @@ class DependencyClass(object):
         return self.difference(other)
 
     def getDeps(self):
-        l = self.members.items()
         # sort by name
-        l.sort()
-        for name, dep in l:
+        for name, dep in sorted(self.members.iteritems()):
             yield dep
 
     def thawDependency(frozen):
@@ -765,7 +763,7 @@ class DependencySet(object):
         a = new.addDep
         for tag, depClass in self.members.iteritems():
             c = depClass.__class__
-            for dep in depClass.getDeps():
+            for dep in depClass.members.itervalues():
                 a(c, dep)
         return new
 
@@ -813,7 +811,7 @@ class DependencySet(object):
             if tag in self.members:
 		self.members[tag].union(members, mergeType = mergeType)
 	    else:
-                for dep in members.getDeps():
+                for dep in members.members.itervalues():
                     a(c, dep)
 
     def intersection(self, other, strict=True):
@@ -839,7 +837,7 @@ class DependencySet(object):
                 if dep is not None:
                     newDep.members[tag] = dep
             else:
-                for dep in depClass.getDeps():
+                for dep in depClass.members.itervalues():
                     a(c, dep)
         return newDep
 
