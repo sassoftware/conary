@@ -114,9 +114,12 @@ class CfgFlavor(CfgType):
 
     def parseString(self, val):
         try:
-            return deps.parseFlavor(val)
+            f = deps.parseFlavor(val)
         except Exception, e:
             raise ParseError, e
+        if f is None:
+            raise ParseError, 'Invalid flavor %s' % val
+        return f
 
     def format(self, val, displayOptions=None):
         val = ', '.join(deps.formatFlavor(val).split(','))
