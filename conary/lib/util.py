@@ -429,17 +429,36 @@ def assertIteratorAtEnd(iter):
     except StopIteration:
 	return True
 
-class ObjectCache(weakref.WeakKeyDictionary):
+ref = weakref.ref
+class ObjectCache(dict):
     """
     Implements a cache of arbitrary (hashable) objects where an object
     can be looked up and have its cached value retrieved. This allows
     a single copy of immutable objects to be kept in memory.
     """
+    def __init__(self, *args):
+        dict.__init__(self, *args)
+
+        def remove(k, selfref=ref(self)):
+            self = selfref()
+            if self is not None:
+                return dict.__delitem__(self, k)
+        self._remove = remove
+
     def __setitem__(self, key, value):
-	weakref.WeakKeyDictionary.__setitem__(self, key, weakref.ref(value))
+        return dict.__setitem__(self, ref(key, self._remove), ref(value))
+
+    def __contains__(self, key):
+        return dict.__contains__(self, ref(key))
+
+    def has_key(self, key):
+        return key in self
+
+    def __delitem__(self, key):
+        return dict.__delitem__(self, ref(key))
 
     def __getitem__(self, key):
-	return weakref.WeakKeyDictionary.__getitem__(self, key)()
+        return dict.__getitem__(self, ref(key))()
 
 def memsize():
     pfn = "/proc/%d/status" % os.getpid()
