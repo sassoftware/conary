@@ -671,14 +671,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return rc[0]
 
-    def getTroves(self, troves, withFiles = True):
+    def getTroves(self, troves, withFiles = True, callback = None):
 	chgSetList = []
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))
 
 	cs = self._getChangeSet(chgSetList, recurse = False, 
                                 withFiles = withFiles,
-                                withFileContents = False)
+                                withFileContents = False, 
+                                callback = callback)
 
 	l = []
         # walk the list so we can return the troves in the same order

@@ -38,22 +38,44 @@ class ChangesetCallback:
     def setChangesetHunk(self, hunk, hunkCount):
         pass
 
+    def checkAbort(self):
+        pass
+
     def __init__(self):
         self.rate = 0
 
-class CookCallback:
+class CookCallback(ChangesetCallback):
 
     def setCurrentRate(self, rate):
         pass
 
-    def setRate(self, rate):
-        self.rate = rate
+    def buildingChangeset(self):
+        pass
 
     def sendingChangeset(self, sent, total):
         pass
 
-    def __init__(self):
-        self.rate = 0
+    def findingTroves(self, num):
+        pass
+
+    def gettingTroveDefinitions(self, num):
+        pass
+
+    def groupResolvingDependencies(self):
+        pass
+
+    def groupCheckingDependencies(self):
+        pass
+
+    def groupCheckingPaths(self, current):
+        pass
+
+    def groupDeterminingPathConflicts(self, total):
+        pass
+
+    def done(self):
+        pass
+
 
 class UpdateCallback(ChangesetCallback):
 
