@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,7 +12,6 @@
 # full details.
 #
 
-import copy
 import re
 from conary.lib import misc, util
 
@@ -758,9 +757,7 @@ class DependencySet(object):
         self.members[tag] = depClass()
 
     def copy(self):
-        new = DependencySet()
-        new.members = copy.deepcopy(self.members)
-        return new
+        return ThawDependencySet(self.freeze())
 
     def toStrongFlavor(self):
         newDep = DependencySet()
@@ -801,12 +798,12 @@ class DependencySet(object):
 
         self.hash = None
 
-	for tag in other.members:
-	    if self.members.has_key(tag):
-		self.members[tag].union(other.members[tag],
-                                        mergeType = mergeType)
+	for tag, members in other.members.iteritems():
+            if tag in self.members:
+		self.members[tag].union(members, mergeType = mergeType)
 	    else:
-		self.members[tag] = copy.deepcopy(other.members[tag])
+                for dep in members.getDeps():
+                    self.addDep(members.__class__, dep)
 
     def intersection(self, other, strict=True):
         newDep = DependencySet()
@@ -829,7 +826,8 @@ class DependencySet(object):
                 if dep is not None:
                     newDep.members[tag] = dep
             else:
-                newDep.members[tag] = copy.deepcopy(depClass)
+                for dep in depClass.getDeps():
+                    newDep.addDep(depClass.__class__, dep)
         return newDep
 
     def __sub__(self, other):
@@ -853,10 +851,10 @@ class DependencySet(object):
 
     def __hash__(self):
         if self.hash is None:
-            self.hash = 0
+            h = 0
             for member in self.members.itervalues():
-                self.hash ^= hash(member)
-
+                h ^= hash(member)
+            self.hash = h
 	return self.hash
 
     def __nonzero__(self):

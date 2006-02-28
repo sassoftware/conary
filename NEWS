@@ -1,3 +1,9 @@
+Changes in @NEW@:
+ o Performance improvements:
+    * The use of copy.deepcopy() has been eliminated from the
+      dependency code.  The new routines are up to 80% faster for
+      operations like DependencySet.copy().
+
 Changes in 1.0.4:
  o Performance improvements:
     * The speed of erasing troves with many dependencies has been
