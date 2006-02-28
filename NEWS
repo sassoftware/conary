@@ -5,9 +5,9 @@ Changes in 1.0.4:
     * The join order of tables is forced through the use of
       STRAIGHT_JOIN in TroveStore.iterTroves() to work around some
       MySQL optimizer shortcomings.
-    * An --analyze command line option has been added to the stand
-      alone server (server.py) to re-ANALYZE the SQL tables for MySQL
-      and SQLite.  This can significantly improve repository
+    * An --analyze command line option has been added to the
+      stand-alone server (server.py) to re-ANALYZE the SQL tables for
+      MySQL and SQLite.  This can significantly improve repository
       performance in some cases.
     * The changes made to dependency string parsing were a loss in
       some cases due to inefficiency in PyArg_ParseTuple().
