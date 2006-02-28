@@ -757,7 +757,11 @@ class DependencySet(object):
         self.members[tag] = depClass()
 
     def copy(self):
-        return ThawDependencySet(self.freeze())
+        new = DependencySet()
+        for tag, depClass in self.members.iteritems():
+            for dep in depClass.getDeps():
+                new.addDep(depClass.__class__, dep)
+        return new
 
     def toStrongFlavor(self):
         newDep = DependencySet()
