@@ -9,9 +9,10 @@ Changes in 1.0.4:
       alone server (server.py) to re-ANALYZE the SQL tables for MySQL
       and SQLite.  This can significantly improve repository
       performance in some cases.
-    * The changes for parsing dependency strings were a loss in some
-      cases due to PyArg_ParseTuple() slowness. Performance sensitive
-      paths in misc.c now parse the arguments directly.
+    * The changes made to dependency string parsing were a loss in
+      some cases due to inefficiency in PyArg_ParseTuple().
+      Performance sensitive paths in misc.c now parse the arguments
+      directly.
 
   o Bugfixes:
     * An Apache-based conary repository server no longer logs
