@@ -406,6 +406,9 @@ class GroupRecipe(_BaseGroupRecipe):
         if checkOnlyByDefaultDeps is None:
             checkOnlyByDefaultDeps = origGroup.checkOnlyByDefaultDeps
 
+        if checkPathConflicts is None:
+            checkPathConflicts = origGroup.checkPathConflicts
+
         newGroup = SingleGroup(groupName, depCheck, autoResolve, 
                                 checkOnlyByDefaultDeps, 
                                 checkPathConflicts, byDefault)
