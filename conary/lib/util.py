@@ -461,10 +461,7 @@ class ObjectCache(dict):
         return dict.__getitem__(self, ref(key))()
 
     def setdefault(self, key, value):
-        if key in self:
-            return self[key]
-        self[key] = value
-        return value
+        return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
 def memsize():
     pfn = "/proc/%d/status" % os.getpid()
