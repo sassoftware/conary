@@ -749,8 +749,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        logBuildEnvironment(logFile, sourceVersion, policyTroves,
-                            recipeObj.macros, cfg)
+        if logBuild:
+            logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                                recipeObj.macros, cfg)
     try:
         bldInfo.begin()
         bldInfo.destdir = destdir
