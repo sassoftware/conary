@@ -961,16 +961,18 @@ order by
         return r
 
     def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True,
-		 withFiles = True):
+		 withFiles = True, withDeps = True):
 	return self._getTrove(troveName = troveName,
 			      troveVersion = troveVersion,
 			      troveFlavor = troveFlavor,
 			      pristine = pristine,
-			      withFiles = withFiles)
+			      withFiles = withFiles,
+                              withDeps = withDeps)
 
     def _getTrove(self, pristine, troveName = None, troveInstanceId = None,
 		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None, withFiles = True):
+		  troveFlavor = 0, troveFlavorId = None, withFiles = True,
+                  withDeps = True):
 	if not troveName:
 	    (troveName, troveVersionId, troveFlavorId) = \
 		    self.instances.getId(troveInstanceId,
@@ -1042,7 +1044,9 @@ order by
 	    trv.addTrove(name, version, flavor, byDefault = byDefault,
                          weakRef = weakRef)
 
-        self.depTables.get(cu, trv, troveInstanceId)
+        if withDeps:
+            self.depTables.get(cu, trv, troveInstanceId)
+
         self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
         if not withFiles:

@@ -158,9 +158,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return self.db.findTroveReferences(names)
 
     def getTrove(self, name, version, flavor, pristine = True,
-		 withFiles = True):
+		 withFiles = True, withDeps = True):
         try:
-            return self.db.getTrove(name, version, flavor, pristine = pristine)
+            return self.db.getTrove(name, version, flavor, pristine = pristine,
+                                    withDeps = withDeps)
         except KeyError, e:
             raise errors.TroveMissing(name, version)
 
@@ -450,8 +451,10 @@ class Database(SqlDbRepository):
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
 		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
-		trove = self.getTrove(name, old, flavor, pristine = False)
-		origTrove = self.getTrove(name, old, flavor, pristine = True)
+		trove = self.getTrove(name, old, flavor, pristine = False,
+                                      withDeps = False)
+		origTrove = self.getTrove(name, old, flavor, pristine = True,
+                                      withDeps = False)
 		assert(trove)
 		troveList.append((trove, origTrove, ver, 
                                   flags & update.MISSINGFILESOKAY))
@@ -459,9 +462,10 @@ class Database(SqlDbRepository):
         for (name, version, flavor) in cs.getOldTroveList():
             rollbackVersion = version.createBranch(versions.RollbackLabel(), 
                                                 withVerRel = 1)
-            trove = self.getTrove(name, version, flavor, pristine = False)
+            trove = self.getTrove(name, version, flavor, pristine = False,
+                                  withDeps = False)
             origTrove = self.getTrove(name, version, flavor, 
-                                      pristine = True)
+                                      pristine = True, withDeps = False)
             assert(trove)
             troveList.append((trove, origTrove, rollbackVersion, 
                               update.MISSINGFILESOKAY))
