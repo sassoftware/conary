@@ -5,9 +5,10 @@ Changes in @NEW@:
       operations like DependencySet.copy().
     * Extraneous dependency cache checks have been moved from the
       addDep() path.
-    * Removing files looks directly into the file stream of the file
-      being removed when cleaning up config file contents rather than
-      thawing the full file stream.
+    * When removing files, conary now looks up the file flags directly
+      in the file stream in order to clean up config file contents.
+      Previously the entire file stream was thawed, which is much more
+      resource intensive.
 
 Changes in 1.0.4:
  o Performance improvements:
