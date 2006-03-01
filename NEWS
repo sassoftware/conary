@@ -5,6 +5,9 @@ Changes in @NEW@:
       operations like DependencySet.copy().
     * Extraneous dependency cache checks have been moved from the
       addDep() path.
+    * Removing files looks directly into the file stream of the file
+      being removed when cleaning up config file contents rather than
+      thawing the full file stream.
 
 Changes in 1.0.4:
  o Performance improvements:
