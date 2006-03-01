@@ -256,6 +256,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	"""
 	return [ x for x in self.db.iterFindByName(name) ]
 
+    def getFileStream(self, fileId):
+        return self.db.getFileStream(fileId, pristine = True)
+
     def getFileVersion(self, pathId, fileId, version, withContents = 0):
 	fileObj = self.db.getFile(pathId, fileId, pristine = True)
 	if withContents:

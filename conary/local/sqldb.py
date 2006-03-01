@@ -855,6 +855,10 @@ order by
 						 justPresent = not pristine)[1]
 	return files.ThawFile(stream, pathId)
 
+    def getFileStream(self, fileId, pristine = False):
+        return self.troveFiles.getFileByFileId(fileId, 
+                                               justPresent = not pristine)[1]
+
     def findFileVersion(self, fileId):
         cu = self.db.cursor()
         cu.execute("""SELECT stream FROM DBTroveFiles

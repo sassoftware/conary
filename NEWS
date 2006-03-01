@@ -3,6 +3,9 @@ Changes in @NEW@:
     * The use of copy.deepcopy() has been eliminated from the
       dependency code.  The new routines are up to 80% faster for
       operations like DependencySet.copy().
+    * Removing files looks directly into the file stream of the file
+      being removed when cleaning up config file contents rather than
+      thawing the full file stream.
 
 Changes in 1.0.4:
  o Performance improvements:

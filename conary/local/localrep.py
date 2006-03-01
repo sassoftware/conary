@@ -19,6 +19,7 @@ from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
 from conary.local import schema
+from conary import files
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -63,8 +64,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def oldTroveList(self):
 	return self.oldTroves
 
-    def oldFile(self, pathId, fileId, fileObj):
-	self.oldFiles.append((pathId, fileId, fileObj))
+    def oldFile(self, pathId, fileId, sha1):
+	self.oldFiles.append((pathId, fileId, sha1))
 
     def oldFileList(self):
 	return self.oldFiles
@@ -86,11 +87,15 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     # remove the specified file 
     def removeFile(self, pathId, fileId):
-        # getFileVersion only really needs the version for network
-        # repositories (so it knows which one to use), so passing
-        # None here works
-	fileObj = self.repos.getFileVersion(pathId, fileId, None)
-	self.oldFile(pathId, fileId, fileObj)
+        stream = self.repos.getFileStream(fileId)
+        sha1 = None
+        if files.frozenFileHasContents(stream):
+            flags = files.frozenFileFlags(stream)
+            if flags.isConfig():
+                contentInfo = files.frozenFileContentInfo(stream)
+                sha1 = contentInfo.sha1()
+
+        self.oldFile(pathId, fileId, sha1)
 
     def checkTroveSignatures(self, trv, threshold, keyCache=None):
         trust, missingKeys = trv.verifyDigitalSignatures(threshold, keyCache)
@@ -116,12 +121,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         for name, version, flavor in self.oldTroveList():
             self.repos.eraseTrove(name, version, flavor)
 
-	for (pathId, fileVersion, fileObj) in self.oldFileList():
+        for (pathId, fileVersion, sha1) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)
 
-	for (pathId, fileVersion, fileObj) in self.oldFileList():
-	    if fileObj.hasContents and fileObj.flags.isConfig():
-		self.repos._removeFileContents(fileObj.contents.sha1())
+        for (pathId, fileVersion, sha1) in self.oldFileList():
+            if sha1 is not None:
+		self.repos._removeFileContents(sha1)
 
 class SqlDataStore(datastore.AbstractDataStore):
 
