@@ -3,7 +3,7 @@ Changes in @NEW@:
     * The use of copy.deepcopy() has been eliminated from the
       dependency code.  The new routines are up to 80% faster for
       operations like DependencySet.copy().
-    * Extraneous dependency cache checks have been moved from the
+    * Extraneous dependency cache checks have been removed from the
       addDep() path.
     * When removing files, conary now looks up the file flags directly
       in the file stream in order to clean up config file contents.
