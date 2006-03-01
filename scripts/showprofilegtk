@@ -19,6 +19,7 @@ import gobject
 import gtk
 import hotshot.stats
 import sys
+import pango
 
 class ProfileStat(gobject.GObject):
     func = None
@@ -134,14 +135,18 @@ def setup_tree_view(treeview, model, cols):
         column = treeview.get_column(col)
         model.set_sort_func(col, sort)
         column.set_sort_column_id(col)
-        
+
 class StatWindow(gtk.Window):
     def __init__(self, filename):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_title('Profile viewer: %s' %filename)
         self.connect('destroy', lambda *x: gtk.main_quit())
-        self.set_default_size(700, 400)
+        self.set_default_size(800, 400)
+        self.source_window = SourceWindow()
+        mainpane = gtk.VPaned()
+        mainpane.pack1(self.source_window)
         pane = gtk.VPaned()
+        mainpane.pack2(pane)
 
         self.funcstore = gtk.ListStore(ProfileStat)
         self.funcview = gtk.TreeView(self.funcstore)
@@ -159,7 +164,7 @@ class StatWindow(gtk.Window):
         setup_tree_view(self.funcview, self.funcstore, cols)
         # set to total time, decending
         self.funcstore.set_sort_column_id(1, gtk.SORT_DESCENDING)
-        
+
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(150, 150)
@@ -179,34 +184,48 @@ class StatWindow(gtk.Window):
         setup_tree_view(self.callerview, self.callerstore, cols)
         # set to number of calls, decending
         self.callerstore.set_sort_column_id(0, gtk.SORT_DESCENDING)
-        
+
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(-1, 150)
         sw.add(self.callerview)
         pane.pack2(sw, False, True)
-        
-        self.add(pane)
+
+        self.add(mainpane)
 
     def button_press(self, obj, event):
         selection = obj.get_selection()
         if event.keyval == ord('c'):
-           self.display_children(selection)
+            self.display_children(selection)
         elif event.keyval == ord('p'):
-           self.display_callers(selection)
-            
-    def display_callers(self, selection):
+            self.display_callers(selection)
+        elif event.keyval == ord('s'):
+            self.display_source(selection)
+
+    def display_source(self, selection):
         model, iter = selection.get_selected()
         if not iter:
             return
         info = model.get_value(iter, 0)
+        self.source_window.show()
+
+    def display_callers(self, selection):
+        model, iter = selection.get_selected()
+        if not iter:
+            return
+
+        # show the relevant source
+        info = model.get_value(iter, 0)
+        path, lineno, func = info.func
+        self.source_window.load_source(path, lineno)
+
         self.callerstore.clear()
         for func, nc in info.callers.iteritems():
             caller = Caller()
             caller.func = func
-            caller. nc = nc
-            caller. tt = stats.stats[func][2]
-            caller. ct = stats.stats[func][3]
+            caller.nc = nc
+            caller.tt = stats.stats[func][2]
+            caller.ct = stats.stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Parent function')
@@ -220,9 +239,9 @@ class StatWindow(gtk.Window):
         for func, nc in info.callees.iteritems():
             caller = Caller()
             caller.func = func
-            caller. nc = nc
-            caller. tt = stats.stats[func][2]
-            caller. ct = stats.stats[func][3]
+            caller.nc = nc
+            caller.tt = stats.stats[func][2]
+            caller.ct = stats.stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Child function')
@@ -244,7 +263,7 @@ class StatWindow(gtk.Window):
                 self.funcview.set_cursor(path, col, False)
                 break
             iter = self.funcstore.iter_next(iter)
-        
+
     def populate(self, stats):
         callees = {}
         for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
@@ -255,7 +274,8 @@ class StatWindow(gtk.Window):
 
         for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
             stat = ProfileStat()
-            stat.func = func
+            # line numbers are off by one
+            stat.func = (func[0], func[1]-1, func[2])
             stat.cc = cc
             stat.nc = nc
             stat.tt = tt
@@ -264,6 +284,73 @@ class StatWindow(gtk.Window):
             stat.callees = callees[func]
             iter = self.funcstore.append()
             self.funcstore.set(iter, 0, stat)
+
+class SourceWindow(gtk.ScrolledWindow):
+    def __init__(self):
+        self.last_file = None
+        self.source_buffer = None
+        self.start = None
+        self.end = None
+        gtk.ScrolledWindow.__init__(self)
+        self.set_size_request(700, 400)
+        view = self.view = gtk.TextView()
+        view.set_property('editable', False)
+        self.add(view)
+
+    def idle_load_source(self, args):
+        path, lineno = args
+
+        if path != self.last_file:
+            self.last_file = path
+            source_buffer = SourceBuffer()
+            self.source_buffer = source_buffer
+            try:
+                f = open(path, 'r')
+            except IOError:
+                return
+
+            source_buffer.insert_source(f.read())
+            f.close()
+        else:
+            source_buffer = self.source_buffer
+            if self.start and self.end:
+                source_buffer.get_buffer().remove_tag_by_name('current',
+                                                              self.start,
+                                                              self.end)
+
+        buffer = source_buffer.get_buffer()
+        self.view.set_buffer(buffer)
+
+        iter = buffer.get_iter_at_line(lineno)
+        buffer.place_cursor(iter)
+        mark = buffer.create_mark(None, iter)
+        self.view.scroll_to_mark(buffer.get_insert(), 0, True, 0.5, 0.5)
+        start = iter.copy()
+        end = iter.copy()
+        end.forward_chars(start.get_bytes_in_line())
+        buffer.apply_tag_by_name('current', start, end)
+        self.start = start
+        self.end = end
+
+    def load_source(self, path, lineno=0):
+        gobject.idle_add(self.idle_load_source, (path, lineno))
+
+class SourceBuffer:
+    def __init__(self):
+        buffer = self.buffer = gtk.TextBuffer(None)
+        tag = buffer.create_tag('source')
+        tag.set_property('font', 'monospace')
+        tag.set_property('pixels_above_lines', 0)
+        tag.set_property('pixels_below_lines', 0)
+        buffer.create_tag('current', background='#aaaaff')
+
+    def get_buffer(self):
+        return self.buffer
+
+    def insert_source(self, data):
+        buffer = self.buffer
+        iter = buffer.get_iter_at_offset(0)
+        buffer.insert_with_tags_by_name(iter, data, 'source')
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
@@ -274,11 +361,10 @@ if __name__ == '__main__':
     if ".pickle" in filename:
         f = open(filename)
         stats = cPickle.load(f)
-    else:    
+    else:
         stats = hotshot.stats.load(filename)
 
     app = StatWindow(filename)
     app.populate(stats)
     app.show_all()
     gtk.main()
-    
