@@ -909,7 +909,8 @@ order by
 
         return result
 
-    def getTroves(self, troveList, pristine, withFiles = True, withDeps = True):
+    def getTroves(self, troveList, pristine = True, withFiles = True,
+                  withDeps = True):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
