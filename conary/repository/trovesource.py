@@ -592,6 +592,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                             withFiles=withFiles)
 
                 newTrove.applyChangeSet(trvCs,
+                                        skipFiles = not withFiles,
                                         skipIntegrityChecks = not withFiles)
             retList.append(newTrove)
 

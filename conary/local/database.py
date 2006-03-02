@@ -158,12 +158,13 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return self.db.findTroveReferences(names)
 
     def getTrove(self, name, version, flavor, pristine = True,
-		 withFiles = True, withDeps = True):
-        try:
-            return self.db.getTrove(name, version, flavor, pristine = pristine,
-                                    withDeps = withDeps)
-        except KeyError, e:
+                 withFiles = True, withDeps = True):
+        l = self.db.getTroves([ (name, version, flavor) ], pristine = pristine,
+                              withDeps = withDeps, withFiles = withFiles)
+        if l[0] is None:
             raise errors.TroveMissing(name, version)
+
+        return l[0]
 
     def getTroves(self, troveList, pristine = True, withFiles = True):
         return self.db.getTroves(troveList, pristine, withFiles = withFiles)

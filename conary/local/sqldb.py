@@ -909,7 +909,7 @@ order by
 
         return result
 
-    def getTroves(self, troveList, pristine, withFiles = True):
+    def getTroves(self, troveList, pristine, withFiles = True, withDeps = True):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
@@ -917,7 +917,8 @@ order by
             if instanceId is not None:
                 instances[i] = self._getTrove(pristine,
                                               troveInstanceId = instanceId,
-                                              withFiles = withFiles)
+                                              withFiles = withFiles,
+                                              withDeps = withDeps)
 
         return instances
 
@@ -959,15 +960,6 @@ order by
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
         return r
-
-    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True,
-		 withFiles = True, withDeps = True):
-	return self._getTrove(troveName = troveName,
-			      troveVersion = troveVersion,
-			      troveFlavor = troveFlavor,
-			      pristine = pristine,
-			      withFiles = withFiles,
-                              withDeps = withDeps)
 
     def _getTrove(self, pristine, troveName = None, troveInstanceId = None,
 		  troveVersion = None, troveVersionId = None,

@@ -876,7 +876,7 @@ class Trove(streams.StreamSet):
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False, 
-                       allowIncomplete = False):
+                       allowIncomplete = False, skipFiles = False):
 	"""
 	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
@@ -892,6 +892,9 @@ class Trove(streams.StreamSet):
 	@rtype: dict
 	"""
 
+        # If we skipFiles, we have to also skipIntegrityChecks
+        assert(not skipFiles or skipIntegrityChecks)
+
 	self.redirect.set(trvCs.getIsRedirect())
         if self.redirect():
             # we don't explicitly remove files for redirects
@@ -899,21 +902,23 @@ class Trove(streams.StreamSet):
 
 	fileMap = {}
 
-	for (pathId, path, fileId, fileVersion) in trvCs.getNewFileList():
-	    self.addFile(pathId, path, fileVersion, fileId)
-	    fileMap[pathId] = self.idMap[pathId] + \
-                                (self.name(), None, None, None)
+        if not skipFiles:
+            for (pathId, path, fileId, fileVersion) in trvCs.getNewFileList():
+                self.addFile(pathId, path, fileVersion, fileId)
+                fileMap[pathId] = self.idMap[pathId] + \
+                                    (self.name(), None, None, None)
 
-	for (pathId, path, fileId, fileVersion) in trvCs.getChangedFileList():
-	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
-	    self.updateFile(pathId, path, fileVersion, fileId)
-	    # look up the path/version in self.idMap as the ones here
-	    # could be None
-	    fileMap[pathId] = self.idMap[pathId] + \
+            for (pathId, path, fileId, fileVersion) in \
+                                                    trvCs.getChangedFileList():
+                (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
+                self.updateFile(pathId, path, fileVersion, fileId)
+                # look up the path/version in self.idMap as the ones here
+                # could be None
+                fileMap[pathId] = self.idMap[pathId] + \
                                 (self.name(), oldPath, oldFileId, oldVersion)
 
-	for pathId in trvCs.getOldFileList():
-	    self.removeFile(pathId)
+            for pathId in trvCs.getOldFileList():
+                self.removeFile(pathId)
 
 	self.mergeTroveListChanges(
               trvCs.iterChangedTroves(strongRefs = True,  weakRefs = False),

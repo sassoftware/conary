@@ -6,6 +6,13 @@ Changes in @NEW@:
     * Removing files looks directly into the file stream of the file
       being removed when cleaning up config file contents rather than
       thawing the full file stream.
+    * Getting a single trove from the database without files returned file
+      information anyway
+    * Trove.applyChangeSet() optionally skips merging file information
+
+ o Bugfixes
+    * Installing from a changeset needlessly relied on troves from the 
+      database having file information while processing redirects
 
 Changes in 1.0.4:
  o Performance improvements:
