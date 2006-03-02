@@ -847,8 +847,6 @@ class DatabaseCacheWrapper:
         for i, info in enumerate(l):
             retList.append(self.cache.get((info, pristine), None))
 
-        print l, retList
-
         missing = [ (x[0], x[1][1]) for x in 
                         enumerate(itertools.izip(retList, l)) if
                         x[1][0] is None ]
