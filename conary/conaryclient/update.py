@@ -488,7 +488,7 @@ class ClientUpdate:
 
                 if not trove.troveIsCollection(oldInfo[0]): continue
                 trv = self.db.getTrove(withFiles = False, pristine = False,
-                                       *oldInfo)
+                                       withDeps = False, *oldInfo)
 
                 for inclInfo in trv.iterTroveList(strongRefs=True):
                     # we only use strong references when erasing.

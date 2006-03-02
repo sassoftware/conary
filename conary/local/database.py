@@ -14,6 +14,7 @@
 
 #stdlib
 import errno
+import itertools
 import os
 import shutil
 
@@ -159,15 +160,17 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def getTrove(self, name, version, flavor, pristine = True,
                  withFiles = True, withDeps = True):
-        l = self.db.getTroves([ (name, version, flavor) ], pristine = pristine,
-                              withDeps = withDeps, withFiles = withFiles)
+        l = self.getTroves([ (name, version, flavor) ], pristine = pristine,
+                           withDeps = withDeps, withFiles = withFiles)
         if l[0] is None:
             raise errors.TroveMissing(name, version)
 
         return l[0]
 
-    def getTroves(self, troveList, pristine = True, withFiles = True):
-        return self.db.getTroves(troveList, pristine, withFiles = withFiles)
+    def getTroves(self, troveList, pristine = True, withFiles = True,
+                  withDeps = True):
+        return self.db.getTroves(troveList, pristine, withFiles = withFiles,
+                                 withDeps = withDeps)
 
     def getTroveLatestVersion(self, name, branch):
         cu = self.db.db.cursor()
@@ -444,6 +447,8 @@ class Database(SqlDbRepository):
 
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
+        dbCache = DatabaseCacheWrapper(self)
+
 	# create the change set from A->A.local
 	troveList = []
 	for newTrove in cs.iterNewTroveList():
@@ -452,10 +457,8 @@ class Database(SqlDbRepository):
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
 		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
-		trove = self.getTrove(name, old, flavor, pristine = False,
-                                      withDeps = False)
-		origTrove = self.getTrove(name, old, flavor, pristine = True,
-                                      withDeps = False)
+		trove = dbCache.getTrove(name, old, flavor, pristine = False)
+		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
 		assert(trove)
 		troveList.append((trove, origTrove, ver, 
                                   flags & update.MISSINGFILESOKAY))
@@ -463,10 +466,9 @@ class Database(SqlDbRepository):
         for (name, version, flavor) in cs.getOldTroveList():
             rollbackVersion = version.createBranch(versions.RollbackLabel(), 
                                                 withVerRel = 1)
-            trove = self.getTrove(name, version, flavor, pristine = False,
-                                  withDeps = False)
-            origTrove = self.getTrove(name, version, flavor, 
-                                      pristine = True, withDeps = False)
+            trove = dbCache.getTrove(name, version, flavor, pristine = False)
+            origTrove = dbCache.getTrove(name, version, flavor, 
+                                         pristine = True)
             assert(trove)
             troveList.append((trove, origTrove, rollbackVersion, 
                               update.MISSINGFILESOKAY))
@@ -483,11 +485,11 @@ class Database(SqlDbRepository):
 	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
 
 	if not isRollback:
-            reposRollback = cs.makeRollback(self, configFiles = True,
+            reposRollback = cs.makeRollback(dbCache, configFiles = True,
                                redirectionRollbacks = (not localRollbacks))
             flags |= update.MERGE
 
-	fsJob = update.FilesystemJob(self, cs, fsTroveDict, self.root, 
+	fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root, 
 				     flags = flags, callback = callback,
                                      removeHints = removeHints)
 
@@ -553,7 +555,7 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             localrep.LocalRepositoryChangeSetJob(
-                self, cs, callback, autoPinList, threshold = threshold,
+                dbCache, cs, callback, autoPinList, threshold = threshold,
                 allowIncomplete=isRollback)
             self.db.mapPinnedTroves(uJob.getPinMaps())
 
@@ -827,6 +829,44 @@ class Database(SqlDbRepository):
             else:
                 self.readRollbackStatus()
             SqlDbRepository.__init__(self, root + path)
+
+class DatabaseCacheWrapper:
+
+    def __getattr__(self, attr):
+        return getattr(self.db, attr)
+
+    def getTrove(self, name, version, flavor, pristine = True):
+        l = self.getTroves([ (name, version, flavor) ], pristine = pristine)
+        if l[0] is None:
+            raise errors.TroveMissing(name, version)
+
+        return l[0]
+
+    def getTroves(self, l, pristine = True):
+        retList = []
+        for i, info in enumerate(l):
+            retList.append(self.cache.get((info, pristine), None))
+
+        print l, retList
+
+        missing = [ (x[0], x[1][1]) for x in 
+                        enumerate(itertools.izip(retList, l)) if
+                        x[1][0] is None ]
+
+        if not missing:
+            return retList
+
+        trvs = self.db.getTroves([ x[1] for x in missing ], 
+                                 pristine = pristine)
+        for (idx, info), trv in itertools.izip(missing, trvs):
+            retList[idx] = trv
+            self.cache[(info, pristine)] = trv
+
+        return retList
+
+    def __init__(self, db):
+        self.db = db
+        self.cache = {}
 
 # Exception classes
 class RollbackError(errors.ConaryError):
