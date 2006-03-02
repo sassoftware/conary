@@ -9,6 +9,8 @@ Changes in @NEW@:
     * Getting a single trove from the database without files returned file
       information anyway
     * Trove.applyChangeSet() optionally skips merging file information
+    * Cache troves on the update/erase path to avoid duplicate fetchs from
+      the local database
 
  o Bugfixes
     * Installing from a changeset needlessly relied on troves from the 
@@ -19,6 +21,7 @@ Changes in @NEW@:
       in the file stream in order to clean up config file contents.
       Previously the entire file stream was thawed, which is much more
       resource intensive.
+
  o Build fixes:
     * r.addArchive() now supports rpms with bzip2-compressed payloads.
 
