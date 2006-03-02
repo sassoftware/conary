@@ -1025,7 +1025,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
             state = conaryState.getSourceState()
             if state.getName() == srcName and \
                             state.getVersion() != versions.NewVersion():
-                if state.getVersion().trailingRevision().version != versionStr:
+                stateVer = state.getVersion().trailingRevision().version
+                if versionStr and stateVer != versionStr:
                     return state.getVersion().branch().createVersion(
                                 versions.Revision('%s-1' % (versionStr)))
                 return state.getVersion()
@@ -1127,7 +1128,17 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    log.error('Error setting build flag values: %s' % msg)
 	    sys.exit(1)
 	try:
-	    loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
+            # make a guess on the branch to use since it can be important
+            # for loading superclasses.
+            sourceVersion = guessSourceVersion(repos, pkgname,
+                                               None, cfg.buildLabel)
+            if sourceVersion:
+                branch = sourceVersion.branch()
+            else:
+                branch = None
+
+	    loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
+                                             branch=branch)
             version = None
 	except builderrors.RecipeFileError, msg:
 	    raise CookError(str(msg))
