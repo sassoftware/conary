@@ -419,11 +419,8 @@ class DependencyClass(object):
 	    # merge the flags, and add the newly created dependency
 	    # into the class
 	    dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
-	    del self.members[dep.name]
 
-        grpDep = dependencyCache.setdefault(dep, dep)
-
-	self.members[grpDep.name] = grpDep
+	self.members[dep.name] = dep
 	assert(not self.justOne or len(self.members) == 1)
 
     def hasDep(self, name):
@@ -689,13 +686,6 @@ class TroveDependencies(DependencyClass):
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
     depFormat = 'IDENT(?::IDENT)?' # trove[:comp] 
-
-    def thawDependency(frozen):
-        d = DependencyClass.thawDependency(frozen)
-        cached = dependencyCache.setdefault(d, d)
-        return cached
-
-    thawDependency = staticmethod(thawDependency)
 
 _registerDepClass(TroveDependencies)
 

@@ -13,6 +13,14 @@ Changes in @NEW@:
  o Bugfixes
     * Installing from a changeset needlessly relied on troves from the 
       database having file information while processing redirects
+    * Extraneous dependency cache checks have been removed from the
+      addDep() path.
+    * When removing files, conary now looks up the file flags directly
+      in the file stream in order to clean up config file contents.
+      Previously the entire file stream was thawed, which is much more
+      resource intensive.
+ o Build fixes:
+    * r.addArchive() now supports rpms with bzip2-compressed payloads.
 
 Changes in 1.0.4:
  o Performance improvements:
