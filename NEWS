@@ -9,6 +9,8 @@ Changes in @NEW@:
       in the file stream in order to clean up config file contents.
       Previously the entire file stream was thawed, which is much more
       resource intensive.
+ o Build fixes:
+    * r.addArchive() now supports rpms with bzip2-compressed payloads.
 
 Changes in 1.0.4:
  o Performance improvements:
