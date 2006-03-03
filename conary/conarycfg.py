@@ -288,6 +288,8 @@ class ConaryConfiguration(SectionedConfigFile):
         return True
 
     def getContext(self, name):
+        if not self.hasSection(name):
+            return False
         return self.getSection(name)
 
     def displayContext(self, out=None):
