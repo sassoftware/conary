@@ -159,17 +159,12 @@ class DirectedGraph:
         finishes = {}
         timeCount = 0
         parent = None
+        nodeStack = []
 
         if start is not None:
             startId = nodeData.getIndex(start)
             nodeIds.remove(startId)
-
-            nodeStack = [(startId,False)]
-            nodeId = startId
-            parent = nodeId
-            trees[nodeId] = []
-        else:
-            nodeStack = []
+            nodeIds.insert(0, startId)
 
         while nodeIds:
             if not nodeStack:
