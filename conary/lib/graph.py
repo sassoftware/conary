@@ -129,6 +129,20 @@ class DirectedGraph:
                 newEdges.setdefault(toId, []).append(fromId)
         return dict((x[0], set(x[1])) for x in newEdges.iteritems())
 
+    def iterChildren(self, node):
+        return (self.data.get(idx) 
+                    for idx in self.edges[self.data.getIndex(node)])
+
+    def getParents(self, node):
+        idx = self.data.getIndex(node)
+        return [ self.data.get(x[0]) 
+                    for x in self.edges.iteritems() if idx in x[1] ]
+
+    def getLeaves(self):
+        return [ self.data.get(x[0])
+                    for x in self.edges.iteritems() if not x[1] ]
+
+
     def transpose(self):
         g = DirectedGraph()
         g.data = self.data.copy()
@@ -215,3 +229,25 @@ class DirectedGraph:
         treeKeys = [ x[0] for x in self.data.sortSubset(trees.iterkeys(), 
                                                         nodeSelect) ]
         return [ set(self.get(y) for y in trees[x]) for x in treeKeys ]
+
+    def getStronglyConnectedGraph(self):
+        compSets = self.getStronglyConnectedComponents()
+
+        sccGraph = self.__class__()
+
+        setsByNode = {}
+
+        for compSet in compSets:
+            for node in compSet:
+                setsByNode[node] = frozenset(compSet)
+
+        for compSet in compSets:
+            compSet = frozenset(compSet)
+            sccGraph.addNode(compSet)
+            for node in compSet:
+                for childNode in self.iterChildren(node):
+                    childComp = setsByNode[childNode]
+                    if childComp != compSet:
+                        sccGraph.addEdge(compSet, setsByNode[childNode])
+        return sccGraph
+
