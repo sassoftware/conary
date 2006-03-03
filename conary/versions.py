@@ -1207,7 +1207,9 @@ class Branch(VersionSequence):
 	"""
 	Returns the parent branch of a branch.
 
-	@rtype: Version
+        @rtype: L{Branch}
+        @precondition: The branch has a parent branch.
+        L{hasParentBranch} is one way to check this condition.
 	"""
         items = self.versions[:-1]
         if isinstance(items[-1], Revision):

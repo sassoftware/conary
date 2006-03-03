@@ -912,16 +912,21 @@ def merge(repos, callback=None):
         callback = CheckinCallback()
 
     troveName = state.getName()
+    troveBranch = state.getBranch()
+
+    if not state.getVersion().isShadow():
+        log.error("%s=%s is not a shadow" % (troveName, troveBranch.asString()))
+        return
 
     # make sure the current version is at head
-    shadowHeadVersion = repos.getTroveLatestVersion(troveName, 
-                                                    state.getBranch())
+    shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
     if state.getVersion() != shadowHeadVersion:
         log.info("working directory is already based on head of branch")
         return
 
-    parentHeadVersion = repos.getTroveLatestVersion(troveName, 
-                                  state.getBranch().parentBranch())
+    # safe to call parentBranch() b/c a shadow will always have a parent branch
+    parentHeadVersion = repos.getTroveLatestVersion(troveName,
+                                  troveBranch.parentBranch())
     parentRootVersion = _determineRootVersion(repos, state)
 
     changeSet = repos.createChangeSet([(troveName,
