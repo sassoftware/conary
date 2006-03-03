@@ -17,6 +17,8 @@ from conary.deps import deps
 from conary.lib import graph
 from conary.local import schema
 
+import itertools
+
 NO_FLAG_MAGIC = '-*none*-'
 
 class DependencyWorkTables:
@@ -144,19 +146,56 @@ class DependencyWorkTables:
                                 ("Dependencies", "TmpDependencies"),
                                 multiplier = -1)
 
-    def __init__(self, cu):
+    def mergeRemoves(Self):
+        self.cu.execute("""INSERT INTO RemovedTroveIds
+                           SELECT instanceId, nodeId FROM
+                               RemovedTroves
+                           INNER JOIN Versions ON
+                               RemovedTroves.version = Versions.version
+                           INNER JOIN Flavors ON
+                               RemovedTroves.flavor = Flavors.flavor OR
+                               (RemovedTroves.flavor is NULL AND
+                                Flavors.flavor is NULL)
+                           INNER JOIN Instances ON
+                               Instances.troveName = RemovedTroves.name AND
+                               Instances.versionId = Versions.versionId AND
+                               Instances.flavorId  = Flavors.flavorId""")
+
+        schema.resetTable("RemovedTroves")
+
+    def removeTrove(self, troveInfo, nodeId):
+        self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
+                        (troveInfo[0], troveInfo[1].asString(), 
+                         troveInfo[2], nodeIdx))
+
+    def __init__(self, cu, removedTables = False):
         self.cu = cu
 	self.populateStmt = self.cu.compile("""
             INSERT INTO DepCheck
             (troveId, depNum, flagCount, isProvides, class, name, flag)
             VALUES(?, ?, ?, ?, ?, ?, ?)
             """)
-        schema.resetTable(self.cu, "TmpDependencies")
-        schema.resetTable(self.cu, "TmpRequires")
-        schema.resetTable(self.cu, "TmpProvides")
+
         schema.resetTable(self.cu, "DepCheck")
+        schema.resetTable(self.cu, "RemovedTroveIds")
+        schema.resetTable(self.cu, "TmpDependencies")
+        schema.resetTable(self.cu, "TmpProvides")
+        schema.resetTable(self.cu, "TmpRequires")
+
+        if removedTables:
+            schema.resetTable(self.cu, "RemovedTroveIds")
 
 class DependencyChecker:
+
+    # We build up a graph to let us split the changeset into pieces.
+    # Each node in the graph represents a remove/add pair. Note that
+    # for (troveNum < 0) nodes[abs(troveNum)] is the node for that
+    # addition. The initial None makes that work out. For removed nodes,
+    # the index is built into the sql tables. Each node stores the
+    # old trove info, new trode info, list of nodes whose operations
+    # need to occur before this nodes, and a list of nodes whose
+    # operations should occur after this nodes (the two lists form
+    # the ordering graph and it's transpose)
 
     def _addJob(self, job):
         nodeId = len(self.nodes)
@@ -316,6 +355,10 @@ class DependencyChecker:
         # - that's the order we created by our sort() above.
         orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
         return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
+
+    def iterNodes(self):
+        # skips the None node on the front
+        return [ x[0] for x in itertools.islice(self.nodes, 1, None) ]
 
     def __init__(self):
         self.g = graph.DirectedGraph()
@@ -509,8 +552,10 @@ class DependencyTables:
 	"""
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
-            failedSets = [ (x, None, None, None) for x in troveNames]
-            stillNeededMap = [ [] for x in troveNames ]
+            failedSets1 = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
+                    for x in checker.iterNodes() if x[2][0] is not None ]
+            failedSets = [ (x, None, None, None) for x in troveNames ]
+            assert(failedSets == failedSets1)
             ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
 
             for idx in idxList:
@@ -614,7 +659,7 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        workTables = DependencyWorkTables(cu)
+        workTables = DependencyWorkTables(cu, removeTables = True)
 
 	# this begins a transaction. we do this explicitly to keep from
 	# grabbing any exclusive locks (when the python binding autostarts
@@ -630,15 +675,6 @@ class DependencyTables:
         oldTroves = []
         troveNames = []
 
-        # We build up a graph to let us split the changeset into pieces.
-        # Each node in the graph represents a remove/add pair. Note that
-        # for (troveNum < 0) nodes[abs(troveNum)] is the node for that
-        # addition. The initial None makes that work out. For removed nodes,
-        # the index is built into the sql tables. Each node stores the
-        # old trove info, new trode info, list of nodes whose operations
-        # need to occur before this nodes, and a list of nodes whose
-        # operations should occur after this nodes (the two lists form
-        # the ordering graph and it's transpose)
         checker = DependencyChecker()
 
 	# This sets up negative depNum entries for the requirements we're
@@ -668,6 +704,7 @@ class DependencyTables:
             if job[1][0] is not None:
 		oldInfo = (job[0], job[1][0], job[1][1])
                 oldTroves.append((oldInfo, newNodeId))
+                workTables.removeTrove(oldInfo, newNodeId)
 	    else:
 		oldInfo = None
 
@@ -677,49 +714,14 @@ class DependencyTables:
         workTables.merge()
 
         # now build a table of all the troves which are being erased
-        schema.resetTable(cu, "RemovedTroveIds")
-
         for job in jobSet:
             if job[2][0] is not None: continue
             oldInfo = (job[0], job[1][0], job[1][1])
             nodeId = checker._addJob(job)
             oldTroves.append((oldInfo, nodeId))
+            workTables.removeTrove(oldInfo, nodeId)
 
-        if oldTroves:
-            # this sets up nodesByRemovedId because the temporary RemovedTroves
-            # table exactly parallels the RemovedTroveIds we set up
-            cu.execute("""
-            CREATE TEMPORARY TABLE RemovedTroves(
-                name        VARCHAR(254),
-                version     VARCHAR(767),
-                flavor      VARCHAR(767),
-                nodeId      INTEGER
-            )""", start_transaction = False)
-            for (name, version, flavor), nodeIdx in oldTroves:
-                if flavor:
-                    flavor = flavor.freeze()
-                else:
-                    flavor = None
-
-                cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
-                           (name, version.asString(), flavor, nodeIdx))
-
-            cu.execute("""INSERT INTO RemovedTroveIds
-                            SELECT instanceId, nodeId FROM
-                                RemovedTroves
-                            INNER JOIN Versions ON
-                                RemovedTroves.version = Versions.version
-                            INNER JOIN Flavors ON
-                                RemovedTroves.flavor = Flavors.flavor OR
-                                (RemovedTroves.flavor is NULL AND
-                                 Flavors.flavor is NULL)
-                            INNER JOIN Instances ON
-                                Instances.troveName = RemovedTroves.name AND
-                                Instances.versionId = Versions.versionId AND
-                                Instances.flavorId  = Flavors.flavorId""")
-
-            # no need to remove RemovedTroves -- this is all in a transaction
-            # which gets rolled back
+        workTables.mergeRemoves()
 
         # Check the dependencies for anything which depends on things which
         # we've removed. We insert those dependencies into our temporary

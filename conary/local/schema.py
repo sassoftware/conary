@@ -332,6 +332,16 @@ def setupTempDepTables(db, cu = None):
         cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)",
                    start_transaction=False)
         db.tempTables["RemovedTroveIds"] = True
+    if "RemovedTroves" not in db.tempTables:
+        self.cu.execute("""
+            CREATE TEMPORARY TABLE RemovedTroves(
+                name        VARCHAR(254),
+                version     VARCHAR(767),
+                flavor      VARCHAR(767),
+                nodeId      INTEGER
+            )""", start_transaction = False)
+        db.tempTables["RemovedTroves"] = True
+
     db.commit()
 
 def createDependencies(db):
