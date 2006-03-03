@@ -1,3 +1,9 @@
+Changes in @NEW@:
+ o Bugfixes:
+    * cvc merge on a non-shadow no longer returns a traceback (bz# 792),
+      and cvc context foo does not return a traceback when context foo does
+      not exist (bz #757)  Fixed by David Coulthart.
+
 Changes in 1.0.5:
  o Performance improvements:
     * The use of copy.deepcopy() has been eliminated from the
