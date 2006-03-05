@@ -811,10 +811,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if cfg.debugRecipeExceptions:
             traceback.print_exception(*sys.exc_info())
             debugger.post_mortem(sys.exc_info()[2])
-        if isinstance(msg, CookError):
-            raise
-        else:
-            raise CookError(str(msg))
+        raise
 
     if logBuild and recipeObj._autoCreatedFileCount:
         logFile.close()
