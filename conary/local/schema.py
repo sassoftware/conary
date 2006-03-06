@@ -333,7 +333,7 @@ def setupTempDepTables(db, cu = None):
                    start_transaction=False)
         db.tempTables["RemovedTroveIds"] = True
     if "RemovedTroves" not in db.tempTables:
-        self.cu.execute("""
+        cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroves(
                 name        VARCHAR(254),
                 version     VARCHAR(767),

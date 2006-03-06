@@ -146,7 +146,7 @@ class DependencyWorkTables:
                                 ("Dependencies", "TmpDependencies"),
                                 multiplier = -1)
 
-    def mergeRemoves(Self):
+    def mergeRemoves(self):
         self.cu.execute("""INSERT INTO RemovedTroveIds
                            SELECT instanceId, nodeId FROM
                                RemovedTroves
@@ -161,14 +161,14 @@ class DependencyWorkTables:
                                Instances.versionId = Versions.versionId AND
                                Instances.flavorId  = Flavors.flavorId""")
 
-        schema.resetTable("RemovedTroves")
+        schema.resetTable(self.cu, "RemovedTroves")
 
     def removeTrove(self, troveInfo, nodeId):
         self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
                         (troveInfo[0], troveInfo[1].asString(), 
-                         troveInfo[2], nodeIdx))
+                         troveInfo[2].freeze(), nodeId))
 
-    def __init__(self, cu, removedTables = False):
+    def __init__(self, cu, removeTables = False):
         self.cu = cu
 	self.populateStmt = self.cu.compile("""
             INSERT INTO DepCheck
@@ -182,7 +182,7 @@ class DependencyWorkTables:
         schema.resetTable(self.cu, "TmpProvides")
         schema.resetTable(self.cu, "TmpRequires")
 
-        if removedTables:
+        if removeTables:
             schema.resetTable(self.cu, "RemovedTroveIds")
 
 class DependencyChecker:
@@ -721,6 +721,8 @@ class DependencyTables:
             oldTroves.append((oldInfo, nodeId))
             workTables.removeTrove(oldInfo, nodeId)
 
+        import epdb
+        epdb.st('f')
         workTables.mergeRemoves()
 
         # Check the dependencies for anything which depends on things which
