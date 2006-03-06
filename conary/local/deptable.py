@@ -163,6 +163,39 @@ class DependencyWorkTables:
 
         schema.resetTable(self.cu, "RemovedTroves")
 
+        # Check the dependencies for anything which depends on things which
+        # we've removed. We insert those dependencies into our temporary
+        # tables (which define everything which needs to be checked) with
+        # a positive depNum which mathes the depNum from the Requires table.
+        self.cu.execute("DELETE FROM TmpRequires WHERE depNum > 0")
+        self.cu.execute("""
+                INSERT INTO TmpRequires SELECT
+                    DISTINCT Requires.instanceId, Requires.depId,
+                             Requires.depNum, Requires.depCount
+                FROM
+                    RemovedTroveIds
+                INNER JOIN Provides ON
+                    RemovedTroveIds.troveId = Provides.instanceId
+                INNER JOIN Requires ON
+                    Provides.depId = Requires.depId
+        """)
+
+        self.cu.execute("DELETE FROM DepCheck WHERE depNum > 0")
+        self.cu.execute("""
+                INSERT INTO DepCheck SELECT
+                    Requires.instanceId, Requires.depNum,
+                    Requires.DepCount, 0, Dependencies.class,
+                    Dependencies.name, Dependencies.flag
+                FROM
+                    RemovedTroveIds
+                INNER JOIN Provides ON
+                    RemovedTroveIds.troveId = Provides.instanceId
+                INNER JOIN Requires ON
+                    Provides.depId = Requires.depId
+                INNER JOIN Dependencies ON
+                    Dependencies.depId = Requires.depId
+        """)
+
     def removeTrove(self, troveInfo, nodeId):
         self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
                         (troveInfo[0], troveInfo[1].asString(), 
@@ -354,7 +387,75 @@ class DependencyChecker:
         # to choose between several choices, use the index order for jobSets
         # - that's the order we created by our sort() above.
         orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
+
         return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
+
+    def _findOrdering(self, jobSet, result, depList, troveSource,
+                      brokenByErase, satisfied):
+        changeSetList = []
+
+        # there are four kinds of edges -- old needs old, old needs new,
+        # new needs new, and new needs old. Each edge carries a depId
+        # to aid in cancelling them out. Our initial edge representation
+        # is a simple set of edges.
+        oldNewEdges, oldOldEdges, newNewEdges, newOldEdges = \
+                    self._createDependencyEdges(result, depList)
+
+        # Create dependencies from collections to the things they include.
+        # This forces collections to be installed after all of their
+        # elements.  We include weak references in case the intermediate
+        # trove is not part of the update job.
+        newNewEdges.update(self._createCollectionEdges(jobSet, troveSource))
+
+        resatisfied = set(brokenByErase) & set(satisfied)
+        if resatisfied:
+            # These dependencies are ones where the same dependency
+            # is being both removed and added, and which is required
+            # by something already installed on the system. To ensure
+            # dependency closure, these two operations must happen
+            # simultaneously. Create a loop between the nodes.
+            for depId in resatisfied:
+                oldNodeId = brokenByErase[depId]
+                newNodeId = -satisfied[depId]
+                if oldNodeId != newNodeId and newNodeId > 0:
+                    # if newNodeId < 0, the dependency remains satisfied
+                    # by something on the system and we don't need
+                    # to do anything special. Creating the loop
+                    # this way is a bit abusive of the edge types since
+                    # they aren't really descriptive in this case
+                    oldOldEdges.add((oldNodeId, newNodeId, depId))
+                    newNewEdges.add((oldNodeId, newNodeId, depId))
+
+        # Remove nodes which cancel each other
+        self._collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
+
+        # the edges left in oldNewEdges represent dependencies which troves
+        # slated for removal have on troves being installed. either those
+        # dependencies will already be guaranteed by edges in oldOldEdges,
+        # or they were broken to begin with. either way, we don't have to
+        # care about them
+        del oldNewEdges
+        # newOldEdges are dependencies which troves being installed have on
+        # troves being removed. since those dependencies will be broken
+        # after this operation, we don't need to order on them (it's likely
+        # they are filled by some other trove being added, and the edge
+        # in newNewEdges will make that work out
+        del newOldEdges
+
+        # Now build up a unified node list. The different kinds of edges
+        # and the particular depId no longer matter. The direction here is
+        # a bit different, and defines the ordering for the operation, not
+        # the order of the dependency
+        self._buildEdges(oldOldEdges, newNewEdges)
+        del oldOldEdges
+        del newNewEdges
+
+        componentLists = self._stronglyConnect()
+
+        for componentList in componentLists:
+            changeSetList.append(list(componentList))
+
+        return changeSetList
 
     def iterNodes(self):
         # skips the None node on the front
@@ -552,10 +653,8 @@ class DependencyTables:
 	"""
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
-            failedSets1 = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
-                    for x in checker.iterNodes() if x[2][0] is not None ]
-            failedSets = [ (x, None, None, None) for x in troveNames ]
-            assert(failedSets == failedSets1)
+            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
+                    for x in checker.iterNodes() ]
             ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
 
             for idx in idxList:
@@ -672,8 +771,6 @@ class DependencyTables:
 
         # build the table of all the requirements we're looking for
         depList = [ None ]
-        oldTroves = []
-        troveNames = []
 
         checker = DependencyChecker()
 
@@ -682,79 +779,29 @@ class DependencyTables:
 	# indexing depList. depList is a list of (troveNum, depClass, dep)
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
-        i = 0
         for job in jobSet:
-            # removal jobs are handled elsewhere
-            if job[2][0] is None: continue
+            if job[2][0] is None:
+                nodeId = checker._addJob(job)
+                workTables.removeTrove((job[0], job[1][0], job[1][1]), nodeId)
+            else:
+                trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                           withFiles = False)
 
-            newInfo = (job[0], job[2][0], job[2][1])
+                newNodeId = checker._addJob(job)
 
-            trv = troveSource.getTrove(withFiles = False, *newInfo)
+                workTables._populateTmpTable(depList = depList,
+                                             troveNum = -newNodeId,
+                                             requires = trv.getRequires(),
+                                             provides = trv.getProvides(),
+                                             multiplier = -1)
 
-            newNodeId = checker._addJob(job)
-
-            troveNum = -newNodeId
-            troveNames.append(newInfo)
-            workTables._populateTmpTable(depList = depList,
-                                         troveNum = troveNum,
-                                         requires = trv.getRequires(),
-                                         provides = trv.getProvides(),
-                                         multiplier = -1)
-
-            if job[1][0] is not None:
-		oldInfo = (job[0], job[1][0], job[1][1])
-                oldTroves.append((oldInfo, newNodeId))
-                workTables.removeTrove(oldInfo, newNodeId)
-	    else:
-		oldInfo = None
-
-            i += 1
+                if job[1][0] is not None:
+                    workTables.removeTrove((job[0], job[1][0], job[1][1]), 
+                                           newNodeId)
 
         # merge everything into TmpDependencies, TmpRequires, and tmpProvides
         workTables.merge()
-
-        # now build a table of all the troves which are being erased
-        for job in jobSet:
-            if job[2][0] is not None: continue
-            oldInfo = (job[0], job[1][0], job[1][1])
-            nodeId = checker._addJob(job)
-            oldTroves.append((oldInfo, nodeId))
-            workTables.removeTrove(oldInfo, nodeId)
-
-        import epdb
-        epdb.st('f')
         workTables.mergeRemoves()
-
-        # Check the dependencies for anything which depends on things which
-        # we've removed. We insert those dependencies into our temporary
-	# tables (which define everything which needs to be checked) with
-	# a positive depNum which mathes the depNum from the Requires table.
-        cu.execute("""
-                INSERT INTO TmpRequires SELECT
-                    DISTINCT Requires.instanceId, Requires.depId,
-                             Requires.depNum, Requires.depCount
-                FROM
-                    RemovedTroveIds
-                INNER JOIN Provides ON
-                    RemovedTroveIds.troveId = Provides.instanceId
-                INNER JOIN Requires ON
-                    Provides.depId = Requires.depId
-        """)
-
-        cu.execute("""
-                INSERT INTO DepCheck SELECT
-                    Requires.instanceId, Requires.depNum,
-                    Requires.DepCount, 0, Dependencies.class,
-                    Dependencies.name, Dependencies.flag
-                FROM
-		    RemovedTroveIds
-		INNER JOIN Provides ON
-                    RemovedTroveIds.troveId = Provides.instanceId
-                INNER JOIN Requires ON
-                    Provides.depId = Requires.depId
-                INNER JOIN Dependencies ON
-                    Dependencies.depId = Requires.depId
-        """)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
@@ -776,8 +823,6 @@ class DependencyTables:
 	result = [ x for x in cu ]
 	# XXX there's no real need to instantiate this; we're just doing
 	# it for convienence while this code gets reworked
-
-        changeSetList = []
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -833,67 +878,11 @@ class DependencyTables:
                     satisfied[depNum] = provInstId
 
         if findOrdering:
-            # there are four kinds of edges -- old needs old, old needs new,
-            # new needs new, and new needs old. Each edge carries a depId
-            # to aid in cancelling them out. Our initial edge representation
-            # is a simple set of edges.
-            oldNewEdges, oldOldEdges, newNewEdges, newOldEdges = \
-                        checker._createDependencyEdges(result, depList)
-
-            # Create dependencies from collections to the things they include.
-            # This forces collections to be installed after all of their
-            # elements.  We include weak references in case the intermediate
-            # trove is not part of the update job.
-            newNewEdges.update(
-                    checker._createCollectionEdges(jobSet, troveSource))
-
-            resatisfied = set(brokenByErase) & set(satisfied)
-            if resatisfied:
-                # These dependencies are ones where the same dependency
-                # is being both removed and added, and which is required
-                # by something already installed on the system. To ensure
-                # dependency closure, these two operations must happen
-                # simultaneously. Create a loop between the nodes.
-                for depId in resatisfied:
-                    oldNodeId = brokenByErase[depId]
-                    newNodeId = -satisfied[depId]
-                    if oldNodeId != newNodeId and newNodeId > 0:
-                        # if newNodeId < 0, the dependency remains satisfied
-                        # by something on the system and we don't need
-                        # to do anything special. Creating the loop
-                        # this way is a bit abusive of the edge types since
-                        # they aren't really descriptive in this case
-                        oldOldEdges.add((oldNodeId, newNodeId, depId))
-                        newNewEdges.add((oldNodeId, newNodeId, depId))
-
-            # Remove nodes which cancel each other
-            checker._collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
-
-            # the edges left in oldNewEdges represent dependencies which troves
-            # slated for removal have on troves being installed. either those
-            # dependencies will already be guaranteed by edges in oldOldEdges,
-            # or they were broken to begin with. either way, we don't have to
-            # care about them
-            del oldNewEdges
-            # newOldEdges are dependencies which troves being installed have on
-            # troves being removed. since those dependencies will be broken
-            # after this operation, we don't need to order on them (it's likely
-            # they are filled by some other trove being added, and the edge
-            # in newNewEdges will make that work out
-            del newOldEdges
-
-            # Now build up a unified node list. The different kinds of edges
-            # and the particular depId no longer matter. The direction here is
-            # a bit different, and defines the ordering for the operation, not
-            # the order of the dependency
-            checker._buildEdges(oldOldEdges, newNewEdges)
-            del oldOldEdges
-            del newNewEdges
-
-            componentLists = checker._stronglyConnect()
-
-            for componentList in componentLists:
-                changeSetList.append(list(componentList))
+            changeSetList = checker._findOrdering(jobSet, result, depList,
+                                                  troveSource, brokenByErase,
+                                                  satisfied)
+        else:
+            changeSetList = []
 
         satisfied = set(satisfied)
         brokenByErase = set(brokenByErase)
