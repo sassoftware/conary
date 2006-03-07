@@ -6,6 +6,8 @@ Changes in @NEW@:
     * opening invalid changesets now gives a good error message instead of
       a traceback
     * removed obsolete changemail script
+    * Exceptions which display fileId's display them as hex sha1s now
+      instead of as python strings
 
 Changes in 1.0.5:
  o Performance improvements:
