@@ -27,6 +27,7 @@ def usage(exitcode=1):
     sys.stderr.write("\n".join((
      "Usage: commitaction --repmap <repmap> --build-label <buildLabel>",
      "                    [--username <repository username> --password <password>]",
+     "                    [--config-file <path>] [--config 'item value']",
      "                    --module '/path/to/module module options'",
      r"Takes triplets of name\nversion\nflavor\n on standard input",
      ""
@@ -35,13 +36,15 @@ def usage(exitcode=1):
 
 
 def main(argv):
-    if not len(argv):
+    if not len(argv) > 1:
         usage()
 
     sys.excepthook = util.genExcepthook(prefix='commitaction-stack-')
 
     argDef = {
         'module': options.MULT_PARAM,
+        'config-file': options.ONE_PARAM,
+        'config': options.MULT_PARAM,
         'username': options.OPT_PARAM,
         'password': options.OPT_PARAM,
         'repmap': options.OPT_PARAM,
@@ -64,7 +67,11 @@ def main(argv):
     if 'module' not in argSet:
         usage()
 
+    for line in argSet.pop('config', []):
+        cfg.configLine(line)
+
     if 'repmap' in argSet:
+        # this is ONLY for accessing the committing repository
         host, url = argSet['repmap'].split(" ")
         cfg.repositoryMap.update({host: url})
         

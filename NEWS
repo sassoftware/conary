@@ -1,4 +1,8 @@
 Changes in @NEW@:
+ o Repository changes:
+    * The commitaction script now accepts the standard conary arguments
+      --config and --config-file.
+
  o Bugfixes:
     * cvc merge on a non-shadow no longer returns a traceback (bz# 792),
       and cvc context foo does not return a traceback when context foo does
