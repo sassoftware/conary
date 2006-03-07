@@ -5,6 +5,7 @@ Changes in @NEW@:
       not exist (bz #757)  Fixed by David Coulthart.
     * opening invalid changesets now gives a good error message instead of
       a traceback
+    * removed obsolete changemail script
 
 Changes in 1.0.5:
  o Performance improvements:

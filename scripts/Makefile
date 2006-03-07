@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio changemail changemail.py commitaction conary-debug perlreqs.pl dbsh dumpcontainer showchangeset mirror
+extra_dist = Makefile rpm2cpio changemail.py commitaction conary-debug perlreqs.pl dbsh dumpcontainer showchangeset mirror
 
 dist_files = $(python_files) $(extra_dist)
 
