@@ -1096,7 +1096,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     nonCfgExt = ('bz2', 'ccs', 'eps', 'gif', 'gz', 'ico', 'img',
                  'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
-                 'tbz2', 'tgz', 'tiff', 'ttf', 'zip')
+                 'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
 
     isSrcTrove = curTrove.getName().endswith(':source')
 
