@@ -462,6 +462,7 @@ def realMain(cfg, argv=sys.argv):
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
                 ('trove-flags', 'showTroveFlags'),
                 'deps', 'info'):
             if isinstance(opt, tuple):
@@ -474,7 +475,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
 	db = openDatabase(cfg.root, cfg.dbPath)
 
@@ -535,7 +536,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
         if argSet: return usage()
         troveList = otherArgs[2:]
@@ -605,7 +606,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
         if argSet or len(otherArgs) < 3:
             showchangeset.usage()
