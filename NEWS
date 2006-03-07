@@ -7,6 +7,10 @@ Changes in @NEW@:
       a traceback
     * removed obsolete changemail script
 
+ o Build fixes:
+    * The default ComponentSpec for :perl components now include files
+      in site_perl as well as in vendor_perl.
+
 Changes in 1.0.5:
  o Performance improvements:
     * The use of copy.deepcopy() has been eliminated from the

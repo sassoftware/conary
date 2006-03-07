@@ -220,7 +220,7 @@ class ComponentSpec(_filterSpec):
         # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
         # perl is potentially architecture-specific because of %(lib)
-	('perl',      ('/usr/(%(lib)s|lib)/perl.*/vendor_perl/')),
+	('perl',      ('/usr/(%(lib)s|lib)/perl.*/(vendor|site)_perl/')),
         # devellib is architecture-specific
         ('devellib',  (r'\.so',), stat.S_IFLNK),
 	('devellib',  (r'\.a',
