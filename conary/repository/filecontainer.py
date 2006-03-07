@@ -56,6 +56,7 @@ Each file table entry looks like::
 import gzip
 import struct
 
+import conary.errors
 from conary.lib import util
 from conary.repository import filecontents
 
@@ -196,6 +197,6 @@ class FileContainer:
 		raise
 	    self.mutable = False
 
-class BadContainer(Exception):
+class BadContainer(conary.errors.ConaryError):
 
     pass
