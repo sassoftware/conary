@@ -10,10 +10,14 @@ Changes in @NEW@:
     * opening invalid changesets now gives a good error message instead of
       a traceback
     * removed obsolete changemail script
+    * Exceptions which display fileId's display them as hex sha1s now
+      instead of as python strings
 
  o Build fixes:
     * The default ComponentSpec for :perl components now include files
       in site_perl as well as in vendor_perl.
+    * Ruby uses /usr/share/ri for its documentation system, so all files
+      in %(datadir)s/ri are now included in the default :doc ComponentSpec.
 
 Changes in 1.0.5:
  o Performance improvements:
