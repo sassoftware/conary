@@ -274,8 +274,7 @@ class StatWindow(gtk.Window):
 
         for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
             stat = ProfileStat()
-            # line numbers are off by one
-            stat.func = (func[0], func[1]-1, func[2])
+            stat.func = func
             stat.cc = cc
             stat.nc = nc
             stat.tt = tt
@@ -321,7 +320,8 @@ class SourceWindow(gtk.ScrolledWindow):
         buffer = source_buffer.get_buffer()
         self.view.set_buffer(buffer)
 
-        iter = buffer.get_iter_at_line(lineno)
+        # buffer lines start at 0
+        iter = buffer.get_iter_at_line(lineno - 1)
         buffer.place_cursor(iter)
         mark = buffer.create_mark(None, iter)
         self.view.scroll_to_mark(buffer.get_insert(), 0, True, 0.5, 0.5)
