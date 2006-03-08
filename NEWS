@@ -14,6 +14,8 @@ Changes in @NEW@:
     * removed obsolete changemail script
     * Exceptions which display fileId's display them as hex sha1s now
       instead of as python strings
+    * A bug where including a redirect in a group that has autoResolve 
+      caused conary to traceback has been fixed.
 
  o Build fixes:
     * The default ComponentSpec for :perl components now include files
