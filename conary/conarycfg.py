@@ -177,6 +177,7 @@ class ConaryContext(ConfigSection):
     contact               =  None
     excludeTroves         =  CfgRegExpList
     flavor                =  CfgList(CfgFlavor)
+    lookaside             =  CfgPath
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
     repositoryMap         =  CfgRepoMap
