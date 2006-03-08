@@ -136,11 +136,36 @@ class _addInfo(policy.Policy):
 
 class Config(policy.Policy):
     """
-    Mark all files below C{%(sysconfdir)s} (/etc) and
-    C{%(taghandlerdir)s} as config files; exceptions as
-    C{r.Config(exceptions=I{filterexp})}
-    Mark explicit inclusions as config files:
-    C{r.Config(I{filterexp})}
+    NAME
+    ====
+
+    B{C{r.Config()}} - Mark files as configuration files
+    
+    SYNOPSIS
+    ========
+
+    C{r.Config([I{filterexp}] || [I{exceptions=filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    Mark all files below C{%(sysconfdir)s} (C{/etc}) and C{%(taghandlerdir)s} 
+    as configuration files. To mark files as exceptions, use:
+    C{r.Config(exceptions=filterexp)} To mark explicit inclusions as 
+    configuration files, use: C{r.Config(filterexp)}
+
+    EXAMPLES
+    ========
+
+    C{r.Config(exceptions='/etc/X11/xkb/xkbcomp')}
+
+    In the above example, the file C{/etc/X11/xkb/xkbcomp} is marked as an 
+    exception, since it is not actually a configuration file.
+
+    C{r.Config('%(mmdir)s/Mailman/mm_cfg.py')}
+
+    The above example demonstrates inclusion of the configuration 
+    file C{%(mmdir)s/Mailman/mm_cfg.py}.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -181,19 +206,45 @@ class Config(policy.Policy):
 
 class ComponentSpec(_filterSpec):
     """
-    Determines which component each file is in:
-    C{r.ComponentSpec(I{componentname}, I{filterexp}...)}
-    or
-    C{r.ComponentSpec(I{packagename:component}, I{filterexp}...)}
+    NAME
+    ====
+
+    B{C{r.ComponentSpec()}} - Determines which component each file is in
+    
+    SYNOPSIS
+    ========
+
+    C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename:component}, I{filterexp}])}
+
+    DESCRIPTION
+    ===========
 
     This class includes the filter expressions that specify the default
     assignment of files to components.  The expressions are considered
     in the order in which they are evaluated in the recipe, and the
     first match wins.  After all the recipe-provided expressions are
     evaluated, the default expressions are evaluated.  If no expression
-    matches, then the file is assigned to the catchall component, which
-    is C{runtime} by default but can be changed with the C{catchall=}
-    argument.
+    matches, then the file is assigned to the C{catchall} component.
+    
+    PARAMETERS
+    ==========
+
+    B{recipe} : holds the recipe object, which is used for the macro set and 
+    package objects.
+
+    KEYWORDS
+    ========
+
+    B{catchall} : Specify the  component name which gets all otherwise 
+    unassigned files. Default: C{runtime}
+
+    EXAMPLES
+    ========
+
+    C{r.ComponentSpec('manual', '%(contentdir)s/manual/')}
+
+    The above example, uses C{r.ComponentSpec} to specify the 
+    C{%(contentdir)s/manual/} directory is in the C{:manual} component.
     """
     requires = (
         ('Config', policy.REQUIRED_PRIOR),
@@ -289,8 +340,37 @@ class ComponentSpec(_filterSpec):
 
 class PackageSpec(_filterSpec):
     """
-    Determines which package (and optionally also component) each file is in:
-    C{r.PackageSpec(I{packagename}, I{filterexp}...)}
+    NAME
+    ====
+
+    B{C{r.PackageSpec()}} - Determines package / component file is in
+    
+    SYNOPSIS
+    ========
+
+    C{r.PackageSpec([I{packagename},] [I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.PackageSpec()} is typically called from within a 
+    Conary recipe to determine which package, and optionally, which component 
+    each file is in.
+    
+    PARAMETERS
+    ==========
+
+    B{recipe} : Holds the recipe object, which is used for the macro set and 
+    package objects.
+
+    
+    EXAMPLES
+    ========
+    
+    C{r.PackageSpec('openssh-server', '%(sysconfdir)s/pam.d/sshd')}
+    
+    The example above specifies the file C{%(sysconfdir)s/pam.d/sshd} is in 
+    the package C{openssh-server}.
     """
     requires = (
         ('ComponentSpec', policy.REQUIRED_PRIOR),
@@ -345,9 +425,31 @@ class PackageSpec(_filterSpec):
 
 class InitialContents(policy.Policy):
     """
-    Mark only explicit inclusions as initial contents files, which
-    provide their contents only if the file does not yet exist:
-    C{r.InitialContents(I{filterexp})}
+    NAME
+    ====
+
+    B{C{r.InitialContents()}} - Mark only explicit inclusions as initial
+    contents files
+    
+    SYNOPSIS
+    ========
+
+    C{InitialContents([I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    Specify only explicit inclusions to be marked as initial contents files, 
+    which provide their contents only if the file does not yet exist.
+
+    
+    EXAMPLES
+    ========
+    
+    C{r.InitialContents('%(sysconfdir)s/conary/.*gpg')}
+    
+    In the above example, the files C{%(sysconfdir)s/conary/.*gpg} are being 
+    marked as initial contents files.
     """
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -378,12 +480,33 @@ class InitialContents(policy.Policy):
 
 class Transient(policy.Policy):
     """
-    Mark files that have transient contents as such:
-    C{r.Transient(I{filterexp})}
+    NAME
+    ====
+
+    B{C{r.Transient()}} - Mark files that have transient contents
     
-    Transient contents are contents that should be overwritten by a new
-    version without question at update time; almost the opposite of
-    configuration files.
+    SYNOPSIS
+    ========
+
+    C{r.Transient([I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.Transient()} is typically called from within a 
+    Conary recipe to mark files with transient contents.
+        
+    Files containing transient contents are almost the opposite of
+    configuration files, in that they should be overwritten by a new
+    version without question at update time.
+    
+    EXAMPLES
+    ========
+    
+    C{r.Transient('%(libdir)s/firefox/extensions/')}
+    
+    The above usage example demonstrates marking files in the directory 
+    C{%(libdir)s/firefox/extensions/} as having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -411,10 +534,31 @@ class Transient(policy.Policy):
 
 class TagDescription(policy.Policy):
     """
-    Mark tag description files as such so that conary handles them
-    correctly.  By default, every file in %(tagdescriptiondir)s/
-    is marked as a tag description file.  No file outside of
-    %(tagdescriptiondir)s/ will be considered by this policy.
+    NAME
+    ====
+
+    B{C{r.TagDescription()}} - Marks tag description files
+    
+    SYNOPSIS
+    ========
+
+    C{r.TagDescription([I{groupname}, I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.TagDescription} is typically called from within a 
+    Conary recipe to mark tag description files as such so that conary 
+    handles them correctly.  Every file in C{%(tagdescriptiondir)s/}
+    is marked as a tag description file by default.  
+    
+    No file outside of C{%(tagdescriptiondir)s/} will be considered by this 
+    policy.
+    
+    EXAMPLES
+    ========
+    
+    This policy class should not require explicit use.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -432,10 +576,28 @@ class TagDescription(policy.Policy):
 
 class TagHandler(policy.Policy):
     """
-    Mark tag handler files as such so that conary handles them
-    correctly.  By default, every file in %(taghandlerdir)s/
-    is marked as a tag handler file.  No file outside of
-    %(taghandlerdir)s/ will be considered by this policy.
+    NAME
+    ====
+
+    B{C{r.TagHandler()}} - Mark tag handler files
+    
+    SYNOPSIS
+    ========
+
+    C{r.TagHandler([I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    By default, all  files in C{%(taghandlerdir)s/} are marked as a tag 
+    handler files. The policy class C{r.TagHandler()} is typically called from
+    within a Conary recipe to mark tag handler files as such so that conary 
+    handles them
+    correctly.
+    
+    Note: No files outside of the C{%(taghandler)s/} directory will be 
+    considered by this policy, and thus it should never be required to invoke
+    this policy explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -452,11 +614,35 @@ class TagHandler(policy.Policy):
 
 class TagSpec(_addInfo):
     """
-    Apply tags defined by tag descriptions in both the current system
-    and C{%(destdir)s} to all the files in C{%(destdir)s}; can also
-    be told to apply tags manually:
-    C{r.TagSpec(I{tagname}, I{filterexp})} to add manually, or
-    C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
+    NAME
+    ====
+
+    B{C{r.TagSpec()}} - Apply tags defined by tag descriptions
+    
+    SYNOPSIS
+    ========
+
+    C{r.TagSpec([I{tagname}, I{filterexp}] || [I{tagname}, I{exceptions=filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.TagSpec()} is typically called from within a Conary 
+    recipe to apply tags defined by tag descriptions in both the current 
+    system and C{%(destdir)s} to all files in C{%(destdir)}.
+    
+    To apply tags manually, use the syntax: C{r.TagSpec(I{tagname}, I{filterexp})}, 
+    or to set an exception to this policy, use: 
+    C{r.TagSpec(I{tagname}, I{exceptions=filterexp})}.
+
+    
+    EXAMPLES
+    ========
+    
+    C{r.TagSpec('initscript', '%(initdir)s/')}
+    
+    The example invocation of C{r.TagSpec} above applies the C{initscript} tag
+    to the directory C{%(initdir)s/}.
     """
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -532,12 +718,34 @@ class TagSpec(_addInfo):
 
 class MakeDevices(policy.Policy):
     """
-    Makes device nodes:
-    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{mode}=0400)}, where C{I{type}} is C{b} or C{c}.
+    NAME
+    ====
 
-    These nodes are only in the package, not in the filesystem, in order
-    to enable Conary's policy of non-root builds (only root can actually
-    create device nodes).
+    B{C{r.MakeDevices()}} - Make device nodes
+    
+    SYNOPSIS
+    ========
+
+    C{MakeDevices([I{path},] [I{type},] [I{major},] [I{minor},] [I{owner},] [I{groups},] [I{mode}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.MakeDevices()} is typically called from within a 
+    Conary recipe to create device nodes.  Conary's policy of non-root builds
+    requires that these nodes exist only in the package, and not in the 
+    filesystem, as only root may actually create device nodes.
+
+    
+    EXAMPLES
+    ========
+    
+    C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666})}
+    
+    The example above creates the device node C{/dev/tty}, as type 'c' 
+    (character, as opposed to type 'b', or block) with a major number of '5', 
+    minor number of '0', owner, and group are both the root user, and 
+    permissions are 0666.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -610,7 +818,29 @@ class setModes(policy.Policy):
 
 class LinkType(policy.Policy):
     """
-    Only regular, non-config files may have hardlinks; no exceptions.
+    NAME
+    ====
+
+    B{C{r.LinkType()}} - Ensures only regular, non-configuration files have hardlinks
+    
+    SYNOPSIS
+    ========
+
+    C{LinkLinkType([I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.LinkType()} is typically called from within a 
+    Conary recipe to to ensure only regular, non-configuration files are 
+    hardlinked.
+
+    
+    EXAMPLES
+    ========
+    
+    FIXME : is an example needed?  could not find an example in recipes.
+    
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -628,13 +858,39 @@ class LinkType(policy.Policy):
 
 class LinkCount(policy.Policy):
     """
-    It is generally an error to have hardlinks across directories,
-    except when the packager knows that there is no reasonable
-    chance that they will be on separate filesystems; in those
-    cases, pass in a list of regexps specifying directory names
-    that are exceptions to this rule by calling
-    C{r.LinkCount(exceptions=I{regexp}} or
-    C{r.LinkCount(exceptions=[I{regexp}, I{regexp}])}
+    NAME
+    ====
+
+    B{C{r.LinkCount()}} - Define exceptions to hardlinking rules
+    
+    SYNOPSIS
+    ========
+
+    C{LinkCount([I{filterexp}] | [I{exceptions=filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.LinkCount()} is typically called from within a Conary
+    recipe to allow for exceptions to the hardlinks across directories policy.
+    
+    It is generally an error to have hardlinks across directories, except when
+    the packager knows that there is no reasonable chance that they will be on
+    separate filesystems
+
+    In cases where the packager is certain hardlinks will not cross 
+    filesystems,  a list of regular expressions specifying directory names 
+    which are exceptions to the hardlink policy may be passed to 
+    C{r.LinkCount}.
+
+
+    EXAMPLES
+    ========
+    
+    C{r.LinkCount(exceptions='/usr/share/zoneinfo/.*')}
+    
+    The above example uses C{r.LinkCount} to except zoneinfo files, 
+    located in C{/usr/share/zoneinfo/} to the hardlinks policy.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -680,23 +936,46 @@ class LinkCount(policy.Policy):
 
 class ExcludeDirectories(policy.Policy):
     """
-    Causes directories to be excluded from the package by default; set
-    exceptions to this policy with
-    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
-    matching the regular expression will be included in the package.
+    NAME
+    ====
 
-    There are only two reasons to package a directory: the directory needs
-    permissions other than 0755, or it must exist even if it is empty.
+    B{C{r.ExcludeDirectories()}} - Exclude directories from package
+    
+    SYNOPSIS
+    ========
 
-    It should generally not be necessary to invoke this policy directly,
-    because the most common reason to include a directory in a package
-    is that it needs permissions other than 0755, so simply call
-    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
-    and the directory will automatically included.
+    C{r.ExcludeDirectories([I{filterexp}] | [I{exceptions=filterexp}])}
 
-    Packages do not need to explicitly include a directory just to ensure
-    that there is a place to put a file; Conary will appropriately create
-    the directory, and delete it later if the directory becomes empty.
+    DESCRIPTION
+    ===========
+
+    Causes directories to be excluded from the package by default. Use 
+    C{r.ExcludeDirectories(exceptions=filterexp)} to set exceptions to 
+    this policy, and directories matching the regular expression 
+    C{filterexp} will be included in the package.
+    
+    There are only two reasons to explicitly package a directory: the 
+    directory needs permissions other than 0755, or it must exist even 
+    if it is empty.
+
+    Therefore, it should generally not be necessary to invoke this policy 
+    directly.  If your directory requires permissions other than 0755, simply
+    use C{r.SetMode} to specify the permissions, and the directory will be 
+    automatically included.
+    
+    Packages do not need to explicitly include directories to ensure
+    existence of a target to place a file in. Conary will appropriately
+    create the directory, and delete it later if the directory becomes empty.
+    
+
+    EXAMPLES
+    ========
+    
+    C{r.ExcludeDirectories(exceptions='/tftpboot')}
+    
+    The above example sets the file C{/tftboot} as an exception to the 
+    C{r.ExcludeDirectories} policy, and ensures C{/tftpboot} will be included
+    in the package.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -717,12 +996,62 @@ class ExcludeDirectories(policy.Policy):
 
 class ByDefault(policy.Policy):
     """
-    Determines which components should be installed by default when
-    the package is installed; set a component as not installed by
-    default with C{r.ByDefault(exceptions=':I{comp}')} or
-    C{r.ByDefault(exceptions='I{pkgname}:I{comp}')}.
-    The default is that :test and :debuginfo packages are not installed
-    by default.
+    NAME
+    ====
+
+    B{C{r.ByDefault()}} - Determines components to be installed by default
+  
+    SYNOPSIS
+    ========
+
+    C{r.ByDefault([I{exceptions},] [I{use},] [I{inclusions},] [I{subtrees}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.ByDefault()} is called from within a Conary recipe
+    to determine which components should be installed by default at the time 
+    of package installation. By default, :debug, and :test packages are not 
+    installed.
+    
+    PARAMETERS
+    ==========
+
+    The following parameters are recognized by C{r.ByDefault}:
+
+    B{recipe} : Holds the recipe object, which is used for the macro set,
+    and package objects.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.ByDefault}:
+
+    B{exceptions} : An optional argument comprised of regular expressions,
+    which specifies files to ignore while enforcing the policy action. The
+    content of C{exceptions} will be interpolated against recipe macros prior
+    to being used.
+
+    B{inclusions} : C{FileFilter} strings, C{FileFilter} tuples, or a 
+    non-tuple list of C{FileFilter} strings, or C{FileFilter}s tuples used to
+    limit the policy, or if it already is limited (invariantinclusion) then
+    C{inclusions} provide additional FileFilters to include within the general
+    limitation.
+    
+    B{subtrees} : Specifies a subtree to which to limit the policy, or it it
+    already is limited (invariantsubtrees), then C{subtrees} provides 
+    additional subtrees to consider.
+    
+    B{use} : An optional argument which specifies Use flag(s) instructing 
+    whether to perform the action.
+    
+    EXAMPLES
+    ========
+    
+    C{r.ByDefault(exceptions=[':manual'])}
+    
+    The above example uses C{r.ByDefault} to ignore C{:manual} components when 
+    enforcing the policy.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -771,14 +1100,43 @@ class _UserGroup(policy.Policy):
 
 class Ownership(_UserGroup):
     """
-    Sets user and group ownership of files when the default of
-    root:root is not appropriate:
-    C{r.Ownership(I{username}, I{groupname}, I{filterexp}...)}
-    List them in order, most specific first, ending with most
-    general; the filespecs will be matched in the order that
-    you provide them.
+    NAME
+    ====
 
-    No exceptions to this policy are permitted.
+    B{C{r.Ownership()}} - Set file ownership
+    
+    SYNOPSIS
+    ========
+
+    C{r.Ownership([I{username},] [I{groupname},] [I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.Ownership()} is typically called from within a Conary
+    recipe to set user and group ownership of files when the default of
+    C{root:root} is not appropriate.
+    
+    List the ownerships in order, most specific first, ending with least
+    specific. The filespecs will be matched in the order that you provide them.
+    
+    PARAMETERS
+    ==========
+
+    None.
+
+    KEYWORDS
+    ========
+
+    None.
+    
+    EXAMPLES
+    ========
+    
+    C{r.Ownership('apache', 'apache', '%(localstatedir)s/lib/php/session')}
+    
+    The example above sets ownership of C{%(localstatedir)s/lib/php/session}
+    to owner C{apache}, and group C{apache}.
     """
 
     def __init__(self, *args, **keywords):
@@ -868,12 +1226,34 @@ class _Utilize(_UserGroup):
 
 class UtilizeUser(_Utilize):
     """
-    Marks files as requiring a user definition to exist even though
-    the file is not owned by that user:
-    C{r.UtilizeUser(I{username}, I{filterexp}...)}
-    This is particularily useful for daemons that are setuid root
+    NAME
+    ====
+
+    B{C{r.UtilizeUser()}} - Marks files as requiring a user definition to exist
+    
+    SYNOPSIS
+    ========
+
+    C{r.UtilizeUser([I{username}, I{filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.UtilizeUser} is typically called from within a
+    Conary recipe to mark files as requiring a user definition to exist even
+    though the file is not owned by that user
+    
+    This is particularly useful for daemons that are setuid root
     but change their user id to a user id with no filesystem permissions
     after they start.
+    
+    EXAMPLES
+    ========
+    
+    C{r.UtilizeUser('sshd', '%(sbindir)s/sshd')}
+
+    The example above marks the file C{%(sbindir)s/sshd} as requiring the
+    user definition 'sshd' although the file is not owned by the 'sshd' user.
     """
     def _markItem(self, path, user):
         self.info('user %s: %s' % (user, path))
@@ -882,12 +1262,36 @@ class UtilizeUser(_Utilize):
 
 class UtilizeGroup(_Utilize):
     """
-    Marks files as requiring a user definition to exist even though
-    the file is not owned by that user:
-    C{r.UtilizeGroup(I{groupname}, I{filterexp}...)}
-    This is particularily useful for daemons that are setuid root
-    but change their group id to a group id with no filesystem permissions
+    NAME
+    ====
+
+    B{C{r.UtilizeGroup()** - Marks files as requiring a user definition to
+    exist}}
+    
+    SYNOPSIS
+    ========
+
+    C{r.UtilizeGroup([groupname, filterexp])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.UtilizeGroup} is typically called from within a
+    Conary recipe to mark files as requiring a group definition to exist
+    even though the file is not owned by that group.
+    
+    This is particularly useful for daemons that are setuid root
+    but change their user id to a group id with no filesystem permissions
     after they start.
+    
+    EXAMPLES
+    ========
+    
+    C{r.UtilizeGroup('users', '%(sysconfdir)s/default/useradd')}
+
+    The example above marks the file C{%(sysconfdir)s/default/useradd} as
+    requiring the group definition 'users' although the file is not owned
+    by the 'users' group.
     """
     def _markItem(self, path, group):
         self.info('group %s: %s' % (group, path))
@@ -896,19 +1300,53 @@ class UtilizeGroup(_Utilize):
 
 class ComponentRequires(policy.Policy):
     """
-    Creates automatic intra-package inter-component dependencies, such
-    as C{:lib} components depending on their corresponding C{:data}
-    components.  Changes are passed in with dictionaries; general changes with:
-    C{r.ComponentRequires({I{componentname}: I{requiringComponentSet}})}
-    and top-level package-specific changes with:
-    C{r.ComponentRequires({I{packagename}: {I{componentname}: I{requiringComponentSet}}})}
-    (i.e.  C{r.ComponentRequires({'data': set(('lib',))})} means that in
-    all top-level packages (normally just one), only C{:lib} requires
-    C{:data}, whereas by default both C{:lib} and C{:runtime} require C{:data};
-    and C{r.ComponentRequires({'foo': {'data': set(('lib',))}})} makes that
-    same change, but only for the C{foo} package).  C{ComponentRequires} cannot
-    require capability flags; use C{Requires} if you need to specify a
-    requirement including a capability flag.
+    NAME
+    ====
+
+    B{C{r.ComponentRequires()}} - Create automatic, intra-package, 
+    inter-component dependencies
+    
+    SYNOPSIS
+    ========
+
+    C{r.ComponentRequires([I{componentname: requiringComponentSet}] |
+    [I{packagename: componentname: requiringComponentSet}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.ComponentRequires()} is called from within a Conary
+    recipe to create automatic, intra-package, inter-component dependencies,
+    such as a corresponding dependency between C{:lib} and C{:data} components.
+    
+    Changes are passed in using dictionaries for both general, and top-level,
+    package-specific changes.  For general changes, use this syntax:
+    C{r.ComponentRequires(B{componentname: requiringComponentSet})}.
+    For top-level, package-specific changes, the syntax is as such:
+    C{r.ComponentRequires(B{packagename: componentname: requiringComponentSet})}.
+    
+    In  concept, a top-level example would be the default requirement of
+    C{:data} by C{:lib} and C{:runtime}.
+    Using C{r.ComponentRequires({'data': set(('lib',))})} would specify to all
+    top-level packages only C{:lib} requires C{:data}, however.
+   
+    For the general use, such requirements might be affected on only one
+    package, such as package C{foo}, for example, by using a syntax such
+    as: C{r.ComponentRequires({'foo': 'data': set(('lib',))})}.
+    
+    Note that C{r.ComponentRequires} cannot require capability flags; use 
+    C{r.Requires} if you need to specify requirements, including capability
+    flags.
+    
+
+    EXAMPLES
+    ========
+    
+    C{r.ComponentRequires({'openssl': {'config': set(('runtime', 'lib'))}})}
+    
+    The above example uses C{r.ComponentRequires} to create dependencies in a
+    top-level manner for the C{:runtime} and C{:lib} component sets to require 
+    the C{:config} component for the C{openssl} package.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -964,17 +1402,34 @@ class ComponentRequires(policy.Policy):
 
 class ComponentProvides(policy.Policy):
     """
-    Causes each trove to provide itself explicitly; optionally with
-    capability flags provided by
-    C{r.ComponentProvides(I{flags})} or
-    C{r.ComponentProvides('I{pkgname}', I{flags})}
-    where C{I{flags}} may be a single string, or a list, tuple, or set
-    of strings.
-    At this time, all packages and components have the union of all
-    capability flags built from this recipe.  The second form may in
-    the future be changed to apply capability flags only to the named
-    package.  It is impossible to provide a capability flag for one
+    NAME
+    ====
+
+    B{C{r.ComponentProvides()}} - Causes each trove to explicitly provide
+    itself.
+    
+    SYNOPSIS
+    ========
+
+    C{r.ComponentProvides([I{flags}] | [I{pkgname}, I{flags}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.ComponentProvides()} is called from within a Conary
+    recipe to cause each trove to provide itself explicitly, with optional
+    capability flags consisting of a single string, or a list, tuple, or set
+    of strings. It is impossible to provide a capability flag for one 
     component but not another within a single package.
+
+    EXAMPLES
+    ========
+    
+    C{r.ComponentProvides("addcolumn")}
+    
+    The above example uses C{r.ComponentProvides} in the context of the 
+    sqlite recipe, and causes sqlite to provide itself explicitly with the
+    capability flag C{addcolumn}.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -1081,16 +1536,38 @@ def _getperl(macros, recipe):
 
 class Provides(policy.Policy):
     """
-    Drives provides mechanism: to avoid marking a file as providing things,
-    such as for package-private plugin modules installed in system library
-    directories:
-    C{r.Provides(exceptions=I{filterexp})} or
-    C{r.Provides(I{provision}, I{filterexp}...)}
-    A C{I{provision}} may be a file, soname or an ABI; a C{I{provision}} that
-    starts with 'file' is a file, one that starts with 'soname:' is a
-    soname, and one that starts with 'abi:' is an ABI.  Other prefixes are
-    reserved.  Note: use C{ComponentProvides} to add capability flags to
-    components.
+    NAME
+    ====
+
+    B{C{r.Provides()}} - Drives provides mechanism
+    
+    SYNOPSIS
+    ========
+
+    C{r.Provides([I{provision}, I{filterexp}] || [I{exceptions=filterexp}])
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.Provides()} is called from within a Conary recipe to
+    mark files as providing certain features, or characteristics, or to avoid
+    marking a file as providing things, such as for package-private plugin
+    modules installed in system library directories. 
+
+    A C{provision} may be a file, soname or an ABI; Provisions that begin with
+    'file' are files, those that start with 'soname:' are sonames, and those
+    that start with 'abi:' are ABIs. Other prefixes are reserved. 
+    
+    Note: Use {Cr.ComponentProvides}, and not C{r.Provides} to add capability
+    flags to components.
+    
+    EXAMPLES
+    ========
+    
+    C{r.Provides('file', '/usr/sbin/sendmail')}
+    
+    The above example demonstrates using C{r.Provides} to specify the file
+    provision C{/usr/sbin/sendmail}.
     """
     bucket = policy.PACKAGE_CREATION
 
@@ -1434,61 +1911,78 @@ class Provides(policy.Policy):
 
 class Requires(_addInfo):
     """
-    Drives requirement mechanism: to avoid adding requirements for a file,
-    such as example shell scripts outside C{%(docdir)s},
-    C{r.Requires(exceptions=I{filterexp})}
-    and to add a requirement manually,
-    C{r.Requires('I{foo}', I{filterexp})} where C{'I{foo}'} can be
-    C{'I{/path/to/file}'} or C{'I{packagename}:I{component[}(I{FLAGS})I{]}'}
-    (components are the only troves that can be required).
+    NAME
+    ====
 
-    For executables that are executed only through wrappers that use
-    C{LD_LIBRARY_PATH} to find the libraries instead of embedding an
-    C{RPATH} in the binary, you will need to provide a synthetic
-    RPATH using the C{r.Requires(rpath=I{RPATH})} or
-    C{r.Requires(rpath=(I{filterExp}, I{RPATH}))} calls, which are
-    tested in the order provided.  The C{I{RPATH}} is a standard
-    Unix-style path string containing one or more directory names,
-    separated only by colon characters, except for one significant
-    change: Each path component is interpreted using shell-style globs,
-    which are checked first in the C{%(destdir)s} and then on the
-    installed system.  (The globs are useful for cases like perl
-    where statically determining the entire content of the path
-    is difficult.  Use globs only for variable parts of paths; be
-    as specific as you can without using the glob feature any more
-    than necessary.)
+    B{C{r.Requires()}} - Drives requirements mechanism
+    
+    SYNOPSIS
+    ========
 
-    Executables that use C{dlopen()} to open a shared library will
-    not automatically have a dependency on that shared library.
-    If the program unconditionally requires that it be able to
-    C{dlopen()} the shared library, encode that requirement by
-    manually creating the requirement by calling
-    C{r.Requires('soname: I{libfoo.so}', 'I{filterexp}')} or
-    C{r.Requires('soname: I{/path/to/libfoo.so}', 'I{filterexp}')}
-    depending on whether the library is in a system library
-    directory or not.  (It needs to be the same as how the
-    soname dependency is expressed by the providing package.)
+    C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]},] || [I{exceptions=filterexp)}])}
 
-    For (unusual) cases where a system library is not listed
-    in C{ld.so.conf} but is instead found through a search through
-    special subdirectories with architecture-specific names (like
-    C{i686} and C{tls}), you can pass in a string or list of
-    strings specifying the directory or list of directories.
-    C{r.Requires(sonameSubtrees='/directoryname')} or
-    C{r.Requires(sonameSubtrees=['/list', '/of', '/dirs'])}
-    These are B{not} regular expressions.  They will have macro
-    expansion expansion done on them.
+    DESCRIPTION
+    ===========
 
-    For (unusual) cases where Conary finds a false or misleading
-    dependency, or in which you need to override a true dependency,
-    you can specify
-    C{r.Requires(exceptDeps='I{regexp}')} to override all
-    dependencies matching a regular expression,
-    C{r.Requires(exceptDeps=('I{filterexp}', 'I{regexp}'))} to override
-    dependencies matching a regular expression only for files
-    matching C{I{filterexp}}, or
-    C{r.Requires(exceptDeps=(('I{filterexp}', 'I{regexp}'), ...))} to
-    specify multiple overrides.
+    The policy class C{r.Requires()} is called from within a Conary recipe to
+    avoid adding requirements for a file, such as example shell scripts
+    outside of C{%(docdir)s}.
+    
+    Note: Components are the only troves which can be required.
+    
+    For executables executed only through wrappers that use C{LD_LIBRARY_PATH}
+    to find the libraries instead of embedding an RPATH in the binary, you
+    will need to provide a synthetic RPATH using C{r.Requires(rpath=RPATH)}
+    or C{r.Requires(rpath=(filterExp, RPATH))} calls, which are tested in the
+    order provided. 
+    
+    The RPATH is a standard Unix-style path string containing one or more
+    directory names, separated only by colon characters, except for one
+    significant change: Each path component is interpreted using shell-style
+    globs, which are checked first in the C{%(destdir)s} and then on the
+    installed system. (The globs are useful for cases like perl where
+    statically determining the entire content of the path is difficult. Use
+    globs only for variable parts of paths; be as specific as you can without
+    using the glob feature any more than necessary.)
+    
+    Executables that use C{dlopen()} to open a shared library will not
+    automatically have a dependency on that shared library. If the program
+    unconditionally requires that it be able to C{dlopen()} the shared
+    library, encode that requirement by manually creating the requirement
+    by calling C{r.Requires('soname: libfoo.so', 'filterexp')} or
+    C{r.Requires('soname: /path/to/libfoo.so', 'filterexp')} depending on
+    whether the library is in a system library directory or not. (It should be
+    the same as how the soname dependency is expressed by the providing
+    package.)
+    
+    For unusual cases where a system library is not listed in C{ld.so.conf}
+    but is instead found through a search through special subdirectories with
+    architecture-specific names (such as C{i686} and C{tls}), you can pass in
+    a string or list of strings specifying the directory or list of
+    directories. with C{r.Requires(sonameSubtrees='/directoryname')}
+    or C{r.Requires(sonameSubtrees=['/list', '/of', '/dirs'])} 
+    
+    Note: These are B{not} regular expressions. They will have macro
+    expansion expansion performed on them.
+    
+    For unusual cases where Conary finds a false or misleading dependency,
+    or in which you need to override a true dependency, you can specify
+    C{r.Requires(exceptDeps='regexp')} to override all dependencies matching
+    a regular expression, C{r.Requires(exceptDeps=('filterexp', 'regexp'))}
+    to override dependencies matching a regular expression only for files
+    matching filterexp, or
+    C{r.Requires(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+    
+
+    EXAMPLES
+    ========
+    
+    C{r.Requires('mailbase:runtime', '%(sbindir)s/sendmail')}
+    
+    The above example demonstrates using C{r.Requires} to specify a manual
+    requirement of the file C{%(sbindir)s/sendmail} to the  C{:runtime}
+    component of package C{mailbase}.
     """
 
     bucket = policy.PACKAGE_CREATION
@@ -1993,8 +2487,30 @@ class Requires(_addInfo):
 
 class Flavor(policy.Policy):
     """
-    Drives flavor mechanism: to avoid marking a file's flavor:
-    C{r.Flavor(exceptions=I{filterexp})}
+    NAME
+    ====
+
+    B{C{r.Flavor()}} - Controls the Flavor mechanism
+    
+    SYNOPSIS
+    ========
+
+    C{r.Flavor([I{filterexp}] | [I{exceptions=filterexp}])}
+
+    DESCRIPTION
+    ===========
+
+    Mark a file's Flavor with the flavor mechanism.  To except a file's flavor
+    from being marked, use:  C{r.Flavor(exceptions=filterexp)}.
+
+    EXAMPLES
+    ========
+    
+    C{r.Flavor(exceptions='%(crossprefix)s/lib/gcc-lib/.*')}
+    
+    In the above example, the files in the directory 
+    C{%(crossprefix)s/lib/gcc-lib} are being excepted from having their Flavor
+    marked.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (

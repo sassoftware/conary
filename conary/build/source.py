@@ -132,21 +132,77 @@ class _Source(action.RecipeAction):
 
 class Archive(_Source):
     """
-    Called as C{r.addArchive()} from a recipe, this class adds an archive
-    such as an optionally compressed tarball or zip file, unpacking it
-    into the appropriate directory.
-    
-    If you provide the C{keyid} argument, it will search for a file
-    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
-    signed with the appropriate GPG key.  A missing signature is a
-    warning; a failed signature check is fatal.
+    NAME
+    ====
 
-    By default, C{addArchive} assumes that the archive contains the 
-    first directory level in which all the build commands will run,
-    called C{%(maindir)s}.  If an archive needs to be unpacked within
-    this directory, pass in C{dir=r.macros.maindir} or for a
-    subdirectory of maindir, pass in
-    C{dir=r.macros.maindir + '/subdir'}
+    B{C{r.addArchive()}} - Add a source code archive
+  
+    SYNOPSIS
+    ========
+
+    C{r.addArchive([I{dir},] [I{keyid},] [I{rpm},] [I{sourcename},] [I{use}])}
+
+    DESCRIPTION
+    ===========
+
+    From within a Conary recipe, call C{r.addArchive()} to add a 
+    source code archive consisting of an optionally compressed tarball,
+    or zip file, and unpack it to the proper directory.
+
+    PARAMETERS
+    ==========
+
+    The following parameters are recognized by C{r.addArchive}:
+
+    B{recipe} : The recipe object currently being built is provided
+    automatically by the C{PackageRecipe} object. Passing in  C{recipe} from 
+    within a recipe is unnecessary.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addArchive}:
+
+    B{dir} : Instructs C{r.addArchive} to change to the directory
+    specified by C{dir} prior to unpacking the source archive.
+    Directories relative to C{%(builddir)s} are considered
+    relative, and directories relative to C{%(destdir)s} are
+    considered absolute.
+
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
+    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+    source code archive signature should be sought, and checked.
+    If you provide the C{keyid} keyword, C{r.addArchive} will
+    search for a file named I{sourcenameC{{.sig,sign,asc}}} and 
+    ensure it is signed with the appropriate GPG key. A missing signature
+    results in a warning; a failed signature check is fatal.
+
+    B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
+    looks in the file, or URL specified by C{rpm} for an RPM
+    containing C{sourcename}.
+    
+    B{sourcename} : The name of the source archive, which may be a
+    local filename, or a Uniform Resource Locator. (URL)
+
+    B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
+    boolean values which determine whether the source code archive is
+    actually unpacked, or merely stored in the archive.
+
+    EXAMPLES
+    ========
+
+    The following examples demonstrate invocations of C{r.addArchive}
+    from within a recipe:
+
+    C{r.addArchive('initscripts-%(upmajver)s.tar.bz2', rpm=srpm)}
+
+    The above example demonstrates use with a local source code archive file,
+    and the C{rpm} keyword.
+
+    C{r.addArchive('ftp://ftp.visi.com/users/hawkeyd/X/Xaw3d-%(version)s.tar.gz')} 
+
+    The second example above shows use with a source code archive accessed 
+    via an FTP URL.
     """
 
     def __init__(self, recipe, *args, **keywords):
@@ -253,13 +309,95 @@ class Archive(_Source):
 
 class Patch(_Source):
     """
-    Called as C{r.addPatch()} from a recipe, this class applies a
-    patch.
+    NAME
+    ====
+
+    B{C{r.addPatch()}} - Add a patch to source code
+
+    SYNOPSIS
+    ========
+       
+    C{r.addPatch([I{backup},] [I{dir},] [I{extraArgs},] [I{keyid},] [I{level},] [I{macros},] [I{rpm},] [I{sourcename},] [I{use}])}
+
+    DESCRIPTION
+    ===========
+        
+    From within a Conary recipe, call C{r.addPatch()} to add a 
+    patch to be applied to the source code during the build phase.
+
+    PARAMETERS
+    ==========
+
+    The following parameters are recognized by I{r.addPatch}:
+
+    B{recipe} : The recipe object currently being built is provided
+    automatically by the PackageRecipe object. Passing in  C{recipe} from 
+    within a recipe is unnecessary.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addPatch}:
+
+    B{backup} : The suffix to use when storing file versions before applying 
+    the patch.
     
-    If you provide the C{keyid} argument, it will search for a file
-    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
-    signed with the appropriate GPG key.  A missing signature is a
-    warning; a failed signature check is fatal.
+    B{dir} : Instructs C{r.addPatch} to change to the directory
+    specified by C{dir} prior to applying the patch.
+    Directories relative to C{%(builddir)s} are considered
+    relative, and directories relative to C{%(destdir)s} are
+    considered absolute.
+    
+    B{extraArgs} : As a last resort, arbitrary arguments may be passed to the
+    patch program  with the C{extraArgs} keyword. This should not normally be
+    required, and is  indicative of a possible bug which should be reported 
+    with the suggestion of direct support for the patch arguments in question.
+    
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
+    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+    source code archive signature should be sought, and checked.
+    If you provide the C{keyid} keyword, {r.addPatch} will
+    search for a file named I{sourcenameC{{.sig,sign,asc}}} and 
+    ensure it is signed with the appropriate GPG key. A missing signature
+    results in a warning; a failed signature check is fatal.
+    
+    B{level} : By default, one level of initial subdirectory names is stripped
+    out prior to applying the patch.  The C{level} keyword allows 
+    specification of additional initial subdirectory levels to be removed.
+    
+    B{macros} : The C{macros} keyword accepts a boolean value, and defaults 
+    to false. However, if the value of C{macros} is true, recipe macros in the
+    body  of the patch will be interpolated before applying the patch. For 
+    example, a patch which modifies the value C{CFLAGS = -02} using 
+    C{CFLAGS = %(cflags)s} will update the C{CFLAGS} parameter based upon the
+    current setting of C{recipe.macros.cflags}.
+
+    B{rpm} : If the C{rpm} keyword is used, C{Archive}
+    looks in the file, or URL specified by C{rpm} for an RPM
+    containing C{sourcename}.
+    
+    B{sourcename} : The name of the patch file.
+
+    B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
+    boolean values which determine whether the source code archive is
+    actually unpacked, or merely stored in the archive.
+
+    EXAMPLES
+    ========
+        
+    The following examples demonstrate invocations of C{r.addPatch}
+    from within a recipe:
+
+    C{r.addPatch('iptables-1.3.0-no_root.patch')}
+
+    The above example demonstrates typical, simple usage of C{r.addPatch}.
+
+    C{r.addPatch('Xaw3d-1.5E-xorg-imake.patch', level=0, dir='lib/Xaw3d')}
+
+    The second example above shows use with a C{level} keyword specifying that
+    no initial subdirectory names be stripped, and a C{dir} keyword, 
+    instructing C{r.addPatch} to change to the C{lib/Xaw3d} directory prior
+    to applying the patch.
     """
     keywords = {'level': '1',
 		'backup': '',
@@ -334,14 +472,96 @@ class Patch(_Source):
 
 class Source(_Source):
     """
-    Called as C{r.addSource()} from a recipe, this class copies a file
-    into the build directory %(builddir)s or the destination directory
-    %(destdir)s.   
+    NAME
+    ====
+
+    B{C{r.addSource()}} - Copy a file into build, or destination directory
+
+    SYNOPSIS
+    ========
+
+    C{r.addSource([I{keyid},] [I{rpm},] [I{sourcename},] [I{use}])}
+
+    DESCRIPTION
+    ===========
     
-    If you provide the C{keyid} argument, it will search for a file
-    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
-    signed with the appropriate GPG key.  A missing signature is a
-    warning; a failed signature check is fatal.
+    From within a Conary recipe, call C{r.addSource()} to copy a file into the
+    build directory, or destination directory.
+
+    PARAMETERS
+    ==========
+
+    The following parameters are recognized by C{r.addSource}:
+
+    B{recipe} : The recipe object currently being built is provided
+    automatically by the PackageRecipe object. Passing in C{recipe} from 
+    within a recipe is unnecessary.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addSource}:
+
+    B{apply} : A command line to run after storing the file. Macros will be 
+    interpolated into this command.
+    
+    B{dest} : If set, provides the target name of the file in the build 
+    directory. A full pathname can be used. Absolute directories will be 
+    considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest} to 
+    specify directory information, but not both. Useful mainly  when fetching 
+    the file from an source outside your direct control, such as a URL to a 
+    third-party web site, or copying a file out of an RPM package.
+    
+    B{dir} : The directory in which to store the file, relative to the build 
+    directory. Directories relative to the destination directory will be 
+    considered absolute. Defaults to storing file directly in the build 
+    directory.
+
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
+    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+    source code archive signature should be sought, and checked.
+    If you provide the C{keyid} keyword, C{r.addArchive} will
+    search for a file named I{sourcename}C{{.sig,sign,asc}} and 
+    ensure it is signed with the appropriate GPG key. A missing signature
+    results in a warning; a failed signature check is fatal.
+
+    B{macros} : If True, interpolate recipe macros in the body of a patch 
+    before applying it.  For example, you might have a patch that changes 
+    C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} 
+    to be replaced with the current setting of C{recipe.macros.cflags}. 
+    Defaults to False.
+    
+    B{mode}: If set, provides the mode to set on the file.
+    
+    B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or boolean 
+    values which determine whether the source code archive is actually 
+    unpacked, or merely stored in the archive.
+
+    B{rpm} : If the C{rpm} keyword is used, C{Archive} looks in the file, or 
+    URL specified by C{rpm} for an RPM containing C{sourcename}.
+
+    B{sourcename} : The name of the file
+    
+    B{use} : A Use flag or boolean, or a tuple of Use flags and/or booleans, 
+    that determine whether the archive is actually unpacked or merely stored 
+    in the archive.
+        
+    EXAMPLES
+    ========
+
+    The following examples demonstrate invocations of C{r.addSource}
+    from within a recipe:
+
+    C{r.addSource('usbcam.console')}
+    
+    The example above is a typical, simple invocation of C{r.addSource()} 
+    which adds the file C{usbcam.console} directly to the build directory.
+    
+    C{r.addSource('pstoraster' , rpm=srpm, dest='pstoraster.new')}
+    
+    The above example of C{r.addSource} specifies the file C{pstoraster} is 
+    to be sought in a source RPM file, and is to be added to the build 
+    directory as C{pstoraster.new}.
     """
 
     keywords = {'apply': '',
@@ -454,8 +674,63 @@ class Source(_Source):
 
 class Action(action.RecipeAction):
     """
-    Called as C{r.addAction()} from a recipe, this class copies a file
-    into the build directory C{%(builddir)s}.
+    NAME
+    ====
+
+    B{C{r.addAction()}} - Copies a file into the build directory
+
+    SYNOPSIS
+    ========
+
+    C{r.addAction([I{action},] [I{dir},] [I{use},])}
+
+    DESCRIPTION
+    ===========
+    
+    From within a Conary recipe, call C{r.addAction()} to copy an
+    arbitrary file into the build directory, C{%(builddir)s}.
+
+    PARAMETERS
+    ==========
+
+    The following parameters are recognized by C{r.addAction}:
+
+    B{recipe} : The recipe object currently being built is provided
+    automatically by the PackageRecipe object. Passing in  C{recipe} from 
+    within a recipe is unnecessary.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{action} :  A command line which will be executed with macro 
+    interpolation.
+
+    B{dir} : Specify the directory where the file is to be located, relative 
+    to C{%(builddir)s}. By default, C{r.addAction} stores the
+    file directly in C{%(builddir)s}. If an absolute directory is specified,
+    it will be considered relative to C{%(builddir)s}.
+ 
+    B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
+    boolean values which determine whether the source code archive is
+    actually unpacked, or merely stored in the archive.
+
+    EXAMPLES
+    ========
+
+    The following examples demonstrate invocations of C{r.addAction}
+    from within a recipe:
+
+    C{r.addAction('sed -i "s/^SUBLEVEL.*/SUBLEVEL = %(sublevel)s/" Makefile')}
+
+    The above example demonstrates use of a command line with macro 
+    interpolation, upon the file C{Makefile}.
+
+    C{r.addAction('mv lib/util/shhopt.h lib/util/pbmshhopt.h')}
+
+    The second example above demonstrates renaming a file via the C{mv} 
+    command.
     """
 
     keywords = {'dir': '' }

@@ -26,21 +26,45 @@ from conary.build import policy
 
 class TestSuiteLinks(policy.Policy):
     """
-    Indicate extra files to link into the test directory:
-    C{r.TestSuiteLinks(I{%(thisdocdir)s/README})} or 
-    C{r.TestSuiteLinks(fileMap={I{<builddir_path>:} I{<destdir_path>}})}.
+    NAME
+    ====
 
-    Files listed in the first filterexp can override standard exclusions;
-    currently, document, man, info, and init directories.  
-    Alternatively, a fileMap can be given.  A fileMap is a dictionary where 
-    each key is a path to a symlink that will be created in the test directory, 
-    and the value pointed to by that key is the path of a file installed 
-    in the destination directory that the symlink should point to.  
+    B{C{r.TestSuiteLinks()}} - Indicate extra files to link into the test 
+    directory
+    
+    SYNOPSIS
+    ========
 
-    The C{r.TestSuiteLinks()} command is only useful if you have indicated 
-    to conary that you wish to create a test suite.  To create a test suite, 
-    you should run the C{r.TestSuite()} command, documented in
+    C{r.TestSuiteLinks([I{filterexp}] || [I{fileMap='<builddir_path>' : '<destdir_path>'}])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class ``r.TestSuiteLinks()} is typically called from within a
+    Conary recipe to indicate extra files which should be linked into the test
+    suite directory.
+    
+    Files specified by the filter expression can override standard exclusions,
+    such as the document, man, info, or init directories.  Alternatively, a
+    fileMap may be expressed. A fileMap is a dictionary each key is a path to
+    a symlink that will be created in the test directory, and the value
+    pointed to by that key is the path of a file installed in the destination
+    directory that the symlink should point to.
+    
+    In order for C{r.TestSuiteLinks()} to be useful, you must indicate to
+    Conary that you wish to create a test suite.  To create a test suite,
+    you should use the C{r.TestSuite()} class, as documented in
     conary.build.build.
+
+    EXAMPLES
+    ========
+    
+    C{r.TestSuiteLinks(fileMap={'client/mysqladmin': '/usr/bin/mysqladmin'})}
+    
+    The example above uses the fileMap convention of C{r.TestSuiteLinks()} to
+    indicate an extra test suite file comprised of the symbolic link
+    C{client/mysqladmin} which in turn, points to the file
+    C{/usr/bin/mysqladmin}.
     """
     bucket = policy.TESTSUITE
     requires = (
@@ -237,19 +261,41 @@ class TestSuiteLinks(policy.Policy):
 
 class TestSuiteFiles(policy.Policy):
     """
-    Indicate extra files to copy into the test directory; 
-    C{r.TestSuiteFiles(I{<filterexp>})} - note that this filterexp is relative
-    to the build directory, not the install directory as are the rest of
-    the destdir policies.
+    NAME
+    ====
+
+    B{C{r.TestSuiteFiles}}** - Indicate extra files to copy into the test directory
+    
+    SYNOPSIS
+    ========
+
+    C{r.TestSuiteFiles([filterexp])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.TestSuiteFiles()} is typically called from within a
+    Conary recipe to indicate extra files which should be copied into the
+    test suite directory. The filter expression is relative to the build
+    directory, not the install directory as is the case with the rest of the
+    destdir policies.
 
     Files included in the filterexp will be copied into the test directory,
     with their path relative to the build dir retained.  E.g. a file found
     at %(builddir)s/bin/foo will be copied to %(testdir)s/bin/foo.
 
-    The C{r.TestSuiteFiles()} command is only useful if you have indicated 
-    to conary that you wish to create a test suite.  To create a test suite, 
-    you should run the C{r.TestSuite()} command, documented in
+    In order for C{r.TestSuiteFiles()} to be useful, you must indicate to
+    Conary that you wish to create a test suite.  To create a test suite, 
+    you should use the C{r.TestSuite()} class, as documented in
     conary.build.build.
+
+    EXAMPLES
+    ========
+
+    C{r.TestSuiteFiles('MANIFEST')}
+
+    The example above uses the C{r.TestSuiteFiles} to indicate that the file
+    C{MAINFEST} is to be copied into the package's test suite directory.
     """
     bucket = policy.TESTSUITE
     requires = (
@@ -330,9 +376,24 @@ class TestSuiteFiles(policy.Policy):
 
 class FixDirModes(policy.Policy):
     """
-    Modifies directory permissions that would otherwise prevent
-    Conary from packaging C{%(destdir)s} as non-root; not invoked
-    from recipes.
+    NAME
+    ====
+
+    B{C{r.FixDirModes}} - Modifies directory permissions
+    
+    SYNOPSIS
+    ========
+
+    C{r.TestSuiteFiles([filterexp])}
+
+    DESCRIPTION
+    ===========
+
+    The policy class C{r.TestSuiteFiles()} is typically called from within a
+    Conary recipe to modify directory permissions which would otherwise prevent
+    Conary from packaging C{%(destdir)s} as a non-root user; 
+    
+    B{NOTE}: This policy class is B{not} invoked from recipes directly.
 
     Any directories that do not have user read/write/execute must be
     fixed up now so that we can traverse the tree in following policy,
@@ -340,6 +401,11 @@ class FixDirModes(policy.Policy):
 
     This policy must be run first so that other policies can be
     counted on to search the full directory tree.
+    
+    EXAMPLES
+    ========
+    
+    FIXME : need usage example
     """
     bucket = policy.DESTDIR_PREPARATION
     requires = (
