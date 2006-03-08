@@ -478,16 +478,28 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
 def main(argv=sys.argv):
     try:
+        debugAll = '--debug-all' in argv
+        if debugAll:
+            argv = argv[:]
+            argv.remove('--debug-all')
+            debuggerException = Exception
+        else:
+            debuggerException = errors.InternalConaryError
+
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
             ccfg = conarycfg.ConaryConfiguration()
         else:
             ccfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
+
+        if debugAll:
+            ccfg.debugExceptions = True
+
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
-	return realMain(ccfg, argv)
-    except errors.InternalConaryError, err:
+        return realMain(ccfg, argv)
+    except debuggerException, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
         if str(e):

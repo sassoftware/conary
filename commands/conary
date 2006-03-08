@@ -721,6 +721,14 @@ def realMain(cfg, argv=sys.argv):
 def main(argv=sys.argv):
     from conary.repository import errors
     try:
+        debugAll = '--debug-all' in argv
+        if debugAll:
+            argv = argv[:]
+            argv.remove('--debug-all')
+            debuggerException = Exception
+        else:
+            debuggerException = errors.InternalConaryError
+
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
@@ -728,14 +736,16 @@ def main(argv=sys.argv):
         else:
             ccfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
 
+        if debugAll:
+            ccfg.debugExceptions = True
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
-	return realMain(ccfg, argv)
+        return realMain(ccfg, argv)
     except IOError, e:
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:
             raise
-    except errors.InternalConaryError:
+    except debuggerException:
         raise
     except cfgtypes.CfgError, e:
         if log.getVerbosity() == log.DEBUG:
