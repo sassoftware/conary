@@ -7,6 +7,8 @@ Changes in @NEW@:
     * cvc merge on a non-shadow no longer returns a traceback (bz# 792),
       and cvc context foo does not return a traceback when context foo does
       not exist (bz #757)  Fixed by David Coulthart.
+    * A bug that caused new OpenPGP keys to be skipped when troves
+      were filtered out during mirroring has been fixed.
     * opening invalid changesets now gives a good error message instead of
       a traceback
     * removed obsolete changemail script
