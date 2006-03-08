@@ -267,8 +267,7 @@ class Dependency(BaseDependency):
 	"""
 	allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
-            if (mergeType == DEP_MERGE_TYPE_OVERRIDE
-                    or not allFlags.has_key(flag)):
+            if mergeType == DEP_MERGE_TYPE_OVERRIDE or flag not in allFlags:
                 allFlags[flag] = otherSense
                 continue
 
@@ -411,7 +410,7 @@ class DependencyClass(object):
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
 
-	if self.members.has_key(dep.name):
+	if dep.name in self.members:
 	    # this is a little faster then doing all of the work when
 	    # we could otherwise avoid it
 	    if dep == self.members[dep.name]: return
@@ -432,7 +431,7 @@ class DependencyClass(object):
         
         score = 0
 	for requiredDep in requirements.members.itervalues():
-	    if not self.members.has_key(requiredDep.name):
+            if requiredDep.name not in self.members:
                 if self.depNameSignificant:
                     # dependency names are always 'requires', so if the 
                     # dependency class name is significant (i.e. the dep 
@@ -750,11 +749,11 @@ class DependencySet(object):
 
     def copy(self):
         new = DependencySet()
-        a = new.addDep
-        for tag, depClass in self.members.iteritems():
-            c = depClass.__class__
+        add = new.addDep
+        for depClass in self.members.itervalues():
+            cls = depClass.__class__
             for dep in depClass.members.itervalues():
-                a(c, dep)
+                add(cls, dep)
         return new
 
     def toStrongFlavor(self):
@@ -840,7 +839,7 @@ class DependencySet(object):
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
-	    if not self.members.has_key(tag): 
+	    if tag not in self.members:
 		return False
 	    if not self.members[tag] == other.members[tag]:
 		return False
