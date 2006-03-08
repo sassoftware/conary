@@ -20,7 +20,6 @@ Changes in @NEW@:
       in site_perl as well as in vendor_perl.
     * Ruby uses /usr/share/ri for its documentation system, so all files
       in %(datadir)s/ri are now included in the default :doc ComponentSpec.
->>>>>>> /tmp/NEWS~other.jDSvaZ
 
 Changes in 1.0.5:
  o Performance improvements:
