@@ -95,7 +95,7 @@ class Query:
         raise NotImplementedError
 
     def addMissing(self, missing, name):
-        troveTup = self.map[name]
+        troveTup = self.map[name][0]
         missing[troveTup] = self.missingMsg(name)
             
     def missingMsg(self, name):
@@ -113,7 +113,7 @@ class QueryByVersion(Query):
 
     def addQuery(self, troveTup, version, flavorList):
         name = troveTup[0]
-        self.map[name] = troveTup
+        self.map[name] = [troveTup]
         if not flavorList:
             self.queryNoFlavor[name] = { version : None }
         else:
@@ -157,7 +157,7 @@ class QueryByVersion(Query):
                 pkgList = []
                 for version, flavorList in matches.iteritems():
                     pkgList.extend((name, version, f) for f in flavorList)
-                finalMap[self.map[name]] = pkgList
+                finalMap[self.map[name][0]] = pkgList
 
         for name in namesToFind:
             self.addMissing(missing, name)
@@ -175,10 +175,10 @@ class QueryByVersion(Query):
             pkgList = []
             for version, flavorList in matches.iteritems():
                 pkgList.extend((name, version, f) for f in flavorList)
-            finalMap[self.map[name]] = pkgList
+            finalMap[self.map[name][0]] = pkgList
 
     def missingMsg(self, name):
-        versionStr = self.map[name][1]
+        versionStr = self.map[name][0][1]
         return "version %s of %s was not found" % (versionStr, name)
 
 class QueryByLabelPath(Query):
@@ -193,7 +193,7 @@ class QueryByLabelPath(Query):
 
     def addQuery(self, troveTup, labelPath, flavorList):
         name = troveTup[0]
-        self.map[name] = troveTup
+        self.map[name] = [troveTup, labelPath]
 
         if self.acrossLabels:
             if not flavorList:
@@ -243,7 +243,7 @@ class QueryByLabelPath(Query):
 
     def addQueryWithAffinity(self, troveTup, labelPath, affinityTroves):
         name = troveTup[0]
-        self.map[name] = troveTup
+        self.map[name] = [troveTup, labelPath]
 
         for label in labelPath:
             flavors = []
@@ -336,12 +336,12 @@ class QueryByLabelPath(Query):
                     if self.acrossLabels:
                         foundNameLabels.add((name, 
                                              version.branch().label()))
-                finalMap.setdefault(self.map[name], []).extend(pkgList)
+                finalMap.setdefault(self.map[name][0], []).extend(pkgList)
             index +=1
 
     def missingMsg(self, name):
         # collapse all the labels searched in the queries to a unique list
-        labelPath = list(itertools.chain(*(x.keys() for x in self.query[name])))
+        labelPath = self.map[name][1]
         if labelPath:
             return "%s was not found on path %s" \
                     % (name, ', '.join(x.asString() for x in labelPath))
@@ -378,7 +378,7 @@ class QueryByBranch(Query):
                 elif branch not in self.query[i][name]:
                     self.query[i][name][branch] = []
                 self.query[i][name][branch].append(flavor)
-        self.map[name] = troveTup 
+        self.map[name] = [ troveTup ]
 
     def addQueryWithAffinity(self, troveTup, branch, affinityTroves):
         if branch:
@@ -412,7 +412,7 @@ class QueryByBranch(Query):
 
     def _addLocalTrove(self, troveTup):
         name = troveTup[0]
-        self.map[name] = troveTup
+        self.map[name] = [ troveTup ]
         self.localTroves.add(name)
 
     def findAll(self, troveSource, missing, finalMap):
@@ -465,7 +465,7 @@ class QueryByBranch(Query):
                 for version, flavorList in matches.iteritems():
                     pkgList.extend((name, version, f) for f in flavorList)
                     foundBranches.add((name, version.branch()))
-                finalMap.setdefault(self.map[name], []).extend(pkgList)
+                finalMap.setdefault(self.map[name][0], []).extend(pkgList)
         for name in namesToFind:
             self.addMissing(missing, name)
 
@@ -490,14 +490,14 @@ class QueryByBranch(Query):
             pkgList = []
             for version, flavorList in res[name].iteritems():
                 pkgList.extend((name, version, f) for f in flavorList)
-            finalMap[self.map[name]] = pkgList
+            finalMap[self.map[name][0]] = pkgList
 
     def _findLocalTroves(self, finalMap):
         for name in self.localTroves:
-            finalMap.setdefault(self.map[name], [])
+            finalMap.setdefault(self.map[name][0], [])
 
     def missingMsg(self, name):
-        flavor = self.map[name][2]
+        flavor = self.map[name][0][2]
         if name in self.queryNoFlavor:
             branches = self.queryNoFlavor[name].keys()
         else:
@@ -521,7 +521,7 @@ class QueryRevisionByBranch(QueryByBranch):
     def filterTroveMatches(self, name, versionFlavorDict):
         versionFlavorDict = QueryByBranch.filterTroveMatches(self, name, 
                                                              versionFlavorDict)
-        versionStr = self.map[name][1]
+        versionStr = self.map[name][0][1]
         try:
             verRel = versions.Revision(versionStr)
         except errors.ParseError:
@@ -543,7 +543,7 @@ class QueryRevisionByBranch(QueryByBranch):
 
     def missingMsg(self, name):
         branch = self.query[0][name].keys()[0]
-        versionStr = self.map[name][1]
+        versionStr = self.map[name][0][1]
         return "revision %s of %s was not found on branch %s" \
                                     % (versionStr, name, branch.asString())
 
@@ -566,7 +566,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
         matching = {}
         matchingLabels = set()
 
-        versionStr = self.map[name][1].split('/')[-1]
+        versionStr = self.map[name][0][1].split('/')[-1]
         try:
             verRel = versions.Revision(versionStr)
         except errors.ParseError:
@@ -593,8 +593,8 @@ class QueryRevisionByLabel(QueryByLabelPath):
         return matching
 
     def missingMsg(self, name):
-        labelPath = set(x.keys()[0] for x in self.query[name] if x.keys())
-        versionStr = self.map[name][1].split('/')[-1]
+        labelPath = self.map[name][1]
+        versionStr = self.map[name][0][1].split('/')[-1]
         if labelPath:
             return "revision %s of %s was not found on label(s) %s" \
                     % (versionStr, name, 
