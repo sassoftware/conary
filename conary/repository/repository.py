@@ -369,8 +369,8 @@ class ChangeSetJob:
             if newTrove.troveInfo.incomplete():
                 log.warning('trove %s has schema version %s, which contains'
                         ' information not handled by this client.  This'
-                        ' understands schema version %s.  Dropping extra'
-                        ' information.  Please upgrade conary.', 
+                        ' version of Conary understands schema version %s.'
+                        ' Dropping extra information.  Please upgrade conary.', 
                         newTrove.getName(), newTrove.troveInfo.troveVersion(), 
                         trove.TROVE_VERSION)
 
