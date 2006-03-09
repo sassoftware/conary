@@ -1863,7 +1863,7 @@ conary erase '%s=%s[%s]'
                 # rollback the current transaction
                 self.db.db.rollback()
                 if isinstance(e, database.CommitError):
-                    raise UpdateError, "changeset cannot be applied"
+                    raise UpdateError, "changeset cannot be applied:\n%s" % e
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):

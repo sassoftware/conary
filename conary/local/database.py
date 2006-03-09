@@ -561,9 +561,8 @@ class Database(SqlDbRepository):
 
         errList = fsJob.getErrorList()
         if errList:
-            for err in errList:
-                log.error(err)
-            raise CommitError, 'file system job contains errors'
+            raise CommitError, ('file system job contains errors:\n' 
+                                '\n'.join(errList))
         if test:
             self.db.rollback()
             return
@@ -757,8 +756,8 @@ class Database(SqlDbRepository):
                                          replaceFiles = replaceFiles,
                                          callback = callback)
                     rb.removeLast()
-                except CommitError:
-                    raise RollbackError(name)
+                except CommitError, err:
+                    raise RollbackError(name, err)
 
                 (reposCs, localCs) = rb.getLast()
 
@@ -871,15 +870,16 @@ class RollbackError(errors.ConaryError):
 
     """Base class for exceptions related to applying rollbacks"""
 
-    def __init__(self, rollbackName):
+    def __init__(self, rollbackName, errorMessage=''):
 	"""
         Create new new RollbackrError
 	@param rollbackName: string represeting the name of the rollback
         """
 	self.name = rollbackName
+        self.error = errorMessage
 
     def __str__(self):
-	return "rollback %s cannot be applied" % self.name
+	return "rollback %s cannot be applied:\n%s" % (self.name, self.error)
 
 class RollbackOrderError(RollbackError):
 
