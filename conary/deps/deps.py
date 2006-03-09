@@ -29,6 +29,7 @@ DEP_CLASS_JAVA          = 10
 DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
+DEP_CLASS_PHP           = 14
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -668,12 +669,22 @@ class PerlDependencies(DependencyClass):
 _registerDepClass(PerlDependencies)
 
 class RubyDependencies(DependencyClass):
+
     tag = DEP_CLASS_RUBY
     tagName = "ruby"
     justOne = False
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(RubyDependencies)
+
+class PhpDependencies(DependencyClass):
+
+    tag = DEP_CLASS_PHP
+    tagName = "php"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(PhpDependencies)
 
 class FileDependencies(DependencyClass):
 
