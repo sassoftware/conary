@@ -24,7 +24,7 @@ from conary import conaryclient
 from conary import callbacks
 from conary.deps import deps
 from conary import errors
-from conary.lib import graph, util
+from conary.lib import graph, log, util
 from conary.repository import trovesource
 from conary import trove
 from conary import versions
@@ -796,11 +796,14 @@ def buildGroups(recipeObj, cfg, repos, callback):
     # find all the groups needed for all groups in a few massive findTroves
     # calls.
     replaceSpecs = list(recipeObj.iterReplaceSpecs())
+    log.info('Getting initial set of troves for'
+             ' building all %s groups' % (len(recipeObj.iterGroupList())))
     troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(),
                                    replaceSpecs,
                                    labelPath, flavor, callback)
     troveTupList = list(chain(*chain(*(x.values() for x in troveMap.itervalues()))))
     cache.cacheTroves(troveTupList)
+    log.info('Troves cached.')
 
     groupsWithConflicts = {}
 
@@ -813,6 +816,8 @@ def buildGroups(recipeObj, cfg, repos, callback):
             group.replaceSpec(*(troveSpec + (ref,)))
 
     for groupIdx, group in enumerate(groupList):
+        log.info('Building %s (%s of %s)...' % (group.name, groupIdx + 1,
+                                                len(groupList)))
         callback.buildingGroup(group.name, groupIdx + 1, len(groupList))
 
         childGroups = recipeObj.getChildGroups(group.name)
@@ -833,11 +838,20 @@ def buildGroups(recipeObj, cfg, repos, callback):
         # add troves to this group.
         addTrovesToGroup(group, troveMap, cache, childGroups, repos)
 
+        log.debug('Troves in %s:' % group.name)
+        for troveTup in sorted(group.iterTroveList(strongRefs=True)):
+            log.debug(' %s=%s[%s]' % troveTup)
+
+
         if group.autoResolve:
+            callback.done()
+            log.info('Resolving dependencies...')
             resolveGroupDependencies(group, cache, cfg, 
                                      repos, labelPath, flavor, callback)
 
         if group.depCheck:
+            callback.done()
+            log.info('Checking for dependency closure...')
             failedDeps = checkGroupDependencies(group, cfg, callback)
             if failedDeps:
                 raise GroupDependencyFailure(group.name, failedDeps)
@@ -845,6 +859,8 @@ def buildGroups(recipeObj, cfg, repos, callback):
         addPackagesForComponents(group, repos, cache)
         checkForRedirects(group, repos, cache, cfg.buildFlavor)
 
+        callback.done()
+        log.info('Calculating size and checking hashes...')
         conflicts = calcSizeAndCheckHashes(group, cache, callback)
 
         if conflicts:
@@ -852,6 +868,9 @@ def buildGroups(recipeObj, cfg, repos, callback):
 
         if group.isEmpty():
             raise CookError('%s has no troves in it' % group.name)
+
+        callback.groupBuilt()
+        log.info('%s built.\n' % group.name)
 
     if groupsWithConflicts:
         raise GroupPathConflicts(groupsWithConflicts)
@@ -1266,9 +1285,31 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                                              checkPathConflicts=False)
 
     for trove, needs in suggMap.iteritems():
-        print "trove:%s" % trove[0]
+        if cfg.fullVersions:
+            verStr = trove[1]
+        else:
+            verStr = trove[1].trailingRevision()
+
+        if cfg.fullFlavors:
+            flavorStr = '[%s]' % trove[2]
+        else:
+            flavorStr = ''
+
+        log.info("%s=%s%s resolves deps by including:" % (trove[0], verStr, 
+                                                          flavorStr))
+
         for item in needs:
-            print "\t", item[0], item[1].trailingRevision()
+            if cfg.fullVersions:
+                verStr = item[1]
+            else:
+                verStr = item[1].trailingRevision()
+
+            if cfg.fullFlavors:
+                flavorStr = '[%s]' % item[2]
+            else:
+                flavorStr = ''
+
+            log.info("\t%s=%s%s" % (item[0], verStr, flavorStr))
 
     neededTups = list(chain(*suggMap.itervalues()))
 

@@ -20,6 +20,9 @@ class Callback:
 
 class ChangesetCallback:
 
+    def preparingChangeSet(self):
+        pass
+
     def requestingChangeSet(self):
         pass
 
@@ -39,6 +42,9 @@ class ChangesetCallback:
         pass
 
     def checkAbort(self):
+        pass
+
+    def done(self):
         pass
 
     def __init__(self):
@@ -61,6 +67,12 @@ class CookCallback(ChangesetCallback):
     def gettingTroveDefinitions(self, num):
         pass
 
+    def buildingGroup(self, groupName, idx, total):
+        pass
+
+    def groupBuilt(self):
+        pass
+
     def groupResolvingDependencies(self):
         pass
 
@@ -73,14 +85,8 @@ class CookCallback(ChangesetCallback):
     def groupDeterminingPathConflicts(self, total):
         pass
 
-    def done(self):
-        pass
-
-
 class UpdateCallback(ChangesetCallback):
 
-    def preparingChangeSet(self):
-        pass
 
     def resolvingDependencies(self):
         pass

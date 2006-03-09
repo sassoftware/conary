@@ -128,93 +128,39 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(callbacks.LineOutput, lookaside.ChangesetCallback,
-                   callbacks.CookCallback):
-    def setRate(self, rate):
-        self.rate = rate
+class CookCallback(lookaside.ChangesetCallback, callbacks.CookCallback):
 
     def buildingChangeset(self):
         self._message('Building changeset...')
 
-    def sendingChangeset(self, got, need):
-        if need != 0:
-            self._message("Committing changeset "
-                          "(%dKb (%d%%) of %dKb at %dKb/sec)..."
-                          % (got/1024, (got*100)/need, need/1024, self.rate/1024))
-        else:
-            self._message("Committing changeset "
-                          "(%dKb at %dKb/sec)..." % (got/1024, self.rate/1024))
-
     def findingTroves(self, num):
         self._message('Finding %s troves...' % num)
 
-    def _downloading(self, msg, got, rate, need):
-        if got == need:
-            self.csText = None
-        elif need != 0:
-            if self.csHunk[1] < 2 or not self.updateText:
-                self.csMsg("%s %dKb (%d%%) of %dKb at %dKb/sec"
-                           % (msg, got/1024, (got*100)/need, need/1024, rate/1024))
-            else:
-                self.csMsg("%s %d of %d: %dKb (%d%%) of %dKb at %dKb/sec"
-                           % ((msg,) + self.csHunk + \
-                              (got/1024, (got*100)/need, need/1024, rate/1024)))
-        else: # no idea how much we need, just keep on counting...
-            self.csMsg("%s (got %dKb at %dKb/s so far)" % (msg, got/1024, rate/1024))
-
-        self.update()
-
-    def preparingChangeSet(self):
-        self.updateMsg("%sPreparing changeset request" % self.prefix)
-
-    def downloadingChangeSet(self, got, need):
-        self._downloading('%sDownloading' % self.prefix, got, self.rate, need)
-
-    def requestingChangeSet(self):
-        pass
-
-    def csMsg(self, text):
-        self.csText = text
-        self.update()
-
-    def update(self):
-        t = self.csText
-        if t:
-            self._message(t)
-        else:
-            self._message('')
-
     def gettingTroveDefinitions(self, num):
-        self._message('%sGetting %s trove definitions...' % (self.prefix, num))
+        self._message('Getting %s trove definitions...' % num)
 
     def buildingGroup(self, groupName, idx, total):
-        self.prefix = '%s (%s/%s): ' % (groupName, idx, total)
+        self.setPrefix('%s (%s/%s): ' % (groupName, idx, total))
+
+    def groupBuilt(self):
+        self.clearPrefix()
+        self.done()
 
     def groupResolvingDependencies(self):
-        self._message('%sResolving dependencies...' % self.prefix)
+        self._message('Resolving dependencies...')
 
     def groupCheckingDependencies(self):
-        self._message('%sChecking dependency closure...' % self.prefix)
+        self._message('Checking dependency closure...')
 
     def groupCheckingPaths(self, current):
-        self._message('%sChecking for path conflicts: %d' % (self.prefix,
-                                                               current))
+        self._message('Checking for path conflicts: %d' % (current))
 
     def groupDeterminingPathConflicts(self, total):
-        self._message('%sDetermining the %s paths involved in the path conflicts' % (self.prefix, total))
-
-    def done(self):
-        self._message('')
+        self._message('Determining the %s paths involved in the path conflicts' % total)
 
     def __init__(self, *args, **kw):
-        callbacks.LineOutput.__init__(self, *args, **kw)
         callbacks.CookCallback.__init__(self, *args, **kw)
-        self.restored = 0
-        self.csHunk = (0, 0)
-        self.updateHunk = (0, 0)
-        self.csText = None
-        self.updateText = None
-        self.prefix = ''
+        lookaside.ChangesetCallback.__init__(self, *args, **kw)
 
 
 
