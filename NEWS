@@ -1,3 +1,9 @@
+Changes in @NEW@:
+ o Client changes:
+    * A better method of determining what local changes have been made to a 
+      local system has been implemented, improving conary's behavior when
+      updating.
+
 Changes in 1.0.6:
  o Repository changes:
     * The commitaction script now accepts the standard conary arguments
