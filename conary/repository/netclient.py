@@ -101,7 +101,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                 # It's possible we switched to anonymous
                 # for an earlier query, and now need to 
                 # switch back to our specified user/passwd
-                if self.__altHostCallback():
+                if self.__altHostCallback and self.__altHostCallback():
                     self.__altHostCallback = None
                     # recursively call doCall to get all the 
                     # password handling goodness
