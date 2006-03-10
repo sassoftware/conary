@@ -808,7 +808,10 @@ class Database(SqlDbRepository):
                 recurseOne(newDepSetList)
         recurseOne(depSetList)
         return closureDepDict
-    
+
+    def iterUpdateContainerInfo(self, troveNames=None):
+        return self.db.iterUpdateContainerInfo(troveNames)
+
     def __init__(self, root, path):
 	self.root = root
 
