@@ -30,7 +30,6 @@ install:
 	install -m 755 conary-debug $(DESTDIR)$(bindir)
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
-	install -m 755 changemail $(DESTDIR)$(conarydir)
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
 	install -m 755 dumpcontainer $(DESTDIR)$(datadir)/conary
