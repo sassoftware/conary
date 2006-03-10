@@ -16,6 +16,10 @@ Changes in @NEW@:
       instead of as python strings
     * A bug where including a redirect in a group that has autoResolve 
       caused conary to traceback has been fixed.
+    * A bug that kept conary from prompting for your password when committing
+      has been fixed.
+    * A bug that randomized the order of the labels in the  installLabelPath 
+      in some error messages has been fixed.
 
  o Build fixes:
     * The default ComponentSpec for :perl components now include files
