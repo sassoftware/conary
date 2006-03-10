@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.6:
  o Repository changes:
     * The commitaction script now accepts the standard conary arguments
       --config and --config-file.
