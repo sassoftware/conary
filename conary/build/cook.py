@@ -318,7 +318,11 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     (cs, built, cleanup) = ret
 
     # sign the changeset
-    signatureKey = selectSignatureKey(cfg, sourceVersion.branch().label())
+    if targetLabel:
+        signatureLabel = targetLabel
+    else:
+        signatureLabel = sourceVersion.branch().label()
+    signatureKey = selectSignatureKey(cfg, signatureLabel)
     signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:

@@ -1,3 +1,13 @@
+Changes in @NEW@:
+ o Bugfixes:
+    * A bug that caused the user to be prompted for their OpenPGP
+      passphrase when building on a target label that does not match
+      any signatureKeyMap entry has been fixed.  Previously, if you
+      had a signatureKeyMap entry for conary.example.com, and your
+      buildLabel was set to conary.example.com@rpl:devel, you would be
+      prompted to enter a passphrase even when cooking locally to the
+      local@local:COOK label.
+
 Changes in 1.0.6:
  o Repository changes:
     * The commitaction script now accepts the standard conary arguments
