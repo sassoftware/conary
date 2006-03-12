@@ -26,6 +26,9 @@ class ChangesetCallback:
     def requestingChangeSet(self):
         pass
 
+    def sendingChangeset(self, sent, total):
+        pass
+
     def setRate(self, rate):
         self.rate = rate
 
@@ -52,13 +55,7 @@ class ChangesetCallback:
 
 class CookCallback(ChangesetCallback):
 
-    def setCurrentRate(self, rate):
-        pass
-
     def buildingChangeset(self):
-        pass
-
-    def sendingChangeset(self, sent, total):
         pass
 
     def findingTroves(self, num):
