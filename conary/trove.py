@@ -1041,7 +1041,7 @@ class Trove(streams.StreamSet):
     def __ne__(self, them):
 	return not self == them
 
-    def diff(self, them, absolute = 0, diffWeak = False):
+    def diff(self, them, absolute = 0):
 	"""
 	Generates a change set between them (considered the old
 	version) and this instance. We return the change set, a list
@@ -1283,8 +1283,7 @@ class Trove(streams.StreamSet):
 	removed = {}
 
         for name, chgList in \
-                chgSet.iterChangedTroves(strongRefs = True,
-                                         weakRefs = diffWeak):
+                chgSet.iterChangedTroves(strongRefs = True):
             for (how, version, flavor, byDefault) in chgList:
                 if how == '+':
                     whichD = added

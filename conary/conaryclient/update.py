@@ -684,9 +684,10 @@ class ClientUpdate:
         # a lot about what the user has done to his system. 
         localUpdates = self.getPrimaryLocalUpdates(names)
         if localUpdates:
-            localUpdates += self.getChildLocalUpdates(uJob.getSearchSource(), 
+            localUpdates += self.getChildLocalUpdates(uJob.getSearchSource(),
                                                       localUpdates,
-                                                      installedTroves)
+                                                      installedTroves,
+                                                      referencedNotInstalled)
         localUpdatesByPresent = \
                  dict( ((job[0], job[2][0], job[2][1]), job[1]) for
                         job in localUpdates if job[1][0] is not None and
@@ -1666,7 +1667,7 @@ conary erase '%s=%s[%s]'
         return allJobs
 
     def getChildLocalUpdates(self, searchSource, localUpdates,
-                             installedTroves=None):
+                             installedTroves=None, missingTroves=None):
         """
             Given a set of primary local updates - the updates the user
             is likely to have typed at the command line, return their
@@ -1675,31 +1676,40 @@ conary erase '%s=%s[%s]'
             installed where a child of b is, and assert that that update is 
             from childa -> childb.
         """
-        if installedTroves is None:
-            newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates]
-            newTroves = self.db.getTroves(newTroveTups, withFiles=False)
-
-            chain = itertools.chain
-            izip = itertools.izip
-
-            childTroves = list(set(chain(*(x.iterTroveList(strongRefs=True,
-                                                           weakRefs=True)
-                                                        for x in newTroves))))
-            hasTroves = self.db.hasTroves(childTroves)
-            installedTroves = set(x[0] for x in izip(childTroves,
-                                                   hasTroves) if x[1])
-            installedTroves.update(newTroveTups)
-            del childTroves, newTroves
-        else:
-            installedTroves = installedTroves.copy()
-
         localUpdates = [ x for x in localUpdates if x[1][0] ]
-        oldTroves = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
-        newTroves = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
+        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
+        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
 
         oldTroveSource = trovesource.stack(searchSource, self.repos)
-        oldTroves = oldTroveSource.getTroves(oldTroves, withFiles=False)
-        newTroves = self.db.getTroves(newTroves, withFiles=False)
+        oldTroves = oldTroveSource.getTroves(oldTroveTups, withFiles=False)
+        newTroves = self.db.getTroves(newTroveTups, withFiles=False)
+
+        if installedTroves is None:
+            assert(missingTroves is None)
+            chain = itertools.chain
+            izip = itertools.izip
+            childNew = list(set(chain(*(x.iterTroveList(strongRefs=True,
+                                                           weakRefs=True)
+                                                        for x in newTroves))))
+            childOld = list(set(chain(*(x.iterTroveList(strongRefs=True,
+                                                        weakRefs=True)
+                                                        for x in oldTroves))))
+            hasTroves = self.db.hasTroves(childNew + childOld)
+            installedTroves = set(x[0] for x in izip(childNew, hasTroves) 
+                                                if x[1])
+            installedTroves.update(newTroveTups)
+
+            hasTroves = hasTroves[len(childNew):]
+            missingTroves = set(x[0] for x in izip(childOld, hasTroves) 
+                                              if not x[1])
+            installedTroves.update(oldTroveTups)
+            del childNew, childOld, hasTroves
+        else:
+            assert(missingTroves is not None)
+            installedTroves = installedTroves.copy()
+            missingTroves = missingTroves.copy()
+
+        del oldTroveTups, newTroveTups
 
         allJobs = []
         for oldTrove, newTrove in itertools.izip(oldTroves, newTroves):
@@ -1708,21 +1718,31 @@ conary erase '%s=%s[%s]'
             # that contains only those parts of newTrove that are actually
             # installed.
 
-            existsNewTrove = trove.Trove(oldTrove.getName(),
+            notExistsOldTrove = trove.Trove('@update',
+                                            versions.NewVersion(),
+                                            deps.DependencySet())
+            existsNewTrove = trove.Trove('@update',
                                          versions.NewVersion(),
                                          deps.DependencySet())
 
+            # only create local updates between old troves that
+            # don't exist and new troves that do.
+            for tup, _, isStrong in oldTrove.iterTroveListInfo():
+                if tup in missingTroves:
+                    notExistsOldTrove.addTrove(*tup)
             for tup, _, isStrong in newTrove.iterTroveListInfo():
                 if tup in installedTroves:
-                    existsNewTrove.addTrove(weakRef=not isStrong, *tup)
+                    existsNewTrove.addTrove( *tup)
 
-            newUpdateJobs = existsNewTrove.diff(oldTrove, diffWeak=True)[2]
+            newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
 
             for newJob in newUpdateJobs:
                 if not newJob[1][0] or not newJob[2][0]:
                     continue
 
+                # no trove should be part of more than one update.
                 installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
+                missingTroves.remove((newJob[0], newJob[1][0], newJob[1][1]))
                 allJobs.append(newJob)
         return allJobs
 
