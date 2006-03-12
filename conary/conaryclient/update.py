@@ -1510,9 +1510,14 @@ conary erase '%s=%s[%s]'
         return newJob
 
     def fullUpdateItemList(self):
-        items = [ (x[0], x[2][0], x[2][1])
-                   for x in self.getPrimaryLocalUpdates()
+        # ignore updates that just switch version, not flavor or 
+        # branch
+        items = ( x for x in self.getPrimaryLocalUpdates() 
+                  if (x[1][1] != x[2][1] 
+                      or x[1][0].branch() != x[2][0].branch()))
+        items = [ (x[0], x[2][0], x[2][1]) for x in items
                    if not x[2][0].isOnLocalHost() ]
+
         installed = self.db.findByNames(x[0] for x in items)
 
         installedDict = {}
