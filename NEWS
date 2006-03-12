@@ -13,6 +13,11 @@ Changes in @NEW@:
       prompted to enter a passphrase even when cooking locally to the
       local@local:COOK label.
 
+ o Build fixes:
+    * Group cooking now produces output to make it easier to tell what
+      is happening.  The --debug flag can be used to get a more 
+      detailed log of what troves are being included.
+
 Changes in 1.0.6:
  o Repository changes:
     * The commitaction script now accepts the standard conary arguments
