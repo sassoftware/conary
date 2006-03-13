@@ -15,6 +15,8 @@ Changes in @NEW@:
     * Dependency resolution will no longer cause a trove to switch branches.
     * If a component is kept when performing dep resolution because it is
       still needed, it's package will be kept as well if possible.
+    * "conary q --path" now expands symlinks found in the path to the
+      file in question. (bug #855)
 
  o Build fixes:
     * Group cooking now produces output to make it easier to tell what

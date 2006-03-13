@@ -39,6 +39,13 @@ def normpath(path):
 	return s[1:]
     return s
 
+def realpath(path):
+    # returns the real path of a file, if and only if it is not a symbolic
+    # link
+    if stat.S_ISLNK(os.lstat(path)[stat.ST_MODE]):
+        return path
+    return os.path.realpath(path)
+
 def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
