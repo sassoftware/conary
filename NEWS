@@ -12,6 +12,9 @@ Changes in @NEW@:
       buildLabel was set to conary.example.com@rpl:devel, you would be
       prompted to enter a passphrase even when cooking locally to the
       local@local:COOK label.
+    * Dependency resolution will no longer cause a trove to switch branches.
+    * If a component is kept when performing dep resolution because it is
+      still needed, it's package will be kept as well if possible.
 
  o Build fixes:
     * Group cooking now produces output to make it easier to tell what

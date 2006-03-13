@@ -128,7 +128,7 @@ class ClientUpdate:
                         oldIdx[(job[0], job[1][0], job[1][1])] = job
 
                 restoreSet = set()
-                    
+
                 for (reqInfo, depSet, provInfoList) in cannotResolve:
                     # Modify/remove non-primary jobs that cause
                     # irreconcilable dependency problems.
@@ -165,6 +165,18 @@ class ClientUpdate:
                 if not restoreSet:
                     return (depList, cannotResolve, changeSetList, keepList)
 
+                if self.cfg.autoResolvePackages:
+                    # if we're keeping any components, keep the package as well.
+                    jobsByOld = dict(((x[0], x[1]), x) for x in jobSet 
+                                     if ':' not in x[0])
+                    for job in list(restoreSet):
+                        if ':' in job[0]:
+                            pkgName =  job[0].split(':')[0]
+                            pkgJob = jobsByOld.get((pkgName, job[1]), None)
+                            if pkgJob:
+                                restoreSet.add(pkgJob)
+                                break
+
                 for job in restoreSet:
                     jobSet.remove(job)
                     if job[2][0] is not None:
@@ -172,6 +184,27 @@ class ClientUpdate:
                         # retain it
                         jobSet.add((job[0], (None, None), job[2], False))
         # end checkDeps "while True" loop here
+
+        def _filterCrossBranchResolutions(jobSet, troveSource):
+            # We can't resolve deps in a way that would cause conary to
+            # switch the branch of a trove.
+            crossBranchJobs = [ x for x in jobSet
+                                if (x[1][0] and
+                                    x[1][0].branch() != x[2][0].branch()) ]
+            if crossBranchJobs:
+                jobSet.difference_update(crossBranchJobs)
+                oldTroves = self.db.getTroves(
+                      [ (x[0], x[1][0], x[1][1]) for x in crossBranchJobs ],
+                      withFiles = False)
+                newTroves = troveSource.getTroves(
+                      [ (x[0], x[2][0], x[2][1]) for x in crossBranchJobs ],
+                      withFiles = False)
+                for job, oldTrv, newTrv in itertools.izip(crossBranchJobs,
+                                                          oldTroves,
+                                                          newTroves):
+                    if oldTrv.compatibleWith(newTrv):
+                        jobSet.add((job[0], (None, None), job[2], False))
+            return jobSet
 
         # def _resolveDependencies() begins here
 
@@ -261,6 +294,15 @@ class ClientUpdate:
                                           ineligible = beingRemoved,
                                           checkPrimaryPins = True)
                 assert(not (newJob & jobSet))
+
+                newJob = _filterCrossBranchResolutions(newJob, troveSource)
+                if not newJob:
+                    # we had potential solutions, but they would have
+                    # required implicitly switching the branch of a trove
+                    # on a user, and we don't do that.
+                    pathIdx += 1
+                    continue
+
                 jobSet.update(newJob)
 
                 lastCheck = depList
@@ -1702,7 +1744,7 @@ conary erase '%s=%s[%s]'
             hasTroves = hasTroves[len(childNew):]
             missingTroves = set(x[0] for x in izip(childOld, hasTroves) 
                                               if not x[1])
-            installedTroves.update(oldTroveTups)
+            missingTroves.update(oldTroveTups)
             del childNew, childOld, hasTroves
         else:
             assert(missingTroves is not None)
