@@ -1,10 +1,10 @@
-Changes in @NEW@:
- o Client changes:
+Changes in 1.0.7:
+  o Client changes:
     * A better method of determining what local changes have been made to a 
       local system has been implemented, improving conary's behavior when
       updating.
 
- o Bugfixes:
+  o Bugfixes:
     * A bug that caused the user to be prompted for their OpenPGP
       passphrase when building on a target label that does not match
       any signatureKeyMap entry has been fixed.  Previously, if you
@@ -13,12 +13,13 @@ Changes in @NEW@:
       prompted to enter a passphrase even when cooking locally to the
       local@local:COOK label.
     * Dependency resolution will no longer cause a trove to switch branches.
-    * If a component is kept when performing dep resolution because it is
-      still needed, it's package will be kept as well if possible.
+    * If a component is kept when performing dependency resolution
+      because it is still needed, it's package will be kept as well if
+      possible.
     * "conary q --path" now expands symlinks found in the path to the
       file in question. (bug #855)
 
- o Build fixes:
+  o Build fixes:
     * Group cooking now produces output to make it easier to tell what
       is happening.  The --debug flag can be used to get a more 
       detailed log of what troves are being included.
