@@ -1,3 +1,23 @@
+Changes in @NEW@:
+ o Client changes:
+    * A better method of determining what local changes have been made to a 
+      local system has been implemented, improving conary's behavior when
+      updating.
+
+ o Bugfixes:
+    * A bug that caused the user to be prompted for their OpenPGP
+      passphrase when building on a target label that does not match
+      any signatureKeyMap entry has been fixed.  Previously, if you
+      had a signatureKeyMap entry for conary.example.com, and your
+      buildLabel was set to conary.example.com@rpl:devel, you would be
+      prompted to enter a passphrase even when cooking locally to the
+      local@local:COOK label.
+
+ o Build fixes:
+    * Group cooking now produces output to make it easier to tell what
+      is happening.  The --debug flag can be used to get a more 
+      detailed log of what troves are being included.
+
 Changes in 1.0.6:
  o Repository changes:
     * The commitaction script now accepts the standard conary arguments

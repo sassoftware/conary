@@ -1444,6 +1444,106 @@ order by
 
         return l
 
+
+    def iterUpdateContainerInfo(self, troveNames=None):
+        """
+            Returns information about troves and their containers that should 
+            be enough to determine what local updates have been made to the 
+            system.
+
+            If troveNames are specified, returns enough information to be
+            used to determine what local updates have been made to the 
+            given troves.
+
+            Yields ((name, version, flavor), parentInfo, isPresent)
+            tuples, for troves on the system that may be part of a local
+            update.  parentInfo may be (name, version, flavor) or None.
+        """
+        cu = self.db.cursor()
+
+        if troveNames:
+            # Return information needed for determining local updates 
+            # concerning the given troves only.  To do that, we need a 
+            # list of all troves that could potentially affect whether this 
+            # trove is an update - that all parents of these troves
+            # and all troves with the same name as the parents of these troves.
+            cu.execute("CREATE TEMPORARY TABLE tmpInst(instanceId INT)",
+                       start_transaction = False)
+
+            for name in troveNames:
+                cu.execute("""INSERT INTO tmpInst 
+                   SELECT instanceId FROM Instances WHERE troveName = ?""",
+                           name, start_transaction = False)
+
+            # Summary, Insert into this tmpInst all troves that are parents
+            # of the troves already in tmpIst + all troves with the same 
+            # name.
+            cu.execute('''
+                INSERT INTO tmpInst
+                    SELECT DISTINCT SameName.instanceId
+                        FROM tmpInst
+                        JOIN TroveTroves
+                           ON (TroveTroves.includedId = tmpInst.instanceId)
+                        JOIN Instances
+                           ON (TroveTroves.instanceId = Instances.instanceId)
+                        JOIN Instances AS SameName
+                           ON (Instances.troveName == SameName.troveName)
+                        WHERE SameName.instanceId NOT IN
+                              (SELECT instanceId from tmpInst)
+                ''', start_transaction = False)
+            fromClause = 'FROM tmpInst JOIN Instances USING(instanceId)'
+        else:
+            fromClause = 'FROM Instances'
+
+        # Select troves where:
+        # 1. The trove instanceId is listed in tmpInst
+        # 2. There is another trove with the same name that is on the system -
+        #    we don't list removals as local updates (maybe we should?)
+        # 3. This trove is not both present and referenced - such troves
+        #    are definitely not parts of local updates - they are intended
+        #    installs.
+        cu.execute("""
+        SELECT Instances.isPresent, Instances.troveName, Versions.version,
+               Instances.timeStamps, Flavors.flavor,
+               Parent.troveName, ParentVersion.version, Parent.timeStamps,
+               ParentFlavor.flavor
+        %s
+        JOIN Instances AS InstPresent ON
+            (InstPresent.troveName=Instances.troveName and
+             InstPresent.isPresent)
+        JOIN Versions ON
+            Instances.versionId = Versions.versionId
+        JOIN Flavors ON
+            Instances.flavorId = Flavors.flavorId
+        LEFT OUTER JOIN TroveTroves ON
+            (Instances.instanceId = TroveTroves.includedId
+             AND TroveTroves.inPristine=1)
+        LEFT OUTER JOIN Instances AS Parent ON
+            TroveTroves.instanceId=Parent.instanceId
+        LEFT OUTER JOIN Versions AS ParentVersion ON
+            ParentVersion.versionId=Parent.versionId
+        LEFT OUTER JOIN Flavors AS ParentFlavor ON
+            ParentFlavor.flavorId=Parent.flavorId
+        WHERE ((inPristine=1 AND Instances.isPresent=0) OR inPristine is NULL)
+        """ % fromClause)
+
+        VFS = versions.VersionFromString
+        Flavor = deps.deps.ThawDependencySet
+
+        for (isPresent, name, versionStr, timeStamps, flavorStr, 
+             parentName, parentVersion, parentTimeStamps, parentFlavor) in cu:
+            version = VFS(versionStr, timeStamps=timeStamps.split(':'))
+            if parentName:
+                parentVersion = VFS(parentVersion, 
+                                    timeStamps=parentTimeStamps.split(':'))
+                parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
+            else:
+                parentInfo = None
+            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent)
+
+        if troveNames:
+            cu.execute("DROP TABLE tmpInst", start_transaction = False)
+
     def findRemovedByName(self, name):
         """
         Returns information on erased troves with a given name.

@@ -128,22 +128,41 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
-    def setRate(self, rate):
-        self.rate = rate
+class CookCallback(lookaside.ChangesetCallback, callbacks.CookCallback):
 
-    def sendingChangeset(self, got, need):
-        if need != 0:
-            self._message("Committing changeset "
-                          "(%dKb (%d%%) of %dKb at %dKb/sec)..."
-                          % (got/1024, (got*100)/need, need/1024, self.rate/1024))
-        else:
-            self._message("Committing changeset "
-                          "(%dKb at %dKb/sec)..." % (got/1024, self.rate/1024))
+    def buildingChangeset(self):
+        self._message('Building changeset...')
+
+    def findingTroves(self, num):
+        self._message('Finding %s troves...' % num)
+
+    def gettingTroveDefinitions(self, num):
+        self._message('Getting %s trove definitions...' % num)
+
+    def buildingGroup(self, groupName, idx, total):
+        self.setPrefix('%s (%s/%s): ' % (groupName, idx, total))
+
+    def groupBuilt(self):
+        self.clearPrefix()
+        self.done()
+
+    def groupResolvingDependencies(self):
+        self._message('Resolving dependencies...')
+
+    def groupCheckingDependencies(self):
+        self._message('Checking dependency closure...')
+
+    def groupCheckingPaths(self, current):
+        self._message('Checking for path conflicts: %d' % (current))
+
+    def groupDeterminingPathConflicts(self, total):
+        self._message('Determining the %s paths involved in the path conflicts' % total)
 
     def __init__(self, *args, **kw):
-        callbacks.LineOutput.__init__(self, *args, **kw)
         callbacks.CookCallback.__init__(self, *args, **kw)
+        lookaside.ChangesetCallback.__init__(self, *args, **kw)
+
+
 
 def signAbsoluteChangeset(cs, fingerprint=None):
     # adds signatures or at least sha1s (if fingerprint is None)
@@ -303,7 +322,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
 	ret = cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, 
 			      macros = macros, targetLabel = targetLabel,
-                              alwaysBumpCount = alwaysBumpCount)
+                              alwaysBumpCount = alwaysBumpCount,
+                              callback = callback)
     elif recipeClass.getType() == recipe.RECIPE_TYPE_FILESET:
 	ret = cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, 
 				macros = macros, targetLabel = targetLabel,
@@ -318,7 +338,11 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     (cs, built, cleanup) = ret
 
     # sign the changeset
-    signatureKey = selectSignatureKey(cfg, sourceVersion.branch().label())
+    if targetLabel:
+        signatureLabel = targetLabel
+    else:
+        signatureLabel = sourceVersion.branch().label()
+    signatureKey = selectSignatureKey(cfg, signatureLabel)
     signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
@@ -408,7 +432,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     return (changeSet, built, None)
 
 def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
-		    targetLabel = None, alwaysBumpCount=False):
+		    targetLabel = None, alwaysBumpCount=False, 
+                    callback = callbacks.CookCallback()):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -447,7 +472,9 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     flavors = [buildpackage._getUseDependencySet(recipeObj)]
 
-    grouprecipe.buildGroups(recipeObj, cfg, repos)
+    grouprecipe.buildGroups(recipeObj, cfg, repos, callback)
+
+    callback.buildingChangeset()
 
     for group in recipeObj.iterGroupList():
         flavors.extend(x[2] for x in group.iterTroveList())

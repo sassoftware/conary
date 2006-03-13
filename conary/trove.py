@@ -1283,7 +1283,7 @@ class Trove(streams.StreamSet):
 	removed = {}
 
         for name, chgList in \
-                chgSet.iterChangedTroves(strongRefs = True, weakRefs = False):
+                chgSet.iterChangedTroves(strongRefs = True):
             for (how, version, flavor, byDefault) in chgList:
                 if how == '+':
                     whichD = added
