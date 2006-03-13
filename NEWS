@@ -17,6 +17,8 @@ Changes in @NEW@:
       still needed, it's package will be kept as well if possible.
     * "conary q --path" now expands symlinks found in the path to the
       file in question. (bug #855)
+    * Committing changesets which provided duplicate file streams for streams
+      the server previously referenced from other servers caused a traceback
 
  o Build fixes:
     * Group cooking now produces output to make it easier to tell what
