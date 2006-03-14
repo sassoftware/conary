@@ -1117,18 +1117,21 @@ order by
             # NOTE: if we could assume that we have weak references this
             # would be a two-step process
             cu = self.db.cursor()
-            cu.execute("""SELECT Instances.instanceId, TroveTroves.includedId
+
+            cu.execute("""DELETE FROM TroveInfo WHERE 
+                    instanceId IN (
+                        SELECT Instances.instanceId FROM Instances
+                        WHERE isPresent = 0)
+                      """)
+
+            cu.execute("""DELETE FROM Instances WHERE 
+                    instanceId IN (
+                        SELECT Instances.instanceId
                         FROM
                         Instances LEFT OUTER JOIN TroveTroves
                         ON Instances.instanceId = TroveTroves.includedId
-                        WHERE isPresent = 0
+                        WHERE isPresent = 0 AND TroveTroves.includedId IS NULL)
                       """)
-            for instanceId, isIncluded in cu.fetchall():
-                if isIncluded is None:
-                    cu.execute("DELETE FROM Instances WHERE instanceId=?", 
-                                instanceId)
-                cu.execute("DELETE FROM TroveInfo WHERE instanceId=?", 
-                            instanceId)
 
             cu.execute("""DELETE FROM Versions WHERE Versions.versionId IN
                             (SELECT rmvdVer FROM RemovedVersions
