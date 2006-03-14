@@ -488,7 +488,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "created temporary table ffFlavor", entries)
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
-        self.log(3, "len(troveSpecs)=%s" % troveSpecs)
+        self.log(3, troveSpecs, flavorIndices)
         schema.resetTable(cu, 'gtvlTbl')
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
@@ -1056,8 +1056,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 fileLabel = fileVersion.branch().label()
                 fileId = self.toFileId(fileId)
 
-                if not self.auth.check(authToken, write = False,
-                                       label = fileLabel):
+                if not self.auth.check(authToken, write = False, label = fileLabel):
                     raise errors.InsufficientPermission
 
                 fileObj = self.troveStore.findFileVersion(fileId)
