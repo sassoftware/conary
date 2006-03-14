@@ -561,8 +561,8 @@ class Database(SqlDbRepository):
 
         errList = fsJob.getErrorList()
         if errList:
-            raise CommitError, ('file system job contains errors:\n' 
-                                '\n'.join(errList))
+            raise CommitError, ('file system job contains errors:\n' + 
+                                '\n\n'.join(errList))
         if test:
             self.db.rollback()
             return
