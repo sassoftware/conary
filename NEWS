@@ -1,4 +1,8 @@
 Changes in @NEW@
+  o Client changes:
+    * Conary will now replace symlinks and regular files as long as their
+      contents agree (bug #626)
+
   o Server changes:
     * The server traceLog now logs more information about the
       repository calls
