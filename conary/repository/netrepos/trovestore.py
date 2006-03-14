@@ -364,7 +364,7 @@ class TroveStore:
         # too slow
         cu.execute("""
         UPDATE FileStreams
-        SET stream = (SELECT NewFiles.stream FROM NewFiles
+        SET stream = (SELECT DISTINCT NewFiles.stream FROM NewFiles
                       WHERE FileStreams.fileId = NewFiles.fileId
                         AND NewFiles.stream IS NOT NULL)
         WHERE FileStreams.stream IS NULL
