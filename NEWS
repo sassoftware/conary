@@ -3,6 +3,11 @@ Changes in @NEW@
     * The server traceLog now logs more information about the
       repository calls
 
+  o Bugfixes
+    * A server error triggered when using long flavor strings in
+      server queries has been fixed.
+
+
 Changes in 1.0.7:
   o Client changes:
     * A better method of determining what local changes have been made to a
