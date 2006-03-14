@@ -1,6 +1,11 @@
+Changes in @NEW@
+  o Server changes:
+    * The server traceLog now logs more information about the
+      repository calls
+
 Changes in 1.0.7:
   o Client changes:
-    * A better method of determining what local changes have been made to a 
+    * A better method of determining what local changes have been made to a
       local system has been implemented, improving conary's behavior when
       updating.
 
@@ -25,7 +30,7 @@ Changes in 1.0.7:
 
   o Build fixes:
     * Group cooking now produces output to make it easier to tell what
-      is happening.  The --debug flag can be used to get a more 
+      is happening.  The --debug flag can be used to get a more
       detailed log of what troves are being included.
 
 Changes in 1.0.6:
