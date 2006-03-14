@@ -35,6 +35,9 @@ _thisFile = os.path.basename(sys.modules[__name__].__file__)
 # "static" placeholder for global use
 _LOG = None
 
+# Maximum str(arg) length for fully printing complex datatypes
+MaxArgLen = 100
+
 # we log time in milliseconds
 def logTime():
     t = time.time()
@@ -94,6 +97,17 @@ class FileLog(NullLog):
         self.log("logging level %d for pid %d on '%s'" % (
             self.level, self.pid, self.filename))
 
+    def argStr(self, val):
+        global MaxArgLen
+        ret = str(val)
+        # for really verbose logging levels, print everything out
+        if self.level > 3:
+            return ret
+        # otherwise, of this takes too much space, just print it's length
+        if type(val) in set([list,tuple,dict]) and len(ret) > MaxArgLen:
+            ret = "len(%s)=%d" % (type(val), len(val))
+        return ret
+
     # python cookbooks are great
     def log(self, *args):
         global _thisFile
@@ -124,7 +138,7 @@ class FileLog(NullLog):
             location = "__main__"
         msg = "%s.%s" % (module, location)
         if len(args):
-            msg = "%s %s" % (msg, " ".join([str(x) for x in args]))
+            msg = "%s %s" % (msg, " ".join([self.argStr(x) for x in args]))
         # format for logging
         msg = self.formatLog(msg)
         self.writeLog(msg)
