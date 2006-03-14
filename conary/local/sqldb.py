@@ -1114,17 +1114,19 @@ order by
 	    # which was included by a trove which was removed; getting that
 	    # closure may have to be iterative?). that process may be faster
 	    # then the full join?
+            # NOTE: if we could assume that we have weak references this
+            # would be a two-step process
             cu = self.db.cursor()
-            cu.execute("""SELECT Instances.instanceId FROM
+            cu.execute("""SELECT Instances.instanceId, TroveTroves.includedId
+                        FROM
                         Instances LEFT OUTER JOIN TroveTroves
                         ON Instances.instanceId = TroveTroves.includedId
-                        WHERE isPresent = 0 AND TroveTroves.includedId is NULL
+                        WHERE isPresent = 0
                       """)
-            instanceIds = [ x[0] for x in cu ]
-
-            for instanceId in instanceIds:
-                cu.execute("DELETE FROM Instances WHERE instanceId=?", 
-                            instanceId)
+            for instanceId, isIncluded in cu.fetchall():
+                if isIncluded is None:
+                    cu.execute("DELETE FROM Instances WHERE instanceId=?", 
+                                instanceId)
                 cu.execute("DELETE FROM TroveInfo WHERE instanceId=?", 
                             instanceId)
 
