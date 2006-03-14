@@ -33,6 +33,7 @@ class OptionError(Exception):
 
 class OptionParser(optparse.OptionParser):
     def error(self, msg):
+        print >>sys.stderr, self.usage
         raise OptionError(msg)
 
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
