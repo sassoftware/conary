@@ -730,6 +730,11 @@ class ClientUpdate:
                                                       localUpdates,
                                                       installedTroves,
                                                       referencedNotInstalled)
+            # although we needed parent updates to get the correct set of
+            # local updates related to this job, we don't care local updates
+            # that aren't related to troves in our job.
+            localUpdates = [ x for x in localUpdates if x[0] in names ]
+
         localUpdatesByPresent = \
                  dict( ((job[0], job[2][0], job[2][1]), job[1]) for
                         job in localUpdates if job[1][0] is not None and
