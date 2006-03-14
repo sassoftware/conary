@@ -20,8 +20,6 @@ Changes in 1.0.7:
       file in question. (bug #855)
     * Committing changesets which provided duplicate file streams for streams
       the server previously referenced from other servers caused a traceback
-    * Conary's patch implementation didn't handle patches which are already
-      applied
 
   o Build fixes:
     * Group cooking now produces output to make it easier to tell what
