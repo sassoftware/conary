@@ -22,7 +22,7 @@ Changes in 1.0.7:
     * Committing a changeset that provided duplicate file streams for
       streams the server previously referenced from other servers no
       longer causes a traceback.
-    * Conary's patch implementation didn't handle patches which are
+    * Conary's patch implementation how handles patches which are
       already applied. (bug #640)
 
   o Build fixes:
