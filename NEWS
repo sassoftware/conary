@@ -12,16 +12,18 @@ Changes in 1.0.7:
       buildLabel was set to conary.example.com@rpl:devel, you would be
       prompted to enter a passphrase even when cooking locally to the
       local@local:COOK label.
-    * Dependency resolution will no longer cause a trove to switch branches.
+    * Dependency resolution will no longer cause a trove to switch
+      branches.
     * If a component is kept when performing dependency resolution
       because it is still needed, it's package will be kept as well if
       possible.
     * "conary q --path" now expands symlinks found in the path to the
       file in question. (bug #855)
-    * Committing changesets which provided duplicate file streams for streams
-      the server previously referenced from other servers caused a traceback
-    * Conary's patch implementation didn't handle patches which are already
-      applied
+    * Committing a changeset that provided duplicate file streams for
+      streams the server previously referenced from other servers no
+      longer causes a traceback.
+    * Conary's patch implementation how handles patches which are
+      already applied. (bug #640)
 
   o Build fixes:
     * Group cooking now produces output to make it easier to tell what
