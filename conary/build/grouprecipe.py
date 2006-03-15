@@ -90,47 +90,503 @@ class _BaseGroupRecipe(Recipe):
 
 class GroupRecipe(_BaseGroupRecipe):
     """
-        Provides the recipe interface for creating a group.  Commands not meant 
-        to be used in recipes have an underscore in front of them.  
+    NAME
+    ====
 
-        Most user commands take a groupName parameter.  This parameter 
-        specifies the group that a particular command applies to.  For example,
-        r.add('foo', groupName='group-bar') tries to add 'foo' to 'group-bar'.
-        The group specified must have been created before it may be added to.
-        groupName may also be a list of groups, in which case the command will
-        be applied to all groups.  If groupName is not supplied or is None,
-        then the command applies to the current default group.
+    B{C{r.GroupRecipe()}} - Provides the recipe interface for creating a group.
 
-        There are several parameters to groups that are set at the time of 
-        group creation.  Although they are normally passed as parameters
-        to r.createNewGroup(), for the base group, they are set as variables
-        in the recipe class.  
+    SYNOPSIS
+    ========
 
-        Note that setting these parameters affects not only the value for 
-        the base group, but also the default value for newly created groups.
-        So, for example, if you turn on autoResolve in the base group,
-        all other groups created will have autoResolve turned on by default.
+    See USER COMMANDS Section
+    
+    DESCRIPTION
+    ===========
+    The class C{r.GroupRecipe} provides the interface for creation of groups
+    in a Conary recipe.  A group refers to a collection of troves.  The troves
+    may be related in purpose, to provide a useful functionality such as a
+    group of media-related troves to provide encoding, decoding, and playback
+    facilities for various media, for example.  Groups are not required to
+    consist of troves with related functionality however, and may contain a
+    collection of any arbitrary troves.
 
-        The following parameters are settable:
+    Most C{r.GRoupRecipe} user commands accept a B{groupName}
+    parameter.  This parameter  specifies the group a particular command
+    applies to.  For example, C{r.add('foo', groupName='group-bar')}
+    attempts to add the trove I{foo} to the group I{group-bar}.
+    
+    The group specified by B{groupName} must exist, or be created before
+    troves may be added to it. The B{groupName} parameter may also be a list
+    of groups, in which case the command will be applied to all groups.  If 
+    B{groupName} is not specified, or is None, then the command will apply to
+    the current default group.
 
-            depCheck (default False): if set to True, then conary will check
-                for dependency closure in this group, and raise an error if 
-                it is not found.
+    PARAMETERS
+    ==========
+    Several parameters may be set at the time of group creation.  Although
+    these parameters are typically passed to C{r.createNewGroup()} for the
+    base group, they should be set as variables in the recipe class.  
 
-            autoResolve (default False): if set to True, then conary will
-                include any extra troves needed to make this group dependency
-                complete.  
+    Note: Setting these parameters affects not only the value for the base 
+    group, but also the default value for all newly created groups. For
+    example, if B{autoResolve} is set to C{True} in the base group, all other 
+    groups created will have autoResolve set to C{True} by default.
 
-            checkOnlyByDefaultDeps (default True): By default, conary
-                checks only the dependencies of the troves in a group that
-                are installed by default.  By setting this option to False,
-                conary will check the dependencies of byDefault False troves
-                as well.
+    The following parameters are accepted by C{r.GroupRecipe} with default
+    values indicated in parentheses when applicable:
 
-            checkPathConflicts (default True): By default, conary checks for
-                path conflicts in each group, to ensure that the group can
-                be installed without path conflicts.  Setting this to False
-                will disable that check.
+    B{depCheck} : (False) If set to C{True}, Conary will check for dependency
+    closure in this group, and raise an error if closure is not found.
+
+    B{autoResolve} : (False) If set to C{True}, Conary will include any extra 
+    troves needed to make this group dependency complete.
+    
+    B{checkOnlyByDefaultDeps} : (True) By default, Conary checks only the
+    dependencies of the troves in a group that are installed by default.
+    Conary will check the dependencies of B{byDefault} C{False} troves as well
+    if this parameter is set to C{True}.
+
+    B{checkPathConflicts} : (True) Conary checks for path conflicts in each 
+    group by default to ensure that the group can be installed without path
+    conflicts.  Setting this parameter to C{False} will disable the check.
+    
+    USER COMMANDS
+    =============
+    The following user commands are applicable in Conary group recipes.
+    This information includes details on parameters which may be specified
+    when invoking the command:
+        
+        NAME
+        ====
+        
+        B{C{r.add()}} - Adds trove to group
+        
+        SYNOPSIS
+        ========
+        
+        C{r.add(I{name}, [I{byDefault},] [I{components},] [I{flavor},] [I{groupName},] [I{name},] [I{ref},] [I{versionStr}])}
+        
+        DESCRIPTION
+        ===========
+        
+        The C{r.add()} command is used in a conary group recipe to add a trove
+        to a group.  
+        
+        PARAMETERS
+        ==========
+        
+        The C{r.add()} command accepts the following parameters, with
+        default values shown in parentheses:
+                        
+        B{byDefault} : (None, or value of B{createNewGroup) Specifies whether
+        to include a trove  by defaultt. Defaults to the B{byDefault} setting
+        as  defined with B{createNewGroup}.
+
+        B{components} : (None) Specify a set of trove components to include.
+        Only relevant when adding packages.  Specified as a list,
+        such as C{r.add('foo', components=['runtime', 'lib'])}.
+
+        B{flavor} : (None) A flavor limiter such as that passed to
+        B{repquery} which determines the trove returned.
+        
+        B{groupName} : (None) The group to add trove to.
+        
+        B{name} : (None) Specifies the name of trove to add- This parameter is
+        required.
+            
+        B{ref} : (None) Trove reference to search for this trove in. See
+        C{r.addReference} for more information.
+         
+        B{source} : (None) Specifies the source from which this trove
+        originates for programs which read group recipes.
+        This parameter's explicit use is generally unnecessary.
+        
+        B{versionStr} : (None) A version specifier like that passed to
+        B{repquery} which determines the trove returned.
+
+        EXAMPLES
+        ========
+        
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.addAll()}} - Add all troves directly contained in a given
+        reference to groupName
+        
+        SYNOPSIS
+        ========
+        
+        C{r.addAll(I{name}, [I{flavor},] [I{groupName},] [I{recurse},] [I{ref},] [I{versionStr}])
+        
+        DESCRIPTION
+        ===========
+        
+        The C{r.addAll()} command used in a Conary group recipe adds all troves
+        directly contained in a given reference to B{groupName} to the recipe.
+        
+        For example, if the cooked I{group-foo} contains references to the
+        troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
+        entries followed by C{r.addAll(name, versionStr, flavor)} would be 
+        equivalent to adding the c{r.addTrove} lines:
+            
+        C{r.add('foo1', <version>)}
+        C{r.add('foo2', <version>)}.  
+                
+        PARAMETERS
+        ==========
+        
+        The C{r.addAll()} command accepts the following parameters, with default
+        values shown in parentheses:
+        
+        B{groupName} : (None) The group to add trove to
+        
+        B{recurse} : (True) If True, and the trove you specify with B{addAll}
+        contains groups, new groups will be created in the recipe that match
+        those contained groups, and the C{r.addAll()} command is recursed on
+        those groups.  
+        
+        Note: If the subgroups already exist in the group, those preexisting
+        groups will be used.  Otherwise, the default settings will be used
+        when creating any new groups.
+        
+        B{ref}: (None) Trove reference to search in for this trove. See
+        C{r.addReference()} for more information.
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        BC{{r.addNewGroup()}} - Adds one newly created group to another newly
+        created group
+        
+        SYNOPSIS
+        ========
+        
+        C{r.addNewGroup(I{name,} [I{byDefault},] [I{groupName}])}
+        
+        DESCRIPTION
+        ===========
+        
+        Used in a Conary group recipe, C{r.addNewGroup()} adds one newly
+        created group, to another newly created group.
+        
+        PARAMETERS
+        ==========
+        
+        The C{r.addNewGroup()} command accepts the following parameters, with
+        default values shown in parentheses:
+
+        B{name} : (None) The name of group to add
+
+        B{byDefault}: (True) Whether to add this group by default.
+
+        B{groupName} : (Current group name) The name(s) of group(s) to add
+        this trove to.
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.addReference}} - Adds a reference to a trove
+        
+        SYNOPSIS
+        ========
+        
+        C{r.addReference(I{name}, [I{flavor},] [I{ref},] [I{versionStr}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.addReference} adds a
+        reference to a trove, (usually a group trove) which may then be passed
+        to future invocations of C{r.add} or C{r.addAll} commandss as the
+        reference parameter.
+        
+        Passing in a reference will cause affected commands to search for the
+        trove to be added in the reference.
+
+        PARAMETERS
+        ==========
+        
+        The C{r.addReference()} command accepts the following parameters, with
+        default values shown in parentheses:
+            
+        B{flavor} : (None) A flavor limiter such as that passed to
+        B{repquery} which determines the trove returned.
+
+        B{name} : (None) The name of the reference to add
+
+        B{ref} : (None) Trove reference to search for this trove in. See
+        C{r.addReference} for more information.
+
+        B{versionStr} : (None) A version specifier like that passed to
+        B{repquery} which determines the trove returned.
+        
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.createGroup()}} - Creates a new group
+        
+        SYNOPSIS
+        ========
+        
+        C{r.createGroup(I{groupName}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.createGroup} creates
+        a new group.
+
+        PARAMETERS
+        ==========
+        
+        The C{r.createGroup()} command accepts the following parameters, with
+        default values shown in parentheses:
+        
+        B{autoResolve} : (current group setting) Whether to resolve 
+        dependencies for this group.
+
+        B{byDefault} : (Current group setting) Whether to add troves to this
+        group byDefault C{True}, or byDefault C{False} by default.
+        
+        B{checkOnlyByDefaultDeps} :  (Current group setting) Whether to
+        include byDefault C{False} troves in this group.
+        
+        B{checkPathConflicts} :  (Current group setting) Whether to check path
+        conflicts for this group.
+        
+        B{depCheck} : (Current group setting) Whether to check for dependency
+        closure for this group.
+        
+        B{groupName} : (None) The name of the group to be created. Must start
+        with 'group-'.
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.remove()}} - Removes a trove
+        
+        SYNOPSIS
+        ========
+        
+        C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.remove} removes a
+        trove from the group which was previously added with C{r.addAll}, or
+        C{addTrove} commands.
+
+        Note: If the trove is not included explicitly, such as by C{r.add()},
+        but rather implicitly, as a component in a package which has been
+        added, then removing the trove only changes its B{byDefault} setting,
+        so that installing this group will not install the trove.
+        
+        Troves may be removed from a super group which are present due to an
+        included subgroup. For example, the group I{group-os} is a top
+        level group, and includes I{group-dist}, which in turn, includes
+        package I{foo}.
+
+        Using C{r.remove('foo', groupName='group-os')} prevents installation
+        of package I{foo} during the installation of the group I{group-os}.
+        
+        PARAMETERS
+        ==========
+        
+        The C{r.remove()} command accepts the following parameters, with
+        default values shown in parentheses:
+
+        B{flavor} : (None) A flavor limiter such as that passed to
+        B{repquery} which determines the trove returned.
+
+        B{groupName} : (None) The name of the group to remove trove from
+
+        B{name} : (None) The name of the trove to be removed. This parameter
+        is required.
+
+        B{versionStr} : (None) A version specifier like that passed to
+        B{repquery} which determines the trove returned.
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.removeComponents()}} - Define components which should not be
+        installed
+        
+        SYNOPSIS
+        ========
+        
+        C{r.removeComponents(I{componentList}, [I{groupName}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.removeComponents}
+        specifies components which should not be installed by default when
+        installing the group.
+        
+        PARAMETERS
+        ==========
+        
+        The C{r.removeComponents()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{componentList} : (None) A list of components which should not be
+        installed by default when the group is installed
+
+        B{groupName} : (None) The name of the group to affect
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.Requires()}} - Defines a runtime requirement for group
+        
+        SYNOPSIS
+        ========
+        
+        C{r.Requires(I{requirement}, [I{groupName}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.Requires} causes a
+        group to have a runtime requirement of the trove requirement.
+        
+        PARAMETERS
+        ==========
+        
+        The C{r.Requires()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{requirement} : (None) Specifies the group runtime requirement
+
+        B{groupName} : (None) The name of the group to affect
+
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.replace()}} - Replace troves
+        
+        SYNOPSIS
+        ========
+        
+        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.replace} replaces all
+        troves with a particular name with a new version of the trove.
+
+        Note: By default, C{r.replace()} affects B{all} groups.  This behavior
+        is different from other group commands.
+            
+        PARAMETERS
+        ==========
+        
+        The C{r.replace()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{name} : (None) Specify name of the trove to replace
+
+        B{groupName} : (None) The name of the group to affect
+        
+        B{newFlavor} : (None) The new flavor to add
+
+        B{newVersionStr} : (None) The new version to add
+        
+        B{ref} : (None) The trove reference to search for the trove in
+        
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+
+
+        NAME
+        ====
+        
+        B{C{r.setByDefault()}} - Set troves to be added to group with byDefault
+        True
+        
+        SYNOPSIS
+        ========
+        
+        C{r.setByDefault(I{byDefault}, [I{groupName}])}
+        
+        DESCRIPTION
+        ===========
+        
+        When used from within a Conary group recipe, C{r.setByDefault}
+        specifies whether troves are added to the group with B{byDefault}
+        C{True}.
+            
+        PARAMETERS
+        ==========
+        
+        The C{r.setByDefault()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{byDefault} : (Current group setting) Whether to add troves to this
+        group byDefault C{True}, or byDefault C{False} by default.
+
+        B{groupName} : (None) The name of the group to affect
+        
+        EXAMPLES
+        ========
+
+        FIXME Need Example
+        example:
+        r.setByDefault(False, groupName='group-os')
+        
+        
+    B{setDefaultGroup}
+    B{setLabelPath}
     """
     Flags = use.LocalFlags
     ignore = 1
