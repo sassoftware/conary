@@ -229,8 +229,9 @@ def commit(repos, cfg, message, callback=None):
                       "from the head of the branch; use update")
             return
 
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(), 
-                                     cfg=cfg, repos=repos)
+    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                     cfg=cfg, repos=repos,
+                                     branch=state.getBranch())
 
     srcMap = {}
     cwd = os.getcwd()
