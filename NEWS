@@ -1,7 +1,11 @@
-Changes in @NEW@
+Changes in 1.0.8
   o Client changes:
     * Conary will now replace symlinks and regular files as long as their
       contents agree (bug #626)
+
+  o Bug Fixes:
+    * An error in the method of determining what local changes have been 
+      made has been fixed.
 
 Changes in 1.0.7:
   o Client changes:
