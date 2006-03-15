@@ -3,15 +3,6 @@ Changes in @NEW@
     * Conary will now replace symlinks and regular files as long as their
       contents agree (bug #626)
 
-  o Server changes:
-    * The server traceLog now logs more information about the
-      repository calls
-
-  o Bugfixes
-    * A server error triggered when using long flavor strings in
-      server queries has been fixed.
-
-
 Changes in 1.0.7:
   o Client changes:
     * A better method of determining what local changes have been made to a
@@ -38,11 +29,18 @@ Changes in 1.0.7:
       longer causes a traceback.
     * Conary's patch implementation how handles patches which are
       already applied. (bug #640)
+    * A server error triggered when using long flavor strings in
+      server queries has been fixed.
 
   o Build fixes:
     * Group cooking now produces output to make it easier to tell what
       is happening.  The --debug flag can be used to get a more
       detailed log of what troves are being included.
+
+  o Server changes:
+    * The server traceLog now logs more information about the
+      repository calls
+
 
 Changes in 1.0.6:
   o Repository changes:
