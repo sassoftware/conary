@@ -48,11 +48,15 @@ subdirs: default-subdirs
 
 install: install-subdirs
 
-dist: $(dist_files)
+dist:
 	if ! grep "^Changes in $(VERSION)" NEWS > /dev/null 2>&1; then \
 		echo "no NEWS entry"; \
 		exit 1; \
 	fi
+	$(MAKE) forcedist
+
+
+forcedist: $(dist_files)
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
 	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
