@@ -256,15 +256,15 @@ class DependencyChecker:
         oldOldEdges.difference_update(oldNewEdges)
         newNewEdges.difference_update(newOldEdges)
 
-    def _createCollectionEdges(self, jobSet, troveSource):
+    def _createCollectionEdges(self, jobSet):
         edges = set()
         i = 0
         for job in jobSet:
             if job[2][0] is None: continue
             if not trove.troveIsCollection(job[0]): continue
 
-            trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                       withFiles = False)
+            trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                            withFiles = False)
 
             for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
                 targetTrove = self.newInfoToNodeId.get(info, -1)
@@ -337,7 +337,7 @@ class DependencyChecker:
         return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
 
     def _gatherDependencyErrors(self, satisfied, brokenByErase, unresolveable, 
-                                depList, wasIn):
+                                wasIn):
 
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
@@ -457,18 +457,62 @@ class DependencyChecker:
         # (which is -1 * each index into depList), and subtract out the
         # dependencies which were satistied. what's left are the depNum's
         # (negative) of the dependencies which failed
-        unsatisfied = set([ -1 * x for x in range(len(depList)) ]) - satisfied
+        unsatisfied = set([ -1 * x for x in range(len(self.depList)) ]) - \
+                                    satisfied
         # don't report things as both unsatisfied and unresolveable
         unsatisfied = unsatisfied - unresolveable
 
-        unsatisfiedList = _depItemsToSet(unsatisfied, depList)
-        unresolveableList = _depItemsToSet(unresolveable, depList,
+        unsatisfiedList = _depItemsToSet(unsatisfied, self.depList)
+        unresolveableList = _depItemsToSet(unresolveable, self.depList,
                                            wasIn = wasIn )
         unresolveableList += _brokenItemsToSet(self.cu, brokenByErase, wasIn)
 
         _expandProvidedBy(self.cu, unresolveableList)
 
         return (unsatisfiedList, unresolveableList)
+
+    def _gatherResolution(self, result):
+        # these track the nodes which satisfy each depId. brokenByErase
+        # tracks what used to provide something but is being removed, while
+        # satisfied tracks what now provides it
+        unresolveable = set()
+        brokenByErase = {}
+        satisfied = { 0 : 0 }
+        wasIn = {}
+
+        for (depId, depNum, reqInstanceId,
+             reqNodeIdx, provInstId, provNodeIdx) in result:
+            if provNodeIdx is not None:
+                if reqNodeIdx is not None:
+                    # this is an old dependency and an old provide.
+                    # ignore it
+                    continue
+                if depNum < 0:
+                    # the dependency would have been resolved, but this
+                    # change set removes what would have resolved it
+                    unresolveable.add(depNum)
+                    wasIn.setdefault(depNum, []).append(provInstId)
+                else:
+                    # this change set removes something which is needed
+                    # by something else on the system (it might provide
+                    # a replacement; we handle that later)
+                    brokenByErase[depNum] = provNodeIdx
+                    wasIn.setdefault(depNum, []).append(provInstId)
+            else:
+                # if we get here, the dependency is resolved; mark it as
+                # resolved by clearing it's entry in depList
+                if depNum < 0:
+                    satisfied[depNum] = provInstId
+                else:
+                    # if depNum > 0, this was a dependency which was checked
+                    # because of something which is being removed, but it
+                    # remains satisfied
+                    satisfied[depNum] = provInstId
+
+        satisfied = set(satisfied)
+        brokenByErase = set(brokenByErase)
+
+        return satisfied, brokenByErase, wasIn, unresolveable
 
     def _stronglyConnect(self):
         def orderJobSets(jobSetA, jobSetB):
@@ -524,8 +568,7 @@ class DependencyChecker:
 
         return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
 
-    def _findOrdering(self, jobSet, result, depList, troveSource,
-                      brokenByErase, satisfied):
+    def _findOrdering(self, jobSet, result, brokenByErase, satisfied):
         changeSetList = []
 
         # there are four kinds of edges -- old needs old, old needs new,
@@ -533,13 +576,13 @@ class DependencyChecker:
         # to aid in cancelling them out. Our initial edge representation
         # is a simple set of edges.
         oldNewEdges, oldOldEdges, newNewEdges, newOldEdges = \
-                    self._createDependencyEdges(result, depList)
+                    self._createDependencyEdges(result, self.depList)
 
         # Create dependencies from collections to the things they include.
         # This forces collections to be installed after all of their
         # elements.  We include weak references in case the intermediate
         # trove is not part of the update job.
-        newNewEdges.update(self._createCollectionEdges(jobSet, troveSource))
+        newNewEdges.update(self._createCollectionEdges(jobSet))
 
         resatisfied = brokenByErase & satisfied
         if resatisfied:
@@ -595,7 +638,33 @@ class DependencyChecker:
         # skips the None node on the front
         return [ x[0] for x in itertools.islice(self.nodes, 1, None) ]
 
-    def __init__(self, cu):
+    def addJobs(self, jobSet):
+        for job in jobSet:
+            if job[2][0] is None:
+                nodeId = self._addJob(job)
+                self.workTables.removeTrove((job[0], job[1][0], job[1][1]), 
+                                            nodeId)
+            else:
+                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                                withFiles = False)
+
+                newNodeId = self._addJob(job)
+
+                self.workTables._populateTmpTable(depList = self.depList,
+                                                  troveNum = -newNodeId,
+                                                  requires = trv.getRequires(),
+                                                  provides = trv.getProvides(),
+                                                  multiplier = -1)
+
+                if job[1][0] is not None:
+                    self.workTables.removeTrove((job[0], job[1][0], job[1][1]),
+                                                newNodeId)
+
+        # merge everything into TmpDependencies, TmpRequires, and tmpProvides
+        self.workTables.merge()
+        self.workTables.mergeRemoves()
+
+    def __init__(self, cu, troveSource):
         self.g = graph.DirectedGraph()
         # adding None to the front prevents us from using nodeId's of 0, which
         # would be a problem since we use negative nodeIds in the SQL
@@ -603,7 +672,10 @@ class DependencyChecker:
         # present, and -1 * 0 == 0
         self.nodes = [ None ]
         self.newInfoToNodeId = {}
+        self.depList = [ None ]
         self.cu = cu
+        self.troveSource = troveSource
+        self.workTables = DependencyWorkTables(cu, removeTables = True)
 
 class DependencyTables:
     def get(self, cu, trv, troveId):
@@ -790,8 +862,6 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        workTables = DependencyWorkTables(cu, removeTables = True)
-
 	# this begins a transaction. we do this explicitly to keep from
 	# grabbing any exclusive locks (when the python binding autostarts
 	# a transaction, it uses "begin immediate" to grab an exclusive
@@ -802,38 +872,14 @@ class DependencyTables:
 	cu.execute("BEGIN")
 
         # build the table of all the requirements we're looking for
-        depList = [ None ]
-
-        checker = DependencyChecker(cu)
+        checker = DependencyChecker(cu, troveSource)
 
 	# This sets up negative depNum entries for the requirements we're
 	# checking (multiplier = -1 makes them negative), with (-1 * depNum)
 	# indexing depList. depList is a list of (troveNum, depClass, dep)
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
-        for job in jobSet:
-            if job[2][0] is None:
-                nodeId = checker._addJob(job)
-                workTables.removeTrove((job[0], job[1][0], job[1][1]), nodeId)
-            else:
-                trv = troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                           withFiles = False)
-
-                newNodeId = checker._addJob(job)
-
-                workTables._populateTmpTable(depList = depList,
-                                             troveNum = -newNodeId,
-                                             requires = trv.getRequires(),
-                                             provides = trv.getProvides(),
-                                             multiplier = -1)
-
-                if job[1][0] is not None:
-                    workTables.removeTrove((job[0], job[1][0], job[1][1]), 
-                                           newNodeId)
-
-        # merge everything into TmpDependencies, TmpRequires, and tmpProvides
-        workTables.merge()
-        workTables.mergeRemoves()
+        checker.addJobs(jobSet)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
@@ -865,57 +911,20 @@ class DependencyTables:
         #    depList); positive ones are for dependencies broken by an
         #    erase (and need to be looked up in the Requires table in the
         #    database to get a nice description)
-        unresolveable = set()
-
-        # these track the nodes which satisfy each depId. brokenByErase
-        # tracks what used to provide something but is being removed, while
-        # satisfied tracks what now provides it
-        brokenByErase = {}
-        satisfied = { 0 : 0 }
-        wasIn = {}
-
-        for (depId, depNum, reqInstanceId,
-             reqNodeIdx, provInstId, provNodeIdx) in result:
-            if provNodeIdx is not None:
-                if reqNodeIdx is not None:
-                    # this is an old dependency and an old provide.
-                    # ignore it
-                    continue
-                if depNum < 0:
-                    # the dependency would have been resolved, but this
-                    # change set removes what would have resolved it
-                    unresolveable.add(depNum)
-                    wasIn.setdefault(depNum, []).append(provInstId)
-                else:
-                    # this change set removes something which is needed
-                    # by something else on the system (it might provide
-                    # a replacement; we handle that later)
-                    brokenByErase[depNum] = provNodeIdx
-                    wasIn.setdefault(depNum, []).append(provInstId)
-            else:
-                # if we get here, the dependency is resolved; mark it as
-                # resolved by clearing it's entry in depList
-                if depNum < 0:
-                    satisfied[depNum] = provInstId
-                else:
-                    # if depNum > 0, this was a dependency which was checked
-                    # because of something which is being removed, but it
-                    # remains satisfied
-                    satisfied[depNum] = provInstId
-
-        satisfied = set(satisfied)
-        brokenByErase = set(brokenByErase)
+        satisfied, brokenByErase, wasIn, unresolveable = \
+                                checker._gatherResolution(result)
 
         if findOrdering:
-            changeSetList = checker._findOrdering(jobSet, result, depList,
-                                                  troveSource, brokenByErase,
+            changeSetList = checker._findOrdering(jobSet, result,
+                                                  brokenByErase,
                                                   satisfied)
         else:
             changeSetList = []
 
         unsatisfiedList, unresolveableList = \
                 checker._gatherDependencyErrors(satisfied, brokenByErase,
-                                                unresolveable, depList, wasIn)
+                                                unresolveable,
+                                                wasIn)
 
         # no need to drop our temporary tables since we're rolling this whole
         # transaction back anyway
