@@ -336,6 +336,140 @@ class DependencyChecker:
 
         return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
 
+    def _gatherDependencyErrors(self, satisfied, brokenByErase, unresolveable, 
+                                depList, wasIn):
+
+        def _depItemsToSet(idxList, depInfoList, provInfo = True,
+                           wasIn = None):
+            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
+                    for x in self.iterNodes() ]
+            ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
+
+            for idx in idxList:
+                (troveIndex, classId, dep) = depInfoList[-idx]
+
+                if classId in ignoreDepClasses:
+                    continue
+
+                troveIndex = -(troveIndex + 1)
+
+                if failedSets[troveIndex][2] is None:
+                    failedSets[troveIndex] = (failedSets[troveIndex][0],
+                                              failedSets[troveIndex][1],
+                                              deps.DependencySet(),
+                                              []
+                                              )
+                failedSets[troveIndex][2].addDep(
+                                deps.dependencyClasses[classId], dep)
+
+                if wasIn is not None:
+                    failedSets[troveIndex][3].extend(wasIn[idx])
+
+            failedList = []
+            for (name, classId, depSet, neededByList) in failedSets:
+                if depSet is not None:
+                    if not wasIn:
+                        failedList.append((name, depSet))
+                    else:
+                        failedList.append((name, depSet, neededByList))
+
+            return failedList
+
+        def _brokenItemsToSet(cu, depIdSet, wasIn):
+            # this only works for databases (not repositories)
+            if not depIdSet: return []
+
+            schema.resetTable(cu, 'BrokenDeps')
+            for depNum in depIdSet:
+                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
+                           start_transaction = False)
+
+            cu.execute("""
+                    SELECT DISTINCT troveName, version, flavor, class,
+                                    name, flag, BrokenDeps.depNum FROM
+                        BrokenDeps INNER JOIN Requires ON
+                            BrokenDeps.depNum = Requires.DepNum
+                        JOIN Dependencies ON
+                            Requires.depId = Dependencies.depId
+                        JOIN Instances ON
+                            Requires.instanceId = Instances.instanceId
+                        JOIN Versions ON
+                            Instances.versionId = Versions.versionId
+                        JOIN Flavors ON
+                            Instances.flavorId = Flavors.flavorId
+                """, start_transaction = False)
+
+            failedSets = {}
+            for (troveName, troveVersion, troveFlavor, depClass, depName,
+                            flag, depNum) in cu:
+                info = (troveName, versions.VersionFromString(troveVersion),
+                        deps.ThawDependencySet(troveFlavor))
+
+                if info not in failedSets:
+                    failedSets[info] = (deps.DependencySet(), [])
+
+                if flag == NO_FLAG_MAGIC:
+                    flags = []
+                else:
+                    flags = [ (flag, deps.FLAG_SENSE_REQUIRED) ]
+
+                failedSets[info][0].addDep(
+                        deps.dependencyClasses[depClass],
+                        deps.Dependency(depName, flags))
+                failedSets[info][1].extend(wasIn[depNum])
+
+            return [ (x[0], x[1][0], x[1][1])
+                                for x in failedSets.iteritems() ]
+
+        def _expandProvidedBy(cu, itemList):
+            for info, depSet, provideList in itemList:
+                for instanceId in provideList:
+                    assert(instanceId > 0)
+                cu.execute("""
+                        SELECT DISTINCT troveName, version, flavor FROM
+                            Instances JOIN Versions ON
+                                Instances.versionId = Versions.versionId
+                            JOIN Flavors ON
+                                Instances.flavorId = Flavors.flavorId
+                            WHERE
+                                instanceId IN (%s)""" %
+                        ",".join(["%d" % x for x in provideList]))
+
+                del provideList[:]
+                for name, version, flavor in cu:
+                    if flavor is None:
+                        flavor = ""
+                    provideList.append((name,
+                                        versions.VersionFromString(version),
+                                        deps.ThawDependencySet(flavor)))
+        # def _gatherDependencyErrors starts here
+
+        # things which are listed in satisfied should be removed from
+        # brokenByErase; they are dependencies that were broken, but are
+        # resolved by something else
+        brokenByErase.difference_update(satisfied)
+
+        # sort things out of unresolveable which were resolved by something
+        # else.
+        unresolveable.difference_update(satisfied)
+
+        # build a list of all of the depnums which need to be satisfied
+        # (which is -1 * each index into depList), and subtract out the
+        # dependencies which were satistied. what's left are the depNum's
+        # (negative) of the dependencies which failed
+        unsatisfied = set([ -1 * x for x in range(len(depList)) ]) - satisfied
+        # don't report things as both unsatisfied and unresolveable
+        unsatisfied = unsatisfied - unresolveable
+
+        unsatisfiedList = _depItemsToSet(unsatisfied, depList)
+        unresolveableList = _depItemsToSet(unresolveable, depList,
+                                           wasIn = wasIn )
+        unresolveableList += _brokenItemsToSet(self.cu, brokenByErase, wasIn)
+
+        _expandProvidedBy(self.cu, unresolveableList)
+
+        return (unsatisfiedList, unresolveableList)
+
     def _stronglyConnect(self):
         def orderJobSets(jobSetA, jobSetB):
             AHasInfo = 0
@@ -407,7 +541,7 @@ class DependencyChecker:
         # trove is not part of the update job.
         newNewEdges.update(self._createCollectionEdges(jobSet, troveSource))
 
-        resatisfied = set(brokenByErase) & set(satisfied)
+        resatisfied = brokenByErase & satisfied
         if resatisfied:
             # These dependencies are ones where the same dependency
             # is being both removed and added, and which is required
@@ -461,7 +595,7 @@ class DependencyChecker:
         # skips the None node on the front
         return [ x[0] for x in itertools.islice(self.nodes, 1, None) ]
 
-    def __init__(self):
+    def __init__(self, cu):
         self.g = graph.DirectedGraph()
         # adding None to the front prevents us from using nodeId's of 0, which
         # would be a problem since we use negative nodeIds in the SQL
@@ -469,6 +603,7 @@ class DependencyChecker:
         # present, and -1 * 0 == 0
         self.nodes = [ None ]
         self.newInfoToNodeId = {}
+        self.cu = cu
 
 class DependencyTables:
     def get(self, cu, trv, troveId):
@@ -651,109 +786,6 @@ class DependencyTables:
 		dependency failures caused by removal of existing
 		packages
 	"""
-        def _depItemsToSet(idxList, depInfoList, provInfo = True,
-                           wasIn = None):
-            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
-                    for x in checker.iterNodes() ]
-            ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
-
-            for idx in idxList:
-                (troveIndex, classId, dep) = depInfoList[-idx]
-
-                if classId in ignoreDepClasses:
-                    continue
-
-                troveIndex = -(troveIndex + 1)
-
-                if failedSets[troveIndex][2] is None:
-                    failedSets[troveIndex] = (failedSets[troveIndex][0],
-                                              failedSets[troveIndex][1],
-                                              deps.DependencySet(),
-                                              []
-                                              )
-                failedSets[troveIndex][2].addDep(
-                                deps.dependencyClasses[classId], dep)
-
-                if wasIn is not None:
-                    failedSets[troveIndex][3].extend(wasIn[idx])
-
-            failedList = []
-            for (name, classId, depSet, neededByList) in failedSets:
-                if depSet is not None:
-                    if not wasIn:
-                        failedList.append((name, depSet))
-                    else:
-                        failedList.append((name, depSet, neededByList))
-
-            return failedList
-
-        def _brokenItemsToSet(cu, depIdSet, wasIn):
-            # this only works for databases (not repositories)
-            if not depIdSet: return []
-
-            schema.resetTable(cu, 'BrokenDeps')
-            for depNum in depIdSet:
-                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
-                           start_transaction = False)
-
-            cu.execute("""
-                    SELECT DISTINCT troveName, version, flavor, class,
-                                    name, flag, BrokenDeps.depNum FROM
-                        BrokenDeps INNER JOIN Requires ON
-                            BrokenDeps.depNum = Requires.DepNum
-                        JOIN Dependencies ON
-                            Requires.depId = Dependencies.depId
-                        JOIN Instances ON
-                            Requires.instanceId = Instances.instanceId
-                        JOIN Versions ON
-                            Instances.versionId = Versions.versionId
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                """, start_transaction = False)
-
-            failedSets = {}
-            for (troveName, troveVersion, troveFlavor, depClass, depName,
-                            flag, depNum) in cu:
-                info = (troveName, versions.VersionFromString(troveVersion),
-                        deps.ThawDependencySet(troveFlavor))
-
-                if info not in failedSets:
-                    failedSets[info] = (deps.DependencySet(), [])
-
-                if flag == NO_FLAG_MAGIC:
-                    flags = []
-                else:
-                    flags = [ (flag, deps.FLAG_SENSE_REQUIRED) ]
-
-                failedSets[info][0].addDep(
-                        deps.dependencyClasses[depClass],
-                        deps.Dependency(depName, flags))
-                failedSets[info][1].extend(wasIn[depNum])
-
-            return [ (x[0], x[1][0], x[1][1])
-                                for x in failedSets.iteritems() ]
-
-        def _expandProvidedBy(cu, itemList):
-            for info, depSet, provideList in itemList:
-                for instanceId in provideList:
-                    assert(instanceId > 0)
-                cu.execute("""
-                        SELECT DISTINCT troveName, version, flavor FROM
-                            Instances JOIN Versions ON
-                                Instances.versionId = Versions.versionId
-                            JOIN Flavors ON
-                                Instances.flavorId = Flavors.flavorId
-                            WHERE
-                                instanceId IN (%s)""" %
-                        ",".join(["%d" % x for x in provideList]))
-
-                del provideList[:]
-                for name, version, flavor in cu:
-                    if flavor is None:
-                        flavor = ""
-                    provideList.append((name,
-                                        versions.VersionFromString(version),
-                                        deps.ThawDependencySet(flavor)))
 
         # this works against a database, not a repository
         cu = self.db.cursor()
@@ -772,7 +804,7 @@ class DependencyTables:
         # build the table of all the requirements we're looking for
         depList = [ None ]
 
-        checker = DependencyChecker()
+        checker = DependencyChecker(cu)
 
 	# This sets up negative depNum entries for the requirements we're
 	# checking (multiplier = -1 makes them negative), with (-1 * depNum)
@@ -833,12 +865,6 @@ class DependencyTables:
         #    depList); positive ones are for dependencies broken by an
         #    erase (and need to be looked up in the Requires table in the
         #    database to get a nice description)
-        # removedInstanceId != None means that the dependency was resolved by
-        #    something which is being removed. If it is None, the dependency
-        #    was resolved by something which isn't disappearing. It could
-        #    occur multiple times for the same dependency with both None
-        #    and !None, in which case the None wins (as long as one item
-        #    resolves it, it's resolved)
         unresolveable = set()
 
         # these track the nodes which satisfy each depId. brokenByErase
@@ -863,7 +889,7 @@ class DependencyTables:
                 else:
                     # this change set removes something which is needed
                     # by something else on the system (it might provide
-		    # a replacement; we handle that later)
+                    # a replacement; we handle that later)
                     brokenByErase[depNum] = provNodeIdx
                     wasIn.setdefault(depNum, []).append(provInstId)
             else:
@@ -877,6 +903,9 @@ class DependencyTables:
                     # remains satisfied
                     satisfied[depNum] = provInstId
 
+        satisfied = set(satisfied)
+        brokenByErase = set(brokenByErase)
+
         if findOrdering:
             changeSetList = checker._findOrdering(jobSet, result, depList,
                                                   troveSource, brokenByErase,
@@ -884,36 +913,13 @@ class DependencyTables:
         else:
             changeSetList = []
 
-        satisfied = set(satisfied)
-        brokenByErase = set(brokenByErase)
-
-        # things which are listed in satisfied should be removed from
-        # brokenByErase; they are dependencies that were broken, but are
-        # resolved by something else
-        brokenByErase.difference_update(satisfied)
-
-        # sort things out of unresolveable which were resolved by something
-        # else.
-        unresolveable.difference_update(satisfied)
-
-        # build a list of all of the depnums which need to be satisfied
-        # (which is -1 * each index into depList), and subtract out the
-        # dependencies which were satistied. what's left are the depNum's
-        # (negative) of the dependencies which failed
-        unsatisfied = set([ -1 * x for x in range(len(depList)) ]) - satisfied
-        # don't report things as both unsatisfied and unresolveable
-        unsatisfied = unsatisfied - unresolveable
-
-        unsatisfiedList = _depItemsToSet(unsatisfied, depList)
-        unresolveableList = _depItemsToSet(unresolveable, depList,
-                                           wasIn = wasIn )
-        unresolveableList += _brokenItemsToSet(cu, brokenByErase, wasIn)
-
-        _expandProvidedBy(cu, unresolveableList)
+        unsatisfiedList, unresolveableList = \
+                checker._gatherDependencyErrors(satisfied, brokenByErase,
+                                                unresolveable, depList, wasIn)
 
         # no need to drop our temporary tables since we're rolling this whole
         # transaction back anyway
-	self.db.rollback()
+        self.db.rollback()
 
         return (unsatisfiedList, unresolveableList, changeSetList)
 
