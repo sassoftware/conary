@@ -730,6 +730,10 @@ class ClientUpdate:
                                                       localUpdates,
                                                       installedTroves,
                                                       referencedNotInstalled)
+            # make some assertions about the local updates:
+            # 1. a missing trove can only be a part of one local update
+            # 2. a present trove can only be a part of one local update
+
             # although we needed parent updates to get the correct set of
             # local updates related to this job, we don't care local updates
             # that aren't related to troves in our job.
@@ -1756,8 +1760,6 @@ conary erase '%s=%s[%s]'
             installedTroves = installedTroves.copy()
             missingTroves = missingTroves.copy()
 
-        del oldTroveTups, newTroveTups
-
         allJobs = []
         for oldTrove, newTrove in itertools.izip(oldTroves, newTroves):
             # find the relevant local updates by performing a 
@@ -1775,10 +1777,10 @@ conary erase '%s=%s[%s]'
             # only create local updates between old troves that
             # don't exist and new troves that do.
             for tup, _, isStrong in oldTrove.iterTroveListInfo():
-                if tup in missingTroves:
+                if tup in missingTroves and tup not in oldTroveTups:
                     notExistsOldTrove.addTrove(*tup)
             for tup, _, isStrong in newTrove.iterTroveListInfo():
-                if tup in installedTroves:
+                if tup in installedTroves and tup not in newTroveTups:
                     existsNewTrove.addTrove( *tup)
 
             newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
