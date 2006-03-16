@@ -1777,10 +1777,12 @@ conary erase '%s=%s[%s]'
             # only create local updates between old troves that
             # don't exist and new troves that do.
             for tup, _, isStrong in oldTrove.iterTroveListInfo():
-                if tup in missingTroves and tup not in oldTroveTups:
+                if (tup in missingTroves and tup not in oldTroveTups
+                    and not newTrove.hasTrove(*tup)):
                     notExistsOldTrove.addTrove(*tup)
             for tup, _, isStrong in newTrove.iterTroveListInfo():
-                if tup in installedTroves and tup not in newTroveTups:
+                if (tup in installedTroves and tup not in newTroveTups
+                    and not oldTrove.hasTrove(*tup)):
                     existsNewTrove.addTrove( *tup)
 
             newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
