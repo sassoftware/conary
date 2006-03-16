@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o Bug Fixes:
     * Recipes that use loadRecipe('foo') and rely on conary to look upstream
-      to find their branch.
+      to find their branch now work correctly when committing.
     * A bug affecting systems with multiple groups referencing the same troves,
       where the groups are out of sync, has been fixed.
 
