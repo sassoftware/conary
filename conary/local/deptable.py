@@ -110,10 +110,16 @@ class DependencyWorkTables:
             allDeps += [ (1,  x) for x in
                             provides.getDepClasses().iteritems() ]
 
+        populateStmt = self.cu.compile("""
+            INSERT INTO DepCheck
+            (troveId, depNum, flagCount, isProvides, class, name, flag)
+            VALUES(?, ?, ?, ?, ?, ?, ?)
+            """)
+
         for (isProvides, (classId, depClass)) in allDeps:
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                    self.cu.execstmt(self.populateStmt,
+                    self.cu.execstmt(populateStmt,
                                    troveNum, multiplier * len(depList),
                                     1 + len(flags), isProvides, classId,
                                     depName, NO_FLAG_MAGIC)
@@ -217,12 +223,6 @@ class DependencyWorkTables:
 
         if removeTables:
             schema.resetTable(self.cu, "RemovedTroveIds")
-
-        self.populateStmt = self.cu.compile("""
-            INSERT INTO DepCheck
-            (troveId, depNum, flagCount, isProvides, class, name, flag)
-            VALUES(?, ?, ?, ?, ?, ?, ?)
-            """)
 
 class DependencyChecker:
 
