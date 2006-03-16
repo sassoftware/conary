@@ -702,12 +702,28 @@ class _AbstractPackageRecipe(Recipe):
 
 class PackageRecipe(_AbstractPackageRecipe):
     """
+    NAME
+    ====
+    B{C{PackageRecipe}} - Base class which provides Conary functionality
+    
+    SYNOPSIS
+    ========
+    
+    C{PackageRecipe} is inheirted by the other *PackageRecipe super classes
+    
+    DESCRIPTION
+    ===========
+    
     The C{PackageRecipe} base class provides Conary recipes with references to
     the essential troves which offer Conary's functionality. 
     
     Other PackageRecipe classes such as C{AutoPackageRecipe} inherit the
     functionality offerred by C{PackageRecipe}.
     
+    EXAMPLE
+    =======
+    
+    FIXME : What to do for an example here?
     """
     # abstract base class
     ignore = 1
@@ -744,6 +760,20 @@ _addRecipeToCopy(PackageRecipe)
 
 class BuildPackageRecipe(PackageRecipe):
     """
+    NAME
+    ====
+    
+    B{C{BuildPackageRecipe}} - Build packages requiring Make and shell
+    utilities
+    
+    SYNOPSIS
+    ========
+    
+    C{class I{className(BuildPackageRecipe):}}
+    
+    DESCRIPTION
+    ===========
+    
     The C{BuildPackageRecipe} class provides recipes with capabilities for
     building packages which require the C{make} utility, and additional,
     standard shell tools.
@@ -752,6 +782,13 @@ class BuildPackageRecipe(PackageRecipe):
     requirements that are not satisfied by the C{CPackageRecipe} class, such
     as the C{gawk}, C{grep}, and C{sed} utilities.
     
+    EXAMPLE
+    =======
+    
+    C{class DocbookDtds(BuidlPackageRecipe):}
+    
+    The above example demonstrates using C{BuildPackageRecipe} in defining the
+    class for a Docbook Document Type Definition collection recipe.
     """
     # Again, no :devellib here
     buildRequires = [
@@ -773,6 +810,19 @@ _addRecipeToCopy(BuildPackageRecipe)
 
 class CPackageRecipe(BuildPackageRecipe):
     """
+    NAME
+    ====
+    
+    B{C{CPackageRecipe}} - Build packages consisting of binaries built from C
+    source code
+    
+    SYNOPSIS
+    ========
+    
+    C{class I{className(CPackageRecipe):}}
+    
+    DESCRIPTION
+    ===========
     The C{CPackageRecipe} class provides the essential build requirements
     needed for packages consisting of binaries built from C source code.
     
@@ -780,6 +830,14 @@ class CPackageRecipe(BuildPackageRecipe):
     consist of applications derived from C source code which do not require
     additional shell utilities as build requirements use the
     C{CPackageRecipe} class.
+
+    EXAMPLE
+    =======
+    
+    C{class Bzip2(CPackageRecipe):}
+    
+    The above example defines the class for a C{bzip2} recipe using 
+    C{AutoPackageRecipe}.
     """
     buildRequires = [
         'binutils:runtime',
@@ -805,6 +863,19 @@ _addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
+    NAME
+    ====
+    
+    B{C{AutoPackageRecipe}} - Build simple packages with auto* tools
+    
+    SYNOPSIS
+    ========
+    
+    C{class I{className(AutoPackageRecipe):}}
+    
+    DESCRIPTION
+    ===========
+    
     The  C{AutoPackageRecipe} recipe class provides a simple means for the
     creation of basic packages which are built from source code using the
     auto* tools, such as C{automake}, and C{autoconf}.  
@@ -836,6 +907,14 @@ class AutoPackageRecipe(CPackageRecipe):
     Of the three methods, C{Configure}, and C{Make} are least likely to be
     insufficient, and require overriding for the majority of recipes using 
     C{AutoPackageRecipe}.
+    
+    EXAMPLE
+    =======
+    
+    C{class Gimp(AutoPackageRecipe):}
+    
+    The above example defines the class for a GNU Image Manipulation Program
+    (Gimp) recipe using C{AutoPackageRecipe}.
     """
     Flags = use.LocalFlags
     # abstract base class
