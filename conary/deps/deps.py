@@ -819,6 +819,13 @@ class DependencySet(object):
             c = members.__class__
             if tag in self.members:
 		self.members[tag].union(members, mergeType = mergeType)
+
+                # If we're dropping conflicts, we might drop this class
+                # of troves all together.
+                if (mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS
+                    and c.justOne and not 
+                    self.members[tag].members.values()[0].flags):
+                    del self.members[tag]
 	    else:
                 for dep in members.members.itervalues():
                     a(c, dep)
@@ -1041,6 +1048,10 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
                     depsByName.setdefault(dep.name, []).append(dep)
         for depList in depsByName.itervalues():
             dep = _mergeDeps(depList, mergeType)
+            if (depClass.justOne
+                and mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS and 
+                not dep.flags):
+                continue
             a(depClass, dep)
     return finalDep
 
