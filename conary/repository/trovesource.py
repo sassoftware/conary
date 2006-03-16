@@ -791,6 +791,18 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         return (cs, remainder)
 
+    def merge(self, source):
+        assert(not self.storeDeps and not source.storeDeps)
+        self.troveCsMap.update(source.troveCsMap)
+        self.jobMap.update(source.jobMap)
+        self.providesMap.update(source.providesMap)
+        self.csList.extend(source.csList)
+        self.invalidated = self.invalidated or source.invalidated
+        self.erasuresMap.update(source.erasuresMap)
+        self.rooted.update(source.rooted)
+        self.idMap.update(source.idMap)
+        self.storeDeps = self.storeDeps or source.storeDeps
+
 
 class TroveSourceStack(SearchableTroveSource):
 

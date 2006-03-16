@@ -234,6 +234,7 @@ class ConaryConfiguration(SectionedConfigFile):
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
+    resolveLevel          =  (CfgInt, 1)
     showLabels            =  CfgBool
     showComponents        =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
