@@ -1504,6 +1504,8 @@ order by
         # 1. The trove instanceId is listed in tmpInst
         # 2. There is another trove with the same name that is on the system -
         #    we don't list removals as local updates (maybe we should?)
+        #    This trove must also not be referenced (this is why we join
+        #    TroveTroves as NotReferenced)
         # 3. This trove is not both present and referenced - such troves
         #    are definitely not parts of local updates - they are intended
         #    installs.
@@ -1516,6 +1518,9 @@ order by
         JOIN Instances AS InstPresent ON
             (InstPresent.troveName=Instances.troveName and
              InstPresent.isPresent)
+        LEFT JOIN TroveTroves AS NotReferenced ON
+            (InstPresent.instanceId=NotReferenced.includedId
+             AND NotReferenced.inPristine=1)
         JOIN Versions ON
             Instances.versionId = Versions.versionId
         JOIN Flavors ON
@@ -1529,7 +1534,9 @@ order by
             ParentVersion.versionId=Parent.versionId
         LEFT OUTER JOIN Flavors AS ParentFlavor ON
             ParentFlavor.flavorId=Parent.flavorId
-        WHERE ((inPristine=1 AND Instances.isPresent=0) OR inPristine is NULL)
+        WHERE (NotReferenced.instanceId IS NULL
+               AND (TroveTroves.inPristine=1
+                    OR TroveTroves.inPristine is NULL))
         """ % fromClause)
 
         VFS = versions.VersionFromString
