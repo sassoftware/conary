@@ -40,7 +40,7 @@ class TestSuiteLinks(policy.Policy):
     DESCRIPTION
     ===========
 
-    The policy class ``r.TestSuiteLinks()} is typically called from within a
+    The policy class C{r.TestSuiteLinks()} is typically called from within a
     Conary recipe to indicate extra files which should be linked into the test
     suite directory.
     

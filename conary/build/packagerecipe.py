@@ -701,6 +701,14 @@ class _AbstractPackageRecipe(Recipe):
 
 
 class PackageRecipe(_AbstractPackageRecipe):
+    """
+    The C{PackageRecipe} base class provides Conary recipes with references to
+    the essential troves which offer Conary's functionality. 
+    
+    Other PackageRecipe classes such as C{AutoPackageRecipe} inherit the
+    functionality offerred by C{PackageRecipe}.
+    
+    """
     # abstract base class
     ignore = 1
     # these initial buildRequires need to be cleared where they would
@@ -736,11 +744,14 @@ _addRecipeToCopy(PackageRecipe)
 
 class BuildPackageRecipe(PackageRecipe):
     """
-    Packages that need to be built with the make utility and basic standard
-    shell tools should descend from this recipe in order to automatically
-    have a reasonable set of build requirements.  This package differs
-    from the C{PackageRecipe} class only by providing additional explicit
-    build requirements.
+    The C{BuildPackageRecipe} class provides recipes with capabilities for
+    building packages which require the C{make} utility, and additional,
+    standard shell tools.
+    
+    This class is useful for building packages which have additional build
+    requirements that are not satisfied by the C{CPackageRecipe} class, such
+    as the C{gawk}, C{grep}, and C{sed} utilities.
+    
     """
     # Again, no :devellib here
     buildRequires = [
@@ -762,11 +773,13 @@ _addRecipeToCopy(BuildPackageRecipe)
 
 class CPackageRecipe(BuildPackageRecipe):
     """
-    Most packages should descend from this recipe in order to automatically
-    have a reasonable set of build requirements for a package that builds
-    C source code to binaries.  This package differs from the
-    C{BuildPackageRecipe} class only by providing additional explicit build
-    requirements.
+    The C{CPackageRecipe} class provides the essential build requirements
+    needed for packages consisting of binaries built from C source code.
+    
+    Most package recipes which are too complex for C{AutoPackageRecipe}, and
+    consist of applications derived from C source code which do not require
+    additional shell utilities as build requirements use the
+    C{CPackageRecipe} class.
     """
     buildRequires = [
         'binutils:runtime',
@@ -792,14 +805,37 @@ _addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
-    Recipe class for simple packages built with auto* tools.  Child
-    classes should provide the C{unpack()} method for populating the
-    source list.  To call policy, implement the C{policy()} method and
-    put any necessary policy invocations there.  Next mostly likely is
-    to provide a C{makeinstall()} method if C{MakeInstall()} is
-    insufficient for the package.  Least likely to need overriding
-    are C{configure()} if C{Configure()} is insufficient, and
-    C{make()} if C{Make()} is insufficient.
+    The  C{AutoPackageRecipe} recipe class provides a simple means for the
+    creation of basic packages which are built from source code using the
+    auto* tools, such as C{automake}, and C{autoconf}.  
+    
+    Processing in the C{AutoPackageRecipe} class is a simple workflow modeled
+    after building software from source code, and is essentially comprised of
+    these steps:
+        
+        1. Unpack source archive
+        2. C{configure}
+        3. C{make}
+        4. C{make install}
+        5. Applying Conary policy (optional)
+    
+    With C{AutoPackageRecipe} the recipe writer does not necessarily need to
+    define the C{Configure}, C{Make}, or C{MakeInstall} methods, which allows
+    for very compact, and simple recipes.
+    
+    The recipe's child classes should define the C{unpack()} method in order
+    to populate the source list.
+    
+    Invoke the C{policy} method, with necessary policy parameters, and
+    keywords in your recipe to enforce Conary policy in the package.
+    
+    If the standard C{Configure()}, C{Make()}, and C{MakeInstall()} methods
+    are insufficient for your package requirements, you should define your own
+    methods to override them.
+    
+    Of the three methods, C{Configure}, and C{Make} are least likely to be
+    insufficient, and require overriding for the majority of recipes using 
+    C{AutoPackageRecipe}.
     """
     Flags = use.LocalFlags
     # abstract base class

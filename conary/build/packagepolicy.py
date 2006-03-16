@@ -1544,7 +1544,7 @@ class Provides(policy.Policy):
     SYNOPSIS
     ========
 
-    C{r.Provides([I{provision}, I{filterexp}] || [I{exceptions=filterexp}])
+    C{r.Provides([I{provision}, I{filterexp}] || [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
