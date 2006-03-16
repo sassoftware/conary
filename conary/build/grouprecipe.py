@@ -270,7 +270,7 @@ class GroupRecipe(_BaseGroupRecipe):
     NAME
     ----
     
-    BC{{r.addNewGroup()}} - Adds one newly created group to another newly
+    B{C{r.addNewGroup()}} - Adds one newly created group to another newly
     created group
     
     SYNOPSIS
