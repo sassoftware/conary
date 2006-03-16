@@ -679,7 +679,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         d = {}
         for server, l in byServer.iteritems():
-            exists = self.c[server].hasTroves([x[1] for x in l])
+            if server == 'local':
+                exists = [False] * len(l)
+            else:
+                exists = self.c[server].hasTroves([x[1] for x in l])
             d.update(dict(itertools.izip((x[0] for x in l), exists)))
 
         return d
