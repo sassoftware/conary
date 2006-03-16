@@ -129,7 +129,7 @@ class DependencyWorkTables:
                             # prevents them from making it into any repository
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            self.cu.execstmt(self.populateStmt,
+                            self.cu.execstmt(populateStmt,
                                         troveNum, multiplier * len(depList),
                                         1 + len(flags), isProvides, classId,
                                         depName, flag)
