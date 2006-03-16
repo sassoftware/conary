@@ -265,6 +265,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     FIXME Need Example
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -303,6 +304,8 @@ class GroupRecipe(_BaseGroupRecipe):
     
     The example above uses C{r.addNewGroup} to add the group C{group-3d}
     to the group C{group-graphics}.
+
+    __________________________________________________________________________
 
     NAME
     ----
@@ -347,6 +350,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     C{r.addReference()} - FIXME - Need Example
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -402,6 +406,7 @@ class GroupRecipe(_BaseGroupRecipe):
     C{group-multiplay} and specifies no dependencies are resolved
     automatically for this group.
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -458,10 +463,11 @@ class GroupRecipe(_BaseGroupRecipe):
     The above example removes the trove C{kernel:configs} from the current
     group for the flavor kernel.smp.
 
+    __________________________________________________________________________
 
     NAME
     ----
-    
+
     B{C{r.removeComponents()}} - Define components which should not be
     installed
     
@@ -493,6 +499,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     FIXME Need Example
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -525,6 +532,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     FIXME Need Example
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -566,6 +574,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     FIXME Need Example
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -603,6 +612,7 @@ class GroupRecipe(_BaseGroupRecipe):
     The above example uses C{r.setByDefault} to specify troves are not
     added to the group C{group-ftools} by default.
 
+    __________________________________________________________________________
 
     NAME
     ----
@@ -637,6 +647,7 @@ class GroupRecipe(_BaseGroupRecipe):
     The example above uses C{r.setDefaultGroup} to define the default
     group as C{group-consmod}.
 
+    __________________________________________________________________________
 
     NAME
     ----
