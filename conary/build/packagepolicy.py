@@ -149,23 +149,33 @@ class Config(policy.Policy):
     DESCRIPTION
     ===========
 
-    Mark all files below C{%(sysconfdir)s} (C{/etc}) and C{%(taghandlerdir)s} 
-    as configuration files. To mark files as exceptions, use:
-    C{r.Config(exceptions=filterexp)} To mark explicit inclusions as 
-    configuration files, use: C{r.Config(filterexp)}
+    Mark all files below C{%(sysconfdir)s} (that is, C{/etc}) and
+    C{%(taghandlerdir)s} (that is, C{/usr/libexec/conary/tags/})
+    as configuration files.
+    - To mark files as exceptions, use
+      C{r.Config(exceptions='I{filterexp}')}.
+    - To mark explicit inclusions as configuration files, use:
+      C{r.Config('I{filterexp}')}
+
+    A file marked as a Config file cannot also be marked as a
+    Transient file or an InitialContents file.  Conary enforces this
+    requirement.
 
     EXAMPLES
     ========
 
-    C{r.Config(exceptions='/etc/X11/xkb/xkbcomp')}
+    C{r.Config(exceptions='%(sysconfdir)s/X11/xkb/xkbcomp')}
 
     In the above example, the file C{/etc/X11/xkb/xkbcomp} is marked as an 
-    exception, since it is not actually a configuration file.
+    exception, since it is not actually a configuration file even though
+    it is within the C{/etc} (C{%(sysconfdir)s}) directory hierarchy
+    and would be marked as a configuration file by default.
 
     C{r.Config('%(mmdir)s/Mailman/mm_cfg.py')}
 
-    The above example demonstrates inclusion of the configuration 
-    file C{%(mmdir)s/Mailman/mm_cfg.py}.
+    The above example marks the file C{%(mmdir)s/Mailman/mm_cfg.py}
+    as a configuration file; it would not be automatically marked
+    as a configuration file otherwise.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -214,7 +224,7 @@ class ComponentSpec(_filterSpec):
     SYNOPSIS
     ========
 
-    C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename:component}, I{filterexp}])}
+    C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename:componentname}, I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -226,12 +236,6 @@ class ComponentSpec(_filterSpec):
     evaluated, the default expressions are evaluated.  If no expression
     matches, then the file is assigned to the C{catchall} component.
     
-    PARAMETERS
-    ==========
-
-    B{recipe} : holds the recipe object, which is used for the macro set and 
-    package objects.
-
     KEYWORDS
     ========
 
@@ -243,8 +247,15 @@ class ComponentSpec(_filterSpec):
 
     C{r.ComponentSpec('manual', '%(contentdir)s/manual/')}
 
-    The above example, uses C{r.ComponentSpec} to specify the 
-    C{%(contentdir)s/manual/} directory is in the C{:manual} component.
+    This example uses C{r.ComponentSpec} to specify that all files
+    below the C{%(contentdir)s/manual/} directory are part of the
+    C{:manual} component.
+
+    C{r.ComponentSpec(catchall='data')}
+
+    This example uses C{r.ComponentSpec} to specify that all files
+    not otherwise specified go into the C{:data} component instead
+    of the default {:runtime} component.
     """
     requires = (
         ('Config', policy.REQUIRED_PRIOR),
@@ -343,7 +354,7 @@ class PackageSpec(_filterSpec):
     NAME
     ====
 
-    B{C{r.PackageSpec()}} - Determines package / component file is in
+    B{C{r.PackageSpec()}} - Determines which package each file is in
     
     SYNOPSIS
     ========
@@ -353,24 +364,21 @@ class PackageSpec(_filterSpec):
     DESCRIPTION
     ===========
 
-    The policy class C{r.PackageSpec()} is typically called from within a 
-    Conary recipe to determine which package, and optionally, which component 
-    each file is in.
-    
-    PARAMETERS
-    ==========
-
-    B{recipe} : Holds the recipe object, which is used for the macro set and 
-    package objects.
-
+    The policy class C{r.PackageSpec()} is called from within a
+    Conary recipe to determine which package, and optionally in
+    addition which component, each file is in.  (Use
+    C{r.ComponentSpec()} to specify component without specifying
+    package.)
     
     EXAMPLES
     ========
     
     C{r.PackageSpec('openssh-server', '%(sysconfdir)s/pam.d/sshd')}
     
-    The example above specifies the file C{%(sysconfdir)s/pam.d/sshd} is in 
-    the package C{openssh-server}.
+    This example specifies that the file C{%(sysconfdir)s/pam.d/sshd} is in 
+    the package C{openssh-server} rather than the default (which in
+    this case would have been C{openssh} because this example was
+    provided by C{openssh.recipe}).
     """
     requires = (
         ('ComponentSpec', policy.REQUIRED_PRIOR),
@@ -439,9 +447,16 @@ class InitialContents(policy.Policy):
     DESCRIPTION
     ===========
 
-    Specify only explicit inclusions to be marked as initial contents files, 
-    which provide their contents only if the file does not yet exist.
+    By default, C{r.InitialContents()} does not apply to any files.
+    Call it to specify all files that Conary needs to mark as
+    providing only initial contents.  When Conary installs or
+    updates one of these files, it will never replace existing
+    contents; it uses the provided contents only if the file does
+    not yet exist at the time Conary is creating it.
 
+    A file marked as an InitialContents file cannot also be marked
+    as a Transient file or a Config file.  Conary enforces this
+    requirement.
     
     EXAMPLES
     ========
@@ -449,7 +464,9 @@ class InitialContents(policy.Policy):
     C{r.InitialContents('%(sysconfdir)s/conary/.*gpg')}
     
     In the above example, the files C{%(sysconfdir)s/conary/.*gpg} are being 
-    marked as initial contents files.
+    marked as initial contents files.  Conary will use those contents
+    when creating the files the first time, but will never overwrite
+    existing contents in those files.
     """
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -493,19 +510,26 @@ class Transient(policy.Policy):
     DESCRIPTION
     ===========
 
-    The policy class C{r.Transient()} is typically called from within a 
+    The policy class C{r.Transient()} is called from within a 
     Conary recipe to mark files with transient contents.
+    It automatically marks the two most common uses of
+    transient contents: python and emacs byte-compiled files
+    (C{.pyc}, C{.pyo}, and C{.elc} files).
         
     Files containing transient contents are almost the opposite of
     configuration files, in that they should be overwritten by a new
     version without question at update time.
+
+    A file marked as a Transient file cannot also be marked as an
+    InitialContents file or a Config file.  Conary enforces this
+    requirement.
     
     EXAMPLES
     ========
     
     C{r.Transient('%(libdir)s/firefox/extensions/')}
     
-    The above usage example demonstrates marking files in the directory 
+    The above usage example marks all the files in the directory 
     C{%(libdir)s/firefox/extensions/} as having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
@@ -1014,14 +1038,6 @@ class ByDefault(policy.Policy):
     of package installation. By default, :debug, and :test packages are not 
     installed.
     
-    PARAMETERS
-    ==========
-
-    The following parameters are recognized by C{r.ByDefault}:
-
-    B{recipe} : Holds the recipe object, which is used for the macro set,
-    and package objects.
-
     KEYWORDS
     ========
 
@@ -1120,11 +1136,6 @@ class Ownership(_UserGroup):
     List the ownerships in order, most specific first, ending with least
     specific. The filespecs will be matched in the order that you provide them.
     
-    PARAMETERS
-    ==========
-
-    None.
-
     KEYWORDS
     ========
 
