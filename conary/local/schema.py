@@ -493,7 +493,6 @@ class MigrateTo_9(SchemaMigration):
                 obj = klass(data)
                 f = obj.freeze()
                 if f != data:
-                    count += 1
                     self.cu.execute("update troveinfo set data=? where "
                                     "instanceId=? and infoType=?", f,
                                     instanceId, infoType)

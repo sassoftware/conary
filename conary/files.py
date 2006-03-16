@@ -23,7 +23,6 @@ import tempfile
 import time
 
 from conary import streams
-from conary.deps import deps
 from conary.lib import util, sha1helper, log
 
 _FILE_FLAG_CONFIG = 1 << 0

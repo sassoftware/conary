@@ -14,7 +14,6 @@
 import md5
 import os
 import re
-import sys
 
 from conary.repository import errors
 from conary.lib import tracelog
@@ -650,6 +649,7 @@ class NetworkAuthorization:
         # validate the password
         if not self.checkUserPass(authToken):
             raise errors.InsufficientPermission
+        self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
         if len(entitlement) > 64:
             raise errors.InvalidEntitlement
@@ -674,6 +674,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
+        self.log(2, "entGroup=%s userGroup=%s" % (entGroup, userGroup))
 
         # check for duplicate
         cu.execute("SELECT COUNT(*) FROM EntitlementGroups WHERE "
@@ -699,6 +700,7 @@ class NetworkAuthorization:
         """
         if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
+        self.log(2, "userGroup=%s entGroup=%s" % (userGroup, entGroup))
         cu = self.db.cursor()
         entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
                                 "WHERE entGroup = ?", entGroup).next()[0]

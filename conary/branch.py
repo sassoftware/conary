@@ -20,7 +20,6 @@ import itertools
 from conary import conaryclient
 from conary import errors
 from conary import updatecmd
-from conary import versions
 from conary.lib import log
 from conaryclient import cmdline
 from conary.build.cook import signAbsoluteChangeset
@@ -63,6 +62,11 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     client = conaryclient.ConaryClient(cfg)
 
     troveSpecs = [ updatecmd.parseTroveSpec(x) for x in troveSpecs ]
+
+    componentSpecs = [ x[0] for x in troveSpecs 
+                        if (':' in x[0] and x[0].split(':')[1] != 'source')]
+    if componentSpecs:
+        raise errors.ParseError('Cannot branch or shadow individual components: %s' % ', '.join(componentSpecs))
 
     result = repos.findTroves(cfg.buildLabel, troveSpecs, cfg.buildFlavor)
     troveList = [ x for x in itertools.chain(*result.itervalues())]

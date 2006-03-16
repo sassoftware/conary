@@ -609,14 +609,17 @@ class FilesystemJob:
                             inWay = False
 
                     if inWay:
-                        self.errors.append("%s is in the way of a newly " 
-                           "created file in %s=%s[%s]" % (  
-                               util.normpath(headRealPath), 
-                               troveCs.getName(), 
-                               troveCs.getNewVersion().asString(),
-                               deps.formatFlavor(troveCs.getNewFlavor())))
-                        fullyUpdated = False
-                        continue
+                        existingFile = files.FileFromFilesystem(headRealPath,
+                                                                pathId)
+                        if not silentlyReplace(headFile, existingFile):
+                            self.errors.append("%s is in the way of a newly "
+                               "created file in %s=%s[%s]" % (  
+                                   util.normpath(headRealPath), 
+                                   troveCs.getName(), 
+                                   troveCs.getNewVersion().asString(),
+                                   deps.formatFlavor(troveCs.getNewFlavor())))
+                            fullyUpdated = False
+                            continue
             except OSError:
                 # the path doesn't exist, carry on with the restore
                 pass
@@ -1096,7 +1099,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     nonCfgExt = ('bz2', 'ccs', 'eps', 'gif', 'gz', 'ico', 'img',
                  'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
-                 'tbz2', 'tgz', 'tiff', 'ttf', 'zip')
+                 'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
 
     isSrcTrove = curTrove.getName().endswith(':source')
 
@@ -1757,3 +1760,15 @@ class TagCommand:
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
                     log.error("%s failed", command[0])
+
+def silentlyReplace(newF, oldF):
+    # Can the file already on the disk (oldF) be replaced with the new file
+    # (newF) without telling the user it happened
+    if newF.__class__ != oldF.__class__:
+        return False
+    elif isinstance(newF, files.SymbolicLink) and newF.target == oldF.target:
+        return True
+    elif isinstance(newF, files.RegularFile) and newF.contents == oldF.contents:
+        return True
+
+    return False

@@ -62,9 +62,27 @@ static PyObject * depSetSplit(PyObject *self, PyObject *args) {
     char * data, * dataPtr, * endPtr;
     int offset, tag;
     PyObject * retVal;
+    PyObject * offsetArg, * dataArg;
 
-    if (!PyArg_ParseTuple(args, "is", &offset, &data))
+    /* This avoids PyArg_ParseTuple because it's sloooow */
+    if (PyTuple_GET_SIZE(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "exactly two arguments expected");
         return NULL;
+    }
+
+    offsetArg = PyTuple_GET_ITEM(args, 0);
+    dataArg = PyTuple_GET_ITEM(args, 1);
+
+    if (!PyInt_CheckExact(offsetArg)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+        return NULL;
+    } else if (!PyString_CheckExact(dataArg)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be a string");
+        return NULL;
+    }
+
+    offset = PyInt_AS_LONG(offsetArg);
+    data = PyString_AS_STRING(dataArg);
 
     dataPtr = data + offset;
     /* this while is a cheap goto for the error case */
@@ -97,10 +115,22 @@ static PyObject * depSetSplit(PyObject *self, PyObject *args) {
 
 static PyObject * depSplit(PyObject *self, PyObject *args) {
     char * origData, * data, * chptr, * endPtr;
-    PyObject * flags, * flag, * name, * ret;
+    PyObject * flags, * flag, * name, * ret, * dataArg;
 
-    if (!PyArg_ParseTuple(args, "s", &origData))
+    /* This avoids PyArg_ParseTuple because it's sloooow */
+    if (PyTuple_GET_SIZE(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "exactly one argument expected");
         return NULL;
+    }
+
+    dataArg = PyTuple_GET_ITEM(args, 0);
+
+    if (!PyString_CheckExact(dataArg)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be a string");
+        return NULL;
+    }
+
+    origData = PyString_AS_STRING(dataArg);
 
     /* Copy the original string over, replace single : with a '\0' and
        double :: with a single : */
@@ -191,9 +221,33 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     int offset;
     PyObject * retList, * dataObj;
     int intVal;
+    PyObject * formatArg, * offsetArg, * dataArg;
 
-    if (!PyArg_ParseTuple(args, "sis#", &format, &offset, &data, &dataLen))
+    /* This avoids PyArg_ParseTuple because it's sloooow */
+    if (PyTuple_GET_SIZE(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "exactly two arguments expected");
         return NULL;
+    }
+
+    formatArg = PyTuple_GET_ITEM(args, 0);
+    offsetArg = PyTuple_GET_ITEM(args, 1);
+    dataArg = PyTuple_GET_ITEM(args, 2);
+
+    if (!PyString_CheckExact(formatArg)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be a string");
+        return NULL;
+    } else if (!PyInt_CheckExact(offsetArg)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
+        return NULL;
+    } else if (!PyString_CheckExact(dataArg)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be a string");
+        return NULL;
+    }
+
+    format = PyString_AS_STRING(formatArg);
+    offset = PyInt_AS_LONG(offsetArg);
+    data = PyString_AS_STRING(dataArg);
+    dataLen = PyString_GET_SIZE(dataArg);
 
     formatPtr = format;
 

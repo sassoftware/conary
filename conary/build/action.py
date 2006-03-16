@@ -18,10 +18,9 @@ Provides superclasses for build and policy.
 import os
 import sys
 import string
-import tempfile
 import traceback
 
-from conary.lib import debugger, log, util, stackutil
+from conary.lib import debugger, log, util
 
 # build.py and policy.py need some common definitions
 

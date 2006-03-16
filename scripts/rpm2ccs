@@ -23,6 +23,7 @@ import tempfile
 
 from conary import checkin
 from conary import conarycfg
+from conary import conaryclient
 from conary import rpmhelper
 
 from conary.build import cook
@@ -555,9 +556,10 @@ def main(argv):
     except:
         return usage()
 
-    cfg = conarycfg.ConaryConfiguration()
+    cfg = conarycfg.ConaryConfiguration(readConfigFiles = True)
     cfg.initializeFlavors()
-    repos = NetworkRepositoryClient(cfg.repositoryMap)
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.repos
 
     create = CHANGESET
     if '--recipe' in argv:
@@ -583,7 +585,7 @@ def main(argv):
         return 1
         commitWork=True
 
-    sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
+    sys.excepthook = util.genExcepthook(cfg.debugExceptions)
 
     recipe = recipeBuilder(rpmfile, rpmname, packageScripts)
 

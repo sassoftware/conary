@@ -141,7 +141,9 @@ def usage(rc = 1):
     print ""
     print
     print "     showcs flags:"
+    print "                 --all"
     print "                 --show-changes"
+    print "                 --recurse-repository"
     print
     print "rollback flags:  --replace-files"
     print "syncchildren flags:"
@@ -241,10 +243,14 @@ def realMain(cfg, argv=sys.argv):
     argDef["profile"] = NO_PARAM
     argDef["quiet"] = NO_PARAM
     argDef["recurse"] = NO_PARAM
+    argDef["recurse-repository"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["root"] = ONE_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
+    argDef["show-contexts"] = NO_PARAM
+    argDef["show-passwords"] = NO_PARAM
+    argDef["signatures"] = NO_PARAM
     argDef["sync-to-parents"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
@@ -256,9 +262,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["update-only"] = NO_PARAM
     argDef["weak-refs"] = NO_PARAM
     argDef["version"] = NO_PARAM
-    argDef["show-passwords"] = NO_PARAM
-    argDef["show-contexts"] = NO_PARAM
-    argDef["signatures"] = NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, {}, cfg, usage,
@@ -412,12 +415,14 @@ def realMain(cfg, argv=sys.argv):
                 return 1
             cookIds = (info.pw_uid, info.pw_gid)
             # reset the HOME environment variable, and reinterpolate
-            # any buildPath/lookaside configuration variables so that
-            # the correct home directory will be used.
+            # buildPath, lookaside, and logFile configuration variables
+            # so that the correct home directory will be used.
             os.environ['HOME'] = info.pw_dir
             for cfgvar in ('buildPath', 'lookaside'):
                 unexpanded = cfg[cfgvar]._getUnexpanded()
                 cfg.configLine('%s %s' %(cfgvar, unexpanded))
+            cfg.configLine('logFile ' +
+                ':'.join(x._getUnexpanded() for x in cfg.logFile))
         else:
             cookIds = None
 
@@ -457,6 +462,7 @@ def realMain(cfg, argv=sys.argv):
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
                 ('trove-flags', 'showTroveFlags'),
                 'deps', 'info'):
             if isinstance(opt, tuple):
@@ -469,7 +475,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
 	db = openDatabase(cfg.root, cfg.dbPath)
 
@@ -530,7 +536,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
         if argSet: return usage()
         troveList = otherArgs[2:]
@@ -588,6 +594,8 @@ def realMain(cfg, argv=sys.argv):
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
                 ('trove-flags', 'showTroveFlags'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
+                ('recurse-repository', 'recurseRepos'),
                 'deps', 'info', 'all', ('show-changes', 'showChanges')):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
@@ -598,7 +606,7 @@ def realMain(cfg, argv=sys.argv):
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
-            del argset['no-recurse']
+            del argSet['no-recurse']
 
         if argSet or len(otherArgs) < 3:
             showchangeset.usage()
@@ -713,6 +721,14 @@ def realMain(cfg, argv=sys.argv):
 def main(argv=sys.argv):
     from conary.repository import errors
     try:
+        debugAll = '--debug-all' in argv
+        if debugAll:
+            argv = argv[:]
+            argv.remove('--debug-all')
+            debuggerException = Exception
+        else:
+            debuggerException = errors.InternalConaryError
+
         if '--skip-default-config' in argv:
             argv = argv[:]
             argv.remove('--skip-default-config')
@@ -720,14 +736,16 @@ def main(argv=sys.argv):
         else:
             ccfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
 
+        if debugAll:
+            ccfg.debugExceptions = True
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
-	return realMain(ccfg, argv)
+        return realMain(ccfg, argv)
     except IOError, e:
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:
             raise
-    except errors.InternalConaryError:
+    except debuggerException:
         raise
     except cfgtypes.CfgError, e:
         if log.getVerbosity() == log.DEBUG:

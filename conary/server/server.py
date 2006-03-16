@@ -15,14 +15,11 @@
 #
 
 import base64
-import cgi
 import errno
 import os
 import posixpath
 import select
 import sys
-import tempfile
-import traceback
 import xmlrpclib
 import urllib
 import zlib
@@ -39,15 +36,13 @@ mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
 
 from conary import dbstore
-from conary.conarycfg import CfgRepoMap
 from conary.lib import options
 from conary.lib import util
-from conary.lib.cfg import ConfigFile,CfgPath,CfgInt,CfgBool
+from conary.lib.cfg import CfgInt
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
-from conary.repository.netrepos import netauth
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
@@ -330,6 +325,7 @@ class ServerConfig(netserver.ServerConfig):
 def usage():
     print "usage: %s" % sys.argv[0]
     print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
+    print "       %s --analyze" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
     print '              --db "driver <path>"'
@@ -381,6 +377,7 @@ if __name__ == '__main__':
 
     argDef['add-user'] = options.ONE_PARAM
     argDef['admin'] = options.NO_PARAM
+    argDef['analyze'] = options.NO_PARAM
     argDef['help'] = options.NO_PARAM
     argDef['migrate'] = options.NO_PARAM
     argDef['mirror'] = options.NO_PARAM
@@ -414,7 +411,7 @@ if __name__ == '__main__':
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     # start the logging
-    if 'add-user' not in argSet:
+    if 'add-user' not in argSet and 'analyze' not in argSet:
         (l, f) = (3, "stderr")
         if cfg.traceLog:
             (l, f) = cfg.traceLog
@@ -452,6 +449,11 @@ if __name__ == '__main__':
         if argSet:
             usage()
         sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
+    elif argSet.pop('analyze', False):
+        if argSet:
+            usage()
+        netRepos.db.analyze()
+        sys.exit(0)
 
     if argSet:
         usage()

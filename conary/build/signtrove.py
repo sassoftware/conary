@@ -13,21 +13,14 @@
 # full details.
 #
 
-import re
-import sys
-import base64
-import urllib
-
 from conary import callbacks
 from conary import conaryclient
 from conary import trove
-from conary.checkin import fullLabel
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.lib.openpgpfile import KeyNotFound
-from conary.repository.netclient import NetworkRepositoryClient
 from conary.updatecmd import parseTroveSpec
 from conary.repository import errors
 

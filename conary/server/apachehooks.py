@@ -13,7 +13,6 @@
 #
 
 from mod_python import apache
-from mod_python import util
 from mod_python.util import FieldStorage
 from email import MIMEText
 import os
@@ -24,7 +23,7 @@ import traceback
 import xmlrpclib
 import zlib
 
-from conary.lib import log, tracelog
+from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer

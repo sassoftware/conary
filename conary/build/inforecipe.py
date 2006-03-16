@@ -16,7 +16,6 @@ from conary.build.packagerecipe import _AbstractPackageRecipe, _recipeHelper
 from conary.build.recipe import RECIPE_TYPE_INFO
 
 from conary.build import buildpackage
-from conary.build import errors
 from conary.build import usergroup
 from conary.deps import deps
 

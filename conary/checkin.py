@@ -29,9 +29,7 @@ from conary import deps
 from conary import errors
 from conary import files
 from conary import trove
-from conary import updatecmd
 from conary import versions
-import build.errors
 from conary.build import recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
@@ -40,8 +38,6 @@ from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
 from conary.lib import log
 from conary.lib import magic
-from conary.lib import openpgpfile
-from conary.lib import openpgpkey
 from conary.lib import util
 from conary.local import update
 from conary.repository import changeset
@@ -233,8 +229,9 @@ def commit(repos, cfg, message, callback=None):
                       "from the head of the branch; use update")
             return
 
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(), 
-                                     cfg=cfg, repos=repos)
+    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                     cfg=cfg, repos=repos,
+                                     branch=state.getBranch())
 
     srcMap = {}
     cwd = os.getcwd()
@@ -916,16 +913,21 @@ def merge(repos, callback=None):
         callback = CheckinCallback()
 
     troveName = state.getName()
+    troveBranch = state.getBranch()
+
+    if not state.getVersion().isShadow():
+        log.error("%s=%s is not a shadow" % (troveName, troveBranch.asString()))
+        return
 
     # make sure the current version is at head
-    shadowHeadVersion = repos.getTroveLatestVersion(troveName, 
-                                                    state.getBranch())
+    shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
     if state.getVersion() != shadowHeadVersion:
         log.info("working directory is already based on head of branch")
         return
 
-    parentHeadVersion = repos.getTroveLatestVersion(troveName, 
-                                  state.getBranch().parentBranch())
+    # safe to call parentBranch() b/c a shadow will always have a parent branch
+    parentHeadVersion = repos.getTroveLatestVersion(troveName,
+                                  troveBranch.parentBranch())
     parentRootVersion = _determineRootVersion(repos, state)
 
     changeSet = repos.createChangeSet([(troveName,

@@ -20,7 +20,6 @@ import string
 import sys
 import tempfile
 import traceback
-import types
 
 from conary.repository import errors
 from conary.build import recipe,use
@@ -143,7 +142,7 @@ class RecipeLoader:
         self.recipes = {}
         
         if filename[0] != "/":
-            raise LoadRecipeError("recipe file names must be absolute paths")
+            raise builderrors.LoadRecipeError("recipe file names must be absolute paths")
 
         if component:
             pkgname = component.split(':')[0]
@@ -529,7 +528,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 version, flavor = parts
                 while version.isOnLocalHost():
                     version = version.parentVersion()
-                versionStr = version.getSourceVersion().asString()
+                versionStr = str(version)
         if flavor:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 

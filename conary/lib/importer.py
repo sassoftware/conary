@@ -18,7 +18,6 @@
 """
 import sys
 import imp
-import os
 import types
 
 def makeImportedModule(name, pathname, desc, scope):

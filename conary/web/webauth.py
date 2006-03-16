@@ -44,8 +44,7 @@ def getAuth(req):
             entitlement = entitlement.split()
             entitlement[1] = base64.decodestring(entitlement[1])
         except:
-            self.send_error(400)
-            return None
+            return apache.HTTP_BAD_REQUEST
     else:
         entitlement = [ None, None ]
 

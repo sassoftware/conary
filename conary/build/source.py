@@ -503,8 +503,17 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
 
     r = file(rpm, 'r')
+    h = rpmhelper.readHeader(r)
+    # assume compression is gzip unless specifically tagged as bzip2
+    decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
+    if h.has_key(rpmhelper.PAYLOADCOMPRESSOR):
+        compression = h[rpmhelper.PAYLOADCOMPRESSOR]
+        if compression == 'bzip2':
+            decompressor = lambda fobj: util.BZ2File(fobj)
+    # rewind the file to let seekToData do its job
+    r.seek(0)
     rpmhelper.seekToData(r)
-    gz = gzip.GzipFile(fileobj=r)
+    uncompressed = decompressor(r)
     (rpipe, wpipe) = os.pipe()
     pid = os.fork()
     if not pid:
@@ -513,8 +522,9 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	os.chdir(directory)
 	os.execl(*cpioArgs)
 	os._exit(1)
+    os.close(rpipe)
     while 1:
-	buf = gz.read(4096)
+        buf = uncompressed.read(4096)
 	if not buf:
 	    break
 	os.write(wpipe, buf)

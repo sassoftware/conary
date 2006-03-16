@@ -11,18 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import base64
 import os
-
-# kid imports
-import kid
 
 # apache imports
 from mod_python import apache
 from mod_python import Cookie
 from mod_python.util import FieldStorage
-
-import webauth
 
 # helper class for web handlers
 class WebHandler(object):

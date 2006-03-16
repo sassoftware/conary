@@ -362,6 +362,8 @@ class SectionedConfigFile(ConfigFile):
         return sectionName in self._sections
 
     def getSection(self, sectionName):
+        if not self.hasSection(sectionName):
+            raise ParseError, 'Unknown section "%s"' % sectionName
         return self._sections[sectionName]
 
     def setSection(self, sectionName):

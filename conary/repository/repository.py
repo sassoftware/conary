@@ -13,12 +13,10 @@
 #
 
 # defines the Conary repository
-import sha
-import tempfile
 
 from conary.repository import changeset, errors, filecontents
-from conary import deps, files, trove, versions
-from conary.lib import log, patch, sha1helper, util, openpgpkey, openpgpfile
+from conary import files, trove
+from conary.lib import log, patch, openpgpkey, openpgpfile
 
 class AbstractTroveDatabase:
 
@@ -283,6 +281,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
+    def checkTroveCompleteness(self, trv):
+        pass
+    
     def checkTroveSignatures(self, trv, threshold, keyCache = None):
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
@@ -368,10 +369,13 @@ class ChangeSetJob:
             if newTrove.troveInfo.incomplete():
                 log.warning('trove %s has schema version %s, which contains'
                         ' information not handled by this client.  This'
-                        ' understands schema version %s.  Dropping extra'
-                        ' information.  Please upgrade conary.', 
+                        ' version of Conary understands schema version %s.'
+                        ' Dropping extra information.  Please upgrade conary.', 
                         newTrove.getName(), newTrove.troveInfo.troveVersion(), 
                         trove.TROVE_VERSION)
+
+            self.checkTroveCompleteness(newTrove)
+
             self.checkTroveSignatures(newTrove, threshold, keyCache=keyCache)
 
 	    troveInfo = self.addTrove(

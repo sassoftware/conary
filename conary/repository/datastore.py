@@ -21,14 +21,12 @@ keys are assumed to be unique.
 """
 
 import errno
-import fcntl
 import gzip
 import itertools
 import os
 import sha
 import tempfile
 
-from conary.lib import log
 from conary.lib import util
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents

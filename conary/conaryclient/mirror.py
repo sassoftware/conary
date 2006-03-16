@@ -17,10 +17,8 @@
 
 import itertools
 import os
-import sys
 
 from conary import conarycfg
-from conary.repository import netclient
 from conary.lib import cfg, util, log
 
 class MirrorConfigurationSection(cfg.ConfigSection):
@@ -179,6 +177,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
     log.debug("%d new troves are available", len(troveList))
 
+    log.debug("looking for new pgp keys")
+    keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
+    if test:
+        log.debug("(not adding %d keys due to test mode)", len(keyList))
+    else:
+        log.debug("adding %d keys to target", len(keyList))
+        targetRepos.addPGPKeyList(cfg.host, keyList)
+
     # FIXME: getnewTroveList should accept and only return troves on
     # the labels we're interested in
     if cfg.labels and len(troveList):
@@ -205,17 +211,9 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
             # try again
             return -1
 
-    log.debug("looking for new pgp keys")
-    keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
-    if test:
-        log.debug("(not adding %d keys due to test mode)", len(keyList))
-    else:
-        log.debug("adding %d keys to target", len(keyList))
-        targetRepos.addPGPKeyList(cfg.host, keyList)
-
     if syncSigs:
         log.debug("getting full trove list for signature sync")
-        troveDict = sourceRepos.getTroveVersionList(host, { None : None })
+        troveDict = sourceRepos.getTroveVersionList(cfg.host, { None : None })
         sigList = []
         for name, versionD in troveDict.iterkeys():
             for version, flavorList in versionD.iterkeys():

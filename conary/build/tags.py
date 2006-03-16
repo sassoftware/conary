@@ -18,7 +18,6 @@ Module implementing tag file handling
 import os
 
 from conary.build import filter
-from conary.lib import log
 from conary.lib.cfg import *
 
 EXCLUDE, INCLUDE = range(2)

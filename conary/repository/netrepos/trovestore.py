@@ -12,18 +12,16 @@
 # full details.
 #
 
-import copy
 import itertools
 
 from conary import files, metadata, trove, versions, changelog
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable
-from conary.local import versiontable, sqldb
+from conary.local import versiontable
 from conary.repository import errors
 from conary.repository.netrepos import instances, items, keytable, flavors
 from conary.repository.netrepos import troveinfo, versionops, cltable
-from conary.dbstore import sqlerrors
 from conary.server import schema
 
 class LocalRepVersionTable(versiontable.VersionTable):
@@ -212,20 +210,6 @@ class TroveStore:
     def addTrove(self, trv):
 	cu = self.db.cursor()
 
-        if not trv.troveInfo.sigs.sha1():
-            raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
-                                              trv.getFlavor())
-        if trv.troveInfo.incomplete():
-            if trv.troveInfo.troveVersion() > trove.TROVE_VERSION:
-                raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
-                                              trv.getFlavor(),
-                                              trv.troveInfo.troveVersion(),
-                                              trove.TROVE_VERSION)
-            else:
-                nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
-                err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
-                raise errors.TroveIntegrityError(error=err, *nvf)
-
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 
@@ -380,7 +364,7 @@ class TroveStore:
         # too slow
         cu.execute("""
         UPDATE FileStreams
-        SET stream = (SELECT NewFiles.stream FROM NewFiles
+        SET stream = (SELECT DISTINCT NewFiles.stream FROM NewFiles
                       WHERE FileStreams.fileId = NewFiles.fileId
                         AND NewFiles.stream IS NOT NULL)
         WHERE FileStreams.stream IS NULL
@@ -606,14 +590,15 @@ class TroveStore:
         schema.resetTable(cu, 'gtl')
         schema.resetTable(cu, 'gtlInst')
 
+
         for idx, info in enumerate(troveInfoList):
             flavorStr = "'%s'" % info[2].freeze()
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
 
-        cu.execute("""SELECT gtl.idx, I.instanceId, I.isRedirect,
-                             Nodes.timeStamps, Changelogs.name,
+        cu.execute("""SELECT %(STRAIGHTJOIN)s gtl.idx, I.instanceId, 
+                             I.isRedirect, Nodes.timeStamps, Changelogs.name,
                              ChangeLogs.contact, ChangeLogs.message
                             FROM
                                 gtl, Items, Versions, Flavors, Instances as I,
@@ -630,7 +615,7 @@ class TroveStore:
                                 I.itemId = Nodes.itemId AND
                                 I.versionId = Nodes.versionId
                             ORDER BY
-                                gtl.idx""")
+                                gtl.idx""" % self.db.keywords)
 
         troveIdList = [ x for x in cu ]
 
@@ -638,11 +623,10 @@ class TroveStore:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
                        start_transaction = False)
-
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-                        SELECT idx, item, version, flavor, flags,
-                               Nodes.timeStamps
+                        SELECT %(STRAIGHTJOIN)s idx, item, version, flavor, 
+                               flags, Nodes.timeStamps
                         FROM
                             gtlInst, TroveTroves, Instances, Items,
                             Versions, Flavors, Nodes
@@ -656,7 +640,8 @@ class TroveStore:
                             Instances.versionId = Nodes.versionId
                         ORDER BY
                             gtlInst.idx
-                   """)
+                   """ % self.db.keywords)
+
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
         troveFilesCursor = self.db.cursor()
@@ -702,11 +687,11 @@ class TroveStore:
                     """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
 
+
         neededIdx = 0
         while troveIdList:
-            # [0:4] because we don't need the changelog information
-            (idx, troveInstanceId, isRedirect, timeStamps) =  \
-                        troveIdList.pop(0)[0:4]
+            (idx, troveInstanceId, isRedirect, timeStamps,
+             clName, clVersion, clMessage) =  troveIdList.pop(0)
 
             # make sure we've returned something for everything up to this
             # point
@@ -719,8 +704,8 @@ class TroveStore:
 
             singleTroveInfo = troveInfoList[idx]
 
-            if singleTroveIds[4] is not None:
-                changeLog = changelog.ChangeLog(*singleTroveIds[4:7])
+            if clName is not None:
+                changeLog = changelog.ChangeLog(clName, clVersion, clMessage)
             else:
                 changeLog = None
 

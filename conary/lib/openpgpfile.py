@@ -24,7 +24,6 @@ from Crypto.Cipher import Blowfish
 from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
-from string import upper
 
 # key types defined in RFC 2440 page 49
 PK_ALGO_RSA                  = 1

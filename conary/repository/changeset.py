@@ -12,7 +12,6 @@
 # full details.
 #
 
-from StringIO import StringIO
 import struct
 import tempfile
 import difflib
@@ -22,7 +21,6 @@ import itertools
 import os
 
 from conary import files, streams, trove, versions
-from conary.deps import deps
 from conary.lib import enum, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
 
@@ -1079,23 +1077,19 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 pathId = err.pathId
                 # look up the trove and file that caused the pathId 
                 # conflict.  
-                for myTrove in self.iterNewTroveList():
+                troves = set(itertools.chain(self.iterNewTroveList(),
+                                             otherCs.iterNewTroveList()))
+                conflicts = []
+                for myTrove in troves:
                     files = (myTrove.getNewFileList() 
                              + myTrove.getChangedFileList())
-                    conflict1 = [ x for x in files if x[0] == pathId]
-                    if conflict1:
-                        conflict1 = conflict1[0]
-                        break
-                for otherTrove in otherCs.iterNewTroveList():
-                    files = (otherTrove.getNewFileList() 
-                             + otherTrove.getChangedFileList())
-                    conflict2 = [ x for x in files if x[0] == pathId]
-                    if conflict2:
-                        conflict2 = conflict2[0]
-                        break
-                assert(conflict1 and conflict2)
-                raise PathIdsConflictError(pathId, myTrove, conflict1,
-                                                   otherTrove, conflict2)
+                    conflicts.extend((myTrove, x) for x in files if x[0] == pathId)
+                if len(conflicts) >= 2:
+                    raise PathIdsConflictError(pathId,
+                                               conflicts[0][0], conflicts[0][1],
+                                               conflicts[1][0], conflicts[1][1])
+                else:
+                    raise
 
         else:
             assert(otherCs.__class__ ==  ChangeSet)
@@ -1131,17 +1125,23 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
-        if type(fileName) is str:
-            try:
-                f = open(fileName, "r")
-            except IOError, err:
-                raise errors.ConaryError("Error opening changeset '%s': %s" % (fileName, err.strerror))
-            csf = filecontainer.FileContainer(f)
-        else:
-            csf = filecontainer.FileContainer(fileName)
+        try:
+            if type(fileName) is str:
+                try:
+                    f = open(fileName, "r")
+                except IOError, err:
+                    raise errors.ConaryError(
+                                "Error opening changeset '%s': %s" % 
+                                    (fileName, err.strerror))
+                csf = filecontainer.FileContainer(f)
+            else:
+                csf = filecontainer.FileContainer(fileName)
 
-	(name, tagInfo, control) = csf.getNextFile()
-        assert(name == "CONARYCHANGESET")
+            (name, tagInfo, control) = csf.getNextFile()
+            assert(name == "CONARYCHANGESET")
+        except filecontainer.BadContainer:
+            raise filecontainer.BadContainer(
+                        "File %s is not a valid conary changeset." % fileName)
 
 	start = gzip.GzipFile(None, 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)

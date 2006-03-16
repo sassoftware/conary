@@ -65,26 +65,30 @@ class NodeDataByHash(NodeData):
         self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(enumerate(self.data), sortAlg)
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
+                      sortAlg)
 
     def copy(self):
         new = self.__class__()
-        new.data = self.data[:]
+        new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
         return new
 
     def getIndex(self, item):
-        idx = self.hashedData.setdefault(item, len(self.data))
-        if idx == len(self.data):
+        idx = self.hashedData.setdefault(item, self.index)
+        if idx == self.index:
             self.data.append(item)
+            self.index += 1
         return idx
 
     def isEmpty(self):
-        return not self.data
+        return not self.hashedData
 
     def delete(self, item):
         idx = self.hashedData.pop(item)
-        del self.data[idx]
+        # we can't delete from self.data, since that array position is how
+        # things are indexed.
+        self.data[idx] = None
 
 class DirectedGraph:
     def __init__(self, dataSearchMethod=NodeDataByHash):
@@ -128,6 +132,20 @@ class DirectedGraph:
                 newEdges.setdefault(toId, []).append(fromId)
         return dict((x[0], set(x[1])) for x in newEdges.iteritems())
 
+    def iterChildren(self, node):
+        return (self.data.get(idx) 
+                    for idx in self.edges[self.data.getIndex(node)])
+
+    def getParents(self, node):
+        idx = self.data.getIndex(node)
+        return [ self.data.get(x[0]) 
+                    for x in self.edges.iteritems() if idx in x[1] ]
+
+    def getLeaves(self):
+        return [ self.data.get(x[0])
+                    for x in self.edges.iteritems() if not x[1] ]
+
+
     def transpose(self):
         g = DirectedGraph()
         g.data = self.data.copy()
@@ -144,13 +162,12 @@ class DirectedGraph:
         finishes = {}
         timeCount = 0
         parent = None
+        nodeStack = []
 
         if start is not None:
             startId = nodeData.getIndex(start)
             nodeIds.remove(startId)
             nodeIds.insert(0, startId)
-
-        nodeStack = []
 
         while nodeIds:
             if not nodeStack:
@@ -210,3 +227,25 @@ class DirectedGraph:
         treeKeys = [ x[0] for x in self.data.sortSubset(trees.iterkeys(), 
                                                         nodeSelect) ]
         return [ set(self.get(y) for y in trees[x]) for x in treeKeys ]
+
+    def getStronglyConnectedGraph(self):
+        compSets = self.getStronglyConnectedComponents()
+
+        sccGraph = self.__class__()
+
+        setsByNode = {}
+
+        for compSet in compSets:
+            for node in compSet:
+                setsByNode[node] = frozenset(compSet)
+
+        for compSet in compSets:
+            compSet = frozenset(compSet)
+            sccGraph.addNode(compSet)
+            for node in compSet:
+                for childNode in self.iterChildren(node):
+                    childComp = setsByNode[childNode]
+                    if childComp != compSet:
+                        sccGraph.addEdge(compSet, setsByNode[childNode])
+        return sccGraph
+

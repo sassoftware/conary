@@ -12,8 +12,6 @@
 # full details.
 #
 
-from conary import changelog
-
 class ChangeLogTable:
     """
     Table for changelogs.

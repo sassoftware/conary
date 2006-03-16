@@ -19,11 +19,10 @@ and create changesets from the files created during the build process
 """
 
 import os
-import string
 import time
 
 from conary import files
-from conary.lib import log, sha1helper, elf
+from conary.lib import sha1helper, elf
 from conary.build import use
 from conary.deps import deps
 

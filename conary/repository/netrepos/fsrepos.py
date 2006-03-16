@@ -15,21 +15,38 @@
 # implements a db-based repository
 
 import traceback
-import os
 import sys
 
-from conary import files, versions
+from conary import files, trove
 from conary.deps import deps
-from conary.lib import util, stackutil, log, openpgpfile
+from conary.lib import util, openpgpfile
 from conary.repository import changeset, errors, filecontents
-from conary.repository.netrepos import trovestore
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
 from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
-from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
-from conary.repository import repository, netclient
+from conary.repository import netclient
+
+class FilesystemChangeSetJob(ChangeSetJob):
+    def __init__(self, *args, **kw):
+        self.mirror = kw.pop('mirror', False)
+        ChangeSetJob.__init__(self, *args, **kw)
+
+    def checkTroveCompleteness(self, trv):
+        if not self.mirror and not trv.troveInfo.sigs.sha1():
+            raise errors.TroveChecksumMissing(trv.getName(), trv.getVersion(),
+                                              trv.getFlavor())
+        if trv.troveInfo.incomplete():
+            if trv.troveInfo.troveVersion() > trove.TROVE_VERSION:
+                raise errors.TroveSchemaError(trv.getName(), trv.getVersion(),
+                                              trv.getFlavor(),
+                                              trv.troveInfo.troveVersion(),
+                                              trove.TROVE_VERSION)
+            else:
+                nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
+                err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
+                raise errors.TroveIntegrityError(error=err, *nvf)
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -131,10 +148,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             threshold = TRUST_UNTRUSTED
         try:
             # reset time stamps only if we're not mirroring.
-            ChangeSetJob(self, cs, [ serverName ],
-                         resetTimestamps = not mirror,
-                         keyCache = self.troveStore.keyTable.keyCache,
-                         threshold = threshold)
+            FilesystemChangeSetJob(self, cs, [ serverName ],
+                                   resetTimestamps = not mirror,
+                                   keyCache = self.troveStore.keyTable.keyCache,
+                                   threshold = threshold,
+                                   mirror = mirror)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()

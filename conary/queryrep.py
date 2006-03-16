@@ -15,16 +15,11 @@
 Provides the output for the "conary repquery" command
 """
 import itertools
-import sys
-import time
 
 from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
-from conary.lib import log
-from conary import versions
-
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1

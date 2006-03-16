@@ -208,11 +208,6 @@ class DependencyWorkTables:
 
     def __init__(self, cu, removeTables = False):
         self.cu = cu
-	self.populateStmt = self.cu.compile("""
-            INSERT INTO DepCheck
-            (troveId, depNum, flagCount, isProvides, class, name, flag)
-            VALUES(?, ?, ?, ?, ?, ?, ?)
-            """)
 
         schema.resetTable(self.cu, "DepCheck")
         schema.resetTable(self.cu, "RemovedTroveIds")
@@ -222,6 +217,12 @@ class DependencyWorkTables:
 
         if removeTables:
             schema.resetTable(self.cu, "RemovedTroveIds")
+
+        self.populateStmt = self.cu.compile("""
+            INSERT INTO DepCheck
+            (troveId, depNum, flagCount, isProvides, class, name, flag)
+            VALUES(?, ?, ?, ?, ?, ?, ?)
+            """)
 
 class DependencyChecker:
 
@@ -267,7 +268,6 @@ class DependencyChecker:
         for job in self.jobSet:
             if job[2][0] is None: continue
             if not trove.troveIsCollection(job[0]): continue
-
             trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
                                             withFiles = False)
 
@@ -888,15 +888,12 @@ class DependencyTables:
         cu.execute("INSERT INTO suspectDeps SELECT DISTINCT depId "
                    "FROM suspectDepsOrig")
 
-        cu.execute("""DELETE FROM Dependencies WHERE depId IN
-                (SELECT DISTINCT suspectDeps.depId FROM suspectDeps
-                 LEFT OUTER JOIN
-                    (SELECT depId AS depId1,
-                            instanceId AS instanceId1 FROM Requires UNION
-                     SELECT depId AS depId1,
-                            instanceId AS instanceId1 FROM Provides)
-                    ON suspectDeps.depId = depId1
-                 WHERE instanceId1 IS NULL)""")
+        cu.execute("""
+                DELETE FROM Dependencies WHERE depId IN
+                (SELECT suspectDeps.depId FROM suspectDeps WHERE depId NOT IN
+                    (SELECT distinct depId AS depId1 FROM Requires UNION
+                     SELECT distinct depId AS depId1 FROM Provides))
+                 """)
 
     def _restrictResolveByLabel(self, label):
         """ Restrict resolution by label

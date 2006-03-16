@@ -1381,6 +1381,8 @@ def setupTempTables(db):
             instanceId  INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtlInst"] = True
+        db.createIndex("gtlInst", "gtlInstInstanceIdx", "instanceId, idx",
+                       check = False)
     if "getFilesTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
@@ -1399,7 +1401,7 @@ def setupTempTables(db):
     if "gtvlTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE gtvlTbl(
-            item        VARCHAR(254),
+            item        VARCHAR(767),
             versionSpec VARCHAR(767),
             flavorId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)

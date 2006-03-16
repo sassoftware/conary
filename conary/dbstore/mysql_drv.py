@@ -12,7 +12,6 @@
 # full details.
 #
 
-import re
 import MySQLdb as mysql
 from MySQLdb import converters
 from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
@@ -32,6 +31,7 @@ class KeywordDict(BaseKeywordDict):
     keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
     keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
     keys['TABLEOPTS'] = 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin'
+    keys['STRAIGHTJOIN'] = 'STRAIGHT_JOIN'
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 
@@ -46,7 +46,7 @@ class Cursor(BindlessCursor):
         except mysql.IntegrityError, e:
             if e[0] in (1062,):
                 raise sqlerrors.ColumnNotUnique(e)
-            raise errors.CursorError(e.args[1], (e,) + tuple(e.args))
+            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
         except mysql.OperationalError, e:
             if e[0] in (1216, 1217, 1451, 1452):
                 raise sqlerrors.ConstraintViolation(e.args[1], e.args)
@@ -138,7 +138,7 @@ class Database(BaseDatabase):
             return self.connect()
         return False
 
-    # Important: MySQL can not report back a list of temporray tables
+    # Important: MySQL can not report back a list of temporary tables
     # created in the current connection, therefore the self.tempTables
     # is managed separately outside of the loadSchema() calls.
     def loadSchema(self, cu = None):
@@ -211,3 +211,9 @@ class Database(BaseDatabase):
         self.loadSchema()
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
+
+    def analyze(self):
+        self.loadSchema()
+        cu = self.cursor()
+        for table in self.tables:
+            cu.execute("ANALYZE TABLE %s" % table)

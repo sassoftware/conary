@@ -13,8 +13,6 @@
 #
 
 import struct
-import sys
-from conary.lib import util
 
 class _javaSymbolTable:
     def __init__(self):

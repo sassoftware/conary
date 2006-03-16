@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,7 +12,6 @@
 # full details.
 #
 
-import copy
 import re
 from conary.lib import misc, util
 
@@ -29,6 +28,8 @@ DEP_CLASS_CIL           = 9
 DEP_CLASS_JAVA          = 10
 DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
+DEP_CLASS_RUBY          = 13
+DEP_CLASS_PHP           = 14
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -268,8 +269,7 @@ class Dependency(BaseDependency):
 	"""
 	allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
-            if (mergeType == DEP_MERGE_TYPE_OVERRIDE
-                    or not allFlags.has_key(flag)):
+            if mergeType == DEP_MERGE_TYPE_OVERRIDE or flag not in allFlags:
                 allFlags[flag] = otherSense
                 continue
 
@@ -412,7 +412,7 @@ class DependencyClass(object):
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
 
-	if self.members.has_key(dep.name):
+	if dep.name in self.members:
 	    # this is a little faster then doing all of the work when
 	    # we could otherwise avoid it
 	    if dep == self.members[dep.name]: return
@@ -420,11 +420,8 @@ class DependencyClass(object):
 	    # merge the flags, and add the newly created dependency
 	    # into the class
 	    dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
-	    del self.members[dep.name]
 
-        grpDep = dependencyCache.setdefault(dep, dep)
-
-	self.members[grpDep.name] = grpDep
+	self.members[dep.name] = dep
 	assert(not self.justOne or len(self.members) == 1)
 
     def hasDep(self, name):
@@ -436,7 +433,7 @@ class DependencyClass(object):
         
         score = 0
 	for requiredDep in requirements.members.itervalues():
-	    if not self.members.has_key(requiredDep.name):
+            if requiredDep.name not in self.members:
                 if self.depNameSignificant:
                     # dependency names are always 'requires', so if the 
                     # dependency class name is significant (i.e. the dep 
@@ -471,8 +468,9 @@ class DependencyClass(object):
 
     def toStrongFlavor(self):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         for dep in self.members.values():
-            newDepClass.addDep(dep.toStrongFlavor())
+            a(dep.toStrongFlavor())
         return newDepClass
 
     def satisfies(self, requirements):
@@ -480,23 +478,25 @@ class DependencyClass(object):
 
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	if other is None: return
+        a = self.addDep
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
-	    self.addDep(otherdep, mergeType = mergeType)
+	    a(otherdep, mergeType = mergeType)
 
     def __and__(self, other):
         return self.intersection(other)
 
     def intersection(self, other, strict=True):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
                 dep = dep.intersection(other.members[tag], strict=strict)
                 if dep is None:
-                    newDepClass.addDep(Dependency(tag))
+                    a(Dependency(tag))
                 else:
-                    newDepClass.addDep(dep)
+                    a(dep)
                 found = True
         if found:
             return newDepClass
@@ -504,13 +504,14 @@ class DependencyClass(object):
 
     def difference(self, other, strict=True):
         newDepClass = self.__class__()
+        a = newDepClass.addDep
         found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
                 diff = dep.difference(other.members[tag], strict=strict)
                 if diff is None:
                     continue
-                newDepClass.addDep(diff)
+                a(diff)
             else:
                 newDepClass.addDep(dep)
             found = True
@@ -523,10 +524,8 @@ class DependencyClass(object):
         return self.difference(other)
 
     def getDeps(self):
-        l = self.members.items()
         # sort by name
-        l.sort()
-        for name, dep in l:
+        for name, dep in sorted(self.members.iteritems()):
             yield dep
 
     def thawDependency(frozen):
@@ -669,6 +668,24 @@ class PerlDependencies(DependencyClass):
     flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(PerlDependencies)
 
+class RubyDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RUBY
+    tagName = "ruby"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(RubyDependencies)
+
+class PhpDependencies(DependencyClass):
+
+    tag = DEP_CLASS_PHP
+    tagName = "php"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(PhpDependencies)
+
 class FileDependencies(DependencyClass):
 
     tag = DEP_CLASS_FILES
@@ -688,13 +705,6 @@ class TroveDependencies(DependencyClass):
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
     depFormat = 'IDENT(?::IDENT)?' # trove[:comp] 
-
-    def thawDependency(frozen):
-        d = DependencyClass.thawDependency(frozen)
-        cached = dependencyCache.setdefault(d, d)
-        return cached
-
-    thawDependency = staticmethod(thawDependency)
 
 _registerDepClass(TroveDependencies)
 
@@ -759,7 +769,11 @@ class DependencySet(object):
 
     def copy(self):
         new = DependencySet()
-        new.members = copy.deepcopy(self.members)
+        add = new.addDep
+        for depClass in self.members.itervalues():
+            cls = depClass.__class__
+            for dep in depClass.members.itervalues():
+                add(cls, dep)
         return new
 
     def toStrongFlavor(self):
@@ -800,13 +814,21 @@ class DependencySet(object):
             return
 
         self.hash = None
+        a = self.addDep
+	for tag, members in other.members.iteritems():
+            c = members.__class__
+            if tag in self.members:
+		self.members[tag].union(members, mergeType = mergeType)
 
-	for tag in other.members:
-	    if self.members.has_key(tag):
-		self.members[tag].union(other.members[tag],
-                                        mergeType = mergeType)
+                # If we're dropping conflicts, we might drop this class
+                # of troves all together.
+                if (mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS
+                    and c.justOne and not 
+                    self.members[tag].members.values()[0].flags):
+                    del self.members[tag]
 	    else:
-		self.members[tag] = copy.deepcopy(other.members[tag])
+                for dep in members.members.itervalues():
+                    a(c, dep)
 
     def intersection(self, other, strict=True):
         newDep = DependencySet()
@@ -823,13 +845,16 @@ class DependencySet(object):
 
     def difference(self, other, strict=True):
         newDep = DependencySet()
+        a = newDep.addDep
         for tag, depClass in self.members.iteritems():
+            c = depClass.__class__
             if tag in other.members:
                 dep = depClass.difference(other.members[tag], strict=strict)
                 if dep is not None:
                     newDep.members[tag] = dep
             else:
-                newDep.members[tag] = copy.deepcopy(depClass)
+                for dep in depClass.members.itervalues():
+                    a(c, dep)
         return newDep
 
     def __sub__(self, other):
@@ -841,7 +866,7 @@ class DependencySet(object):
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
-	    if not self.members.has_key(tag): 
+	    if tag not in self.members:
 		return False
 	    if not self.members[tag] == other.members[tag]:
 		return False
@@ -853,10 +878,10 @@ class DependencySet(object):
 
     def __hash__(self):
         if self.hash is None:
-            self.hash = 0
+            h = 0
             for member in self.members.itervalues():
-                self.hash ^= hash(member)
-
+                h ^= hash(member)
+            self.hash = h
 	return self.hash
 
     def __nonzero__(self):
@@ -899,10 +924,12 @@ def ThawDependencySet(frz):
         return depSet
 
     i = 0
+    a = depSet.addDep
+    depSetSplit = misc.depSetSplit
     while i < len(frz):
-        (i, tag, frozen) = misc.depSetSplit(i, frz)
+        (i, tag, frozen) = depSetSplit(i, frz)
         depClass = dependencyClasses[tag]
-        depSet.addDep(depClass, depClass.thawDependency(frozen))
+        a(depClass, depClass.thawDependency(frozen))
 
     return depSet
 
@@ -1011,7 +1038,8 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
     depClasses = set()
     for flavor in flavors:
         depClasses.update([ dependencyClasses[x] for x in flavor.getDepClasses()])
-            
+
+    a = finalDep.addDep
     for depClass in depClasses:
         depsByName = {}
         for flavor in flavors:
@@ -1020,7 +1048,11 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
                     depsByName.setdefault(dep.name, []).append(dep)
         for depList in depsByName.itervalues():
             dep = _mergeDeps(depList, mergeType)
-            finalDep.addDep(depClass, dep)
+            if (depClass.justOne
+                and mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS and 
+                not dep.flags):
+                continue
+            a(depClass, dep)
     return finalDep
 
 

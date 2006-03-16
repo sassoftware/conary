@@ -12,12 +12,10 @@
 # full details.
 #
 
-from conary import deps, files, sqlite3, streams, trove, versions
+from conary import deps, files, streams, trove, versions
 from conary import dbstore
-from conary.dbstore import idtable, migration, sqlerrors
+from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
-
-import itertools
 
 OldDatabaseSchema = schema.OldDatabaseSchema
 
@@ -857,6 +855,10 @@ order by
 						 justPresent = not pristine)[1]
 	return files.ThawFile(stream, pathId)
 
+    def getFileStream(self, fileId, pristine = False):
+        return self.troveFiles.getFileByFileId(fileId, 
+                                               justPresent = not pristine)[1]
+
     def findFileVersion(self, fileId):
         cu = self.db.cursor()
         cu.execute("""SELECT stream FROM DBTroveFiles
@@ -907,7 +909,8 @@ order by
 
         return result
 
-    def getTroves(self, troveList, pristine, withFiles = True):
+    def getTroves(self, troveList, pristine = True, withFiles = True,
+                  withDeps = True):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
@@ -915,7 +918,8 @@ order by
             if instanceId is not None:
                 instances[i] = self._getTrove(pristine,
                                               troveInstanceId = instanceId,
-                                              withFiles = withFiles)
+                                              withFiles = withFiles,
+                                              withDeps = withDeps)
 
         return instances
 
@@ -958,17 +962,10 @@ order by
 
         return r
 
-    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True,
-		 withFiles = True):
-	return self._getTrove(troveName = troveName,
-			      troveVersion = troveVersion,
-			      troveFlavor = troveFlavor,
-			      pristine = pristine,
-			      withFiles = withFiles)
-
     def _getTrove(self, pristine, troveName = None, troveInstanceId = None,
 		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None, withFiles = True):
+		  troveFlavor = 0, troveFlavorId = None, withFiles = True,
+                  withDeps = True):
 	if not troveName:
 	    (troveName, troveVersionId, troveFlavorId) = \
 		    self.instances.getId(troveInstanceId,
@@ -1040,7 +1037,9 @@ order by
 	    trv.addTrove(name, version, flavor, byDefault = byDefault,
                          weakRef = weakRef)
 
-        self.depTables.get(cu, trv, troveInstanceId)
+        if withDeps:
+            self.depTables.get(cu, trv, troveInstanceId)
+
         self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
         if not withFiles:
@@ -1115,19 +1114,24 @@ order by
 	    # which was included by a trove which was removed; getting that
 	    # closure may have to be iterative?). that process may be faster
 	    # then the full join?
+            # NOTE: if we could assume that we have weak references this
+            # would be a two-step process
             cu = self.db.cursor()
-            cu.execute("""SELECT Instances.instanceId FROM
+
+            cu.execute("""DELETE FROM TroveInfo WHERE 
+                    instanceId IN (
+                        SELECT Instances.instanceId FROM Instances
+                        WHERE isPresent = 0)
+                      """)
+
+            cu.execute("""DELETE FROM Instances WHERE 
+                    instanceId IN (
+                        SELECT Instances.instanceId
+                        FROM
                         Instances LEFT OUTER JOIN TroveTroves
                         ON Instances.instanceId = TroveTroves.includedId
-                        WHERE isPresent = 0 AND TroveTroves.includedId is NULL
+                        WHERE isPresent = 0 AND TroveTroves.includedId IS NULL)
                       """)
-            instanceIds = [ x[0] for x in cu ]
-
-            for instanceId in instanceIds:
-                cu.execute("DELETE FROM Instances WHERE instanceId=?", 
-                            instanceId)
-                cu.execute("DELETE FROM TroveInfo WHERE instanceId=?", 
-                            instanceId)
 
             cu.execute("""DELETE FROM Versions WHERE Versions.versionId IN
                             (SELECT rmvdVer FROM RemovedVersions
@@ -1340,7 +1344,7 @@ order by
             result.append([])
 
         cu.execute("""SELECT idx, Instances.troveName, Versions.version,
-                             Flavors.flavor
+                             Flavors.flavor, flags
                         FROM ftc JOIN Versions AS IncVersion ON
                             ftc.version = IncVersion.version
                         JOIN Flavors AS IncFlavor ON
@@ -1359,7 +1363,12 @@ order by
                         JOIN Versions ON
                             Instances.versionId = Versions.versionId
                 """)
-        for (idx, name, version, flavor) in cu:
+        for (idx, name, version, flavor, flags) in cu:
+            if flags & schema.TROVE_TROVES_WEAKREF:
+                # don't include weak references, they are not direct
+                # containers
+                continue
+
             result[idx].append((name, versions.VersionFromString(version),
                                 deps.deps.ThawDependencySet(flavor)))
 
@@ -1462,6 +1471,113 @@ order by
             l.append((name, versions.VersionFromString(version), flavorStr))
 
         return l
+
+
+    def iterUpdateContainerInfo(self, troveNames=None):
+        """
+            Returns information about troves and their containers that should 
+            be enough to determine what local updates have been made to the 
+            system.
+
+            If troveNames are specified, returns enough information to be
+            used to determine what local updates have been made to the 
+            given troves.
+
+            Yields ((name, version, flavor), parentInfo, isPresent)
+            tuples, for troves on the system that may be part of a local
+            update.  parentInfo may be (name, version, flavor) or None.
+        """
+        cu = self.db.cursor()
+
+        if troveNames:
+            # Return information needed for determining local updates 
+            # concerning the given troves only.  To do that, we need a 
+            # list of all troves that could potentially affect whether this 
+            # trove is an update - that all parents of these troves
+            # and all troves with the same name as the parents of these troves.
+            cu.execute("CREATE TEMPORARY TABLE tmpInst(instanceId INT)",
+                       start_transaction = False)
+
+            for name in troveNames:
+                cu.execute("""INSERT INTO tmpInst 
+                   SELECT instanceId FROM Instances WHERE troveName = ?""",
+                           name, start_transaction = False)
+
+            # Summary, Insert into this tmpInst all troves that are parents
+            # of the troves already in tmpIst + all troves with the same 
+            # name.
+            cu.execute('''
+                INSERT INTO tmpInst
+                    SELECT DISTINCT SameName.instanceId
+                        FROM tmpInst
+                        JOIN TroveTroves
+                           ON (TroveTroves.includedId = tmpInst.instanceId)
+                        JOIN Instances
+                           ON (TroveTroves.instanceId = Instances.instanceId)
+                        JOIN Instances AS SameName
+                           ON (Instances.troveName == SameName.troveName)
+                        WHERE SameName.instanceId NOT IN
+                              (SELECT instanceId from tmpInst)
+                ''', start_transaction = False)
+            fromClause = 'FROM tmpInst JOIN Instances USING(instanceId)'
+        else:
+            fromClause = 'FROM Instances'
+
+        # Select troves where:
+        # 1. The trove instanceId is listed in tmpInst
+        # 2. There is another trove with the same name that is on the system -
+        #    we don't list removals as local updates (maybe we should?)
+        #    This trove must also not be referenced (this is why we join
+        #    TroveTroves as NotReferenced)
+        # 3. This trove is not both present and referenced - such troves
+        #    are definitely not parts of local updates - they are intended
+        #    installs.
+        cu.execute("""
+        SELECT Instances.isPresent, Instances.troveName, Versions.version,
+               Instances.timeStamps, Flavors.flavor,
+               Parent.troveName, ParentVersion.version, Parent.timeStamps,
+               ParentFlavor.flavor
+        %s
+        JOIN Instances AS InstPresent ON
+            (InstPresent.troveName=Instances.troveName and
+             InstPresent.isPresent)
+        LEFT JOIN TroveTroves AS NotReferenced ON
+            (InstPresent.instanceId=NotReferenced.includedId
+             AND NotReferenced.inPristine=1)
+        JOIN Versions ON
+            Instances.versionId = Versions.versionId
+        JOIN Flavors ON
+            Instances.flavorId = Flavors.flavorId
+        LEFT OUTER JOIN TroveTroves ON
+            (Instances.instanceId = TroveTroves.includedId
+             AND TroveTroves.inPristine=1)
+        LEFT OUTER JOIN Instances AS Parent ON
+            TroveTroves.instanceId=Parent.instanceId
+        LEFT OUTER JOIN Versions AS ParentVersion ON
+            ParentVersion.versionId=Parent.versionId
+        LEFT OUTER JOIN Flavors AS ParentFlavor ON
+            ParentFlavor.flavorId=Parent.flavorId
+        WHERE (NotReferenced.instanceId IS NULL
+               AND ((TroveTroves.inPristine=1 AND Instances.isPresent=0)
+                     OR TroveTroves.inPristine is NULL))
+        """ % fromClause)
+
+        VFS = versions.VersionFromString
+        Flavor = deps.deps.ThawDependencySet
+
+        for (isPresent, name, versionStr, timeStamps, flavorStr, 
+             parentName, parentVersion, parentTimeStamps, parentFlavor) in cu:
+            version = VFS(versionStr, timeStamps=timeStamps.split(':'))
+            if parentName:
+                parentVersion = VFS(parentVersion, 
+                                    timeStamps=parentTimeStamps.split(':'))
+                parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
+            else:
+                parentInfo = None
+            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent)
+
+        if troveNames:
+            cu.execute("DROP TABLE tmpInst", start_transaction = False)
 
     def findRemovedByName(self, name):
         """

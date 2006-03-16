@@ -16,7 +16,6 @@ import itertools
 
 from conary import files
 from conary import trove
-from conary.deps import deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
 
@@ -419,6 +418,12 @@ class GroupRecipeSource(SearchableTroveSource):
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
 
+    def delTrove(self, name, version, flavor):
+        self._trovesByName[name].remove((name, version, flavor))
+
+    def addTrove(self, name, version, flavor):
+        self._trovesByName.setdefault(name, []).append((name, version, flavor))
+
 class ReferencedTrovesSource(SearchableTroveSource):
     """ A TroveSource that only (n,v,f) pairs for troves that are
         referenced by other, installed troves.
@@ -587,6 +592,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                             withFiles=withFiles)
 
                 newTrove.applyChangeSet(trvCs,
+                                        skipFiles = not withFiles,
                                         skipIntegrityChecks = not withFiles)
             retList.append(newTrove)
 
@@ -852,7 +858,7 @@ class TroveSourceStack(SearchableTroveSource):
         return False
 
     def trovesByName(self, name):
-        return list(chain(*(x.trovesByName(name) for x in self.sources)))
+        return list(itertools.chain(*(x.trovesByName(name) for x in self.sources)))
         
     def getTroves(self, troveList, withFiles = True):
         troveList = list(enumerate(troveList)) # make a copy and add indexes

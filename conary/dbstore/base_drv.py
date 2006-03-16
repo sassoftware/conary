@@ -29,10 +29,11 @@ class BaseBinary:
 
 # this will be derived by the backend drivers to handle schema creation
 class BaseKeywordDict(dict):
-    keys = { 'PRIMARYKEY' : 'INTEGER PRIMARY KEY',
-             'BLOB'       : 'BLOB',
-             'MEDIUMBLOB' : 'BLOB',
-             'TABLEOPTS'  : '',
+    keys = { 'PRIMARYKEY'    : 'INTEGER PRIMARY KEY',
+             'BLOB'          : 'BLOB',
+             'MEDIUMBLOB'    : 'BLOB',
+             'STRAIGHTJOIN'  : '',
+             'TABLEOPTS'     : '',
              }
     def __init__(self):
         dict.__init__(self, self.keys)
@@ -435,4 +436,3 @@ class BaseDatabase:
 
     def use(self, dbName):
         pass
-

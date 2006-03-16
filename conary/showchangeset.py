@@ -16,24 +16,22 @@ Provides the output for the "conary showcs" command
 """
 
 import itertools
-import time
-import sys
 
 #conary
 from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display, query
-from conary import files
 from conary.lib import log
-from conary.lib.sha1helper import sha1ToString
-from conary.repository import repository, trovesource
+from conary.repository import trovesource
 
 def usage():
     print "conary showcs   <changeset> [trove[=version]]"
     print "  Accepts all common display options.  Also,"
-    print "                --show-changes    For modifications, show the old "
-    print "                                  file info below new"
-    print "                --all             Combine tags to display most information about the changeset"
+    print "                --show-changes        For modifications, show the old "
+    print "                                      file info below new"
+    print "                --all                 Combine tags to display most information about the changeset"
+    print "                --recurse-repository  Search repositories for information about referenced but not"
+    print "                                      included troves"
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg,
@@ -46,17 +44,20 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                      # collection options
                      showTroves = False, recurse = None, showAllTroves = False,
                      weakRefs = False, showTroveFlags = False,
-                     alwaysDisplayHeaders = False,
+                     alwaysDisplayHeaders = False,  recurseRepos=False,
                      # job options
                      showChanges = False, asJob = False):
 
     if all:
-        deps = tags = recurse = showTroveFlags = True
+        deps = recurse = showTroveFlags = showAllTroves = True
         if ls:
-            fileDeps = lsl = True
+            fileDeps = lsl = tags = True
 
     if showChanges:
         lsl = True
+    
+    if recurseRepos:
+        recurse = True
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -76,11 +77,15 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         else:
             troveTups, primary  = query.getTrovesToDisplay(changeSetSource, 
                                                            troveSpecs)
-        querySource = trovesource.stack(changeSetSource, client.getRepos())
+        if recurseRepos:
+            querySource = trovesource.stack(changeSetSource, client.getRepos())
+        else:
+            querySource = changeSetSource
 
         dcfg = display.DisplayConfig(querySource, client.db)
         dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
-                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor)
+                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor,
+                             fullVersions=cfg.fullVersions)
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
                             fileDeps=fileDeps, fileVersions=fileVersions)
 
@@ -94,6 +99,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves,
                          showWeakRefs = weakRefs,
+                         checkExists = True, showNotExists = True,
                          showTroveFlags = showTroveFlags,
                          displayHeaders = alwaysDisplayHeaders or showTroveFlags)
 

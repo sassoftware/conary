@@ -15,7 +15,6 @@
 import base64
 
 from conary import deps, files, versions
-from conary.lib import sha1helper
 
 class NetworkConvertors(object):
 

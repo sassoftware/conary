@@ -14,7 +14,6 @@
 from conary import trove, versions
 from conary.deps import deps
 from conary.lib import util
-from conary.repository import errors
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use

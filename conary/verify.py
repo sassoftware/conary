@@ -14,16 +14,11 @@
 """
 Provides the output for the "conary verify" command
 """
-import sys
-import time
-
-from conary import files
 from conary import showchangeset
 from conary import versions
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
-from conary.lib.sha1helper import sha1ToString
 from conary.local import update
 from conary import errors
 
