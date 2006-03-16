@@ -620,6 +620,9 @@ class FilesystemJob:
                                    deps.formatFlavor(troveCs.getNewFlavor())))
                             fullyUpdated = False
                             continue
+                        else:
+                            self.userRemoval(*info)
+
             except OSError:
                 # the path doesn't exist, carry on with the restore
                 pass
