@@ -197,9 +197,14 @@ class DependencyWorkTables:
         """)
 
     def removeTrove(self, troveInfo, nodeId):
+        if troveInfo[2]:
+            flavor = troveInfo[2].freeze()
+        else:
+            flavor = None
+
         self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
-                        (troveInfo[0], troveInfo[1].asString(), 
-                         troveInfo[2].freeze(), nodeId))
+                        (troveInfo[0], troveInfo[1].asString(), flavor, 
+                         nodeId))
 
     def __init__(self, cu, removeTables = False):
         self.cu = cu
@@ -509,9 +514,6 @@ class DependencyChecker:
                     # remains satisfied
                     satisfied[depNum] = provInstId
 
-        satisfied = set(satisfied)
-        brokenByErase = set(brokenByErase)
-
         return satisfied, brokenByErase, wasIn, unresolveable
 
     @staticmethod
@@ -623,18 +625,18 @@ class DependencyChecker:
                                             for idxSet in compSets ]
         jobSets.sort(cmp=orderJobSets)
 
-        # create index from jobIdx -> jobSetIdx for creating a SCC graph.
+        # create index from nodeIdx -> jobSetIdx for creating a SCC graph.
         jobSetsByJob = {}
         for jobSetIdx, jobSet in enumerate(jobSets):
-            for job, jobIdx in jobSet:
-                jobSetsByJob[jobIdx] = jobSetIdx
+            for job, nodeIdx in jobSet:
+                jobSetsByJob[nodeIdx] = jobSetIdx
 
         sccGraph = graph.DirectedGraph()
         for jobSetIdx, jobSet in enumerate(jobSets):
             sccGraph.addNode(jobSetIdx)
-            for job, jobIdx in jobSet:
-                for childIdx in self.g.getChildren(jobIdx):
-                    childJobSetIdx = jobSetsByJob[childIdx]
+            for job, nodeIdx in jobSet:
+                for childNodeIdx in self.g.getChildren(nodeIdx):
+                    childJobSetIdx = jobSetsByJob[childNodeIdx]
                     sccGraph.addEdge(jobSetIdx, childJobSetIdx)
 
         # create an ordering based on dependencies, and then, when forced
@@ -660,7 +662,7 @@ class DependencyChecker:
         # trove is not part of the update job.
         newNewEdges.update(self._createCollectionEdges())
 
-        resatisfied = brokenByErase & satisfied
+        resatisfied = set(brokenByErase) & set(satisfied)
         if resatisfied:
             # These dependencies are ones where the same dependency
             # is being both removed and added, and which is required
@@ -754,7 +756,7 @@ class DependencyChecker:
         # "unresolvable" dependencies. (they could be resolved by something
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
-        self.cu.execute("""
+        stmt = """
                 SELECT depId, depNum, reqInstanceId, Required.nodeId,
                        provInstanceId, Provided.nodeId
                     FROM
@@ -765,7 +767,8 @@ class DependencyChecker:
                         provInstanceId = Provided.troveId
                 """ % self._resolveStmt("TmpRequires",
                                         ("Provides", "TmpProvides"),
-                                        ("Dependencies", "TmpDependencies")))
+                                        ("Dependencies", "TmpDependencies"))
+        self.cu.execute(stmt)
 
         # it's a shame we instantiate this, but merging _gatherResoltion
         # and _findOrdering doesn't seem like any fun
@@ -784,11 +787,13 @@ class DependencyChecker:
                                 self._gatherResolution(result)
 
         if findOrdering:
-            changeSetList = self._findOrdering(result,
-                                                  brokenByErase,
-                                                  satisfied)
+            changeSetList = self._findOrdering(result, brokenByErase,
+                                               satisfied)
         else:
             changeSetList = []
+
+        brokenByErase = set(brokenByErase)
+        satisfied = set(satisfied)
 
         unsatisfiedList, unresolveableList = \
                 self._gatherDependencyErrors(satisfied, brokenByErase,
@@ -922,26 +927,6 @@ class DependencyTables:
 """ % label
 
         return restrictJoin, restrictWhere
-
-    def check(self, jobSet, troveSource, findOrdering = False):
-	"""
-	Check the database for closure against the operations in
-	the passed changeSet.
-
-	@param changeSet: The changeSet which defined the operations
-	@type changeSet: repository.ChangeSet
-	@rtype: tuple of dependency failures for new packages and
-		dependency failures caused by removal of existing
-		packages
-	"""
-
-        checker = DependencyChecker(self.db, troveSource)
-        checker.addJobs(jobSet)
-        unsatisfiedList, unresolveableList, changeSetList = \
-                checker.check(findOrdering = findOrdering)
-        checker.done()
-
-        return (unsatisfiedList, unresolveableList, changeSetList)
 
     def _resolve(self, depSetList, selectTemplate, restrictor=None,
                  restrictBy=None):
