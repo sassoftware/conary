@@ -65,13 +65,13 @@ class NodeDataByHash(NodeData):
         self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), sortAlg)
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
+                      sortAlg)
 
     def copy(self):
         new = self.__class__()
         new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
-        new.index = self.index
         return new
 
     def getIndex(self, item):
@@ -120,6 +120,9 @@ class DirectedGraph:
 
     def deleteEdges(self, item):
         self.edges[self.data.getIndex(item)] = set()
+
+    def getChildren(self, item):
+        return self.data.getItemsByIndex(self.edges[self.data.getIndex(item)])
 
     def getReversedEdges(self):
         newEdges = {}

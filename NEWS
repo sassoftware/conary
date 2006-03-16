@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o Client Changes:
+    * A new dependency resolution method has been added which can be turned
+      on by setting resolveLevel to 2 in your conarycfg:  If updating trove 'a'
+      removes a dependency needed by trove 'b', attempt to update 'b' to 
+      solve the dependency issue.  This will allow 'conary update conary'
+      to work as expected when you have conary-build installed, for example.
   o Bug Fixes:
     * Recipes that use loadRecipe('foo') and rely on conary to look upstream
       to find their branch now work correctly when committing.

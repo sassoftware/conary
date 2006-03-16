@@ -641,6 +641,17 @@ Multiple maps can be given for a single label. (If no mapping is found,
 The path to install files into, normally \fI/\fR.
 Can be overridden by the \fB\-\-root \fI<root>\fR command-line option.
 .TP
+.B resolveLevel
+Determines the level of effort conary will put into resolving dependencies.
+
+If the level is 1:
+    Attempt to resolve dependencies by adding new troves that fulfill those missing dependencies.
+
+If the level is 2:
+    If updating trove 'a' removes a dependency needed by trove 'b', attempt to update 'b' to solve the dependency issue.
+
+(The default level is 1)
+.TP
 .B signatureKey
 Specifies the OpenPGP Key from a local keyring to be used when generating trove
 signatures. \fBNOTE:\fR When this option is processed, it clears all entries in
