@@ -1535,8 +1535,8 @@ order by
         LEFT OUTER JOIN Flavors AS ParentFlavor ON
             ParentFlavor.flavorId=Parent.flavorId
         WHERE (NotReferenced.instanceId IS NULL
-               AND (TroveTroves.inPristine=1
-                    OR TroveTroves.inPristine is NULL))
+               AND ((TroveTroves.inPristine=1 AND Instances.isPresent=0)
+                     OR TroveTroves.inPristine is NULL))
         """ % fromClause)
 
         VFS = versions.VersionFromString
