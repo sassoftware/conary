@@ -177,6 +177,7 @@ class DependencySolver(object):
             # affect resolving normal missing dependencies.
 
             changeMade = False
+            newJobSet = None
 
             # first: attempt to update packages that dependended on the missing
             # package.
