@@ -621,7 +621,9 @@ class FilesystemJob:
                             fullyUpdated = False
                             continue
                         else:
-                            self.userRemoval(*info)
+                            for info in self.db.iterFindPathReferences(
+                                                                    headPath):
+                                self.userRemoval(*info)
 
             except OSError:
                 # the path doesn't exist, carry on with the restore
