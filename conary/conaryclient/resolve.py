@@ -177,7 +177,6 @@ class DependencySolver(object):
             # affect resolving normal missing dependencies.
 
             changeMade = False
-            newJobSet = None
 
             # first: attempt to update packages that dependended on the missing
             # package.
@@ -187,9 +186,9 @@ class DependencySolver(object):
                                                                 cannotResolve,
                                                                 uJob, jobSet,
                                                                 ineligible)
-            if newJobSet:
-                jobSet |= newJobSet
-                changeMade = True
+                if newJobSet:
+                    jobSet |= newJobSet
+                    changeMade = True
 
             if not changeMade and cannotResolve:
                 # second: attempt to keep packages that were being erased
