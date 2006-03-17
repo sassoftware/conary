@@ -32,14 +32,14 @@ class _Source(action.RecipeAction):
 		'dir': '',
 		'keyid': None }
 
-	        
+
     def __init__(self, recipe, *args, **keywords):
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
-	    
+
     def doPrep(self):
 	if self.keyid:
 	    self._addSignature()
@@ -54,7 +54,7 @@ class _Source(action.RecipeAction):
         for suffix in ('sig', 'sign', 'asc'):
             self.gpg = '%s.%s' %(self.sourcename, suffix)
             self.localgpgfile = lookaside.searchAll(self.recipe.cfg,
-				    self.recipe.laReposCache, self.gpg, 
+				    self.recipe.laReposCache, self.gpg,
                                     self.recipe.name, self.recipe.srcdirs)
 	    if self.localgpgfile:
 		return
@@ -136,7 +136,7 @@ class Archive(_Source):
     ====
 
     B{C{r.addArchive()}} - Add a source code archive
-  
+
     SYNOPSIS
     ========
 
@@ -145,9 +145,9 @@ class Archive(_Source):
     DESCRIPTION
     ===========
 
-    From within a Conary recipe, call C{r.addArchive()} to add a 
-    source code archive consisting of an optionally compressed tarball,
-    or zip file, and unpack it to the proper directory.
+    The C{r.addArchive()} class adds a source code archive consisting of an
+    optionally compressed tarball, or zip file, and unpack it to the proper
+    directory.
 
     PARAMETERS
     ==========
@@ -155,7 +155,7 @@ class Archive(_Source):
     The following parameters are recognized by C{r.addArchive}:
 
     B{recipe} : The recipe object currently being built is provided
-    automatically by the C{PackageRecipe} object. Passing in  C{recipe} from 
+    automatically by the C{PackageRecipe} object. Passing in  C{recipe} from
     within a recipe is unnecessary.
 
     KEYWORDS
@@ -173,14 +173,14 @@ class Archive(_Source):
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcenameC{{.sig,sign,asc}}} and 
+    search for a file named I{sourcenameC{{.sig,sign,asc}}} and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file, or URL specified by C{rpm} for an RPM
     containing C{sourcename}.
-    
+
     B{sourcename} : The name of the source archive, which may be a
     local filename, or a Uniform Resource Locator. (URL)
 
@@ -196,39 +196,46 @@ class Archive(_Source):
 
     C{r.addArchive('initscripts-%(upmajver)s.tar.bz2', rpm=srpm)}
 
-    The above example demonstrates use with a local source code archive file,
-    and the C{rpm} keyword.
+    Demonstrates use with a local source code archive file, and the C{rpm}
+    keyword.
 
-    C{r.addArchive('ftp://ftp.visi.com/users/hawkeyd/X/Xaw3d-%(version)s.tar.gz')} 
+    C{r.addArchive('ftp://ftp.visi.com/users/hawkeyd/X/Xaw3d-%(version)s.tar.gz')}
 
-    The second example above shows use with a source code archive accessed 
-    via an FTP URL.
+    Demonstrates use with a source code archive accessed via an FTP URL.
     """
 
     def __init__(self, recipe, *args, **keywords):
 	"""
-	@param recipe: The recipe object currently being built.
-	    Provided automatically by the PackageRecipe object;
-	    do not pass in C{r} from within a recipe.
-	@keyword sourcename: The name of the archive
-	@keyword rpm: If specified, causes Archive to look in the URL or
-	    file specified by C{rpm} for an RPM containing C{sourcename}
-        @keyword dir: The directory to change to unpack the sources.
-            Relative dirs are relative to C{%(builddir)s}.  Absolute dirs
-            are relative to C{%(destdir)s}.
-	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
-	    signature.  Indicates that a signature should be sought and
-	    checked.
-	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
-	    booleans, that determine whether the archive is actually
-	    unpacked or merely stored in the archive.
+	@param recipe: The recipe object currently being built is provided
+        automatically by the C{PackageRecipe} object. Passing in  C{recipe}
+        from within a recipe is unnecessary.
+    @keyword dir: Instructs C{r.addArchive} to change to the directory
+        specified by C{dir} prior to unpacking the source archive.
+        Directories relative to C{%(builddir)s} are considered
+        relative, and directories relative to C{%(destdir)s} are
+        considered absolute.
+	@keyword keyid: Using the C{keyid} keyword indicates the eight-digit
+        GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+        source code archive signature should be sought, and checked.
+        If you provide the C{keyid} keyword, C{r.addArchive} will
+        search for a file named I{sourcenameC{{.sig,sign,asc}}} and
+        ensure it is signed with the appropriate GPG key. A missing signature
+        results in a warning; a failed signature check is fatal.
+    @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive}
+        looks in the file, or URL specified by C{rpm} for an RPM
+        containing C{sourcename}.
+	@keyword sourcename: The name of the source archive, which may be a
+        local filename, or a Uniform Resource Locator. (URL)
+    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the source code archive is
+        actually unpacked, or merely stored in the archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 
     def do(self):
 	f = self._findSource()
 	self._checkSignature(f)
-        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+        destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
 
         guessMainDir = (not self.recipe.explicitMainDir and
@@ -262,7 +269,7 @@ class Archive(_Source):
             elif isinstance(m, magic.gzip) or f.endswith("gz") \
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
-            
+
             # There are things we know we know...
             _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
                            "tar.gz", "tar.bz2", "tar.Z"]
@@ -275,7 +282,7 @@ class Archive(_Source):
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
-                # TODO: do something smarter about the contents of the 
+                # TODO: do something smarter about the contents of the
                 # archive
                 _unpack = "tar -C %s -xSf -" % (destDir,)
             else:
@@ -316,14 +323,14 @@ class Patch(_Source):
 
     SYNOPSIS
     ========
-       
+
     C{r.addPatch([I{backup},] [I{dir},] [I{extraArgs},] [I{keyid},] [I{level},] [I{macros},] [I{rpm},] [I{sourcename},] [I{use}])}
 
     DESCRIPTION
     ===========
-        
-    From within a Conary recipe, call C{r.addPatch()} to add a 
-    patch to be applied to the source code during the build phase.
+
+    The C{r.addPatch()} class adds a patch to be applied to the source code
+    during the build phase.
 
     PARAMETERS
     ==========
@@ -331,7 +338,7 @@ class Patch(_Source):
     The following parameters are recognized by I{r.addPatch}:
 
     B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in  C{recipe} from 
+    automatically by the PackageRecipe object. Passing in  C{recipe} from
     within a recipe is unnecessary.
 
     KEYWORDS
@@ -339,44 +346,43 @@ class Patch(_Source):
 
     The following keywords are recognized by C{r.addPatch}:
 
-    B{backup} : The suffix to use when storing file versions before applying 
+    B{backup} : The suffix to use when storing file versions before applying
     the patch.
-    
-    B{dir} : Instructs C{r.addPatch} to change to the directory
-    specified by C{dir} prior to applying the patch.
-    Directories relative to C{%(builddir)s} are considered
-    relative, and directories relative to C{%(destdir)s} are
-    considered absolute.
-    
+
+    B{dir} : Instructs C{r.addPatch} to change to the directory specified by
+    C{dir} prior to applying the patch. Directories relative to
+    C{%(builddir)s} are considered relative, and directories relative to
+    C{%(destdir)s} are considered absolute.
+
     B{extraArgs} : As a last resort, arbitrary arguments may be passed to the
     patch program  with the C{extraArgs} keyword. This should not normally be
-    required, and is  indicative of a possible bug which should be reported 
+    required, and is  indicative of a possible bug which should be reported
     with the suggestion of direct support for the patch arguments in question.
-    
-    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
-    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
-    source code archive signature should be sought, and checked.
-    If you provide the C{keyid} keyword, {r.addPatch} will
-    search for a file named I{sourcenameC{{.sig,sign,asc}}} and 
-    ensure it is signed with the appropriate GPG key. A missing signature
-    results in a warning; a failed signature check is fatal.
-    
+
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit GNU
+    Privacy Guard (GPG) key ID, without leading C{0x} for the source code
+    archive signature should be sought, and checked. If you provide the
+    C{keyid} keyword, {r.addPatch} will search for a file named
+    I{sourcenameC{{.sig,sign,asc}}} and ensure it is signed with the
+    appropriate GPG key. A missing signature results in a warning; a failed
+    signature check is fatal.
+
     B{level} : By default, one level of initial subdirectory names is stripped
-    out prior to applying the patch.  The C{level} keyword allows 
+    out prior to applying the patch.  The C{level} keyword allows
     specification of additional initial subdirectory levels to be removed.
-    
-    B{macros} : The C{macros} keyword accepts a boolean value, and defaults 
+
+    B{macros} : The C{macros} keyword accepts a boolean value, and defaults
     to false. However, if the value of C{macros} is true, recipe macros in the
-    body  of the patch will be interpolated before applying the patch. For 
-    example, a patch which modifies the value C{CFLAGS = -02} using 
+    body  of the patch will be interpolated before applying the patch. For
+    example, a patch which modifies the value C{CFLAGS = -02} using
     C{CFLAGS = %(cflags)s} will update the C{CFLAGS} parameter based upon the
     current setting of C{recipe.macros.cflags}.
 
     B{rpm} : If the C{rpm} keyword is used, C{Archive}
     looks in the file, or URL specified by C{rpm} for an RPM
     containing C{sourcename}.
-    
-    B{sourcename} : The name of the patch file.
+
+    B{sourcename} : The name of the patch file
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -384,20 +390,20 @@ class Patch(_Source):
 
     EXAMPLES
     ========
-        
+
     The following examples demonstrate invocations of C{r.addPatch}
     from within a recipe:
 
     C{r.addPatch('iptables-1.3.0-no_root.patch')}
 
-    The above example demonstrates typical, simple usage of C{r.addPatch}.
+    Simple usage of C{r.addPatch} specifying the application of the patch
+    C{iptables-1.3.0-no_root.patch}.
 
     C{r.addPatch('Xaw3d-1.5E-xorg-imake.patch', level=0, dir='lib/Xaw3d')}
 
-    The second example above shows use with a C{level} keyword specifying that
-    no initial subdirectory names be stripped, and a C{dir} keyword, 
-    instructing C{r.addPatch} to change to the C{lib/Xaw3d} directory prior
-    to applying the patch.
+    Uses the C{level} keyword specifying that no initial subdirectory names be
+    stripped, and a C{dir} keyword, instructing C{r.addPatch} to change to the
+    C{lib/Xaw3d} directory prior to applying the patch.
     """
     keywords = {'level': '1',
 		'backup': '',
@@ -407,34 +413,42 @@ class Patch(_Source):
 
     def __init__(self, recipe, *args, **keywords):
 	"""
-	@param recipe: The recipe object currently being built.
-	    Provided automatically by the PackageRecipe object;
-	    do not pass in C{r} from within a recipe.
+	@param recipe: The recipe object currently being built is provided
+        automatically by the PackageRecipe object. Passing in  C{recipe} from
+        within a recipe is unnecessary.
+	@keyword backup: The suffix to use when storing file versions before
+        applying the patch.
+	@keyword extraArgs: As a last resort, arbitrary arguments may be passed to
+        the patch program  with the C{extraArgs} keyword. This should not
+        normally be required, and is  indicative of a possible bug which
+        should be reported with the suggestion of direct support for the patch
+        arguments in question.
+    @keyword dir: Instructs C{r.addPatch} to change to the directory specified
+        by C{dir} prior to applying the patch. Directories relative to
+        C{%(builddir)s} are considered relative, and directories relative to
+        C{%(destdir)s} are considered absolute.
+    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        Privacy Guard (GPG) key ID, without leading C{0x} for the source code
+        archive signature should be sought, and checked. If you provide the
+        C{keyid} keyword, {r.addPatch} will search for a file named
+        I{sourcenameC{{.sig,sign,asc}}} and ensure it is signed with the
+        appropriate GPG key. A missing signature results in a warning; a
+        failed signature check is fatal.
+    @keyword level: By default, one level of initial subdirectory names is
+        stripped out prior to applying the patch.  The C{level} keyword allows
+        specification of additional initial subdirectory levels to be removed.
+	@keyword macros: The C{macros} keyword accepts a boolean value, and
+        defaults to false. However, if the value of C{macros} is true, recipe
+        macros in the body  of the patch will be interpolated before applying
+        the patch. For example, a patch which modifies the value
+        C{CFLAGS = -02} using C{CFLAGS = %(cflags)s} will update the C{CFLAGS}
+        parameter based upon the current setting of C{recipe.macros.cflags}.
+	@keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
+        or URL specified by C{rpm} for an RPM containing C{sourcename}.
 	@keyword sourcename: The name of the patch file
-	@keyword rpm: If specified, causes Archive to look in the URL or
-	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@keyword dir: The directory to change to before applying the patch.
-            Relative dirs are relative to C{%(maindir)s}.  Absolute dirs
-            are relative to C{%(destdir)s}.
-	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
-	    signature.  Indicates that a signature should be sought and
-	    checked.
-	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
-	    booleans, that determine whether the archive is actually
-	    unpacked or merely stored in the archive.
-	@keyword level: The number of initial subdirectory names to strip
-	    out when applying the patch; the default is 1.
-	@keyword backup: A backup suffix to use for storing the versions
-	    of files before the patch is applied.
-	@keyword macros: If true, interpolate recipe macros in the body
-	    of the patch before applying it.  For example, you might
-	    have a patch that changes C{CFLAGS = -O2} to
-	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
-	    be replaced with the current setting of C{recipe.macros.cflags}.
-	    Defaults to False.
-	@keyword extraArgs: Arbitrary arguments to pass to the patch program.
-	    Use only as a last resort -- and probably also file a bug
-	    report suggesting the possibility of direct support.
+    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the source code archive is
+        actually unpacked, or merely stored in the archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
@@ -450,7 +464,7 @@ class Patch(_Source):
 	if self.backup:
 	    self.backup = '-b -z %s' % self.backup
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
-        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+        destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir=defaultDir)
         util.mkdirChain(destDir)
 	if self.applymacros:
@@ -484,9 +498,9 @@ class Source(_Source):
 
     DESCRIPTION
     ===========
-    
-    From within a Conary recipe, call C{r.addSource()} to copy a file into the
-    build directory, or destination directory.
+
+    The C{r.addSource()} class copies a file into the build directory, or
+    destination directory.
 
     PARAMETERS
     ==========
@@ -494,7 +508,7 @@ class Source(_Source):
     The following parameters are recognized by C{r.addSource}:
 
     B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in C{recipe} from 
+    automatically by the PackageRecipe object. Passing in C{recipe} from
     within a recipe is unnecessary.
 
     KEYWORDS
@@ -502,50 +516,46 @@ class Source(_Source):
 
     The following keywords are recognized by C{r.addSource}:
 
-    B{apply} : A command line to run after storing the file. Macros will be 
+    B{apply} : A command line to run after storing the file. Macros will be
     interpolated into this command.
-    
-    B{dest} : If set, provides the target name of the file in the build 
-    directory. A full pathname can be used. Absolute directories will be 
-    considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest} to 
-    specify directory information, but not both. Useful mainly  when fetching 
-    the file from an source outside your direct control, such as a URL to a 
+
+    B{dest} : If set, provides the target name of the file in the build
+    directory. A full pathname can be used. Absolute directories will be
+    considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest} to
+    specify directory information, but not both. Useful mainly  when fetching
+    the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
-    
-    B{dir} : The directory in which to store the file, relative to the build 
-    directory. Directories relative to the destination directory will be 
-    considered absolute. Defaults to storing file directly in the build 
+
+    B{dir} : The directory in which to store the file, relative to the build
+    directory. Directories relative to the destination directory will be
+    considered absolute. Defaults to storing file directly in the build
     directory.
 
     B{keyid} : Using the C{keyid} keyword indicates the eight-digit
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcename}C{{.sig,sign,asc}} and 
+    search for a file named I{sourcename}C{{.sig,sign,asc}} and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
-    B{macros} : If True, interpolate recipe macros in the body of a patch 
-    before applying it.  For example, you might have a patch that changes 
-    C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} 
-    to be replaced with the current setting of C{recipe.macros.cflags}. 
+    B{macros} : If True, interpolate recipe macros in the body of a patch
+    before applying it.  For example, you might have a patch that changes
+    C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s}
+    to be replaced with the current setting of C{recipe.macros.cflags}.
     Defaults to False.
-    
-    B{mode}: If set, provides the mode to set on the file.
-    
-    B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or boolean 
-    values which determine whether the source code archive is actually 
-    unpacked, or merely stored in the archive.
 
-    B{rpm} : If the C{rpm} keyword is used, C{Archive} looks in the file, or 
+    B{mode}: If set, provides the mode to set on the file.
+
+    B{rpm} : If the C{rpm} keyword is used, C{Archive} looks in the file, or
     URL specified by C{rpm} for an RPM containing C{sourcename}.
 
     B{sourcename} : The name of the file
-    
-    B{use} : A Use flag or boolean, or a tuple of Use flags and/or booleans, 
-    that determine whether the archive is actually unpacked or merely stored 
+
+    B{use} : A Use flag or boolean, or a tuple of Use flags and/or booleans,
+    that determine whether the archive is actually unpacked or merely stored
     in the archive.
-        
+
     EXAMPLES
     ========
 
@@ -553,14 +563,14 @@ class Source(_Source):
     from within a recipe:
 
     C{r.addSource('usbcam.console')}
-    
-    The example above is a typical, simple invocation of C{r.addSource()} 
+
+    The example above is a typical, simple invocation of C{r.addSource()}
     which adds the file C{usbcam.console} directly to the build directory.
-    
+
     C{r.addSource('pstoraster' , rpm=srpm, dest='pstoraster.new')}
-    
-    The above example of C{r.addSource} specifies the file C{pstoraster} is 
-    to be sought in a source RPM file, and is to be added to the build 
+
+    The above example of C{r.addSource} specifies the file C{pstoraster} is
+    to be sought in a source RPM file, and is to be added to the build
     directory as C{pstoraster.new}.
     """
 
@@ -575,41 +585,42 @@ class Source(_Source):
 
 
 	"""
-	@param recipe: The recipe object currently being built.
-	    Provided automatically by the PackageRecipe object;
-	    do not pass in C{r} from within a recipe.
-	@keyword sourcename: The name of the archive
-	@keyword rpm: If specified, causes Archive to look in the URL or
-	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@keyword dir: The directory in which to store the file, relative
-	    to C{%(builddir)s}. Absolute directories will be considered
-            relative to c{%(destdir)s}. Defaults to storing directly in the
-	    C{%(builddir)s}.
-	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
-	    signature.  Indicates that a signature should be sought and
-	    checked.
-	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
-	    booleans, that determine whether the archive is actually
-	    unpacked or merely stored in the archive.
-	@keyword apply: A command line to run after storing the file.
-	    Macros will be interpolated into this command.
-	@keyword contents: If specified, provides the contents of the
-	    file.  The provided contents will be placed in C{sourcename}.
-	@keyword macros: If true, interpolate recipe macros in the body
-	    of the patch before applying it.  For example, you might
-	    have a patch that changes C{CFLAGS = -O2} to
-	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
-	    be replaced with the current setting of C{recipe.macros.cflags}.
-	    Defaults to False.
-        @keyword mode: If set, provides the mode to set on the file.
-	@keyword dest: If set, provides the target name of the file in
-            the build directory.  A full pathname can be used. Absolute
-            directories will be considered relative to c{%(builddir)s},
-            but do not specify directory information here as well 
-            as in the dir keyword; use one or the other.  Useful mainly 
-            when fetching the file from an source outside your direct 
-            control, such as a URL to a third-party web site, or copying 
-            a file out of an RPM package.
+	@param recipe: The recipe object currently being built is provided
+        automatically by the PackageRecipe object. Passing in C{recipe} from
+        within a recipe is unnecessary.
+    @keyword dest: If set, provides the target name of the file in the build
+        directory. A full pathname can be used. Absolute directories will be
+        considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest}
+        to specify directory information, but not both. Useful mainly  when
+        fetching the file from an source outside your direct control, such as
+        a URL to a third-party web site, or copying a file out of an RPM
+        package.
+    @keyword dir: The directory in which to store the file, relative to the
+        build directory. Directories relative to the destination directory
+        will be considered absolute. Defaults to storing file directly in the
+        build directory.
+    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        Privacy Guard (GPG) key ID, without leading C{0x} for the source code
+        archive signature should be sought, and checked. If you provide the
+        C{keyid} keyword, C{r.addArchive} will search for a file named
+        I{sourcename}C{{.sig,sign,asc}} and ensure it is signed with the
+        appropriate GPG key. A missing signature results in a warning; a
+        failed signature check is fatal.
+    @keyword macros: If True, interpolate recipe macros in the body of a patch
+        before applying it.  For example, you might have a patch that changes
+        C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause
+        C{%(cflags)s} to be replaced with the current setting of
+        C{recipe.macros.cflags}. Defaults to False.
+    @keyword mode: If set, provides the mode to set on the file.
+        use} : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
+        values which determine whether the source code archive is actually
+        unpacked, or merely stored in the archive.
+    @keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
+        or URL specified by C{rpm} for an RPM containing C{sourcename}.
+    @keyword sourcename: The name of the file
+    @keyword use: A Use flag or boolean, or a tuple of Use flags and/or
+        booleans, that determine whether the archive is actually unpacked or
+        merely stored in the archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:
@@ -617,7 +628,7 @@ class Source(_Source):
 	    fileName = os.path.basename(self.dest %recipe.macros)
 	    if fileName != self.dest:
 		if self.dir:
-		    self.init_error(RuntimeError, 
+		    self.init_error(RuntimeError,
 				    'do not specify a directory in both dir and'
 				    ' dest keywords')
 		elif (self.dest % recipe.macros)[-1] == '/':
@@ -626,9 +637,9 @@ class Source(_Source):
                 else:
                     self.dir = os.path.dirname(self.dest % recipe.macros)
                     self.dest = fileName
-                    # unfortunately, dir is going to be macro expanded again 
+                    # unfortunately, dir is going to be macro expanded again
                     # later, make sure any %s in the path name survive
-                    self.dir.replace('%', '%%') 
+                    self.dir.replace('%', '%%')
 	else:
 	    self.dest = os.path.basename(self.sourcename %recipe.macros)
 
@@ -644,7 +655,7 @@ class Source(_Source):
 	f = self._findSource()
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
-        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+        destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir=defaultDir)
         util.mkdirChain(destDir)
         destFile = os.sep.join((destDir, self.dest))
@@ -686,9 +697,9 @@ class Action(action.RecipeAction):
 
     DESCRIPTION
     ===========
-    
-    From within a Conary recipe, call C{r.addAction()} to copy an
-    arbitrary file into the build directory, C{%(builddir)s}.
+
+    The C{r.addAction()} class copies an arbitrary file into the build
+    directory, C{%(builddir)s}.
 
     PARAMETERS
     ==========
@@ -696,7 +707,7 @@ class Action(action.RecipeAction):
     The following parameters are recognized by C{r.addAction}:
 
     B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in  C{recipe} from 
+    automatically by the PackageRecipe object. Passing in  C{recipe} from
     within a recipe is unnecessary.
 
     KEYWORDS
@@ -704,14 +715,14 @@ class Action(action.RecipeAction):
 
     The following keywords are recognized by C{r.addAction}:
 
-    B{action} :  A command line which will be executed with macro 
+    B{action} :  A command line which will be executed with macro
     interpolation.
 
-    B{dir} : Specify the directory where the file is to be located, relative 
+    B{dir} : Specify the directory where the file is to be located, relative
     to C{%(builddir)s}. By default, C{r.addAction} stores the
     file directly in C{%(builddir)s}. If an absolute directory is specified,
     it will be considered relative to C{%(builddir)s}.
- 
+
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
     actually unpacked, or merely stored in the archive.
@@ -724,31 +735,30 @@ class Action(action.RecipeAction):
 
     C{r.addAction('sed -i "s/^SUBLEVEL.*/SUBLEVEL = %(sublevel)s/" Makefile')}
 
-    The above example demonstrates use of a command line with macro 
-    interpolation, upon the file C{Makefile}.
+    Demonstrates use of a command line with macro interpolation, upon the file
+    C{Makefile}.
 
     C{r.addAction('mv lib/util/shhopt.h lib/util/pbmshhopt.h')}
 
-    The second example above demonstrates renaming a file via the C{mv} 
-    command.
+    Demonstrates renaming a file via the C{mv} command.
     """
 
     keywords = {'dir': '' }
 
     def __init__(self, recipe, *args, **keywords):
 	"""
-	@param recipe: The recipe object currently being built.
-	    Provided automatically by the PackageRecipe object;
-	    do not pass in C{r} from within a recipe.
-	@keyword action: A command line to run.
-	    Macros will be interpolated into this command.
-	@keyword dir: The directory in which to store the file, relative
-	    to C{%(builddir)s}.  Absolute directories will be considered
-            relative to c{%(destdir)s}.  Defaults to storing directly in the
-	    C{%(builddir)s}.
-	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
-	    booleans, that determine whether the archive is actually
-	    unpacked or merely stored in the archive.
+	@param recipe: The recipe object currently being built is provided
+        automatically by the PackageRecipe object. Passing in  C{recipe} from
+        within a recipe is unnecessary.
+    @keyword action:  A command line which will be executed with macro
+        interpolation.
+    @keyword dir: Specify the directory where the file is to be located,
+        relative to C{%(builddir)s}. By default, C{r.addAction} stores the
+        file directly in C{%(builddir)s}. If an absolute directory is
+        specified, it will be considered relative to C{%(builddir)s}.
+    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the source code archive is
+        actually unpacked, or merely stored in the archive.
 	"""
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]
@@ -756,12 +766,12 @@ class Action(action.RecipeAction):
     def do(self):
 	builddir = self.recipe.macros.builddir
         defaultDir = os.sep.join((builddir, self.recipe.theMainDir))
-        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+        destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir)
         util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
 
-    def fetch(self): 
+    def fetch(self):
 	return None
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):

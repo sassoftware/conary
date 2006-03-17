@@ -108,7 +108,7 @@ class BuildCommand(BuildAction, action.ShellCommand):
 
     def do(self, macros):
         """
-	Method which is used if the ShellCommand instance is invoked 
+	Method which is used if the ShellCommand instance is invoked
         during build
         @param macros: macros which will be expanded through dictionary
         substitution in self.command
@@ -125,7 +125,7 @@ class Run(BuildCommand):
     ====
 
     B{C{r.Run()}} - Run a shell command
-    
+
     SYNOPSIS
     ========
 
@@ -134,60 +134,61 @@ class Run(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.Run()} is typically called from within a Conary recipe
-    to run a shell command with simple macro substitution.
-    
+    The C{r.Run()} class is called from within a Conary recipe to run a shell
+    command with simple macro substitution.
+
     PARAMETERS
     ==========
-    
+
     The C{r.Run()} class accepts the following parameters:
-        
-    B{macros} : macros which will be expanded through dictionary substitution 
+
+    B{macros} : macros which will be expanded through dictionary substitution
 
     KEYWORDS
     ========
 
-    The C{r.Run()} class accepts the following keywords, with default values 
+    The C{r.Run()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
-    B{dir} : directory in which to run the command. Relative dirs are relative
-    to the build directory, absolute dirs are relative to the destination 
-    directory.
-    
+    B{dir} : (None) Directory in which to run the command. Relative dirs are
+    relative to the build directory, absolute dirs are relative to the
+    destination directory.
+
     B{filewrap} : (False) If set to C{True}, a C{LD_PRELOAD} wrapper will look
     in C{%(destdir)s} for some common file operations.  Occasionally useful to
     avoid the need to modify programs that need to be run after the build and
     assume that they are not run until after installation.
-    
+
     B{wrapdir} : (None) If set, points to a directory. Similar to C{filewrap},
     except it limits the C{%(destdir)s} substitution to only the tree under
     the given directory.
-    
+
     EXAMPLES
     ========
-   
+
     C{r.Run('find %(destdir)s -name "floppyd*" -print | xargs rm')}
-    
-    The example above calls C{r.Run()} to locate instances of the filespec
-    C{floppyd*} in the C{%(destdir)s}, and remove them.
+
+    Locate instances of the filespec C{floppyd*} in the C{%(destdir)s}, and
+    remove them.
     """
     keywords = {'dir': '', 'filewrap': False, 'wrapdir': None}
     template = "%%(envcmd)s%%(cdcmd)s%(args)s"
 
     def __init__(self, *args, **kwargs):
         """
-        @keyword dir: directory in which to run the command.  Relative dirs
-                are relative to the build dir, absolute dirs are relative
-                to the destdir.
-        @keyword filewrap: Defaults to False; if True, causes a
-                C{LD_PRELOAD} wrapper that looks in %(destdir)s for
-                some common file operations.  Occasionally useful
-                to avoid the need to modify programs that need to
-                be run after the build and assume that they are not
-                run until after installation.
-        @keyword wrapdir: points to a directory, defaults to None.
-                Like C{filewrap}, except it limits the %(destdir)s
-                substitution only to the tree under the given directory.
+        @param macros: macros which will be expanded through dictionary
+        substitution
+        @keyword dir: Directory in which to run the command. Relative dirs are
+            relative to the build directory, absolute dirs are relative to the
+            destination directory.
+        @keyword filewrap: If set to C{True}, a C{LD_PRELOAD} wrapper will
+            look in C{%(destdir)s} for some common file operations.
+            Occasionally useful to avoid the need to modify programs that need
+            to be run after the build and assume that they are not run until
+            after installation.
+        @keyword wrapdir: If set, points to a directory. Similar to
+            C{filewrap}, except it limits the C{%(destdir)s} substitution to
+            only the tree under the given directory.
         """
         BuildCommand.__init__(self, *args, **kwargs)
 
@@ -198,7 +199,7 @@ class Run(BuildCommand):
         if self.wrapdir:
             self.filewrap = True
             envStr += 'export WRAPDIR=%(wrapdir)s; '
-            macros.wrapdir = self.wrapdir           
+            macros.wrapdir = self.wrapdir
         if self.filewrap:
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-2])
             localcopy = '/'.join((basedir, 'lib', 'filename_wrapper.so'))
@@ -214,7 +215,7 @@ class Run(BuildCommand):
             macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
 	else:
 	    macros.cdcmd = ''
-       
+
         util.execute(self.command %macros)
 
 class Automake(BuildCommand):
@@ -223,7 +224,7 @@ class Automake(BuildCommand):
     ====
 
     B{C{r.Automake()}} - Re-runs aclocal, autoconf, and automake
-    
+
     SYNOPSIS
     ========
 
@@ -232,41 +233,41 @@ class Automake(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.Automake()} is typically called from within a Conary
-    recipe to re-run the C{aclocal}, C{autoconf}, and C{automake} commands.
-
+    The C{r.Automake()} class is called from within a Conary recipe to re-run
+    the C{aclocal}, C{autoconf}, and C{automake} commands.
 
     KEYWORDS
     ========
 
     The C{r.Automake()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
-        
-    B{aclocalArgs} : Arguments to the C{aclocal} program
-    
-    B{autoConfArgs} : Arguments to the C{autoconf} program
-    
-    B{autoMakeArgs} : Arguments to the automake program.
-    
-    B{automakeVer} : FIXME : what does this keyword do
-    
-    B{m4Dir} : FIXME : what does this keyword do
-    
-    B{preAutoconf} : FIXME : what does this keyword do
-    
+
+    B{aclocalArgs} : (None) Arguments to the C{aclocal} program
+
+    B{autoConfArgs} : (None) Arguments to the C{autoconf} program
+
+    B{autoMakeArgs} : (None) Arguments to the automake program.
+
+    B{automakeVer} : (None) FIXME : what does this keyword do
+
+    B{m4Dir} : FIXME : (None) what does this keyword do
+
+    B{preAutoconf} : (None) FIXME : what does this keyword do
+
     B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
     (by default) and if set to C{True} skip the action when C{subDir} does not
     exist.
-    
-    B{subDir}: Directory in which to re-run aclocal, autoconf, and automake
-    
+
+    B{subDir}: (None) Directory in which to re-run aclocal, autoconf,
+    and automake
+
     EXAMPLES
     ========
-    
+
     C{r.Automake(autoMakeArgs='--add-missing --foreign')}
-    
-    The above example demonstrates calling C{r.Automake()} and passing in the
-    C{--add-missing}, and C{--foreign} arguments to the C{automake} program.
+
+    Demonstrates calling C{r.Automake()} and passing in the C{--add-missing},
+    and C{--foreign} arguments to the C{automake} program.
     """
     # note: no use of %(args)s -- to which command would it apply?
     template = ('cd %%(actionDir)s; '
@@ -282,10 +283,10 @@ class Automake(BuildCommand):
                 'subDir': '',
                 'skipMissingSubDir': False,
                }
-    
+
     def do(self, macros):
 	macros = macros.copy()
-        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+        macros.actionDir = action._expandOnePath(self.subDir, macros,
              macros.builddir, error=not self.skipMissingSubDir)
         if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
@@ -304,7 +305,7 @@ class Configure(BuildCommand):
     ====
 
     B{C{r.Configure()}} - Runs autoconf configure script
-    
+
     SYNOPSIS
     ========
 
@@ -313,9 +314,9 @@ class Configure(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.Configure()} is typically called from within a Conary
-    recipe to run an autoconf configure script, giving it the default paths as
-    defined by the macro set: C{r.Configure(extra args)}
+    The C{r.Configure()} class is called from within a Conary recipe to run an
+    autoconf configure script, giving it the default paths as defined by the
+    macro set: C{r.Configure(extra args)}
 
     It provides many common arguments, set correctly to values provided by
     system macros. If any of these arguments do not work for a program, then
@@ -328,30 +329,30 @@ class Configure(BuildCommand):
     The C{r.Configure()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{configureName} : The name of the configure command. Normally,
+    B{configureName} : (None) The name of the configure command. Normally,
     C{configure} but occasionally C{Configure} or something else.
-    
-    B{objDir} : Make an object directory before running C{configure}. This is
-    useful for applications which do not support running configure from the
-    same directory as the sources (srcdir != objdir). It can contain macro
-    references. 
-    
-    B{preConfigure} : Extra shell script which is inserted in front of the
-    C{configure} command. 
-        
+
+    B{objDir} : (None) Make an object directory before running C{configure}.
+    This is useful for applications which do not support running configure
+    from the same directory as the sources (srcdir != objdir). It can contain
+    macro references.
+
+    B{preConfigure} : (None) Extra shell script which is inserted in front of
+    the C{configure} command.
+
     B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
     (by default) and if set to C{True} skip the action when C{subDir} does not
     exist.
 
-    B{subDir} : Directory in which to run C{configure} 
-    
+    B{subDir} : (None) Directory in which to run C{configure}
+
     EXAMPLES
     ========
-    
+
     C{r.Configure('--sbindir=%(essentialsbindir)s')}
-    
-    The above example demonstrates calling C{r.Configure()} and specifying
-    the C{%(essentialsbindir)s} directory with an C{--sbindir=} argument.
+
+    Demonstrates calling C{r.Configure()} and specifying the
+    C{%(essentialsbindir)s} directory with an C{--sbindir=} argument.
     """
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
@@ -388,27 +389,24 @@ class Configure(BuildCommand):
 
     def __init__(self, recipe, *args, **keywords):
         """
-        Create a new Configure instance used to run the autoconf configure
-        command with default parameters
-
-        @keyword objDir: make an object directory before running configure.
-        This is useful for applications which do not support running configure
-        from the same directory as the sources (srcdir != objdir).
-	It can contain macro references.
-	@keyword subDir: directory in which to run configure
-        @keyword skipMissingSubDir: By default (C{False}) raise an error
-        if C{subDir} does not exist; if C{True}, skip the action if
-        C{subDir} does not exist.
-        @keyword preConfigure: Extra shell script which is inserted in front of
-        the configure command.
-	@keyword configureName: the name of the configure command; normally
-	C{configure} but occasionally C{Configure} or something else.
+        @keyword configureName: The name of the configure command. Normally,
+            C{configure} but occasionally C{Configure} or something else.
+        @keyword objDir: Make an object directory before running C{configure}.
+            This is useful for applications which do not support running
+            configure from the same directory as the sources
+            (srcdir != objdir). It can contain macro references.
+        @keyword preConfigure: Extra shell script which is inserted in front
+            of the C{configure} command.
+        @keyword skipMissingSubDir: Raise an error if C{subDir} does not
+            exist, (by default) and if set to C{True} skip the action when
+            C{subDir} does not exist.
+        @keyword subDir: Directory in which to run C{configure}
         """
         BuildCommand.__init__(self, recipe, *args, **keywords)
-         
+
     def do(self, macros):
 	macros = macros.copy()
-        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+        macros.actionDir = action._expandOnePath(self.subDir, macros,
              macros.builddir, error=not self.skipMissingSubDir)
         if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
@@ -450,7 +448,7 @@ class ManualConfigure(Configure):
     ====
 
     B{C{r.ManualConfigure()}} - Runs make without functional DESTDIR
-    
+
     SYNOPSIS
     ========
 
@@ -459,19 +457,19 @@ class ManualConfigure(Configure):
     DESCRIPTION
     ===========
 
-    The build class C{r.ManualConfigure()} is typically called from within a
-    Conary recipe in a manner similar to C{r.Configure} except all arguments
-    to the configure script must be provided explicitly.
-    
+    The C{r.ManualConfigure()} class is called from within a Conary recipe in
+    a manner similar to C{r.Configure} except all arguments to the configure
+    script must be provided explicitly.
+
     No arguments are given beyond those explicitly provided.
 
     EXAMPLES
     ========
-   
+
     C{r.ManualConfigure('--prefix=/usr --shared')}
-    
-    The example above calls C{r.ManualConfigure()} and specifies the
-    C{--prefix} and C{--shared} arguments to the configure script.
+
+    Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared
+    arguments to the configure script.
     """
     template = ('cd %%(actionDir)s; '
                 '%%(mkObjdir)s '
@@ -486,7 +484,7 @@ class Make(BuildCommand):
     ====
 
     B{C{r.Make()}} - Runs make with system defaults
-    
+
     SYNOPSIS
     ========
 
@@ -495,30 +493,29 @@ class Make(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.Make()} is typically called from within a Conary
-    recipe to execute the C{make} utility with system defaults.  The
-    environment variables C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, and so on are
-    set to the system default values, as are the variables C{mflags}, and
-    C{parallelmflags}.
-    
+    The C{r.Make()} class is called from within a Conary recipe to execute the
+    C{make} utility with system defaults.  The environment variables
+    C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, and so on are set to the system
+    default values, as are the variables C{mflags}, and C{parallelmflags}.
+
     If the package C{Makefile} explicitly sets the *FLAGS variables,
     and you wish to change them, you will have to override them,
     either explicitly in the recipe with C{r.Make('CFLAGS="%(cflags)s"')},
     etc., or forcing them all to the system defaults by passing in the
     C{forceFlags=True} argument.
-    
+
     If your package does not build correctly with parallelized C{make},
     you should disable parallel C{make} by using C{r.disableParallelMake()}
     in your recipe.  If your package can do parallel builds but needs some
     other mechanism, then you can modify C{parallelmflags} as necessary in
     your recipe.  You can use C{r.MakeParallelSubdir()} if the top-level
     C{make} is unable to handle parallelization but all subdirectories are.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.Make()} class accepts the following parameters:
-        
+
     B{macros} : macros which will be expanded through dictionary substitution
 
     KEYWORDS
@@ -527,34 +524,34 @@ class Make(BuildCommand):
     The C{r.Make()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
-    B{forceFlags} : boolean; if set, unconditionally override the Makefile
+    B{forceFlags} : ( FIXME ) If set, unconditionally override the Makefile
     definitions of *FLAGS (that is, CFLAGS, CXXFLAGS, LDFLAGS)
 
-    B{makeName} - the name of the make command; normally C{make} but
+    B{makeName} - (None) The name of the make command; normally C{make} but
     occasionally 'qmake' or something else.
 
-    B{preMake} : string to be inserted before the C{make} command.
+    B{preMake} : (None) String to be inserted before the C{make} command.
     Use preMake if you need to set an environment variable. The preMake
     keyword cannot contain a ; character.
-    
+
     B{skipMissingSubDir} : (False) Raises an error if subDir does not exist.
     If True, skip the action if subDir does not exist.
 
-    B{subDir} : the directory to enter before running C{make}
-    
+    B{subDir} : (None) The directory to enter before running C{make}
+
     EXAMPLES
     ========
-    
+
     C{r.Make("PARALLELMFLAGS='%(parallelmflags)s'", subDir=objDir)}
-    
-    The above example demonstrates calling C{r.Make()} and setting the
-    environment variable C{PARALLELMFLAGS} equal to the current value of
-    C{%(parallelmflags)s}, and requesting a change into the C{objDir}
-    subdirectory before executing make.
-    
+
+    Demonstrates calling C{r.Make()} and setting the environment variable
+    C{PARALLELMFLAGS} equal to the current value of C{%(parallelmflags)s},
+    and requesting a change into the C{objDir} subdirectory before executing
+    make.
+
     C{r.Make('check', subDir='tests')}
-    
-    The example above uses C{r.Make()} with the C{check} argument to the
+
+    Demonstrates calling C{r.Make()} with the C{check} argument to the
     C{make} command while also changing to the subdirectory C{tests} prior
     to executing C{make}.
     """
@@ -576,18 +573,19 @@ class Make(BuildCommand):
 
     def __init__(self, recipe, *args, **keywords):
         """
-        @keyword preMake: string to be inserted before the "make" command.
-        Use C{preMake} if you need to set an environment variable.  The
-        C{preMake} keyword cannot contain a C{;} character.
-        @keyword subDir: the directory to enter before running "make"
-        @keyword skipMissingSubDir: By default (C{False}) raise an error
-        if C{subDir} does not exist; if C{True}, skip the action if
-        C{subDir} does not exist.
-	@keyword forceFlags: boolean; if set, unconditionally override
-	the Makefile definitions of *FLAGS (that is, C{CFLAGS}, C{CXXFLAGS},
-        C{LDFLAGS})
-        @keyword makeName: the name of the make command; normally
-        C{make} but occasionally C{qmake} or something else.
+        @param macros: macros which will be expanded through dictionary
+        substitution
+        @keyword forceFlags: boolean; if set, unconditionally override the
+            C{Makefile} definitions of *FLAGS
+            (that is, CFLAGS, CXXFLAGS, LDFLAGS)
+        @keyword makeName: The name of the make command; normally C{make} but
+            occasionally 'qmake' or something else.
+        @keyword preMake: string to be inserted before the C{make} command.
+            Use preMake if you need to set an environment variable. The
+            preMake keyword cannot contain a C{;} character.
+        @keyword skipMissingSubDir: Raises an error if subDir does not exist.
+            If True, skip the action if subDir does not exist.
+        @keyword subDir: The directory to enter before running C{make}
         """
 	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
@@ -604,7 +602,7 @@ class Make(BuildCommand):
 	                           ' LDFLAGS="%(ldflags)s"')
 	else:
 	    macros['overrides'] = ''
-        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+        macros.actionDir = action._expandOnePath(self.subDir, macros,
              macros.builddir, error=not self.skipMissingSubDir)
         if not os.path.exists(macros.actionDir):
             assert(self.skipMissingSubDir)
@@ -617,9 +615,9 @@ class MakeParallelSubdir(Make):
     NAME
     ====
 
-    B{C{r.MakeParallelSubdir()}} - Runs make parallelmflags applied only to 
+    B{C{r.MakeParallelSubdir()}} - Runs make parallelmflags applied only to
     sub-make processes
-    
+
     SYNOPSIS
     ========
 
@@ -628,13 +626,13 @@ class MakeParallelSubdir(Make):
     DESCRIPTION
     ===========
 
-    The build class C{r.MakeParallelSubdir()} is typically called from within
-    a Conary recipe to execute the C{make} utility with system defaults for
-    parallelmflags only applied to sub-make processes.
+    The C{r.MakeParallelSubdir()} class is called from within a Conary recipe
+    to execute the C{make} utility with system defaults for parallelmflags
+    only applied to sub-make processes.
 
     EXAMPLES
     ========
-    FIX ME : need usage example
+    FIX ME : Need usage example
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -659,16 +657,16 @@ class MakeInstall(Make):
     DESCRIPTION
     ===========
 
-    The build class C{r.MakeInstall()} is typically called from within a
-    Conary recipe to run the C{make} utility, automatically set C{DESTDIR},
-    and provide the install target.
-    
-    If your package does not have C{DESTDIR} or an analog, use 
+    The C{r.MakeInstall()} class is called from within a Conary recipe to run
+    the C{make} utility, automatically set C{DESTDIR}, and provide the install
+    target.
+
+    If your package does not have C{DESTDIR} or an analog, use
     C{r.MakePathsInstall()} instead, or as a last option, C{r.Make()}.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.MakeInstall()} class accepts the following parameters:
 
     B{macros} : macros which will be expanded through dictionary substitution
@@ -682,19 +680,19 @@ class MakeInstall(Make):
     B{rootVar} : (DESTDIR) The install root
 
     B{installtarget} : (install) The install target to C{make}
-    
+
     EXAMPLES
     ========
-    
+
     C{r.MakeInstall(rootVar='BUILDROOT')}
-    
-    The above example demonstrates C{r.MakeInstall()}, specifying C{BUILDROOT}
-    as the rootVar instead of the default C{DESTDIR}.
-    
+
+    Demonstrates C{r.MakeInstall()}, specifying C{BUILDROOT} as the rootVar
+    instead of the default C{DESTDIR}.
+
     C{r.MakeInstall('LIBTOOL=%(bindir)s/libtool')}
-    
-    The above example uses C{r.MakeInstall()}, and sets the environment
-    variable C{LIBTOOL} to C{%(bindir)s/libtool}.
+
+    Demonstrates using C{r.MakeInstall()}, and sets the environment variable
+    C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -721,7 +719,7 @@ class MakePathsInstall(Make):
     ====
 
     B{C{r.MakePathsInstall()}} - Runs make without functional DESTDIR
-    
+
     SYNOPSIS
     ========
 
@@ -730,18 +728,18 @@ class MakePathsInstall(Make):
     DESCRIPTION
     ===========
 
-    The build class C{r.MakePathsInstall()} is typically called from within a
-    Conary recipe when there is no single functional C{DESTDIR},or similar
-    definition, but enough of the de-facto standard variables such as
-    C{prefix}, C{bindir}, and so on are honored by the Makefile to make a
-    destdir installation successful
+    The C{r.MakePathsInstall()} class is called from within a Conary recipe
+    when there is no single functional C{DESTDIR},or similar definition, but
+    enough of the de-facto standard variables such as C{prefix}, C{bindir},
+    and so on are honored by the Makefile to make a destdir installation
+    successful
 
     EXAMPLES
     ========
     C{r.MakePathsInstall('mandir=%(destdir)s/%(mandir)s/man1')}
-    
-    The example above calls C{r.MakePathsinstall()} and specifies the 
-    C{mandir} argument C{%(destdir)s/%(mandir)s/man1} to C{make}.
+
+    Calls C{r.MakePathsinstall()} and specifies the C{mandir} argument
+    C{%(destdir)s/%(mandir)s/man1} to C{make}.
     """
     template = (
 	'cd %%(actionDir)s; '
@@ -773,7 +771,7 @@ class CompilePython(BuildCommand):
     ====
 
     B{C{r.CompilePython()}} - Builds compiled and optimized Python bytecode files
-    
+
     SYNOPSIS
     ========
 
@@ -782,17 +780,16 @@ class CompilePython(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.CompilePython()} is typically called from within a
-    Conary recipe to compile optimized, and compiled Python bytcode files. The
-    paths specified must be absolute paths, which are interpreted relative to
-    C{%(destdir)s} in order for the paths compiled into the bytecode files to
-    be correct.
+    The C{r.CompilePython()} is called from within a Conary recipe to compile
+    optimized, and compiled Python bytcode files. The paths specified must be
+    absolute paths, which are interpreted relative to C{%(destdir)s} in order
+    for the paths compiled into the bytecode files to be correct.
 
     EXAMPLES
     ========
-    
+
     C{r.CompilePython('%(varmmdir)s')}
-    
+
     The above example demonstrates calling C{r.CompilePython()} and specifying
     the absolute path defined by C{%(varmmdirs)s}.
     """
@@ -825,7 +822,7 @@ class PythonSetup(BuildCommand):
     ====
 
     B{C{r.PythonSetup()}} - Moves files
-    
+
     SYNOPSIS
     ========
 
@@ -834,11 +831,11 @@ class PythonSetup(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.PythonSetup()} is typically called from within a
-    Conary recipe to call setup.py in the correct way to use python-setuptools
-    to install without building a C{.egg} file, regardless of whether this
-    version of setup.py was written to use disttools or setuptools.  
-    
+    The C{r.PythonSetup()} class is called from within a Conary recipe to
+    invoke setup.py in the correct way to use python-setuptools to install
+    without building a C{.egg} file, regardless of whether this version of
+    setup.py was written to use disttools or setuptools.
+
     If a different name is used for the disttools, or setuptools script, pass
     that name as the argument.
 
@@ -848,23 +845,22 @@ class PythonSetup(BuildCommand):
     The C{r.PythonSetup()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{action} : The main argument to pass to setup.py, C{install} by default.
-    
-    B{bootstrap} : (False) HELP
-    
-    B{dir}: Directory in which to find the setup.py file, defaults to the
-    build directory.
+    B{action} : (install) The main argument to pass to C{setup.py}
 
-    B{rootDir} : The directory to pass to setup.py via the C{--root} option,
-    the destdir by default.
-    
+    B{bootstrap} : (False) HELP
+
+    B{dir}: (%(builddir)s) Directory in which to find the setup.py file,
+    defaults to the build directory.
+
+    B{rootDir} (%(destdir)s) The directory to pass to setup.py via the
+    C{--root} option
+
     EXAMPLES
     ========
-   
+
     C{r.PythonSetup(bootstrap=True)}
-    
-    The example above calls C{r.PythonSetup()} and specifies C{bootstrap}
-    to be C{True}.
+
+    Calls C{r.PythonSetup()} and specifies C{bootstrap} to be C{True}.
     """
     template = (
         '%%(cdcmd)s'
@@ -922,7 +918,7 @@ class Ldconfig(BuildCommand):
     ====
 
     B{C{r.Ldconfig()}} - Runs ldconfig in a directory
-    
+
     SYNOPSIS
     ========
 
@@ -931,32 +927,32 @@ class Ldconfig(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.Ldconfig()} is typically called from within a Conary
-    recipe to execute the C{ldconfig} program in a subdirectory.
-    
+    The C{r.Ldconfig()} class is called from within a Conary recipe to execute
+    the C{ldconfig} program in a subdirectory.
+
     Used mainly when a package does not set up all the appropriate
     symlinks for a library.  Conary packages should include all the
-    appropriate symlinks in the packages.  
-    
+    appropriate symlinks in the packages.
+
     This is not a replacement for marking a file as a shared library.
     C{ldconfig} still needs to be run after libraries are installed.
     Note that C{ldconfig} will automatically be run for all system libraries
     as defined by the C{SharedLibrary} policy.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.Ldconfig()} class accepts the following parameters:
-        
+
     B{macros} : macros which will be expanded through dictionary substitution
 
     EXAMPLES
     ========
-    
+
     C{r.Ldconfig('%(libdir)s/')}
-    
-    The above example demonstrates calling C{r.Ldconfig()} to execute
-    C{ldconfig} in the C{%(libdir)s/} subdirectory.
+
+    Demonstrates calling C{r.Ldconfig()} to execute C{ldconfig} in the
+    C{%(libdir)s/} subdirectory.
     """
     template = '%%(essentialsbindir)s/ldconfig -n %%(destdir)s/%(args)s'
     def do(self, macros):
@@ -1056,7 +1052,7 @@ class Desktopfile(BuildCommand, _FileAction):
     ====
 
     B{C{r.Desktopfile()}} - Properly installs desktop files
-    
+
     SYNOPSIS
     ========
 
@@ -1065,10 +1061,10 @@ class Desktopfile(BuildCommand, _FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Desktopfile()} is typically called from within a
-    Conary recipe to install a desktop file in C{/usr/share/applications},
-    including setting a category, and vendor.
-    
+    The C{r.Desktopfile()} class is called from within a Conary recipe to
+    install a desktop file in C{/usr/share/applications}, including setting a
+    category, and vendor.
+
     Proper build requirements for desktop files are also enforced by
     C{r.Desktopfile()}. The C{filename} argument is interpreted only relative
     to C{%(builddir)s}, and never relative to C{%(destdir)s}.
@@ -1079,16 +1075,16 @@ class Desktopfile(BuildCommand, _FileAction):
     The C{r.Desktopfile()} class accepts the following keywords:
 
     B{category} : (None) A category name for the desktop file
-    
+
     B{vendor} : (net) A vendor name for the desktop file.
-    
+
     EXAMPLES
     ========
-    
+
     C{r.Desktopfile('thunderbird.desktop')}
-    
-    The above example demonstrates creation of the desktop file
-    C{thunderbird.desktop} with C{r.Desktopfile()}.
+
+    Demonstrates creation of the desktop file C{thunderbird.desktop} with
+    C{r.Desktopfile()}.
     """
     template = ('cd %%(builddir)s; '
 		'desktop-file-validate %(args)s ; '
@@ -1098,7 +1094,7 @@ class Desktopfile(BuildCommand, _FileAction):
 		' %(args)s')
     keywords = {'vendor': 'net',
 		'category': None}
-	
+
 
     def do(self, macros):
 	if not Use.desktop:
@@ -1115,7 +1111,7 @@ class Desktopfile(BuildCommand, _FileAction):
             macros['category'] = ''
 	BuildCommand.do(self, macros)
 	for file in self.arglist:
-	    self.setComponents(macros.destdir, 
+	    self.setComponents(macros.destdir,
                            macros.destdir + '%(datadir)s/applications'+file)
 
 
@@ -1125,7 +1121,7 @@ class Environment(BuildAction):
     ====
 
     B{C{r.Environment()}} - Set an environment variable
-    
+
     SYNOPSIS
     ========
 
@@ -1134,16 +1130,15 @@ class Environment(BuildAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Environment()} is typically called from within a
-    Conary recipe to set an environment variable after all macros have been
-    set.
-    
-    
+    The C{r.Environment()} class is called from within a Conary recipe to set
+    an environment variable after all macros have been set.
+
+
     PARAMETERS
     ==========
-    
+
     The C{r.Environment()} class accepts the following parameters:
-        
+
     B{macros} : Macro set to be used for expansion
 
     KEYWORDS
@@ -1156,11 +1151,11 @@ class Environment(BuildAction):
 
     EXAMPLES
     ========
-    
+
     C{r.Environment('MOZ_THUNDERBIRD', '1')}
-    
-    The above example demonstrates calling C{r.Environment()} to set the
-    environment variable C{MOZ_THUNDERBIRD} to C{1}.
+
+    Demonstrates calling C{r.Environment()} to set the environment variable
+    C{MOZ_THUNDERBIRD} to C{1}.
     """
     def __init__(self, recipe, *args, **keywords):
 	assert(len(args)==2)
@@ -1177,7 +1172,7 @@ class SetModes(_FileAction):
     ====
 
     B{C{r.SetModes()}} - Sets modes on files
-    
+
     SYNOPSIS
     ========
 
@@ -1186,14 +1181,13 @@ class SetModes(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.SetModes()} is typically called from within a Conary
-    recipe to set modes on files in the C{%(destdir)s}, or C{%(builddir)s}
-    directories.
-    
+    The C{r.SetModes()} class is called from within a Conary recipe to set
+    modes on files in the C{%(destdir)s}, or C{%(builddir)s} directories.
+
     For a file to be setuid in the repository, it needs to have its mode
     explicitly provided in the recipe.  File installation classes which
     provide a mode are sufficient, but for files installed by makefiles,
-    C{r.SetModes()} provides a specific, intentional listing of their modes. 
+    C{r.SetModes()} provides a specific, intentional listing of their modes.
 
     Additionally, C{r.SetModes()} can be used to change arbitrary
     file modes in the destination directory, or build directory. Relative
@@ -1206,19 +1200,19 @@ class SetModes(_FileAction):
     values shown in parentheses when applicable:
 
     B{use} : Optional arguments of Use flag(s) telling whether to actually
-    perform the action. 
-    
+    perform the action.
+
     EXAMPLES
     ========
-   
+
     C{r.SetModes('%(sbindir)s/sendmail', 2755)}
-    
-    The example above calls C{r.SetModes()} on the file
-    C{%(sbindir)s/sendmail}, setting it to mode C{2755}.
+
+    Calls C{r.SetModes()} on the file C{%(sbindir)s/sendmail}, setting it to
+    mode C{2755}.
     """
-    
+
     def __init__(self, recipe, *args, **keywords):
-        _FileAction.__init__(self, recipe, *args, **keywords) 
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
 	self.paths = args[:split]
 	self.mode = args[split]
@@ -1260,7 +1254,7 @@ class _PutFiles(_FileAction):
 
 	if os.path.isdir(dest):
 	    dest = util.joinPaths(dest, os.path.basename(source))
-	
+
 	mode = self.mode
 	if mode == -2:
 	    # any executable bit on in source means 0755 on target, else 0644
@@ -1278,7 +1272,7 @@ class _PutFiles(_FileAction):
             shutil.copy2(source, dest)
 	self.setComponents(destdir, dest)
 	self.chmod(destdir, dest, mode=mode)
-	
+
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -1295,7 +1289,7 @@ class Install(_PutFiles):
     ====
 
     B{C{r.Install()}} - Copies file while setting permissions
-    
+
     SYNOPSIS
     ========
 
@@ -1304,14 +1298,14 @@ class Install(_PutFiles):
     DESCRIPTION
     ===========
 
-    The build class C{r.Install()} is typically called from within a Conary
-    recipe to copy files from a source to destination as with C{r.Copy} with
-    the exception that C{r.Install} also fixes the file's modes.
-    
+    The C{r.Install()} calss is called from within a Conary recipe to copy
+    files from a source to destination as with C{r.Copy} with the exception
+    that C{r.Install} also fixes the file's modes.
+
     Mostly, C{r.Install()} is used to install files from the C{%(builddir)s}
     to the C{%(destdir)s}. The argument C{srcfile} is normally a relative
     path, and C{destfile} is normally an absolute path.
-    
+
     Note that a trailing slash on C{destfile} means to create the directory
     if necessary.  Source files with no execute permission will default
     to mode 0644; Source files with any execute permission will default
@@ -1328,11 +1322,11 @@ class Install(_PutFiles):
 
     EXAMPLES
     ========
-    
+
     C{r.Install('am-utils.conf', '%(sysconfdir)s/amd.conf')}
-    
-    The above example demonstrates calling C{r.Environment()} to install the
-    file C{am-utils.conf} to the location C{%(sysconfdir)s/amd.conf}.
+
+    Demonstrates calling C{r.Environment()} to install the file
+    C{am-utils.conf} to the location C{%(sysconfdir)s/amd.conf}.
     """
     keywords = { 'mode': -2 }
 
@@ -1347,7 +1341,7 @@ class Copy(_PutFiles):
     ====
 
     B{C{r.Copy()}} - Copies files without changing the mode
-    
+
     SYNOPSIS
     ========
 
@@ -1356,10 +1350,10 @@ class Copy(_PutFiles):
     DESCRIPTION
     ===========
 
-    The build class C{r.Copy()} is typically called from within a Conary
-    recipe to copy files from a source directory, to a destination directory
-    without changing the mode of the file(s).
-    
+    The C{r.Copy()} class is called from within a Conary recipe to copy files
+    from a source directory, to a destination directory without changing the
+    mode of the file(s).
+
     Note that a trailing slash on a destination file means to create the
     directory if necessary, and use the basename of C{srcname} for the name
     of the file created in the destination directory.  The mode of C{srcfile}
@@ -1372,14 +1366,14 @@ class Copy(_PutFiles):
 
     B{use} : Optional argument specifying Use flag(s) for telling whether to
     actually perform the action.
-    
+
     EXAMPLES
     ========
-    
+
     C{r.Copy('mm_cfg.py', 'Mailman/mm_cfg.py.dist')}
-    
-    The above example demonstrates calling C{r.Copy()} and specifying the file
-    C{mm_cfg.py} be copied to C{Mailman/mm_cfg.py.dist}.
+
+    Demonstrates calling C{r.Copy()} and specifying the file C{mm_cfg.py} be
+    copied to C{Mailman/mm_cfg.py.dist}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -1392,7 +1386,7 @@ class Move(_PutFiles):
     ====
 
     B{C{r.Move()}} - Moves files
-    
+
     SYNOPSIS
     ========
 
@@ -1401,8 +1395,7 @@ class Move(_PutFiles):
     DESCRIPTION
     ===========
 
-    The build class C{r.Move()} is typically called from within a Conary
-    recipe to move files.
+    The C{r.Move()} class is called from within a Conary recipe to move files.
 
     Note that a trailing slash on the C{destfile} means to create the directory
     if necessary, and use the basename of C{srcname} for the name of
@@ -1417,14 +1410,14 @@ class Move(_PutFiles):
 
     B{use} : Optional arguments of Use flag(s) telling whether to actually
     perform the action.
-    
+
     EXAMPLES
     ========
-   
+
     C{r.Move('%(sbindir)s/lpc', '%(sbindir)s/lpc.cups')')}
-    
-    The example above calls C{r.Move()} to move the file C{%(sbindir)s/lpc}
-    to C{%(sbindir)s/lpc.cups}.
+
+    Calls C{r.Move()} to move the file C{%(sbindir)s/lpc} to
+    C{%(sbindir)s/lpc.cups}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -1437,7 +1430,7 @@ class Symlink(_FileAction):
     ====
 
     B{C{r.Symlink()}} - Creates a symbolic link
-    
+
     SYNOPSIS
     ========
 
@@ -1446,19 +1439,19 @@ class Symlink(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Symlink()} is typically called from within a Conary
-    recipe to create a symbolic link from C{contents} to C{destfile}.
+    The C{r.Symlink()} class is called from within a Conary recipe to create a
+    symbolic link from C{contents} to C{destfile}.
 
     Multiple symlinks can be created if the destination path is a directory.
     The destination path is determined to be a directory if it already
     exists or if the path ends with a slash (C{/}) character.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.Symlink()} class accepts the following parameters:
-        
-    B{macros} : Macro set to be used for expansion 
+
+    B{macros} : Macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1468,14 +1461,14 @@ class Symlink(_FileAction):
 
     B{allowDangling} : (False) Whether to allow dangling symbolic links.
     That is, a symbolic link for which the target (C{destfile}) does not exist.
-    
+
     EXAMPLES
     ========
-   
+
     C{r.Symlink('enable', '%(bindir)s/cups-enable')}
-    
-    The example above calls C{r.Symlink()} and creates a symbolic link named
-    C{enable} to the destination C{%(bindir)s/cups-enable}.
+
+    Calls C{r.Symlink()} and creates a symbolic link named C{enable} to the
+    destination C{%(bindir)s/cups-enable}.
     """
     keywords = { 'allowDangling': False }
 
@@ -1503,7 +1496,7 @@ class Symlink(_FileAction):
             baseDir = macros.destdir
         else:
             baseDir = macros.builddir
-            
+
         for source in sources:
             # if the symlink contains a /, concatenate in order to glob
             if source[0] == '/':
@@ -1522,7 +1515,7 @@ class Symlink(_FileAction):
                 else:
                     expandedSources.append(os.path.basename(expanded))
         sources = expandedSources
-        
+
         if len(sources) > 1 and not targetIsDir:
             raise TypeError, 'creating multiple symlinks, but destination is not a directory'
 
@@ -1569,7 +1562,7 @@ class Link(_FileAction):
     ====
 
     B{C{r.Link()}} - Creates a hard link
-    
+
     SYNOPSIS
     ========
 
@@ -1578,34 +1571,34 @@ class Link(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Link()} is typically called from within a Conary
-    recipe to install a hard link.
-    
+    The C{r.Link()} class is called from within a Conary recipe to install a
+    hard link.
+
     Note: The use of hard links is strongly discouraged in most cases.
     Hardlinks are limited to the same directory, and symbolic links should
     always be chosen in preference to them.  You should not use hard links
     unless the situation deems using them B{absolutely} necessary.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.Link()} class accepts the following parameters:
-        
+
     B{macros} : macros which will be expanded through dictionary substitution
 
     EXAMPLES
     ========
-    
+
     C{r.Link('mumble', 'passwd')}
-    
-    The above example demonstrates calling C{r.Link()} to create a hard link 
-    from the file C{passwd} to the file C{mumble}.
+
+    Demonstrates calling C{r.Link()} to create a hard link from the file
+    C{passwd} to the file C{mumble}.
     """
     def do(self, macros):
 	d = macros['destdir']
         self.existingpath = self.existingpath % macros
         if self.existingpath and self.existingpath[0] != '/':
-            self.init_error(TypeError, 
+            self.init_error(TypeError,
                 'hardlink %s must be located in destdir' %self.existingpath)
 	e = util.joinPaths(d, self.existingpath)
 	if not os.path.exists(e):
@@ -1639,7 +1632,7 @@ class Remove(BuildAction):
     ====
 
     B{C{r.Remove()}} - Removes files
-    
+
     SYNOPSIS
     ========
 
@@ -1648,16 +1641,16 @@ class Remove(BuildAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Remove()} is typically called from within a Conary
-    recipe to remove one, or more files
-    
-    
+    The C{r.Remove()} class is called from within a Conary recipe to remove
+    one, or more files
+
+
     PARAMETERS
     ==========
-    
+
     The C{r.Remove()} class accepts the following parameters:
-        
-    B{macros} : macro set to be used for expansion 
+
+    B{macros} : macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1667,20 +1660,20 @@ class Remove(BuildAction):
 
     B{use} Optional argument; Use flag(s) telling whether to actually perform
     the action
-    
+
     EXAMPLES
     ========
-   
+
     C{r.Remove('/lib/modules/%(kver)s/modules.*')}
-    
-    The example above calls C{r.Remove()} to remove the C{modules.*} files
-    from the C{/lib/modules/%(kver)s/} subdirectory.
+
+    Calls C{r.Remove()} to remove the C{modules.*} files from the
+    C{/lib/modules/%(kver)s/} subdirectory.
 
     """
     keywords = { 'recursive': False }
 
     def do(self, macros):
-	for path in action._expandPaths(self.filespecs, 
+	for path in action._expandPaths(self.filespecs,
                                         macros, braceGlob=False):
 	    if self.recursive:
 		util.rmtree(path, ignore_errors=True)
@@ -1701,7 +1694,7 @@ class Replace(BuildAction):
     ====
 
     B{C{r.Replace()}} - Substitute text in a file
-    
+
     SYNOPSIS
     ========
 
@@ -1710,32 +1703,32 @@ class Replace(BuildAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Replace()} is typically called from within a Conary
-    recipe to substitute text *sub* for *pattern* in a file using Python
-    regular expression rules
-    
+    The C{r.Replace()} class is called from within a Conary recipe to
+    substitute text *sub* for *pattern* in a file using Python regular
+    expression rules
+
     Note that C{r.Replace()} cannot do multi-line substitutions.  For more
     complicated replacements, C{sed} is appropriate.  However, C{r.Replace()}
     performs error checking that C{sed} does not.
-    
+
     By default, C{r.Replace()} will raise an error if a file passed into
-    C{r.Replace()} is not modified by any of the regular expressions given.  
+    C{r.Replace()} is not modified by any of the regular expressions given.
     The allowNoChange keyword can be used to turn off that behavior.
 
     The lines matched by Replace can be restricted by the {lines} keyword.
-    Lines may consist of a tuple *(begin, end)* or a single integer *line* or a 
+    Lines may consist of a tuple *(begin, end)* or a single integer *line* or a
     regular expression of lines to match.  Lines are indexed starting with 1.
-    
+
     Remember that python will interpret C{\1}-C{\7} as octal characters.
     You must either escape the backslash: C{\\1} or make the string raw by
     prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.Replace()} class accepts the following parameters:
-        
-    B{macros} : macro set to be used for expansion 
+
+    B{macros} : macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1744,25 +1737,24 @@ class Replace(BuildAction):
     values shown in parentheses when applicable:
 
     B{allowNoChange} : (False) FIXME : What does this keyword do?
-    
+
     B{lines:} : (None) FIXME : What does this keyword do?
-    
+
     EXAMPLES
     ========
-   
+
     C{r.Replace('-lgphoto2', '-lgphoto2 -lgphoto2_port', 'gphoto2-config')}
-    
-    The example above calls C{r.Replace()} to substitute
-    C{-lgphoto2 -lgphoto2_port} for C{-lgphoto2} in the path
-    C{gphoto2-config}.
+
+    Calls C{r.Replace()} to substitute C{-lgphoto2 -lgphoto2_port} for
+    C{-lgphoto2} in the path C{gphoto2-config}.
     """
-        
+
 
     keywords = { 'allowNoChange' : False,
                  'lines'         : None }
 
     octalchars = re.compile('[\1\2\3\4\5\6\7]')
-    
+
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword lines: Determines the lines to which the replacement applies
@@ -1794,14 +1786,14 @@ class Replace(BuildAction):
                     r' prepend "r", as in r"\1"' %sub)
 
         if not args:
-	    self.init_error(TypeError, 
+	    self.init_error(TypeError,
                             'not enough arguments: no file glob supplied')
         self.paths = args[:]
 
         if [ x for x in self.paths if not x ]:
-	    self.init_error(TypeError, 
+	    self.init_error(TypeError,
                             'empty file path specified to Replace')
-        
+
         self.min = self.max = self.lineMatch = None
         if self.lines:
             if isinstance(self.lines, (list, tuple)):
@@ -1811,7 +1803,7 @@ class Replace(BuildAction):
             elif isinstance(self.lines, str):
                 self.lineMatch = re.compile(self.lines)
         if self.min is not None and min(self.min, self.max, 1) != 1:
-            self.init_error(RuntimeError, 
+            self.init_error(RuntimeError,
                             "Replace() line indices start at 1, like sed")
 
     def _lineMatches(self, index, line):
@@ -1823,7 +1815,7 @@ class Replace(BuildAction):
 
     def do(self, macros):
         paths = action._expandPaths(self.paths, macros, error=True)
-        log.info("Replacing '%s' in %s", 
+        log.info("Replacing '%s' in %s",
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
         if not paths:
@@ -1844,8 +1836,8 @@ class Replace(BuildAction):
                 log.warning("%s is not a regular file, not applying Replace")
                 continue
 
-            fd, tmppath = tempfile.mkstemp(suffix='rep', 
-                                           prefix=os.path.basename(path), 
+            fd, tmppath = tempfile.mkstemp(suffix='rep',
+                                           prefix=os.path.basename(path),
                                            dir=os.path.dirname(path))
             try:
                 foundMatch = False
@@ -1854,7 +1846,7 @@ class Replace(BuildAction):
                     if self._lineMatches(index, line):
                         for (regexp, sub) in regexps:
                             line, count = regexp.subn(sub, line)
-                            if count: 
+                            if count:
                                 foundMatch = True
 
                     os.write(fd, line)
@@ -1886,7 +1878,7 @@ class Doc(_FileAction):
     ====
 
     B{C{r.Doc()}} - Installs documentation files
-    
+
     SYNOPSIS
     ========
 
@@ -1895,18 +1887,18 @@ class Doc(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Doc()} is typically called from within a Conary
-    recipe to Install documentation files from the C{%(builddir)s} into
+    The C{r.Doc()} class is called from within a Conary recipe to Install
+    documentation files from the C{%(builddir)s} into
     C{%(destdir)s/%(thisdocdir)s}.
-    
+
     The C{subdir=path} keyword argument creates a subdirectory under
     C{%(thisdocdir)s} to put the files in.
-    
+
     PARAMETERS
     ==========
 
     The C{r.Doc()} class accepts the following parameters:
-    
+
     B{macros} : Macro set to be used for expansion
 
     KEYWORDS
@@ -1922,17 +1914,17 @@ class Doc(_FileAction):
 
     EXAMPLES
     ========
-    
+
     C{r.Doc('doc/kbd.FAQ*.html', subdir='html')}
-    
-    The above example demonstrates installing documentation from
-    C{doc/kbd.FAQ*.html} files into the C{html} subdirectory after first
-    creating the C{html} subdirectory. using C{r.Doc()}.
+
+    Demonstrates installing documentation from C{doc/kbd.FAQ*.html} files into
+    the C{html} subdirectory after first creating the C{html} subdirectory
+    using C{r.Doc()}.
     """
     keywords = {'subdir':  '',
 		'mode': 0644,
 		'dirmode': 0755}
-    
+
     def do(self, macros):
 	macros = macros.copy()
 	destlen = len(macros['destdir'])
@@ -1962,7 +1954,7 @@ class Create(_FileAction):
     ====
 
     B{C{r.Create()}} - Creates a file
-    
+
     SYNOPSIS
     ========
 
@@ -1971,39 +1963,39 @@ class Create(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.Create()} is typically called from within a Conary
-    recipe to create a file, either empty, or optionally with contents.  
-    
+    The C{r.Create()} class is called from within a Conary recipe to create a
+    file, either empty, or optionally with contents.
+
     Without B{contents} specified, C{r.Create()} behaves like C{touch foo}.
     If B{contents} is specified C{r.Create} acts more like
     C{cat > foo <<EOF ... EOF}. If B{contents} is not empty, then a newline
     will be implicitly appended unless B{contents} already ends in a newline.
-    
+
     PARAMETERS
     ==========
 
     The C{r.Create()} class accepts the following parameters:
-    
-    B{macros} macro set to be used for expansion 
+
+    B{macros} macro set to be used for expansion
 
     KEYWORDS
     ========
 
     The C{r.Create()} class accepts the following keywords:
 
-    B{contents} : The (optional) contents of the file 
-    
-    B{macros}  : Whether or not to interpolate macros into the contents 
-    
+    B{contents} : The (optional) contents of the file
+
+    B{macros}  : Whether or not to interpolate macros into the contents
+
     B{mode} : The mode of the file (defaults to 0644)
-    
+
     EXAMPLES
     ========
-    
+
     C{r.Create('%(localstatedir)s/log/acpid', mode=0640)}
-    
-    The above example demonstrates calling C{r.Create()} specifying the
-    creation of C{%(localstatedir)s/log/acpid} with mode C{0640}.
+
+    Demonstrates calling C{r.Create()} specifying the creation of
+    C{%(localstatedir)s/log/acpid} with mode C{0640}.
     """
     keywords = {'contents': '',
 		'macros': True,
@@ -2015,7 +2007,7 @@ class Create(_FileAction):
 	    contents = self.contents
 	if contents and contents[-1] != '\n':
 	    contents += '\n'
-	for bracepath in action._expandPaths(self.paths, macros, 
+	for bracepath in action._expandPaths(self.paths, macros,
                                                          braceGlob=False):
 	    for fullpath in util.braceExpand(bracepath):
 		util.mkdirChain(os.path.dirname(fullpath))
@@ -2043,7 +2035,7 @@ class MakeDirs(_FileAction):
     ====
 
     B{C{r.MakeDirs()}} - Creates directories
-    
+
     SYNOPSIS
     ========
 
@@ -2052,14 +2044,14 @@ class MakeDirs(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.MakeDirs()} is typically called from within a Conary
-    recipe to create directories.
-    
+    The C{r.MakeDirs()} class is called from within a Conary recipe to create
+    directories.
+
     PARAMETERS
     ==========
-    
+
     The C{r.MakeDirs()} class accepts the following parameters:
-        
+
     B{macros} : macros which will be expanded through dictionary substitution
 
     KEYWORDS
@@ -2069,19 +2061,18 @@ class MakeDirs(_FileAction):
     values shown in parentheses when applicable:
 
     B{use} : Optional argument of Use flag(s) telling whether to actually
-    perform the action. 
+    perform the action.
 
     B{component} : Set to component name if package is responsible for the
     directory.
-    
+
     EXAMPLES
     ========
-    
+
     C{r.MakeDirs('/misc', component='runtime')}
-    
-    The above example demonstrates C{r.MakeDirs()}, and creates the C{/misc}
-    directory while specifying the C{:runtime} component is responsible for
-    this directory.
+
+    Demonstrates C{r.MakeDirs()}, and creates the C{/misc} directory while
+    specifying the C{:runtime} component is responsible for this directory.
     """
     keywords = { 'mode': 0755 }
 
@@ -2107,7 +2098,7 @@ class TestSuite(_FileAction):
     ====
 
     B{C{r.TestSuite()}} - Creates a script to run package test suite
-    
+
     SYNOPSIS
     ========
 
@@ -2116,26 +2107,26 @@ class TestSuite(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.TestSuite()} is typically called from within a Conary
-    recipe to create a script to run the package's test suite. 
-    
+    The C{r.TestSuite()} class is called from within a Conary recipe to create
+    a script to run the package's test suite.
+
     TestSuite also modifies Makefiles in order to compile binaries needed for
     testing at cook time, while allowing the actual test suite to run at a
     later point.  It does this if the command to be run is of the form
     C{make  <target>}, in which case all of the target's dependencies are
     built, and the makefile is edited to then remove those dependencies from
-    the target.  
-    
+    the target.
+
     If the command is a make command, the arguments
     C{-o Makefile -o config.status} are added to help ensure that
     C{automake} does not try to regenerate the Makefile at test time.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.TestSuite()} class accepts the following parameters:
-        
-    B{macros} : Macro set to be used for expansion 
+
+    B{macros} : Macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -2144,14 +2135,14 @@ class TestSuite(_FileAction):
     values shown in parentheses when applicable:
 
     None
-    
+
     EXAMPLES
     ========
-   
+
     C{r.TestSuite('testsuite/', 'runtest')}
-    
-    The example above calls C{r.TestSuite()} to execute the test suite
-    C{runtest} in the directory C{testsuite/}.
+
+    Calls C{r.TestSuite()} to execute the test suite C{runtest} in the
+    directory C{testsuite/}.
     """
 
     commandScript = '''#!/bin/sh -x
@@ -2164,7 +2155,7 @@ exit $failed
 '''
 
     testSuiteScript = '''#!/bin/sh -x
-# testsuite 
+# testsuite
 pushd ./%(dir)s
     failed=0
     subdirs="%(subdirs)s"
@@ -2180,20 +2171,20 @@ exit $failed
 
     idnum = 0
 
-    command_path = '%(thistestdir)s/conary-test-command' 
+    command_path = '%(thistestdir)s/conary-test-command'
     testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
     keywords = {'ignore'    : [],
 		'recursive' : False,
 		'autoBuildMakeDependencies' : True,
-		'subdirs'   : [] } 
+		'subdirs'   : [] }
 
 
     def __init__(self, recipe, *args, **keywords):
         """
-        @keyword ignore: A list of files to tell make not to rebuild.  
-	In addition to this key, make is told to never rebuild Makefile 
+        @keyword ignore: A list of files to tell make not to rebuild.
+	In addition to this key, make is told to never rebuild Makefile
 	or config.status.  Default: []
-        @keyword recursive:  If True, modify all the Makefiles below the given directory.  Default: False 
+        @keyword recursive:  If True, modify all the Makefiles below the given directory.  Default: False
         @keyword subdirs: Modify the Makefiles in the given subdirs.  Default: []
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -2227,7 +2218,7 @@ exit $failed
 	    self.setComponents(destdir, fullpath)
 
     def writeTestSuiteScript(self):
-	idnum = TestSuite.idnum 
+	idnum = TestSuite.idnum
 	TestSuite.idnum = idnum + 1
 	self.macros.identifier = str(idnum)
 	path = self.testsuite_path % self.macros
@@ -2237,7 +2228,7 @@ exit $failed
 	    f = open(fullpath, 'w')
 	    f.write(self.testSuiteScript % self.macros)
 	    self.chmod(self.macros.destdir, self.macros.destdir + path)
-    
+
     def mungeMakeCommand(self):
         """
         Munge the make command to ignore files that do not need to be rebuilt.
@@ -2254,7 +2245,7 @@ exit $failed
         """
         Build, and remove from Makefiles, appropriate make dependencies,
         so that when the test suite is run, the makefile does not
-        spuriously require the capability to build any 
+        spuriously require the capability to build any
         already-built test executables.
         """
 	makefile = dir + '/Makefile'
@@ -2300,7 +2291,7 @@ class ConsoleHelper(BuildAction):
     ====
 
     B{C{r.ConsoleHelper()}} - Set up consolehelper symlinks, control files, and dependency
-    
+
     SYNOPSIS
     ========
 
@@ -2309,10 +2300,10 @@ class ConsoleHelper(BuildAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.ConsoleHelper()} is typically called from within a
-    Conary recipe to set up C{consolehelper} symlinks, control files, and
-    dependency for an application.
-    
+    The C{r.ConsoleHelper()} class is called from within a Conary recipe to
+    set up C{consolehelper} symlinks, control files, and dependency for an
+    application.
+
     The C{linkname} and C{realprogram} paths are relative to destdir.
 
     Setting C{consoleuser} to C{True} allows the console user to access
@@ -2336,49 +2327,42 @@ class ConsoleHelper(BuildAction):
     of text lines (without newline characters) to place in the
     C{console.apps} file.  It is assumed that C{session=True} implies
     that the application uses X.
-    
-    PARAMETERS
-    ==========
-    
-    The C{r.ConsoleHelper()} class accepts the following parameters:
-        
-    None.
 
     KEYWORDS
     ========
 
     The C{r.ConsoleHelper()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
-        
+
     B{consoleuser} : (False) Allows the console user to access service
     without password if set to C{True}.
-    
+
     B{fallback} : (None) By default, no entry is added to the C{console.apps}
     file
-    
+
     B{noxoption}': (None) By default, no entry is added to the C{console.apps}
     file
-    
+
     B{otherlines}: FIXME : what does this keyword do?
-    
+
     B{pamfile} : Specify a C{pamfile} relative to the builddir. If used,
     I{consoluser} is ignored.
-    
+
     B{session} : (None) By default, no entry is added to the C{console.apps}
     file
-    
+
     B{targetuser} : (root) FIXME : what does this keyword do?
-    
+
     B{timestamp} : (False) FIXME : what does this keyword do?
-    
+
     EXAMPLES
     ========
-    
+
     C{r.ConsoleHelper('%(bindir)s/xmtr', '%(prefix)s/X11R6/bin/xmtr', session=True)}
-    
-    The above example demonstrates calling C{r.ConsoleHelper()} and specifying
-    the link name C{%(bindir)s/xmtr}, program name
-    C{%(prefix)s/X11R6/bin/xmtr}, and using the argument C{session=True}.
+
+    Demonstrates calling C{r.ConsoleHelper()} and specifying the link name
+    C{%(bindir)s/xmtr}, program name C{%(prefix)s/X11R6/bin/xmtr}, and using
+    the argument C{session=True}.
     """
     keywords = {
         'consoleuser': False,
@@ -2450,7 +2434,7 @@ class ConsoleHelper(BuildAction):
             contents.append('NOXOPTION='+self.noxoption)
         if self.otherlines is not None:
             contents.extend(self.otherlines)
-            
+
         f = file(destpath, 'w')
         f.writelines([ x+'\n' for x in contents])
         f.close()
@@ -2472,7 +2456,7 @@ class XInetdService(_FileAction):
     ====
 
     B{C{r.XInetdService()}} - Creates a file in /etc/xinetd.d
-    
+
     SYNOPSIS
     ========
 
@@ -2489,10 +2473,10 @@ class XInetdService(_FileAction):
     DESCRIPTION
     ===========
 
-    The build class C{r.XInetdService()} is typically called from within a
-    Conary recipe to create a file in /etc/xinetd.d for running an application
-    from the C{xinetd} daemon.
-    
+    The C{r.XInetdService()} class is called from within a Conary recipe to
+    create a file in /etc/xinetd.d for running an application from the
+    C{xinetd} daemon.
+
     Specify only the arguments that you absolute need to specify.
     The C{otherlines} argument should be a list of lines, and should
     not include any leading tabs or trailing newlines.  The arguments
@@ -2503,13 +2487,13 @@ class XInetdService(_FileAction):
     description; they are encoded as comments.  Do not include comment
     characters in either, and do not wrap the description; it will be
     nicely wrapped for you according to chkconfig's rules.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.XInetdService()} class accepts the following parameters:
-        
-    B{macros} : Macro set to be used for expansion 
+
+    B{macros} : Macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -2518,17 +2502,17 @@ class XInetdService(_FileAction):
     default values shown in parentheses when applicable:
 
     None
-    
+
     EXAMPLES
     ========
     C{r.XInetdService('swat', 'SWAT is the Samba Web Admin Tool. Use swat to
     configure your Samba server. To use SWAT, connect to port 901 with your
-    favorite web browser.', port='901', socket_type='stream', wait=False, 
+    favorite web browser.', port='901', socket_type='stream', wait=False,
     otherlines=['only_from        = 127.0.0.1', 'log_on_failure  += USERID'],
     user='root', server='%(sbindir)s/swat')}
-    
-    The example above calls C{r.XInetdService()} to create a C{swat} entry in
-    the C{/etc/xinetd.d} directory so that the Samba Web Administration Tool
+
+    Calls C{r.XInetdService()} to create a C{swat} entry in the
+    C{/etc/xinetd.d} directory so that the Samba Web Administration Tool
     (C{swat}) may run from the C{xinetd} service daemon.
     """
     keywords = {
@@ -2620,7 +2604,7 @@ class XInetdService(_FileAction):
             else:
                 self.filename = '/'.join((
                     macros.sysconfdir, 'xinetd.d', self.serviceName))
-        
+
         dest = macros.destdir+self.filename
 	util.mkdirChain(os.path.dirname(dest))
         f = file(dest, 'w')
@@ -2672,7 +2656,7 @@ class XMLCatalogEntry(BuildCommand):
 
     B{C{r.XMLCatalogEntry()}} - Adds an entry to the XML catalog file catalog
     file
-    
+
     SYNOPSIS
     ========
 
@@ -2681,18 +2665,18 @@ class XMLCatalogEntry(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.XMLCatalogEntry()} is typically called from within a
-    Conary recipe to add an entry to the XML catalog file C{catalogFile}.
-    
-    If the catalog default directory (C{/etc/xml}) is nonexistant, 
+    The C{r.XMLCatalogEntry()} class is called from within a Conary recipe to
+    add an entry to the XML catalog file C{catalogFile}.
+
+    If the catalog default directory (C{/etc/xml}) is nonexistant,
     C{r.XMLCatalogEntry} will create it. If the catalog itself is noexistant,
     it will be created as well.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.XMLCatalogEntry()} class accepts the following parameters:
-        
+
     B{macros} : Macros which will be expanded through dictionary substitution
 
     KEYWORDS
@@ -2703,20 +2687,20 @@ class XMLCatalogEntry(BuildCommand):
 
     B{catalogDir} : (C{'%(sysconfdir)s/xml'}) The directory where the catalog
     file is located.
-    
+
     EXAMPLES
     ========
-   
+
     C{r.XMLCatalogEntry('docbook-xsl.xml', 'rewriteSystem',
     'http://docbook.sourceforge.net/release/xsl/1.65.1',
     'file://%(datadir)s/sgml/docbook/xsl-stylesheets-1.65.1')}
-    
-    The example above calls C{r.XMLCatalogEntry()} on the catalog file 
-    C{docbook-xsl.xml}, specifying a type of C{rewriteSystem}, and an original
-    entry of C{http://docbook.sourceforge.net/release/xsl/1.65.1} to be
-    replaced by C{file://%(datadir)s/sgml/docbook/xsl-stylesheets-1.65.1}.
+
+    Calls C{r.XMLCatalogEntry()} on the catalog file C{docbook-xsl.xml},
+    specifying a type of C{rewriteSystem}, and an original entry of
+    C{http://docbook.sourceforge.net/release/xsl/1.65.1} to be replaced by
+    C{file://%(datadir)s/sgml/docbook/xsl-stylesheets-1.65.1}.
     """
-    
+
     template = (
         '%%(createcmd)s'
         ' xmlcatalog --noout --add '
@@ -2738,7 +2722,7 @@ class XMLCatalogEntry(BuildCommand):
         self.replace     = args[3]
 
         BuildCommand.__init__(self, recipe, *args, **keywords)
-        
+
     def do(self, macros):
         if 'libxml2:runtime' not in self.recipe.buildRequires:
             self.recipe.reportErrors(
@@ -2758,7 +2742,7 @@ class XMLCatalogEntry(BuildCommand):
             macros.createcmd = ''
 
         util.execute(self.command % macros)
-        
+
 
 class SGMLCatalogEntry(BuildCommand):
     """
@@ -2766,7 +2750,7 @@ class SGMLCatalogEntry(BuildCommand):
     ====
 
     B{C{r.SGMLCatalogEntry()}} - Adds an entry to the SGML catalog file
-    
+
     SYNOPSIS
     ========
 
@@ -2775,17 +2759,17 @@ class SGMLCatalogEntry(BuildCommand):
     DESCRIPTION
     ===========
 
-    The build class C{r.SGMLCatalogEntry()} is typically called from within a
-    Conary recipe to add an entry to the SGML catalog file. 
-    
+    The C{r.SGMLCatalogEntry()} class is called from within a Conary recipe to
+    add an entry to the SGML catalog file.
+
     If the catalog directory (by default, C{/etc/sgml}) is nonexistant, it is
     created.  If the catalog file does not exist,it is created.
-    
+
     PARAMETERS
     ==========
-    
+
     The C{r.SGMLCatalogEntry()} class accepts the following parameters:
-        
+
     B{macros} : Macros which will be expanded through dictionary substitution
 
     KEYWORDS
@@ -2796,18 +2780,17 @@ class SGMLCatalogEntry(BuildCommand):
 
     B{catalogDir} : (C{'%(sysconfdir)s/sgml'}) The directory where the catalog
     file is located.
-    
+
     B{use} : Optional arguments of Use flag(s) telling whether to actually
-    perform the action. 
-    
+    perform the action.
+
     EXAMPLES
     ========
-   
+
     C{r.SGMLCatalogEntry('sgml-common.cat', '%(datadir)s/xml/qaml/catalog')}
-    
-    The example above calls C{r.SGMLCatalogEntry()} adding the entry
-    C{sgml-common.cat} to the catalog reference
-    C{%(datatdir)s/xml/qaml/catalog}.
+
+    Calls C{r.SGMLCatalogEntry()} adding the entry C{sgml-common.cat} to the
+    catalog reference C{%(datatdir)s/xml/qaml/catalog}.
     """
 
     template = (
@@ -2816,7 +2799,7 @@ class SGMLCatalogEntry(BuildCommand):
         ' %(catalogReference)s > '
         ' %%(destdir)s/%(catalogDir)s/%(catalogFile)s'
     )
-    
+
     keywords = {
         'catalogDir' : '%(sysconfdir)s/sgml'
     }
@@ -2826,9 +2809,9 @@ class SGMLCatalogEntry(BuildCommand):
         assert(len(args)==2)
         self.catalogFile = args[0]
         self.catalogReference = args[1]
-        
+
         BuildCommand.__init__(self, recipe, *args, **keywords)
-    
+
 
     def do(self, macros):
         if 'libxml2:runtime' not in self.recipe.buildRequires:
@@ -2836,18 +2819,18 @@ class SGMLCatalogEntry(BuildCommand):
                 "Must add 'libxml2:runtime' to buildRequires")
 
         macros = macros.copy()
-        
+
         catalogDirectory = "%%(destdir)s/%s" % self.catalogDir
         catalogDirectory = catalogDirectory % macros
         if not os.path.exists(catalogDirectory):
             os.makedirs(catalogDirectory)
-       
+
         cleanTemp = False
-        catalogName = '%%(destdir)s/%s/%s' % (self.catalogDir, 
+        catalogName = '%%(destdir)s/%s/%s' % (self.catalogDir,
                                               self.catalogFile)
         catalogName = catalogName % macros
         if os.path.exists(catalogName) and util.isregular(catalogName):
-            fd, tempPath = tempfile.mkstemp(suffix='cat', 
+            fd, tempPath = tempfile.mkstemp(suffix='cat',
                                 prefix=os.path.basename(catalogName),
                                 dir=os.path.dirname(catalogName))
             os.close(fd)
@@ -2856,7 +2839,7 @@ class SGMLCatalogEntry(BuildCommand):
             cleanTemp = True
         else:
             macros.tempFileName = catalogName
-   
+
         util.execute(self.command % macros)
 
         if cleanTemp:
