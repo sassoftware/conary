@@ -5,6 +5,8 @@ Changes in @NEW@:
       removes a dependency needed by trove 'b', attempt to update 'b' to 
       solve the dependency issue.  This will allow 'conary update conary'
       to work as expected when you have conary-build installed, for example.
+    * Switched to using more of optparse's capabilities, including --help 
+      messages.
   o Bug Fixes:
     * Recipes that use loadRecipe('foo') and rely on conary to look upstream
       to find their branch now work correctly when committing.
