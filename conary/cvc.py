@@ -274,13 +274,14 @@ class CloneCommand(CvcCommand):
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["skip-build-info"] = NO_PARAM
+        argDef["info"] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) < 3:
             return self.usage()
 
-        import clone
+        from conary import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
         info = argSet.pop('info', False)
         if argSet: return self.usage()
@@ -719,7 +720,7 @@ def main(argv=sys.argv):
         return realMain(ccfg, argv)
     except debuggerException, err:
         raise
-    except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
+    except (errors.ConaryError, cfg.CfgError), e:
         if str(e):
             log.error(str(e))
             sys.exit(1)
