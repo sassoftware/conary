@@ -18,6 +18,7 @@ python_files =	__init__.py	\
 		cmdline.py      \
 		mirror.py	\
 		password.py	\
+		resolve.py	\
                 update.py
 
 extra_dist = Makefile
