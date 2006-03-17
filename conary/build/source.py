@@ -210,21 +210,19 @@ class Archive(_Source):
         automatically by the C{PackageRecipe} object. Passing in  C{recipe}
         from within a recipe is unnecessary.
     @keyword dir: Instructs C{r.addArchive} to change to the directory
-        specified by C{dir} prior to unpacking the source archive.
-        Directories relative to C{%(builddir)s} are considered
-        relative, and directories relative to C{%(destdir)s} are
-        considered absolute.
-	@keyword keyid: Using the C{keyid} keyword indicates the eight-digit
+        specified by C{dir} prior to unpacking the source archive. Directories
+        relative to C{%(builddir)s} are considered relative, and directories
+        relative to C{%(destdir)s} are considered absolute.
+    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit
         GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
         source code archive signature should be sought, and checked.
         If you provide the C{keyid} keyword, C{r.addArchive} will
         search for a file named I{sourcenameC{{.sig,sign,asc}}} and
         ensure it is signed with the appropriate GPG key. A missing signature
         results in a warning; a failed signature check is fatal.
-    @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive}
-        looks in the file, or URL specified by C{rpm} for an RPM
-        containing C{sourcename}.
-	@keyword sourcename: The name of the source archive, which may be a
+    @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive} looks in the
+        file, or URL specified by C{rpm} for an RPM containing C{sourcename}.
+    @keyword sourcename: The name of the source archive, which may be a
         local filename, or a Uniform Resource Locator. (URL)
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
@@ -413,12 +411,12 @@ class Patch(_Source):
 
     def __init__(self, recipe, *args, **keywords):
 	"""
-	@param recipe: The recipe object currently being built is provided
+    @param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in  C{recipe} from
         within a recipe is unnecessary.
-	@keyword backup: The suffix to use when storing file versions before
+    @keyword backup: The suffix to use when storing file versions before
         applying the patch.
-	@keyword extraArgs: As a last resort, arbitrary arguments may be passed to
+    @keyword extraArgs: As a last resort, arbitrary arguments may be passed to
         the patch program  with the C{extraArgs} keyword. This should not
         normally be required, and is  indicative of a possible bug which
         should be reported with the suggestion of direct support for the patch
@@ -435,17 +433,17 @@ class Patch(_Source):
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
     @keyword level: By default, one level of initial subdirectory names is
-        stripped out prior to applying the patch.  The C{level} keyword allows
-        specification of additional initial subdirectory levels to be removed.
-	@keyword macros: The C{macros} keyword accepts a boolean value, and
+    stripped out prior to applying the patch.  The C{level} keyword allows
+    specification of additional initial subdirectory levels to be removed.
+    @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
         macros in the body  of the patch will be interpolated before applying
         the patch. For example, a patch which modifies the value
         C{CFLAGS = -02} using C{CFLAGS = %(cflags)s} will update the C{CFLAGS}
         parameter based upon the current setting of C{recipe.macros.cflags}.
-	@keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
+    @keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
         or URL specified by C{rpm} for an RPM containing C{sourcename}.
-	@keyword sourcename: The name of the patch file
+    @keyword sourcename: The name of the patch file
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
@@ -521,7 +519,7 @@ class Source(_Source):
 
     B{dest} : If set, provides the target name of the file in the build
     directory. A full pathname can be used. Absolute directories will be
-    considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest} to
+    considered relative to C{%(builddir)s}. Use either B{dir}, or B{dest} to
     specify directory information, but not both. Useful mainly  when fetching
     the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
@@ -590,7 +588,7 @@ class Source(_Source):
         within a recipe is unnecessary.
     @keyword dest: If set, provides the target name of the file in the build
         directory. A full pathname can be used. Absolute directories will be
-        considered relative to c{%(builddir)s}. Use either B{dir}, or B{dest}
+        considered relative to C{%(builddir)s}. Use either B{dir}, or B{dest}
         to specify directory information, but not both. Useful mainly  when
         fetching the file from an source outside your direct control, such as
         a URL to a third-party web site, or copying a file out of an RPM
@@ -612,7 +610,7 @@ class Source(_Source):
         C{%(cflags)s} to be replaced with the current setting of
         C{recipe.macros.cflags}. Defaults to False.
     @keyword mode: If set, provides the mode to set on the file.
-        use} : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
+        use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
         values which determine whether the source code archive is actually
         unpacked, or merely stored in the archive.
     @keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,

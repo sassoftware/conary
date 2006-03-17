@@ -176,8 +176,6 @@ class Run(BuildCommand):
 
     def __init__(self, *args, **kwargs):
         """
-        @param macros: macros which will be expanded through dictionary
-        substitution
         @keyword dir: Directory in which to run the command. Relative dirs are
             relative to the build directory, absolute dirs are relative to the
             destination directory.
@@ -468,7 +466,7 @@ class ManualConfigure(Configure):
 
     C{r.ManualConfigure('--prefix=/usr --shared')}
 
-    Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared
+    Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared}
     arguments to the configure script.
     """
     template = ('cd %%(actionDir)s; '
@@ -573,8 +571,6 @@ class Make(BuildCommand):
 
     def __init__(self, recipe, *args, **keywords):
         """
-        @param macros: macros which will be expanded through dictionary
-        substitution
         @keyword forceFlags: boolean; if set, unconditionally override the
             C{Makefile} definitions of *FLAGS
             (that is, CFLAGS, CXXFLAGS, LDFLAGS)
