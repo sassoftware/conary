@@ -423,6 +423,10 @@ class RollbackCommand(ConaryCommand):
     commands = ['rollback']
     paramHelp = "<rollback>"
 
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["replace-files"] = NO_PARAM
+
     def process(self, cfg, argSet, otherArgs):
         kwargs = {}
         if argSet.has_key('replace-files'):
