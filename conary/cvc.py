@@ -66,7 +66,7 @@ def usage(rc = 1):
     print "       cvc rename <oldfile> <newfile>"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
     print '       cvc sign <trove>[=version][[flavor]]+'
-    print "       cvc update <version>"
+    print "       cvc update [<version>]"
     print ""
     print "type 'cvc <command> --help' for command-specific usage"
     return rc
@@ -249,6 +249,8 @@ class CheckoutCommand(CvcCommand):
     commands = ['checkout', 'co']
     paramHelp = '<trove>[=<version>]'
 
+    docs = {'dir': 'Check out trove in directory DIR'}
+
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["dir"] = ONE_PARAM
@@ -270,6 +272,11 @@ class CloneCommand(CvcCommand):
 
     commands = 'clone'
     paramHelp = '<target-branch> <trove>[=<version>][[flavor]]+'
+
+    docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
+                                  'information about how this trove was built'),
+             'info'            : 'Do not perform clone'
+           }
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -294,6 +301,8 @@ class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
 
+    docs = {'message': 'Use MESSAGE to describe why the commit was performed'}
+
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["message"] = ONE_PARAM
@@ -317,6 +326,9 @@ _register(CommitCommand)
 
 class ConfigCommand(CvcCommand):
     commands = ['config']
+
+    docs = {'show-contexts'  : 'display contexts as well as current config',
+            'show-passwords' : 'do not mask passwords'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -344,6 +356,13 @@ _register(ConfigCommand)
 
 class ContextCommand(CvcCommand):
     commands = ['context']
+    paramHelp = '[CONTEXT]'
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["ask"] = NO_PARAM
+
+    docs = {'ask' : 'If not defined, create CONTEXT by answering questions'}
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -364,18 +383,33 @@ class CookCommand(CvcCommand):
     commands = ['cook']
     paramHelp = '<file.recipe|troveName=<version>>[[flavor]]+'
 
+    docs = {'cross'   : ('set macros for cross-compiling', 
+                         '[(local|HOST)--]TARGET'),
+            'debug-exceptions' : 'Enter debugger if a recipe fails in conary',
+            'flavor'  : 'build the trove with flavor FLAVOR',
+            'macro'   : ('set macro NAME to VALUE', "'NAME VALUE'"),
+            'macros'  : optparse.SUPPRESS_HELP, # can we get rid of this?
+            'no-clean': 'do not remove build directory even if build is'
+                        ' successful',
+            'no-deps' : 'do not check build requirements',
+            'prep'    : 'unpack, but do not build',
+            'resume'  : ('resume building at given loc (default at failure)', 
+                         '[LINENO|policy]'),
+            'unknown-flags' : optparse.SUPPRESS_HELP,
+           }
+
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
+        argDef['debug-exceptions'] = NO_PARAM
         argDef['cross'] = ONE_PARAM
         argDef['flavor'] = ONE_PARAM
-        argDef['prep'] = NO_PARAM
-        argDef['no-deps'] = NO_PARAM
         argDef['macro'] = MULT_PARAM
         argDef['macros'] = ONE_PARAM
-        argDef['no-clean'] = NO_PARAM, 'Do not clean up after build'
+        argDef['no-clean'] = NO_PARAM
+        argDef['no-deps'] = NO_PARAM
+        argDef['prep'] = NO_PARAM
         argDef['resume'] = OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
-        argDef['debug-exceptions'] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -505,7 +539,7 @@ _register(LogCommand)
 
 class RdiffCommand(CvcCommand):
     commands = ['rdiff']
-    paramHelp = "<name> <oldver> <newver>"
+    paramHelp = "<name> [<oldver>|-<num>] <newver>"
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -538,6 +572,12 @@ class SignCommand(CvcCommand):
     commands = ['sign']
     paramHelp = "<newshadow> <trove>[=<version>][[flavor]]"
 
+    docs = {'recurse' : 'recursively sign child troves'}
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['recurse'] = NO_PARAM
+
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                 callback = None):
         if len(args) <2: return self.usage()
@@ -551,6 +591,12 @@ _register(SignCommand)
 class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
+
+    docs = {'dir' : 'create new package in DIR' }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['dir'] = ONE_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                 callback = None):
