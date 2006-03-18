@@ -213,12 +213,13 @@ conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>
 
 Creates a changeset with the specified troves and stores it in <outfile>'''
 
+    docs = {'no-recurse' : "Don't include child troves in changeset"}
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
-        argDef['no-recurse'] = (NO_PARAM,
-                                "Don't include child troves in changeset")
+        argDef['no-recurse'] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
 
         callback = updatecmd.UpdateCallback(cfg)
@@ -245,12 +246,15 @@ _register(ChangeSetCommand)
 class ConfigCommand(ConaryCommand):
     commands = ['config']
 
+    docs = {'show-contexts'  : 'display contexts as well as current config',
+            'show-passwords' : 'do not mask passwords'}
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["show-contexts"] = NO_PARAM
         argDef["show-passwords"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         showPasswords = argSet.pop('show-passwords', False)
         showContexts = argSet.pop('show-contexts', False)
         try:
@@ -272,11 +276,13 @@ class CommitCommand(ConaryCommand):
     commands = ['commit']
     paramHelp = "<changeset>"
 
+    docs = {'target-branch' : ('commit to branch BRANCH', 'BRANCH')}
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["target-branch"] = ONE_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         targetBranch = None
         if argSet.has_key('target-branch'):
             targetBranch  = argSet['target-branch']
@@ -290,11 +296,13 @@ class EmergeCommand(ConaryCommand):
     commands = ['emerge']
     paramHelp = "<troveName>+"
 
+    docs = {'no-deps' : 'Do not check to see if buildreqs are installed' }
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["no-deps"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         # import this late to reduce the dependency set for
         # the main conary command in the common case.  This lets
         # conary run even if, for example, libelf is missing
@@ -352,7 +360,7 @@ class LocalChangeSetCommand(ConaryCommand):
     commands = ['localcs']
     paramHelp = "<pkgname>[=<version>][[flavor]] <outfile>"
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         if len(otherArgs) != 4 and len(otherArgs) != 4:
             return self.usage()
 
@@ -368,7 +376,7 @@ class LocalCommitCommand(ConaryCommand):
     commands = ['localcommit']
     paramHelp = "<changeset>"
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         if len(otherArgs) < 3: return self.usage()
         db = database.Database(cfg.root, cfg.dbPath)
         for changeSet in otherArgs[2:]:
@@ -380,7 +388,7 @@ class PinCommand(ConaryCommand):
     commands = ['pin', 'unpin']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         if argSet: return self.usage()
         updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
 _register(PinCommand)
@@ -390,7 +398,7 @@ class RemoveCommand(ConaryCommand):
     commands = ['remove']
     paramHelp = "<path>+"
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         if len(otherArgs) != 3: return self.usage()
         if argSet: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
@@ -413,7 +421,7 @@ _register(RemoveCommand)
 class ListRollbackCommand(ConaryCommand):
     commands = ['rblist']
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         if argSet: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
         rollbacks.listRollbacks(db, cfg)
@@ -423,11 +431,14 @@ class RollbackCommand(ConaryCommand):
     commands = ['rollback']
     paramHelp = "<rollback>"
 
+    docs = {'replace-files' : ('replace files on system with files from'
+                               ' rollback if conflict')}
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["replace-files"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
         if argSet.has_key('replace-files'):
             kwargs['replaceFiles'] = True
@@ -441,6 +452,33 @@ _register(RollbackCommand)
 
 
 class _AbstractQueryCommand(ConaryCommand):
+
+    docs = {'all-troves'    : '', # Meaning changes based on command
+            'buildreqs'     : ('Display troves used to satisfy buildreqs'
+                               ' of this trove'),
+            'deps'          : 'Display trove dependencies',
+            'file-deps'     : 'Display dependencies for individual files',
+            'file-versions' : 'Display file versions',
+            'ids'           : 'Display path and file ids for files',
+            'info'          : 'Display detailed trove info',
+            'ls'            : 'List files',
+            'lsl'           : 'List file details like ls -l',
+            'no-pristine'   : optparse.SUPPRESS_HELP,
+            'no-recurse'    : 'Force no recursive display of child troves',
+            'path'          : 'Display trove that owns PATH',
+            'recurse'       : 'Force recursive display of child troves',
+            'sha1s'         : 'Display checksums for original file contents',
+            'signatures'    : 'Display any signatures on this trove',
+            'tags'          : 'Display tags for files',
+            'troves'        : 'Display one level of child troves',
+            'trove-flags'   : 'Display trove flags (see man page)',
+            'trove-headers' : 'Display current trove name when listing info'
+                              ' from multiple troves',
+            'weak-refs'     : optparse.SUPPRESS_HELP,
+            }
+
+
+
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -460,7 +498,6 @@ class _AbstractQueryCommand(ConaryCommand):
         d["deps"] = NO_PARAM
         d["info"] = NO_PARAM
         d["signatures"] = NO_PARAM
-        d["troves"] = NO_PARAM
         d["trove-flags"] = NO_PARAM
         argDef['Info Display'] = d
 
@@ -468,17 +505,20 @@ class _AbstractQueryCommand(ConaryCommand):
         d["all-troves"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
+        d["troves"] = NO_PARAM
         d["trove-headers"] = NO_PARAM
         d["weak-refs"] = NO_PARAM
         argDef['Child Display'] = d
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         raise NotImplementedError
 
 class QueryCommand(_AbstractQueryCommand):
 
     commands = [ 'query', 'q' ]
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    docs = {'all-troves' : 'Display troves that are not installed'}
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
@@ -487,7 +527,7 @@ class QueryCommand(_AbstractQueryCommand):
         d["path"] = MULT_PARAM
         argDef['Trove Selection'] = d
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
@@ -524,6 +564,19 @@ class RepQueryCommand(_AbstractQueryCommand):
     commands = [ 'repquery', 'rq' ]
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
 
+    docs = { 'affinity'    : ('Use branch and flavor affinity when searching'
+                             ' for troves (behave like conary update)'),
+            'all-troves'   : 'Display byDefault False troves',
+            'all-flavors'  : 'Return all flavors of troves matching the query',
+            'all-versions' : 'Return all versions of troves that'
+                             ' match the query',
+            'available-flavors' : ('Return all flavors that match system flavor'
+                                  ' and the query (and affinity if specified)'),
+            'best-flavors' : optparse.SUPPRESS_HELP, # default
+            'latest-versions': optparse.SUPPRESS_HELP, # default
+            'leaves'         : 'Return latest version for each unique flavor'}
+
+
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
         d = {}
@@ -532,12 +585,11 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["all-versions"] = NO_PARAM
         d["available-flavors"] = NO_PARAM
         d["best-flavors"] = NO_PARAM
-        d["compatible-flavors"] = NO_PARAM
         d["latest-versions"] = NO_PARAM
         d["leaves"] = NO_PARAM
         argDef['Trove Selection'] = d
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
         versionOpts = [argSet.pop(x, False) for x in ['all-versions',
                                                       'latest-versions',
@@ -605,6 +657,14 @@ class ShowChangesetCommand(_AbstractQueryCommand):
     commands = [ "showcs", "scs" ]
     paramHelp = "<changeset> <pkgname>[=<version>][[flavor]]*"
 
+    docs = {'all'                : 'combine many common scs flags',
+            'all-troves'         : 'display not-by-default troves', 
+            'show-changes'       : ('(for relative changeset) display changes'
+                                    'that the relative changeset contains'),
+            'recurse-repository' : ('search the repository for troves not '
+                                    'contained in the changeset when recursing')
+           }
+
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
         d = {}
@@ -612,7 +672,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
                                        "show-changes": NO_PARAM }
         argDef['Child Display']["recurse-repository"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         from conary.repository import changeset
         kw = {}
         # FIXME: organize
@@ -657,29 +717,45 @@ class UpdateCommand(ConaryCommand):
     commands = ["update", "erase", "sync", "syncchildren"]
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
+    docs = {
+        'from-file'     : 'search changeset(s) for given troves',
+        'just-db'       : 'Update db only - Do not modify rest of file system',
+        'keep-existing' : 'Install new troves as new, leaving existing troves.',
+        'info'          : 'Display what update would have done',
+        'no-deps'       : 'Do not raise errors due to dependency failures', 
+        'no-recurse'    : 'Do not install/erase children of specified trove',
+        'no-resolve'    : 'Do not attempt to solve dependency problems',
+        'no-conflict-check' : 'Ignore potential path conflicts', 
+        'recurse'       : optparse.SUPPRESS_HELP,
+        'replace-files' : 'Replace existing files if file conflict found', 
+        'resolve'       : 'Add troves to update to solve dependency problems',
+        'sync-to-parents' : 'Install already referenced versions of troves',
+        'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
+        'test'      : 'Run through whole update but do not modify system',
+        'update-only' : 'Do not install any new troves', 
+    }
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         d = {}
         d["from-file"] = MULT_PARAM
-        d["keep-existing"] = NO_PARAM
-        d["no-deps"] = NO_PARAM
-        d["info"] = NO_PARAM
         d["just-db"] = NO_PARAM
+        d["keep-existing"] = NO_PARAM
+        d["info"] = NO_PARAM
+        d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
         d["resolve"] = NO_PARAM
+        d["sync-to-parents"] = NO_PARAM
+        d["tag-script"] = ONE_PARAM
         d["test"] = NO_PARAM
         d["update-only"] = NO_PARAM
-        d["sync-to-parents"] = NO_PARAM
-        d["tag-script"] = (ONE_PARAM,
-                           ('Output commands to run tag-script to PATH',
-                            'PATH'))
         argDef['Update Options'] = d
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
         kwargs = {}
 
@@ -728,9 +804,11 @@ class UpdateCommand(ConaryCommand):
             return self.usage()
 _register(UpdateCommand)
 
-class UpdateAllCommand(ConaryCommand):
+class UpdateAllCommand(UpdateCommand):
 
     commands = ['updateall']
+    docs = {'items': ('Display troves that conary updateall will update '
+                      'to upgrade your system')}
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -742,7 +820,7 @@ class UpdateAllCommand(ConaryCommand):
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
         kwargs = {}
 
@@ -786,7 +864,7 @@ _register(UpdateAllCommand)
 class UpdateConaryCommand(ConaryCommand):
     commands = ['updateconary']
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
 _register(UpdateConaryCommand)
@@ -796,11 +874,13 @@ class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
 
+    doc = {'all' : 'verify all troves on system'}
+
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["all"] = NO_PARAM
 
-    def process(self, cfg, argSet, otherArgs):
+    def runCommand(self, cfg, argSet, otherArgs):
         db = openDatabase(cfg.root, cfg.dbPath)
         all = argSet.has_key('all')
         if all: del argSet['all']
@@ -894,7 +974,7 @@ def realMain(cfg, argv=sys.argv):
         return usage()
 
     thisCommand.setParser(parser)
-    rv = thisCommand.process(cfg, argSet, otherArgs)
+    rv = thisCommand.runCommand(cfg, argSet, otherArgs)
 
     if profile:
         prof.stop()
