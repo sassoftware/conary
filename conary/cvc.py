@@ -686,7 +686,7 @@ def realMain(cfg, argv=sys.argv):
 
     thisCommand.setParser(parser)
 
-    rv = sourceCommand(cfg, otherArgs[1:], argSet, profile, thisCommand)
+    rv = sourceCommand(cfg, otherArgs[1:], argSet, profile, thisCommand=thisCommand)
 
     if profile:
         prof.stop()
