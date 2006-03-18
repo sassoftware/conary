@@ -874,7 +874,7 @@ class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
 
-    doc = {'all' : 'verify all troves on system'}
+    docs = {'all' : 'verify all troves on system'}
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
