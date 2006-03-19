@@ -814,6 +814,7 @@ class UpdateAllCommand(UpdateCommand):
         ConaryCommand.addParameters(self, argDef)
         argDef["items"] = NO_PARAM
         argDef["info"] = NO_PARAM
+        argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
@@ -840,6 +841,8 @@ class UpdateAllCommand(UpdateCommand):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
 
+        kwargs['checkPathConflicts'] = \
+                                not argSet.pop('no-conflict-check', False)
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
             del argSet['no-resolve']
