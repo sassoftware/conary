@@ -177,6 +177,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
     # we need to protect ourselves from duplicate items in the troveList
     troveList = list(set(troveList))
+    troveList.sort(lambda a,b: cmp(a[0], b[0]))
     log.debug("%d new troves are available", len(troveList))
 
     log.debug("looking for new pgp keys")
@@ -225,6 +226,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
         sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
     # protection against duplicate items returned in the list by some servers
     sigList = list(set(sigList))
+    sigList.sort(lambda a,b: cmp(a[0], b[0]))
     log.debug("%d new signatures are available" % len(sigList))
 
     # also weed out the signatures that don't belong on our label. Having none
