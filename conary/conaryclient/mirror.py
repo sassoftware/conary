@@ -166,10 +166,11 @@ def mirrorSignatures(sourceRepos, targetRepos, sigList):
     return updateCount
 
 def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
+    # find the latest timestamp stored on the target mirror
     if sync:
         currentMark = -1
+        targetRepos.setMirrorMark(cfg.host, currentMark)
     else:
-        # find the latest timestamp stored on the target mirror
         currentMark = targetRepos.getMirrorMark(cfg.host)
     log.debug("currently up to date through %d", int(currentMark))
 
