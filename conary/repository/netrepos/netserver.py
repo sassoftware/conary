@@ -1705,43 +1705,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
         query = """
-                SELECT UP.permittedTrove, item, version, flavor,
-                          Instances.changed FROM Instances
-                    JOIN TroveInfo USING (instanceId)
-                    JOIN Nodes ON
-                        Instances.itemId = Nodes.itemId AND
-                        Instances.versionId = Nodes.versionId
-                    JOIN LabelMap ON
-                        Nodes.itemId = LabelMap.itemId AND
-                        Nodes.branchId = LabelMap.branchId
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed <= ? AND
-                        Instances.isPresent = 1 AND
-                        TroveInfo.changed >= ? AND
-                        TroveInfo.infoType = ?
-                    ORDER BY
-                        TroveInfo.changed
-                    LIMIT
-                        1000
-                    """ % ",".join("%d" % x for x in userGroupIds)
-
+        SELECT UP.permittedTrove, item, version, flavor, Instances.changed
+        FROM Instances
+        JOIN TroveInfo USING (instanceId)
+        JOIN Nodes ON
+             Instances.itemId = Nodes.itemId AND
+             Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+             Nodes.itemId = LabelMap.itemId AND
+             Nodes.branchId = LabelMap.branchId
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
+              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed <= ?
+          AND Instances.isPresent = 1
+          AND TroveInfo.changed >= ?
+          AND TroveInfo.infoType = ?
+        ORDER BY TroveInfo.changed
+        LIMIT 1000
+        """ % ",".join("%d" % x for x in userGroupIds)
         cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
 
         l = []
