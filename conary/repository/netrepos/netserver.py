@@ -1890,48 +1890,66 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
             lim = 1000 # for safety and efficiency
+
+        # To avoid using a LIMIT value too low on the big query below,
+        # we need to find out how many distinct permissions will
+        # likely grant access to a trove for this user
+        cu.execute("""
+        SELECT COUNT(*) AS perms
+        FROM UserGroups
+        JOIN Permissions USING(userGroupId)
+        WHERE UserGroups.canMirror = 1
+          AND UserGroups.userGroupId in (%s)
+        """ % (",".join("%d" % x for x in userGroupIds),))
+        permCount = cu.fetchall()[0][0]
+        if permCount == 0:
+	    raise errors.InsufficientPermission
+        if permCount is None:
+            permCount = 1
+
+        # We now use the permissionCount as the upper limit of the
+        # number of troves we will select to make sure that after
+        # eliminating duplicate rows we return at least 'lim' troves
+        # to the client
         query = """
-                SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-                          timeStamps, Instances.changed FROM Instances
-                    JOIN Nodes USING (itemId, versionId)
-                    JOIN LabelMap USING (itemId, branchId)
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed >= ? AND
-                        Instances.isPresent = 1
-                    ORDER BY
-                        Instances.changed
-                    LIMIT
-                        %d
-                    """ % (",".join("%d" % x for x in userGroupIds), lim)
+        SELECT DISTINCT UP.permittedTrove, item, version, flavor,
+            timeStamps, Instances.changed
+        FROM Instances
+        JOIN Nodes USING (itemId, versionId)
+        JOIN LabelMap USING (itemId, branchId)
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
+              JOIN Items as PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+              ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed >= ?
+          AND Instances.isPresent = 1
+        ORDER BY Instances.changed
+        LIMIT %d
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
 
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
-        l = []
+        l = set()
 
         for pattern, name, version, flavor, timeStamps, mark in cu:
             if self.auth.checkTrove(pattern, name):
                 version = versions.strToFrozen(version,
                     [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+            if len(l) >= lim:
+                # we need to flush the cursor to stop a backend from complaining
+                junk = cu.fetchall()
+                break
+        return list(l)
 
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
