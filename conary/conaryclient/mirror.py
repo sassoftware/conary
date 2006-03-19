@@ -175,6 +175,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
 
     # now find all of the troves we need from from the mirror source
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
+    # we need to protect ourselves from duplicate items in the troveList
+    troveList = list(set(troveList))
     log.debug("%d new troves are available", len(troveList))
 
     log.debug("looking for new pgp keys")
@@ -185,7 +187,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
         log.debug("adding %d keys to target", len(keyList))
         targetRepos.addPGPKeyList(cfg.host, keyList)
 
-    # FIXME: getnewTroveList should accept and only return troves on
+    # FIXME: getNewTroveList should accept and only return troves on
     # the labels we're interested in
     if cfg.labels and len(troveList):
         # XXX: temporary fix: we're trying to "weed out" troves that don't
@@ -221,7 +223,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     else:
         log.debug("looking for new trove signatures")
         sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
-
+    # protection against duplicate items returned in the list by some servers
+    sigList = list(set(sigList))
     log.debug("%d new signatures are available" % len(sigList))
 
     # also weed out the signatures that don't belong on our label. Having none
