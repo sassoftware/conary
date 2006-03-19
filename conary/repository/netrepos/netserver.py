@@ -1704,6 +1704,42 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, mark)
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
+        # compute the max number of troves with the same mark for
+        # dynamic sizing; the client can get stuck if we keep
+        # returning the same subset because of a LIMIT too low
+        cu.execute("""
+        SELECT MAX(c) + 1 AS lim
+        FROM (
+           SELECT COUNT(instanceId) AS c
+           FROM Instances
+           WHERE Instances.isPresent = 1
+             AND Instances.changed <= ?
+           GROUP BY changed
+           HAVING c>1
+        ) AS lims""", mark)
+        lim = cu.fetchall()[0][0]
+        if lim is None or lim < 1000:
+            lim = 1000 # for safety and efficiency
+
+        # To avoid using a LIMIT value too low on the big query below,
+        # we need to find out how many distinct permissions will
+        # likely grant access to a trove for this user
+        cu.execute("""
+        SELECT COUNT(*) AS perms
+        FROM UserGroups
+        JOIN Permissions USING(userGroupId)
+        WHERE UserGroups.canMirror = 1
+          AND UserGroups.userGroupId in (%s)
+        """ % (",".join("%d" % x for x in userGroupIds),))
+        permCount = cu.fetchall()[0][0]
+        if permCount == 0:
+	    raise errors.InsufficientPermission
+        if permCount is None:
+            permCount = 1
+
+        # multiply LIMIT by permCount so that after duplicate
+        # elimination we are sure to return at least 'lim' troves
+        # back to the client
         query = """
         SELECT UP.permittedTrove, item, version, flavor, Instances.changed
         FROM Instances
@@ -1732,17 +1768,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND TroveInfo.changed >= ?
           AND TroveInfo.infoType = ?
         ORDER BY TroveInfo.changed
-        LIMIT 1000
-        """ % ",".join("%d" % x for x in userGroupIds)
+        LIMIT %d
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
         cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
 
-        l = []
-
+        l = set()
         for pattern, name, version, flavor, mark in cu:
             if self.auth.checkTrove(pattern, name):
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+            if len(l) > lim:
+                # flush the cursor
+                junk = cu.fetchall()
+                break
+        return list(l)
 
     def getTroveSigs(self, authToken, clientVersion, infoList):
         if not self.auth.check(authToken, write = False, mirror = True):
@@ -1869,16 +1907,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
-        # first off, compute the max number of troves with the same mark for dynamic sizing;
-        # the client can get stuck if we keep returning a (same) subset
+        # compute the max number of troves with the same mark for
+        # dynamic sizing; the client can get stuck if we keep
+        # returning the same subset because of a LIMIT too low
         cu.execute("""
         SELECT MAX(c) + 1 AS lim
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
+           WHERE Instances.isPresent = 1
+             AND Instances.changed >= ?
            GROUP BY changed
            HAVING c>1
-        ) AS lims""")
+        ) AS lims""", mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
             lim = 1000 # for safety and efficiency
@@ -1899,10 +1940,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if permCount is None:
             permCount = 1
 
-        # We now use the permissionCount as the upper limit of the
-        # number of troves we will select to make sure that after
-        # eliminating duplicate rows we return at least 'lim' troves
-        # to the client
+        # multiply LIMIT by permCount so that after duplicate
+        # elimination we are sure to return at least 'lim' troves
+        # back to the client
         query = """
         SELECT DISTINCT UP.permittedTrove, item, version, flavor,
             timeStamps, Instances.changed
