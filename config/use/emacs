@@ -1,0 +1,2 @@
+shortDoc Enable support for the EMACS editor
+longDoc Build the EMACS editor, and include support for the EMACS editor in other packages.  If not Use.emacs, packages should not have files in the site-lisp directory and should not have an :emacs component.
