@@ -264,8 +264,11 @@ class DependencyChecker:
 
     def _createCollectionEdges(self):
         edges = set()
-        i = 0
-        for job in self.jobSet:
+        
+        nodes = iter(self.nodes)
+        nodes.next()
+
+        for i, (job, _, _) in enumerate(nodes):
             if job[2][0] is None: continue
             if not trove.troveIsCollection(job[0]): continue
             trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
@@ -275,8 +278,6 @@ class DependencyChecker:
                 targetTrove = self.newInfoToNodeId.get(info, -1)
                 if targetTrove >= 0:
                     edges.add((i + 1, targetTrove, None))
-
-            i += 1
 
         return edges
 
