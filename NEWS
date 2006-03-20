@@ -18,6 +18,7 @@ Changes in @NEW@:
       doing a --full-trove-sync has been fixed
     * conary rq --trove-flags will now display redirect info even if you
       do not specify --troves (bug #877)
+    * dep resolution now support --flavors --full-versions output (bug #751)
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
