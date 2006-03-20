@@ -1542,7 +1542,7 @@ class Provides(policy.Policy):
     NAME
     ====
 
-    B{C{r.Provides()}} - Drives provides mechanism
+    B{C{r.Provides()}} - Creates dependency provision
 
     SYNOPSIS
     ========
@@ -1933,7 +1933,7 @@ class Requires(_addInfo):
     NAME
     ====
 
-    B{C{r.Requires()}} - Drives requirements mechanism
+    B{C{r.Requires()}} - Creates dependency requirements
 
     SYNOPSIS
     ========
@@ -1945,7 +1945,7 @@ class Requires(_addInfo):
 
     The C{r.Requires()} policy adds requirements for a file.
     You can pass in exceptions that should not have automatic requirement
-    discovering done, such as example shell scripts outside of C{%(docdir)s}.
+    discovery done, such as example shell scripts outside of C{%(docdir)s}.
 
     Note: Components are the only troves which can be required.
 
