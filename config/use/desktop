@@ -1,0 +1,2 @@
+shortDoc Build with support for freedesktop.org specs
+longDoc Set if any graphical desktop platform/environment that attempts to conform to the freedesktop.org specifications is enabled.  In particular, desktop and menu entries and the shared mime database at this time.  This flag should mediate dependence on implementation of these capabilities.

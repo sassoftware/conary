@@ -1,1 +1,3 @@
 sense prefernot
+shortDoc Enable support for SELinux
+longDoc Build support for the Security-Enhanced Linux Role-based Access Control system.  Adds dependencies on particular filesystems, Linux 2.6 or later kernel, and multiple SELinux tools.  Unlikely to be appropriate for deeply embedded systems.
