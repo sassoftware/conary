@@ -305,7 +305,7 @@ class CommitCommand(CvcCommand):
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
-        argDef["message"] = ONE_PARAM
+        argDef["message"] = '-m', ONE_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):

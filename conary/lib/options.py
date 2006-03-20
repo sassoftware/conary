@@ -74,7 +74,8 @@ def addOptions(parser, argDef, skip=None):
         meta = None
         if isinstance(data, (list, tuple)):
             if len(data) == 3:
-                shortOpt = data[2]
+                shortOpt = data[0]
+                data = data[1:]
             if len(data) >= 2:
                 help = data[1]
                 if isinstance(help, (list, tuple)):
@@ -84,7 +85,7 @@ def addOptions(parser, argDef, skip=None):
             paramType = data
         flagNames = ['--' + name]
         if shortOpt:
-            flagNames.append('-' + shortOpt)
+            flagNames.append(shortOpt)
 
         if paramType == NO_PARAM:
             parser.add_option(action='store_true', dest=name, help=help, 
