@@ -149,9 +149,10 @@ class Config(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Config} class is called to mark all files below C{%(sysconfdir)s}
+    The C{r.Config} policy marks all files below C{%(sysconfdir)s}
     (that is, C{/etc}) and C{%(taghandlerdir)s} (that is,
-    C{/usr/libexec/conary/tags/}) as configuration files.
+    C{/usr/libexec/conary/tags/}), and any other files explicitly
+    mentioned, as configuration files.
 
         - To mark files as exceptions, use
           C{r.Config(exceptions='I{filterexp}')}.
@@ -229,7 +230,7 @@ class ComponentSpec(_filterSpec):
     DESCRIPTION
     ===========
 
-    The C{r.ComponentSpec} class includes the filter expressions that specify
+    The C{r.ComponentSpec} policy includes the filter expressions that specify
     the default assignment of files to components.  The expressions are
     considered in the order in which they are evaluated in the recipe, and the
     first match wins.  After all the recipe-provided expressions are
@@ -363,7 +364,7 @@ class PackageSpec(_filterSpec):
     DESCRIPTION
     ===========
 
-    The C{r.PackageSpec()} class is called to determine which package, and
+    The C{r.PackageSpec()} policy is called to determine which package, and
     optionally in addition which component, each file is in.
     (Use C{r.ComponentSpec()} to specify the component without specifying
     the package.)
@@ -506,7 +507,7 @@ class Transient(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Transient()} class is called to mark files as containing transient
+    The C{r.Transient()} policy is called to mark files as containing transient
     contents. It automatically marks the two most common uses of transient
     contents: python and emacs byte-compiled files
     (C{.pyc}, C{.pyo}, and C{.elc} files).
@@ -579,7 +580,7 @@ class TagDescription(policy.Policy):
     EXAMPLES
     ========
 
-    This policy class is not called explicitly.
+    This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -616,7 +617,7 @@ class TagHandler(policy.Policy):
     EXAMPLES
     ========
 
-    This policy class is not called explicitly.
+    This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -646,7 +647,7 @@ class TagSpec(_addInfo):
     DESCRIPTION
     ===========
 
-    The C{r.TagSpec()} class automatically applies tags defined by tag
+    The C{r.TagSpec()} policy automatically applies tags defined by tag
     descriptions in both the current system and C{%(destdir)s} to all
     files in C{%(destdir)}.
 
@@ -751,7 +752,7 @@ class MakeDevices(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.MakeDevices()} class is called to create device nodes.  Conary's
+    The C{r.MakeDevices()} policy is called to create device nodes.  Conary's
     policy of non-root builds requires that these nodes exist only in the
     package, and not in the filesystem, as only root may actually create
     device nodes.
@@ -850,14 +851,14 @@ class LinkType(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.LinkType()} class is called to to ensure only regular,
+    The C{r.LinkType()} policy ensures that only regular,
     non-configuration files are hardlinked.
 
 
     EXAMPLES
     ========
 
-    This policy class is not called explicitly.
+    This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -888,7 +889,7 @@ class LinkCount(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.LinkCount()} class is called to allow for exceptions to the
+    The C{r.LinkCount()} policy is called to allow for exceptions to the
     rule preventing hardlinks across directories.
 
     It is generally an error to have hardlinks across directories, except when
@@ -1028,7 +1029,7 @@ class ByDefault(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.ByDefault()} class is called to determine which components should
+    The C{r.ByDefault()} policy determines which components should
     be installed by default at the time the package is installed on the
     system.  The default setting for the C{ByDefault} policy is that the
     C{:debug}, and C{:test} packages are not installed with the package.
@@ -1115,7 +1116,7 @@ class Ownership(_UserGroup):
     DESCRIPTION
     ===========
 
-    The C{r.Ownership()} class is typically called to set user and group
+    The C{r.Ownership()} policy is called to set user and group
     ownership of files when the default of C{root:root} is not appropriate.
 
     List the ownerships in order, most specific first, ending with least
@@ -1235,11 +1236,11 @@ class UtilizeUser(_Utilize):
     DESCRIPTION
     ===========
 
-    The C{r.UtilizeUser} class is typically called to mark files as requiring
-    a user definition to exist even though the file is not owned by that user
+    The C{r.UtilizeUser} policy is called to mark files as requiring
+    a user definition to exist even though the file is not owned by that user.
 
     This is particularly useful for daemons that are setuid root
-    but change their user id to a user id with no filesystem permissions
+    ant change their user id to a user id with no filesystem permissions
     after they start.
 
     EXAMPLES
@@ -1260,8 +1261,8 @@ class UtilizeGroup(_Utilize):
     NAME
     ====
 
-    B{C{r.UtilizeGroup()** - Marks files as requiring a user definition to
-    exist}}
+    B{C{r.UtilizeGroup()}} - Marks files as requiring a user definition to
+    exist
 
     SYNOPSIS
     ========
@@ -1271,12 +1272,12 @@ class UtilizeGroup(_Utilize):
     DESCRIPTION
     ===========
 
-    The C{r.UtilizeGroup} class is called to mark files as requiring
+    The C{r.UtilizeGroup} policy is called to mark files as requiring
     a group definition to exist even though the file is not owned by that
     group.
 
     This is particularly useful for daemons that are setuid root
-    but change their user id to a group id with no filesystem permissions
+    ant change their user id to a group id with no filesystem permissions
     after they start.
 
     EXAMPLES
@@ -1297,36 +1298,42 @@ class ComponentRequires(policy.Policy):
     NAME
     ====
 
-    B{C{r.ComponentRequires()}} - Create automatic, intra-package,
+    B{C{r.ComponentRequires()}} - Create automatic intra-package,
     inter-component dependencies
 
     SYNOPSIS
     ========
 
-    C{r.ComponentRequires([I{componentname: requiringComponentSet}] |
-    [I{packagename: componentname: requiringComponentSet}])}
+    C{r.ComponentRequires([{'I{componentname}': I{requiringComponentSet}}] |
+    [{'I{packagename}': {'I{componentname}': I{requiringComponentSet}}}])}
 
     DESCRIPTION
     ===========
 
-    The C{r.ComponentRequires()} class is called to create automatic,
+    The C{r.ComponentRequires()} policy creates automatic,
     intra-package, inter-component dependencies, such as a corresponding
     dependency between C{:lib} and C{:data} components.
 
-    Changes are passed in using dictionaries for both general, and top-level,
-    package-specific changes.  For general changes, use this syntax:
-    C{r.ComponentRequires(B{componentname: requiringComponentSet})}.
-    For top-level, package-specific changes, the syntax is as such:
-    C{r.ComponentRequires(B{packagename: componentname: requiringComponentSet})}.
+    Changes are passed in using dictionaries, both for additions that
+    are specific to a specific package, and additions that apply
+    generally to all binary packages being cooked from one recipe.
+    For general changes that are not specific to a package, use this syntax:
+    C{r.ComponentRequires({'I{componentname}': I{requiringComponentSet}})}.
+    For package-specific changes, you need to specify packages as well
+    as components:
+    C{r.ComponentRequires({'I{packagename}': 'I{componentname}': I{requiringComponentSet}})}.
 
-    In  concept, a top-level example would be the default requirement of
-    C{:data} by C{:lib} and C{:runtime}.
-    Using C{r.ComponentRequires({'data': set(('lib',))})} would specify to all
-    top-level packages only C{:lib} requires C{:data}, however.
+    By default, both C{:lib} and C{:runtime} components (if they exist)
+    require the C{:data} component (if it exists).  If you call
+    C{r.ComponentRequires({'data': set(('lib',))})}, you limit it
+    so that C{:runtime} components will not require C{:data} components
+    for this recipe.
 
-    For the general use, such requirements might be affected on only one
-    package, such as package C{foo}, for example, by using a syntax such
-    as: C{r.ComponentRequires({'foo': 'data': set(('lib',))})}.
+    In recipes that create more than one binary package, you may need
+    to limit your changes to a single binary package.  To do so, use
+    the package-specific syntax.  For example, to remove the C{:runtime}
+    requirement on C{:data} only for the C{foo} package, call:
+    C{r.ComponentRequires({'foo': 'data': set(('lib',))})}.
 
     Note that C{r.ComponentRequires} cannot require capability flags; use
     C{r.Requires} if you need to specify requirements, including capability
@@ -1405,16 +1412,16 @@ class ComponentProvides(policy.Policy):
     SYNOPSIS
     ========
 
-    C{r.ComponentProvides([I{flags}] | [I{pkgname}, I{flags}])}
+    C{r.ComponentProvides(I{flags})}
 
     DESCRIPTION
     ===========
 
-    The C{r.ComponentProvides()} class is called to cause each trove to
-    provide itself explicitly, with optional capability flags consisting of a
-    single string, or a list, tuple, or set of strings. It is impossible to
-    provide a capability flag for one component but not another within a
-    single package.
+    The C{r.ComponentProvides()} policy causes each trove to explicitly
+    provide its name.  Call it to provide optional capability flags
+    consisting of a single string, or a list, tuple, or set of strings,
+    It is impossible to provide a capability flag for one component but
+    not another within a single package.
 
     EXAMPLES
     ========
@@ -1435,6 +1442,8 @@ class ComponentProvides(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
         if len(args) == 2:
+            # update the documentation if we ever support the
+            # pkgname, flags calling convention
             #pkgname = args[0]
             flags = args[1]
         else:
@@ -1543,7 +1552,7 @@ class Provides(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Provides()} class is called to mark files as providing certain
+    The C{r.Provides()} policy marks files as providing certain
     features, or characteristics, or to avoid marking a file as providing
     things, such as for package-private plugin modules installed in system
     library directories.
@@ -1918,16 +1927,18 @@ class Requires(_addInfo):
     DESCRIPTION
     ===========
 
-    The C{r.Requires()} class is called to avoid adding requirements for a
-    file, such as example shell scripts outside of C{%(docdir)s}.
+    The C{r.Requires()} policy adds requirements for a file.
+    You can pass in exceptions that should not have automatic requirement
+    discovering done, such as example shell scripts outside of C{%(docdir)s}.
 
     Note: Components are the only troves which can be required.
 
-    For executables executed only through wrappers that use C{LD_LIBRARY_PATH}
-    to find the libraries instead of embedding an RPATH in the binary, you
-    will need to provide a synthetic RPATH using C{r.Requires(rpath=RPATH)}
-    or C{r.Requires(rpath=(filterExp, RPATH))} calls, which are tested in the
-    order provided.
+    For executables executed only through wrappers that
+    use C{LD_LIBRARY_PATH} to find the libraries instead of
+    embedding an RPATH in the binary, you will need to provide
+    a synthetic RPATH using C{r.Requires(rpath='I{RPATH}')}
+    or C{r.Requires(rpath=('I{filterExp}', 'I{RPATH}'))} calls,
+    which are tested in the order provided.
 
     The RPATH is a standard Unix-style path string containing one or more
     directory names, separated only by colon characters, except for one
@@ -2493,9 +2504,9 @@ class Flavor(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Flavor} class is called to mark a file's Flavor with the flavor
-    mechanism.  To except a file's flavor from being marked, use:
-    C{r.Flavor(exceptions=filterexp)}.
+    The C{r.Flavor} policy marks files with the appropriate Flavor.
+    To except a file's flavor from being marked, use:
+    C{r.Flavor(exceptions='I{filterexp}')}.
 
     EXAMPLES
     ========
@@ -2503,7 +2514,8 @@ class Flavor(policy.Policy):
     C{r.Flavor(exceptions='%(crossprefix)s/lib/gcc-lib/.*')}
 
     Files in the directory C{%(crossprefix)s/lib/gcc-lib} are being excepted
-    from having their Flavor marked.
+    from having their Flavor marked, because they are not flavored for
+    the system on which the trove is being installed.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -2568,7 +2580,7 @@ class Flavor(policy.Policy):
 
 class reportErrors(policy.Policy):
     """
-    This class is used to report together all package errors.
+    This policy is used to report together all package errors.
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
