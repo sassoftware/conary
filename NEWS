@@ -16,6 +16,8 @@ Changes in @NEW@:
       by older servers
     * A bug that caused the mirror client to loop indefinitely when
       doing a --full-trove-sync has been fixed
+    * conary rq --trove-flags will now display redirect info even if you
+      do not specify --troves (bug #877)
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
