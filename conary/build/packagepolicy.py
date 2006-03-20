@@ -154,9 +154,9 @@ class Config(policy.Policy):
     C{/usr/libexec/conary/tags/}) as configuration files.
 
         - To mark files as exceptions, use
-        C{r.Config(exceptions='I{filterexp}')}.
+          C{r.Config(exceptions='I{filterexp}')}.
         - To mark explicit inclusions as configuration files, use:
-        C{r.Config('I{filterexp}')}
+          C{r.Config('I{filterexp}')}
 
     A file marked as a Config file cannot also be marked as a
     Transient file or an InitialContents file.  Conary enforces this
@@ -365,7 +365,8 @@ class PackageSpec(_filterSpec):
 
     The C{r.PackageSpec()} class is called to determine which package, and
     optionally in addition which component, each file is in.
-    (Use C{r.ComponentSpec()} to specify component without specifying package.)
+    (Use C{r.ComponentSpec()} to specify the component without specifying
+    the package.)
 
     EXAMPLES
     ========
@@ -505,14 +506,17 @@ class Transient(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Transient()} class is called to mark files with transient
+    The C{r.Transient()} class is called to mark files as containing transient
     contents. It automatically marks the two most common uses of transient
     contents: python and emacs byte-compiled files
     (C{.pyc}, C{.pyo}, and C{.elc} files).
 
     Files containing transient contents are almost the opposite of
-    configuration files, in that they should be overwritten by a new
-    version without question at update time.
+    configuration files: their contents should be overwritten by
+    the new contents without question at update time, even if the
+    contents in the filesystem have changed.  (Conary raises an
+    error if file contents have changed in the filesystem for normal
+    files.)
 
     A file marked as a Transient file cannot also be marked as an
     InitialContents file or a Config file.  Conary enforces this
@@ -560,7 +564,7 @@ class TagDescription(policy.Policy):
     SYNOPSIS
     ========
 
-    C{r.TagDescription([I{groupname}, I{filterexp}])}
+    C{r.TagDescription([I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -575,7 +579,7 @@ class TagDescription(policy.Policy):
     EXAMPLES
     ========
 
-    This policy class should not require explicit use.
+    This policy class is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -606,15 +610,13 @@ class TagHandler(policy.Policy):
     DESCRIPTION
     ===========
 
-    By default, all  files in C{%(taghandlerdir)s/} are marked as a tag
-    handler files. The policy class C{r.TagHandler()} is typically called from
-    within a Conary recipe to mark tag handler files as such so that conary
-    handles them
-    correctly.
+    All files in C{%(taghandlerdir)s/} are marked as a tag
+    handler files.
 
-    Note: No files outside of the C{%(taghandler)s/} directory will be
-    considered by this policy, and thus it should never be required to invoke
-    this policy explicitly.
+    EXAMPLES
+    ========
+
+    This policy class is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -644,22 +646,23 @@ class TagSpec(_addInfo):
     DESCRIPTION
     ===========
 
-    The C{r.TagSpec()} class is called to apply tags defined by tag
-    descriptions in both the current system and C{%(destdir)s} to all files in
-    C{%(destdir)}.
+    The C{r.TagSpec()} class automatically applies tags defined by tag
+    descriptions in both the current system and C{%(destdir)s} to all
+    files in C{%(destdir)}.
 
-    To apply tags manually, use the syntax:
-    C{r.TagSpec(I{tagname}, I{filterexp})}, or to set an exception to this
-    policy, use:
+    To apply tags manually (removing a dependency on the tag description
+    file existing when the packages is cooked), use the syntax:
+    C{r.TagSpec(I{tagname}, I{filterexp})}.
+    To set an exception to this policy, use:
     C{r.TagSpec(I{tagname}, I{exceptions=filterexp})}.
-
 
     EXAMPLES
     ========
 
     C{r.TagSpec('initscript', '%(initdir)s/')}
 
-    Applies the C{initscript} tag to the directory C{%(initdir)s/}.
+    Applies the C{initscript} tag to all files in the directory
+    C{%(initdir)s/}.
     """
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -854,8 +857,7 @@ class LinkType(policy.Policy):
     EXAMPLES
     ========
 
-    FIXME : is an example needed?  could not find an example in recipes.
-
+    This policy class is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -876,7 +878,7 @@ class LinkCount(policy.Policy):
     NAME
     ====
 
-    B{C{r.LinkCount()}} - Define exceptions to hardlinking rules
+    B{C{r.LinkCount()}} - Limit hardlinks across directories.
 
     SYNOPSIS
     ========
@@ -887,25 +889,24 @@ class LinkCount(policy.Policy):
     ===========
 
     The C{r.LinkCount()} class is called to allow for exceptions to the
-    hardlinks across directories policy.
+    rule preventing hardlinks across directories.
 
     It is generally an error to have hardlinks across directories, except when
     the packager knows that there is no reasonable chance that they will be on
-    separate filesystems
+    separate filesystems.
 
     In cases where the packager is certain hardlinks will not cross
-    filesystems,  a list of regular expressions specifying directory names
-    which are exceptions to the hardlink policy may be passed to
-    C{r.LinkCount}.
-
+    filesystems, a list of regular expressions specifying files
+    which are excepted from this rule may be passed to C{r.LinkCount}.
 
     EXAMPLES
     ========
 
-    C{r.LinkCount(exceptions='/usr/share/zoneinfo/.*')}
+    C{r.LinkCount(exceptions='/usr/share/zoneinfo/')}
 
     Uses C{r.LinkCount} to except zoneinfo files, located in
-    C{/usr/share/zoneinfo/} to the hardlinks policy.
+    C{/usr/share/zoneinfo/}, from the policy against cross-director
+    hardlinks.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -964,11 +965,14 @@ class ExcludeDirectories(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.ExcludeDirectories} class is called to cause directories to be
-    excluded from the package by default. Use
-    C{r.ExcludeDirectories(exceptions=filterexp)} to set exceptions to this
-    policy, and directories matching the regular expression C{filterexp} will
-    be included in the package.
+    The C{r.ExcludeDirectories} policy causes directories to be
+    excluded from the package by default.  Use
+    C{r.ExcludeDirectories(exceptions=I{filterexp})} to set exceptions to this
+    policy, which will cause directories matching the regular expression
+    C{filterexp} to be included in the package.  Remember that Conary
+    packages cannot share files, including directories, so only one
+    package installed on a system at any one time can own the same
+    directory.
 
     There are only two reasons to explicitly package a directory: the
     directory needs permissions other than 0755, or it must exist even
@@ -983,14 +987,14 @@ class ExcludeDirectories(policy.Policy):
     existence of a target to place a file in. Conary will appropriately
     create the directory, and delete it later if the directory becomes empty.
 
-
     EXAMPLES
     ========
 
     C{r.ExcludeDirectories(exceptions='/tftpboot')}
 
-    Sets the file C{/tftboot} as an exception to the C{r.ExcludeDirectories}
-    policy, and ensures C{/tftpboot} will be included in the package.
+    Sets the directory C{/tftboot} as an exception to the
+    C{r.ExcludeDirectories} policy, so that the C{/tftpboot}
+    directory will be included in the package.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -1019,38 +1023,20 @@ class ByDefault(policy.Policy):
     SYNOPSIS
     ========
 
-    C{r.ByDefault([I{exceptions},] [I{use},] [I{inclusions},] [I{subtrees}])}
+    C{r.ByDefault([I{inclusions} || C{exceptions}=I{exceptions}])}
 
     DESCRIPTION
     ===========
 
-    The C{r.ByDefault()} class is called to detrmine which components should
-    be installed by default at the time of package installation. By default,
-    C{:debug}, and C{:test} packages are not
-    installed.
+    The C{r.ByDefault()} class is called to determine which components should
+    be installed by default at the time the package is installed on the
+    system.  The default setting for the C{ByDefault} policy is that the
+    C{:debug}, and C{:test} packages are not installed with the package.
 
-    KEYWORDS
-    ========
-
-    The following keywords are recognized by C{r.ByDefault}:
-
-    B{exceptions} : An optional argument comprised of regular expressions,
-    which specifies files to ignore while enforcing the policy action. The
-    content of C{exceptions} will be interpolated against recipe macros prior
-    to being used.
-
-    B{inclusions} : C{FileFilter} strings, C{FileFilter} tuples, or a
-    non-tuple list of C{FileFilter} strings, or C{FileFilter}s tuples used to
-    limit the policy, or if it already is limited (invariantinclusion) then
-    C{inclusions} provide additional FileFilters to include within the general
-    limitation.
-
-    B{subtrees} : Specifies a subtree to which to limit the policy, or it it
-    already is limited (invariantsubtrees), then C{subtrees} provides
-    additional subtrees to consider.
-
-    B{use} : An optional argument which specifies Use flag(s) instructing
-    whether to perform the action.
+    The inclusions and exceptions do B{not} specify filenames.  They are
+    either C{I{package}:I{component}} or C{:I{component}}.  Inclusions
+    are considered before exceptions, and inclusions and exceptions are
+    considered in the order provided in the recipe, and first match wins.
 
     EXAMPLES
     ========
@@ -1059,6 +1045,15 @@ class ByDefault(policy.Policy):
 
     Uses C{r.ByDefault} to ignore C{:manual} components when enforcing the
     policy.
+
+    C{r.ByDefault(exceptions=[':manual'])}
+    C{r.ByDefault('foo:manual')
+
+    If these lines are in the C{bar} package, and there is both a
+    C{foo:manual} and a C{bar:manual} component, then the C{foo:manual}
+    component will be installed by default when the C{foo} package is
+    installed, but the C{bar:manual} component will not be installed by
+    default when the C{bar} package is installed.
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
