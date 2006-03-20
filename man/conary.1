@@ -621,6 +621,10 @@ specified to install package, query the repository, and abbreviate
 versions when displaying them.
 Can be overridden by the \fB\-\-install-label \fI<label>\fR command-line option.
 .TP
+.B interactive
+If set to True, conary will ask for confirmation before performing actions that modifying system or repository state.
+Can be overridden by the \fB\-\-interactive\fR or \fB\-\-no-interactive\fR command-line option.
+.TP
 .B lookaside
 The transient lookaside cache used only during building, normally
 \fI/var/cache/conary\fR
