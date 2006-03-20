@@ -532,6 +532,10 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
+        @param removalHints: set of (name, version, flavor) tuples which
+        are being removed as part of this operation; troves which are
+        scheduled to be removed won't generate file conflicts with new
+        troves
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -603,15 +607,31 @@ class FilesystemJob:
                     continue
                 elif not self.removes.has_key(headRealPath):
                     inWay = (flags & REPLACEFILES) == 0
-                    for info in self.db.iterFindPathReferences(headPath):
-                        if (flags & REPLACEFILES) or info[0:3] in removalHints:
-                            self.userRemoval(*info)
-                            inWay = False
+                    if removalHints:
+                        # Don't go through the database if we know removalHints
+                        # won't help avoid this conflict. This avoids calling
+                        # iterFindPathReferences() against a network server
+                        # for source control operations
+                        for info in self.db.iterFindPathReferences(headPath):
+                            if (flags & REPLACEFILES) or \
+                                    info[0:3] in removalHints:
+                                self.userRemoval(*info)
+                                inWay = False
 
                     if inWay:
-                        existingFile = files.FileFromFilesystem(headRealPath,
-                                                                pathId)
-                        if not silentlyReplace(headFile, existingFile):
+                        # For system updates, we should look through the
+                        # database for file conflicts and handle those. For
+                        # source updates, we just give up.
+                        if hasattr(self.db, 'iterFindPathReferences'):
+                            existingFile = files.FileFromFilesystem(
+                                headRealPath, pathId)
+                            inWay = not silentlyReplace(headFile, existingFile)
+                            if not inWay:
+                                for info in self.db.iterFindPathReferences(
+                                                                    headPath):
+                                    self.userRemoval(*info)
+
+                        if inWay:
                             self.errors.append("%s is in the way of a newly "
                                "created file in %s=%s[%s]" % (  
                                    util.normpath(headRealPath), 
@@ -620,10 +640,6 @@ class FilesystemJob:
                                    deps.formatFlavor(troveCs.getNewFlavor())))
                             fullyUpdated = False
                             continue
-                        else:
-                            for info in self.db.iterFindPathReferences(
-                                                                    headPath):
-                                self.userRemoval(*info)
 
             except OSError:
                 # the path doesn't exist, carry on with the restore
