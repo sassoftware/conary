@@ -1149,32 +1149,8 @@ order by
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
 
-    def depCheck(self, jobSet, troveSource, findOrdering = False):
-        """
-        Check the database for closure against the operations in
-        the passed changeSet.
-
-        @param jobSet: The jobs which define the dependency check
-        @type jobSet: set
-        @param troveSource: Trove source troves in the job are
-                            available from
-        @type troveSource: AbstractTroveSource:
-        @param findOrdering: If true, a reordering of the job is
-                             returned which preserves dependency
-                             closure at each step.
-        @param findOrdering: boolean
-        @rtype: tuple of dependency failures for new packages and
-                dependency failures caused by removal of existing
-                packages
-        """
-
-        checker = deptable.DependencyChecker(self.db, troveSource)
-        checker.addJobs(jobSet)
-        unsatisfiedList, unresolveableList, changeSetList = \
-                checker.check(findOrdering = findOrdering)
-        checker.done()
-
-        return (unsatisfiedList, unresolveableList, changeSetList)
+    def dependencyChecker(self, troveSource):
+        return deptable.DependencyChecker(self.db, troveSource)
 
     def pathIsOwned(self, path):
 	for instanceId in self.troveFiles.iterPath(path):
