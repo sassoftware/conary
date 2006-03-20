@@ -766,7 +766,7 @@ def main(argv=sys.argv):
         return realMain(ccfg, argv)
     except debuggerException, err:
         raise
-    except (errors.ConaryError, cfg.CfgError), e:
+    except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
         if str(e):
             log.error(str(e))
             sys.exit(1)
