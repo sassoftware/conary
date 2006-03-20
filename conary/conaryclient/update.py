@@ -1687,11 +1687,11 @@ conary erase '%s=%s[%s]'
                 log.warning('keeping %s - required by at least %s' % (job[0], reqInfo[0]))
 
         if depList:
-            raise DepResolutionFailure(depList)
+            raise DepResolutionFailure(depList, self.cfg)
         elif suggMap and not self.cfg.autoResolve:
-            raise NeededTrovesFailure(suggMap)
+            raise NeededTrovesFailure(suggMap, self.cfg)
         elif cannotResolve:
-            raise EraseDepFailure(cannotResolve)
+            raise EraseDepFailure(cannotResolve, self.cfg)
 
         # look for troves which look like they'll conflict (same name/branch
         # and incompatible install paths)
@@ -1993,12 +1993,34 @@ class NoNewTrovesError(UpdateError):
 
 class DependencyFailure(UpdateError):
     """ Base class for dependency failures """
-    pass
+    def formatNVF(self, troveTup, showVersion=True):
+        if not self.cfg:
+            return '%s=%s' % (troveTup[0], troveTup[1].trailingRevision())
+        if self.cfg.fullVersions:
+            version = troveTup[1]
+        elif self.cfg.showLabels:
+            version = '%s/%s' % (troveTup[1].branch().label(), 
+                                 troveTup[1].trailingRevision())
+        elif showVersion:
+            version = troveTup[1].trailingRevision()
+        else:
+            version = ''
+
+        if version:
+            version = '=%s' % version
+
+        if self.cfg.fullFlavors:
+            flavor = '[%s]' % troveTup[2]
+        else:
+            flavor = ''
+
+        return '%s%s%s' % (troveTup[0], version, flavor)
 
 class DepResolutionFailure(DependencyFailure):
     """ Unable to resolve dependencies """
-    def __init__(self, failures):
+    def __init__(self, failures, cfg=None):
         self.failures = failures
+        self.cfg = cfg
 
     def getFailures(self):
         return self.failures
@@ -2007,7 +2029,8 @@ class DepResolutionFailure(DependencyFailure):
         res = ["The following dependencies could not be resolved:"]
         for (troveInfo, depSet) in self.failures:
             res.append("    %s:\n\t%s" %  \
-                       (troveInfo[0], "\n\t".join(str(depSet).split("\n"))))
+                       (self.formatNVF(troveInfo),
+                        "\n\t".join(str(depSet).split("\n"))))
         return '\n'.join(res)
 
 class EraseDepFailure(DepResolutionFailure):
@@ -2020,14 +2043,16 @@ class EraseDepFailure(DepResolutionFailure):
         res.append("Troves being removed create unresolved dependencies:")
         for (reqBy, depSet, providedBy) in self.failures:
             res.append("    %s requires %s:\n\t%s" %
-                       (reqBy[0], ' or '.join(x[0] for x in providedBy),
+                       (self.formatNVF(reqBy),
+                        ' or '.join(self.formatNVF(x) for x in providedBy),
                         "\n\t".join(str(depSet).split("\n"))))
         return '\n'.join(res)
 
 class NeededTrovesFailure(DependencyFailure):
     """ Dependencies needed and resolve wasn't used """
-    def __init__(self, suggMap):
+    def __init__(self, suggMap, cfg=None):
          self.suggMap = suggMap
+         self.cfg = cfg
 
     def getSuggestions(self):
         return self.suggMap
@@ -2035,10 +2060,10 @@ class NeededTrovesFailure(DependencyFailure):
     def __str__(self):
         res = []
         res.append("Additional troves are needed:")
-        for ((reqName, reqVersion, reqFlavor), suggList) in self.suggMap.iteritems():
+        for (reqInfo, suggList) in self.suggMap.iteritems():
             res.append("    %s -> %s" % \
-              (reqName, " ".join(["%s(%s)" % 
-              (x[0], x[1].trailingRevision().asString()) for x in suggList])))
+              (self.formatNVF(reqInfo),
+               " ".join([self.formatNVF(x) for x in suggList])))
         return '\n'.join(res)
 
 class InstallPathConflicts(UpdateError):
