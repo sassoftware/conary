@@ -492,7 +492,7 @@ class ClientUpdate:
         # override implied updates that would downgrade this trove.
         sameBranchLocalUpdates = set()
 
-        for job in localUpdates:
+        for job in sorted(localUpdates):
             if job[1][0] is not None and job[2][0] is not None:
                 if (job[1][0].branch() == job[2][0].branch() and
                       (job[0], job[1][0], job[1][1]) not in avail):
@@ -548,11 +548,11 @@ class ClientUpdate:
                         job in relativeUpdateJobs))
 
         # thew newTroves parameters are described below.
-        newTroves = [ ((x[0], x[2][0], x[2][1]), 
-                        True, {}, False, None, respectBranchAffinity, True,
-                        True, updateOnly) 
-                            for x in itertools.chain(absolutePrimaries, 
-                                                     relativePrimaries) ]
+        newTroves = sorted(((x[0], x[2][0], x[2][1]), 
+                            True, {}, False, None, respectBranchAffinity, True,
+                            True, updateOnly) 
+                                for x in itertools.chain(absolutePrimaries,
+                                                         relativePrimaries))
 
         newJob = set()
 
@@ -966,7 +966,7 @@ conary erase '%s=%s[%s]'
             # we do not install foo:runtime (though if it's installed, it
             # is reasonable to upgrade it).
 
-            for info in trv.iterTroveList(strongRefs=True):
+            for info in sorted(trv.iterTroveList(strongRefs=True)):
 
                 if not isPrimary:
                     if not jobAdded and info not in byDefaultDict:
