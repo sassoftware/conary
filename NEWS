@@ -12,13 +12,15 @@ Changes in @NEW@:
       to find their branch now work correctly when committing.
     * A bug affecting systems with multiple groups referencing the same troves,
       where the groups are out of sync, has been fixed.
-    * the mirror client now correctly handles duplicate items returned in trove lists
-      by older servers
+    * the mirror client now correctly handles duplicate items returned in
+      trove lists by older servers
     * A bug that caused the mirror client to loop indefinitely when
       doing a --full-trove-sync has been fixed
     * conary rq --trove-flags will now display redirect info even if you
       do not specify --troves (bug #877)
     * dep resolution now support --flavors --full-versions output (bug #751)
+    * cvc merge no longer tracebacks if files were added on both upstream
+      and on the shadow
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
