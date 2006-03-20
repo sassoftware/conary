@@ -208,9 +208,11 @@ class DirectedGraph:
         # have the latest possible finish times, and score better in the
         # nodeSelect below.
         if nodeSort:
-            nodeSort = lambda(a,b): -nodeSort(a,b)
+            reversedSort = lambda a,b: -nodeSort(a,b)
+        else:
+            reversedSort = None
 
-        starts, finishes, trees = self.doDFS(nodeSort=nodeSort)
+        starts, finishes, trees = self.doDFS(nodeSort=reversedSort)
 
         def nodeSelect(a, b):
             return cmp(finishes[b[0]], finishes[a[0]])
