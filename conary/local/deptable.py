@@ -622,8 +622,8 @@ class DependencyChecker:
         # help create a repeatable total ordering.
         # We sort them so that info- packages are first, then we sort them
         # alphabetically.
-        jobSets = [ sorted((self.nodes[x][0], x) for x in idxSet)
-                                            for idxSet in compSets ]
+        jobSets = [ sorted((self.nodes[nodeIdx][0], nodeIdx)
+                           for nodeIdx in idxSet) for idxSet in compSets ]
         jobSets.sort(cmp=orderJobSets)
 
         # create index from nodeIdx -> jobSetIdx for creating a SCC graph.
@@ -636,15 +636,15 @@ class DependencyChecker:
         for jobSetIdx, jobSet in enumerate(jobSets):
             sccGraph.addNode(jobSetIdx)
             for job, nodeIdx in jobSet:
-                for childNodeIdx in self.g.getChildren(nodeIdx):
+                for childNodeIdx in self.g.iterChildren(nodeIdx):
                     childJobSetIdx = jobSetsByJob[childNodeIdx]
                     sccGraph.addEdge(jobSetIdx, childJobSetIdx)
 
         # create an ordering based on dependencies, and then, when forced
         # to choose between several choices, use the index order for jobSets
         # - that's the order we created by our sort() above.
-        orderedComponents = sccGraph.getTotalOrdering(nodeSort=lambda a, b: a[1] < b[1])
-
+        orderedComponents = sccGraph.getTotalOrdering(
+                                    nodeSort=lambda a, b: cmp(a[1],  b[1]))
         return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
 
     def _findOrdering(self, result, brokenByErase, satisfied):
