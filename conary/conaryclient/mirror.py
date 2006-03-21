@@ -192,7 +192,6 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
         if test:
             log.debug("not mirroring %d signatures due to test mode", len(sigs))
         else:
-            log.debug("mirroring %d sigs", len(sigs))
             updateCount = targetRepos.setTroveSigs(sigs)
 
     return updateCount
