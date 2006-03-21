@@ -200,6 +200,8 @@ class ClientUpdate:
 	    ERASE = 1
 	    KEEP = 2
 	    UNKNOWN = 3
+            import epdb
+            epdb.st()
 
             jobQueue = util.IterableQueue()
             # The order of this chain matters. It's important that we handle
@@ -364,7 +366,7 @@ class ClientUpdate:
                                     if x[3])
         assert(len(relativePrimaries) + len(absolutePrimaries) +
                len(erasePrimaries) == len(primaryJobList))
-        
+
         log.debug('_mergeGroupChanges(recurse=%s,'
                       ' checkPrimaryPins=%s,'
                       ' installMissingRefs=%s, '
@@ -377,9 +379,15 @@ class ClientUpdate:
 
         troveSource = uJob.getTroveSource()
 
+
         # ineligible needs to be a transitive closure when recurse is set
         if recurse:
             ineligible = _troveTransitiveClosure(self.db, ineligible)
+
+        for job in erasePrimaries:
+            # an erase primary can't be part of an update (but their children
+            # can, so add this after we've recursed)
+            ineligible.add((job[0], job[1][0], job[1][1]))
 
         # Build the trove which contains all of the absolute change sets
         # we may need to install. Build a set of all of the trove names
