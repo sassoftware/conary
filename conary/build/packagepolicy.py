@@ -702,6 +702,7 @@ class ExcludeDirectories(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
@@ -914,7 +915,7 @@ class ComponentRequires(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
-        ('ExcludeDirectories', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
     def __init__(self, *args, **keywords):
@@ -981,6 +982,7 @@ class ComponentProvides(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
     # frozenset to make sure we do not modify class data
