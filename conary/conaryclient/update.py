@@ -200,8 +200,6 @@ class ClientUpdate:
 	    ERASE = 1
 	    KEEP = 2
 	    UNKNOWN = 3
-            import epdb
-            epdb.st()
 
             jobQueue = util.IterableQueue()
             # The order of this chain matters. It's important that we handle
