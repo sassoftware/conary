@@ -271,6 +271,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     groupList = groupTroves(troveList)
     log.debug("building grouped job list")
     bundles = buildJobList(targetRepos, groupList)
+    # make sure the bundles are sorted in ascending order of their mark
+    bundles.sort(lambda a,b: cmp(min(x[0] for x in a), min(x[0] for x in b)))
 
     if len(bundles) > 1:
         # We cut off the last bundle if there is more than one and let the
@@ -284,7 +286,9 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         os.close(outFd)
         log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), bundle))
         jobList = [ x[1] for x in bundle ]
-        newMark = max(x[0] for x in bundle)
+        # advance the mark as little as possible so that we won't
+        # loose troves on resume if this loop is interrupted
+        newMark = min(x[0] for x in bundle)
         cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
         # XXX it's a shame we can't give a hint as to what server to use
         # to avoid having to open the changeset and read in bits of it
@@ -294,8 +298,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
             targetRepos.setMirrorMark(cfg.host, newMark)
-
         os.unlink(tmpName)
         updateCount += len(bundle)
-
+    else: # only when we're all done looping advance mark to the new max
+        targetRepos.setMirrorMark(cfg.host, crtMaxMark)
     return updateCount
