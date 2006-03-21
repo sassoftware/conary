@@ -584,6 +584,7 @@ class setModes(policy.Policy):
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
+        ('ExcludeDirectories', policy.CONDITIONAL_SUBSEQUENT),
     )
     def __init__(self, *args, **keywords):
 	self.fixmodes = {}
