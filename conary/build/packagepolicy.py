@@ -1048,7 +1048,7 @@ class ByDefault(policy.Policy):
     policy.
 
     C{r.ByDefault(exceptions=[':manual'])}
-    C{r.ByDefault('foo:manual')
+    C{r.ByDefault('foo:manual')}
 
     If these lines are in the C{bar} package, and there is both a
     C{foo:manual} and a C{bar:manual} component, then the C{foo:manual}
