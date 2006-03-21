@@ -1111,10 +1111,11 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         results = groupAsSource.findTroves(None, removeSpecs, allowMissing=True)
 
         troveTups = chain(*results.itervalues())
-        for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache):
+        for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache,
+                                                  childGroups):
             group.delTrove(*troveTup)
 
-def findAllWeakTrovesToRemove(group, primaryErases, cache):
+def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
     # we only remove weak troves if either a) they are primary 
     # removes or b) they are referenced only by troves being removed
     primaryErases = list(primaryErases)
@@ -1128,11 +1129,14 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache):
     # create temporary parents info for all troves.  Unfortunately
     # we don't have this anywhere helpful like we do in the erase
     # on the system in conaryclient.update
-    for troveTup in chain(group.iterTroveList(strongRefs=True), troveQueue):
-        for childTup in cache.iterTroveList(troveTup, strongRefs=True):
-            parents.setdefault(childTup, []).append(troveTup)
-            if trove.troveIsCollection(childTup[0]):
-                troveQueue.add(childTup)
+    groups = [group] + [ x[0] for x in childGroups ] 
+    for thisGroup in groups:
+        for troveTup in chain(thisGroup.iterTroveList(strongRefs=True), 
+                              troveQueue):
+            for childTup in cache.iterTroveList(troveTup, strongRefs=True):
+                parents.setdefault(childTup, []).append(troveTup)
+                if trove.troveIsCollection(childTup[0]):
+                    troveQueue.add(childTup)
 
     for troveTup in chain(primaryErases, troveQueue):
         # BFS through erase troves.  If any of the parents is not
