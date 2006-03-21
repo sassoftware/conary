@@ -57,29 +57,18 @@ def filterSigsWithoutTroves(repos, currentMark, sigList):
     # keep troves whose mark are older than currentMark and troves which
     # are present on the target
     sigList = [ x for x in sigList if present.get(x[1], True) ]
-
     return sigList
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
     # flavor; it's assumed that adjacent troves with the same version/flavor
     # must be in a single commit
-    grouping = []
-    currentGroup = []
+    grouping = {}
     for info in troveList:
-        troveInfo = info[1]
-        if not currentGroup:
-            currentGroup.append(info)
-        elif troveInfo[1:] == currentGroup[0][1][1:]:
-            currentGroup.append(info)
-        else:
-            grouping.append(currentGroup)
-            currentGroup = [ info ]
-
-    if currentGroup:
-        grouping.append(currentGroup)
-
-    return grouping
+        (n, v, f) = info[1]
+        crtGrp = grouping.setdefault((v,f), [])
+        crtGrp.append(info)
+    return grouping.values()
 
 def buildJobList(repos, groupList):
     # Match each trove with something we already have; this is to mirror
@@ -158,7 +147,8 @@ def buildJobList(repos, groupList):
 
     return jobList
 
-def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg, syncSigs):
+def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
+                     test = False, syncSigs = False):
     log.debug("looking for new pgp keys")
     keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
     if test:
@@ -196,11 +186,16 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg, syncSigs):
     updateCount = 0
     if sigList:
         sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
-        updateCount = targetRepos.setTroveSigs(
-            [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
+        if test:
+            log.debug("not mirroring %d signatures due to test mode", len(sigs))
+        else:
+            log.debug("mirroring %d sigs", len(sigs))
+            updateCount = targetRepos.setTroveSigs(
+                [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
     return updateCount
 
-def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
+def mirrorRepository(sourceRepos, targetRepos, cfg,
+                     test = False, sync = False, syncSigs = False):
     # find the latest timestamp stored on the target mirror
     if sync:
         currentMark = -1
@@ -211,7 +206,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
 
     # first, mirror signatures for troves already mirrored
     updateCount = mirrorSignatures(sourceRepos, targetRepos, currentMark,
-                                   cfg, syncSigs)
+                                   cfg = cfg, test = test, syncSigs = syncSigs)
 
     # now find all of the troves we need from from the mirror source
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
