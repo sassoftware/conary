@@ -161,9 +161,10 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
         log.debug("getting full trove list for signature sync")
         troveDict = sourceRepos.getTroveVersionList(cfg.host, { None : None })
         sigList = []
-        for name, versionD in troveDict.iterkeys():
-            for version, flavorList in versionD.iterkeys():
-                sigList += [ (name, version, x) for x in flavorList ]
+        for name, versionD in troveDict.iteritems():
+            for version, flavorList in versionD.iteritems():
+                for flavor in flavorList:
+                    sigList.append((currentMark, (name, version, flavor)))
     else:
         log.debug("looking for new trove signatures")
         sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
@@ -186,12 +187,14 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
     updateCount = 0
     if sigList:
         sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
+        # build the ((n,v,f), signature) list only for the troves that have signatures
+        sigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
         if test:
             log.debug("not mirroring %d signatures due to test mode", len(sigs))
         else:
             log.debug("mirroring %d sigs", len(sigs))
-            updateCount = targetRepos.setTroveSigs(
-                [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
+            updateCount = targetRepos.setTroveSigs(sigs)
+
     return updateCount
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
