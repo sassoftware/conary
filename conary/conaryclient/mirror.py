@@ -298,5 +298,6 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         os.unlink(tmpName)
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
+        log.debug("setting the mirror mark to %d", crtMaxMark)
         targetRepos.setMirrorMark(cfg.host, crtMaxMark)
     return updateCount
