@@ -1794,24 +1794,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.check(authToken, write = False, trove = name,
                        label = self.toVersion(version).branch().label()):
                 raise errors.InsufficientPermission
+
+            # When a mirror client is doing a full sig sync it is
+            # likely they'll ask for signatures of troves that are not
+            # signed. We return "" in that case.
             cu.execute("""
-                    SELECT data FROM Items
-                        JOIN Instances USING (itemId)
-                        JOIN Versions USING (versionId)
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN TroveInfo ON
-                            Instances.instanceId = TroveInfo.instanceId
-                        WHERE
-                            TroveInfo.infoType = ? AND
-                            item = ? AND
-                            version = ? AND
-                            flavor = ?
-                    """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
+            SELECT TroveInfo.data
+              FROM Items
+              JOIN Instances USING (itemId)
+              JOIN Versions USING (versionId)
+              JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+              LEFT OUTER JOIN TroveInfo ON
+                   Instances.instanceId = TroveInfo.instanceId
+                   AND TroveInfo.infoType = ?
+             WHERE item = ? AND version = ? AND flavor = ?
+               """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
             try:
-                result.append(cu.next()[0])
+                data = cu.fetchall()[0][0]
+                if data is None:
+                    data = ""
+                result.append(data)
             except:
-                raise errors.TroveMissing(name, version = version)
+                raise errors.TroveMissing(name, version = self.toVersion(version))
 
         return [ base64.encodestring(x) for x in result ]
 
