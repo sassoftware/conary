@@ -913,6 +913,7 @@ class ComponentRequires(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.REQUIRED_PRIOR),
     )
 
     def __init__(self, *args, **keywords):
