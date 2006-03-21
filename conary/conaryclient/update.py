@@ -1745,7 +1745,7 @@ conary erase '%s=%s[%s]'
                     if name.startswith('info-'):
                         assert(isInfo is True or isInfo is None)
                         isInfo = True
-                        if not isInfo:
+                        if not infoName:
                             infoName = name.split(':')[0]
                     else:
                         assert(isInfo is False or isInfo is None)
