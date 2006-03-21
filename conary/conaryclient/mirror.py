@@ -20,6 +20,7 @@ import os
 
 from conary import conarycfg
 from conary.lib import cfg, util, log
+from conary.repository import errors
 
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
@@ -70,7 +71,7 @@ def groupTroves(troveList):
         crtGrp.append(info)
     grouping = grouping.values()
     # make sure the groups are sorted in ascending order of their mark
-    grouping.sort(lambda a,b: cmp(max(x[0] for x in a), max(x[0] for x in b)))
+    grouping.sort(lambda a,b: cmp(a[0][0], b[0][0]))
     return grouping
 
 def buildJobList(repos, groupList):
@@ -265,7 +266,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if len(troveList) == 0 and crtTroveLen:
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
-        log.debug("advancing newMark to %s" % crtMaxMark)
+        log.debug("advancing newMark to %d" % int(crtMaxMark))
         targetRepos.setMirrorMark(cfg.host, crtMaxMark)
         # try again
         return -1
@@ -285,8 +286,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     for i, bundle in enumerate(bundles):
         (outFd, tmpName) = util.mkstemp()
         os.close(outFd)
-        log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), bundle))
         jobList = [ x[1] for x in bundle ]
+        log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), jobList))
         cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
         # XXX it's a shame we can't give a hint as to what server to use
         # to avoid having to open the changeset and read in bits of it
@@ -294,10 +295,20 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("(skipping commit due to test mode)")
         else:
             log.debug("committing")
-            targetRepos.commitChangeSetFile(tmpName, mirror = True)
+            try:
+                targetRepos.commitChangeSetFile(tmpName, mirror = True)
+            except errors.InternalServerError:
+                log.debug("relative changeset could not be committed")
+                jobList = [(x[0], (None, None), x[2], x[3]) for x in jobList]
+                log.debug("getting absolute changeset %s", jobList)
+                # try again as an absolute changeset
+                cs = sourceRepos.createChangeSetFile(jobList, tmpName,
+                                                     recurse = False)
+                log.debug("committing absolute changeset")
+                targetRepos.commitChangeSetFile(tmpName, mirror = True)
         os.unlink(tmpName)
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
-        log.debug("setting the mirror mark to %d", crtMaxMark)
+        log.debug("setting the mirror mark to %d", int(crtMaxMark))
         targetRepos.setMirrorMark(cfg.host, crtMaxMark)
     return updateCount
