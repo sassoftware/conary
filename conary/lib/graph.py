@@ -258,3 +258,15 @@ class DirectedGraph:
                         sccGraph.addEdge(compSet, setsByNode[childNode])
         return sccGraph
 
+    def flatten(self):
+        start, finished, trees = self.doDFS()
+        for node in self.edges.keys():
+            seen = set()
+            children = self.edges.get(node, set()).copy()
+            while children:
+                child = children.pop()
+                if child in seen:
+                    continue
+                children.update(self.edges.get(child, []))
+                self.edges[node].update(self.edges.get(child, []))
+                seen.add(child)

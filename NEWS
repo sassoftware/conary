@@ -21,6 +21,8 @@ Changes in @NEW@:
     * dep resolution now support --flavors --full-versions output (bug #751)
     * cvc merge no longer tracebacks if files were added on both upstream
       and on the shadow
+    * admin web access for the server doesn't require write permission for
+      operations which also require admin access (bug #833)
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
