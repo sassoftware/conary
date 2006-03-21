@@ -1,1 +1,3 @@
 buildRequired False
+shortdoc Build test suites
+longDoc Conary supports the installation of build-time test suites in a manner that allows them to be run later, using the installed package.  However, testsuites often require the compilation of extra files and extra post processing.  Use this flag to turn off building testsuites.

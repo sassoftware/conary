@@ -1,0 +1,2 @@
+shortDoc Use the Perl-compatible regex libary
+longDoc The perl-compatible regular expression library can be used by several programs to increase the power and uniformity of available regular expressions.  It adds a dependency and should generally be disabled for embedded builds.

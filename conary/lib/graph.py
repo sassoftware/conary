@@ -203,7 +203,16 @@ class DirectedGraph:
         return starts, finishes, trees
 
     def getTotalOrdering(self, nodeSort=None):
-        starts, finishes, trees = self.doDFS(nodeSort=nodeSort)
+        # to sort correctly, we need the nodes the user wants first to 
+        # be picked _last_ by the selection algorithm.  That way they'll
+        # have the latest possible finish times, and score better in the
+        # nodeSelect below.
+        if nodeSort:
+            reversedSort = lambda a,b: -nodeSort(a,b)
+        else:
+            reversedSort = None
+
+        starts, finishes, trees = self.doDFS(nodeSort=reversedSort)
 
         def nodeSelect(a, b):
             return cmp(finishes[b[0]], finishes[a[0]])
