@@ -359,11 +359,11 @@ class HttpHandler(WebHandler):
                                        selCategory, source, "C")
         self._redirect("metadata?troveName=%s" % troveName)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     def userlist(self, auth):
         return self._write("user_admin", netAuth = self.repServer.auth)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(userGroupName = "")
     def addPermForm(self, auth, userGroupName):
         groups = (x[1] for x in self.repServer.auth.iterGroups())
@@ -374,7 +374,7 @@ class HttpHandler(WebHandler):
             label=None, groups=groups, labels=labels, troves=troves,
             writeperm=None, capped=None, admin=None)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "")
     @intFields(writeperm = None, capped = None, admin = None)
     def editPermForm(self, auth, group, label, trove, writeperm, capped, admin):
@@ -386,7 +386,7 @@ class HttpHandler(WebHandler):
             trove=trove, groups=groups, labels=labels, troves=troves,
             writeperm=writeperm, capped=capped, admin=admin)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
                writeperm = "off", capped = "off", admin = "off")
     def addPerm(self, auth, group, label, trove,
@@ -404,7 +404,7 @@ class HttpHandler(WebHandler):
         return self._write("notice", message = "Permission successfully added.",
             link = "User Administration", url = "userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
                oldlabel = "", oldtrove = "",
                writeperm = "off", capped = "off", admin = "off")
@@ -424,12 +424,12 @@ class HttpHandler(WebHandler):
         return self._write("notice", message = "Permission successfully modified.",
             link = "User Administration", url = "userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     def addGroupForm(self, auth):
         users = dict(self.repServer.auth.iterUsers())
         return self._write("add_group", modify = False, userGroupName = None, userGroupId = None, users = users, members = [])
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(userGroupName = None)
     def manageGroupForm(self, auth, userGroupName):
         users = dict(self.repServer.auth.iterUsers())
@@ -438,7 +438,7 @@ class HttpHandler(WebHandler):
 
         return self._write("add_group", userGroupName = userGroupName, userGroupId = groupId, users = users, members = members, modify = True)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(userGroupName = None)
     @intFields(userGroupId = None)
     @listFields(int, initialUserIds = [])
@@ -454,7 +454,7 @@ class HttpHandler(WebHandler):
         members = list(self.repServer.auth.iterGroupMembers(userGroupId))
         return self._write("add_group", userGroupName = userGroupName, userGroupId = userGroupId, users = users, members = members, modify = True)
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(userGroupName = None)
     @listFields(int, initialUserIds = [])
     def addGroup(self, auth, userGroupName, initialUserIds):
@@ -464,13 +464,13 @@ class HttpHandler(WebHandler):
 
         self._redirect("userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @intFields(userGroupId = None)
     def deleteGroup(self, auth, userGroupId):
         self.repServer.auth.deleteGroupById(userGroupId)
         self._redirect("userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(groupId = None, labelId = "", itemId = "")
     def deletePerm(self, auth, groupId, labelId, itemId):
         # labelId and itemId are optional parameters so we can't
@@ -483,11 +483,11 @@ class HttpHandler(WebHandler):
         self.repServer.auth.deleteAcl(groupId, labelId, itemId)
         self._redirect("userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     def addUserForm(self, auth):
         return self._write("add_user")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(user = None, password = None)
     @boolFields(write = False, admin = False)
     def addUser(self, auth, user, password, write, admin):
@@ -496,7 +496,7 @@ class HttpHandler(WebHandler):
 
         self._redirect("userlist")
 
-    @checkAuth(write = True, admin = True)
+    @checkAuth(admin = True)
     @strFields(username = None)
     def deleteUser(self, auth, username):
         self.repServer.auth.deleteUserByName(username)
