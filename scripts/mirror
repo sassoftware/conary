@@ -91,5 +91,4 @@ count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
                                 syncSigs = options.syncSigs)
 while not options.test and count:
     count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                    test = options.test, sync = False,
-                                    syncSigs = options.syncSigs)
+                                    test = options.test)
