@@ -158,29 +158,7 @@ def buildJobList(repos, groupList):
 
     return jobList
 
-def mirrorSignatures(sourceRepos, targetRepos, sigList):
-    sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
-    updateCount = targetRepos.setTroveSigs(
-                [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
-
-    return updateCount
-
-def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
-    # find the latest timestamp stored on the target mirror
-    if sync:
-        currentMark = -1
-        targetRepos.setMirrorMark(cfg.host, currentMark)
-    else:
-        currentMark = targetRepos.getMirrorMark(cfg.host)
-    log.debug("currently up to date through %d", int(currentMark))
-
-    # now find all of the troves we need from from the mirror source
-    troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
-    # we need to protect ourselves from duplicate items in the troveList
-    troveList = list(set(troveList))
-    troveList.sort(lambda a,b: cmp(a[0], b[0]))
-    log.debug("%d new troves are available", len(troveList))
-
+def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg, syncSigs):
     log.debug("looking for new pgp keys")
     keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
     if test:
@@ -188,32 +166,6 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     else:
         log.debug("adding %d keys to target", len(keyList))
         targetRepos.addPGPKeyList(cfg.host, keyList)
-
-    # FIXME: getNewTroveList should accept and only return troves on
-    # the labels we're interested in
-    if cfg.labels and len(troveList):
-        # XXX: temporary fix: we're trying to "weed out" troves that don't
-        # belong on the configured labels. If we're left with no troves after
-        # filtering, we need to force the target mark to the max of the current
-        # set in order to be able to move on - otherwise the next call to
-        # getNewTroveList will return the same data set
-        crtMaxMark = max(x[0] for x in troveList)
-        crtTroveLen = len(troveList)
-        if currentMark > 0 and crtMaxMark == currentMark:
-            # if we're hung on the current max then we need to
-            # forcibly advance the mark in case we're stuck
-            crtMaxMark += 1 # only used if we filter out all troves below
-        labelDict = set(cfg.labels)
-        troveList = [ x for x in troveList if
-                            x[1][1].branch().label() in cfg.labels ]
-        log.debug("after label filtering %d troves are needed", len(troveList))
-        if len(troveList) == 0 and crtTroveLen:
-            # we had troves and now we don't
-            log.debug("getNewTroveList did not return any troves for our label %s" % cfg.labels)
-            log.debug("setting newMark to %s" % crtMaxMark)
-            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
-            # try again
-            return -1
 
     if syncSigs:
         log.debug("getting full trove list for signature sync")
@@ -241,18 +193,67 @@ def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
     sigList = filterSigsWithoutTroves(targetRepos, currentMark, sigList)
     log.debug("%d signatures need to be mirrored", len(sigList))
 
-    log.debug("filtering troves already present on the mirror")
+    updateCount = 0
+    if sigList:
+        sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
+        updateCount = targetRepos.setTroveSigs(
+            [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) ])
+    return updateCount
 
-    troveList = filterAlreadyPresent(targetRepos, troveList)
+def mirrorRepository(sourceRepos, targetRepos, cfg, test, sync, syncSigs):
+    # find the latest timestamp stored on the target mirror
+    if sync:
+        currentMark = -1
+        targetRepos.setMirrorMark(cfg.host, currentMark)
+    else:
+        currentMark = targetRepos.getMirrorMark(cfg.host)
+    log.debug("currently up to date through %d", int(currentMark))
+
+    # first, mirror signatures for troves already mirrored
+    updateCount = mirrorSignatures(sourceRepos, targetRepos, currentMark,
+                                   cfg, syncSigs)
+
+    # now find all of the troves we need from from the mirror source
+    troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
+    # we need to protect ourselves from duplicate items in the troveList
+    troveList = list(set(troveList))
+    troveList.sort(lambda a,b: cmp(a[0], b[0]))
+    log.debug("%d new troves are available", len(troveList))
+
+    # FIXME: getNewTroveList should accept and only return troves on
+    # the labels we're interested in
+    if cfg.labels and len(troveList):
+        # XXX: temporary fix: we're trying to "weed out" troves that don't
+        # belong on the configured labels. If we're left with no troves after
+        # filtering, we need to force the target mark to the max of the current
+        # set in order to be able to move on - otherwise the next call to
+        # getNewTroveList will return the same data set
+        crtMaxMark = max(x[0] for x in troveList)
+        crtTroveLen = len(troveList)
+        if currentMark > 0 and crtMaxMark == currentMark:
+            # if we're hung on the current max then we need to
+            # forcibly advance the mark in case we're stuck
+            crtMaxMark += 1 # only used if we filter out all troves below
+        troveList = [ x for x in troveList if
+                            x[1][1].branch().label() in cfg.labels ]
+        log.debug("after label filtering %d troves are needed", len(troveList))
+        # now filter the ones already existing
+        troveList = filterAlreadyPresent(targetRepos, troveList)
+        log.debug("after filtering already present %d troves are needed", len(troveList))
+        # if we were returned troves, but we filtered them all out,
+        # advance the mark and signal "try again"
+        if len(troveList) == 0 and crtTroveLen:
+            # we had troves and now we don't
+            log.debug("no troves found for our label %s" % cfg.labels)
+            log.debug("advancing newMark to %s" % crtMaxMark)
+            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+            # try again
+            return -1
+
     log.debug("grouping %d troves based on version and flavor", len(troveList))
     groupList = groupTroves(troveList)
     log.debug("building grouped job list")
     bundles = buildJobList(targetRepos, groupList)
-
-    if sigList:
-        updateCount = mirrorSignatures(sourceRepos, targetRepos, sigList)
-    else:
-        updateCount = 0
 
     if len(bundles) > 1:
         # We cut off the last bundle if there is more than one and let the
