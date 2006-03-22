@@ -1264,6 +1264,30 @@ def flavorDifferences(flavors, strict=True):
     return diffs
 
 
+def compatibleFlavors(flavor1, flavor2):
+    """
+        Return True if flavor1 does not have any flavor that switches
+        polarity from ~foo to ~!foo, or foo to !foo, and flavor1 
+        does not have any architectures not in flavor2 and vice versa.
+    """
+    for depClass in flavor1.members.values():
+        otherDepClass = flavor2.members.get(depClass.tag, None)
+        if otherDepClass is None:
+            continue
+
+        for name, dep in depClass.members.iteritems():
+            otherDep = otherDepClass.members.get(name, None)
+            if otherDep is None:
+                if depClass.justOne:
+                    continue
+                return False
+            for flag, sense in dep.flags.iteritems():
+                otherSense = otherDep.flags.get(flag, None)
+                if otherSense is None:
+                    continue
+                if toStrongMap[sense] != toStrongMap[otherSense]:
+                    return False
+    return True
 
 dependencyCache = util.ObjectCache()
 
