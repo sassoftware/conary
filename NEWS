@@ -23,6 +23,8 @@ Changes in @NEW@:
       and on the shadow
     * admin web access for the server doesn't require write permission for
       operations which also require admin access (bug #833)
+    * the repository server now handles database deadlocks when committing
+       changesets
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
