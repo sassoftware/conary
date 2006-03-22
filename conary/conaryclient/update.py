@@ -839,6 +839,7 @@ followLocalChanges: %s
                                 # child troves for updates either.
                                 log.debug('SKIP: not installing branch switch')
                                 recurseThis = False 
+                                alreadyInstalled.add(replacedInfo)
                                 break
 
                 # below are checks to see if a fresh install should completed.
