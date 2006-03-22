@@ -33,7 +33,8 @@ Changes in @NEW@:
       components has been fixed.
     * Updates will now happen in a more consistent order based on an
       alphabetic sort.
-
+    * the repository server now handles database deadlocks when committing
+       changesets
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
