@@ -1,5 +1,6 @@
 * Updates involving changeset files are now split into multiple jobs
   properly, allowing changeset files which create users to work proprely
+* Rollbacks now display progress information which matches normal updates
 
 Changes in @NEW@:
   o Client Changes:
