@@ -508,10 +508,11 @@ class Make(BuildCommand):
     The C{r.Make()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
-    B{forceFlags} : ( FIXME ) If set, unconditionally override the Makefile
-    definitions of *FLAGS (that is, CFLAGS, CXXFLAGS, LDFLAGS)
+    B{forceFlags} : If set, unconditionally override the Makefile
+    definitions of *FLAGS (that is, CFLAGS, CXXFLAGS, LDFLAGS) by
+    passing them on the command line as well as in the environment.
 
-    B{makeName} - (None) The name of the make command; normally C{make} but
+    B{makeName} : (C{make}) The name of the make command; normally C{make} but
     occasionally 'qmake' or something else.
 
     B{preMake} : (None) String to be inserted before the C{make} command.
@@ -521,7 +522,8 @@ class Make(BuildCommand):
     B{skipMissingSubDir} : (False) Raises an error if subDir does not exist.
     If True, skip the action if subDir does not exist.
 
-    B{subDir} : (None) The directory to enter before running C{make}
+    B{subDir} : (The build directory) The directory to enter before running
+    C{make}
 
     EXAMPLES
     ========
@@ -597,7 +599,7 @@ class MakeParallelSubdir(Make):
     NAME
     ====
 
-    B{C{r.MakeParallelSubdir()}} - Runs make parallelmflags applied only to
+    B{C{r.MakeParallelSubdir()}} - Runs make wht parallelmflags applied only to
     sub-make processes
 
     SYNOPSIS
@@ -612,9 +614,10 @@ class MakeParallelSubdir(Make):
     to execute the C{make} utility with system defaults for parallelmflags
     only applied to sub-make processes.
 
-    EXAMPLES
-    ========
-    FIX ME : Need usage example
+    C{r.MakeParallelSubdir()} is used exactly like C{r.Make}, but
+    is used in cases where the top-level makefile does not work
+    correctly with parallel make but the lower-level makefiles
+    do work correctly with parallel make.
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -652,9 +655,9 @@ class MakeInstall(Make):
     The C{r.MakeInstall()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{rootVar} : (DESTDIR) The install root
+    B{rootVar} : (C{DESTDIR}) The install root
 
-    B{installtarget} : (install) The install target to C{make}
+    B{installtarget} : (C{install}) The install target to C{make}
 
     EXAMPLES
     ========
@@ -713,8 +716,8 @@ class MakePathsInstall(Make):
     ========
     C{r.MakePathsInstall('mandir=%(destdir)s/%(mandir)s/man1')}
 
-    Calls C{r.MakePathsinstall()} and specifies the C{mandir} argument
-    C{%(destdir)s/%(mandir)s/man1} to C{make}.
+    Calls C{r.MakePathsinstall()} and additionally sets the C{mandir}
+    make variable to C{%(destdir)s/%(mandir)s/man1}.
     """
     template = (
 	'cd %%(actionDir)s; '
@@ -766,7 +769,7 @@ class CompilePython(BuildCommand):
     C{r.CompilePython('%(varmmdir)s')}
 
     The above example demonstrates calling C{r.CompilePython()} and specifying
-    the absolute path defined by C{%(varmmdirs)s}.
+    the absolute path defined by C{%(varmmdir)s}.
     """
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
@@ -820,14 +823,15 @@ class PythonSetup(BuildCommand):
     The C{r.PythonSetup()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{action} : (install) The main argument to pass to C{setup.py}
+    B{action} : (C{install}) The main argument to pass to C{setup.py}
 
-    B{bootstrap} : (False) HELP
+    B{bootstrap} : (False) Avoids reporting errors that are unavoidable
+    when building bootstrap packages.
 
-    B{dir}: (%(builddir)s) Directory in which to find the setup.py file,
+    B{dir}: (C{%(builddir)s}) Directory in which to find the setup.py file,
     defaults to the build directory.
 
-    B{rootDir} (%(destdir)s) The directory to pass to setup.py via the
+    B{rootDir} (C{%(destdir)s}) The directory to pass to setup.py via the
     C{--root} option
 
     EXAMPLES
@@ -912,7 +916,9 @@ class Ldconfig(BuildCommand):
     This is not a replacement for marking a file as a shared library.
     C{ldconfig} still needs to be run after libraries are installed.
     Note that C{ldconfig} will automatically be run for all system libraries
-    as defined by the C{SharedLibrary} policy.
+    as defined by the C{SharedLibrary} policy, so C{r.Ldconfig} needs
+    to be called only for libraries that are not marked as shared
+    libraries by the C{SharedLibrary} policy.
 
     EXAMPLES
     ========
@@ -1044,7 +1050,7 @@ class Desktopfile(BuildCommand, _FileAction):
 
     B{category} : (None) A category name for the desktop file
 
-    B{vendor} : (net) A vendor name for the desktop file.
+    B{vendor} : (C{net}) A vendor name for the desktop file.
 
     EXAMPLES
     ========
@@ -1153,15 +1159,6 @@ class SetModes(_FileAction):
     Additionally, C{r.SetModes()} can be used to change arbitrary
     file modes in the destination directory, or build directory. Relative
     paths are relative to the build directory.
-
-    KEYWORDS
-    ========
-
-    The C{r.SetModes()} class accepts the following keywords, with default
-    values shown in parentheses when applicable:
-
-    B{use} : Optional arguments of Use flag(s) telling whether to actually
-    perform the action.
 
     EXAMPLES
     ========
@@ -1273,14 +1270,6 @@ class Install(_PutFiles):
     to mode 0755.  If that rule doesn't suffice, use C{mode=0}I{octalmode}
     to set the mode explicitly.
 
-    KEYWORDS
-    ========
-
-    The C{r.Install()} class accepts the following keywords:
-
-    B{use} : Optional argument of Use flag(s) telling whether to actually
-    perform the action.
-
     EXAMPLES
     ========
 
@@ -1320,14 +1309,6 @@ class Copy(_PutFiles):
     of the file created in the destination directory.  The mode of C{srcfile}
     is used for C{destfile} unless you set C{mode=0}I{octalmode}.
 
-    KEYWORDS
-    ========
-
-    The C{r.Copy()} class accepts the following keywords:
-
-    B{use} : Optional argument specifying Use flag(s) for telling whether to
-    actually perform the action.
-
     EXAMPLES
     ========
 
@@ -1362,15 +1343,6 @@ class Move(_PutFiles):
     if necessary, and use the basename of C{srcname} for the name of
     the file created in the destination directory.  The mode is preserved,
     unless you explicitly set the new mode with C{mode=0}I{octalmode}.
-
-    KEYWORDS
-    ========
-
-    The C{r.Move()} class accepts the following keywords, with default values
-    shown in parentheses when applicable:
-
-    B{use} : Optional arguments of Use flag(s) telling whether to actually
-    perform the action.
 
     EXAMPLES
     ========
@@ -1590,16 +1562,6 @@ class Remove(BuildAction):
 
     The C{r.Remove()} class is called from within a Conary recipe to remove
     one, or more files
-
-
-    KEYWORDS
-    ========
-
-    The C{r.Remove()} class accepts the following keywords, with default
-    values shown in parentheses when applicable:
-
-    B{use} Optional argument; Use flag(s) telling whether to actually perform
-    the action
 
     EXAMPLES
     ========
@@ -1835,9 +1797,6 @@ class Doc(_FileAction):
     B{subdir} : Specify a subdirectory to create before placing documentation
     files into it.
 
-    B{use} : Optional argument of Use flag(s) telling whether to actually
-    perform the action.
-
     EXAMPLES
     ========
 
@@ -1971,9 +1930,6 @@ class MakeDirs(_FileAction):
 
     The C{r.MakeDirs()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
-
-    B{use} : Optional argument of Use flag(s) telling whether to actually
-    perform the action.
 
     B{component} : Set to component name if package is responsible for the
     directory.
@@ -2399,7 +2355,8 @@ class XInetdService(_FileAction):
     The C{r.XInetdService()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
-    None
+    FIXME: these follow the same named elements in xinetd.conf files
+    generally, but need to be explicitly documented here.
 
     EXAMPLES
     ========
