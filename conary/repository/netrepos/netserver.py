@@ -1272,16 +1272,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
-        items = {}
+        items = []
         for troveCs in cs.iterNewTroveList():
             name = troveCs.getName()
             version = troveCs.getNewVersion()
-            items[(name, version)] = True
+            flavor = troveCs.getNewFlavor()
             if not self.auth.check(authToken, write = True, mirror = mirror,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
-        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
+            items.append((name, version, flavor))
+        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,),
+                 [(x[0], x[1].asString()) for x in items])
 	self.repos.commitChangeSet(cs, self.name, mirror = mirror)
 	if not self.commitAction:
 	    return True
