@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.9:
   o Client Changes:
     * A new dependency resolution method has been added which can be turned
       on by setting resolveLevel to 2 in your conarycfg:  If updating trove 'a'
