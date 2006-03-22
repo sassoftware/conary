@@ -244,6 +244,9 @@ class DependencyChecker:
         if job[2][0] is not None:
             self.newInfoToNodeId[(job[0], job[2][0], job[2][1])] = nodeId
 
+        if job[1][0] is not None:
+            self.oldInfoToNodeId[(job[0], job[1][0], job[1][1])] = nodeId
+
         return nodeId
 
     def _buildEdges(self, oldOldEdges, newNewEdges):
@@ -269,15 +272,24 @@ class DependencyChecker:
         nodes.next()
 
         for i, (job, _, _) in enumerate(nodes):
-            if job[2][0] is None: continue
             if not trove.troveIsCollection(job[0]): continue
-            trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                            withFiles = False)
 
-            for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
-                targetTrove = self.newInfoToNodeId.get(info, -1)
-                if targetTrove >= 0:
-                    edges.add((i + 1, targetTrove, None))
+            if job[1][0]:
+                trv = self.troveSource.db.getTrove(job[0], job[1][0], job[1][1],
+                                                   withFiles = False)
+                for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                    targetTrove = self.oldInfoToNodeId.get(info, -1)
+                    if targetTrove >= 0:
+                        edges.add((i + 1, targetTrove, None))
+
+            if job[2][0]:
+                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                                withFiles = False)
+
+                for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                    targetTrove = self.newInfoToNodeId.get(info, -1)
+                    if targetTrove >= 0:
+                        edges.add((i + 1, targetTrove, None))
 
         return edges
 
@@ -596,20 +608,26 @@ class DependencyChecker:
     def _stronglyConnect(self):
         def orderJobSets(jobSetA, jobSetB):
             AHasInfo = 0
+            AIsPackage = 0
             BHasInfo = 0
+            BIsPackage = 0
             for comp, idx in jobSetA:
                 if comp[0].startswith('info-'):
                     AHasInfo = 1
-                    break
+                if ':' not in comp[0]:
+                    AIsPackage = 1
             for comp, idx in jobSetB:
                 if comp[0].startswith('info-'):
                     BHasInfo = 1
                     break
+                if ':' not in comp[0]:
+                    BIsPackage = 1
 
             # if A has info- components and B doesn't, we want A
             # to be first.  Otherwise, sort by the components in the jobSets
             # (which should already be internally sorted)
-            return cmp((-AHasInfo, jobSetA), (-BHasInfo, jobSetB))
+            return cmp((-AHasInfo, -AIsPackage, jobSetA),
+                       (-BHasInfo, -BIsPackage, jobSetB))
 
         # get sets of strongly connected components - each component has
         # a cycle where something at the beginning requires something at the
@@ -819,6 +837,7 @@ class DependencyChecker:
         # present, and -1 * 0 == 0
         self.nodes = [ None ]
         self.newInfoToNodeId = {}
+        self.oldInfoToNodeId = {}
         self.depList = [ None ]
         self.jobSet = set()
         self.db = db
