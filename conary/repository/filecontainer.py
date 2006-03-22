@@ -161,7 +161,15 @@ class FileContainer:
                      lambda size, newTag: 
                         sizeCallback(dumpString, name, newTag, size))
             next = self.getNextFile()
-	
+
+    def reset(self):
+        """
+        Reset the current position in the filecontainer to the beginning."
+        """
+        assert(not self.mutable)
+        self.file.seek(self.contentsStart, SEEK_SET)
+        self.next = self.contentsStart
+
     def __del__(self):
 	if self.file:
 	    self.close()

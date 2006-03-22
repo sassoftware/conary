@@ -1068,6 +1068,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             assert(not otherCs.lastCsf)
 
             self.configCache.update(otherCs.configCache)
+            self.fileContainers += otherCs.fileContainers
 
             try:
                 for entry in otherCs.fileQueue:
@@ -1104,20 +1105,39 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                     self.configCache[pathId] = (contType, contents, compressed)
                 else:
                     configs[pathId] = (contType, contents, compressed)
-                    
+
             wrapper = DictAsCsf(otherCs.fileContents)
             wrapper.addConfigs(configs)
+            self.csfWrappers.append(wrapper)
             entry = wrapper.getNextFile()
             if entry:
                 util.tupleListBsearchInsert(self.fileQueue,
                                             entry + (wrapper,), 
                                             self.fileQueueCmp)
 
+    def reset(self):
+        for csf in self.fileContainers:
+            csf.reset()
+            # skip the CONARYCHANGESET
+            (name, tagInfo, control) = csf.getNextFile()
+            assert(name == "CONARYCHANGESET")
+
+        for csf in self.csfWrappers:
+            csf.reset()
+
+        self.fileQueue = []
+        for csf in itertools.chain(self.fileContainers, self.csfWrappers):
+            entry = csf.getNextFile()
+            if entry:
+                util.tupleListBsearchInsert(self.fileQueue, entry + (csf,),
+                                            self.fileQueueCmp)
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
 	self.configCache = {}
         self.filesRead = False
+        self.csfWrappers = []
+        self.fileContainers = []
 
         self.lastCsf = None
         self.fileQueue = []
@@ -1148,6 +1168,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
 	self.absolute = True
 	empty = True
+        self.fileContainers = [ csf ]
 
 	for trvCs in self.newTroves.itervalues():
 	    if not trvCs.isAbsolute():
@@ -1262,11 +1283,11 @@ def CreateFromFilesystem(troveList):
 class DictAsCsf:
 
     def getNextFile(self):
-        if not self.items:
+        if self.next >= len(self.items):
             return None
 
-        (name, contType, contObj) = self.items[0]
-        del self.items[0]
+        (name, contType, contObj) = self.items[self.next]
+        self.next += 1
 
         # XXX there must be a better way, but I can't think of it
         f = contObj.get()
@@ -1288,6 +1309,9 @@ class DictAsCsf:
         l.sort()
         self.items = l + self.items
 
+    def reset(self):
+        self.next = 0
+
     def __init__(self, contents):
         # convert the dict (which is a changeSet.fileContents object) to
         # a (name, contTag, contObj) list, where contTag is the same kind
@@ -1295,3 +1319,4 @@ class DictAsCsf:
         self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1]) for x in 
                             contents.iteritems() ]
         self.items.sort()
+        self.next = 0
