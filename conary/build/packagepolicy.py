@@ -364,10 +364,9 @@ class PackageSpec(_filterSpec):
     DESCRIPTION
     ===========
 
-    The C{r.PackageSpec()} policy is called to determine which package, and
-    optionally in addition which component, each file is in.
-    (Use C{r.ComponentSpec()} to specify the component without specifying
-    the package.)
+    The C{r.PackageSpec()} policy determines which package and optionally
+    which component each file is in. (Use C{r.ComponentSpec()} to specify
+    the component without specifying the package.)
 
     EXAMPLES
     ========
@@ -446,7 +445,7 @@ class InitialContents(policy.Policy):
     ===========
 
     By default, C{r.InitialContents()} does not apply to any files.
-    Call it to specify all files that Conary needs to mark as
+    It is used to specify all files that Conary needs to mark as
     providing only initial contents.  When Conary installs or
     updates one of these files, it will never replace existing
     contents; it uses the provided contents only if the file does
@@ -507,7 +506,7 @@ class Transient(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Transient()} policy is called to mark files as containing transient
+    The C{r.Transient()} policy marks files as containing transient
     contents. It automatically marks the two most common uses of transient
     contents: python and emacs byte-compiled files
     (C{.pyc}, C{.pyo}, and C{.elc} files).
@@ -570,7 +569,7 @@ class TagDescription(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.TagDescription} cless is called to mark tag description files as
+    The C{r.TagDescription} class marks tag description files as
     such so that conary handles them correctly. Every file in
     C{%(tagdescriptiondir)s/} is marked as a tag description file by default.
 
@@ -752,7 +751,7 @@ class MakeDevices(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.MakeDevices()} policy is called to create device nodes.  Conary's
+    The C{r.MakeDevices()} policy creates device nodes.  Conary's
     policy of non-root builds requires that these nodes exist only in the
     package, and not in the filesystem, as only root may actually create
     device nodes.
@@ -763,7 +762,7 @@ class MakeDevices(policy.Policy):
 
     C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666})}
 
-    Ceates the device node C{/dev/tty}, as type 'c' (character, as opposed to
+    Creates the device node C{/dev/tty}, as type 'c' (character, as opposed to
     type 'b', or block) with a major number of '5', minor number of '0',
     owner, and group are both the root user, and permissions are 0666.
     """
@@ -842,7 +841,7 @@ class LinkType(policy.Policy):
     NAME
     ====
 
-    B{C{r.LinkType()}} - Ensures only regular, non-configuration files have hardlinks
+    B{C{r.LinkType()}} - Ensures only regular, non-configuration files are hardlinked
 
     SYNOPSIS
     ========
@@ -852,8 +851,8 @@ class LinkType(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.LinkType()} policy ensures that only regular,
-    non-configuration files are hardlinked.
+    The C{r.LinkType()} policy ensures that only regular, non-configuration
+    files are hardlinked.
 
 
     EXAMPLES
@@ -880,7 +879,7 @@ class LinkCount(policy.Policy):
     NAME
     ====
 
-    B{C{r.LinkCount()}} - Limit hardlinks across directories.
+    B{C{r.LinkCount()}} - Restricts hardlinks across directories.
 
     SYNOPSIS
     ========
@@ -890,8 +889,7 @@ class LinkCount(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.LinkCount()} policy is called to allow for exceptions to the
-    rule preventing hardlinks across directories.
+    The C{r.LinkCount()} policy restricts hardlinks across directories.
 
     It is generally an error to have hardlinks across directories, except when
     the packager knows that there is no reasonable chance that they will be on
@@ -907,7 +905,7 @@ class LinkCount(policy.Policy):
     C{r.LinkCount(exceptions='/usr/share/zoneinfo/')}
 
     Uses C{r.LinkCount} to except zoneinfo files, located in
-    C{/usr/share/zoneinfo/}, from the policy against cross-director
+    C{/usr/share/zoneinfo/}, from the policy against cross-directory
     hardlinks.
     """
     bucket = policy.PACKAGE_CREATION
@@ -1118,8 +1116,8 @@ class Ownership(_UserGroup):
     DESCRIPTION
     ===========
 
-    The C{r.Ownership()} policy is called to set user and group
-    ownership of files when the default of C{root:root} is not appropriate.
+    The C{r.Ownership()} policy sets user and group ownership of files when
+    the default of C{root:root} is not appropriate.
 
     List the ownerships in order, most specific first, ending with least
     specific. The filespecs will be matched in the order that you provide them.
@@ -1238,8 +1236,8 @@ class UtilizeUser(_Utilize):
     DESCRIPTION
     ===========
 
-    The C{r.UtilizeUser} policy is called to mark files as requiring
-    a user definition to exist even though the file is not owned by that user.
+    The C{r.UtilizeUser} policy marks files as requiring a user definition
+    to exist even though the file is not owned by that user.
 
     This is particularly useful for daemons that are setuid root
     ant change their user id to a user id with no filesystem permissions
@@ -1274,9 +1272,8 @@ class UtilizeGroup(_Utilize):
     DESCRIPTION
     ===========
 
-    The C{r.UtilizeGroup} policy is called to mark files as requiring
-    a group definition to exist even though the file is not owned by that
-    group.
+    The C{r.UtilizeGroup} policy marks files as requiringa group definition
+    to exist even though the file is not owned by that group.
 
     This is particularly useful for daemons that are setuid root
     ant change their user id to a group id with no filesystem permissions
@@ -1559,7 +1556,7 @@ class Provides(policy.Policy):
     The C{r.Provides()} policy marks files as providing certain features,
     or characteristics, and can be called to explicitly provide things
     that cannot be automatically discovered, or to override automatic
-    discover and prefent marking a file as providing things, such as
+    discovery and prevent marking a file as providing things, such as
     for package-private plugin modules installed in system library
     directories.
 
