@@ -1,8 +1,10 @@
 Changes in @NEW@:
   o Client Changes
-    * Given a system based on where you only installed !smp kernels, conary
-      would eventually start installing smp kernels on your system.  Conary 
-      now respects flavor affinity in this case.
+    * Given a system based on rpath linux where you only installed !smp 
+      kernels, conary would eventually start installing smp kernels on your 
+      system, due to the way the update algorithm would determine whether you 
+      should install a newly available trove.  Conary now respects flavor 
+      affinity in this case and does not install the smp kernel.
 
 Changes in 1.0.9:
   o Client Changes:
