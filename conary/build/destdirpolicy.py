@@ -378,30 +378,24 @@ class FixDirModes(policy.Policy):
 
     B{C{r.FixDirModes}} - Modifies directory permissions
 
-    SYNOPSIS
-    ========
-
-    C{r.FixDirModes([filterexp])}
-
     DESCRIPTION
     ===========
 
-    The C{r.FixDirModes()} class is called from within a Conary recipe to
-    modify directory permissions which would otherwise prevent Conary from
-    packaging C{%(destdir)s} as a non-root user.
+    The C{r.FixDirModes()} class modifies directory permissions whicho
+    would otherwise prevent Conary from packaging C{%(destdir)s} as a
+    non-root user.
 
     Any directories that do not have user read/write/execute must be
-    fixed up now so that we can traverse the tree in following policy,
+    fixed up first so that Conary can traverse the tree in following policy,
     packaging, and removing the tree after building.
-
-    This policy must be run first so that other policies can be
-    counted on to search the full directory tree.
 
     EXAMPLES
     ========
 
     This class is B{not} invoked from recipes directly.
     """
+    # This policy must be run first so that other policies can be
+    # counted on to search the full directory tree.
     bucket = policy.DESTDIR_PREPARATION
     requires = (
         ('setModes', policy.REQUIRED_SUBSEQUENT),
