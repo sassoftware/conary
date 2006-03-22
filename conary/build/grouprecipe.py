@@ -111,7 +111,7 @@ class GroupRecipe(_BaseGroupRecipe):
     consist of troves with related functionality however, and may contain a
     collection of any arbitrary troves.
 
-    Most C{r.GRoupRecipe} user commands accept a B{groupName}
+    Most C{r.GroupRecipe} user commands accept a B{groupName}
     parameter.  This parameter  specifies the group a particular command
     applies to.  For example, C{r.add('foo', groupName='group-bar')}
     attempts to add the trove I{foo} to the group I{group-bar}.
@@ -584,8 +584,8 @@ class GroupRecipe(_BaseGroupRecipe):
         ===========
 
         The C{r.setDefaultGroup} command specifies the current group which all
-        commands will apply to if no B{groupName} is specified as a parameter to a
-        given command.
+        commands will apply to if no B{groupName} is specified as a parameter
+        to a given command.
 
         PARAMETERS
         ==========
@@ -667,8 +667,8 @@ class GroupRecipe(_BaseGroupRecipe):
         DESCRIPTION
         ===========
 
-        The C{r.replace} command replaces all troves with a particular name with a
-        new version of the trove.
+        The C{r.replace} command replaces all troves with a particular name 
+        with a new version of the trove.
 
         Note: By default, C{r.replace()} affects B{all} groups.  This behavior
         is different from other group commands.
