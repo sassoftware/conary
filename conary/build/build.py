@@ -137,13 +137,6 @@ class Run(BuildCommand):
     The C{r.Run()} class is called from within a Conary recipe to run a shell
     command with simple macro substitution.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Run()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
-
     KEYWORDS
     ========
 
@@ -509,13 +502,6 @@ class Make(BuildCommand):
     your recipe.  You can use C{r.MakeParallelSubdir()} if the top-level
     C{make} is unable to handle parallelization but all subdirectories are.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Make()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
-
     KEYWORDS
     ========
 
@@ -659,13 +645,6 @@ class MakeInstall(Make):
 
     If your package does not have C{DESTDIR} or an analog, use
     C{r.MakePathsInstall()} instead, or as a last option, C{r.Make()}.
-
-    PARAMETERS
-    ==========
-
-    The C{r.MakeInstall()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
 
     KEYWORDS
     ========
@@ -935,13 +914,6 @@ class Ldconfig(BuildCommand):
     Note that C{ldconfig} will automatically be run for all system libraries
     as defined by the C{SharedLibrary} policy.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Ldconfig()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
-
     EXAMPLES
     ========
 
@@ -1129,13 +1101,6 @@ class Environment(BuildAction):
     The C{r.Environment()} class is called from within a Conary recipe to set
     an environment variable after all macros have been set.
 
-
-    PARAMETERS
-    ==========
-
-    The C{r.Environment()} class accepts the following parameters:
-
-    B{macros} : Macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1442,13 +1407,6 @@ class Symlink(_FileAction):
     The destination path is determined to be a directory if it already
     exists or if the path ends with a slash (C{/}) character.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Symlink()} class accepts the following parameters:
-
-    B{macros} : Macro set to be used for expansion
-
     KEYWORDS
     ========
 
@@ -1575,13 +1533,6 @@ class Link(_FileAction):
     always be chosen in preference to them.  You should not use hard links
     unless the situation deems using them B{absolutely} necessary.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Link()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
-
     EXAMPLES
     ========
 
@@ -1640,13 +1591,6 @@ class Remove(BuildAction):
     The C{r.Remove()} class is called from within a Conary recipe to remove
     one, or more files
 
-
-    PARAMETERS
-    ==========
-
-    The C{r.Remove()} class accepts the following parameters:
-
-    B{macros} : macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1718,13 +1662,6 @@ class Replace(BuildAction):
     Remember that python will interpret C{\1}-C{\7} as octal characters.
     You must either escape the backslash: C{\\1} or make the string raw by
     prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
-
-    PARAMETERS
-    ==========
-
-    The C{r.Replace()} class accepts the following parameters:
-
-    B{macros} : macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -1890,13 +1827,6 @@ class Doc(_FileAction):
     The C{subdir=path} keyword argument creates a subdirectory under
     C{%(thisdocdir)s} to put the files in.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Doc()} class accepts the following parameters:
-
-    B{macros} : Macro set to be used for expansion
-
     KEYWORDS
     ========
 
@@ -1967,13 +1897,6 @@ class Create(_FileAction):
     C{cat > foo <<EOF ... EOF}. If B{contents} is not empty, then a newline
     will be implicitly appended unless B{contents} already ends in a newline.
 
-    PARAMETERS
-    ==========
-
-    The C{r.Create()} class accepts the following parameters:
-
-    B{macros} macro set to be used for expansion
-
     KEYWORDS
     ========
 
@@ -2043,13 +1966,6 @@ class MakeDirs(_FileAction):
     The C{r.MakeDirs()} class is called from within a Conary recipe to create
     directories.
 
-    PARAMETERS
-    ==========
-
-    The C{r.MakeDirs()} class accepts the following parameters:
-
-    B{macros} : macros which will be expanded through dictionary substitution
-
     KEYWORDS
     ========
 
@@ -2116,13 +2032,6 @@ class TestSuite(_FileAction):
     If the command is a make command, the arguments
     C{-o Makefile -o config.status} are added to help ensure that
     C{automake} does not try to regenerate the Makefile at test time.
-
-    PARAMETERS
-    ==========
-
-    The C{r.TestSuite()} class accepts the following parameters:
-
-    B{macros} : Macro set to be used for expansion
 
     KEYWORDS
     ========
@@ -2484,13 +2393,6 @@ class XInetdService(_FileAction):
     characters in either, and do not wrap the description; it will be
     nicely wrapped for you according to chkconfig's rules.
 
-    PARAMETERS
-    ==========
-
-    The C{r.XInetdService()} class accepts the following parameters:
-
-    B{macros} : Macro set to be used for expansion
-
     KEYWORDS
     ========
 
@@ -2668,13 +2570,6 @@ class XMLCatalogEntry(BuildCommand):
     C{r.XMLCatalogEntry} will create it. If the catalog itself is noexistant,
     it will be created as well.
 
-    PARAMETERS
-    ==========
-
-    The C{r.XMLCatalogEntry()} class accepts the following parameters:
-
-    B{macros} : Macros which will be expanded through dictionary substitution
-
     KEYWORDS
     ========
 
@@ -2760,13 +2655,6 @@ class SGMLCatalogEntry(BuildCommand):
 
     If the catalog directory (by default, C{/etc/sgml}) is nonexistant, it is
     created.  If the catalog file does not exist,it is created.
-
-    PARAMETERS
-    ==========
-
-    The C{r.SGMLCatalogEntry()} class accepts the following parameters:
-
-    B{macros} : Macros which will be expanded through dictionary substitution
 
     KEYWORDS
     ========
