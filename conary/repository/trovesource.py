@@ -514,6 +514,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         self.csList.append(cs)
 
+    def reset(self):
+        for cs in self.csList:
+            cs.reset()
+
     def trovesByName(self, name):
         l = []
         for info in self.troveCsMap:
@@ -570,7 +574,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         raise KeyError
 
     def getTroves(self, troveList, withFiles = True):
-        assert(not self.invalidated)
         retList = []
 
         for info in troveList:
@@ -616,7 +619,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         return self.getTroveChangeSets([job], withFiles)[0]
 
     def hasTroves(self, troveList):
-        assert(not self.invalidated)
         return [ x in self.troveCsMap for x in troveList ]
 
     def getChangeSet(self, job):
@@ -638,7 +640,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             suggMap[depSet] = newSolListList
         return suggMap
-            
+
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, useDatabase = True):
         # Returns the changeset plus a remainder list of the bits it
@@ -677,19 +679,21 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             inDatabase = self.db.hasTroves(troves)
         else:
             inDatabase = [ False ] * len(troves)
-            
+
         asChangeset = [ info in self.troveCsMap for info in troves ]
         trovesAvailable = dict((x[0], (x[1], x[2])) for x in 
                             itertools.izip(troves, inDatabase, asChangeset))
 
-        cs = changeset.ReadOnlyChangeSet()
         remainder = []
 
         # Track jobs we need to go get directly from change sets later, and
         # jobs which need to be rooted relative to a change set.
         changeSetJobs = set()
         needsRooting = []
-        
+
+        newCs = changeset.ChangeSet()
+        mergedCs = changeset.ReadOnlyChangeSet()
+
         jobFromCs = set()
 
         for job in jobList:
@@ -697,7 +701,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             newInfo = (job[0], job[2][0], job[2][1])
 
             if newInfo[1] is None:
-                cs.oldTrove(*oldInfo)
+                newCs.oldTrove(*oldInfo)
                 continue
 
             # if this job is available from a changeset already, just deliver
@@ -747,23 +751,25 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             changeSetJobs.add(relJob)
 
         if rootMap:
-            # we can't root changesets multiple times
+            # we can't root troves changesets multiple times
             for info in rootMap:
                 assert(info not in self.rooted)
 
             for subCs in self.csList:
-                if subCs.isAbsolute():
-                    subCs.rootChangeSet(self.db, rootMap)
+                subCs.rootChangeSet(self.db, rootMap)
 
             self.rooted.update(rootMap)
 
         # assemble jobs directly from changesets and update those changesets
         # to not have jobs we don't need
         if changeSetJobs:
-            # this trick only works once
-            self.invalidated = True
+            # Build up a changeset that contains exactly the trvCs objects
+            # we need. The file contents come from the changesets included
+            # in this trove (we don't reset() the underlying changesets
+            # because this isn't a good place to coordinate that reset when
+            # multiple threads are in use)
             for subCs in self.csList:
-                toDel = []
+                keep = False
                 for trvCs in subCs.iterNewTroveList():
                     if trvCs.getOldVersion() is None:
                         job = (trvCs.getName(), 
@@ -776,20 +782,25 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
 
-                    if job not in changeSetJobs:
-                        toDel.append((job[0], job[2][0], job[2][1]))
-
-                for info in toDel:
-                    subCs.delNewTrove(*info)
+                    if job in changeSetJobs:
+                        newCs.newTrove(trvCs)
+                        keep = True
 
                 # we generate our own deletions. we don't need to get them
-                # from here
+                # from the original changeset
                 for info in subCs.getOldTroveList():
-                    subCs.delOldTrove(*info)
+                    newCs.delOldTrove(*info)
 
-                cs.merge(subCs)
+                if keep:
+                    mergedCs.merge(subCs)
 
-        return (cs, remainder)
+        # Remove all of the new and old job information from the merged
+        # changeset and replace it with the job information we assembled
+        # in newCs
+        mergedCs.clearTroves()
+        mergedCs.merge(newCs)
+
+        return (mergedCs, remainder)
 
     def merge(self, source):
         assert(not self.storeDeps and not source.storeDeps)

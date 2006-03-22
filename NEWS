@@ -1,3 +1,6 @@
+* Updates involving changeset files are now split into multiple jobs
+  properly, allowing changeset files which create users to work proprely
+
 Changes in @NEW@:
   o Client Changes:
     * A new dependency resolution method has been added which can be turned

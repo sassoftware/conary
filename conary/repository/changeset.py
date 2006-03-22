@@ -73,6 +73,9 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 	return "".join(l)
 
     def thaw(self, data):
+        while self:
+            self.clear()
+
 	i = 0
 	while i < len(data):
 	    size = struct.unpack("!I", data[i : i + 4])[0]
@@ -679,7 +682,16 @@ class ChangeSet(streams.StreamSet):
                                 (None, None), False))
 
         return jobSet
-            
+
+    def clearTroves(self):
+        """
+        Reset the newTroves and oldTroves list for this changeset. File
+        information is preserved.
+        """
+        self.primaryTroveList.thaw("")
+        self.newTroves.thaw("")
+        self.oldTroves.thaw("")
+
     def __init__(self, data = None):
 	streams.StreamSet.__init__(self, data)
 	self.configCache = {}
@@ -924,9 +936,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 	if a new install is desired (the trove is switched from absolute
         to relative to nothing in this case). If an entry is missing for
         a trove, that trove is left absolute.
-	"""
-	assert(self.absolute)
 
+        Rooting can happen multiple times (only once per trove though). To
+        allow this, the absolute file streams remain available from this
+        changeset for all time; rooting does not remove them.
+	"""
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
 	
@@ -944,6 +958,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
             if key not in troveMap:
                 continue
+
+            assert(troveCs.isAbsolute())
 
             (oldVersion, oldFlavor) = troveMap[key]
 
@@ -989,7 +1005,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                         self.configCache[pathId] = (contType,
                                                     cont.get().read(), False)
 
-	self.files = {}
+        # leave the old files in place; we my need those diffs for a
+        # trvCs which hasn't been rooted yet
 	for tup in newFiles:
 	    self.addFile(*tup)
 
