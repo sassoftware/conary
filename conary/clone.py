@@ -13,6 +13,7 @@
 #
 import itertools
 
+from conary import errors
 from conary import versions
 from conary.conaryclient import ConaryClient, cmdline
 from conary.build.cook import signAbsoluteChangeset
@@ -37,6 +38,13 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     targetBranch = versions.VersionFromString(targetBranch)
 
     troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecList]
+
+    componentSpecs = [ x[0] for x in troveSpecs 
+                       if ':' in x[0] and x[0].split(':')[1] != 'source']
+    if componentSpecs:
+        raise errors.ParseError('Cannot clone components: %s' % ', '.join(componentSpecs))
+
+
     cloneSources = repos.findTroves(cfg.installLabelPath, 
                                     troveSpecs, cfg.flavor)
     cloneSources = list(itertools.chain(*cloneSources.itervalues()))

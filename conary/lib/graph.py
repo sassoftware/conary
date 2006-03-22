@@ -65,13 +65,13 @@ class NodeDataByHash(NodeData):
         self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), sortAlg)
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
+                      sortAlg)
 
     def copy(self):
         new = self.__class__()
         new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
-        new.index = self.index
         return new
 
     def getIndex(self, item):
@@ -120,6 +120,9 @@ class DirectedGraph:
 
     def deleteEdges(self, item):
         self.edges[self.data.getIndex(item)] = set()
+
+    def getChildren(self, item):
+        return self.data.getItemsByIndex(self.edges[self.data.getIndex(item)])
 
     def getReversedEdges(self):
         newEdges = {}
@@ -200,7 +203,16 @@ class DirectedGraph:
         return starts, finishes, trees
 
     def getTotalOrdering(self, nodeSort=None):
-        starts, finishes, trees = self.doDFS(nodeSort=nodeSort)
+        # to sort correctly, we need the nodes the user wants first to 
+        # be picked _last_ by the selection algorithm.  That way they'll
+        # have the latest possible finish times, and score better in the
+        # nodeSelect below.
+        if nodeSort:
+            reversedSort = lambda a,b: -nodeSort(a,b)
+        else:
+            reversedSort = None
+
+        starts, finishes, trees = self.doDFS(nodeSort=reversedSort)
 
         def nodeSelect(a, b):
             return cmp(finishes[b[0]], finishes[a[0]])
@@ -246,3 +258,15 @@ class DirectedGraph:
                         sccGraph.addEdge(compSet, setsByNode[childNode])
         return sccGraph
 
+    def flatten(self):
+        start, finished, trees = self.doDFS()
+        for node in self.edges.keys():
+            seen = set()
+            children = self.edges.get(node, set()).copy()
+            while children:
+                child = children.pop()
+                if child in seen:
+                    continue
+                children.update(self.edges.get(child, []))
+                self.edges[node].update(self.edges.get(child, []))
+                seen.add(child)

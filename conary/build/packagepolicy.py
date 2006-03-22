@@ -275,14 +275,14 @@ class ComponentSpec(_filterSpec):
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp).  This line needs to
         # come first because "lib" in these paths should not mean :lib
-	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
+	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info|ri)/')),
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
         # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
         # perl is potentially architecture-specific because of %(lib)
-	('perl',      ('/usr/(%(lib)s|lib)/perl.*/vendor_perl/')),
+	('perl',      ('/usr/(%(lib)s|lib)/perl.*/(vendor|site)_perl/')),
         # devellib is architecture-specific
         ('devellib',  (r'\.so',), stat.S_IFLNK),
 	('devellib',  (r'\.a',
@@ -812,6 +812,7 @@ class setModes(policy.Policy):
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
+        ('ExcludeDirectories', policy.CONDITIONAL_SUBSEQUENT),
     )
     def __init__(self, *args, **keywords):
 	self.fixmodes = {}
@@ -1000,6 +1001,7 @@ class ExcludeDirectories(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
@@ -1352,6 +1354,7 @@ class ComponentRequires(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
     def __init__(self, *args, **keywords):
@@ -1435,6 +1438,7 @@ class ComponentProvides(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
     # frozenset to make sure we do not modify class data

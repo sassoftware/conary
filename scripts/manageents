@@ -56,6 +56,9 @@ except versions.ParseError, e:
 client = conaryclient.ConaryClient(cfg)
 repos = client.getRepos()
 
+if len(otherArgs) < 2:
+    usage()
+
 if otherArgs[1] == 'add-entitlement':
     if len(otherArgs) != 5: usage()
     repos.addEntitlement(otherArgs[2], otherArgs[3], otherArgs[4])

@@ -15,6 +15,7 @@ from conary.errors import ConaryError, InternalConaryError
 from conary.errors import RepositoryError, TroveNotFound
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.trove import TroveError
+from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
 from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
@@ -158,19 +159,20 @@ class GetFileContentsError(RepositoryError):
     def __init__(self, (fileId, fileVer)):
         self.fileId = fileId
         self.fileVer = fileVer
-        RepositoryError.__init__(self, self.error % (fileId, fileVer))
+        RepositoryError.__init__(self, self.error % 
+                (sha1helper.sha1ToString(fileId), fileVer))
 
 class FileContentsNotFound(GetFileContentsError):
     error = '''File Contents Not Found
 The contents of the following file was not found on the server:
-fileId: %r
+fileId: %s
 fileVersion: %s
 '''
 
 class FileStreamNotFound(GetFileContentsError):
     error = '''File Stream Not Found
 The following file stream was not found on the server:
-fileId: %r
+fileId: %s
 fileVersion: %s
 '''
 

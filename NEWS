@@ -1,14 +1,120 @@
 Changes in @NEW@:
- o Bugfixes:
+  o Client Changes:
+    * A new dependency resolution method has been added which can be turned
+      on by setting resolveLevel to 2 in your conarycfg:  If updating trove 'a'
+      removes a dependency needed by trove 'b', attempt to update 'b' to
+      solve the dependency issue.  This will allow 'conary update conary'
+      to work as expected when you have conary-build installed, for example.
+    * Switched to using more of optparse's capabilities, including --help
+      messages.
+    * One short option has been added, -m for message.
+  o Bug Fixes:
+    * Recipes that use loadRecipe('foo') and rely on conary to look upstream
+      to find their branch now work correctly when committing.
+    * A bug affecting systems with multiple groups referencing the same troves,
+      where the groups are out of sync, has been fixed.
+    * the mirror client now correctly handles duplicate items returned in
+      trove lists by older servers
+    * A bug that caused the mirror client to loop indefinitely when
+      doing a --full-trove-sync has been fixed
+    * conary rq --trove-flags will now display redirect info even if you
+      do not specify --troves (bug #877)
+    * dep resolution now support --flavors --full-versions output (bug #751)
+    * cvc merge no longer tracebacks if files were added on both upstream
+      and on the shadow
+    * admin web access for the server doesn't require write permission for
+      operations which also require admin access (bug #833)
+    * A bug that caused r.remove() in a group to fail if the trove being
+      removed was recursively included from another group has been fixed.
+    * Conary update tmpwatch -tmpwatch:debuginfo will now erase 
+      tmpwatch:debuginfo.
+    * An ordering bug that caused info packages to not be updated with their
+      components has been fixed.
+    * Updates will now happen in a more consistent order based on an
+      alphabetic sort.
+  o Server Changes:
+    * getNewSigList and getNewTroveList could return troveLists with
+      duplicate entries
+
+Changes in 1.0.8
+  o Client changes:
+    * Conary will now replace symlinks and regular files as long as their
+      contents agree (bug #626)
+
+  o Bug Fixes:
+    * An error in the method of determining what local changes have been 
+      made has been fixed.
+
+Changes in 1.0.7:
+  o Client changes:
+    * A better method of determining what local changes have been made to a
+      local system has been implemented, improving conary's behavior when
+      updating.
+
+  o Bugfixes:
+    * A bug that caused the user to be prompted for their OpenPGP
+      passphrase when building on a target label that does not match
+      any signatureKeyMap entry has been fixed.  Previously, if you
+      had a signatureKeyMap entry for conary.example.com, and your
+      buildLabel was set to conary.example.com@rpl:devel, you would be
+      prompted to enter a passphrase even when cooking locally to the
+      local@local:COOK label.
+    * Dependency resolution will no longer cause a trove to switch
+      branches.
+    * If a component is kept when performing dependency resolution
+      because it is still needed, it's package will be kept as well if
+      possible.
+    * "conary q --path" now expands symlinks found in the path to the
+      file in question. (bug #855)
+    * Committing a changeset that provided duplicate file streams for
+      streams the server previously referenced from other servers no
+      longer causes a traceback.
+    * Conary's patch implementation how handles patches which are
+      already applied. (bug #640)
+    * A server error triggered when using long flavor strings in
+      server queries has been fixed.
+
+  o Build fixes:
+    * Group cooking now produces output to make it easier to tell what
+      is happening.  The --debug flag can be used to get a more
+      detailed log of what troves are being included.
+
+  o Server changes:
+    * The server traceLog now logs more information about the
+      repository calls
+
+
+Changes in 1.0.6:
+  o Repository changes:
+    * The commitaction script now accepts the standard conary arguments
+      --config and --config-file.
+
+  o Bugfixes:
     * cvc merge on a non-shadow no longer returns a traceback (bz# 792),
       and cvc context foo does not return a traceback when context foo does
       not exist (bz #757)  Fixed by David Coulthart.
+    * A bug that caused new OpenPGP keys to be skipped when troves
+      were filtered out during mirroring has been fixed.
     * opening invalid changesets now gives a good error message instead of
       a traceback
     * removed obsolete changemail script
+    * Exceptions which display fileId's display them as hex sha1s now
+      instead of as python strings
+    * A bug where including a redirect in a group that has autoResolve 
+      caused conary to traceback has been fixed.
+    * A bug that kept conary from prompting for your password when committing
+      has been fixed.
+    * A bug that randomized the order of the labels in the  installLabelPath 
+      in some error messages has been fixed.
+
+  o Build fixes:
+    * The default ComponentSpec for :perl components now include files
+      in site_perl as well as in vendor_perl.
+    * Ruby uses /usr/share/ri for its documentation system, so all files
+      in %(datadir)s/ri are now included in the default :doc ComponentSpec.
 
 Changes in 1.0.5:
- o Performance improvements:
+  o Performance improvements:
     * The use of copy.deepcopy() has been eliminated from the
       dependency code.  The new routines are up to 80% faster for
       operations like DependencySet.copy().
@@ -21,7 +127,7 @@ Changes in 1.0.5:
     * Cache troves on the update/erase path to avoid duplicate fetchs from
       the local database
 
- o Bugfixes
+  o Bugfixes
     * Installing from a changeset needlessly relied on troves from the 
       database having file information while processing redirects
     * Extraneous dependency cache checks have been removed from the
@@ -31,11 +137,11 @@ Changes in 1.0.5:
       Previously the entire file stream was thawed, which is much more
       resource intensive.
 
- o Build fixes:
+  o Build fixes:
     * r.addArchive() now supports rpms with bzip2-compressed payloads.
 
 Changes in 1.0.4:
- o Performance improvements:
+  o Performance improvements:
     * The speed of erasing troves with many dependencies has been
       significantly improved.
     * The join order of tables is forced through the use of

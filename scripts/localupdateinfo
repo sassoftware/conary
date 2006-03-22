@@ -1,0 +1,30 @@
+#!/usr/bin/python
+import os
+import sys
+if 'CONARY_PATH' in os.environ:
+    sys.path.insert(0, os.environ['CONARY_PATH'])
+
+from conary import conarycfg
+from conary import conaryclient
+
+cfg =conarycfg.ConaryConfiguration(True)
+client = conaryclient.ConaryClient(cfg)
+
+if '--all' in sys.argv:
+    getAll = True
+    sys.argv.remove('--all')
+else:
+    getAll = False
+
+troveNames = sys.argv[1:]
+if not troveNames:
+    troveNames = None
+
+localUpdates = client.getPrimaryLocalUpdates(troveNames)
+
+if getAll:
+    localUpdates += client.getChildLocalUpdates(client.repos, localUpdates)
+
+for name, oldInfo, newInfo, isAbs in sorted(localUpdates):
+    print '%s %s[%s]\n      --> %s[%s]' % (name, oldInfo[0], oldInfo[1], 
+                                           newInfo[0], newInfo[1])

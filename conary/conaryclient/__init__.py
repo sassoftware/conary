@@ -16,7 +16,7 @@ import pickle
 
 #conary imports
 from conary import conarycfg, metadata
-from conary.conaryclient import clone, update
+from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
@@ -54,13 +54,15 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
     """
-    def __init__(self, cfg = None, passwordPrompter = None):
+    def __init__(self, cfg = None, passwordPrompter = None,
+                 resolverClass=resolve.DependencySolver):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
                     If None, the standard Conary configuration is loaded
                     from /etc/conaryrc, ~/.conaryrc, and ./conaryrc.
         @type cfg: L{conarycfg.ConaryConfiguration}
         """
+
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
             cfg.initializeFlavors()
@@ -81,6 +83,11 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                              uploadRateLimit =
                                                     cfg.uploadRateLimit)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
+
+        if not resolverClass:
+            resolverClass = resolve.DependencySolver
+
+        self.resolver = resolverClass(self, cfg, self.repos, self.db)
 
     def getRepos(self):
         return self.repos

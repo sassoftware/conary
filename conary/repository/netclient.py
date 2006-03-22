@@ -57,11 +57,13 @@ quote = lambda s: urllib.quote(s, safe='')
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
-    def __init__(self, send, name, host, pwCallback, anonymousCallback):
+    def __init__(self, send, name, host, pwCallback, anonymousCallback,
+                 altHostCallback):
         xmlrpclib._Method.__init__(self, send, name)
         self.__host = host
         self.__pwCallback = pwCallback
         self.__anonymousCallback = anonymousCallback
+        self.__altHostCallback = altHostCallback
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -96,6 +98,14 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         except errors.InsufficientPermission:
             # no password was specified -- prompt for it
             if not self.__pwCallback():
+                # It's possible we switched to anonymous
+                # for an earlier query, and now need to 
+                # switch back to our specified user/passwd
+                if self.__altHostCallback and self.__altHostCallback():
+                    self.__altHostCallback = None
+                    # recursively call doCall to get all the 
+                    # password handling goodness
+                    return self.doCall(clientVersion, *args)
                 raise
         except xmlrpclib.ProtocolError, err:
             if err.errcode == 500:
@@ -174,16 +184,27 @@ class ServerProxy(xmlrpclib.ServerProxy):
         return True
 
     def __usedAnonymousCallback(self):
+        self.__altHost = self.__host
         self.__host = self.__host.split('@')[-1]
+
+    def __altHostCallback(self):
+        if self.__altHost:
+            self.__host = self.__altHost
+            self.__altHost = None
+            return True
+        else:
+            return False
 
     def __getattr__(self, name):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
-                       self.__passwordCallback, self.__usedAnonymousCallback)
+                       self.__passwordCallback, self.__usedAnonymousCallback,
+                       self.__altHostCallback)
 
     def __init__(self, url, transporter, pwCallback):
         xmlrpclib.ServerProxy.__init__(self, url, transporter)
         self.__pwCallback = pwCallback
+        self.__altHost = None
 
 class ServerCache:
 
@@ -658,7 +679,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         d = {}
         for server, l in byServer.iteritems():
-            exists = self.c[server].hasTroves([x[1] for x in l])
+            if server == 'local':
+                exists = [False] * len(l)
+            else:
+                exists = self.c[server].hasTroves([x[1] for x in l])
             d.update(dict(itertools.izip((x[0] for x in l), exists)))
 
         return d
@@ -671,14 +695,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return rc[0]
 
-    def getTroves(self, troves, withFiles = True):
+    def getTroves(self, troves, withFiles = True, callback = None):
 	chgSetList = []
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))
 
 	cs = self._getChangeSet(chgSetList, recurse = False, 
                                 withFiles = withFiles,
-                                withFileContents = False)
+                                withFileContents = False, 
+                                callback = callback)
 
 	l = []
         # walk the list so we can return the troves in the same order

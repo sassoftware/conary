@@ -13,7 +13,11 @@
 
 from conary.deps import deps
 from conary.repository import changeset
+from conary import errors
 from conary import versions
+
+class BranchError(errors.ClientError):
+    pass
 
 class ClientBranch:
     BRANCH_SOURCE = 1 << 0
@@ -29,6 +33,53 @@ class ClientBranch:
                               branchType=BRANCH_ALL):
         return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
                                           branchType = branchType)
+
+    def _checkForLaterShadows(self, newLabel, troves):
+        # check to see if we've already shadowed any versions later than
+        # these versions to newLabel.
+        query = {}
+        for trove in troves:
+            versionDict = query.setdefault(trove.getName(), {})
+            b = trove.getVersion().branch().createShadow(newLabel)
+            versionDict[b] = None
+        # get the latest version of the new branches
+        results = self.repos.getTroveLeavesByBranch(query)
+
+        if not results:
+            return []
+
+        oldTroves = []
+        for trove in troves:
+            versionDict = results.get(trove.getName(), {})
+            b = trove.getVersion().branch().createShadow(newLabel)
+            versionList = [ x for x in versionDict if x.branch() == b and not x.isModifiedShadow() ]
+            if not versionList:
+                continue
+            latestVersion = max(versionList)
+            oldVersion = latestVersion.parentVersion()
+            # now get the upstream timeStamps associated with the already
+            # shadowed versions.
+            oldTroves.extend((trove.getName(), oldVersion, x) \
+                             for x in versionDict[latestVersion])
+
+        shadowedTroves = self.repos.getTroves(oldTroves, withFiles=False)
+
+        shadowed = {}
+        for shadowedTrove in shadowedTroves:
+            (n,v,f) = shadowedTrove.getNameVersionFlavor()
+            shadowed[n, v.branch(), f] = v
+
+        laterShadows = []
+        for trove in troves:
+            (n,v,f) = trove.getNameVersionFlavor()
+            shadowedVer = shadowed.get((n, v.branch(), f), None)
+            if not shadowedVer:
+                continue
+            if v < shadowedVer:
+                # the version we shadowed before had a later timestamp
+                # than the version we're shadowing now.
+                laterShadows.append((n, v, f, shadowedVer))
+        return laterShadows
 
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
                               branchType=BRANCH_ALL):
@@ -46,6 +97,22 @@ class ClientBranch:
             troves = self.repos.getTroves(troveList)
             troveList = set()
             branchedTroves = {}
+
+            if shadow:
+                laterShadows = self._checkForLaterShadows(newLabel, troves)
+                # we disallow shadowing an earlier trove if a later
+                # later one has already been shadowed - it makes our
+                # cvc merge algorithm not work well.
+                if laterShadows:
+                    msg = []
+                    for n, v, f, shadowedVer in laterShadows:
+                        msg.append('''\
+Cannot shadow backwards - already shadowed
+    %s=%s[%s]
+cannot shadow earlier trove
+    %s=%s[%s]
+''' % (n, shadowedVer, f, n, v, f))
+                    raise BranchError('\n\n'.join(msg))
 
 	    for trove in troves:
                 # add contained troves to the todo-list
@@ -116,19 +183,12 @@ class ClientBranch:
                 branchedTroves[key] = branchedTrove.diff(None,
                                                          absolute = True)[0]
 
-            # check for duplicates - XXX this could be more efficient with
-            # a better repository API
+            # check for duplicates
+            hasTroves = self.repos.hasTroves(branchedTroves)
+
             queryDict = {}
-            for (name, version, flavor) in branchedTroves.iterkeys():
-                l = queryDict.setdefault(name, [])
-                l.append(version)
-
-            matches = self.repos.getAllTroveFlavors(queryDict)
-
             for (name, version, flavor), troveCs in branchedTroves.iteritems():
-                if (matches.has_key(name) and matches[name].has_key(version) 
-                    and flavor in matches[name][version]):
-                    # this trove has already been branched
+                if hasTroves[name, version, flavor]:
                     dupList.append((name, version.branch()))
                 else:
                     cs.newTrove(troveCs)

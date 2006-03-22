@@ -155,7 +155,8 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[]):
     else:
         troveSpecs = []
 
-    pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
+    pathList = [ util.realpath(os.path.abspath(util.normpath(x)))
+                 for x in pathList ]
 
     troveTups = []
     for path in pathList:

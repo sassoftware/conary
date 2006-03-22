@@ -419,8 +419,34 @@ class Database(SqlDbRepository):
         return resultDict
 
     def depCheck(self, jobSet, troveSource, findOrdering = False):
-        return self.db.depCheck(jobSet, troveSource, 
-                                findOrdering = findOrdering)
+        """
+        Check the database for closure against the operations in
+        the passed changeSet.
+
+        @param jobSet: The jobs which define the dependency check
+        @type jobSet: set
+        @param troveSource: Trove source troves in the job are
+                            available from
+        @type troveSource: AbstractTroveSource:
+        @param findOrdering: If true, a reordering of the job is
+                             returned which preserves dependency
+                             closure at each step.
+        @param findOrdering: boolean
+        @rtype: tuple of dependency failures for new packages and
+                dependency failures caused by removal of existing
+                packages
+        """
+
+        checker = self.dependencyChecker(troveSource)
+        checker.addJobs(jobSet)
+        unsatisfiedList, unresolveableList, changeSetList = \
+                checker.check(findOrdering = findOrdering)
+        checker.done()
+
+        return (unsatisfiedList, unresolveableList, changeSetList)
+
+    def dependencyChecker(self, troveSource):
+        return self.db.dependencyChecker(troveSource)
 
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
@@ -561,9 +587,8 @@ class Database(SqlDbRepository):
 
         errList = fsJob.getErrorList()
         if errList:
-            for err in errList:
-                log.error(err)
-            raise CommitError, 'file system job contains errors'
+            raise CommitError, ('file system job contains errors:\n' + 
+                                '\n\n'.join(errList))
         if test:
             self.db.rollback()
             return
@@ -757,8 +782,8 @@ class Database(SqlDbRepository):
                                          replaceFiles = replaceFiles,
                                          callback = callback)
                     rb.removeLast()
-                except CommitError:
-                    raise RollbackError(name)
+                except CommitError, err:
+                    raise RollbackError(name, err)
 
                 (reposCs, localCs) = rb.getLast()
 
@@ -809,7 +834,10 @@ class Database(SqlDbRepository):
                 recurseOne(newDepSetList)
         recurseOne(depSetList)
         return closureDepDict
-    
+
+    def iterUpdateContainerInfo(self, troveNames=None):
+        return self.db.iterUpdateContainerInfo(troveNames)
+
     def __init__(self, root, path):
 	self.root = root
 
@@ -871,15 +899,16 @@ class RollbackError(errors.ConaryError):
 
     """Base class for exceptions related to applying rollbacks"""
 
-    def __init__(self, rollbackName):
+    def __init__(self, rollbackName, errorMessage=''):
 	"""
         Create new new RollbackrError
 	@param rollbackName: string represeting the name of the rollback
         """
 	self.name = rollbackName
+        self.error = errorMessage
 
     def __str__(self):
-	return "rollback %s cannot be applied" % self.name
+	return "rollback %s cannot be applied:\n%s" % (self.name, self.error)
 
 class RollbackOrderError(RollbackError):
 

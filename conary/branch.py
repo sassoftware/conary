@@ -63,6 +63,11 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
 
     troveSpecs = [ updatecmd.parseTroveSpec(x) for x in troveSpecs ]
 
+    componentSpecs = [ x[0] for x in troveSpecs 
+                        if (':' in x[0] and x[0].split(':')[1] != 'source')]
+    if componentSpecs:
+        raise errors.ParseError('Cannot branch or shadow individual components: %s' % ', '.join(componentSpecs))
+
     result = repos.findTroves(cfg.buildLabel, troveSpecs, cfg.buildFlavor)
     troveList = [ x for x in itertools.chain(*result.itervalues())]
 

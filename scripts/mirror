@@ -83,8 +83,12 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
                           entitlementDir = cfg.entitlementDirectory)
 
-count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg, options.test,
-                         options.sync, options.syncSigs)
+# we pass in the sync flag only the first time around, because after
+# that we need the targetRepos mark to advance accordingly after being
+# reset to -1
+count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
+                                test = options.test, sync = options.sync,
+                                syncSigs = options.syncSigs)
 while not options.test and count:
-    count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg, options.test,
-                             options.sync, options.syncSigs)
+    count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
+                                    test = options.test)

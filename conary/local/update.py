@@ -532,6 +532,10 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
+        @param removalHints: set of (name, version, flavor) tuples which
+        are being removed as part of this operation; troves which are
+        scheduled to be removed won't generate file conflicts with new
+        troves
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -603,20 +607,40 @@ class FilesystemJob:
                     continue
                 elif not self.removes.has_key(headRealPath):
                     inWay = (flags & REPLACEFILES) == 0
-                    for info in self.db.iterFindPathReferences(headPath):
-                        if (flags & REPLACEFILES) or info[0:3] in removalHints:
-                            self.userRemoval(*info)
-                            inWay = False
+                    if removalHints:
+                        # Don't go through the database if we know removalHints
+                        # won't help avoid this conflict. This avoids calling
+                        # iterFindPathReferences() against a network server
+                        # for source control operations
+                        for info in self.db.iterFindPathReferences(headPath):
+                            if (flags & REPLACEFILES) or \
+                                    info[0:3] in removalHints:
+                                self.userRemoval(*info)
+                                inWay = False
 
                     if inWay:
-                        self.errors.append("%s is in the way of a newly " 
-                           "created file in %s=%s[%s]" % (  
-                               util.normpath(headRealPath), 
-                               troveCs.getName(), 
-                               troveCs.getNewVersion().asString(),
-                               deps.formatFlavor(troveCs.getNewFlavor())))
-                        fullyUpdated = False
-                        continue
+                        # For system updates, we should look through the
+                        # database for file conflicts and handle those. For
+                        # source updates, we just give up.
+                        if hasattr(self.db, 'iterFindPathReferences'):
+                            existingFile = files.FileFromFilesystem(
+                                headRealPath, pathId)
+                            inWay = not silentlyReplace(headFile, existingFile)
+                            if not inWay:
+                                for info in self.db.iterFindPathReferences(
+                                                                    headPath):
+                                    self.userRemoval(*info)
+
+                        if inWay:
+                            self.errors.append("%s is in the way of a newly "
+                               "created file in %s=%s[%s]" % (  
+                                   util.normpath(headRealPath), 
+                                   troveCs.getName(), 
+                                   troveCs.getNewVersion().asString(),
+                                   deps.formatFlavor(troveCs.getNewFlavor())))
+                            fullyUpdated = False
+                            continue
+
             except OSError:
                 # the path doesn't exist, carry on with the restore
                 pass
@@ -1757,3 +1781,15 @@ class TagCommand:
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
                     log.error("%s failed", command[0])
+
+def silentlyReplace(newF, oldF):
+    # Can the file already on the disk (oldF) be replaced with the new file
+    # (newF) without telling the user it happened
+    if newF.__class__ != oldF.__class__:
+        return False
+    elif isinstance(newF, files.SymbolicLink) and newF.target == oldF.target:
+        return True
+    elif isinstance(newF, files.RegularFile) and newF.contents == oldF.contents:
+        return True
+
+    return False

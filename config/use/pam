@@ -1,1 +1,3 @@
 sense required
+shortDoc Enable support for PAM
+longDoc Pluggable Authentication Modules (PAM) makes most system authentication happen in a unified way, but adds a dependency on PAM libraries, and requires shared libraries.  You may want to disable PAM during the early stages of bootstrapping a new architecture.

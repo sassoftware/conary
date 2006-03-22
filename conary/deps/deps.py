@@ -28,6 +28,8 @@ DEP_CLASS_CIL           = 9
 DEP_CLASS_JAVA          = 10
 DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
+DEP_CLASS_RUBY          = 13
+DEP_CLASS_PHP           = 14
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -267,8 +269,7 @@ class Dependency(BaseDependency):
 	"""
 	allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
-            if (mergeType == DEP_MERGE_TYPE_OVERRIDE
-                    or not allFlags.has_key(flag)):
+            if mergeType == DEP_MERGE_TYPE_OVERRIDE or flag not in allFlags:
                 allFlags[flag] = otherSense
                 continue
 
@@ -411,7 +412,7 @@ class DependencyClass(object):
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
 
-	if self.members.has_key(dep.name):
+	if dep.name in self.members:
 	    # this is a little faster then doing all of the work when
 	    # we could otherwise avoid it
 	    if dep == self.members[dep.name]: return
@@ -432,7 +433,7 @@ class DependencyClass(object):
         
         score = 0
 	for requiredDep in requirements.members.itervalues():
-	    if not self.members.has_key(requiredDep.name):
+            if requiredDep.name not in self.members:
                 if self.depNameSignificant:
                     # dependency names are always 'requires', so if the 
                     # dependency class name is significant (i.e. the dep 
@@ -667,6 +668,24 @@ class PerlDependencies(DependencyClass):
     flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(PerlDependencies)
 
+class RubyDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RUBY
+    tagName = "ruby"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(RubyDependencies)
+
+class PhpDependencies(DependencyClass):
+
+    tag = DEP_CLASS_PHP
+    tagName = "php"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(PhpDependencies)
+
 class FileDependencies(DependencyClass):
 
     tag = DEP_CLASS_FILES
@@ -750,11 +769,11 @@ class DependencySet(object):
 
     def copy(self):
         new = DependencySet()
-        a = new.addDep
-        for tag, depClass in self.members.iteritems():
-            c = depClass.__class__
+        add = new.addDep
+        for depClass in self.members.itervalues():
+            cls = depClass.__class__
             for dep in depClass.members.itervalues():
-                a(c, dep)
+                add(cls, dep)
         return new
 
     def toStrongFlavor(self):
@@ -800,6 +819,13 @@ class DependencySet(object):
             c = members.__class__
             if tag in self.members:
 		self.members[tag].union(members, mergeType = mergeType)
+
+                # If we're dropping conflicts, we might drop this class
+                # of troves all together.
+                if (mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS
+                    and c.justOne and not 
+                    self.members[tag].members.values()[0].flags):
+                    del self.members[tag]
 	    else:
                 for dep in members.members.itervalues():
                     a(c, dep)
@@ -840,7 +866,7 @@ class DependencySet(object):
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
-	    if not self.members.has_key(tag): 
+	    if tag not in self.members:
 		return False
 	    if not self.members[tag] == other.members[tag]:
 		return False
@@ -1022,6 +1048,10 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
                     depsByName.setdefault(dep.name, []).append(dep)
         for depList in depsByName.itervalues():
             dep = _mergeDeps(depList, mergeType)
+            if (depClass.justOne
+                and mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS and 
+                not dep.flags):
+                continue
             a(depClass, dep)
     return finalDep
 

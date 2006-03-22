@@ -449,8 +449,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.troveStore.commit()
         return retval
 
-    def getMetadata(self, authToken, clientVersion,
-                    troveList, language):
+    def getMetadata(self, authToken, clientVersion, troveList, language):
+        self.log(2, "language=%s" % language, troveList)
         metadata = {}
         # XXX optimize this to one SQL query downstream
         for troveName, branch, version in troveList:
@@ -466,7 +466,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             md = self.troveStore.getMetadata(troveName, branch, version, language)
             if md:
                 metadata[troveName] = md.freeze()
-        self.log(2, "len(troveList):", len(troveList))
         return metadata
 
     def _setupFlavorFilter(self, cu, flavorSet):
@@ -489,7 +488,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "created temporary table ffFlavor", entries)
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
-        self.log(3, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(3, troveSpecs, flavorIndices)
         schema.resetTable(cu, 'gtvlTbl')
         for troveName, versionDict in troveSpecs.iteritems():
             if type(versionDict) is list:
@@ -883,7 +882,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return list(names)
 
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
             if len(name) == 0:
@@ -898,14 +897,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs,
                               bestFlavor, self._GTL_VERSION_TYPE_VERSION,
                               latestFilter = self._GET_TROVE_ALL_VERSIONS)
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
                           flavorFilter = 0):
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
             if len(name) == 0:
@@ -976,7 +975,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs,
                               bestFlavor, versionType, latestFilter):
-        self.log(3, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(3, troveSpecs)
         hasFlavors = False
         d = {}
         for (name, labels) in troveSpecs.iteritems():
@@ -1010,7 +1009,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
                                  bestFlavor):
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
@@ -1018,7 +1017,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
@@ -1027,7 +1026,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList,
                               labelStr, flavorFilter = None):
         troveSpecs = troveNameList
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
@@ -1037,7 +1036,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList,
                               labelStr, flavorFilter = None):
         troveSpecs = troveNameList
-        self.log(2, "len(troveSpecs)=%s" % len(troveSpecs))
+        self.log(2, troveSpecs)
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
@@ -1045,7 +1044,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           self._GET_TROVE_ALL_VERSIONS)
 
     def getFileContents(self, authToken, clientVersion, fileList):
-        self.log(2, "fileList length:", len(fileList))
+        self.log(2, "fileList", fileList)
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
@@ -1057,8 +1056,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 fileLabel = fileVersion.branch().label()
                 fileId = self.toFileId(fileId)
 
-                if not self.auth.check(authToken, write = False,
-                                       label = fileLabel):
+                if not self.auth.check(authToken, write = False, label = fileLabel):
                     raise errors.InsufficientPermission
 
                 fileObj = self.troveStore.findFileVersion(fileId)
@@ -1150,9 +1148,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         newChgSetList = []
         allFilesNeeded = []
 
-        self.log(2, "changesets: %d recurse=%s withFiles=%s withFileContents=%s" % (
-            len(chgSetList), recurse, withFiles, withFileContents))
-
+        # try to log more information about these requests
+        self.log(2, [x[0] for x in chgSetList],
+                 list(set([x[2][0] for x in chgSetList])),
+                 "recurse=%s withFiles=%s withFileContents=%s" % (
+            recurse, withFiles, withFileContents))
         # XXX all of these cache lookups should be a single operation through a
         # temporary table
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
@@ -1227,7 +1227,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False,
 			       label = self.toLabel(label)):
 	    raise errors.InsufficientPermission
-        self.log(2, label)
+        self.log(2, label, requiresList)
 	requires = {}
 	for dep in requiresList:
 	    requires[self.toDepSet(dep)] = dep
@@ -1281,7 +1281,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
-        self.log(2, authToken[0], url)
+        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
 	self.repos.commitChangeSet(cs, self.name, mirror = mirror)
 	if not self.commitAction:
 	    return True
@@ -1310,7 +1310,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return True
 
     def getFileVersions(self, authToken, clientVersion, fileList):
-        self.log(2, "len(fileList):", len(fileList))
+        self.log(2, fileList)
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
@@ -1324,7 +1324,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
                        withContents = 0):
-        self.log(2, str(pathId), str(fileId))
+        self.log(2, pathId, fileId, "withContents=%s" % (withContents,))
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
@@ -1383,7 +1383,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
-        self.log(2, "len(troveList):", len(troveList))
+        self.log(2, troveList)
         for row, item in enumerate(troveList):
             flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
@@ -1432,7 +1432,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return results
 
     def getCollectionMembers(self, authToken, clientVersion, troveName,
-                                branch):
+                             branch):
 	if not self.auth.check(authToken, write = False,
                                trove = troveName,
 			       label = self.toBranch(branch).label()):
@@ -1701,61 +1701,52 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getNewSigList(self, authToken, clientVersion, mark):
         # only show troves the user is allowed to see
         cu = self.db.cursor()
-
+        self.log(2, mark)
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
+        # Since signatures are small blobs, it doesn't make a lot
+        # of sense to use a LIMIT on this query...
         query = """
-                SELECT UP.permittedTrove, item, version, flavor, 
-                          Instances.changed FROM Instances
-                    JOIN TroveInfo USING (instanceId)
-                    JOIN Nodes ON
-                        Instances.itemId = Nodes.itemId AND
-                        Instances.versionId = Nodes.versionId
-                    JOIN LabelMap ON
-                        Nodes.itemId = LabelMap.itemId AND
-                        Nodes.branchId = LabelMap.branchId
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed <= ? AND
-                        Instances.isPresent = 1 AND
-                        TroveInfo.changed >= ? AND
-                        TroveInfo.infoType = ?
-                    ORDER BY
-                        TroveInfo.changed
-                    LIMIT
-                        1000
-                    """ % ",".join("%d" % x for x in userGroupIds)
-
+        SELECT UP.permittedTrove, item, version, flavor, Instances.changed
+        FROM Instances
+        JOIN TroveInfo USING (instanceId)
+        JOIN Nodes ON
+             Instances.itemId = Nodes.itemId AND
+             Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+             Nodes.itemId = LabelMap.itemId AND
+             Nodes.branchId = LabelMap.branchId
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
+              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed <= ?
+          AND Instances.isPresent = 1
+          AND TroveInfo.changed >= ?
+          AND TroveInfo.infoType = ?
+        ORDER BY TroveInfo.changed
+        """ % (",".join("%d" % x for x in userGroupIds), )
         cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
 
-        l = []
-
+        l = set()
         for pattern, name, version, flavor, mark in cu:
             if self.auth.checkTrove(pattern, name):
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+        return list(l)
 
     def getTroveSigs(self, authToken, clientVersion, infoList):
         if not self.auth.check(authToken, write = False, mirror = True):
             raise errors.InsufficientPermission
-
+        self.log(2, infoList)
         cu = self.db.cursor()
 
         # XXX this should really be batched
@@ -1764,24 +1755,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.check(authToken, write = False, trove = name,
                        label = self.toVersion(version).branch().label()):
                 raise errors.InsufficientPermission
+
+            # When a mirror client is doing a full sig sync it is
+            # likely they'll ask for signatures of troves that are not
+            # signed. We return "" in that case.
             cu.execute("""
-                    SELECT data FROM Items 
-                        JOIN Instances USING (itemId)
-                        JOIN Versions USING (versionId)
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN TroveInfo ON
-                            Instances.instanceId = TroveInfo.instanceId
-                        WHERE
-                            TroveInfo.infoType = ? AND
-                            item = ? AND
-                            version = ? AND
-                            flavor = ?
-                    """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
+            SELECT TroveInfo.data
+              FROM Items
+              JOIN Instances USING (itemId)
+              JOIN Versions USING (versionId)
+              JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+              LEFT OUTER JOIN TroveInfo ON
+                   Instances.instanceId = TroveInfo.instanceId
+                   AND TroveInfo.infoType = ?
+             WHERE item = ? AND version = ? AND flavor = ?
+               """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
             try:
-                result.append(cu.next()[0])
+                data = cu.fetchall()[0][0]
+                if data is None:
+                    data = ""
+                result.append(data)
             except:
-                raise errors.TroveMissing(name, version = version)
+                raise errors.TroveMissing(name, version = self.toVersion(version))
 
         return [ base64.encodestring(x) for x in result ]
 
@@ -1791,7 +1786,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # this requires mirror access and write access for that trove
         if not self.auth.check(authToken, write = False, mirror = True):
             raise errors.InsufficientPermission
-
+        self.log(2, infoList)
         cu = self.db.cursor()
         updateCount = 0
 
@@ -1877,61 +1872,81 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
-        # first off, compute the max number of troves with the same mark for dynamic sizing;
-        # the client can get stuck if we keep returning a (same) subset
+        # compute the max number of troves with the same mark for
+        # dynamic sizing; the client can get stuck if we keep
+        # returning the same subset because of a LIMIT too low
         cu.execute("""
         SELECT MAX(c) + 1 AS lim
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
+           WHERE Instances.isPresent = 1
+             AND Instances.changed >= ?
            GROUP BY changed
            HAVING c>1
-        ) AS lims""")
+        ) AS lims""", mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
             lim = 1000 # for safety and efficiency
+
+        # To avoid using a LIMIT value too low on the big query below,
+        # we need to find out how many distinct permissions will
+        # likely grant access to a trove for this user
+        cu.execute("""
+        SELECT COUNT(*) AS perms
+        FROM UserGroups
+        JOIN Permissions USING(userGroupId)
+        WHERE UserGroups.canMirror = 1
+          AND UserGroups.userGroupId in (%s)
+        """ % (",".join("%d" % x for x in userGroupIds),))
+        permCount = cu.fetchall()[0][0]
+        if permCount == 0:
+	    raise errors.InsufficientPermission
+        if permCount is None:
+            permCount = 1
+
+        # multiply LIMIT by permCount so that after duplicate
+        # elimination we are sure to return at least 'lim' troves
+        # back to the client
         query = """
-                SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-                          timeStamps, Instances.changed FROM Instances
-                    JOIN Nodes USING (itemId, versionId)
-                    JOIN LabelMap USING (itemId, branchId)
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed >= ? AND
-                        Instances.isPresent = 1
-                    ORDER BY
-                        Instances.changed
-                    LIMIT
-                        %d
-                    """ % (",".join("%d" % x for x in userGroupIds), lim)
+        SELECT DISTINCT UP.permittedTrove, item, version, flavor,
+            timeStamps, Instances.changed
+        FROM Instances
+        JOIN Nodes USING (itemId, versionId)
+        JOIN LabelMap USING (itemId, branchId)
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
+              JOIN Items as PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+              ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed >= ?
+          AND Instances.isPresent = 1
+        ORDER BY Instances.changed
+        LIMIT %d
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
 
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
-        l = []
+        l = set()
 
         for pattern, name, version, flavor, timeStamps, mark in cu:
             if self.auth.checkTrove(pattern, name):
                 version = versions.strToFrozen(version,
                     [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+            if len(l) >= lim:
+                # we need to flush the cursor to stop a backend from complaining
+                junk = cu.fetchall()
+                break
+        return list(l)
 
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):

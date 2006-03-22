@@ -177,6 +177,7 @@ class ConaryContext(ConfigSection):
     contact               =  None
     excludeTroves         =  CfgRegExpList
     flavor                =  CfgList(CfgFlavor)
+    lookaside             =  CfgPath
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
     repositoryMap         =  CfgRepoMap
@@ -233,6 +234,7 @@ class ConaryConfiguration(SectionedConfigFile):
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
+    resolveLevel          =  (CfgInt, 1)
     showLabels            =  CfgBool
     showComponents        =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')

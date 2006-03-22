@@ -12,6 +12,7 @@
 # full details.
 #
 import os
+import itertools
 import sys
 import thread
 import urllib2
@@ -315,19 +316,18 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
     if suggMap:
         callback.done()
+        dcfg = display.DisplayConfig()
+        dcfg.setTroveDisplay(fullFlavors = cfg.fullFlavors,
+                             fullVersions = cfg.fullVersions,
+                             showLabels = cfg.showLabels)
+        formatter = display.TroveTupFormatter(dcfg)
+
         print "Including extra troves to resolve dependencies:"
         print "   ",
-        items = {}
-        for suggList in suggMap.itervalues():
-            # remove duplicates
-            items.update(dict.fromkeys([(x[0], x[1]) for x in suggList]))
 
-        items = items.keys()
-        items.sort()
-        print "%s" % (" ".join(["%s(%s)" % 
-                       (x[0], x[1].trailingRevision().asString())
-                       for x in items]))
-
+        items = sorted(set(formatter.formatNVF(*x)
+                       for x in itertools.chain(*suggMap.itervalues())))
+        print " ".join(items)
         keepExisting = False
 
     if cfg.interactive:
@@ -413,7 +413,7 @@ def updateConary(cfg, conaryVersion):
                               callback = callback, replaceFiles = True)
     
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              test = False, showItems = False):
+              test = False, showItems = False, checkPathConflicts = True):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
 
@@ -436,7 +436,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     callback = UpdateCallback(cfg)
     _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                   depCheck = depCheck, test = test, info = info, 
-                  callback = callback, checkPrimaryPins = False)
+                  callback = callback, checkPrimaryPins = False,
+                  checkPathConflicts = checkPathConflicts)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
