@@ -149,15 +149,6 @@ class Archive(_Source):
     optionally compressed tarball, or zip file, and unpack it to the proper
     directory.
 
-    PARAMETERS
-    ==========
-
-    The following parameters are recognized by C{r.addArchive}:
-
-    B{recipe} : The recipe object currently being built is provided
-    automatically by the C{PackageRecipe} object. Passing in  C{recipe} from
-    within a recipe is unnecessary.
-
     KEYWORDS
     ========
 
@@ -330,15 +321,6 @@ class Patch(_Source):
     The C{r.addPatch()} class adds a patch to be applied to the source code
     during the build phase.
 
-    PARAMETERS
-    ==========
-
-    The following parameters are recognized by I{r.addPatch}:
-
-    B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in  C{recipe} from
-    within a recipe is unnecessary.
-
     KEYWORDS
     ========
 
@@ -499,15 +481,6 @@ class Source(_Source):
 
     The C{r.addSource()} class copies a file into the build directory, or
     destination directory.
-
-    PARAMETERS
-    ==========
-
-    The following parameters are recognized by C{r.addSource}:
-
-    B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in C{recipe} from
-    within a recipe is unnecessary.
 
     KEYWORDS
     ========
@@ -698,15 +671,6 @@ class Action(action.RecipeAction):
 
     The C{r.addAction()} class copies an arbitrary file into the build
     directory, C{%(builddir)s}.
-
-    PARAMETERS
-    ==========
-
-    The following parameters are recognized by C{r.addAction}:
-
-    B{recipe} : The recipe object currently being built is provided
-    automatically by the PackageRecipe object. Passing in  C{recipe} from
-    within a recipe is unnecessary.
 
     KEYWORDS
     ========
