@@ -7,7 +7,8 @@ Changes in @NEW@:
       to work as expected when you have conary-build installed, for example.
     * Switched to using more of optparse's capabilities, including --help
       messages.
-    * One short option has been added, -m for message.
+    * One short option has been added, cvc -m for message.
+
   o Bug Fixes:
     * Recipes that use loadRecipe('foo') and rely on conary to look upstream
       to find their branch now work correctly when committing.
@@ -32,9 +33,14 @@ Changes in @NEW@:
       components has been fixed.
     * Updates will now happen in a more consistent order based on an
       alphabetic sort.
+
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
+
+  o Documentation Changes:
+    * The inline documentation for recipes has been significantly
+      improved and expanded, including many new usage examples.
 
 Changes in 1.0.8
   o Client changes:
