@@ -34,7 +34,7 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     target                =  MirrorConfigurationSection
     uploadRateLimit       =  (conarycfg.CfgInt, 0)
     downloadRateLimit     =  (conarycfg.CfgInt, 0)
-        
+
     def __init__(self):
         cfg.SectionedConfigFile.__init__(self)
 
@@ -235,18 +235,17 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     # FIXME: getNewTroveList should accept and only return troves on
     # the labels we're interested in
     troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
-
     # we need to protect ourselves from duplicate items in the troveList
     troveList = list(set(troveList))
     troveList.sort(lambda a,b: cmp(a[0], b[0]))
     log.debug("%d new troves are available", len(troveList))
-
-    # prepare a new max mark to be used when we need to break out of a loop
-    crtMaxMark = max(x[0] for x in troveList)
     crtTroveLen = len(troveList)
     if not crtTroveLen:
         # this should be the end - no more troves to look at
         return 0
+
+    # prepare a new max mark to be used when we need to break out of a loop
+    crtMaxMark = max(x[0] for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
         # if we're hung on the current max then we need to
         # forcibly advance the mark in case we're stuck
