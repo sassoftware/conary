@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fixed a case where an Assertion could be raised when switching from an
+      incomplete trove to a complete trove.
+
 Changes in 1.0.9:
   o Client Changes:
     * A new dependency resolution method has been added which can be turned
