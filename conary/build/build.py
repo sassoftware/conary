@@ -237,20 +237,20 @@ class Automake(BuildCommand):
 
     B{autoConfArgs} : (None) Arguments to the C{autoconf} program
 
-    B{autoMakeArgs} : (None) Arguments to the automake program.
+    B{autoMakeArgs} : (None) Arguments to the C{automake} program.
 
-    B{automakeVer} : (None) FIXME : what does this keyword do
+    B{automakeVer} : (None) Specifies C{automake} version
 
-    B{m4Dir} : FIXME : (None) what does this keyword do
+    B{m4Dir} : (None) Specifies directory for C{m4} macro processor
 
-    B{preAutoconf} : (None) FIXME : what does this keyword do
+    B{preAutoconf} : (None) FIXME : keyword purpose?
 
     B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
     (by default) and if set to C{True} skip the action when C{subDir} does not
     exist.
 
-    B{subDir}: (None) Directory in which to re-run aclocal, autoconf,
-    and automake
+    B{subDir}: (None) Directory in which to re-run C{aclocal}, C{autoconf},
+    and C{automake}
 
     EXAMPLES
     ========
@@ -599,7 +599,7 @@ class MakeParallelSubdir(Make):
     NAME
     ====
 
-    B{C{r.MakeParallelSubdir()}} - Runs make wht parallelmflags applied only to
+    B{C{r.MakeParallelSubdir()}} - Runs make with parallelmflags applied only to
     sub-make processes
 
     SYNOPSIS
@@ -759,7 +759,7 @@ class CompilePython(BuildCommand):
     ===========
 
     The C{r.CompilePython()} is called from within a Conary recipe to compile
-    optimized, and compiled Python bytcode files. The paths specified must be
+    optimized, and compiled Python bytecode files. The paths specified must be
     absolute paths, which are interpreted relative to C{%(destdir)s} in order
     for the paths compiled into the bytecode files to be correct.
 
@@ -1256,7 +1256,7 @@ class Install(_PutFiles):
     DESCRIPTION
     ===========
 
-    The C{r.Install()} calss is called from within a Conary recipe to copy
+    The C{r.Install()} class is called from within a Conary recipe to copy
     files from a source to destination as with C{r.Copy} with the exception
     that C{r.Install} also fixes the file's modes.
 
@@ -1982,7 +1982,7 @@ class TestSuite(_FileAction):
     testing at cook time, while allowing the actual test suite to run at a
     later point.  It does this if the command to be run is of the form
     C{make  <target>}, in which case all of the target's dependencies are
-    built, and the makefile is edited to then remove those dependencies from
+    built, and the Makefile is edited to then remove those dependencies from
     the target.
 
     If the command is a make command, the arguments
@@ -2355,8 +2355,55 @@ class XInetdService(_FileAction):
     The C{r.XInetdService()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
-    FIXME: these follow the same named elements in xinetd.conf files
-    generally, but need to be explicitly documented here.
+    B{serviceName} : (None) Specifies the name of the service, and must be
+    identical to the string passed to C{xinetd} when the remote service
+    requestor first makes the connection (Per RFC 1078)
+
+    B{description} : (None) Specifies a human-readable description of the
+    service
+
+    B{server} : (None) Specifies the program that will be executed for this
+    service
+
+    Bserver_args} : (None) Specifies additional command-line arguments to the
+    program defined by B{server}
+
+    B{protocol} : (None) Specifies the protocol to be used by the service from
+    the listing of valid protocols contained in C{/etc/protocols}
+
+    B{port} : (None) Specifies the service port.
+ 
+    B{default} : (False) Specifies the C{chkconfig} default value
+
+    B{type} : (None) Specifies whether the server or C{xinetd} will handle
+    the initial protocol handshake
+
+    B{socket_type} : (None) Specifies type of socket the service should
+    use.
+
+    B{id} : (False) Specifies unique identifier for the service
+
+    B{wait} : (False) Specifies whether service is single-threaded or
+    multi-threaded and whether the server program accepts the connection
+    or C{xinetd} accepts the connection
+
+    B{disable} : (True) Specifies whether the service should be disabled
+
+    B{user} : (None) Specifies the User ID for the server process
+
+    B{group} : (None) Specifies the Group ID for the server process
+
+    B{log_on_success} : (None) Specifies information to be logged when
+    a server is started and when a server exits
+
+    B{log_on_failure} : (None) Specifies information to log when a server
+    cannot be started
+ 
+    B{filename} : (None) Specifies service definition filename
+ 
+    B{mode} : (0644) Specifies permissions of service definition file
+
+    B{otherlines} : (None) Specifies additional service definition lines
 
     EXAMPLES
     ========
@@ -2523,8 +2570,8 @@ class XMLCatalogEntry(BuildCommand):
     The C{r.XMLCatalogEntry()} class is called from within a Conary recipe to
     add an entry to the XML catalog file C{catalogFile}.
 
-    If the catalog default directory (C{/etc/xml}) is nonexistant,
-    C{r.XMLCatalogEntry} will create it. If the catalog itself is noexistant,
+    If the catalog default directory (C{/etc/xml}) is nonexistent,
+    C{r.XMLCatalogEntry} will create it. If the catalog itself is nonexistent,
     it will be created as well.
 
     KEYWORDS
@@ -2610,7 +2657,7 @@ class SGMLCatalogEntry(BuildCommand):
     The C{r.SGMLCatalogEntry()} class is called from within a Conary recipe to
     add an entry to the SGML catalog file.
 
-    If the catalog directory (by default, C{/etc/sgml}) is nonexistant, it is
+    If the catalog directory (by default, C{/etc/sgml}) is nonexistent, it is
     created.  If the catalog file does not exist,it is created.
 
     KEYWORDS

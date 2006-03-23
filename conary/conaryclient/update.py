@@ -496,7 +496,7 @@ class ClientUpdate:
         # keep track of troves that are changes on the same branch, 
         # since those are still explicit user requests and might 
         # override implied updates that would downgrade this trove.
-        sameBranchLocalUpdates = set()
+        sameBranchLocalUpdates = {}
 
         for job in sorted(localUpdates):
             if job[1][0] is not None and job[2][0] is not None:
@@ -508,7 +508,7 @@ class ClientUpdate:
                     log.debug('reworking same-branch local update: %s' % (job,))
                     # track this update for since it means the user
                     # requested this version explicitly
-                    sameBranchLocalUpdates.add((job[0], job[2][0], job[2][1]))
+                    sameBranchLocalUpdates[job[0], job[2][0], job[2][1]] = (job[1][0], job[1][1])
                 else:
                     log.debug('local update: %s' % (job,))
 
@@ -553,9 +553,11 @@ class ClientUpdate:
                     dict( ((job[0], job[2][0], job[2][1]), (job[1], False)) for
                         job in relativeUpdateJobs))
 
+        respectFlavorAffinity = True
         # thew newTroves parameters are described below.
         newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, None, respectBranchAffinity, True,
+                            True, {}, False, None, respectBranchAffinity, 
+                            respectFlavorAffinity, True,
                             True, updateOnly) 
                                 for x in itertools.chain(absolutePrimaries,
                                                          relativePrimaries))
@@ -582,6 +584,11 @@ class ClientUpdate:
             #              if a) a primary trove update is overriding branch
             #              affinity, or b) the call to mergeGroupChanges
             #              had respectBranchAffinity False
+            # respectFlavorAffinity: If true, we generally try to respect
+            #              the user's choice to switch a trove from one flavor
+            #              to another.  We might not respect flavor affinity
+            #              for the same reasons we might not respect branch
+            #              affinity.
             # installRedirects: If True, we install redirects even when they
             #              are not upgrades.
             # followLocalChanges: see the code where it is used for a 
@@ -590,7 +597,7 @@ class ClientUpdate:
             #              fresh.
 
             (newInfo, isPrimary, byDefaultDict, parentInstalled, branchHint,
-               respectBranchAffinity, installRedirects,
+               respectBranchAffinity, respectFlavorAffinity, installRedirects,
                followLocalChanges, updateOnly) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
@@ -600,12 +607,12 @@ class ClientUpdate:
 %s=%s[%s]
 primary: %s  byDefault:%s  parentInstalled: %s  updateOnly: %s
 branchHint: %s
-branchAffinity: %s   installRedirects: %s
+branchAffinity: %s   flavorAffinity: %s installRedirects: %s
 followLocalChanges: %s
 
 ''' % (newInfo[0], newInfo[1], newInfo[2], isPrimary, byDefault, 
        parentInstalled, updateOnly, branchHint, respectBranchAffinity,
-       installRedirects, followLocalChanges))
+       respectFlavorAffinity, installRedirects, followLocalChanges))
 
             trv = None
             jobAdded = False
@@ -773,15 +780,19 @@ followLocalChanges: %s
                             # affinity concerns.  If the user has made
                             # a local change that would make this new 
                             # install a downgrade, skip it.
-                            if (newInfo[1] < replaced[0] 
-                                    and not isPrimary 
-                                    and replacedInfo in sameBranchLocalUpdates):
-                                log.debug('SKIP: avoiding downgrade')
+                            if not isPrimary:
+                                if replacedInfo in sameBranchLocalUpdates:
+                                    notInstalledFlavor = \
+                                        sameBranchLocalUpdates[replacedInfo][1]
 
-                                # don't let this trove be erased, pretend
-                                # like it was explicitly requested.
-                                alreadyInstalled.add(replacedInfo)
-                                break
+                                if (newInfo[1] < replaced[0]
+                                    and replacedInfo in sameBranchLocalUpdates):
+                                    log.debug('SKIP: avoiding downgrade')
+
+                                    # don't let this trove be erased, pretend
+                                    # like it was explicitly requested.
+                                    alreadyInstalled.add(replacedInfo)
+                                    break
                         elif notInstalledBranch == installedBranch:
                             log.debug('INSTALL: branch switch is reversion')
                             # we are reverting back to the branch we were
@@ -841,6 +852,36 @@ followLocalChanges: %s
                                 recurseThis = False 
                                 alreadyInstalled.add(replacedInfo)
                                 break
+
+                        if replaced[0] and respectFlavorAffinity:
+                            if replacedInfo in localUpdatesByPresent:
+                                notInstalledFlavor = \
+                                        localUpdatesByPresent[replacedInfo][1]
+                                # create alreadyBranchSwitch variable for 
+                                # readability
+                                alreadyFlavorSwitch = True
+                            elif replacedInfo in sameBranchLocalUpdates:
+                                notInstalledFlavor = \
+                                        sameBranchLocalUpdates[replacedInfo][1]
+                            else:
+                                notInstalledFlavor = None
+
+                            if (notInstalledFlavor
+                                and not deps.compatibleFlavors(
+                                                           notInstalledFlavor,
+                                                           replacedInfo[2])
+                                and not deps.compatibleFlavors(replacedInfo[2],
+                                                               newInfo[2])):
+                                if isPrimary:
+                                    respectFlavorAffinity = False
+                                else:
+                                    log.debug('SKIP: Not reverting'
+                                              ' incompatible flavor switch')
+                                    recurseThis = False
+                                    alreadyInstalled.add(replacedInfo)
+                                    break
+
+
 
                 # below are checks to see if a fresh install should completed.
                 # Since its possible that an update from above could be 
@@ -947,6 +988,10 @@ conary erase '%s=%s[%s]'
             elif replaced[0]:
                 branchHint = (replaced[0].branch(), newInfo[1].branch())
 
+            if replaced[0] and deps.compatibleFlavors(replaced[1], newInfo[2]):
+                log.debug('respecting flavor affinity for children')
+                respectFlavorAffinity = True
+
             if trv is None:
                 try:
                     trv = troveSource.getTrove(withFiles = False, *newInfo)
@@ -988,7 +1033,8 @@ conary erase '%s=%s[%s]'
 
                 newTroves.append((info, False, 
                                   byDefaultDict, jobAdded, branchHint,
-                                  respectBranchAffinity, installRedirects,
+                                  respectBranchAffinity, respectFlavorAffinity,
+                                  installRedirects,
                                   childrenFollowLocalChanges,
                                   updateOnly))
 

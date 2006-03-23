@@ -1,3 +1,13 @@
+Changes in @NEW@:
+  o Client Changes
+    * Given a system based on rPath linux where you only installed !smp 
+      kernels, conary would eventually start installing smp kernels on your 
+      system, due to the way the update algorithm would determine whether you 
+      should install a newly available trove.  Conary now respects flavor 
+      affinity in this case and does not install the smp kernel.
+    * Mirror configuration files can now specify uploadRateLimit and
+      downloadRateLimit.
+
 Changes in 1.0.9:
   o Client Changes:
     * A new dependency resolution method has been added which can be turned
