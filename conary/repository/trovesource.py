@@ -506,6 +506,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 if info in self.troveCsMap:
                     # FIXME: there is no such exception in this context
                     raise DuplicateTrove
+                if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
+                    # we don't has the old version of this trove, don't 
+                    # use this changeset when updating this trove.
+                    continue
                 self.troveCsMap[info] = cs
                 self.jobMap[(info[0], (trvCs.getOldVersion(), 
                                        trvCs.getOldFlavor()), 
