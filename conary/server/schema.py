@@ -1337,6 +1337,10 @@ def setupTempTables(db):
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["ffFlavor"] = True
+        db.createIndex("ffFlavor", "ffFlavorBaseIdx", "flavorId,base",
+                       check = False)
+        db.createIndex("ffFlavor", "ffFlavorSenseIdx", "flavorId,sense",
+                       check = False)
     if "NewFiles" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NewFiles(
