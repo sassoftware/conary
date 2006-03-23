@@ -77,10 +77,14 @@ if options.verbose:
 # they have the same name (the repositorymap gets us to the right hosts).
 sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
                           cfg.source.user,
+                          uploadRateLimit = cfg.uploadRateLimit,
+                          downloadRateLimit = cfg.downloadRateLimit,
                           entitlementDir = cfg.entitlementDirectory)
 
 targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
                           cfg.target.user,
+                          uploadRateLimit = cfg.uploadRateLimit,
+                          downloadRateLimit = cfg.downloadRateLimit,
                           entitlementDir = cfg.entitlementDirectory)
 
 # we pass in the sync flag only the first time around, because after

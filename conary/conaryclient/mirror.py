@@ -32,7 +32,9 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     labels                =  conarycfg.CfgInstallLabelPath
     source                =  MirrorConfigurationSection
     target                =  MirrorConfigurationSection
-
+    uploadRateLimit       =  (CfgInt, 0)
+    downloadRateLimit     =  (CfgInt, 0)
+        
     def __init__(self):
         cfg.SectionedConfigFile.__init__(self)
 
