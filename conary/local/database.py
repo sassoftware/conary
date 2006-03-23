@@ -53,6 +53,10 @@ class Rollback:
             return (None, None)
         return self._getChangeSets(self.count - 1)
 
+    def getLocalChangeset(self, i):
+        local = changeset.ChangeSetFromFile(self.localName % (self.dir, i))
+        return local
+
     def removeLast(self):
         if self.count == 0:
             return
@@ -746,7 +750,21 @@ class Database(SqlDbRepository):
 		raise RollbackOrderError(name)
 	    last -= 1
 
-	for name in names:
+        # Count the number of jobs in the rollback. We have to open the
+        # local rollbacks to know if there is any work to do, which is
+        # unfortunate. We don't want to include empty local rollbacks
+        # in the work count though.
+        totalCount = 0
+        for name in names:
+            rb = self.getRollback(name)
+            totalCount += rb.getCount()
+            for i in xrange(rb.getCount()):
+                localCs = rb.getLocalChangeset(i)
+                if not localCs.isEmpty():
+                    totalCount += 1
+
+        for i, name in enumerate(names):
+            itemCount = i * 2
 	    rb = self.getRollback(name)
 
             # we don't want the primary troves from reposCs to win, so get
@@ -772,15 +790,24 @@ class Database(SqlDbRepository):
                 reposCs.merge(newCs)
 
                 try:
+                    itemCount += 1
+                    callback.setUpdateHunk(itemCount, totalCount)
+                    callback.setUpdateJob(reposCs.getJobSet())
                     self.commitChangeSet(reposCs, UpdateJob(None),
                                          isRollback = True,
                                          replaceFiles = replaceFiles,
                                          callback = callback)
-                    self.commitChangeSet(localCs, UpdateJob(None),
-                                         isRollback = True,
-                                         toStash = False,
-                                         replaceFiles = replaceFiles,
-                                         callback = callback)
+
+                    if not localCs.isEmpty():
+                        itemCount += 1
+                        callback.setUpdateHunk(itemCount, totalCount)
+                        callback.setUpdateJob(localCs.getJobSet())
+                        self.commitChangeSet(localCs, UpdateJob(None),
+                                             isRollback = True,
+                                             toStash = False,
+                                             replaceFiles = replaceFiles,
+                                             callback = callback)
+
                     rb.removeLast()
                 except CommitError, err:
                     raise RollbackError(name, err)

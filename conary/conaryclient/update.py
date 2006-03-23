@@ -1597,6 +1597,7 @@ conary erase '%s=%s[%s]'
                                                for x in incompleteJobs])
             newCs = changeset.ChangeSet()
             for newT, oldT in itertools.izip(newTroves, oldTroves):
+                oldT.troveInfo.incomplete.set(1)
                 newT.troveInfo.incomplete.set(0)
                 newCs.newTrove(newT.diff(oldT)[0])
 
@@ -1607,7 +1608,7 @@ conary erase '%s=%s[%s]'
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
-                        split = False, sync = False, fromChangesets = [],
+                        split = True, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False, 
                         updateOnly = False):
@@ -1643,7 +1644,10 @@ conary erase '%s=%s[%s]'
         @type updateByDefault: bool
         @param callback: L{callbacks.UpdateCallback} object.
         @type L{callbacks.UpdateCallback}
-        @param split: Split large update operations into separate jobs.
+        @param split: Split large update operations into separate jobs. As
+                      of 1.0.10, this must be true (False broke how we
+                      handle users and groups, which requires info- packages
+                      to be installed first and in separate jobs)
         @type split: bool
         @param sync: Limit acceptabe trove updates only to versions 
         referenced in the local database.
@@ -1663,13 +1667,13 @@ conary erase '%s=%s[%s]'
         update installed troves.
         @rtype: tuple
         """
+        assert(split)
         callback.preparingChangeSet()
 
         uJob = database.UpdateJob(self.db)
 
         useAffinity = False
         forceJobClosure = False
-        splittable = True
 
         if fromChangesets:
             # when --from-file is used we need to explicitly compute the
@@ -1677,7 +1681,6 @@ conary erase '%s=%s[%s]'
             # repository to give us the right thing, but that won't
             # work when we're pulling jobs out of the change set
             forceJobClosure = True
-            splitabble = False
 
             csSource = trovesource.ChangesetFilesTroveSource(self.db,
                                                              storeDeps=True)
@@ -1695,7 +1698,6 @@ conary erase '%s=%s[%s]'
                                                    includesFileContents = True)
 
             uJob.setSearchSource(trovesource.stack(csSource, self.repos))
-            splittable = False
         elif sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
         elif syncChildren:
@@ -1713,7 +1715,6 @@ conary erase '%s=%s[%s]'
                                        forceJobClosure = forceJobClosure,
                                        syncChildren = syncChildren,
                                        updateOnly = updateOnly)
-        split = split and splittable
         updateThreshold = self.cfg.updateThreshold
 
         # When keep existing is provided none of the changesets should
@@ -1773,63 +1774,60 @@ conary erase '%s=%s[%s]'
             if conflicts:
                 raise InstallPathConflicts(conflicts)
 
-        if split:
-            startNew = True
-            newJob = []
-            for jobList in splitJob:
-                if startNew:
-                    newJob = []
-                    startNew = False
-                    count = 0
-                    newJobIsInfo = False
+        startNew = True
+        newJob = []
+        for jobList in splitJob:
+            if startNew:
+                newJob = []
+                startNew = False
+                count = 0
+                newJobIsInfo = False
 
-                foundCollection = False
+            foundCollection = False
 
-                count += len(jobList)
-                isInfo = None                 # neither true nor false
-                infoName = None
-                for job in jobList:
-                    (name, (oldVersion, oldFlavor),
-                           (newVersion, newFlavor), absolute) = job
+            count += len(jobList)
+            isInfo = None                 # neither true nor false
+            infoName = None
+            for job in jobList:
+                (name, (oldVersion, oldFlavor),
+                       (newVersion, newFlavor), absolute) = job
 
-                    if newVersion is not None and ':' not in name:
-                        foundCollection = True
+                if newVersion is not None and ':' not in name:
+                    foundCollection = True
 
-                    if name.startswith('info-'):
-                        assert(isInfo is True or isInfo is None)
-                        isInfo = True
-                        if not infoName:
-                            infoName = name.split(':')[0]
-                    else:
-                        assert(isInfo is False or isInfo is None)
-                        isInfo = False
-
-                if (not isInfo or infoName != name) and newJobIsInfo is True:
-                    # We switched from installing info components to
-                    # installing fresh components. This has to go into
-                    # a separate job from the last one.
-                    # FIXME: We also require currently that each info 
-                    # job be for the same info trove - that is, can't
-                    # have info-foo and info-bar in the same update job
-                    # because info-foo might depend on info-bar being
-                    # installed already.  This should be fixed.
-                    uJob.addJob(newJob)
-                    count = len(jobList)
-                    newJob = list(jobList)             # make a copy
-                    newJobIsInfo = False
+                if name.startswith('info-'):
+                    assert(isInfo is True or isInfo is None)
+                    isInfo = True
+                    if not infoName:
+                        infoName = name.split(':')[0]
                 else:
-                    newJobIsInfo = isInfo
-                    newJob += jobList
+                    assert(isInfo is False or isInfo is None)
+                    isInfo = False
 
-                if (foundCollection or 
-                    (updateThreshold and (count >= updateThreshold))): 
-                    uJob.addJob(newJob)
-                    startNew = True
-
-            if not startNew:
+            if (not isInfo or infoName != name) and newJobIsInfo is True:
+                # We switched from installing info components to
+                # installing fresh components. This has to go into
+                # a separate job from the last one.
+                # FIXME: We also require currently that each info 
+                # job be for the same info trove - that is, can't
+                # have info-foo and info-bar in the same update job
+                # because info-foo might depend on info-bar being
+                # installed already.  This should be fixed.
                 uJob.addJob(newJob)
-        else:
-            uJob.addJob(jobSet)
+                count = len(jobList)
+                newJob = list(jobList)             # make a copy
+                newJobIsInfo = False
+            else:
+                newJobIsInfo = isInfo
+                newJob += jobList
+
+            if (foundCollection or 
+                (updateThreshold and (count >= updateThreshold))): 
+                uJob.addJob(newJob)
+                startNew = True
+
+        if not startNew:
+            uJob.addJob(newJob)
 
         return (uJob, suggMap)
 
@@ -1857,6 +1855,10 @@ conary erase '%s=%s[%s]'
             return baseCs
 
         def _applyCs(cs, uJob, removeHints = {}):
+            # Before applying this job, reset the underlying changesets. This
+            # lets us traverse user-supplied changesets multiple times.
+            uJob.troveSource.reset()
+
             try:
                 self.db.commitChangeSet(cs, uJob,
                                         replaceFiles = replaceFiles,

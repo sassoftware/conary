@@ -7,6 +7,13 @@ Changes in @NEW@:
       affinity in this case and does not install the smp kernel.
     * Mirror configuration files can now specify uploadRateLimit and
       downloadRateLimit.
+    * Updates involving changeset files are now split into multiple jobs
+      properly, allowing changeset files which create users to work proprely
+
+  o Bug Fixes:
+    * Fixed a case where an Assertion could be raised when switching from an
+      incomplete trove to a complete trove.
+    * Rollbacks now display progress information which matches normal updates
 
 Changes in 1.0.9:
   o Client Changes:
