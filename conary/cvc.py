@@ -445,6 +445,7 @@ class CookCommand(CvcCommand):
 
         if 'no-clean' in argSet:
             cfg.cleanAfterCook = False
+            del argSet['no-clean']
 
         if argSet.has_key('resume'):
             resume = argSet['resume']
