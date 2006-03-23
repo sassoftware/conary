@@ -14,6 +14,7 @@
 import itertools
 
 from conary import errors
+from conary.lib import log
 from conary.repository import trovesource
 from conary.deps import deps
 
@@ -75,7 +76,7 @@ class DependencySolver(object):
 
             troves = set()
 
-            for (troveName, depSet) in depList:
+            for (troveTup, depSet) in depList:
                 if depSet in sugg:
                     suggList = set()
                     for choiceList in sugg[depSet]:
@@ -93,8 +94,9 @@ class DependencySolver(object):
                                                                 affTroveDict)
                             if choice:
                                 suggList.add(choice)
-                                l = suggMap.setdefault(troveName, set())
+                                l = suggMap.setdefault(troveTup, set())
                                 l.add(choice)
+                                log.debug('%s=%s[%s]\n  REQ: %s=%s[%s]\n  SOLVES: %s' % (troveTup + choice + ('\n\t'.join(str(depSet).split('\n')),)))
                                 break
 
                     troves.update([ (x[0], (None, None), x[1:], True)
