@@ -265,13 +265,15 @@ class DependencySolver(object):
             newJob, suggMap = self.client.updateChangeSet(updateJobs,
                                                      keepExisting=False,
                                                      resolveDeps=False,
-                                                     split=False)
+                                                     split=True)
             newJobSet = newJob.getJobs()
 
             # ignore updates where updating this trove would update
             # to something that's already in the jobSet
-            newJobSet = set(x for x in newJobSet[0]
-                            if (x[0], x[2][0], x[2][1]) not in newIdx)
+            jobs = ((x for x in jobSet
+                     if (x[0], x[2][0], x[2][1]) not in newIdx)
+                    for jobSet in newJobSet)
+            newJobSet = set(itertools.chain(*jobs))
 
             # We were able to update some troves that required troves
             # that were in the cannot resolve list.
