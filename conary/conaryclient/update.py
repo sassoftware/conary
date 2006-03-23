@@ -325,8 +325,14 @@ class ClientUpdate:
                 # FIXME: should this include weak references?
                 if inDb:
                     otherTrv = db.getTrove(withFiles = False, *info)
-                else:
+                elif trvSrc.hasTroves(info)[0]:
                     otherTrv = trvSrc.getTrove(withFiles = False, *info)
+                else:
+                    # if the trove is not in the trove source, then it 
+                    # can't be part of the update job.  This can happen 
+                    # for example if you're just installing a package with
+                    # no-recurse.
+                    continue
 
                 if ph is None:
                     ph = otherTrv.getPathHashes()
