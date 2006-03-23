@@ -904,6 +904,8 @@ def realMain(cfg, argv=sys.argv):
         return usage()
 
     commandName = argv[1]
+    if commandName == 'usage':
+        return usage(rc=0)
     if commandName not in supportedCommands:
         return usage()
     

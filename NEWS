@@ -1,8 +1,21 @@
-* Updates involving changeset files are now split into multiple jobs
-  properly, allowing changeset files which create users to work proprely
-* Rollbacks now display progress information which matches normal updates
-
 Changes in @NEW@:
+  o Client Changes
+    * Given a system based on rPath linux where you only installed !smp 
+      kernels, conary would eventually start installing smp kernels on your 
+      system, due to the way the update algorithm would determine whether you 
+      should install a newly available trove.  Conary now respects flavor 
+      affinity in this case and does not install the smp kernel.
+    * Mirror configuration files can now specify uploadRateLimit and
+      downloadRateLimit.
+    * Updates involving changeset files are now split into multiple jobs
+      properly, allowing changeset files which create users to work proprely
+
+  o Bug Fixes:
+    * Fixed a case where an Assertion could be raised when switching from an
+      incomplete trove to a complete trove.
+    * Rollbacks now display progress information which matches normal updates
+
+Changes in 1.0.9:
   o Client Changes:
     * A new dependency resolution method has been added which can be turned
       on by setting resolveLevel to 2 in your conarycfg:  If updating trove 'a'
@@ -11,6 +24,8 @@ Changes in @NEW@:
       to work as expected when you have conary-build installed, for example.
     * Switched to using more of optparse's capabilities, including --help
       messages.
+    * One short option has been added, cvc -m for message.
+
   o Bug Fixes:
     * Recipes that use loadRecipe('foo') and rely on conary to look upstream
       to find their branch now work correctly when committing.
@@ -27,9 +42,23 @@ Changes in @NEW@:
       and on the shadow
     * admin web access for the server doesn't require write permission for
       operations which also require admin access (bug #833)
+    * A bug that caused r.remove() in a group to fail if the trove being
+      removed was recursively included from another group has been fixed.
+    * Conary update tmpwatch -tmpwatch:debuginfo will now erase 
+      tmpwatch:debuginfo.
+    * An ordering bug that caused info packages to not be updated with their
+      components has been fixed.
+    * Updates will now happen in a more consistent order based on an
+      alphabetic sort.
+    * the repository server now handles database deadlocks when committing
+       changesets
   o Server Changes:
     * getNewSigList and getNewTroveList could return troveLists with
       duplicate entries
+
+  o Documentation Changes:
+    * The inline documentation for recipes has been significantly
+      improved and expanded, including many new usage examples.
 
 Changes in 1.0.8
   o Client changes:

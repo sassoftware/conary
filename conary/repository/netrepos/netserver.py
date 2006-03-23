@@ -1259,35 +1259,61 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
-        # FIXME: This general exception handler is to catch the case
-        # where we are retrying a commit as anonymous.  We should find
-        # a way to keep the changeset file from being deleted on the
-        # first try so we can retry it as anonymous.
-        try:
+        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
+        attempt = 1
+        while True:
+            # raise InsufficientPermission if we can't read the changeset
             try:
                 cs = changeset.ChangeSetFromFile(path)
-            finally:
+            except:
+                raise errors.InsufficientPermission
+            # because we have a temporary file we need to delete, we
+            # need to catch the DatabaseLocked errors here and retry
+            # the commit ourselves
+            try:
+                ret = self._commitChangeSet(authToken, cs, mirror)
+            except sqlerrors.DatabaseLocked, e:
+                # deadlock occured; we rollback and try again
+                log.error("Deadlock id %d: %s", attempt, str(e.args))
+                self.log(1, "Deadlock id %d: %s" %(attempt, str(e.args)))
+                if attempt < self.deadlockRetry:
+                    self.db.rollback()
+                    attempt += 1
+                    continue
+                break
+            except Exception, e:
+                break
+            else: # all went well
                 util.removeIfExists(path)
-        except Exception, e:
-            raise errors.InsufficientPermission
+                return ret
+        # we only reach here if we could not handle the exception above
+        util.removeIfExists(path)
+        # Figure out what to return back
+        if isinstance(e, sqlerrors.DatabaseLocked):
+            # too many retries
+            raise errors.CommitError("DeadlockError", e.args)
+        raise
+
+    def _commitChangeSet(self, authToken, cs, mirror = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
         items = {}
         for troveCs in cs.iterNewTroveList():
             name = troveCs.getName()
             version = troveCs.getNewVersion()
-            items[(name, version)] = True
+            flavor = troveCs.getNewFlavor()
             if not self.auth.check(authToken, write = True, mirror = mirror,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
-        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
+            items.setdefault((version, flavor), []).append(name)
+        self.log(2, authToken[0], 'mirror=%s' % (mirror,),
+                 [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, self.name, mirror = mirror)
 	if not self.commitAction:
 	    return True
 
-        d = { 'reppath' : self.urlBase(),
-              'user' : authToken[0], }
+        d = { 'reppath' : self.urlBase(), 'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:

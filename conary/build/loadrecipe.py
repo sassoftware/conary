@@ -289,13 +289,13 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
         the label path, and return the one that's "best".
 
         The following rules should apply:
-        * if the labelPath is [bar, foo] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
-          is that any other shadow/branch in the path may be from a 
-          maintenance branch.
-        * if the labelPath is [bar] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.
-        * if two troves are on the same branch, prefer the later trove.
+            - If the labelPath is [bar, foo] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
+              is that any other shadow/branch in the path may be from a 
+              maintenance branch.
+            - If the labelPath is [bar] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.
+            - If two troves are on the same branch, prefer the later trove.
     """
     scores = [ (_scoreLoadRecipeChoice(labelPath, x[1]), x) for x in troveTups ]
     maxScore = max(scores)[0]
