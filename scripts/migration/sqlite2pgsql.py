@@ -31,8 +31,10 @@ if len(sys.argv) != 3:
     print "Usage: migrate <sqlite_path> <pgsql_spec>"
 
 sqlite = dbstore.connect(sys.argv[1], driver = "sqlite")
+sqlite.loadSchema()
 cs = sqlite.cursor()
 pgsql = dbstore.connect(sys.argv[2], driver = "postgresql")
+pgsql.loadSchema()
 cp = pgsql.cursor()
 
 # create the tables, avoid the indexes

@@ -33,8 +33,10 @@ if len(sys.argv) != 3:
     print "Usage: migrate <sqlite_path> <mysql_spec>"
 
 sqlite = dbstore.connect(sys.argv[1], driver = "sqlite")
+sqlite.loadSchema()
 cs = sqlite.cursor()
 mysql = dbstore.connect(sys.argv[2], driver = "mysql")
+mysql.loadSchema()
 cm = mysql.cursor()
 
 # create the tables, avoid the indexes
