@@ -566,47 +566,48 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-            troveNameClause = "gtvlTbl JOIN Items using (item)"
+            troveNameClause = "gtvlTbl JOIN Items USING (item)"
 
-        getList = [ 'Items.item', 'permittedTrove']
+        getList = [ 'Items.item as item', 'UP.permittedTrove as acl']
         if dropTroveTable:
-            getList.append('gtvlTbl.flavorId')
+            getList.append('gtvlTbl.flavorId as flavorId')
         else:
-            getList.append('0')
+            getList.append('0 as flavorId')
         argList = [ ]
 
-        getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
-                     'Nodes.finalTimestamp' ]
-        versionClause = "join Versions ON Nodes.versionId = Versions.versionId"
+        getList += [ 'Versions.version as version',
+                     'Nodes.timeStamps as timeStamps',
+                     'Nodes.branchId as branchId',
+                     'Nodes.finalTimestamp as finalTimestamp' ]
+        versionClause = "JOIN Versions ON Nodes.versionId = Versions.versionId"
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
-                labelClause = """ JOIN Labels ON
-                    Labels.labelId = LabelMap.labelId AND
-                    Labels.label = '%s'""" % singleVersionSpec
+                labelClause = """JOIN Labels ON
+                Labels.labelId = LabelMap.labelId
+                AND Labels.label = '%s'""" % singleVersionSpec
             else:
                 labelClause = """JOIN Labels ON
-                    Labels.labelId = LabelMap.labelId AND
-                    Labels.label = gtvlTbl.versionSpec"""
+                Labels.labelId = LabelMap.labelId
+                AND Labels.label = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
                 labelClause = """JOIN Branches ON
-                    Branches.branchId = LabelMap.branchId AND
-                    Branches.branch = '%s'""" % singleVersionSpec
+                Branches.branchId = LabelMap.branchId
+                AND Branches.branch = '%s'""" % singleVersionSpec
             else:
                 labelClause = """JOIN Branches ON
-                    Branches.branchId = LabelMap.branchId AND
-                    Branches.branch = gtvlTbl.versionSpec"""
+                Branches.branchId = LabelMap.branchId
+                AND Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
             labelClause = ""
             if singleVersionSpec:
                 vc = "Versions.version = '%s'" % singleVersionSpec
             else:
                 vc = "Versions.version = gtvlTbl.versionSpec"
-            versionClause = """%s AND
-            %s""" % (versionClause, vc)
+            versionClause = """%s AND %s""" % (versionClause, vc)
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             labelClause = ""
@@ -614,97 +615,93 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """join Latest as Domain using (itemId)
-            join Nodes using (itemId, branchId, versionId)"""
+            instanceClause = """JOIN Latest AS Domain USING (itemId)
+            JOIN Nodes USING (itemId, branchId, versionId)"""
         else:
-            instanceClause = """join Instances as Domain using (itemId)
-            join Nodes using (itemId, versionid)"""
+            instanceClause = """JOIN Instances AS Domain USING (itemId)
+            JOIN Nodes USING (itemId, versionid)"""
 
         if withFlavors:
-            getList.append("Flavors.flavor")
-            flavorClause = "join Flavors ON Flavors.flavorId = Domain.flavorId"
+            getList.append("Flavors.flavor as flavor")
+            flavorClause = "JOIN Flavors ON Flavors.flavorId = Domain.flavorId"
         else:
-            getList.append("NULL")
+            getList.append("NULL as flavor")
             flavorClause = ""
 
-        if flavorIndices:
-            assert(withFlavors)
-            if len(flavorIndices) > 1:
-                # if there is only one flavor we don't need to join based on
-                # the gtvlTbl.flavorId (which is good, since it may not exist)
-                extraJoin = """ffFlavor.flavorId = gtvlTbl.flavorId
-                      AND
-                """
-            else:
-                extraJoin = ""
-
-            flavorScoringClause = """
-            LEFT OUTER JOIN FlavorMap ON
-                FlavorMap.flavorId = Flavors.flavorId
-            LEFT OUTER JOIN ffFlavor ON
-                %s
-                ffFlavor.base = FlavorMap.base AND
-                (  ffFlavor.flag = FlavorMap.flag OR
-                   ( ffFlavor.flag is NULL AND FlavorMap.flag is NULL )
-                )
-            LEFT OUTER JOIN FlavorScores ON
-                FlavorScores.present = FlavorMap.sense AND
-                (    FlavorScores.request = ffFlavor.sense OR
-                     ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
-                )
-            """ % extraJoin
-                        #(FlavorScores.request = ffFlavor.sense OR
-                        #    (ffFlavor.sense is NULL AND
-                        #     FlavorScores.request = 0)
-                        #)
-
-            grouping = """GROUP BY
-            Domain.itemId, Domain.versionId, Domain.flavorId, aclId"""
-            if dropTroveTable:
-                grouping = grouping + ", gtvlTbl.flavorId"
-
-            # according to some SQL standard, the SUM in the case where all
-            # values are NULL is NULL. So we use coalesce to change NULL to 0
-            getList.append("SUM(coalesce(FlavorScores.value, 0)) "
-                           "as flavorScore")
-            flavorScoreCheck = "HAVING flavorScore > -500000"
-        else:
-            assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
-            flavorScoringClause = ""
-            grouping = ""
-            getList.append("NULL")
-            flavorScoreCheck = ""
-
-        fullQuery = """
-        SELECT
-            %s
-        FROM
-            %s
-            %s
-            join LabelMap using (itemid, branchId)
-            join (
-               select
+        mainQuery = """
+        SELECT %%(distinct)s %%(select)s
+        FROM %(troveName)s
+        %(instance)s
+        JOIN LabelMap USING (itemid, branchId)
+        JOIN ( SELECT
                    Permissions.labelId as labelId,
                    PerItems.item as permittedTrove,
                    Permissions.permissionId as aclId
-               from
+               FROM
                    Permissions
-                   join Items as PerItems using (itemId)
-               where
-                   Permissions.userGroupId in (%s)
-               ) as UP on
-                   ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            %s
-            %s
-            %s
-            %s
-        %s
-        %s
-        ORDER BY Items.item, Nodes.finalTimestamp
-        """ % (", ".join(getList), troveNameClause, instanceClause,
-               ", ".join("%d" % x for x in userGroupIds),
-               versionClause, labelClause, flavorClause, flavorScoringClause,
-               grouping, flavorScoreCheck)
+                   JOIN Items as PerItems USING (itemId)
+               WHERE
+                   Permissions.userGroupId IN (%(ugid)s)
+            ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        %(version)s
+        %(label)s
+        %(flavor)s
+        """ % {
+            "troveName" : troveNameClause,
+            "instance" : instanceClause,
+            "ugid" : ", ".join("%d" % x for x in userGroupIds),
+            "version" : versionClause,
+            "label" : labelClause,
+            "flavor" : flavorClause,
+            }
+
+        if flavorIndices:
+            assert(withFlavors)
+            extraJoin = extraGrouping = ""
+            if len(flavorIndices) > 1:
+                # if there is only one flavor we don't need to join based on
+                # the gtvlTbl.flavorId (which is good, since it may not exist)
+                extraJoin = """ffFlavor.flavorId = tmpQ.flavorId
+                AND """
+            if dropTroveTable:
+                extraGrouping = ", tmpQ.flavorId"
+
+            fullQuery = """
+            SELECT
+                tmpQ.item, tmpQ.acl, tmpQ.flavorId, tmpQ.version,
+                tmpQ.timeStamps, tmpQ.branchId, tmpQ.finalTimestamp,
+                tmpQ.flavor, SUM(coalesce(FlavorScores.value, 0)) as flavorScore
+            FROM ( %(mainQuery)s ) as tmpQ
+            JOIN Flavors ON tmpQ.flavor = Flavors.flavor
+            LEFT OUTER JOIN FlavorMap ON
+                FlavorMap.flavorId = Flavors.flavorId
+            LEFT OUTER JOIN ffFlavor ON
+                %(extraJoin)s ffFlavor.base = FlavorMap.base
+                AND ( ffFlavor.flag = FlavorMap.flag OR
+                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL)
+                    )
+            LEFT OUTER JOIN FlavorScores ON
+                FlavorScores.present = FlavorMap.sense
+                AND ( FlavorScores.request = ffFlavor.sense OR
+                      ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
+                    )
+            GROUP BY tmpQ.item, tmpQ.version, tmpQ.flavor, tmpQ.aclId %(extraGrouping)s
+            HAVING flavorScore > -500000
+            ORDER BY tmpQ.item, tmpQ.finalTimestamp
+            """ % {
+                "mainQuery" : mainQuery %{ "select" : ", ".join(getList+["UP.aclId as aclId"]),
+                                           "distinct" : "DISTINCT" },
+                "extraJoin" : extraJoin,
+                "extraGrouping" : extraGrouping,
+                }
+        else:
+            assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
+            fullQuery = """%(mainQuery)s
+            ORDER BY Items.item, Nodes.finalTimestamp
+            """ % {
+                "mainQuery" : mainQuery % {"select":", ".join(getList+["NULL as flavorScore"]),
+                                           "distinct" : ""}
+                }
         self.log(4, "execute query", fullQuery, argList)
         cu.execute(fullQuery, argList)
 
