@@ -296,17 +296,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("(skipping commit due to test mode)")
         else:
             log.debug("committing")
-            try:
-                targetRepos.commitChangeSetFile(tmpName, mirror = True)
-            except (errors.TroveIntegrityError,), e:
-                log.debug("relative changeset could not be committed: %s", str(e.args))
-                jobList = [(x[0], (None, None), x[2], x[3]) for x in jobList]
-                log.debug("getting absolute changeset %s", jobList)
-                # try again as an absolute changeset
-                cs = sourceRepos.createChangeSetFile(jobList, tmpName,
-                                                     recurse = False)
-                log.debug("committing absolute changeset")
-                targetRepos.commitChangeSetFile(tmpName, mirror = True)
+            targetRepos.commitChangeSetFile(tmpName, mirror = True)
         os.unlink(tmpName)
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
