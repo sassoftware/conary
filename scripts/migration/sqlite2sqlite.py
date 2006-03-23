@@ -36,8 +36,10 @@ if len(sys.argv) != 3:
     print "Usage: migrate <sqldb-orig> <sqldb-new>"
 
 source = dbstore.connect(sys.argv[1], driver = "sqlite")
+source.loadSchema()
 cs = source.cursor()
 dest = dbstore.connect(sys.argv[2], driver = "sqlite")
+dest.loadSchema()
 cp = dest.cursor()
 
 # create the tables, avoid the indexes
@@ -102,7 +104,12 @@ def timings(current, total, tstart):
 BATCH=5000
 
 for t in tList:
-    count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
+    try:
+        count = cs.execute("SELECT COUNT(ROWID) FROM %s" % t).fetchone()[0]
+    except sqlerrors.InvalidTable, e:
+        print 'error reading table', t, str(e), 'run server.py --migrate first'
+        sys.exit(1)
+
     i = 0
     cs.execute("SELECT * FROM %s" % t)
     t1 = time.time()
