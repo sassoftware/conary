@@ -298,8 +298,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("committing")
             try:
                 targetRepos.commitChangeSetFile(tmpName, mirror = True)
-            except errors.InternalServerError:
-                log.debug("relative changeset could not be committed")
+            except (errors.TroveIntegrityError,), e:
+                log.debug("relative changeset could not be committed: %s", str(e.args))
                 jobList = [(x[0], (None, None), x[2], x[3]) for x in jobList]
                 log.debug("getting absolute changeset %s", jobList)
                 # try again as an absolute changeset
