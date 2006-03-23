@@ -14,6 +14,8 @@ Changes in @NEW@:
     * Fixed a case where an Assertion could be raised when switching from an
       incomplete trove to a complete trove.
     * Rollbacks now display progress information which matches normal updates
+    * Fixed a bug in perl dependencies where extra directories could be 
+      considered part of the dependency
 
 Changes in 1.0.9:
   o Client Changes:
