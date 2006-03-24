@@ -104,21 +104,21 @@ class GroupRecipe(_BaseGroupRecipe):
     DESCRIPTION
     ===========
     The C{r.GroupRecipe} class provides the interface for creation of groups
-    in a Conary recipe.  A group refers to a collection of troves.  The troves
-    may be related in purpose, to provide a useful functionality such as a
+    in a Conary recipe.  A group refers to a collection of troves; the troves
+    may be related in purpose to provide a useful functionality, such as a
     group of media-related troves to provide encoding, decoding, and playback
     facilities for various media, for example.  Groups are not required to
     consist of troves with related functionality however, and may contain a
     collection of any arbitrary troves.
 
     Most C{r.GroupRecipe} user commands accept a B{groupName}
-    parameter.  This parameter  specifies the group a particular command
-    applies to.  For example, C{r.add('foo', groupName='group-bar')}
+    parameter. This parameter  specifies the group a particular command
+    applies to. For example, C{r.add('foo', groupName='group-bar')}
     attempts to add the trove I{foo} to the group I{group-bar}.
 
     The group specified by B{groupName} must exist, or be created before
     troves may be added to it. The B{groupName} parameter may also be a list
-    of groups, in which case the command will be applied to all groups.  If
+    of groups in which case the command will be applied to all groups.  If
     B{groupName} is not specified, or is None, then the command will apply to
     the current default group.
 
@@ -670,7 +670,7 @@ class GroupRecipe(_BaseGroupRecipe):
         The C{r.replace} command replaces all troves with a particular name 
         with a new version of the trove.
 
-        Note: By default, C{r.replace()} affects B{all} groups.  This behavior
+        Note: By default, C{r.replace()} affects B{all} groups; this behavior
         is different from other group commands.
 
         PARAMETERS

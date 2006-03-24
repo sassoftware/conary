@@ -144,12 +144,12 @@ class Run(BuildCommand):
     shown in parentheses when applicable:
 
     B{dir} : (None) Directory in which to run the command. Relative dirs are
-    relative to the build directory, absolute dirs are relative to the
+    relative to the build directory, and absolute dirs are relative to the
     destination directory.
 
     B{filewrap} : (False) If set to C{True}, a C{LD_PRELOAD} wrapper will look
     in C{%(destdir)s} for some common file operations.  Occasionally useful to
-    avoid the need to modify programs that need to be run after the build and
+    avoid the need to modify programs that need to be run after the build, and
     assume that they are not run until after installation.
 
     B{wrapdir} : (None) If set, points to a directory. Similar to C{filewrap},
@@ -175,7 +175,7 @@ class Run(BuildCommand):
         @keyword filewrap: If set to C{True}, a C{LD_PRELOAD} wrapper will
             look in C{%(destdir)s} for some common file operations.
             Occasionally useful to avoid the need to modify programs that need
-            to be run after the build and assume that they are not run until
+            to be run after the build, and assume that they are not run until
             after installation.
         @keyword wrapdir: If set, points to a directory. Similar to
             C{filewrap}, except it limits the C{%(destdir)s} substitution to
@@ -243,7 +243,7 @@ class Automake(BuildCommand):
 
     B{m4Dir} : (None) Specifies directory for C{m4} macro processor
 
-    B{preAutoconf} : (None) FIXME : keyword purpose?
+    B{preAutoconf} : (None) Commands to be run prior to C{autoconf}
 
     B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
     (by default) and if set to C{True} skip the action when C{subDir} does not
@@ -257,7 +257,7 @@ class Automake(BuildCommand):
 
     C{r.Automake(autoMakeArgs='--add-missing --foreign')}
 
-    Demonstrates calling C{r.Automake()} and passing in the C{--add-missing},
+    Demonstrates calling C{r.Automake()} and passing in the C{--add-missing}
     and C{--foreign} arguments to the C{automake} program.
     """
     # note: no use of %(args)s -- to which command would it apply?
@@ -307,7 +307,7 @@ class Configure(BuildCommand):
 
     The C{r.Configure()} class is called from within a Conary recipe to run an
     autoconf configure script, giving it the default paths as defined by the
-    macro set: C{r.Configure(extra args)}
+    macro set: C{r.Configure(extra args)}.
 
     It provides many common arguments, set correctly to values provided by
     system macros. If any of these arguments do not work for a program, then
@@ -320,8 +320,8 @@ class Configure(BuildCommand):
     The C{r.Configure()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{configureName} : (None) The name of the configure command. Normally,
-    C{configure} but occasionally C{Configure} or something else.
+    B{configureName} : (None) The name of the configure command. Normally
+    C{configure}, but occasionally C{Configure} or something else.
 
     B{objDir} : (None) Make an object directory before running C{configure}.
     This is useful for applications which do not support running configure
@@ -487,7 +487,7 @@ class Make(BuildCommand):
     The C{r.Make()} class is called from within a Conary recipe to execute the
     C{make} utility with system defaults.  The environment variables
     C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, and so on are set to the system
-    default values, as are the variables C{mflags}, and C{parallelmflags}.
+    default values, as are the variables C{mflags} and C{parallelmflags}.
 
     If the package C{Makefile} explicitly sets the *FLAGS variables,
     and you wish to change them, you will have to override them,
@@ -530,7 +530,7 @@ class Make(BuildCommand):
 
     C{r.Make("PARALLELMFLAGS='%(parallelmflags)s'", subDir=objDir)}
 
-    Demonstrates calling C{r.Make()} and setting the environment variable
+    Demonstrates calling C{r.Make()}, and setting the environment variable
     C{PARALLELMFLAGS} equal to the current value of C{%(parallelmflags)s},
     and requesting a change into the C{objDir} subdirectory before executing
     make.
@@ -614,10 +614,9 @@ class MakeParallelSubdir(Make):
     to execute the C{make} utility with system defaults for parallelmflags
     only applied to sub-make processes.
 
-    C{r.MakeParallelSubdir()} is used exactly like C{r.Make}, but
-    is used in cases where the top-level makefile does not work
-    correctly with parallel make but the lower-level makefiles
-    do work correctly with parallel make.
+    C{r.MakeParallelSubdir()} is used exactly like C{r.Make} in cases where
+    the top-level C{Makefile} does not work correctly with parallel C{make},
+    but the lower-level Makefiles do work correctly with parallel C{make}.
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -669,7 +668,7 @@ class MakeInstall(Make):
 
     C{r.MakeInstall('LIBTOOL=%(bindir)s/libtool')}
 
-    Demonstrates using C{r.MakeInstall()}, and sets the environment variable
+    Demonstrates using C{r.MakeInstall()}, and setting the environment variable
     C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
     template = ('cd %%(actionDir)s; '
@@ -707,7 +706,7 @@ class MakePathsInstall(Make):
     ===========
 
     The C{r.MakePathsInstall()} class is called from within a Conary recipe
-    when there is no single functional C{DESTDIR},or similar definition, but
+    when there is no single functional C{DESTDIR} or similar definition, but
     enough of the de-facto standard variables such as C{prefix}, C{bindir},
     and so on are honored by the Makefile to make a destdir installation
     successful
@@ -759,8 +758,8 @@ class CompilePython(BuildCommand):
     ===========
 
     The C{r.CompilePython()} is called from within a Conary recipe to compile
-    optimized, and compiled Python bytecode files. The paths specified must be
-    absolute paths, which are interpreted relative to C{%(destdir)s} in order
+    optimized and compiled Python bytecode files. The paths specified must be
+    absolute paths which are interpreted relative to C{%(destdir)s} in order
     for the paths compiled into the bytecode files to be correct.
 
     EXAMPLES
@@ -768,7 +767,7 @@ class CompilePython(BuildCommand):
 
     C{r.CompilePython('%(varmmdir)s')}
 
-    The above example demonstrates calling C{r.CompilePython()} and specifying
+    The above example demonstrates calling C{r.CompilePython()}, and specifying
     the absolute path defined by C{%(varmmdir)s}.
     """
     template = (
@@ -811,10 +810,10 @@ class PythonSetup(BuildCommand):
 
     The C{r.PythonSetup()} class is called from within a Conary recipe to
     invoke setup.py in the correct way to use python-setuptools to install
-    without building a C{.egg} file, regardless of whether this version of
+    without building a C{.egg} file regardless of whether this version of
     setup.py was written to use disttools or setuptools.
 
-    If a different name is used for the disttools, or setuptools script, pass
+    If a different name is used for the disttools or setuptools script, pass
     that name as the argument.
 
     KEYWORDS
@@ -1036,8 +1035,8 @@ class Desktopfile(BuildCommand, _FileAction):
     ===========
 
     The C{r.Desktopfile()} class is called from within a Conary recipe to
-    install a desktop file in C{/usr/share/applications}, including setting a
-    category, and vendor.
+    install a desktop file in C{/usr/share/applications} while also setting a
+    category and vendor.
 
     Proper build requirements for desktop files are also enforced by
     C{r.Desktopfile()}. The C{filename} argument is interpreted only relative
@@ -1149,15 +1148,15 @@ class SetModes(_FileAction):
     ===========
 
     The C{r.SetModes()} class is called from within a Conary recipe to set
-    modes on files in the C{%(destdir)s}, or C{%(builddir)s} directories.
+    modes on files in the C{%(destdir)s} or C{%(builddir)s} directories.
 
     For a file to be setuid in the repository, it needs to have its mode
     explicitly provided in the recipe.  File installation classes which
-    provide a mode are sufficient, but for files installed by makefiles,
-    C{r.SetModes()} provides a specific, intentional listing of their modes.
+    provide a mode are sufficient, but for files installed by Makefiles,
+    C{r.SetModes()} provides a specific intentional listing of their modes.
 
     Additionally, C{r.SetModes()} can be used to change arbitrary
-    file modes in the destination directory, or build directory. Relative
+    file modes in the destination directory or build directory. Relative
     paths are relative to the build directory.
 
     EXAMPLES
@@ -1301,7 +1300,7 @@ class Copy(_PutFiles):
     ===========
 
     The C{r.Copy()} class is called from within a Conary recipe to copy files
-    from a source directory, to a destination directory without changing the
+    from a source directory to a destination directory without changing the
     mode of the file(s).
 
     Note that a trailing slash on a destination file means to create the
@@ -1377,7 +1376,7 @@ class Symlink(_FileAction):
 
     Multiple symlinks can be created if the destination path is a directory.
     The destination path is determined to be a directory if it already
-    exists or if the path ends with a slash (C{/}) character.
+    exists, or if the path ends with a slash (C{/}) character.
 
     KEYWORDS
     ========
@@ -1501,7 +1500,7 @@ class Link(_FileAction):
     hard link.
 
     Note: The use of hard links is strongly discouraged in most cases.
-    Hardlinks are limited to the same directory, and symbolic links should
+    Hardlinks are limited to the same directory and symbolic links should
     always be chosen in preference to them.  You should not use hard links
     unless the situation deems using them B{absolutely} necessary.
 
@@ -1561,7 +1560,7 @@ class Remove(BuildAction):
     ===========
 
     The C{r.Remove()} class is called from within a Conary recipe to remove
-    one, or more files
+    one or more files.
 
     EXAMPLES
     ========
@@ -1631,9 +1630,10 @@ class Replace(BuildAction):
     The C{r.Replace()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{allowNoChange} : (False) FIXME : What does this keyword do?
+    B{allowNoChange} : (False) Do not raise an error if C{I{pattern}} did
+    not apply
 
-    B{lines:} : (None) FIXME : What does this keyword do?
+    B{lines:} : (None) Determines the lines to which the replacement applies
 
     EXAMPLES
     ========
@@ -1849,7 +1849,8 @@ class Create(_FileAction):
     ===========
 
     The C{r.Create()} class is called from within a Conary recipe to create a
-    file, either empty, or optionally with contents.
+    file. The file may be created empty, or with with contents specified
+    optionally.
 
     Without B{contents} specified, C{r.Create()} behaves like C{touch foo}.
     If B{contents} is specified C{r.Create} acts more like
@@ -1863,7 +1864,7 @@ class Create(_FileAction):
 
     B{contents} : The (optional) contents of the file
 
-    B{macros}  : Whether or not to interpolate macros into the contents
+    B{macros}  : Whether to interpolate macros into the contents
 
     B{mode} : The mode of the file (defaults to 0644)
 
@@ -1939,7 +1940,7 @@ class MakeDirs(_FileAction):
 
     C{r.MakeDirs('/misc', component='runtime')}
 
-    Demonstrates C{r.MakeDirs()}, and creates the C{/misc} directory while
+    Demonstrates C{r.MakeDirs()} creating the C{/misc} directory while
     specifying the C{:runtime} component is responsible for this directory.
     """
     keywords = { 'mode': 0755 }
@@ -2204,7 +2205,7 @@ class ConsoleHelper(BuildAction):
     B{noxoption}': (None) By default, no entry is added to the C{console.apps}
     file
 
-    B{otherlines}: FIXME : what does this keyword do?
+    B{otherlines}: Additional options catchall
 
     B{pamfile} : Specify a C{pamfile} relative to the builddir. If used,
     I{consoluser} is ignored.
@@ -2212,9 +2213,10 @@ class ConsoleHelper(BuildAction):
     B{session} : (None) By default, no entry is added to the C{console.apps}
     file
 
-    B{targetuser} : (root) FIXME : what does this keyword do?
+    B{targetuser} : (root) User service is executed as
 
-    B{timestamp} : (False) FIXME : what does this keyword do?
+    B{timestamp} : (False) If set to C{True}, allows recently authenticated user
+    access to the service without entering a password
 
     EXAMPLES
     ========
@@ -2365,7 +2367,7 @@ class XInetdService(_FileAction):
     B{server} : (None) Specifies the program that will be executed for this
     service
 
-    Bserver_args} : (None) Specifies additional command-line arguments to the
+    B{server_args} : (None) Specifies additional command-line arguments to the
     program defined by B{server}
 
     B{protocol} : (None) Specifies the protocol to be used by the service from
@@ -2384,8 +2386,8 @@ class XInetdService(_FileAction):
     B{id} : (False) Specifies unique identifier for the service
 
     B{wait} : (False) Specifies whether service is single-threaded or
-    multi-threaded and whether the server program accepts the connection
-    or C{xinetd} accepts the connection
+    multi-threaded, and whether the server program accepts the connection, or
+    C{xinetd} accepts the connection
 
     B{disable} : (True) Specifies whether the service should be disabled
 
@@ -2394,7 +2396,7 @@ class XInetdService(_FileAction):
     B{group} : (None) Specifies the Group ID for the server process
 
     B{log_on_success} : (None) Specifies information to be logged when
-    a server is started and when a server exits
+    a server is started, and when a server exits
 
     B{log_on_failure} : (None) Specifies information to log when a server
     cannot be started

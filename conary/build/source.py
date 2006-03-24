@@ -146,7 +146,7 @@ class Archive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tarball, or zip file, and unpack it to the proper
+    optionally compressed tarball or zip file, and unpacks it to the proper
     directory.
 
     KEYWORDS
@@ -164,16 +164,16 @@ class Archive(_Source):
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcenameC{{.sig,sign,asc}}} and
+    search for a file named I{sourcenameC{{.sig,sign,asc}}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
-    looks in the file, or URL specified by C{rpm} for an RPM
+    looks in the file or URL specified by C{rpm} for an RPM
     containing C{sourcename}.
 
     B{sourcename} : The name of the source archive, which may be a
-    local filename, or a Uniform Resource Locator. (URL)
+    local filename or a Uniform Resource Locator. (URL)
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -336,19 +336,19 @@ class Patch(_Source):
 
     B{extraArgs} : As a last resort, arbitrary arguments may be passed to the
     patch program  with the C{extraArgs} keyword. This should not normally be
-    required, and is  indicative of a possible bug which should be reported
+    required, and is indicative of a possible bug which should be reported
     with the suggestion of direct support for the patch arguments in question.
 
     B{keyid} : Using the C{keyid} keyword indicates the eight-digit GNU
     Privacy Guard (GPG) key ID, without leading C{0x} for the source code
     archive signature should be sought, and checked. If you provide the
     C{keyid} keyword, {r.addPatch} will search for a file named
-    I{sourcenameC{{.sig,sign,asc}}} and ensure it is signed with the
+    I{sourcenameC{{.sig,sign,asc}}}, and ensure it is signed with the
     appropriate GPG key. A missing signature results in a warning; a failed
     signature check is fatal.
 
     B{level} : By default, one level of initial subdirectory names is stripped
-    out prior to applying the patch.  The C{level} keyword allows
+    out prior to applying the patch. The C{level} keyword allows
     specification of additional initial subdirectory levels to be removed.
 
     B{macros} : The C{macros} keyword accepts a boolean value, and defaults
@@ -366,7 +366,7 @@ class Patch(_Source):
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
-    actually unpacked, or merely stored in the archive.
+    actually unpacked or merely stored in the archive.
 
     EXAMPLES
     ========
@@ -400,7 +400,7 @@ class Patch(_Source):
         applying the patch.
     @keyword extraArgs: As a last resort, arbitrary arguments may be passed to
         the patch program  with the C{extraArgs} keyword. This should not
-        normally be required, and is  indicative of a possible bug which
+        normally be required, and is indicative of a possible bug which
         should be reported with the suggestion of direct support for the patch
         arguments in question.
     @keyword dir: Instructs C{r.addPatch} to change to the directory specified
@@ -411,7 +411,7 @@ class Patch(_Source):
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, {r.addPatch} will search for a file named
-        I{sourcenameC{{.sig,sign,asc}}} and ensure it is signed with the
+        I{sourcenameC{{.sig,sign,asc}}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
     @keyword level: By default, one level of initial subdirectory names is
@@ -469,7 +469,7 @@ class Source(_Source):
     NAME
     ====
 
-    B{C{r.addSource()}} - Copy a file into build, or destination directory
+    B{C{r.addSource()}} - Copy a file into build or destination directory
 
     SYNOPSIS
     ========
@@ -479,7 +479,7 @@ class Source(_Source):
     DESCRIPTION
     ===========
 
-    The C{r.addSource()} class copies a file into the build directory, or
+    The C{r.addSource()} class copies a file into the build directory or
     destination directory.
 
     KEYWORDS
@@ -506,7 +506,7 @@ class Source(_Source):
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcename}C{{.sig,sign,asc}} and
+    search for a file named I{sourcename}C{{.sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
@@ -574,7 +574,7 @@ class Source(_Source):
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, C{r.addArchive} will search for a file named
-        I{sourcename}C{{.sig,sign,asc}} and ensure it is signed with the
+        I{sourcename}C{{.sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
     @keyword macros: If True, interpolate recipe macros in the body of a patch
@@ -670,7 +670,7 @@ class Action(action.RecipeAction):
     ===========
 
     The C{r.addAction()} class copies an arbitrary file into the build
-    directory, C{%(builddir)s}.
+    directory C{%(builddir)s}.
 
     KEYWORDS
     ========
@@ -687,7 +687,7 @@ class Action(action.RecipeAction):
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
-    actually unpacked, or merely stored in the archive.
+    actually unpacked or merely stored in the archive.
 
     EXAMPLES
     ========
@@ -697,7 +697,7 @@ class Action(action.RecipeAction):
 
     C{r.addAction('sed -i "s/^SUBLEVEL.*/SUBLEVEL = %(sublevel)s/" Makefile')}
 
-    Demonstrates use of a command line with macro interpolation, upon the file
+    Demonstrates use of a command line with macro interpolation upon the file
     C{Makefile}.
 
     C{r.addAction('mv lib/util/shhopt.h lib/util/pbmshhopt.h')}
@@ -720,7 +720,7 @@ class Action(action.RecipeAction):
         specified, it will be considered relative to C{%(builddir)s}.
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
-        actually unpacked, or merely stored in the archive.
+        actually unpacked or merely stored in the archive.
 	"""
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]

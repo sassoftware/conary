@@ -1272,7 +1272,7 @@ class UtilizeGroup(_Utilize):
     DESCRIPTION
     ===========
 
-    The C{r.UtilizeGroup} policy marks files as requiringa group definition
+    The C{r.UtilizeGroup} policy marks files as requiring a group definition
     to exist even though the file is not owned by that group.
 
     This is particularly useful for daemons that are setuid root
@@ -1553,11 +1553,11 @@ class Provides(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.Provides()} policy marks files as providing certain features,
+    The C{r.Provides()} policy marks files as providing certain features
     or characteristics, and can be called to explicitly provide things
-    that cannot be automatically discovered, or to override automatic
-    discovery and prevent marking a file as providing things, such as
-    for package-private plugin modules installed in system library
+    that cannot be automatically discovered. C{r.Provides} can also override
+    automatic discovery, and prevent marking a file as providing things, such
+    as for package-private plugin modules installed in system library
     directories.
 
     A C{I{provision}} may be C{'file'} to mark a file as providing its
@@ -2004,6 +2004,12 @@ class Requires(_addInfo):
     Demonstrates using C{r.Requires} to specify a manual requirement of the
     file C{%(sbindir)s/sendmail} to the  C{:runtime} component of package
     C{mailbase}.
+
+    C{r.Requires(exceptions='/usr/share/vim/.*/doc/')}
+
+    Demonstrates using C{r.Requires} to specify that files in the
+    subdirectory C{/usr/share/vim/.*/doc} are excepted from being marked as
+    requirements.
     """
 
     bucket = policy.PACKAGE_CREATION

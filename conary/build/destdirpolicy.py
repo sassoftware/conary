@@ -52,7 +52,7 @@ class TestSuiteLinks(policy.Policy):
 
     In order for C{r.TestSuiteLinks()} to be useful, you must indicate to
     Conary that you wish to create a test suite.  To create a test suite,
-    you should use the C{r.TestSuite()} class, as documented in
+    you should use the C{r.TestSuite()} class as documented in
     conary.build.build.
 
     EXAMPLES
@@ -262,7 +262,7 @@ class TestSuiteFiles(policy.Policy):
     NAME
     ====
 
-    B{C{r.TestSuiteFiles}}** - Indicate extra files to copy into the test directory
+    B{C{r.TestSuiteFiles}} - Indicate extra files to copy into the test directory
 
     SYNOPSIS
     ========
@@ -283,7 +283,7 @@ class TestSuiteFiles(policy.Policy):
 
     In order for C{r.TestSuiteFiles()} to be useful, you must indicate to
     Conary that you wish to create a test suite.  To create a test suite,
-    you should use the C{r.TestSuite()} class, as documented in
+    you should use the C{r.TestSuite()} class as documented in
     conary.build.build.
 
     EXAMPLES
@@ -381,7 +381,7 @@ class FixDirModes(policy.Policy):
     DESCRIPTION
     ===========
 
-    The C{r.FixDirModes()} class modifies directory permissions whicho
+    The C{r.FixDirModes()} class modifies directory permissions which
     would otherwise prevent Conary from packaging C{%(destdir)s} as a
     non-root user.
 

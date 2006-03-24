@@ -723,7 +723,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     EXAMPLE
     =======
 
-    FIXME : What to do for an example here?
+    FIXME example
     """
     # abstract base class
     ignore = 1
