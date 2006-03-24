@@ -566,6 +566,8 @@ class GroupRecipe(_BaseGroupRecipe):
             raise RecipeFileError, 'group %s has not been created' % name
 
         for group in self._getGroups(groupName):
+            if group.name == name:
+                raise RecipeFileError, 'group %s cannot contain itself' % name
             group.addNewGroup(name, byDefault, explicit = True)
 
     def setDefaultGroup(self, groupName):
