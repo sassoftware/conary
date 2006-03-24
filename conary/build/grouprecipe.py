@@ -388,7 +388,7 @@ class GroupRecipe(_BaseGroupRecipe):
         ====
 
         B{C{r.removeComponents()}} - Define components which should not be
-        installed
+        installed by default
 
         SYNOPSIS
         ========
@@ -415,7 +415,10 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        FIXME Need Example
+        C{r.removeComponents(['devel', 'devellib'])}
+
+        Uses C{r.RemoveComponents} to specify that the C{:devel} and
+        C{:devellib} components should not be installed by default.
         """
         if not isinstance(componentList, (list, tuple)):
             componentList = [ componentList ]
@@ -514,7 +517,10 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        FIXME Need Example
+        C{r.addAll('group-core', 'conary.rpath.com@rpl:1')}
+
+	Uses C{r.addAll} to add the troves referenced by C{group-core} to
+	the recipe for version string 'conary.rpath.com@rpl:1'.
         """
         flavor = self._parseFlavor(flavor)
 
@@ -648,7 +654,13 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        C{r.addReference()} - FIXME - Need Example
+	C{coreRef = r.addReference('group-core', 'conary.rpath.com@rpl:1')}
+	C{r.add('tmpwatch', ref=coreRef)}
+
+        Uses C{r.addReference} to Define C{coreRef} as a reference to the
+	group-trove C{group-core} for version string 'conary.rpath.com@rpl:1',
+	and then uses an C{r.add} invocation to add C{tmpwatch} using the
+	C{coreRef} reference.
         """
         flavor = self._parseFlavor(flavor)
         return GroupReference(((name, versionStr, flavor),), ref)
@@ -694,8 +706,10 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        FIXME Need Example
+        r.replace('distro-release')
 
+	Uses C{r.replace} to remove all instances of the C{distro-release}
+	trove, and replaces them with a new version of C{distro-release}.
         """
         newFlavor = self._parseFlavor(newFlavor)
         if groupName is None:
@@ -736,7 +750,10 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        FIXME Need Example
+        r.setLabelPath('myproject.rpath.org@rpl:1', 'conary.rpath.com@rpl:1')}
+
+	Uses C{r.setLabelPath} to specify troves are to be sought in the
+	LabelPaths 'myproject.rpath.org@rpl:1' and 'conary.rpath.com@rpl:1'.
         """
         self.labelPath = [ versions.Label(x) for x in path ]
 
