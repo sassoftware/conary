@@ -1366,16 +1366,16 @@ class Symlink(_FileAction):
     SYNOPSIS
     ========
 
-    C{r.Symlink(I{contents}, I{destfile})}
+    C{r.Symlink(I{symlink}, I{realfile})}
 
     DESCRIPTION
     ===========
 
     The C{r.Symlink()} class is called from within a Conary recipe to create a
-    symbolic link from C{contents} to C{destfile}.
+    symbolic link C{symlink} pointing to C{realfile}.
 
-    Multiple symlinks can be created if the destination path is a directory.
-    The destination path is determined to be a directory if it already
+    Multiple symlinks can be created if the destination path C{realfile} is a
+    directory. The destination path is determined to be a directory if it already
     exists, or if the path ends with a slash (C{/}) character.
 
     KEYWORDS
@@ -1385,7 +1385,7 @@ class Symlink(_FileAction):
     values shown in parentheses when applicable:
 
     B{allowDangling} : (False) Whether to allow dangling symbolic links.
-    That is, a symbolic link for which the target (C{destfile}) does not exist.
+    That is, a symbolic link for which the target (C{realfile}) does not exist.
 
     EXAMPLES
     ========
@@ -1599,13 +1599,13 @@ class Replace(BuildAction):
     SYNOPSIS
     ========
 
-    C{r.Replace(I{pattern}, I{sub}, I{path+} || (I{pattern}, I{sub})+, I{path}+)}
+    C{r.Replace(I{old}, I{new}, I{path+} || (I{old}, I{new})+, I{path}+)}
 
     DESCRIPTION
     ===========
 
     The C{r.Replace()} class is called from within a Conary recipe to
-    substitute text *sub* for *pattern* in a file using Python regular
+    substitute text *old* with *new* in a file using Python regular
     expression rules
 
     Note that C{r.Replace()} cannot do multi-line substitutions.  For more
@@ -1640,8 +1640,8 @@ class Replace(BuildAction):
 
     C{r.Replace('-lgphoto2', '-lgphoto2 -lgphoto2_port', 'gphoto2-config')}
 
-    Calls C{r.Replace()} to substitute C{-lgphoto2 -lgphoto2_port} for
-    C{-lgphoto2} in the path C{gphoto2-config}.
+    Calls C{r.Replace()} to change C{-lgphoto2 -lgphoto2_port} to C{-lgphoto2}
+    in the path C{gphoto2-config}.
     """
 
 
