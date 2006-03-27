@@ -250,8 +250,10 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        FIXME Need Example
+        C{r.Requires('tmpwatch')}
 
+	Uses C{r.Requires} to specify that the trove C{tmpwatch} must be 
+        installed in order for the group to be installed.
         """
         for group in self._getGroups(groupName):
             group.addRequires(requirement)
