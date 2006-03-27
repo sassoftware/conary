@@ -16,9 +16,12 @@ Changes in @NEW@:
     * Rollbacks now display progress information which matches normal updates
     * Fixed a bug in perl dependencies where extra directories could be
       considered part of the dependency
-    * A bug affecting updates where a pinned, partially installed trove was supposed 
-      to be updated due to dep resolution has been fixed.
+    * A bug affecting updates where a pinned, partially installed
+      trove was supposed to be updated due to dep resolution has been
+      fixed.
     * A bug affecting updates where a local cook was installed has been fixed.
+    * A bug that caused a segfault when providing an invalid type to
+      StringStream has been fixed.
 
 Changes in 1.0.9:
   o Client Changes:
