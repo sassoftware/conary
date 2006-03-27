@@ -752,7 +752,7 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        r.setLabelPath('myproject.rpath.org@rpl:1', 'conary.rpath.com@rpl:1')}
+        C{r.setLabelPath('myproject.rpath.org@rpl:1', 'conary.rpath.com@rpl:1')}
 
 	Uses C{r.setLabelPath} to specify troves are to be sought in the
 	LabelPaths 'myproject.rpath.org@rpl:1' and 'conary.rpath.com@rpl:1'.
