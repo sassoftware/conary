@@ -1062,6 +1062,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 		internalCs.addFile(oldFileId, newFileId, filecs)
 
+                if excludeAutoSource and newFileObj.flags.isAutoSource():
+                    continue
+
                 if withFileContents and hash:
                     # pull contents from the trove it was originally
                     # built in
