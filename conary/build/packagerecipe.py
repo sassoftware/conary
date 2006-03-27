@@ -709,16 +709,17 @@ class PackageRecipe(_AbstractPackageRecipe):
     SYNOPSIS
     ========
 
-    C{PackageRecipe} is inheirted by the other *PackageRecipe super classes
+    C{PackageRecipe} is inherited by the other *PackageRecipe super classes
 
     DESCRIPTION
     ===========
 
     The C{PackageRecipe} class provides Conary recipes with references to
-    the essential troves which offer Conary's functionality.
+    the essential troves which offer Conary's packaging requirements. 
+    (python, sqlite, gzip, bzip2, tar, cpio, and patch)
 
     Other PackageRecipe classes such as C{AutoPackageRecipe} inherit the
-    functionality offerred by C{PackageRecipe}.
+    functionality offered by C{PackageRecipe}.
 
     EXAMPLE
     =======
@@ -776,11 +777,11 @@ class BuildPackageRecipe(PackageRecipe):
 
     The C{BuildPackageRecipe} class provides recipes with capabilities for
     building packages which require the C{make} utility, and additional,
-    standard shell tools.
-
-    This class is useful for building packages which have additional build
-    requirements that are not satisfied by the C{CPackageRecipe} class, such
-    as the C{gawk}, C{grep}, and C{sed} utilities.
+    standard shell tools, (coreutils) and the programs needed to run
+    C{configure}. (findutils, C{gawk}, C{grep}, C{sed}, and diffutils)
+    
+    C{BuildPackageRecipe} inherits from C{PackageRecipe}, and therefore
+    includes all the build requirements of  C{PackageRecipe}. 
 
     EXAMPLE
     =======
@@ -824,7 +825,10 @@ class CPackageRecipe(BuildPackageRecipe):
     DESCRIPTION
     ===========
     The C{CPackageRecipe} class provides the essential build requirements
-    needed for packages consisting of binaries built from C source code.
+    needed for packages consisting of binaries built from C source code, such
+    as the linker and C library. C{CPacakgeRecipe} inherits from
+    C{BuildPackageRecipe}, and therefore includes all the build requirements of
+    C{BuildPackageRecipe}.
 
     Most package recipes which are too complex for C{AutoPackageRecipe}, and
     consist of applications derived from C source code which do not require
@@ -876,8 +880,8 @@ class AutoPackageRecipe(CPackageRecipe):
     ===========
 
     The  C{AutoPackageRecipe} class provides a simple means for the
-    creation of basic packages which are built from source code using the
-    auto* tools, such as C{automake}, and C{autoconf}.
+    creation of packages from minimal recipes, which are built from source
+    code using the auto* tools, such as C{automake}, and C{autoconf}.
 
     Processing in the C{AutoPackageRecipe} class is a simple workflow modeled
     after building software from source code, and is essentially comprised of
