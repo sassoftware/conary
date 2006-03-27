@@ -1,25 +1,30 @@
 Changes in @NEW@:
   o Client Changes
-    * Given a system based on rPath linux where you only installed !smp 
-      kernels, conary would eventually start installing smp kernels on your 
-      system, due to the way the update algorithm would determine whether you 
-      should install a newly available trove.  Conary now respects flavor 
-      affinity in this case and does not install the smp kernel.
+    * Given a system based on rPath linux where you only installed
+      !smp kernels, conary would eventually start installing smp
+      kernels on your system, due to the way the update algorithm
+      would determine whether you should install a newly available
+      trove.  Conary now respects flavor affinity in this case and
+      does not install the smp kernel.
     * Mirror configuration files can now specify uploadRateLimit and
       downloadRateLimit.
-    * Updates involving changeset files are now split into multiple jobs
-      properly, allowing changeset files which create users to work proprely
+    * Updates utilizing changeset files are now split into multiple
+      jobs properly, allowing changeset files which create users to
+      work proprely.
+    * "conary rollback" now displays progress information that matches
+      the "conary update" progress information.
 
   o Bug Fixes:
-    * Fixed a case where an Assertion could be raised when switching from an
-      incomplete trove to a complete trove.
-    * Rollbacks now display progress information which matches normal updates
-    * Fixed a bug in perl dependencies where extra directories could be
-      considered part of the dependency
+    * A bug that caused an assertion error when switching from an
+      incomplete trove to a complete trove has been fixed.
+    * A bug in perl dependencies that caused extra directories to be
+      considered part of the dependency has been fixed.
     * A bug affecting updates where a pinned, partially installed
-      trove was supposed to be updated due to dep resolution has been
-      fixed.
-    * A bug affecting updates where a local cook was installed has been fixed.
+      package was supposed to be updated due to dependency resolution
+      has been fixed.
+    * A bug that prevented updates from working when part of a locally
+      cooked package was replaced with a non-locally cooked component
+      has been fixed.  The bug was introduced in Conary 1.0.8.
     * A bug that caused a segfault when providing an invalid type to
       StringStream has been fixed.
 
