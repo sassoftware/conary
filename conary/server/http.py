@@ -204,15 +204,29 @@ class HttpHandler(WebHandler):
         t = unquote(t)
         leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]})
         if t not in leaves:
-            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
+            return self._write("error",
+                               error = '%s was not found on this server.' %t)
+
         versionList = sorted(leaves[t].keys(), reverse = True)
 
         if not v:
             reqVer = versionList[0]
         else:
-            reqVer = versions.ThawVersion(v)
+            try:
+                reqVer = versions.ThawVersion(v)
+            except (versions.ParseError, ValueError):
+                try:
+                    reqVer = versions.VersionFromString(v)
+                except:
+                    return self._write("error",
+                                       error = "Invalid version: %s" %v)
 
-        query = [(t, reqVer, x) for x in leaves[t][reqVer]]
+        try:
+            query = [(t, reqVer, x) for x in leaves[t][reqVer]]
+        except:
+            return self._write("error",
+                               error = "Version %s of %s was not found on this server."
+                               %(reqVer, t))
         troves = self.repos.getTroves(query, withFiles = False)
         metadata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
         if t in metadata:

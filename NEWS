@@ -27,6 +27,10 @@ Changes in @NEW@:
       has been fixed.  The bug was introduced in Conary 1.0.8.
     * A bug that caused a segfault when providing an invalid type to
       StringStream has been fixed.
+    * The troveInfo web page in the repository browser now displays
+      useful error messages instead of traceback messages.  The
+      troveInfo page also handles both frozen and non-frozen version
+      strings.
 
 Changes in 1.0.9:
   o Client Changes:
