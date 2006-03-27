@@ -1041,7 +1041,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileDict = {}
             for ((pathId, fileId, fileVersion), fileObj) in zip(need, fileObjs):
                 fileDict[(pathId, fileId)] = fileObj
-            del fileObj, fileObjs, need
+            del fileObj, fileObjs, need, fileId
 
             contentsNeeded = []
             fileJob = []
@@ -1069,9 +1069,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     needItems = []
 
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
-                        #fetchItems.append( (oldFileId, oldFileVersion, 
-                        #assert(oldFileId == fileId)
-                        fetchItems.append( (fileId, oldFileVersion, 
+                        fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
                         needItems.append( (pathId, oldFileObj) ) 
 
