@@ -325,7 +325,7 @@ class ClientUpdate:
                 # FIXME: should this include weak references?
                 if inDb:
                     otherTrv = db.getTrove(withFiles = False, *info)
-                elif trvSrc.hasTroves(info)[0]:
+                elif trvSrc.hasTrove(*info):
                     otherTrv = trvSrc.getTrove(withFiles = False, *info)
                 else:
                     # if the trove is not in the trove source, then it 
