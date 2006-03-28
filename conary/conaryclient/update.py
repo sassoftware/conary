@@ -1517,9 +1517,7 @@ conary erase '%s=%s[%s]'
             from childa -> childb.
         """
         localUpdates = [ x for x in localUpdates 
-                         if x[1][0]
-                            and trove.troveIsCollection(x[0])
-                            and not x[1][0].isOnLocalHost() ]
+                         if x[1][0] and not x[1][0].isOnLocalHost() ]
         oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
         newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
 
