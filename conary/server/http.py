@@ -223,7 +223,7 @@ class HttpHandler(WebHandler):
 
         try:
             query = [(t, reqVer, x) for x in leaves[t][reqVer]]
-        except:
+        except KeyError:
             return self._write("error",
                                error = "Version %s of %s was not found on this server."
                                %(reqVer, t))
