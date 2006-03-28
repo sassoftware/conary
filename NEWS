@@ -33,8 +33,8 @@ Changes in @NEW@:
       strings.
     * A bug that caused conary to download unnecessary files when checking out
       shadow sources has been fixed.
-    * A bug that caused an rdiff between versions of a trove that were on 
-      different hosts to fail has been fixed.
+    * A bug that caused "cvc rdiff" between versions of a trove that
+      were on different hosts to fail has been fixed.
 
 Changes in 1.0.9:
   o Client Changes:
