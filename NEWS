@@ -36,6 +36,8 @@ Changes in @NEW@:
       shadow sources has been fixed.
     * A bug that caused "cvc rdiff" between versions of a trove that
       were on different hosts to fail has been fixed.
+    * Fixed a bug when determining local file system changes involving a file 
+      or directory with mtime 0.
 
 Changes in 1.0.9:
   o Client Changes:
