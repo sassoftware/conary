@@ -13,6 +13,7 @@ Changes in @NEW@:
       work proprely.
     * "conary rollback" now displays progress information that matches
       the "conary update" progress information.
+    * added --with-sources option for clone
 
   o Bug Fixes:
     * A bug that caused an assertion error when switching from an

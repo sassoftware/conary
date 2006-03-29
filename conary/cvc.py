@@ -275,13 +275,16 @@ class CloneCommand(CvcCommand):
 
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
                                   'information about how this trove was built'),
-             'info'            : 'Do not perform clone'
+             'info'            : 'Do not perform clone',
+             'with-sources'    : ('Ensure that any binaries that are being'
+                                  ' cloned also have a matching source component')
            }
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["skip-build-info"] = NO_PARAM
         argDef["info"] = NO_PARAM
+        argDef["with-sources"] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -291,8 +294,10 @@ class CloneCommand(CvcCommand):
         from conary import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
         info = argSet.pop('info', False)
+        cloneSources = argSet.pop('with-sources', False)
         if argSet: return self.usage()
-        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info)
+        clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info,
+                         cloneSources=cloneSources)
 _register(CloneCommand)
 
 
