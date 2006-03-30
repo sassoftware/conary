@@ -1788,8 +1788,9 @@ class Doc(_FileAction):
     documentation files from the C{%(builddir)s} into
     C{%(destdir)s/%(thisdocdir)s}.
 
-    The C{subdir=path} keyword argument creates a subdirectory under
-    C{%(thisdocdir)s} to put the files in.
+    Specify a single file or directory of files for the C{filename} parameter.
+    The C{subdir=path} keyword argument can be used to create a subdirectory
+    of C{%(destdir)s/%(thisdocdir)s} where files may subsequently be located.
 
     KEYWORDS
     ========
@@ -1804,9 +1805,19 @@ class Doc(_FileAction):
 
     C{r.Doc('doc/kbd.FAQ*.html', subdir='html')}
 
-    Demonstrates installing documentation from C{doc/kbd.FAQ*.html} files into
-    the C{html} subdirectory after first creating the C{html} subdirectory
-    using C{r.Doc()}.
+    Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
+    subdirectory after first creating the C{html} subdirectory using
+    C{r.Doc()}.
+
+    C{r.Doc('pam_smb.conf.example')}
+
+    Demonstrates using C{r.Doc} to place the file C{pam_smb.conf.example}
+    into C{%(destdir)s/%(thisdocdir)s}.
+
+    C{r.Doc("html/")}
+
+    Demonstrates using C{r.Doc} to place the subdirectory C{html} from
+    C{%(builddir)s} into C{%(destdir)s/%(thisdocdir)s}. 
     """
     keywords = {'subdir':  '',
 		'mode': 0644,
