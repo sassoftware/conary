@@ -38,6 +38,7 @@ Changes in @NEW@:
       were on different hosts to fail has been fixed.
     * Fixed a bug when determining local file system changes involving a file 
       or directory with mtime 0.
+    * The --signature-key option was restored
 
 Changes in 1.0.9:
   o Client Changes:

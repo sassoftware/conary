@@ -101,6 +101,7 @@ class CvcCommand(object):
             'full-versions'      : ('Always display complete version strings'),
             'profile'            : optparse.SUPPRESS_HELP,
             'skip-default-config': "Don't read default configs",
+            'signature-key'      : ("Use signature key to sign results", 'KEY'),
             'quiet'              : ('do not display extra information when '
                                     'running'),
             'root'               : 'use conary database at location ROOT'
@@ -129,13 +130,14 @@ class CvcCommand(object):
         argDef[self.defaultGroup] = d
 
     def addConfigOptions(self, cfgMap, argDef):
-        cfgMap["build-label"] = "buildLabel", ONE_PARAM,
-        cfgMap["pubring"]     = "pubRing", ONE_PARAM
-        cfgMap["root"]        = "root", ONE_PARAM,
-        cfgMap["quiet"]       = "quiet", NO_PARAM,
-        cfgMap['interactive'] = 'interactive', NO_PARAM,
+        cfgMap["build-label"]   = "buildLabel", ONE_PARAM,
+        cfgMap['interactive']   = 'interactive', NO_PARAM,
         cfgMap['full-versions'] = 'fullVersions', NO_PARAM
-        cfgMap['flavors'] = 'fullFlavors', NO_PARAM
+        cfgMap['flavors']       = 'fullFlavors', NO_PARAM
+        cfgMap["pubring"]       = "pubRing", ONE_PARAM
+        cfgMap["quiet"]         = "quiet", NO_PARAM,
+        cfgMap["root"]          = "root", ONE_PARAM,
+        cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
 
 
         for name, (cfgName, paramType)  in cfgMap.items():
