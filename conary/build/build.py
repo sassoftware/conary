@@ -169,10 +169,12 @@ class Run(BuildCommand):
 
     def __init__(self, *args, **kwargs):
         """
-        @keyword dir: Directory in which to run the command. Relative dirs are
-            relative to the build directory, absolute dirs are relative to the
-            destination directory.
-        @keyword filewrap: If set to C{True}, a C{LD_PRELOAD} wrapper will
+        @keyword dir: Directory in which to run the command
+	An absolute C{dir} value will be considered relative to 
+        C{%(destdir)s}, whereas a relative C{dir} value will be considered
+        relative to C{%(builddir)s}.
+
+	@keyword filewrap: If set to C{True}, a C{LD_PRELOAD} wrapper will
             look in C{%(destdir)s} for some common file operations.
             Occasionally useful to avoid the need to modify programs that need
             to be run after the build, and assume that they are not run until

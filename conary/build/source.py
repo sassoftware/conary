@@ -156,9 +156,9 @@ class Archive(_Source):
 
     B{dir} : Instructs C{r.addArchive} to change to the directory
     specified by C{dir} prior to unpacking the source archive.
-    Directories relative to C{%(builddir)s} are considered
-    relative, and directories relative to C{%(destdir)s} are
-    considered absolute.
+    An absolute C{dir} value will be considered relative to 
+    C{%(destdir)s}, whereas a relative C{dir} value will be
+    considered relative to C{%(builddir)s}.
 
     B{keyid} : Using the C{keyid} keyword indicates the eight-digit
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
@@ -201,9 +201,10 @@ class Archive(_Source):
         automatically by the C{PackageRecipe} object. Passing in  C{recipe}
         from within a recipe is unnecessary.
     @keyword dir: Instructs C{r.addArchive} to change to the directory
-        specified by C{dir} prior to unpacking the source archive. Directories
-        relative to C{%(builddir)s} are considered relative, and directories
-        relative to C{%(destdir)s} are considered absolute.
+        specified by C{dir} prior to unpacking the source archive. 
+        An absolute C{dir} value will be considered relative to 
+        C{%(destdir)s}, whereas a relative C{dir} value will be
+        considered relative to C{%(builddir)s}.
     @keyword keyid: Using the C{keyid} keyword indicates the eight-digit
         GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
         source code archive signature should be sought, and checked.
@@ -330,9 +331,10 @@ class Patch(_Source):
     the patch.
 
     B{dir} : Instructs C{r.addPatch} to change to the directory specified by
-    C{dir} prior to applying the patch. Directories relative to
-    C{%(builddir)s} are considered relative, and directories relative to
-    C{%(destdir)s} are considered absolute.
+    C{dir} prior to applying the patch. An absolute C{dir} value will be
+    considered relative to C{%(destdir)s}, whereas a relative C{dir} value
+    will be considered relative to C{%(builddir)s}.
+
 
     B{extraArgs} : As a last resort, arbitrary arguments may be passed to the
     patch program  with the C{extraArgs} keyword. This should not normally be
@@ -398,15 +400,16 @@ class Patch(_Source):
         within a recipe is unnecessary.
     @keyword backup: The suffix to use when storing file versions before
         applying the patch.
-    @keyword extraArgs: As a last resort, arbitrary arguments may be passed to
-        the patch program  with the C{extraArgs} keyword. This should not
+    @keyword extraArgs: As a last resort, arbitrary arguments may be passed
+        to the patch program  with the C{extraArgs} keyword. This should not
         normally be required, and is indicative of a possible bug which
-        should be reported with the suggestion of direct support for the patch
-        arguments in question.
-    @keyword dir: Instructs C{r.addPatch} to change to the directory specified
-        by C{dir} prior to applying the patch. Directories relative to
-        C{%(builddir)s} are considered relative, and directories relative to
-        C{%(destdir)s} are considered absolute.
+        should be reported with the suggestion of direct support for the
+        patch arguments in question.
+    @keyword dir: Instructs C{r.addPatch} to change to the directory
+        specified by C{dir} prior to applying the patch. An absolute C{dir}
+        value will be considered relative to C{%(destdir)s}, whereas a
+        relative C{dir} value will be considered
+        relative to C{%(builddir)s}.
     @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
@@ -496,11 +499,16 @@ class Source(_Source):
     specify directory information, but not both. Useful mainly  when fetching
     the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
+    An absolute C{dest} value will be considered relative to  C{%(destdir)s},
+    whereas a relative C{dest} value will be considered relative to
+    C{%(builddir)s}.
+
 
     B{dir} : The directory in which to store the file, relative to the build
-    directory. Directories relative to the destination directory will be
-    considered absolute. Defaults to storing file directly in the build
-    directory.
+    directory. An absolute C{dir} value will be considered relative to 
+    C{%(destdir)s}, whereas a relative C{dir} value will be considered
+    relative to C{%(builddir)s}. Defaults to storing file directly in the
+    build directory.
 
     B{keyid} : Using the C{keyid} keyword indicates the eight-digit
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
@@ -565,11 +573,15 @@ class Source(_Source):
         to specify directory information, but not both. Useful mainly  when
         fetching the file from an source outside your direct control, such as
         a URL to a third-party web site, or copying a file out of an RPM
-        package.
+        package. An absolute C{dest} value will be considered relative to 
+        C{%(destdir)s}, whereas a relative C{dest} value will be
+        considered relative to C{%(builddir)s}.
     @keyword dir: The directory in which to store the file, relative to the
         build directory. Directories relative to the destination directory
         will be considered absolute. Defaults to storing file directly in the
-        build directory.
+        build directory. An absolute C{dir} value will be considered relative
+        to C{%(destdir)s}, whereas a relative C{dir} value will be considered
+        relative to C{%(builddir)s}.
     @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
@@ -681,9 +693,9 @@ class Action(action.RecipeAction):
     interpolation.
 
     B{dir} : Specify the directory where the file is to be located, relative
-    to C{%(builddir)s}. By default, C{r.addAction} stores the
-    file directly in C{%(builddir)s}. If an absolute directory is specified,
-    it will be considered relative to C{%(builddir)s}.
+    to C{%(builddir)s}. By default, C{r.addAction} stores the file directly
+    in C{%(builddir)s}. If an absolute directory is specified, it will be
+    considered relative to C{%(builddir)s}.
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
