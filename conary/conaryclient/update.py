@@ -1897,10 +1897,7 @@ conary erase '%s=%s[%s]'
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
-            # _createCs accesses the database through the uJob.troveSource,
-            # so make sure that references this fresh db as well.
             db = database.Database(cfg.root, cfg.dbPath)
-            uJob.troveSource.db = db
             repos = NetworkRepositoryClient(cfg.repositoryMap,
                                             cfg.user,
                                             downloadRateLimit =
