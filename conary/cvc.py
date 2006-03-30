@@ -649,12 +649,42 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
     repos = client.getRepos()
     return thisCommand.runCommand(repos, cfg, argSet, args, profile, callback)
 
+def _getPreCommandOptions(argv, cfg):
+    """Allow the user to specify generic flags before they specify the
+       command to run.
+    """
+    cfgMap = {}
+    params = {}
+    thisCommand = CvcCommand()
+    thisCommand.addParameters(params)
+    thisCommand.addConfigOptions(cfgMap, params)
+    thisCommand.addDocs(params)
+    defaultGroup = thisCommand.defaultGroup
+    argSet, otherArgs, parser, optionSet = options._processArgs(
+                                                params, {}, cfg,
+                                                usage,
+                                                argv=argv[1:],
+                                                version=constants.version,
+                                                useHelp=True,
+                                                defaultGroup=defaultGroup,
+                                                interspersedArgs=False)
+    return argSet, [argv[0]] + otherArgs
 
 def realMain(cfg, argv=sys.argv):
     argDef = {}
     if '--version' in argv or '-v' in argv:
         print constants.version
         return
+
+    try:
+        # get options before the command.  Only generic options are 
+        # allowed.
+        argSet, argv = _getPreCommandOptions(argv, cfg)
+    except options.OptionError, e:
+        usage()
+        print >>sys.stderr, e
+        sys.exit(e.val)
+
     if len(argv) < 2:
         # no command specified
         return usage()
@@ -678,7 +708,7 @@ def realMain(cfg, argv=sys.argv):
     commandUsage = 'cvc %s %s' % (commandName, thisCommand.paramHelp)
 
     try:
-        argSet, otherArgs, parser, optionSet = options._processArgs(
+        newArgSet, otherArgs, parser, optionSet = options._processArgs(
                                                     params, {}, cfg,
                                                     commandUsage,
                                                     argv=argv,
@@ -686,11 +716,14 @@ def realMain(cfg, argv=sys.argv):
                                                     useHelp=True,
                                                     defaultGroup=defaultGroup)
     except options.OptionError, e:
+        e.parser.print_help()
         print >> sys.stderr, e
         sys.exit(e.val)
     except versions.ParseError, e:
         print >> sys.stderr, e
         sys.exit(1)
+
+    argSet.update(newArgSet)
 
     thisCommand.processConfigOptions(cfg, cfgMap, argSet)
 
