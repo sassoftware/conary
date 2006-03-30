@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.10:
   o Client Changes
     * Given a system based on rPath linux where you only installed
       !smp kernels, conary would eventually start installing smp
