@@ -57,6 +57,9 @@ class AbstractTroveSource:
     def resolveDependencies(self, label, depList):
         return {}
 
+    def resolveDependenciesByGroups(self, troveList, depList):
+        return {}
+
     def hasTroves(self, troveList):
         raise NotImplementedError
 
@@ -136,6 +139,21 @@ class AbstractTroveSource:
 		if not ignoreMissing:
 		    raise
 
+
+    def mergeDepSuggestions(self, allSuggs, newSugg):
+        """
+            Given two suggestion lists, merge them so that
+            all the suggestions are together.
+        """
+        for depSet, trovesByDepList in newSugg.iteritems():
+            if depSet not in allSuggs:
+                lst = [ [] for x in trovesByDepList ]
+                allSuggs[depSet] = lst
+            else:
+                lst = r[depSet]
+
+            for i, troveList in enumerate(trovesByDepList):
+                lst[i].extend(troveList)
 
 
 # constants mostly stolen from netrepos/netserver
@@ -993,6 +1011,13 @@ class TroveSourceStack(SearchableTroveSource):
                 results[depSet] = troves
         
         return results
+    
+    def resolveDependenciesByGroups(self, troveList, depList):
+        allSugg = {}
+        for source in self.sources:
+            sugg = source.resolveDependenciesByGroups(troveList, depList)
+            self.mergeDepSuggestions(allSugg, sugg)
+        return allSugg
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False):

@@ -1030,8 +1030,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if withFiles and filesNeeded:
             need = []
             for (pathId, troveName, 
-                        (oldTroveVersion, oldTroveFlavor, oldFileId, oldFileVersion),
-                        (newTroveVersion, newTroveFlavor, newFileId, newFileVersion)) \
+                (oldTroveVersion, oldTroveFlavor, oldFileId, oldFileVersion),
+                (newTroveVersion, newTroveFlavor, newFileId, newFileVersion)) \
                                 in filesNeeded:
                 if oldFileVersion:
                     need.append((pathId, oldFileId, oldFileVersion))
@@ -1077,9 +1077,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         needItems.append( (pathId, oldFileObj) ) 
 
                     fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileObj) ) 
-
+                    needItems.append( (pathId, newFileObj) )
                     contentsNeeded += fetchItems
+
+
                     fileJob += (needItems,)
 
             contentList = self.getFileContents(contentsNeeded, 
@@ -1149,6 +1150,75 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             r[self.toDepSet(key)] = l
 
         return r
+
+    def resolveDependenciesByGroups(self, groupTroves, depList):
+        if not groupTroves:
+            return {}
+
+        notMatching = []
+        seen = []
+        notMatching = [ x.getNameVersionFlavor() for x in groupTroves ]
+
+        # here's what we pass to servers: all groups + any troves
+        # that are not mentioned by a group on the same host.
+        # that should be the minimal set of troves.
+        while groupTroves:
+            groupsToGet = []
+            for group in groupTroves:
+                groupHost = group.getVersion().getHost()
+
+                for info in group.iterTroveList(strongRefs=True,
+                                                   weakRefs=True):
+                    h = info[1].getHost()
+                    if groupHost == h:
+                        seen.append(info)
+                    else:
+                        notMatching.append(info)
+                        if info[0].startswith('group-'):
+                            groupsToGet.append(info)
+
+            if not groupsToGet:
+                break
+            groupTroves = self.getTroves(groupsToGet)
+
+        # everything in seen was seen by a parent group on the same host
+        # and can be skipped
+        notMatching = set(notMatching)
+        notMatching.difference_update(seen)
+        del seen
+
+        trovesByHost = {}
+        for info in notMatching:
+            trovesByHost.setdefault(info[1].getHost(), []).append(info)
+
+        frozenDeps = [ self.fromDepSet(x) for x in depList ]
+
+        r = {}
+        for host, troveList in trovesByHost.iteritems():
+            t = [ self.fromTroveTup(x) for x in set(troveList) ]
+            d = self.c[host].getDepSuggestionsByTroves(frozenDeps, t)
+
+            # combine the results for the same dep on different host - 
+            # there's no preference of troves on different hosts in a group
+            # therefore there can be no preference here.
+            for (key, val) in d.iteritems():
+                dep = self.toDepSet(key)
+                if dep not in r:
+                    lst = [ [] for x in val ]
+                    r[dep] = lst
+                else:
+                    lst = r[dep]
+                for i, items in enumerate(val):
+                    # NOTE: this depends on servers returning the
+                    # dependencies in the same order.
+                    # That should be true, but there are no assertions
+                    # we can make anywhere to ensure it, except perhaps
+                    # to ensure that each dependency is resolved when it
+                    # is supposed to be.
+                    lst[i].extend(self.toTroveTup(x, withTime=True)
+                                  for x in items)
+        return r
+
 
     def getFileVersions(self, fullList, lookInLocal = False):
         if self.localRep and lookInLocal:

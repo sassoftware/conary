@@ -867,8 +867,8 @@ class TroveStore:
         del retr
         return d
 
-    def resolveRequirements(self, label, depSetList):
-        return self.depTables.resolve(label, depSetList)
+    def resolveRequirements(self, label, depSetList, troveList=[]):
+        return self.depTables.resolve(label, depSetList, troveList=troveList)
 
     def begin(self):
         return self.db.transaction()
