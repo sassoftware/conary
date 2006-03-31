@@ -670,7 +670,8 @@ def _getPreCommandOptions(argv, cfg):
                                                 interspersedArgs=False)
     return argSet, [argv[0]] + otherArgs
 
-def realMain(cfg, argv=sys.argv):
+def realMain(cfg, argv=sys.argv, debugAll=False, 
+             debuggerException = errors.InternalConaryError):
     argDef = {}
     if '--version' in argv or '-v' in argv:
         print constants.version
@@ -680,6 +681,8 @@ def realMain(cfg, argv=sys.argv):
         # get options before the command.  Only generic options are 
         # allowed.
         argSet, argv = _getPreCommandOptions(argv, cfg)
+    except debuggerException:
+        raise
     except options.OptionError, e:
         usage()
         print >>sys.stderr, e
@@ -715,6 +718,8 @@ def realMain(cfg, argv=sys.argv):
                                                     version=constants.version,
                                                     useHelp=True,
                                                     defaultGroup=defaultGroup)
+    except debuggerException, e:
+        raise
     except options.OptionError, e:
         e.parser.print_help()
         print >> sys.stderr, e
@@ -728,7 +733,8 @@ def realMain(cfg, argv=sys.argv):
     thisCommand.processConfigOptions(cfg, cfgMap, argSet)
 
     # the user might have specified --config debugExceptions on the commandline
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                        debugCtrlC=debugAll)
 
     context = cfg.context
     if os.path.exists('CONARY'):
@@ -747,7 +753,8 @@ def realMain(cfg, argv=sys.argv):
         cfg.buildLabel = cfg.installLabelPath[0]
 
     # now set the debug hook using the potentially new cfg.debugExceptions value
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                        debugCtrlC=debugAll)
 
     if cfg.installLabelPath:
         cfg.installLabel = cfg.installLabelPath[0]
@@ -806,8 +813,9 @@ def main(argv=sys.argv):
             ccfg.debugExceptions = True
 
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
-        return realMain(ccfg, argv)
+        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
+                                            debugCtrlC=debugAll)
+        return realMain(ccfg, argv, debugAll, debuggerException)
     except debuggerException, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:

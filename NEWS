@@ -10,6 +10,10 @@ Changes in @NEW@:
       of an update (thanks to, say, --replace-files or identical contents)
     * --replace-files now marks files as owned by the trove which used to
       claim them
+    * You can now kill conary with SIGUSR1 to make conary enter a debugger
+      when you Ctrl-C (or a SIGINT is raised)
+    * --debug-all now enters a debugger in more situations, including option 
+      parsing fails, when you hit Ctrl-C.
 
 Changes in 1.0.10:
   o Client Changes
