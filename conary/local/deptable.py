@@ -1054,7 +1054,13 @@ class DependencyTables:
 
         result = {}
         for depId, troveSet in enumerate(depSolutions):
-            if not troveSet:
+            # we are adding elements in the order of depIds, which 
+            # are ordered by dependency.  Thus, we should be guaranteed
+            # that the return order of deps in a dependency set is consistent.
+            # Note that some lists may be empty, they are still needed
+            # so that the slot in which the results for a dep is returned 
+            # is not dependendent on the current contents of a repository.
+            if not depId:
                 continue
 
             troveSet = [ (x[0][0],
