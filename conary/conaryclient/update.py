@@ -16,8 +16,9 @@ import os
 import traceback
 import sys
 
-from conary.callbacks import UpdateCallback
 from conary import conarycfg
+from conary.callbacks import UpdateCallback
+from conary.conaryclient import resolve
 from conary.deps import deps
 from conary.errors import ClientError
 from conary.lib import log, util
@@ -45,10 +46,12 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 class ClientUpdate:
 
     def _resolveDependencies(self, uJob, jobSet, split = False,
-                             resolveDeps = True, useRepos = True):
+                             resolveDeps = True, useRepos = True,
+                             resolveSource = None):
         return self.resolver.resolveDependencies(uJob, jobSet, split=split,
                                                  resolveDeps=resolveDeps,
-                                                 useRepos=useRepos)
+                                                 useRepos=useRepos,
+                                                 resolveSource=resolveSource)
 
     def _processRedirects(self, csSource, uJob, jobSet, transitiveClosure,
                           recurse):
@@ -1618,7 +1621,7 @@ conary erase '%s=%s[%s]'
                         split = True, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False, 
-                        updateOnly = False):
+                        updateOnly = False, resolveGroupList=None):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1681,6 +1684,7 @@ conary erase '%s=%s[%s]'
 
         useAffinity = False
         forceJobClosure = False
+        resolveSource = None
 
         if fromChangesets:
             # when --from-file is used we need to explicitly compute the
@@ -1713,6 +1717,22 @@ conary erase '%s=%s[%s]'
             uJob.setSearchSource(self.repos)
             useAffinity = True
 
+        if resolveGroupList:
+            resolveRepos = False
+            if useAffinity:
+                affinityDb = self.db
+            else:
+                affinityDb = None
+
+            result = self.repos.findTroves(self.cfg.installLabelPath,
+                                           resolveGroupList,
+                                           self.cfg.flavor,
+                                           affinityDatabase=affinityDb)
+            groupTups = list(itertools.chain(*result.itervalues()))
+            groupTroves = self.repos.getTroves(groupTups, withFiles=False)
+            resolveSource = resolve.DepResolutionByTroveList(self.cfg, self.db,
+                                                             groupTroves)
+
         jobSet = self._updateChangeSet(itemList, uJob,
                                        keepExisting = keepExisting,
                                        recurse = recurse,
@@ -1740,7 +1760,8 @@ conary erase '%s=%s[%s]'
         (depList, suggMap, cannotResolve, splitJob, keepList) = \
             self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
-                                      useRepos = resolveRepos)
+                                      useRepos = resolveRepos,
+                                      resolveSource = resolveSource)
 
         if keepList:
             callback.done()
@@ -1897,7 +1918,10 @@ conary erase '%s=%s[%s]'
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
+            # _createCs accesses the database through the uJob.troveSource,
+            # so make sure that references this fresh db as well.
             db = database.Database(cfg.root, cfg.dbPath)
+            uJob.troveSource.db = db
             repos = NetworkRepositoryClient(cfg.repositoryMap,
                                             cfg.user,
                                             downloadRateLimit =

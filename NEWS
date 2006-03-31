@@ -1,8 +1,17 @@
-* --replace-files removed the file tags from files for no good reason
-* rollbacks now restore files from other troves which are replaced as part of
-  an update (thanks to, say, --replace-files or identical contents)
 
 Changes in @NEW@:
+  o Client Changes:
+    * Conary will now allow generic options to be placed before the command
+      you are giving to conary.  For example, 'conary --root=/foo query'
+      will now work.
+    * the remove command no longer removes file tags from files for no good 
+      reason
+    * rollbacks now restore files from other troves which are replaced as part
+      of an update (thanks to, say, --replace-files or identical contents)
+    * --replace-files now marks files as owned by the trove which used to
+      claim them
+
+Changes in 1.0.10:
   o Client Changes
     * Given a system based on rPath linux where you only installed
       !smp kernels, conary would eventually start installing smp
@@ -42,6 +51,7 @@ Changes in @NEW@:
       were on different hosts to fail has been fixed.
     * Fixed a bug when determining local file system changes involving a file 
       or directory with mtime 0.
+    * The --signature-key option was restored
 
 Changes in 1.0.9:
   o Client Changes:

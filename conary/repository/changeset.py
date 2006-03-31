@@ -954,11 +954,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
 	    newFlavor = troveCs.getNewFlavor()
-	    assert(not troveCs.getOldVersion())
 
             if key not in troveMap:
                 continue
 
+            assert(not troveCs.getOldVersion())
             assert(troveCs.isAbsolute())
 
             (oldVersion, oldFlavor) = troveMap[key]

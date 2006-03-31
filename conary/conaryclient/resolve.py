@@ -18,6 +18,192 @@ from conary.lib import log
 from conary.repository import trovesource
 from conary.deps import deps
 
+class DepResolutionMethod(object):
+    """Abstract base class for dependency resolution methods.
+       These classes wraps around the actual method used to
+       find resolutions for dependencies.
+    """
+    def __init__(self, cfg, db):
+        self.cfg = cfg
+        self.db = db
+
+    def setTroveSource(self, troveSource):
+        self.troveSource = troveSource
+
+    def prepareForResolution(self, depList):
+        """
+            Must be called prior to requesting dep resolution.
+            Returns False if there is no point in doing more dep resolution.
+        """
+        raise NotImplementedError
+
+    def resolveDependencies(self):
+        """
+            Attempts to resolve the dependencies passed into 
+            prepareForResolution.
+        """
+        raise NotImplementedError
+
+    def filterSuggestions(self, depList, sugg, suggMap):
+        """
+            Given a list of several suggestions for one dependency,
+            pick the dep that matches the best.
+        """
+        troves = set()
+
+        for (troveTup, depSet) in depList:
+            if depSet in sugg:
+                suggList = set()
+                choicesAndDep = itertools.izip(sugg[depSet],
+                                               depSet.iterDeps(sort=True))
+                for choiceList, (depClass, dep) in choicesAndDep:
+                    troveNames = set(x[0] for x in choiceList)
+
+                    if self.db:
+                        affTroveDict = \
+                            dict((x, self.db.trovesByName(x))
+                                 for x in troveNames)
+                    else:
+                        affTroveDict = dict.fromkeys(troveNames, {})
+
+                    # iterate over flavorpath -- use suggestions 
+                    # from first flavor on flavorpath that gets a match 
+                    for installFlavor in self.cfg.flavor:
+                        choice = self.selectResolutionTrove(troveTup, dep,
+                                                            depClass,
+                                                            choiceList,
+                                                            installFlavor,
+                                                            affTroveDict)
+                        if choice:
+                            suggList.add(choice)
+                            l = suggMap.setdefault(troveTup, set())
+                            l.add(choice)
+                            log.debug('%s=%s[%s]\n  REQ: %s=%s[%s]\n  SOLVES: %s' % (troveTup + choice + ('\n\t'.join(str(depSet).split('\n')),)))
+                            break
+
+                troves.update([ (x[0], (None, None), x[1:], True)
+                                for x in suggList ])
+
+
+        return troves
+
+
+    def selectResolutionTrove(self, requiredBy, dep, depClass,
+                              troveTups, installFlavor, affFlavorDict):
+        """ determine which of the given set of troveTups is the 
+            best choice for installing on this system.  Because the
+            repository didn't try to determine which flavors are best for 
+            our system, we have to filter the troves locally.  
+        """
+        # we filter the troves in the following ways:
+        # 1. remove trove tups that don't match this installFlavor
+        #    (after modifying the flavor by any affinity flavor found
+        #     in an installed trove by the same name)
+        # 2. filter so that only the latest version of a trove is left
+        #    for each name,branch pair. (this ensures that a really old
+        #    version of a trove doesn't get preferred over a new one 
+        #    just because its got a better flavor)
+        # 3. pick the best flavor out of the remaining
+
+
+        if installFlavor:
+            flavoredList = []
+            for troveTup in troveTups:
+                f = installFlavor.copy()
+                affFlavors = affFlavorDict[troveTup[0]]
+                if affFlavors:
+                    affFlavor = affFlavors[0][2]
+                    flavorsMatch = True
+                    for newF in [x[2] for x in affFlavors[1:]]:
+                        if newF != affFlavor:
+                            flavorsMatch = False
+                            break
+                    if flavorsMatch:
+                        f.union(affFlavor,
+                                mergeType=deps.DEP_MERGE_TYPE_PREFS)
+
+                flavoredList.append((f, troveTup))
+        else:
+            flavoredList = [ (None, x) for x in troveTups ]
+
+        trovesByNB = {}
+        for installFlavor, (n,v,f) in flavoredList:
+            b = v.branch()
+            myTimeStamp = v.timeStamps()[-1]
+            if installFlavor is None:
+                myScore = 0
+            else:
+                myScore = installFlavor.score(f)
+                if myScore is False:
+                    continue
+
+            if (n,b) in trovesByNB:
+                curScore, curTimeStamp, curTup = trovesByNB[n,b]
+                if curTimeStamp > myTimeStamp:
+                    continue
+                if curTimeStamp == myTimeStamp:
+                    if myScore < curScore:
+                        continue
+
+            trovesByNB[n,b] = (myScore, myTimeStamp, (n,v,f))
+
+        scoredList = sorted(trovesByNB.itervalues())
+        if not scoredList:
+            return None
+        else:
+            return scoredList[-1][-1]
+
+
+
+class DepResolutionByLabelPath(DepResolutionMethod):
+    def __init__(self, cfg, db, installLabelPath):
+        self.index = 0
+        self.depList = None
+
+        self.cfg = cfg
+        self.db = db
+        self.installLabelPath = installLabelPath
+
+    def prepareForResolution(self, depList):
+        if not depList:
+            return False
+
+        newDepList = [ x[1] for x in depList ]
+        if newDepList != self.depList:
+            self.index = 0
+            self.depList = newDepList
+        else:
+            self.index += 1
+
+        if self.index < len(self.installLabelPath):
+            return True
+        else:
+            return False
+
+    def resolveDependencies(self):
+        return self.troveSource.resolveDependencies(
+                        self.installLabelPath[self.index],
+                        self.depList)
+
+class DepResolutionByTroveList(DepResolutionMethod):
+    def __init__(self, cfg, db, troveList):
+        assert(troveList)
+        self.troveList = troveList
+        self.depList = None
+        self.db = db
+        self.cfg = cfg
+
+    def prepareForResolution(self, depList):
+        newDepList = [x[1] for x in depList]
+        if not newDepList or newDepList == self.depList:
+            return False
+
+        self.depList = newDepList
+        return True
+
+    def resolveDependencies(self):
+        return self.troveSource.resolveDependenciesByGroups(self.troveList,
+                                                            self.depList)
 
 class DependencySolver(object):
 
@@ -28,7 +214,8 @@ class DependencySolver(object):
         self.db = db
 
     def resolveDependencies(self, uJob, jobSet, split = False,
-                            resolveDeps = True, useRepos = True):
+                            resolveDeps = True, useRepos = True,
+                            resolveSource = None):
         """
             Determine and possibly resolve dependency problems.
             @param uJob: update job we are resolving dependencies for
@@ -44,21 +231,18 @@ class DependencySolver(object):
             @param useRepos: If True, search for dependency solutions in the 
             repository after searching the update job search source.
         """
-
         troveSource = uJob.getSearchSource()
         if useRepos:
             troveSource = trovesource.stack(troveSource, self.repos)
 
         ineligible = set()
 
-        pathIdx = 0
         (depList, cannotResolve, changeSetList, keepList, ineligible) \
                              = self.checkDeps(uJob, jobSet, troveSource,
                                               findOrdering = split,
                                               resolveDeps = resolveDeps,
                                               ineligible=ineligible)
 
-        suggMap = {}
 
         if not resolveDeps:
             # we're not supposed to resolve deps here; just skip the
@@ -66,92 +250,77 @@ class DependencySolver(object):
             depList = []
             cannotResolve = []
 
+        if resolveSource is None:
+            resolveSource = DepResolutionByLabelPath(self.cfg, self.db,
+                                                     self.cfg.installLabelPath)
 
-        while (depList and self.cfg.installLabelPath
-               and pathIdx < len(self.cfg.installLabelPath)):
-            nextCheck = [ x[1] for x in depList ]
-            sugg = troveSource.resolveDependencies(
-                            self.cfg.installLabelPath[pathIdx], 
-                            nextCheck)
+        resolveSource.setTroveSource(troveSource)
 
-            troves = set()
+        suggMap = {}
+        keepList = []
 
-            for (troveTup, depSet) in depList:
-                if depSet in sugg:
-                    suggList = set()
-                    for choiceList in sugg[depSet]:
-                        troveNames = set(x[0] for x in choiceList)
+        while resolveSource.prepareForResolution(depList):
 
-                        affTroveDict = \
-                            dict((x, self.db.trovesByName(x))
-                                              for x in troveNames)
+            sugg = resolveSource.resolveDependencies()
+            newTroves = resolveSource.filterSuggestions(depList, sugg, suggMap)
 
-                        # iterate over flavorpath -- use suggestions 
-                        # from first flavor on flavorpath that gets a match 
-                        for installFlavor in self.cfg.flavor:
-                            choice = self.selectResolutionTrove(choiceList,
-                                                                installFlavor,
-                                                                affTroveDict)
-                            if choice:
-                                suggList.add(choice)
-                                l = suggMap.setdefault(troveTup, set())
-                                l.add(choice)
-                                log.debug('%s=%s[%s]\n  REQ: %s=%s[%s]\n  SOLVES: %s' % (troveTup + choice + ('\n\t'.join(str(depSet).split('\n')),)))
-                                break
+            if not newTroves:
+                continue
 
-                    troves.update([ (x[0], (None, None), x[1:], True)
-                                    for x in suggList ])
+            changedJob = self.addUpdates(newTroves, uJob, jobSet, ineligible,
+                                         keepList, troveSource)
+            if not changedJob:
+                continue
 
-            if troves:
-                # We found good suggestions, merge in those troves. Items
-                # which are being removed by the current job cannot be 
-                # removed again.
-                beingRemoved = set((x[0], x[1][0], x[1][1]) for x in
-                                    jobSet if x[1][0] is not None )
-                beingInstalled = set((x[0], x[2][0], x[2][1]) for x in
-                                      jobSet if x[2][0] is not None )
-
-
-                # add in foo if we are adding foo:lib.  That way 'conary
-                # erase foo' will work as expected.
-                if self.cfg.autoResolvePackages:
-                    packageJobs = self.addPackagesForComponents(troves,
-                                                                troveSource,
-                                                                beingInstalled)
-                    troves.update(packageJobs)
-
-                newJob = self.client._updateChangeSet(troves, uJob,
-                                                      keepExisting = False,
-                                                      recurse = False,
-                                                      ineligible = beingRemoved,
-                                                      checkPrimaryPins = True)
-                assert(not (newJob & jobSet))
-                newJob = self.filterCrossBranchResolutions(newJob, troveSource)
-                if not newJob:
-                    # we had potential solutions, but they would have
-                    # required implicitly switching the branch of a trove
-                    # on a user, and we don't do that.
-                    pathIdx += 1
-                    continue
-
-                jobSet.update(newJob)
-
-                lastCheck = depList
-                (depList, cannotResolve, changeSetList, newKeepList,
-                 ineligible) =  self.checkDeps(uJob, jobSet, 
-                                               uJob.getTroveSource(),
-                                               findOrdering = split,
-                                               resolveDeps = resolveDeps,
-                                               ineligible = ineligible)
-                keepList.extend(newKeepList)
-                if lastCheck != depList:
-                    pathIdx = 0
-            else:
-                # we didnt find any suggestions; go on to the next label
-                # in the search path
-                pathIdx += 1
+            (depList, cannotResolve, changeSetList, newKeepList,
+             ineligible) =  self.checkDeps(uJob, jobSet,
+                                           uJob.getTroveSource(),
+                                           findOrdering = True,
+                                           resolveDeps = True,
+                                           ineligible = ineligible)
+            keepList.extend(newKeepList)
 
         return (depList, suggMap, cannotResolve, changeSetList, keepList)
+
+
+
+    def addUpdates(self, troves, uJob, jobSet, ineligible, keepList, 
+                    troveSource):
+        """
+        Add the given dep resolution solutions to the current jobSet.
+        """
+        # We found good suggestions, merge in those troves. Items
+        # which are being removed by the current job cannot be 
+        # removed again.
+        beingRemoved = set((x[0], x[1][0], x[1][1]) for x in
+                            jobSet if x[1][0] is not None )
+        beingInstalled = set((x[0], x[2][0], x[2][1]) for x in
+                              jobSet if x[2][0] is not None )
+
+
+        # add in foo if we are adding foo:lib.  That way 'conary
+        # erase foo' will work as expected.
+        if self.cfg.autoResolvePackages:
+            packageJobs = self.addPackagesForComponents(troves,
+                                                        troveSource,
+                                                        beingInstalled)
+            troves.update(packageJobs)
+
+        newJob = self.client._updateChangeSet(troves, uJob,
+                                              keepExisting = False,
+                                              recurse = False,
+                                              ineligible = beingRemoved,
+                                              checkPrimaryPins = True)
+        assert(not (newJob & jobSet))
+        newJob = self.filterCrossBranchResolutions(newJob, troveSource)
+        if not newJob:
+            # we had potential solutions, but they would have
+            # required implicitly switching the branch of a trove
+            # on a user, and we don't do that.
+            return False
+
+        jobSet.update(newJob)
+        return True
 
     def checkDeps(self, uJob, jobSet, trvSrc, findOrdering, 
                   resolveDeps, ineligible):
@@ -361,70 +530,6 @@ class DependencySolver(object):
                 jobSet.add((job[0], (None, None), job[2], False))
 
         return (cannotResolve, keepList)
-
-    def selectResolutionTrove(self, troveTups, installFlavor, affFlavorDict):
-        """ determine which of the given set of troveTups is the 
-            best choice for installing on this system.  Because the
-            repository didn't try to determine which flavors are best for 
-            our system, we have to filter the troves locally.  
-        """
-        # we filter the troves in the following ways:
-        # 1. remove trove tups that don't match this installFlavor
-        #    (after modifying the flavor by any affinity flavor found
-        #     in an installed trove by the same name)
-        # 2. filter so that only the latest version of a trove is left
-        #    for each name,branch pair. (this ensures that a really old
-        #    version of a trove doesn't get preferred over a new one 
-        #    just because its got a better flavor)
-        # 3. pick the best flavor out of the remaining
-
-
-        if installFlavor:
-            flavoredList = []
-            for troveTup in troveTups:
-                f = installFlavor.copy()
-                affFlavors = affFlavorDict[troveTup[0]]
-                if affFlavors:
-                    affFlavor = affFlavors[0][2]
-                    flavorsMatch = True
-                    for newF in [x[2] for x in affFlavors[1:]]:
-                        if newF != affFlavor:
-                            flavorsMatch = False
-                            break
-                    if flavorsMatch:
-                        f.union(affFlavor,
-                                mergeType=deps.DEP_MERGE_TYPE_PREFS)
-
-                flavoredList.append((f, troveTup))
-        else:
-            flavoredList = [ (None, x) for x in troveTups ]
-
-        trovesByNB = {}
-        for installFlavor, (n,v,f) in flavoredList:
-            b = v.branch()
-            myTimeStamp = v.timeStamps()[-1]
-            if installFlavor is None:
-                myScore = 0
-            else:
-                myScore = installFlavor.score(f)
-                if myScore is False:
-                    continue
-
-            if (n,b) in trovesByNB:
-                curScore, curTimeStamp, curTup = trovesByNB[n,b]
-                if curTimeStamp > myTimeStamp:
-                    continue
-                if curTimeStamp == myTimeStamp:
-                    if myScore < curScore:
-                        continue
-
-            trovesByNB[n,b] = (myScore, myTimeStamp, (n,v,f))
-
-        scoredList = sorted(trovesByNB.itervalues())
-        if not scoredList:
-            return None
-        else:
-            return scoredList[-1][-1]
 
     def addPackagesForComponents(self, troves, troveSource, beingInstalled):
         packages = {}

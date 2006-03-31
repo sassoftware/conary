@@ -105,10 +105,10 @@ class DependencyWorkTables:
         allDeps = []
         if requires:
             allDeps += [ (0, x) for x in
-                            requires.getDepClasses().iteritems() ]
+                            sorted(requires.getDepClasses().iteritems()) ]
         if provides:
             allDeps += [ (1,  x) for x in
-                            provides.getDepClasses().iteritems() ]
+                            sorted(provides.getDepClasses().iteritems()) ]
 
         populateStmt = self.cu.compile("""
             INSERT INTO DepCheck
@@ -117,6 +117,7 @@ class DependencyWorkTables:
             """)
 
         for (isProvides, (classId, depClass)) in allDeps:
+            # getDeps() returns sorted deps
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     self.cu.execstmt(populateStmt,
@@ -945,6 +946,15 @@ class DependencyTables:
 
         return restrictJoin, restrictWhere
 
+    def _restrictResolveByTrove(self, *args):
+        """ Restricts deps to being solved by the given instanceIds or
+            their children
+        """
+        # LEFT join in case the instanceId we're given is not included in any
+        # troves on this host and we wish to match it.
+        restrictJoin = """JOIN tmpInstances USING(instanceId)"""
+        return restrictJoin, ''
+
     def _resolve(self, depSetList, selectTemplate, restrictor=None,
                  restrictBy=None):
 
@@ -973,7 +983,7 @@ class DependencyTables:
         result.setdefault(depSet, []).append(value)
 
 
-    def resolve(self, label, depSetList):
+    def resolve(self, label, depSetList, troveList=[]):
         """ Determine troves that provide the given dependencies,
             restricting by label and limiting to latest version for
             each (name, flavor) pair.
@@ -995,9 +1005,43 @@ class DependencyTables:
                           ORDER BY
                             Nodes.finalTimestamp DESC
                         """
+        troveIds = []
+        if troveList:
+            cu = self.db.cursor()
+            schema.resetTable(cu, "tmpInstances")
+            for (n,v,f) in troveList:
+                itemId = cu.execute('SELECT itemId FROM Items'
+                                    ' WHERE item=?', n).next()[0]
+                versionId = cu.execute('SELECT versionId FROM Versions'
+                                       ' WHERE version=?', 
+                                       v.asString()).next()[0]
+                flavorId = cu.execute('SELECT flavorId FROM Flavors'
+                                      ' WHERE flavor=?', 
+                                      f.freeze()).next()[0]
+                instanceId = cu.execute('''SELECT instanceId FROM Instances 
+                                           WHERE itemId=?
+                                             AND versionId=?
+                                             AND flavorId=?''', itemId,
+                                        versionId, flavorId).next()[0]
+                cu.execute('''INSERT INTO tmpInstances VALUES (?)''',
+                           instanceId, start_transaction=False)
+                cu.execute('''INSERT INTO tmpInstances
+                                 SELECT DISTINCT includedId FROM TroveTroves
+                                  LEFT JOIN tmpInstances ON
+                                    includedId = tmpInstances.instanceId
+                                  WHERE
+                                    TroveTroves.instanceId=? AND
+                                    tmpInstances.instanceId IS NULL
+                               ''', instanceId, start_transaction=False)
+            restrictBy = None
+            restrictor = self._restrictResolveByTrove
+        else:
+            restrictBy = label.asString()
+            restrictor = self._restrictResolveByLabel
+
         depList, cu = self._resolve(depSetList, selectTemplate,
-                                    restrictBy = label.asString(),
-                                    restrictor = self._restrictResolveByLabel)
+                                    restrictBy = restrictBy,
+                                    restrictor = restrictor)
 
         depSolutions = [ {} for x in xrange(len(depList)) ]
 

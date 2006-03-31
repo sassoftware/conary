@@ -30,6 +30,9 @@ import sys
 
 class OptionError(Exception):
     val = 1
+    def __init__(self, msg, parser):
+        Exception.__init__(self, msg)
+        self.parser = parser
 
 class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
@@ -39,7 +42,7 @@ class OptionParser(optparse.OptionParser):
         optparse.OptionParser.__init__(self, *args, **kw)
 
     def error(self, msg):
-        raise OptionError(msg)
+        raise OptionError(msg, self)
 
     def _process_short_opts(self, rargs, values):
         if (self.hobbleShortOpts and 
@@ -108,7 +111,8 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     return _processArgs(argDef, cfgMap, cfg, usage, argv)[:2]
 
 def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
-                commonParams=None, useHelp=False, defaultGroup=None):
+                commonParams=None, useHelp=False, defaultGroup=None,
+                interspersedArgs=True):
     otherArgs = [ argv[0] ]
     argSet = {}
     # don't mangle the command line
@@ -142,14 +146,14 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         d[arg] = ONE_PARAM
 
     parser = getOptionParser(params, cfgMap, cfg, usage, version, useHelp,
-                             defaultGroup)
+                             defaultGroup, interspersedArgs)
     argSet, otherArgs, options = getArgSet(params, parser, argv)
 
     if 'config-file' in argSet:
         try:
             cfg.read(argSet['config-file'], exception = True)
         except IOError, msg:
-            raise OptionError(msg)
+            raise OptionError(msg, parser)
 	del argSet['config-file']
 	
     for (arg, name) in cfgMap.items():
@@ -173,8 +177,10 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
     return argSet, otherArgs, parser, options
 
 def getOptionParser(params, cfgMap, cfg, usage, version=None, useHelp=False,
-                    defaultGroup=None):
+                    defaultGroup=None, interspersedArgs=True):
     parser = OptionParser(usage=usage, add_help_option=useHelp, version=version)
+    if not interspersedArgs:
+        parser.disable_interspersed_args()
 
     if defaultGroup in params:
         group = optparse.OptionGroup(parser, defaultGroup)
@@ -202,6 +208,7 @@ def getOptionParser(params, cfgMap, cfg, usage, version=None, useHelp=False,
 
 def getArgSet(params, parser, argv=sys.argv):
     (options, otherArgs) = parser.parse_args(argv)
+
     argSet = {}
 
     for name, data in params.iteritems():

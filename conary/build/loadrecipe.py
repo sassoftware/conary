@@ -487,6 +487,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
 
     oldUsed = use.getUsed()
     name, versionStr, flavor = cmdline.parseTroveSpec(troveSpec)
+    versionSpec, flavorSpec = versionStr, flavor
 
     if name.endswith('.recipe'):
         file = name
@@ -533,6 +534,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 while version.isOnLocalHost():
                     version = version.parentVersion()
                 versionStr = str(version)
+
         if flavor:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
@@ -547,6 +549,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                      filterVersions=True,
                                      parentDir=parentDir)[0]
 
+    if label and not versionSpec:
+        # If they used the old-style specification of label, we should 
+        # convert to new style for purposes of storing in troveInfo
+        troveSpec = '%s=%s' % (name, label)
+        if flavorSpec:
+            troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return

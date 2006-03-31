@@ -13,6 +13,7 @@
 #
 """General graph algorithms"""
 import copy
+import itertools
 
 class NodeData(object):
     """Stores data associated with nodes.  Subclasses can determine
@@ -97,7 +98,7 @@ class DirectedGraph:
 
     def addNode(self, item):
         nodeId = self.data.getIndex(item)
-        self.edges.setdefault(nodeId, set())
+        self.edges.setdefault(nodeId, {})
         return nodeId
 
     def isEmpty(self):
@@ -106,40 +107,49 @@ class DirectedGraph:
     def get(self, idx):
         return self.data.get(idx)
 
-    def addEdge(self, fromItem, toItem):
+    def addEdge(self, fromItem, toItem, value=1):
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
-        self.edges.setdefault(fromIdx, set()).add(toIdx)
-        self.edges.setdefault(toIdx, set())
+        self.edges.setdefault(fromIdx, {})[toIdx] = value
+        self.edges.setdefault(toIdx, {})
+
+    def getEdge(self, fromItem, toItem):
+        return self.edges[fromIdx, toIdx]
 
     def delete(self, item):
         idx = self.data.getIndex(item)
         self.data.delete(item)
         del self.edges[idx]
-        [ x.discard(idx) for x in self.edges.itervalues() ]
+        [ x.pop(idx, None) for x in self.edges.itervalues() ]
 
     def deleteEdges(self, item):
-        self.edges[self.data.getIndex(item)] = set()
+        self.edges[self.data.getIndex(item)] = {}
 
-    def getChildren(self, item):
-        return self.data.getItemsByIndex(self.edges[self.data.getIndex(item)])
+    def getChildren(self, item, withEdges=False):
+        idx = self.data.getIndex(item)
+        children = self.data.getItemsByIndex(self.edges[idx])
+        if withEdges:
+            return itertools.izip(children, self.edges[idx].itervalues())
+        else:
+            return children
 
     def getReversedEdges(self):
         newEdges = {}
         for fromId, toIdList in self.edges.iteritems():
             newEdges.setdefault(fromId, [])
-            for toId in toIdList:
-                newEdges.setdefault(toId, []).append(fromId)
-        return dict((x[0], set(x[1])) for x in newEdges.iteritems())
+            for toId, value in toIdList.iteritems():
+                newEdges.setdefault(toId, []).append((fromId, value))
+        return dict((x[0], dict(x[1])) for x in newEdges.iteritems())
 
     def iterChildren(self, node):
         return (self.data.get(idx) 
                     for idx in self.edges[self.data.getIndex(node)])
 
-    def getParents(self, node):
+    def getParents(self, node, withEdges=False):
         idx = self.data.getIndex(node)
-        return [ self.data.get(x[0]) 
-                    for x in self.edges.iteritems() if idx in x[1] ]
+        if withEdges:
+            return [ (self.data.get(x[0]), x[1][idx])
+                        for x in self.edges.iteritems() if idx in x[1] ]
 
     def getLeaves(self):
         return [ self.data.get(x[0])

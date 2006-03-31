@@ -609,6 +609,11 @@ entries when committing changes to source components.
 The path to the Conary database on the local system.  It is relative
 to \fBroot\fP (see below) and should normally not be changed.
 .TP
+.B excludeTroves
+The regular expression of a trove name to exclude when doing updates.
+Multiple regular expressions can be specified with mutiple excludeTrove
+lines.
+.TP
 .B flavor
 The flavor that Conary will use to find troves to install when the
 trove is not yet installed on the system.  It is specified using the

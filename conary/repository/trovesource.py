@@ -57,6 +57,9 @@ class AbstractTroveSource:
     def resolveDependencies(self, label, depList):
         return {}
 
+    def resolveDependenciesByGroups(self, troveList, depList):
+        return {}
+
     def hasTroves(self, troveList):
         raise NotImplementedError
 
@@ -136,6 +139,21 @@ class AbstractTroveSource:
 		if not ignoreMissing:
 		    raise
 
+
+    def mergeDepSuggestions(self, allSuggs, newSugg):
+        """
+            Given two suggestion lists, merge them so that
+            all the suggestions are together.
+        """
+        for depSet, trovesByDepList in newSugg.iteritems():
+            if depSet not in allSuggs:
+                lst = [ [] for x in trovesByDepList ]
+                allSuggs[depSet] = lst
+            else:
+                lst = r[depSet]
+
+            for i, troveList in enumerate(trovesByDepList):
+                lst[i].extend(troveList)
 
 
 # constants mostly stolen from netrepos/netserver
@@ -359,6 +377,9 @@ class SimpleTroveSource(SearchableTroveSource):
     def iterAllTroveNames(self):
         return iter(self._trovesByName)
 
+    def hasTroves(self, troveTups):
+        return [ x in self._trovesByName.get(x[0], []) for x in troveTups ]
+
     def __len__(self):
         return len(list(self))
         
@@ -398,6 +419,9 @@ class TroveListTroveSource(SimpleTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
+
 
 class GroupRecipeSource(SearchableTroveSource):
     """ A TroveSource that contains all the troves in a cooking 
@@ -418,6 +442,9 @@ class GroupRecipeSource(SearchableTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
+
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
 
@@ -434,6 +461,9 @@ class ReferencedTrovesSource(SearchableTroveSource):
     def __init__(self, source):
         self.searchAsDatabase()
         self.source = source
+
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
 
     def getTroves(self, troveTups, *args, **kw):
         return self.source.getTroves(troveTups, *args, **kw)
@@ -981,6 +1011,13 @@ class TroveSourceStack(SearchableTroveSource):
                 results[depSet] = troves
         
         return results
+    
+    def resolveDependenciesByGroups(self, troveList, depList):
+        allSugg = {}
+        for source in self.sources:
+            sugg = source.resolveDependenciesByGroups(troveList, depList)
+            self.mergeDepSuggestions(allSugg, sugg)
+        return allSugg
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False):

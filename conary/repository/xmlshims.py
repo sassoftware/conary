@@ -96,9 +96,18 @@ class NetworkConvertors(object):
     def toEntitlement(self, ent):
         return base64.decodestring(ent)
 
-    def fromTroveTup(self, tuple):
-        return (tuple[0], self.fromVersion(tuple[1]), self.fromFlavor(tuple[2]))
+    def fromTroveTup(self, tuple, withTime=False):
+        if withTime:
+            return (tuple[0], self.freezeVersion(tuple[1]), 
+                    self.fromFlavor(tuple[2]))
+        else:
+            return (tuple[0], self.fromVersion(tuple[1]), 
+                    self.fromFlavor(tuple[2]))
 
-    def toTroveTup(self, tuple):
-        return (tuple[0], self.toVersion(tuple[1]), self.toFlavor(tuple[2]))
+    def toTroveTup(self, tuple, withTime=False):
+        if withTime:
+            return (tuple[0], self.thawVersion(tuple[1]), 
+                    self.toFlavor(tuple[2]))
+        else:
+            return (tuple[0], self.toVersion(tuple[1]), self.toFlavor(tuple[2]))
         

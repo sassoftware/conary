@@ -93,6 +93,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getTroveLatestVersion',
                         'getChangeSet',
                         'getDepSuggestions',
+                        'getDepSuggestionsByTroves',
                         'prepareChangeSet',
                         'commitChangeSet',
                         'getFileVersions',
@@ -1238,6 +1239,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             result[requires[key]] = val
 
         return result
+
+    def getDepSuggestionsByTroves(self, authToken, clientVersion, requiresList,
+                                  troveList):
+        troveList = [ self.toTroveTup(x) for x in troveList ]
+
+        for (n,v,f) in troveList:
+            if not self.auth.check(authToken, write = False,
+                                   label = v.branch().label()):
+                raise errors.InsufficientPermission
+        self.log(2, troveList, requiresList)
+        requires = {}
+        for dep in requiresList:
+            requires[self.toDepSet(dep)] = dep
+
+        sugDict = self.troveStore.resolveRequirements(None, requires.keys(),
+                                                      troveList)
+
+        result = {}
+        for (key, val) in sugDict.iteritems():
+            result[requires[key]] = val
+
+        return result
+
+
 
     def prepareChangeSet(self, authToken, clientVersion):
 	# make sure they have a valid account and permission to commit to

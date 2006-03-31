@@ -130,6 +130,12 @@ class Dependency(BaseDependency):
     def __eq__(self, other):
 	return other.name == self.name and other.flags == self.flags
 
+    def __cmp__(self, other):
+	return (cmp(self.name, other.name) 
+                or cmp(sorted(self.flags.iteritems()),
+                       sorted(other.flags.iteritems())))
+        
+
     def __str__(self):
 	if self.flags:
 	    flags = self.flags.items()
@@ -738,10 +744,17 @@ class DependencySet(object):
         for dep in deps:
             c.addDep(dep)
 
-    def iterDeps(self):
-        for depClass in self.members.itervalues():
-            for dep in depClass.members.itervalues():
-                yield depClass.__class__, dep
+    def iterDeps(self, sort=False):
+        # since this is in an tight loop in some places, avoid overhead
+        # of continual checks on the sort variable.
+        if sort:
+            for _, depClass in sorted(self.members.iteritems()):
+                for _, dep in sorted(depClass.members.iteritems()):
+                    yield depClass.__class__, dep
+        else:
+            for depClass in self.members.itervalues():
+                for dep in depClass.members.itervalues():
+                    yield depClass.__class__, dep
 
     def iterDepsByClass(self, depClass):
         if depClass.tag in self.members:
