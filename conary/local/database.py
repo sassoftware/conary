@@ -537,28 +537,32 @@ class Database(SqlDbRepository):
                 continue
 
             localCs = localRollback.getNewTroveVersion(*newInfo)
-            if trvCs.getOldVersion() != removeCs.getOldVersion() or \
-               trvCs.getOldFlavor() != removeCs.getOldFlavor():
+
+            if localCs.getOldVersion() != removeCs.getOldVersion() or \
+               localCs.getOldFlavor() != removeCs.getOldFlavor():
                 contine
 
-            # There isn't a good way to merge these; we end up creating
-            # a new trove and diffing. We apply the removeCs last
-            # in case there is a locally modified file which is getting
-            # overwritten.
-            old = self.db.getTrove(trvCs.getName(), trvCs.getOldVersion(),
-                                   trvCs.getOldFlavor())
-            new = opd.copy()
-            new.applyChangeSet(trvCs)
-            new.applyChangeSet(localCs)
-            newDiff = new.diff(old)[0]
-            removeCs.newTrove(newDiff)
+            removeRollback.delNewTrove(*newInfo)
+
+            pathIdList = set()
+            for (pathId, path, fileId, version) in removeCs.getNewFileList():
+                pathIdList.add(pathId)
+                localCs.newFile(pathId, path, fileId, version)
+
+            changedList = localCs.getChangedFileList()
+            l = [ x for x in localCs.getChangedFileList() if
+                    x[0] not in pathIdList ]
+            del changedList[:]
+            changedList.extend(l)
+
+            continue
 
         localRollback.merge(removeRollback)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
-	set = fsJob.getDirectoryCountSet()
-	list = set.keys()
+        dirSet = fsJob.getDirectoryCountSet()
+        list = dirSet.keys()
 	list.sort()
 	list.reverse()
 	directoryCandidates = {}
@@ -572,7 +576,7 @@ class Database(SqlDbRepository):
                     raise
                 continue
 
-	    entries -= set[path]
+            entries -= dirSet[path]
 
 	    # listdir excludes . and ..
 	    if (entries) != 0: continue
@@ -580,10 +584,10 @@ class Database(SqlDbRepository):
 	    directoryCandidates[path] = True
 
 	    parent = os.path.dirname(path)
-	    if set.has_key(parent):
-		set[parent] += 1
+            if dirSet.has_key(parent):
+                dirSet[parent] += 1
 	    else:
-		set[parent] = 1
+                dirSet[parent] = 1
 		list.append(parent)
 		# insertion is linear, sort is n log n
 		# oh well.
