@@ -80,15 +80,62 @@ class FilesystemJob:
             l = self.tagRemoves.setdefault(tag, [])
             l.append(target)
 
-    def userRemoval(self, troveName, troveVersion, troveFlavor, pathId):
+    def userRemoval(self, troveName, troveVersion, troveFlavor, pathId,
+                    replaced = False):
+        # replaced is True if this is an automatic replacement and False if
+        # it's the result of a preexisting replacement (True gets it into
+        # the replacement changeset, False leaves it out)
         l = self.userRemovals.setdefault(
                     (troveName, troveVersion, troveFlavor), [])
-        l.append(pathId)
+        l.append((pathId, replaced))
+
+    def createRemoveRollback(self):
+        cs = changeset.ChangeSet()
+
+        # Returns a changeset which undoes the user removals 
+        for (info, fileList) in self.userRemovals.iteritems():
+            if sum([ x[1] for x in fileList ]) == 0:
+                # skip the rest of this processing if there are no files
+                # to handle (it's likely that the trove referred to here
+                # isn't in the database yet)
+                continue
+
+            localTrove = self.db.getTrove(*info)
+            updatedTrove = localTrove.copy()
+            localTrove.changeVersion(
+                localTrove.getVersion().createBranch(
+                        label = versions.LocalLabel(), withVerRel = True))
+            hasChanges = False
+            for (pathId, replaced) in fileList:
+                if not replaced: continue
+                path, fileId = updatedTrove.getFile(pathId)[0:2]
+                stream = self.db.getFileStream(fileId)
+                cs.addFile(None, fileId, stream)
+
+                if files.frozenFileHasContents(stream):
+                    flags = files.frozenFileFlags(stream)
+                    # this file is seen as *added* in the rollback
+                    cs.addFileContents(pathId, changeset.ChangedFileTypes.file,
+                       filecontents.FromFilesystem(util.joinPaths(self.root,
+                                                                  path)),
+                       flags.isConfig())
+
+                updatedTrove.removeFile(pathId)
+                hasChanges = True
+
+            if not hasChanges: continue
+
+            # this is a rollback so the diff is backwards
+            trvCs = localTrove.diff(updatedTrove)[0]
+            cs.newTrove(trvCs)
+
+        return cs
 
     def iterUserRemovals(self):
-	for ((troveName, troveVersion, troveFlavor), pathIdList) in \
-					    self.userRemovals.iteritems():
-	    yield (troveName, troveVersion, troveFlavor, pathIdList)
+	for ((troveName, troveVersion, troveFlavor), fileList) \
+                                        in self.userRemovals.iteritems():
+	    yield (troveName, troveVersion, troveFlavor, 
+                    [ x[0] for x in fileList ])
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -606,40 +653,47 @@ class FilesystemJob:
                     fullyUpdated = False
                     continue
                 elif not self.removes.has_key(headRealPath):
-                    inWay = (flags & REPLACEFILES) == 0
+                    fileConflict = True
+
                     if removalHints:
                         # Don't go through the database if we know removalHints
                         # won't help avoid this conflict. This avoids calling
                         # iterFindPathReferences() against a network server
                         # for source control operations
-                        for info in self.db.iterFindPathReferences(headPath):
-                            if (flags & REPLACEFILES) or \
-                                    info[0:3] in removalHints:
-                                self.userRemoval(*info)
-                                inWay = False
+                        for info in self.db.iterFindPathReferences(
+                                            headPath, justPresent = True):
+                            if info[0:3] in removalHints:
+                                fileConflict = False
 
-                    if inWay:
+                    if fileConflict and \
+                                hasattr(self.db, 'iterFindPathReferences'):
                         # For system updates, we should look through the
                         # database for file conflicts and handle those. For
                         # source updates, we just give up.
-                        if hasattr(self.db, 'iterFindPathReferences'):
                             existingFile = files.FileFromFilesystem(
                                 headRealPath, pathId)
-                            inWay = not silentlyReplace(headFile, existingFile)
-                            if not inWay:
-                                for info in self.db.iterFindPathReferences(
-                                                                    headPath):
-                                    self.userRemoval(*info)
+                            fileConflict = \
+                                    not silentlyReplace(headFile, existingFile)
 
-                        if inWay:
-                            self.errors.append("%s is in the way of a newly "
-                               "created file in %s=%s[%s]" % (  
-                                   util.normpath(headRealPath), 
-                                   troveCs.getName(), 
-                                   troveCs.getNewVersion().asString(),
-                                   deps.formatFlavor(troveCs.getNewFlavor())))
-                            fullyUpdated = False
-                            continue
+                    if fileConflict and (flags & REPLACEFILES):
+                        # --replace-files was specified
+                        fileConflict = False
+
+                    if not fileConflict:
+                        # mark the file as replaced in anything which used
+                        # to own it
+                        for info in self.db.iterFindPathReferences(
+                                    headPath, justPresent = True):
+                            self.userRemoval(replaced = True, *info)
+                    else:
+                        self.errors.append("%s is in the way of a newly "
+                           "created file in %s=%s[%s]" % (  
+                               util.normpath(headRealPath), 
+                               troveCs.getName(), 
+                               troveCs.getNewVersion().asString(),
+                               deps.formatFlavor(troveCs.getNewFlavor())))
+                        fullyUpdated = False
+                        continue
 
             except OSError:
                 # the path doesn't exist, carry on with the restore
@@ -658,10 +712,11 @@ class FilesystemJob:
 	for (pathId, headPath, headFileId, headFileVersion), baseFile \
                 in itertools.izip(troveCs.getChangedFileList(), baseFileList):
 	    if not fsTrove.hasFile(pathId):
-		# the file was removed from the local system; this change
-		# wins
-		self.userRemoval(troveCs.getName(), troveCs.getNewVersion(),
-                                 troveCs.getNewFlavor(), pathId)
+		# the file was removed from the local system; we're not
+		# putting it back
+                self.userRemoval(troveCs.getName(), troveCs.getNewVersion(), 
+                                 troveCs.getNewFlavor(), pathId,
+                                 replaced = False)
 		continue
 
 	    (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)

@@ -1,3 +1,7 @@
+* --replace-files removed the file tags from files for no good reason
+* rollbacks now restore files from other troves which are replaced as part of
+  an update (thanks to, say, --replace-files or identical contents)
+
 Changes in @NEW@:
   o Client Changes
     * Given a system based on rPath linux where you only installed

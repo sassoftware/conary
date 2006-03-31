@@ -456,7 +456,7 @@ class Database(SqlDbRepository):
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
     def commitChangeSet(self, cs, uJob,
-                        isRollback = False, toStash = True,
+                        isRollback = False, updateDatabase = True,
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
@@ -508,7 +508,9 @@ class Database(SqlDbRepository):
 	result = update.buildLocalChanges(self, troveList, root = self.root)
 	if not result: return
 
-	localRollback, retList = result
+        retList = result[1]
+        localRollback = changeset.ReadOnlyChangeSet()
+        localRollback.merge(result[0])
 
 	fsTroveDict = {}
 	for (changed, fsTrove) in retList:
@@ -522,6 +524,36 @@ class Database(SqlDbRepository):
 	fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root, 
 				     flags = flags, callback = callback,
                                      removeHints = removeHints)
+        removeRollback = fsJob.createRemoveRollback()
+
+        # We now have two rollbacks we need to merge together, localRollback
+        # (which is the changes already made to the local system) and
+        # removeRollback, which contains local changes this update will do.
+        # Those two could overlap, so we need to merge them carefully.
+        for removeCs in [ x for x in removeRollback.iterNewTroveList() ]:
+            newInfo = (removeCs.getName(), removeCs.getNewVersion(), 
+                       removeCs.getNewFlavor())
+            if not localRollback.hasNewTrove(*newInfo):
+                continue
+
+            localCs = localRollback.getNewTroveVersion(*newInfo)
+            if trvCs.getOldVersion() != removeCs.getOldVersion() or \
+               trvCs.getOldFlavor() != removeCs.getOldFlavor():
+                contine
+
+            # There isn't a good way to merge these; we end up creating
+            # a new trove and diffing. We apply the removeCs last
+            # in case there is a locally modified file which is getting
+            # overwritten.
+            old = self.db.getTrove(trvCs.getName(), trvCs.getOldVersion(),
+                                   trvCs.getOldFlavor())
+            new = opd.copy()
+            new.applyChangeSet(trvCs)
+            new.applyChangeSet(localCs)
+            newDiff = new.diff(old)[0]
+            removeCs.newTrove(newDiff)
+
+        localRollback.merge(removeRollback)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
@@ -580,7 +612,7 @@ class Database(SqlDbRepository):
                 fsJob.preapply(tagSet, tagScript)
 
         # Build A->B
-        if toStash:
+        if updateDatabase:
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
@@ -588,6 +620,12 @@ class Database(SqlDbRepository):
                 dbCache, cs, callback, autoPinList, threshold = threshold,
                 allowIncomplete=isRollback)
             self.db.mapPinnedTroves(uJob.getPinMaps())
+        else:
+            # When updateDatabase is False, we're applying the local part
+            # of changeset. Files which are newly added by local changesets
+            # need to be recorded in the database as being present (since
+            # they were previously erased)
+            localrep.markAddedFiles(self.db, cs)
 
         errList = fsJob.getErrorList()
         if errList:
@@ -604,9 +642,9 @@ class Database(SqlDbRepository):
             self.db.removeFilesFromTrove(troveName, troveVersion, 
                                          troveFlavor, pathIdList)
 
-	for (name, version, flavor) in fsJob.getOldTroveList():
-	    if toStash:
-		# if to stash if false, we're restoring the local
+        if updateDatabase:
+            for (name, version, flavor) in fsJob.getOldTroveList():
+		# if to database if false, we're restoring the local
 		# branch of a rollback
 		self.db.eraseTrove(name, version, flavor)
 
@@ -804,7 +842,7 @@ class Database(SqlDbRepository):
                         callback.setUpdateJob(localCs.getJobSet())
                         self.commitChangeSet(localCs, UpdateJob(None),
                                              isRollback = True,
-                                             toStash = False,
+                                             updateDatabase = False,
                                              replaceFiles = replaceFiles,
                                              callback = callback)
 
@@ -816,8 +854,8 @@ class Database(SqlDbRepository):
 
             self.removeRollback(name)
 
-    def iterFindPathReferences(self, path):
-        return self.db.iterFindPathReferences(path)
+    def iterFindPathReferences(self, path, justPresent = False):
+        return self.db.iterFindPathReferences(path, justPresent = justPresent)
 
     def getTrovesWithProvides(self, depSetList):
         """Returns a dict { depSet : [troveTup, troveTup] } of local 

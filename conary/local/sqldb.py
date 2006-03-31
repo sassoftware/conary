@@ -104,24 +104,19 @@ class DBTroveFiles:
 	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=? "
 		   "AND instanceId=?", (path, instanceId))
 
-    def removeFileIds(self, instanceId, pathIdList, forReal = False):
+    def _updatePathIdsPresent(self, instanceId, pathIdList, isPresent):
         pathIdListPattern = ",".join(( '?' ) * len(pathIdList))
         cu = self.db.cursor()
-	cu.execute("""DELETE FROM DBFileTags WHERE
-			streamId IN (
-			    SELECT streamId FROM DBTroveFiles
-				WHERE instanceId=%d AND pathId in (%s)
-			)
-		    """ % (instanceId, pathIdListPattern), pathIdList)
 
-	if forReal:
-	    cu.execute("DELETE FROM DBTroveFiles WHERE instanceId=%d "
-		       "AND pathId in (%s)" % (instanceId, pathIdListPattern),
-                       pathIdList)
-	else:
-	    cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE "
-		       "instanceId=%d AND pathId in (%s)" % (instanceId,
-			       pathIdListPattern), pathIdList)
+        cu.execute("UPDATE DBTroveFiles SET isPresent=%d WHERE "
+                   "instanceId=%d AND pathId in (%s)" % (isPresent, 
+                   instanceId, pathIdListPattern), pathIdList)
+
+    def removePathIds(self, instanceId, pathIdList):
+        self._updatePathIdsPresent(instanceId, pathIdList, isPresent = 0)
+
+    def restorePathIds(self, instanceId, pathIdList):
+        self._updatePathIdsPresent(instanceId, pathIdList, isPresent = 1)
 
     def iterFilesWithTag(self, tag):
 	cu = self.db.cursor()
@@ -1168,9 +1163,10 @@ order by
 				 pristine = pristine)
 	    yield trv
 
-    def iterFindPathReferences(self, path):
+    def iterFindPathReferences(self, path, justPresent = False):
         cu = self.db.cursor()
-        cu.execute("""SELECT troveName, version, flavor, pathId
+        cu.execute("""SELECT troveName, version, flavor, pathId, 
+                             DBTroveFiles.isPresent
                             FROM DBTroveFiles JOIN Instances ON
                                 DBTroveFiles.instanceId = Instances.instanceId
                             JOIN Versions ON
@@ -1181,7 +1177,10 @@ order by
                                 path = ?
                     """, path)
 
-        for (name, version, flavor, pathId) in cu:
+        for (name, version, flavor, pathId, isPresent) in cu:
+            if not isPresent and justPresent:
+                continue
+
             version = versions.VersionFromString(version)
             if flavor is None:
                 flavor = deps.deps.DependencySet()
@@ -1200,7 +1199,14 @@ order by
 	versionId = self.versionTable[troveVersion]
         flavorId = self.flavors[troveFlavor]
 	instanceId = self.instances[(troveName, versionId, flavorId)]
-	self.troveFiles.removeFileIds(instanceId, pathIdList)
+	self.troveFiles.removePathIds(instanceId, pathIdList)
+
+    def restorePathIdsToTrove(self, troveName, troveVersion, troveFlavor,
+                              pathIdList):
+        versionId = self.versionTable[troveVersion]
+        flavorId = self.flavors[troveFlavor]
+        instanceId = self.instances[(troveName, versionId, flavorId)]
+        self.troveFiles.restorePathIds(instanceId, pathIdList)
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
