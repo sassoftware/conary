@@ -545,12 +545,6 @@ class QueryCommand(_AbstractQueryCommand):
                 kw[opt] = argSet.pop(opt, False)
         kw['pathList'] = argSet.pop('path', [])
         kw['pristine'] = not argSet.pop('no-pristine', False)
-
-        import time
-        while True:
-            print 'Here! (%s)' % os.getpid()
-            time.sleep(1)
-
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
