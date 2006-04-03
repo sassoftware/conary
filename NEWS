@@ -13,6 +13,8 @@ Changes in @NEW@:
       when you Ctrl-C (or a SIGINT is raised)
     * --debug-all now enters a debugger in more situations, including option
       parsing fails, and when you hit Ctrl-C.
+    * added ccs2tar, which will convert most absolute changesets (like those
+      that cook produces) into tarballs
     * Troves now don't require dependencies that are provided by themselves.
       As troves are built with this new behavior, it should significantly speed
       up dependency resolution.
