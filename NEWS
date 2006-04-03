@@ -19,6 +19,9 @@ Changes in @NEW@:
       As troves are built with this new behavior, it should significantly speed
       up dependency resolution.
 
+  o Bug Fixes:
+    * command-line configurations now override context settings
+
 Changes in 1.0.10:
   o Client Changes
     * Given a system based on rPath linux where you only installed
