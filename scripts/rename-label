@@ -69,9 +69,11 @@ def rename(cu, old, new):
 
 if len(sys.argv) == 2:
     db = sqlite3.connect(sys.argv[1])
-else:
-    print "Usage: %s <path to db>" % (sys.argv[0])
+elif len(sys.argv) > 1:
+    print "ACK"
     sys.exit(1)
+else:
+    db = sqlite3.connect("/var/lib/conarydb/conarydb")
 
 cu = db.cursor()
 
