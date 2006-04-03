@@ -123,16 +123,20 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
     @rtype: yields (troveTup, troveObj, flags, indent) tuples
     """
-    if needTroves or recurseAll or recurseOne or showFlags:
-        if not getPristine:
-            kw = {'pristine' : False}
-        else:
-            kw = {}
+    if not getPristine:
+        kw = {'pristine' : False}
+    else:
+        kw = {}
 
+    if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
+    elif recurseAll or recurseOne:
+        colls = [ x for x in troveTups if trove.troveIsCollection(x[0]) ]
+        troves = troveSource.getTroves(colls, withFiles=False, **kw)
+        troveDict = dict(itertools.izip(colls, troves))
+        troves = [ troveDict.get(x, None) for x in troveTups ]
     else:
         troves = [None] * len(troveTups)
-
 
     indent = 0
     troveCache = {} # cached trove info
@@ -253,7 +257,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             # recurse one level or recurse no levels.
             yield troveTup, trv, TROVE_STRONGREF | TROVE_BYDEFAULT | TROVE_HASTROVE, 0
 
-            if recurseOne:
+            if recurseOne and trv:
                 newTroveTups = trv.iterTroveListInfo()
 
                 if not showWeakRefs:
