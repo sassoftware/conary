@@ -1,4 +1,3 @@
-
 Changes in @NEW@:
   o Client Changes:
     * Conary will now allow generic options to be placed before the command
@@ -12,8 +11,11 @@ Changes in @NEW@:
       claim them
     * You can now kill conary with SIGUSR1 to make conary enter a debugger
       when you Ctrl-C (or a SIGINT is raised)
-    * --debug-all now enters a debugger in more situations, including option 
-      parsing fails, when you hit Ctrl-C.
+    * --debug-all now enters a debugger in more situations, including option
+      parsing fails, and when you hit Ctrl-C.
+    * Troves now don't require dependencies that are provided by themselves.
+      As troves are built with this new behavior, it should significantly speed
+      up dependency resolution.
 
 Changes in 1.0.10:
   o Client Changes
