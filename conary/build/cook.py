@@ -51,7 +51,9 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
-    p.setRequires(bldPkg.requires)
+    # troves don't require things that are provided by themeselves - it 
+    # just creates more work for no benefit.
+    p.setRequires(bldPkg.requires - bldPkg.provides)
     p.setProvides(bldPkg.provides)
 
     linkGroups = {}
