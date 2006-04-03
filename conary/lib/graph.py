@@ -150,6 +150,8 @@ class DirectedGraph:
         if withEdges:
             return [ (self.data.get(x[0]), x[1][idx])
                         for x in self.edges.iteritems() if idx in x[1] ]
+        else:
+            return [self.data.get(x) for x in self.edges if idx in self.edges[x]]
 
     def getLeaves(self):
         return [ self.data.get(x[0])
