@@ -1077,13 +1077,13 @@ class DependencyTables:
         depList, cu = self._resolve(depSetList, selectTemplate)
 
         result = {}
-        depSolutions = {}
+        depSolutions = [ [] for x in xrange(len(depList)) ]
         for depId, troveId in cu:
             depId = -depId
-            depSolutions.setdefault(depId, []).append(troveId)
+            depSolutions[depId].append(troveId)
 
-        for depId, sols in depSolutions.iteritems():
-            if not sols:
+        for depId, sols in enumerate(depSolutions):
+            if not depId:
                 continue
             self._addResult(depId, sols, depList, depSetList, result)
 
