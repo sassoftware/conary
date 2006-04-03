@@ -972,13 +972,7 @@ def realMain(cfg, argv=sys.argv, debugAll=False,
 
     argSet.update(newArgSet)
 
-    thisCommand.processConfigOptions(cfg, cfgMap, argSet)
-
-    # the user might have specified --config debugExceptions on the commandline
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
-                                        debugCtrlC=debugAll)
-
-    context = cfg.context
+    context = cfg.context or argSet.pop('context', None)
     if os.path.exists('CONARY'):
         conaryState = state.ConaryStateFromFile('CONARY')
         if conaryState.hasContext():
@@ -989,6 +983,12 @@ def realMain(cfg, argv=sys.argv, debugAll=False,
 
     if context:
         cfg.setContext(context)
+
+    thisCommand.processConfigOptions(cfg, cfgMap, argSet)
+
+    # the user might have specified --config debugExceptions on the commandline
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                        debugCtrlC=debugAll)
 
     if not cfg.buildLabel and cfg.installLabelPath:
         cfg.buildLabel = cfg.installLabelPath[0]
