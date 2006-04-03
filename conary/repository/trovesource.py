@@ -55,10 +55,16 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def resolveDependencies(self, label, depList):
-        return {}
+        results = {}
+        for depSet in depSet:
+            results[depSet] = [ [] for x in depList.iterDeps() ]
+        return results
 
     def resolveDependenciesByGroups(self, troveList, depList):
-        return {}
+        results = {}
+        for depSet in depSet:
+            results[depSet] = [ [] for x in depList.iterDeps() ]
+        return results
 
     def hasTroves(self, troveList):
         raise NotImplementedError
