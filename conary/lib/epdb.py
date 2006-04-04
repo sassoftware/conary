@@ -14,6 +14,7 @@
 
 
 """ Extended pdb """
+import bdb
 import stackutil
 import inspect
 import pdb
@@ -35,12 +36,19 @@ import traceback
 from pdb import _saferepr
 
 class Epdb(pdb.Pdb):
+    _historyPath = os.path.expanduser('~/.epdbhistory')
+    multiline_prompt = '| '
+    fail_silently_on_ioerror = False # if set to True, ignore calls to epdb
+                                     # when there is no usable device
+
     # epdb will print to here instead of to sys.stdout,
     # and restore stdout when done
+    __old_stdin  = None
     __old_stdout = None
     _displayList = {}
     # used to track the number of times a set_trace has been seen
     trace_counts = {'default' : [ True, 0 ]}
+
 
     def __init__(self):
         self._exc_type = None
@@ -50,10 +58,50 @@ class Epdb(pdb.Pdb):
         pdb.Pdb.__init__(self)
         if hasReadline:
             self._completer = erlcompleter.ECompleter()
+
+        self._oldHistory = []
         self.prompt = '(Epdb) '
-    
+
+    def store_old_history(self):
+        historyLen = readline.get_current_history_length()
+        oldHistory = [ readline.get_history_item(x) for x in xrange(historyLen)]
+        self._oldHistory = oldHistory
+        readline.clear_history()
+
+    def restore_old_history(self):
+        readline.clear_history()
+        for line in self._oldHistory:
+            if line is None:
+                continue
+            readline.add_history(line)
+        self._oldHistory = []
+
+    def read_history(self, storeOldHistory=False):
+        if hasReadline and self._historyPath:
+            if storeOldHistory:
+                self.store_old_history()
+            else:
+                readline.clear_history()
+
+            try:
+                readline.read_history_file(self._historyPath)
+            except IOError:
+                pass
+
+    def save_history(self, restoreOldHistory=False):
+        if hasReadline and self._historyPath:
+            readline.set_history_length(1000)
+            try:
+                readline.write_history_file(self._historyPath)
+            except IOError:
+                pass
+
+            if restoreOldHistory:
+                self.restore_old_history()
+            else:
+                readline.clear_history()
+
     def do_savestack(self, path):
-        
         if 'stack' in self.__dict__:
             # when we're saving we always 
             # start from the top
@@ -102,8 +150,6 @@ class Epdb(pdb.Pdb):
             while frame.f_globals['__name__'] in ('epdb', 'pdb', 'bdb', 'cmd'):
                 frame = frame.f_back
         stackutil.printStack(frame, sys.stderr)
-
-    
 
     def do_printframe(self, arg):
         if not arg:
@@ -254,22 +300,30 @@ class Epdb(pdb.Pdb):
             return self.multiline(origLine)
         if line.count('(') > line.count(')'):
             return self.multiline(origLine)
-        return pdb.Pdb.default(self, origLine)
+        try:
+            self.save_history()
+            return pdb.Pdb.default(self, origLine)
+        finally:
+            self.read_history()
 
-                
     def multiline(self, firstline=''):
         full_input = []
+        # keep a list of the entries that we've made in history
+        old_hist = []
         if firstline:
             print '  ' + firstline
             full_input.append(firstline)
         while True:
+            if hasReadline:
+                # add the current readline position
+                old_hist.append(readline.get_current_history_length())
             if self.use_rawinput:
                 try:
-                    line = raw_input('| ')
+                    line = raw_input(self.multiline_prompt)
                 except EOFError:
                     line = 'EOF'
             else:
-                self.stdout.write('| ')
+                self.stdout.write(self.multiline_prompt)
                 self.stdout.flush()
                 line = self.stdin.readline()
                 if not len(line):
@@ -279,14 +333,39 @@ class Epdb(pdb.Pdb):
             if line == 'EOF':
                 break
             full_input.append(line)
+
+        # add the final readline history position
+        if hasReadline:
+            old_hist.append(readline.get_current_history_length())
+
+        cmd = '\n'.join(full_input) + '\n'
+
+        if hasReadline:
+            # remove the old, individual readline history entries.
+
+            # first remove any duplicate entries
+            old_hist = sorted(set(old_hist))
+
+            # Make sure you do this in reversed order so you move from
+            # the end of the history up.
+            for pos in reversed(old_hist):
+                # get_current_history_length returns pos + 1
+                readline.remove_history_item(pos - 1)
+            # now add the full line
+            readline.add_history(cmd)
+
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
-        print ''
+        print
+        self.save_history()
         try:
-            code = compile('\n'.join(full_input) + '\n', '<stdin>', 'single')
-            exec code in globals, locals
-        except:
-            print self._reprExc()
+            try:
+                code = compile(cmd, '<stdin>', 'single')
+                exec code in globals, locals
+            except:
+                print self._reprExc()
+        finally:
+            self.read_history()
 
     def handle_directive(self, line):
         cmd = line.split('?', 1)
@@ -314,7 +393,9 @@ class Epdb(pdb.Pdb):
     def do_p(self, arg):
         cmd = arg.split('?', 1)
         if len(cmd) == 1:
+            self.save_history()
             pdb.Pdb.do_p(self, arg)
+            self.read_history()
         else:
             self.default(arg)
 
@@ -592,15 +673,36 @@ class Epdb(pdb.Pdb):
                 print "No init function"
 
     def interaction(self, frame, traceback):
+        try:
+            self.switch_input_output()
+        except IOError:
+            if True or self.fail_silently_on_ioerror:
+                # pretend like we never saw this breakpoint
+                self.set_continue()
+                return
+            else:
+                raise
+
+        self.read_history(storeOldHistory=True)
         self.setup(frame, traceback)
         self._displayItems()
         self.print_stack_entry(self.stack[self.curindex])
         self.cmdloop()
         self.forget()
+        self.save_history(restoreOldHistory=True)
+        self.restore_input_output()
+
+    def switch_input_output(self):
+        self.switch_stdout()
+        self.switch_stdin()
+
+    def restore_input_output(self):
         if not self.__old_stdout is None:
             sys.stdout.flush()
             # now we reset stdout to be the whatever it was before
             sys.stdout = self.__old_stdout
+        if not self.__old_stdin is None:
+            sys.stdin = self.__old_stdin
 
     def switch_stdout(self):
         isatty = False
@@ -612,15 +714,37 @@ class Epdb(pdb.Pdb):
             # sys.stdout is not a regular file,
             # go through some hoops
             # (this is less desirable because it doesn't redirect
-            # low-level writes to 1 
-              
+            # low-level writes to 1)
+
         if not isatty:
             sys.stdout.flush()
             self.__old_stdout = sys.stdout
+            # if this fails, we'll raise an IOError
             stdout = open('/dev/tty', 'w')
             sys.stdout = stdout
         else:
             self.__old_stdout = None
+
+    def switch_stdin(self):
+        isatty = False
+        try:
+            fileno = sys.stdin.fileno()
+            isatty = os.isatty(fileno)
+        except AttributeError:
+            pass
+            # sys.stdout is not a regular file,
+            # go through some hoops
+            # (this is less desirable because it doesn't redirect
+            # low-level writes to 1)
+
+        if not isatty:
+            sys.stdin.flush()
+            self.__old_stdin = sys.stdin
+            # if this fails, we'll raise an IOError
+            stdin = open('/dev/tty', 'r')
+            sys.stdin = stdin
+        else:
+            self.__old_stdin = None
 
     # override for cases where we want to search a different
     # path for the file
@@ -720,23 +844,19 @@ class Epdb(pdb.Pdb):
         """This method is called when there is the remote possibility
         that we ever need to stop in this function."""
         if self.stop_here(frame):
-            self.switch_stdout()
             pdb.Pdb.user_call(self, frame, argument_list)
 
     def user_line(self, frame):
         """This function is called when we stop or break at this line."""
-        self.switch_stdout()
         pdb.Pdb.user_line(self, frame)
 
     def user_return(self, frame, return_value):
         """This function is called when a return trap is set here."""
-        self.switch_stdout()
         pdb.Pdb.user_return(self, frame, return_value)
 
     def user_exception(self, frame, exc_info):
         """This function is called if an exception occurs,
         but only if we are to stop at or just below this level."""
-        self.switch_stdout()
         pdb.Pdb.user_exception(self, frame, exc_info)
 
 
@@ -801,7 +921,6 @@ def post_mortem(t, exc_type=None, exc_msg=None):
     p.reset()
     while t.tb_next is not None:
         t = t.tb_next
-    p.switch_stdout()
     p.interaction(t.tb_frame, t)
 
 def matchFileOnDirPath(curpath, pathdir):
