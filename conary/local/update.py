@@ -36,6 +36,7 @@ from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
 from conary.lib import log, patch, sha1helper, util
+from conary.local.errors import *
 from conary.repository import changeset, filecontents
 
 MERGE = 1 << 0
@@ -643,13 +644,12 @@ class FilesystemJob:
                       and os.listdir(headRealPath)):
                     # this is a non-empty directory that's in the way of
                     # a new file.  Even --replace-files can't help here
-                    self.errors.append("non-empty directory %s is in "
-                                   "the way of a newly created "
-                                   "file in %s=%s[%s]" % (
+                    self.errors.append(
+                               DirectoryInWayError(
                                    util.normpath(headRealPath),
-                                   troveCs.getName(), 
-                                   troveCs.getNewVersion().asString(),
-                                   deps.formatFlavor(troveCs.getNewFlavor())))
+                                   troveCs.getName(),
+                                   troveCs.getNewVersion(),
+                                   troveCs.getNewFlavor()))
                 elif (headFile.flags.isInitialContents()  and 
                       not self.removes.has_key(headRealPath)):
                     # don't replace InitialContents files if they already
@@ -690,12 +690,11 @@ class FilesystemJob:
                                     headPath, justPresent = True):
                             self.userRemoval(replaced = True, *info)
                     else:
-                        self.errors.append("%s is in the way of a newly "
-                           "created file in %s=%s[%s]" % (  
-                               util.normpath(headRealPath), 
-                               troveCs.getName(), 
-                               troveCs.getNewVersion().asString(),
-                               deps.formatFlavor(troveCs.getNewFlavor())))
+                        self.errors.append(FileInWayError(
+                               util.normpath(headRealPath),
+                               troveCs.getName(),
+                               troveCs.getNewVersion(),
+                               troveCs.getNewFlavor()))
                         fullyUpdated = False
                         continue
 
@@ -756,8 +755,8 @@ class FilesystemJob:
 		else:
 		    pathOkay = False
 		    finalPath = fsPath	# let updates work still
-		    self.errors.append("path conflict for %s (%s on head)" % 
-                                       (util.normpath(fsPath), headPath))
+                    self.errors.append(
+                        PathConflictError(util.normpath(fsPath), headPath))
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -838,16 +837,12 @@ class FilesystemJob:
                             newLocation = os.path.abspath(os.path.join(
                                 os.path.dirname(finalPath), headFile.target()))
                             self.errors.append(
-                                '%s changed from a directory to '
-                                'a symbolic link.  To apply this changeset, '
-                                'first manually move %s to %s, then run '
-                                '"ln -s %s %s".' %(finalPath, finalPath,
-                                                   newLocation,
-                                                   headFile.target(),
-                                                   finalPath))
+                                DirectoryToSymLinkError(finalPath,
+                                                        newLocation,
+                                                        headFile.target()))
                         else:
-                            self.errors.append("%s changed from a directory to "
-                                               "a non-directory" %finalPath)
+                            self.errors.append(
+                                DirectoryToNonDirectoryError(finalPath))
                         continue
                     else:
                         # someone changed the filesystem so we're replacing
@@ -874,7 +869,7 @@ class FilesystemJob:
                     fileTypeError = True
 
             if fileTypeError:
-                self.errors.append("file type of %s changed" % finalPath)
+                self.errors.append(FileTypeChangedError(finalPath))
                 continue
 
             # if we're forcing an update, we don't need to merge this
@@ -898,8 +893,8 @@ class FilesystemJob:
 			attributesChanged = True
 		    else:
 			contentsOkay = False
-			self.errors.append("file attributes conflict for %s"
-						% util.normpath(realPath))
+                        self.errors.append(FileAttributesConflictError(
+                                                util.normpath(realPath)))
 		else:
 		    # this forces the change to apply
 		    fsFile.twm(headChanges, fsFile, 
@@ -976,37 +971,34 @@ class FilesystemJob:
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
-                    if not changeSet.configFileIsDiff(pathId):
-			self.errors.append("unexpected content type for %s" % 
-						finalPath)
-			contentsOkay = False
-		    else:
-                        (headFileContType,
-                         headFileContents) = changeSet.getFileContents(pathId)
+                    assert(changeSet.configFileIsDiff(pathId))
 
-			cur = open(realPath, "r").readlines()
-			diff = headFileContents.get().readlines()
-			(newLines, failedHunks) = patch.patch(cur, diff)
+                    (headFileContType,
+                     headFileContents) = changeSet.getFileContents(pathId)
 
-			cont = filecontents.FromString("".join(newLines))
-                        # XXX update fsFile.contents.{sha1,size}?
-			self._restore(fsFile, realPath, 
-			      "merging changes from repository into %s",
-			      contentsOverride = cont)
-			beenRestored = True
+                    cur = open(realPath, "r").readlines()
+                    diff = headFileContents.get().readlines()
+                    (newLines, failedHunks) = patch.patch(cur, diff)
 
-			if failedHunks:
-			    self._createFile(
-                                realPath + ".conflicts", 
-                                "".join([x.asString() for x in failedHunks]),
-                                "conflicts from merging changes from " 
-                                "head into %s saved as %s.conflicts" % 
-                            (util.normpath(realPath), util.normpath(realPath)))
+                    cont = filecontents.FromString("".join(newLines))
+                    # XXX update fsFile.contents.{sha1,size}?
+                    self._restore(fsFile, realPath, 
+                          "merging changes from repository into %s",
+                          contentsOverride = cont)
+                    beenRestored = True
 
-			contentsOkay = True
+                    if failedHunks:
+                        self._createFile(
+                            realPath + ".conflicts", 
+                            "".join([x.asString() for x in failedHunks]),
+                            "conflicts from merging changes from " 
+                            "head into %s saved as %s.conflicts" % 
+                        (util.normpath(realPath), util.normpath(realPath)))
+
+                    contentsOkay = True
 		else:
-		    self.errors.append(
-                      "file contents conflict for %s" % util.normpath(realPath))
+                    self.errors.append(FileContentsConflictError(
+                                              util.normpath(realPath)))
 		    contentsOkay = False
             elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.

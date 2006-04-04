@@ -27,6 +27,7 @@ from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, util
 from conary.local import localrep, sqldb, schema, update
+from conary.local.errors import *
 from conary.repository import changeset, datastore, errors, filecontents
 from conary.repository import repository, trovesource
 
@@ -641,10 +642,9 @@ class Database(SqlDbRepository):
             except DatabasePathConflicts, e:
                 for path, pathId, troveName, version, flavor in \
                                                 e.getConflicts():
-                    errList.append(
-                            "%s is already owned by %s=%s[%s]"
-                        % (path, troveName, str(version), 
-                           deps.formatFlavor(flavor)))
+                    errList.append(DatabasePathConflictError(path, troveName,
+                                            version, flavor))
+
             self.db.mapPinnedTroves(uJob.getPinMaps())
         else:
             # When updateDatabase is False, we're applying the local part
@@ -656,7 +656,7 @@ class Database(SqlDbRepository):
         errList.extend(fsJob.getErrorList())
         if errList:
             raise CommitError, ('applying update would cause errors:\n' + 
-                                '\n\n'.join(errList))
+                                '\n\n'.join(str(x) for x in errList))
         if test:
             self.db.rollback()
             return
