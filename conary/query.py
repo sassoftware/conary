@@ -165,8 +165,8 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[]):
                               trove.getFlavor()))
 
     if not (troveSpecs or pathList):
-        names = sorted(db.iterAllTroveNames())
-        troveTups = db.findByNames(names)
+        names = db.iterAllTroveNames()
+        troveTups = sorted(db.findByNames(names))
         primary = False
     else:
         results = db.findTroves(None, troveSpecs)
