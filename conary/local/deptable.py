@@ -1045,8 +1045,10 @@ class DependencyTables:
                                          tmpInstances.instanceId IS NULL
                            ''', instanceId, start_transaction=False)
                 cu.execute('''INSERT INTO tmpInstances 
-                              SELECT instanceId FROM tmpInstances2''')
-                cu.execute('''DELETE FROM tmpInstances2''')
+                              SELECT instanceId FROM tmpInstances2''',
+                              start_transaction=False)
+                cu.execute('''DELETE FROM tmpInstances2''',
+                              start_transaction=False)
 
             restrictBy = None
             restrictor = self._restrictResolveByTrove
