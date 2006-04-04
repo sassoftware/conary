@@ -1027,6 +1027,8 @@ class TroveSourceStack(SearchableTroveSource):
         allSugg = {}
         for source in self.sources:
             sugg = source.resolveDependenciesByGroups(troveList, depList)
+            # there's no ordering of suggestions when you're doing 
+            # resolveDependencies by groups
             self.mergeDepSuggestions(allSugg, sugg)
         return allSugg
 
