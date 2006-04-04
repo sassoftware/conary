@@ -38,8 +38,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
                        newVersion, fileStream = None):
-        import epdb
-        epdb.st()
         isPresent = not self.pathRemovedCheck(troveId[0], pathId)
         self.repos.addFileVersion(troveId[1], pathId, fileObj, path,
                                   fileId, newVersion,
@@ -47,7 +45,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                                   isPresent = isPresent)
 
     def addTroveDone(self, troveId):
-        self.repos.addTroveDone(troveId[1])
+        self.trovesAdded.append(self.repos.addTroveDone(troveId[1]))
 
     def oldTrove(self, oldTrove, trvCs, name, version, flavor):
         # trvCs is None for an erase, !None for an update
@@ -123,6 +121,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.repos = repos
 	self.oldTroves = []
 	self.oldFiles = []
+        self.trovesAdded = []
         self.autoPinList = autoPinList
         self.pathRemovedCheck = pathRemovedCheck
 
@@ -135,6 +134,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)
+
+        # this raises an exception if this install would create conflicts
+        self.repos.db.db.checkPathConflicts(self.trovesAdded)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:

@@ -75,5 +75,8 @@ class DatabasePathConflicts(DatabaseError):
     """Occurs when multiple paths conflict inside of a job. This should
        always be handled internally."""
 
+    def getConflicts(self):
+        return self.l
+
     def __init__(self, l):
         self.l = l

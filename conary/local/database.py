@@ -310,7 +310,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	return self.db.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
-        self.db.addTroveDone(troveInfo)
+        return self.db.addTroveDone(troveInfo)
 
     def pinTroves(self, troveList, pin):
         troves = self.getTroves(troveList)
@@ -625,6 +625,8 @@ class Database(SqlDbRepository):
             self.db.removeFilesFromTrove(troveName, troveVersion,
                                          troveFlavor, fileDict.keys())
 
+        errList = []
+
         # Build A->B
         if updateDatabase:
             # this updates the database from the changeset; the change
@@ -636,13 +638,12 @@ class Database(SqlDbRepository):
                     allowIncomplete = isRollback, 
                     pathRemovedCheck = fsJob.pathRemoved)
             except DatabasePathConflicts, e:
-                errList = []
-                for path, pathId, instanceId, troveName, version, flavor \
-                                                in e.l:
-                    errList.append("%s: %s" % (troveName, path))
-
-                raise CommitError, ('update contains file conflicts:\n' + 
-                                    '\n\n'.join(errList))
+                for path, pathId, troveName, version, flavor in \
+                                                e.getConflicts():
+                    errList.append(
+                            "%s is already owned by %s=%s[%s]"
+                        % (path, troveName, str(version), 
+                           deps.formatFlavor(flavor)))
             self.db.mapPinnedTroves(uJob.getPinMaps())
         else:
             # When updateDatabase is False, we're applying the local part
@@ -651,7 +652,7 @@ class Database(SqlDbRepository):
             # they were previously erased)
             localrep.markAddedFiles(self.db, cs)
 
-        errList = fsJob.getErrorList()
+        errList.extend(fsJob.getErrorList())
         if errList:
             raise CommitError, ('applying update would cause errors:\n' + 
                                 '\n\n'.join(errList))
