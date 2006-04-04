@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.11:
   o Client Changes:
     * Conary will now allow generic options to be placed before the command
       you are giving to conary.  For example, 'conary --root=/foo query'
