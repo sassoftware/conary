@@ -1004,8 +1004,9 @@ class TroveSourceStack(SearchableTroveSource):
 
     def resolveDependencies(self, label, depList):
         results = {}
-
         depList = set(depList)
+        for depSet in depList:
+            results[depSet] = [ [] for x in depSet.iterDeps() ]
 
         for source in self.sources:
             if not depList:
@@ -1013,9 +1014,13 @@ class TroveSourceStack(SearchableTroveSource):
 
             sugg = source.resolveDependencies(label, depList)
             for depSet, troves in sugg.iteritems():
-                depList.remove(depSet)
-                results[depSet] = troves
-        
+                if [ x for x in troves if x ]:
+                    # only consider this depSet 'solved' if at least
+                    # on of the deps had a trove suggested for it.
+                    # FIXME: We _could_ manipulate the depSet and send 
+                    # it back to get more responses from other trove sources.
+                    depList.remove(depSet)
+                    results[depSet] = troves
         return results
     
     def resolveDependenciesByGroups(self, troveList, depList):
