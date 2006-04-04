@@ -33,8 +33,6 @@ from conary import constants
 
 syslog = None
 
-LOGGER_CONARY = 'conary'
-
 class SysLog:
     # class responsible for /var/log/conary
     def __call__(self, str, *args):
@@ -94,26 +92,22 @@ def openSysLog(root, path):
         path = '/dev/null'
     syslog = SysLog(root, path)
 
-def error(msg, *args):
+def error(*args):
     "Log an error"
-    m = "error: " + msg
-    logger.error(m, *args)
+    logger.error(*args)
     hdlr.error = True
 
-def warning(msg, *args):
-    "Log a warning"
-    m = "warning: " + msg
-    logger.warning(m, *args)
+def warning(*args):
+    "Log a warning"    
+    logger.warning(*args)
 
-def info(msg, *args):
+def info(*args):
     "Log an informative message"
-    m = "+ " + msg
-    logger.info(m, *args)
+    logger.info(*args)
 
-def debug(msg, *args):
+def debug(*args):
     "Log a debugging message"
-    m = "+ " + msg
-    logger.debug(m, *args)
+    logger.debug(*args)
 
 def errorOccurred():
     return hdlr.error
@@ -136,9 +130,13 @@ class ErrorCheckingHandler(logging.StreamHandler):
         logging.StreamHandler.emit(self, record)
 
 if not globals().has_key("logger"):
-    logger = logging.getLogger(LOGGER_CONARY)
+    logging.addLevelName(logging.WARNING, "warning:")
+    logging.addLevelName(logging.ERROR, "error:")
+    logging.addLevelName(logging.INFO, "+")
+    logging.addLevelName(logging.DEBUG, "+")
+    logger = logging.getLogger('conary')
     hdlr = ErrorCheckingHandler(sys.stderr)
-    formatter = logging.Formatter('%(message)s')
+    formatter = logging.Formatter('%(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.WARNING)
