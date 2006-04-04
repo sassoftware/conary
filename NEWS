@@ -23,8 +23,15 @@ Changes in @NEW@:
     * added a script to calculate an md5 password (for use in an info recipe,
       for example)
 
+  o Build Changes:
+    * Conary now supports a saltedPassword option to r.User in user info-
+      packages.  Full use of this option will require that a new shadow package
+      be installed.
+
   o Bug Fixes:
     * command-line configurations now override context settings
+
+  o Build Changes:
 
 Changes in 1.0.10:
   o Client Changes

@@ -1621,10 +1621,11 @@ def userAction(root, userFileList):
         f.setdefault('COMMENT', '')
         f.setdefault('HOMEDIR', '/')
         f.setdefault('SHELL', '/sbin/nologin')
+        f.setdefault('PASSWORD', '*')
         if f['USER'] not in passwd:
             passwd.addLine([
                 f['USER'],
-                '*',
+                f['PASSWORD'],
                 f['PREFERRED_UID'],
                 f['GROUPID'],
                 f['COMMENT'],

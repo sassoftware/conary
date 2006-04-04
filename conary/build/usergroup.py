@@ -19,24 +19,35 @@ from conary.lib import util
 class User(build.BuildAction):
     """
     Provides information to use if Conary needs to create a user:
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}', supplemental=[I{group}, ...])}
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}')}
 
     The defaults are::
       - C{group}: same name as the user
       - C{groupid}: same id as the user
       - C{homedir}: None
       - C{comment}: None
+      - C{saltedPassword}: None
       - C{shell}: C{'/sbin/nologin'}
       - C{supplemental}: None (list of supplemental groups for this user)
+
+    The easiest way to get a salted password is to set that password for a 
+    user on your system and then cut and paste the salted value from the
+    /etc/shadow file.
+
+    NOTE: Pre-setting a salted password should be done with caution.  Anyone
+    who is able to access the repository where this info file will be stored
+    will have the salted password, and given enough time will be able to
+    recover the original password.  Trust the security of this password as
+    far as you trust the security of the repository it is stored in.
     """
     def __init__(self, recipe, *args, **keywords):
         if recipe.type != 'user':
             raise UserGroupError, 'User() allowed only in UserInfoRecipe'
         args=list(args)
-        args.extend([None] * (8 - len(args)))
+        args.extend([None] * (9 - len(args)))
 	(self.infoname, self.preferred_uid, self.group,
          self.groupid, self.homedir, self.comment, self.shell,
-         self.supplemental) = args
+         self.supplemental, self.saltedPassword) = args
         if self.shell is None: self.shell = '/sbin/nologin'
 	build.BuildAction.__init__(self, recipe, [], **keywords)
 
@@ -77,6 +88,13 @@ class User(build.BuildAction):
             f.write('SUPPLEMENTAL=%s\n' %(','.join(self.supplemental)))
             for group in self.supplemental:
                 self.recipe.requiresGroup(group)
+        if self.saltedPassword:
+            if self.saltedPassword[0] != '$' or len(self.saltedPassword) != 34:
+                raise UserGroupError('"%s" is not a valid md5 salted password.'
+                                     ' Use md5pw (installed with conary) to '
+                                     ' create a valid password.' 
+                                     % self.saltedPassword)
+            f.write('PASSWORD=%s\n' % self.saltedPassword)
         f.close()
 
 
