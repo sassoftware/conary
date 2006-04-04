@@ -56,13 +56,13 @@ class AbstractTroveSource:
 
     def resolveDependencies(self, label, depList):
         results = {}
-        for depSet in depSet:
+        for depSet in depList:
             results[depSet] = [ [] for x in depList.iterDeps() ]
         return results
 
     def resolveDependenciesByGroups(self, troveList, depList):
         results = {}
-        for depSet in depSet:
+        for depSet in depList:
             results[depSet] = [ [] for x in depList.iterDeps() ]
         return results
 
