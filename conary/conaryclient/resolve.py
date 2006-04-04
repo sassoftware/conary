@@ -257,7 +257,6 @@ class DependencySolver(object):
         resolveSource.setTroveSource(troveSource)
 
         suggMap = {}
-        keepList = []
 
         while resolveSource.prepareForResolution(depList):
 
