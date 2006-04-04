@@ -12,7 +12,7 @@
 # full details.
 #
 
-from conary import deps, files, streams, trove, versions
+from conary import deps, errors, files, streams, trove, versions
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
@@ -681,15 +681,17 @@ order by
                         versionId INTEGER,
                         path VARCHAR(768),
                         fileId BLOB,
-                        stream BLOB)""")
+                        stream BLOB,
+                        isPresent INTEGER)""")
 
         cu.execute("""CREATE TEMPORARY TABLE NewFileTags (
                         pathId BLOB,
                         tag VARCHAR(767))""")
 
         stmt = cu.compile("""
-                INSERT INTO NewFiles (pathId, versionId, path, fileId, stream)
-                        VALUES (?, ?, ?, ?, ?)""")
+                INSERT INTO NewFiles (pathId, versionId, path, fileId, 
+                                      stream, isPresent)
+                        VALUES (?, ?, ?, ?, ?, ?)""")
 
 	return (cu, troveInstanceId, stmt)
 
@@ -796,7 +798,7 @@ order by
                         newVersion.asString())
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
-                fileStream = None):
+                fileStream = None, isPresent = True):
 	(cu, troveInstanceId, addFileStmt) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
@@ -805,7 +807,7 @@ order by
                 fileStream = fileObj.freeze()
 
             cu.execstmt(addFileStmt, pathId, versionId, path, fileId, 
-                        fileStream)
+                        fileStream, isPresent)
 
             if fileObj:
                 tags = fileObj.tags
@@ -818,17 +820,38 @@ order by
                                pathId, tag)
 	else:
 	    cu.execute("""
-		UPDATE DBTroveFiles SET instanceId=? WHERE
+		UPDATE DBTroveFiles SET instanceId=?, isPresent=? WHERE
 		    fileId=? AND pathId=? AND versionId=?""",
-                    troveInstanceId, fileId, pathId, versionId)
+                    troveInstanceId, isPresent, fileId, pathId, versionId)
 
     def addTroveDone(self, troveInfo):
+        # See if any of the paths we're adding conflict we ones which already
+        # exist
 	(cu, troveInstanceId, addFileStmt) = troveInfo
+
+        cu.execute("""
+            SELECT path, DBTroveFiles.pathId, Instances.instanceId, troveName, 
+                   version, flavor
+                FROM NewFiles
+                JOIN DBTroveFiles USING (path)
+                JOIN Instances ON
+                    DBTroveFiles.instanceId = Instances.instanceId 
+                JOIN Versions ON
+                    Instances.versionId = Versions.versionId
+                JOIN Flavors ON
+                    Instances.flavorId = Flavors.flavorId
+                WHERE DBTroveFiles.isPresent = 1
+        """)
+        conflicts = [ x for x in cu ]
+        if conflicts:
+            raise errors.DatabasePathConflicts(conflicts)
+
         cu.execute("""
             INSERT INTO DBTroveFiles (pathId, versionId, path, fileId,
                                       instanceId, isPresent, stream)
                         SELECT pathId, versionId, path, fileId, %d,
-                               1, stream FROM NewFiles""" % troveInstanceId)
+                               isPresent, stream FROM NewFiles""" 
+               % troveInstanceId)
         cu.execute("""
             INSERT INTO Tags (tag) SELECT DISTINCT
                 NewFileTags.tag FROM NewFileTags 

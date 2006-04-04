@@ -70,3 +70,10 @@ class WebError(ConaryError):
 
 class TroveNotFound(ConaryError):
     """Returned from findTrove when no trove is matched"""
+
+class DatabasePathConflicts(DatabaseError):
+    """Occurs when multiple paths conflict inside of a job. This should
+       always be handled internally."""
+
+    def __init__(self, l):
+        self.l = l

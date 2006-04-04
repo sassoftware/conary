@@ -21,7 +21,7 @@ import shutil
 #conary
 from conary import trove, versions
 from conary.build import tags
-from conary.errors import ConaryError, DatabaseError
+from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
@@ -302,9 +302,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	return self.db.iterFilesWithTag(tag)
 
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version,
-                       fileStream = None):
+                       fileStream = None, isPresent = True):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version,
-                        fileStream = fileStream)
+                        fileStream = fileStream, isPresent = isPresent)
 
     def addTrove(self, trove, pin = False):
 	return self.db.addTrove(trove, pin = pin)
@@ -615,14 +615,34 @@ class Database(SqlDbRepository):
                 callback.runningPreTagHandlers()
                 fsJob.preapply(tagSet, tagScript)
 
+        for (troveName, troveVersion, troveFlavor, fileDict) in fsJob.iterUserRemovals():
+            if sum(fileDict.itervalues()) == 0:
+                # Nothing to do (these are updates for a trove being installed
+                # as part of this job rather than for a trove which is part
+                # of this job)
+                continue
+
+            self.db.removeFilesFromTrove(troveName, troveVersion,
+                                         troveFlavor, fileDict.keys())
+
         # Build A->B
         if updateDatabase:
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
-            localrep.LocalRepositoryChangeSetJob(
-                dbCache, cs, callback, autoPinList, threshold = threshold,
-                allowIncomplete=isRollback)
+            try:
+                localrep.LocalRepositoryChangeSetJob(
+                    dbCache, cs, callback, autoPinList, threshold = threshold,
+                    allowIncomplete = isRollback, 
+                    pathRemovedCheck = fsJob.pathRemoved)
+            except DatabasePathConflicts, e:
+                errList = []
+                for path, pathId, instanceId, troveName, version, flavor \
+                                                in e.l:
+                    errList.append("%s: %s" % (troveName, path))
+
+                raise CommitError, ('update contains file conflicts:\n' + 
+                                    '\n\n'.join(errList))
             self.db.mapPinnedTroves(uJob.getPinMaps())
         else:
             # When updateDatabase is False, we're applying the local part
@@ -633,7 +653,7 @@ class Database(SqlDbRepository):
 
         errList = fsJob.getErrorList()
         if errList:
-            raise CommitError, ('file system job contains errors:\n' + 
+            raise CommitError, ('applying update would cause errors:\n' + 
                                 '\n\n'.join(errList))
         if test:
             self.db.rollback()
@@ -641,10 +661,6 @@ class Database(SqlDbRepository):
 
         if not justDatabase:
             fsJob.apply(tagSet, tagScript, journal, callback)
-
-        for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
-            self.db.removeFilesFromTrove(troveName, troveVersion, 
-                                         troveFlavor, pathIdList)
 
         if updateDatabase:
             for (name, version, flavor) in fsJob.getOldTroveList():

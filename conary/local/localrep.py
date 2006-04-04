@@ -32,11 +32,22 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     """
 
     def addTrove(self, oldTroveSpec, trove):
+        info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
-	return self.repos.addTrove(trove, pin = pin)
+	return (info, self.repos.addTrove(trove, pin = pin))
+
+    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
+                       newVersion, fileStream = None):
+        import epdb
+        epdb.st()
+        isPresent = not self.pathRemovedCheck(troveId[0], pathId)
+        self.repos.addFileVersion(troveId[1], pathId, fileObj, path,
+                                  fileId, newVersion,
+                                  fileStream = fileStream,
+                                  isPresent = isPresent)
 
     def addTroveDone(self, troveId):
-        self.repos.addTroveDone(troveId)
+        self.repos.addTroveDone(troveId[1])
 
     def oldTrove(self, oldTrove, trvCs, name, version, flavor):
         # trvCs is None for an erase, !None for an update
@@ -105,7 +116,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs, callback, autoPinList, threshold = 0,
-                 allowIncomplete = False):
+                 allowIncomplete = False, pathRemovedCheck = None):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -113,6 +124,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldTroves = []
 	self.oldFiles = []
         self.autoPinList = autoPinList
+        self.pathRemovedCheck = pathRemovedCheck
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
                                          threshold = threshold, 

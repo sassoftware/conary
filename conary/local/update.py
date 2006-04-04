@@ -85,16 +85,16 @@ class FilesystemJob:
         # replaced is True if this is an automatic replacement and False if
         # it's the result of a preexisting replacement (True gets it into
         # the replacement changeset, False leaves it out)
-        l = self.userRemovals.setdefault(
-                    (troveName, troveVersion, troveFlavor), [])
-        l.append((pathId, replaced))
+        d = self.userRemovals.setdefault(
+                    (troveName, troveVersion, troveFlavor), {})
+        d[pathId] = replaced
 
     def createRemoveRollback(self):
         cs = changeset.ChangeSet()
 
         # Returns a changeset which undoes the user removals 
-        for (info, fileList) in self.userRemovals.iteritems():
-            if sum([ x[1] for x in fileList ]) == 0:
+        for (info, fileDict) in self.userRemovals.iteritems():
+            if sum(fileDict.itervalues()) == 0:
                 # skip the rest of this processing if there are no files
                 # to handle (it's likely that the trove referred to here
                 # isn't in the database yet)
@@ -106,7 +106,7 @@ class FilesystemJob:
                 localTrove.getVersion().createBranch(
                         label = versions.LocalLabel(), withVerRel = True))
             hasChanges = False
-            for (pathId, replaced) in fileList:
+            for (pathId, replaced) in fileDict.iteritems():
                 if not replaced: continue
                 path, fileId = updatedTrove.getFile(pathId)[0:2]
                 stream = self.db.getFileStream(fileId)
@@ -131,11 +131,15 @@ class FilesystemJob:
 
         return cs
 
+    def pathRemoved(self, info, pathId):
+        d = self.userRemovals.get(info, None)
+        if d is None: return False
+        return pathId in d
+
     def iterUserRemovals(self):
-	for ((troveName, troveVersion, troveFlavor), fileList) \
+	for ((troveName, troveVersion, troveFlavor), fileDict) \
                                         in self.userRemovals.iteritems():
-	    yield (troveName, troveVersion, troveFlavor, 
-                    [ x[0] for x in fileList ])
+	    yield (troveName, troveVersion, troveFlavor, fileDict)
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))

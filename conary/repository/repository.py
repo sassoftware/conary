@@ -281,6 +281,12 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
+    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
+                       newVersion, fileStream = None):
+        self.repos.addFileVersion(troveInfo, pathId, fileObj, path,
+                                  fileId, newVersion,
+                                  fileStream = fileStream)
+
     def checkTroveCompleteness(self, trv):
         pass
     
@@ -441,9 +447,8 @@ class ChangeSetJob:
                     raise trove.TroveIntegrityError(csTrove.getName(),
                           csTrove.getNewVersion(), csTrove.getNewFlavor(),
                           "fileObj.fileId() != fileId in changeset")
-                self.repos.addFileVersion(troveInfo, pathId, fileObj, path, 
-                                          fileId, newVersion, 
-                                          fileStream = fileStream)
+                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId, 
+                                    newVersion, fileStream = fileStream)
 
 		# files with contents need to be tracked so we can stick
 		# there contents in the archive "soon"; config files need
