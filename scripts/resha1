@@ -1,0 +1,93 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+import itertools, optparse
+
+from conary import dbstore, trove, versions
+from conary.deps import deps
+from conary.repository.netrepos import trovestore
+from conary.server import schema
+
+parser = optparse.OptionParser(version = '%prog 0.1')
+(options, args) = parser.parse_args()
+
+if len(args) != 2:
+    print >> sys.stderr, "usage: resha1 <driver> <reposdb>"
+    sys.exit(1)
+
+db = dbstore.connect(args[1], driver = args[0])
+schema.setupTempTables(db)
+
+cu = db.cursor()
+
+store = trovestore.TroveStore(db)
+
+cu.execute("""
+            SELECT instanceId, item, version, flavor FROM Instances 
+                JOIN Items ON
+                    Instances.itemId = Items.itemId
+                JOIN Versions ON
+                    Instances.versionId = Versions.versionId
+                JOIN Flavors ON
+                    Instances.flavorId = Flavors.flavorId
+           """)
+
+allTroves = [ (x[0], (x[1], versions.VersionFromString(x[2]),
+                   deps.ThawDependencySet(x[3]))) for x in cu ]
+
+fixes = []
+for count, (instanceId, trv) in enumerate(itertools.izip(
+            (x[0] for x in  allTroves), 
+            store.iterTroves([ x[1] for x in allTroves ]))):
+    if count % 50 == 0:
+        print "Trove %d of %d\r" % (count, len(allTroves)),
+        sys.stdout.flush()
+
+    if trv.verifySignatures():
+        continue
+
+    trv.computeSignatures()
+    fixes.append((instanceId, trv.troveInfo.sigs.freeze()))
+
+print "%d of %d troves need new sha1s" % (len(fixes), len(allTroves))
+
+cu.execute("CREATE TEMPORARY TABLE Fixes (instanceId INTEGER, sigs BLOB)")
+for instanceId, sigs in fixes:
+    cu.execute("INSERT INTO Fixes (instanceId, sigs) VALUES (?, ?)",
+               instanceId, sigs)
+
+cu.execute("""DELETE FROM TroveInfo WHERE instanceId IN
+                    (SELECT instanceId FROM Fixes) AND
+                    infoType == %d""" % trove._TROVEINFO_TAG_SIGS)
+cu.execute("""INSERT INTO TroveInfo (instanceId, infoType, data)
+                SELECT instanceId, %d, sigs FROM Fixes""" 
+                            % trove._TROVEINFO_TAG_SIGS)
+
+db.commit()

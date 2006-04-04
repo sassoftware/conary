@@ -120,7 +120,7 @@ See \-\-replace-files description from \fBconary update\fP
 .RE
 
 .TP
-.B syncchildren [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+.B sync[children] [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Update the children of \fItrovename\fP so that the versions of the child
 troves match the version specified by the parent trove.  
 Arguments include
@@ -609,6 +609,11 @@ entries when committing changes to source components.
 The path to the Conary database on the local system.  It is relative
 to \fBroot\fP (see below) and should normally not be changed.
 .TP
+.B excludeTroves
+The regular expression of a trove name to exclude when doing updates.
+Multiple regular expressions can be specified with mutiple excludeTrove
+lines.
+.TP
 .B flavor
 The flavor that Conary will use to find troves to install when the
 trove is not yet installed on the system.  It is specified using the
@@ -620,6 +625,10 @@ The ordered path of labels to use when an incomplete version is
 specified to install package, query the repository, and abbreviate
 versions when displaying them.
 Can be overridden by the \fB\-\-install-label \fI<label>\fR command-line option.
+.TP
+.B interactive
+If set to True, conary will ask for confirmation before performing actions that modifying system or repository state.
+Can be overridden by the \fB\-\-interactive\fR or \fB\-\-no-interactive\fR command-line option.
 .TP
 .B lookaside
 The transient lookaside cache used only during building, normally
@@ -640,6 +649,17 @@ Multiple maps can be given for a single label. (If no mapping is found,
 .B root
 The path to install files into, normally \fI/\fR.
 Can be overridden by the \fB\-\-root \fI<root>\fR command-line option.
+.TP
+.B resolveLevel
+Determines the level of effort conary will put into resolving dependencies.
+
+If the level is 1:
+    Attempt to resolve dependencies by adding new troves that fulfill those missing dependencies.
+
+If the level is 2:
+    If updating trove 'a' removes a dependency needed by trove 'b', attempt to update 'b' to solve the dependency issue.
+
+(The default level is 1)
 .TP
 .B signatureKey
 Specifies the OpenPGP Key from a local keyring to be used when generating trove

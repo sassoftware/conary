@@ -33,18 +33,16 @@ else:
 
 sys.path.append(os.path.dirname(fullPath))
 
-import conary
-
-from deps import deps
-from lib import util, sha1helper
-from repository import netclient, changeset
-import callbacks
-import conarycfg
-import conaryclient
-import files
-import sqlite3
-import updatecmd
-import versions
+from conary.deps import deps
+from conary.lib import util, sha1helper
+from conary.repository import netclient, changeset
+from conary import callbacks
+from conary import conarycfg
+from conary import conaryclient
+from conary import files
+from conary import sqlite3
+from conary import updatecmd
+from conary import versions
 
 def usage():
     print 'usage: %s conarydb newroot' %sys.argv[0]

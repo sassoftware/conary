@@ -210,3 +210,14 @@ class SqlDataStore(datastore.AbstractDataStore):
     def __init__(self, db):
         self.db = db
         schema.createDataStore(db)
+
+def markAddedFiles(db, cs):
+    """
+    Mark files added by this changeset as present -- they should already
+    be in the database.
+    """
+    for trvCs in cs.iterNewTroveList():
+        # we only need the pathIds
+        pathIds = [ x[0] for x in trvCs.getNewFileList() ]
+        db.restorePathIdsToTrove(trvCs.getName(), trvCs.getOldVersion(),
+                                 trvCs.getOldFlavor(), pathIds)

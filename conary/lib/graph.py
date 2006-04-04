@@ -13,6 +13,7 @@
 #
 """General graph algorithms"""
 import copy
+import itertools
 
 class NodeData(object):
     """Stores data associated with nodes.  Subclasses can determine
@@ -65,13 +66,13 @@ class NodeDataByHash(NodeData):
         self.data = []
 
     def sort(self, sortAlg=None):
-        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), sortAlg)
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
+                      sortAlg)
 
     def copy(self):
         new = self.__class__()
         new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
-        new.index = self.index
         return new
 
     def getIndex(self, item):
@@ -97,7 +98,7 @@ class DirectedGraph:
 
     def addNode(self, item):
         nodeId = self.data.getIndex(item)
-        self.edges.setdefault(nodeId, set())
+        self.edges.setdefault(nodeId, {})
         return nodeId
 
     def isEmpty(self):
@@ -106,37 +107,51 @@ class DirectedGraph:
     def get(self, idx):
         return self.data.get(idx)
 
-    def addEdge(self, fromItem, toItem):
+    def addEdge(self, fromItem, toItem, value=1):
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
-        self.edges.setdefault(fromIdx, set()).add(toIdx)
-        self.edges.setdefault(toIdx, set())
+        self.edges.setdefault(fromIdx, {})[toIdx] = value
+        self.edges.setdefault(toIdx, {})
+
+    def getEdge(self, fromItem, toItem):
+        return self.edges[fromIdx, toIdx]
 
     def delete(self, item):
         idx = self.data.getIndex(item)
         self.data.delete(item)
         del self.edges[idx]
-        [ x.discard(idx) for x in self.edges.itervalues() ]
+        [ x.pop(idx, None) for x in self.edges.itervalues() ]
 
     def deleteEdges(self, item):
-        self.edges[self.data.getIndex(item)] = set()
+        self.edges[self.data.getIndex(item)] = {}
+
+    def getChildren(self, item, withEdges=False):
+        idx = self.data.getIndex(item)
+        children = self.data.getItemsByIndex(self.edges[idx])
+        if withEdges:
+            return itertools.izip(children, self.edges[idx].itervalues())
+        else:
+            return children
 
     def getReversedEdges(self):
         newEdges = {}
         for fromId, toIdList in self.edges.iteritems():
             newEdges.setdefault(fromId, [])
-            for toId in toIdList:
-                newEdges.setdefault(toId, []).append(fromId)
-        return dict((x[0], set(x[1])) for x in newEdges.iteritems())
+            for toId, value in toIdList.iteritems():
+                newEdges.setdefault(toId, []).append((fromId, value))
+        return dict((x[0], dict(x[1])) for x in newEdges.iteritems())
 
     def iterChildren(self, node):
         return (self.data.get(idx) 
                     for idx in self.edges[self.data.getIndex(node)])
 
-    def getParents(self, node):
+    def getParents(self, node, withEdges=False):
         idx = self.data.getIndex(node)
-        return [ self.data.get(x[0]) 
-                    for x in self.edges.iteritems() if idx in x[1] ]
+        if withEdges:
+            return [ (self.data.get(x[0]), x[1][idx])
+                        for x in self.edges.iteritems() if idx in x[1] ]
+        else:
+            return [self.data.get(x) for x in self.edges if idx in self.edges[x]]
 
     def getLeaves(self):
         return [ self.data.get(x[0])
@@ -200,7 +215,16 @@ class DirectedGraph:
         return starts, finishes, trees
 
     def getTotalOrdering(self, nodeSort=None):
-        starts, finishes, trees = self.doDFS(nodeSort=nodeSort)
+        # to sort correctly, we need the nodes the user wants first to 
+        # be picked _last_ by the selection algorithm.  That way they'll
+        # have the latest possible finish times, and score better in the
+        # nodeSelect below.
+        if nodeSort:
+            reversedSort = lambda a,b: -nodeSort(a,b)
+        else:
+            reversedSort = None
+
+        starts, finishes, trees = self.doDFS(nodeSort=reversedSort)
 
         def nodeSelect(a, b):
             return cmp(finishes[b[0]], finishes[a[0]])
@@ -246,3 +270,15 @@ class DirectedGraph:
                         sccGraph.addEdge(compSet, setsByNode[childNode])
         return sccGraph
 
+    def flatten(self):
+        start, finished, trees = self.doDFS()
+        for node in self.edges.keys():
+            seen = set()
+            children = set(self.edges.get(node, set()))
+            while children:
+                child = children.pop()
+                if child in seen:
+                    continue
+                children.update(self.edges.get(child, []))
+                self.edges[node].update(self.edges.get(child, []))
+                seen.add(child)

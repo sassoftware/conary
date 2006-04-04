@@ -289,13 +289,13 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
         the label path, and return the one that's "best".
 
         The following rules should apply:
-        * if the labelPath is [bar, foo] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
-          is that any other shadow/branch in the path may be from a 
-          maintenance branch.
-        * if the labelPath is [bar] and you are choosing between
-          /foo/bar/ and /foo/blah/bar, choose /foo/bar.
-        * if two troves are on the same branch, prefer the later trove.
+            - If the labelPath is [bar, foo] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.  Assumption
+              is that any other shadow/branch in the path may be from a 
+              maintenance branch.
+            - If the labelPath is [bar] and you are choosing between
+              /foo/bar/ and /foo/blah/bar, choose /foo/bar.
+            - If two troves are on the same branch, prefer the later trove.
     """
     scores = [ (_scoreLoadRecipeChoice(labelPath, x[1]), x) for x in troveTups ]
     maxScore = max(scores)[0]
@@ -325,9 +325,13 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     component = name + ":source"
     filename = name + '.recipe'
     if not labelPath:
+        if not cfg.buildLabel:
+             raise builderrors.LoadRecipeError(
+            'no build label set -  cannot find source component %s' % component)
+            
 	labelPath = [cfg.buildLabel]
     try:
-	pkgs = repos.findTrove(labelPath, 
+	pkgs = repos.findTrove(labelPath,
                                (component, versionStr, deps.DependencySet()))
     except errors.TroveNotFound:
         raise builderrors.LoadRecipeError(
@@ -483,6 +487,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
 
     oldUsed = use.getUsed()
     name, versionStr, flavor = cmdline.parseTroveSpec(troveSpec)
+    versionSpec, flavorSpec = versionStr, flavor
 
     if name.endswith('.recipe'):
         file = name
@@ -529,6 +534,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 while version.isOnLocalHost():
                     version = version.parentVersion()
                 versionStr = str(version)
+
         if flavor:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
@@ -543,6 +549,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                      filterVersions=True,
                                      parentDir=parentDir)[0]
 
+    if label and not versionSpec:
+        # If they used the old-style specification of label, we should 
+        # convert to new style for purposes of storing in troveInfo
+        troveSpec = '%s=%s' % (name, label)
+        if flavorSpec:
+            troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return

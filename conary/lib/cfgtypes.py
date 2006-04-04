@@ -101,9 +101,8 @@ class CfgType:
 # A configuration type converts from string -> ConfigValue and from 
 # ConfigValue -> string, and may store information about how to make that 
 # change, but does NOT contain actual configuration values.
+CfgString = CfgType
 
-class CfgString(CfgType):
-    pass
 
 class Path(str):
     def __new__(cls, origString):

@@ -49,7 +49,7 @@ def loadMacros(paths):
         if not os.path.exists(path):
             continue
         macroModule = imp.load_source('tmpmodule', path)
-        baseMacros.update(x for x in macroModule.__dict__.iteritems() 
+        baseMacros.update(x for x in macroModule.__dict__.iteritems()
                           if not x[0].startswith('__'))
     return baseMacros
 
@@ -77,7 +77,7 @@ class _sourceHelper:
 
 def clearBuildReqs(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
-        or all packages if none listed. 
+        or all packages if none listed.
     """
     def _removePackages(class_, pkgs):
         if not pkgs:
@@ -112,7 +112,7 @@ class _AbstractPackageRecipe(Recipe):
 
     def validate(self):
         # wait to check build requires until the object is instantiated
-        # so that we can include all of the parent classes' buildreqs 
+        # so that we can include all of the parent classes' buildreqs
         # in the check
 
         for buildRequires in self.buildRequires:
@@ -122,8 +122,8 @@ class _AbstractPackageRecipe(Recipe):
 
             # we don't allow full version strings or just releases
             if vS and vS[0] not in ':@':
-                raise RecipeFileError("Unsupported buildReq format %s" % buildRequires)       
-            
+                raise RecipeFileError("Unsupported buildReq format %s" % buildRequires)
+
     def mainDir(self, new=None, explicit=True):
 	if new:
 	    self.theMainDir = new % self.macros
@@ -183,7 +183,7 @@ class _AbstractPackageRecipe(Recipe):
 	return files
 
     def checkBuildRequirements(self, cfg, sourceVersion, ignoreDeps=False):
-        """ Checks to see if the build requirements for the recipe 
+        """ Checks to see if the build requirements for the recipe
             are installed
         """
 
@@ -198,14 +198,14 @@ class _AbstractPackageRecipe(Recipe):
                                 ' foo=:tag, not foo=tag')
                     versionStr = ':' + versionStr
 
-           
+
 
 
             for trove in troves:
                 labels = trove.getVersion().iterLabels()
                 if versionStr[0] == ':':
                     branchTag = versionStr[1:]
-                    branchTags = [ x.getLabel() for x in labels ] 
+                    branchTags = [ x.getLabel() for x in labels ]
                     if branchTag in branchTags:
                         versionMatches.append(trove)
                 else:
@@ -243,7 +243,7 @@ class _AbstractPackageRecipe(Recipe):
                 continue
 
             versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
-                
+
             if not versionMatches:
                 missingReqs.append(buildReq)
                 continue
@@ -252,13 +252,13 @@ class _AbstractPackageRecipe(Recipe):
                 reqMap[buildReq] = match
             else:
                 missingReqs.append(buildReq)
-            
-            
-        
+
+
+
         if missingReqs:
             if not ignoreDeps:
                 log.error("Could not find the following troves "
-                          "needed to cook this recipe:\n"  
+                          "needed to cook this recipe:\n"
                           "%s" % '\n'.join(sorted(missingReqs)))
                 raise errors.RecipeDependencyError, \
                                             'unresolved build dependencies'
@@ -408,9 +408,9 @@ class _AbstractPackageRecipe(Recipe):
         """
         Populate a repository lookaside cache
         """
-        recipeClass = self.__class__ 
+        recipeClass = self.__class__
         repos = self.laReposCache.repos
-        
+
         # build a list containing this recipe class and any ancestor class
         # from which it descends
         classes = [ recipeClass ]
@@ -432,7 +432,7 @@ class _AbstractPackageRecipe(Recipe):
                 continue
             srcName = rclass._trove.getName()
             srcVersion = rclass._trove.getVersion()
-            for f in repos.iterFilesInTrove(srcName, srcVersion, 
+            for f in repos.iterFilesInTrove(srcName, srcVersion,
                                             deps.DependencySet(),
                                             withFiles=True):
                 pathId, path, fileId, version, fileObj = f
@@ -511,7 +511,7 @@ class _AbstractPackageRecipe(Recipe):
     def _includeSuperClassBuildReqs(self):
         """ Include build requirements from super classes by searching
             up the class hierarchy for buildRequires.  You can only
-            override this currenly by calling 
+            override this currenly by calling
             <superclass>.buildRequires.remove()
         """
         buildReqs = set()
@@ -525,15 +525,15 @@ class _AbstractPackageRecipe(Recipe):
 
             Example: setCrossCompile(('x86-foo-linux', 'x86_64', False))
 
-            @param crossHost: the architecture of the machine the built binary 
+            @param crossHost: the architecture of the machine the built binary
                  should run on.  Can be either <arch> or <arch>-<vendor>-<os>.
                  If None, determine crossHost based on isCrossTool value.
             @param crossTarget: the architecture of the machine the built
                  binary should be targeted for.
                  Can be either <arch> or <arch>-<vendor>-<os>.
             @param isCrossTool: If true, we are building a cross-compiler for
-                 use on this system.  We set values so that the resulting 
-                 binaries from this build should be runnable on the build 
+                 use on this system.  We set values so that the resulting
+                 binaries from this build should be runnable on the build
                  architecture.
         """
         def _parseArch(archSpec):
@@ -560,14 +560,14 @@ class _AbstractPackageRecipe(Recipe):
         def _setArchFlags(flavor):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
-                flag._set(False) 
+                flag._set(False)
             use.setBuildFlagsFromFlavor(self.name, flavor)
 
         def _setBuildMacros(macros):
             # get the necessary information about the build system
             # the only information we can grab is the arch.
             macros['buildarch'] = use.Arch._getMacro('targetarch')
-            
+
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
             if vendor:
@@ -589,7 +589,7 @@ class _AbstractPackageRecipe(Recipe):
             macros['hostarch'] = use.Arch._getMacro('targetarch')
             use.Arch = tmpArch
 
-             
+
         macros = self.macros
         macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
 
@@ -600,36 +600,36 @@ class _AbstractPackageRecipe(Recipe):
 
         if crossHost is None:
             if isCrossTool:
-                # we want the resulting binaries to run on 
+                # we want the resulting binaries to run on
                 # this machine.
                 macros['hostarch'] = macros['buildarch']
             else:
-                # we want the resulting binaries to run 
+                # we want the resulting binaries to run
                 # on the target machine.
                 macros['hostarch'] = macros['targetarch']
         else:
             _setHostMacros(crossHost, macros)
 
-        # make sure that host != build, so that we are always 
+        # make sure that host != build, so that we are always
         # doing a real cross compile.  To make this work, we add
-        # _build to the buildvendor. However, this little munging of 
-        # of the build system should not affect where the expected 
+        # _build to the buildvendor. However, this little munging of
+        # of the build system should not affect where the expected
         # gcc and g++ for local builds are located, so set those local
         # values first.
-        
+
         origBuild = macros['build'] % macros
         macros['buildcc'] = '%s-gcc' % (origBuild)
         macros['buildcxx'] = '%s-g++' % (origBuild)
 
         if (macros['host'] % macros) == (macros['build'] % macros):
             macros['buildvendor'] += '_build'
-                
+
         if isCrossTool:
             # we want the resulting binaries to run on our machine
             # but be targeted for %(target)s
             compileTarget = origBuild
         else:
-            # we're expecting the resulting binaries to run on 
+            # we're expecting the resulting binaries to run on
             # target
             compileTarget = '%(target)s'
 
@@ -647,8 +647,8 @@ class _AbstractPackageRecipe(Recipe):
         os.environ['PATH'] = newPath + os.environ['PATH']
 
         if not isCrossTool and self.macros.cc == self.macros.buildcc:
-            # if necessary, specify the path for the system 
-            # compiler.  Otherwise, if target == build,  attempts to compile 
+            # if necessary, specify the path for the system
+            # compiler.  Otherwise, if target == build,  attempts to compile
             # for the build system may use the target compiler.
             self.macros.buildcc = '%(bindir)s/' + self.macros.buildcc
             self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
@@ -656,8 +656,8 @@ class _AbstractPackageRecipe(Recipe):
         # set the bootstrap flag
         # FIXME: this should probably be a cross flag instead.
         use.Use.bootstrap._set()
-    
-    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
+
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self)
 	self._sources = []
@@ -685,8 +685,8 @@ class _AbstractPackageRecipe(Recipe):
             self.macros['hostarch'] = self.macros['targetarch']
             self.macros['buildarch'] = self.macros['targetarch']
 
-        # allow for architecture not to be set -- this could happen 
-        # when storing the recipe e.g. 
+        # allow for architecture not to be set -- this could happen
+        # when storing the recipe e.g.
  	for key in cfg.macros:
  	    self.macros._override(key, cfg['macros'][key])
 	self.macros.name = self.name
@@ -701,6 +701,31 @@ class _AbstractPackageRecipe(Recipe):
 
 
 class PackageRecipe(_AbstractPackageRecipe):
+    """
+    NAME
+    ====
+    B{C{PackageRecipe}} - Base class which provides Conary functionality
+
+    SYNOPSIS
+    ========
+
+    C{PackageRecipe} is inherited by the other *PackageRecipe super classes
+
+    DESCRIPTION
+    ===========
+
+    The C{PackageRecipe} class provides Conary recipes with references to
+    the essential troves which offer Conary's packaging requirements. 
+    (python, sqlite, gzip, bzip2, tar, cpio, and patch)
+
+    Other PackageRecipe classes such as C{AutoPackageRecipe} inherit the
+    functionality offered by C{PackageRecipe}.
+
+    EXAMPLE
+    =======
+
+    FIXME example
+    """
     # abstract base class
     ignore = 1
     # these initial buildRequires need to be cleared where they would
@@ -736,11 +761,35 @@ _addRecipeToCopy(PackageRecipe)
 
 class BuildPackageRecipe(PackageRecipe):
     """
-    Packages that need to be built with the make utility and basic standard
-    shell tools should descend from this recipe in order to automatically
-    have a reasonable set of build requirements.  This package differs
-    from the C{PackageRecipe} class only by providing additional explicit
-    build requirements.
+    NAME
+    ====
+
+    B{C{BuildPackageRecipe}} - Build packages requiring Make and shell
+    utilities
+
+    SYNOPSIS
+    ========
+
+    C{class I{className(BuildPackageRecipe):}}
+
+    DESCRIPTION
+    ===========
+
+    The C{BuildPackageRecipe} class provides recipes with capabilities for
+    building packages which require the C{make} utility, and additional,
+    standard shell tools, (coreutils) and the programs needed to run
+    C{configure}. (findutils, C{gawk}, C{grep}, C{sed}, and diffutils)
+    
+    C{BuildPackageRecipe} inherits from C{PackageRecipe}, and therefore
+    includes all the build requirements of  C{PackageRecipe}. 
+
+    EXAMPLE
+    =======
+
+    C{class DocbookDtds(BuidlPackageRecipe):}
+
+    Uses C{BuildPackageRecipe} to define the class for a Docbook Document Type
+    Definition collection recipe.
     """
     # Again, no :devellib here
     buildRequires = [
@@ -762,11 +811,36 @@ _addRecipeToCopy(BuildPackageRecipe)
 
 class CPackageRecipe(BuildPackageRecipe):
     """
-    Most packages should descend from this recipe in order to automatically
-    have a reasonable set of build requirements for a package that builds
-    C source code to binaries.  This package differs from the
-    C{BuildPackageRecipe} class only by providing additional explicit build
-    requirements.
+    NAME
+    ====
+
+    B{C{CPackageRecipe}} - Build packages consisting of binaries built from C
+    source code
+
+    SYNOPSIS
+    ========
+
+    C{class I{className(CPackageRecipe):}}
+
+    DESCRIPTION
+    ===========
+    The C{CPackageRecipe} class provides the essential build requirements
+    needed for packages consisting of binaries built from C source code, such
+    as the linker and C library. C{CPacakgeRecipe} inherits from
+    C{BuildPackageRecipe}, and therefore includes all the build requirements of
+    C{BuildPackageRecipe}.
+
+    Most package recipes which are too complex for C{AutoPackageRecipe}, and
+    consist of applications derived from C source code which do not require
+    additional shell utilities as build requirements use the
+    C{CPackageRecipe} class.
+
+    EXAMPLE
+    =======
+
+    C{class Bzip2(CPackageRecipe):}
+
+    Defines the class for a C{bzip2} recipe using C{AutoPackageRecipe}.
     """
     buildRequires = [
         'binutils:runtime',
@@ -792,14 +866,58 @@ _addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
-    Recipe class for simple packages built with auto* tools.  Child
-    classes should provide the C{unpack()} method for populating the
-    source list.  To call policy, implement the C{policy()} method and
-    put any necessary policy invocations there.  Next mostly likely is
-    to provide a C{makeinstall()} method if C{MakeInstall()} is
-    insufficient for the package.  Least likely to need overriding
-    are C{configure()} if C{Configure()} is insufficient, and
-    C{make()} if C{Make()} is insufficient.
+    NAME
+    ====
+
+    B{C{AutoPackageRecipe}} - Build simple packages with auto* tools
+
+    SYNOPSIS
+    ========
+
+    C{class I{className(AutoPackageRecipe):}}
+
+    DESCRIPTION
+    ===========
+
+    The  C{AutoPackageRecipe} class provides a simple means for the
+    creation of packages from minimal recipes, which are built from source
+    code using the auto* tools, such as C{automake}, and C{autoconf}.
+
+    Processing in the C{AutoPackageRecipe} class is a simple workflow modeled
+    after building software from source code, and is essentially comprised of
+    these steps:
+
+        1. Unpack source archive
+        2. C{configure}
+        3. C{make}
+        4. C{make install}
+        5. Applying Conary policy (optional)
+
+    With C{AutoPackageRecipe} the recipe writer does not necessarily need to
+    define the C{Configure}, C{Make}, or C{MakeInstall} methods, which allows
+    for very compact, and simple recipes.
+
+    The recipe's child classes should define the C{unpack()} method in order
+    to populate the source list.
+
+    Invoke the C{policy} method, with necessary policy parameters, and
+    keywords in your recipe to enforce Conary policy in the package.
+
+    If the standard C{Configure()}, C{Make()}, and C{MakeInstall()} methods
+    are insufficient for your package requirements, you should define your own
+    methods to override them.
+
+    Of the three methods, C{Configure}, and C{Make} are least likely to be
+    insufficient, and require overriding for the majority of recipes using
+    C{AutoPackageRecipe}.
+
+    EXAMPLE
+    =======
+
+    C{class Gimp(AutoPackageRecipe):}
+
+    Defines the class for a GNU Image Manipulation Program (Gimp) recipe using
+    C{AutoPackageRecipe}.
     """
     Flags = use.LocalFlags
     # abstract base class

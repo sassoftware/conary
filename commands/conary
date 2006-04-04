@@ -17,6 +17,7 @@
 The conary main program.
 """
 
+import inspect
 import sys
 if sys.version_info < (2, 4):
     print "error: python 2.4 or later is requried"
@@ -30,6 +31,7 @@ if __name__ == "__main__":
     importer.install()
 
 #stdlib
+import optparse
 import os
 import pwd
 import xmlrpclib
@@ -71,277 +73,155 @@ def usage(rc = 1):
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
     print ""
-    print "changeset flags: --exclude-troves <patterns>"
-    print "                 --no-recurse"
-    print "                 --quiet"
-    print ""
-    print "commit flags:    --target-branch <branch>"
-    print ""
-    print "config flags:    --show-passwords --show-contexts"
-    print ""
-    print 'common flags:    --build-label <label>'
-    print '                 --config-file <path>'
-    print "                 --components"
-    print '                 --config "<item> <value>"'
-    print "                 --flavors"
-    print "                 --full-versions"
-    print '                 --install-label <label>'
-    print '                 --interactive'
-    print "                 --pubring <path>"
-    print "                 --root <root>"
-    print "                 --context <context>"
-    print ""
-    print "Common query/repquery/showcs flags:"
-    print ""
-    print "      trove display flags"
-    print "                 --full-versions"
-    print "                 --labels"
-    print "                 --flavors"
-    print "                 --components"
-    print
-    print "                 --buildreqs"
-    print "                 --deps"
-    print "                 --info"
-    print "                 --signatures"
-    print ""
-    print ""
-    print "     collection flags"
-    print "                 --all-troves"
-    print "                 --components"
-    print "                 --troves"
-    print "                 --trove-flags"
-    print "                 --trove-headers"
-    print "                 --weak-refs"
-    print "                 --recurse"
-    print "                 --no-recurse"
-    print ""
-    print "     file flags (assumes --recurse)"
-    print "                 --file-deps"
-    print "                 --file-versions"
-    print "                 --ids"
-    print "                 --ls"
-    print "                 --lsl"
-    print "                 --sha1s"
-    print "                 --tags"
-    print
-    print ""
-    print "     query only flags:"
-    print "                 --path <file>"
-    print
-    print "     repquery flags:"
-    print "                 --all-versions"
-    print "                 --latest-versions"
-    print "                 --leaves"
-    print "                 --affinity"
-    print ""
-    print "                 --all-flavors"
-    print "                 --available-flavors"
-    print "                 --compatible-flavors"
-    print "                 --best-flavors"
-    print ""
-    print
-    print "     showcs flags:"
-    print "                 --all"
-    print "                 --show-changes"
-    print "                 --recurse-repository"
-    print
-    print "rollback flags:  --replace-files"
-    print "syncchildren flags:"
-    print "                 --update-only"
-    print ""
-    print "update/erase/syncchildren flags:"
-    print "                 --exclude-troves <patterns>"
-    print "                 --from-file <file.ccs>"
-    print "                 --info"
-    print "                 --just-db"
-    print "                 --keep-existing"
-    print "                 --no-conflict-check"
-    print "                 --no-deps"
-    print "                 --no-recurse"
-    print "                 --no-resolve"
-    print "                 --quiet"
-    print "                 --replace-files"
-    print "                 --resolve"
-    print "                 --sync-to-parents"
-    print "                 --test"
-    print "updateall flags:"
-    print "                 --exclude-troves <patterns>"
-    print "                 --info"
-    print "                 --no-deps"
-    print "                 --no-resolve"
-    print "                 --replace-files"
-    print "                 --resolve"
+    print "type 'conary <command> --help' for command-specific usage"
     return rc
 
 def openDatabase(root, path):
     return database.Database(root, path)
 
-def realMain(cfg, argv=sys.argv):
-    argDef = {}
-    cfgMap = {}
+(NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
+(OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
-    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
-    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+supportedCommands = {}
+def _register(commandClass):
+    inst = commandClass()
+    for cmdName in commandClass.commands:
+        supportedCommands[cmdName] = inst
 
-    cfgMap["build-label"] = "buildLabel", ONE_PARAM
-    cfgMap["exclude-troves"] = "excludeTroves", ONE_PARAM
-    cfgMap["trust-threshold"] = "trustThreshold", ONE_PARAM
-    cfgMap["pubring"] = "pubRing", ONE_PARAM
-    cfgMap["root"] = "root", ONE_PARAM
+class ConaryCommand(object):
 
-    cfgMap['interactive'] = 'interactive', NO_PARAM
-    cfgMap['full-versions'] = 'fullVersions', NO_PARAM
-    cfgMap['labels'] = 'showLabels', NO_PARAM
-    cfgMap['flavors'] = 'fullFlavors', NO_PARAM
-    cfgMap['components'] = 'showComponents', NO_PARAM
+    paramHelp = ''
+    defaultGroup = 'Common Options'
 
-
-    for name, (cfgName, paramType) in cfgMap.items():
-        # if it's a NO_PARAM
-        if paramType == NO_PARAM:
-            negName = 'no-' + name
-            argDef[negName] = paramType
-            cfgMap[negName] = (cfgName, paramType)
-        argDef[name] = paramType
-
-    argDef["all"] = NO_PARAM
-    argDef["all-flavors"] = NO_PARAM
-    argDef["all-versions"] = NO_PARAM
-    argDef["all-troves"] = NO_PARAM
-    argDef["available-flavors"] = NO_PARAM
-    argDef["best-flavors"] = NO_PARAM
-    argDef["buildreqs"] = NO_PARAM
-    argDef["components"] = NO_PARAM
-    argDef["compatible-flavors"] = NO_PARAM
-    argDef["config"] = MULT_PARAM
-    argDef["config-file"] = ONE_PARAM
-    argDef["context"] = ONE_PARAM
-    argDef["deps"] = NO_PARAM
-    argDef["diff"] = NO_PARAM
-    argDef["from-file"] = MULT_PARAM
-    argDef["file-deps"] = NO_PARAM
-    argDef["file-versions"] = NO_PARAM
-    argDef["ids"] = NO_PARAM
-    argDef["info"] = NO_PARAM
-    argDef["install"] = NO_PARAM
-    argDef["install-label"] = MULT_PARAM
-    argDef["items"] = NO_PARAM
-    argDef["just-db"] = NO_PARAM
-    argDef["keep-existing"] = NO_PARAM
-    argDef["latest-versions"] = NO_PARAM
-    argDef["leaves"] = NO_PARAM
-    argDef["ls"] = NO_PARAM
-    argDef["lsl"] = NO_PARAM
-    argDef["affinity"] = NO_PARAM
-    argDef["no-deps"] = NO_PARAM
-    argDef["no-recurse"] = NO_PARAM
-    argDef["resolve"] = NO_PARAM
-    argDef["no-resolve"] = NO_PARAM
-    argDef["no-conflict-check"] = NO_PARAM
-    argDef["path"] = MULT_PARAM
-    argDef["no-pristine"] = NO_PARAM
-    argDef["profile"] = NO_PARAM
-    argDef["quiet"] = NO_PARAM
-    argDef["recurse"] = NO_PARAM
-    argDef["recurse-repository"] = NO_PARAM
-    argDef["replace-files"] = NO_PARAM
-    argDef["root"] = ONE_PARAM
-    argDef["sha1s"] = NO_PARAM
-    argDef["show-changes"] = NO_PARAM
-    argDef["show-contexts"] = NO_PARAM
-    argDef["show-passwords"] = NO_PARAM
-    argDef["signatures"] = NO_PARAM
-    argDef["sync-to-parents"] = NO_PARAM
-    argDef["tag-script"] = ONE_PARAM
-    argDef["tags"] = NO_PARAM
-    argDef["target-branch"] = ONE_PARAM
-    argDef["test"] = NO_PARAM
-    argDef["troves"] = NO_PARAM
-    argDef["trove-flags"] = NO_PARAM
-    argDef["trove-headers"] = NO_PARAM
-    argDef["update-only"] = NO_PARAM
-    argDef["weak-refs"] = NO_PARAM
-    argDef["version"] = NO_PARAM
-
-    try:
-        argSet, otherArgs = options.processArgs(argDef, {}, cfg, usage,
-                                                argv=argv)
-    except options.OptionError, e:
-        print >> sys.stderr, e
-        sys.exit(e.val)
-    except versions.ParseError, e:
-	print >> sys.stderr, e
-	sys.exit(1)
-
-    # the user might have specified --config debugExceptions on the commandline
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
-
-    if argSet.has_key('version'):
-        print constants.version
-        sys.exit(0)
-
-    context = cfg.context
-    if os.path.exists('CONARY'):
-        conaryState = state.ConaryStateFromFile('CONARY')
-        if conaryState.hasContext():
-            context = conaryState.getContext()
-
-    context = os.environ.get('CONARY_CONTEXT', context)
-    context = argSet.pop('context', context)
+    docs = {'build-label'        : ('Use build label LABEL as default search'
+                                    ' loc', 'LABEL'),
+            'components'         : ("Do not hide components"),
+            'config'             : ("Set config KEY to VALUE", "'KEY VALUE'"),
+            'config-file'        : ("Read PATH config file", "PATH"),
+            'context'            : "Set the current context",
+            'exclude-troves'     : ('Do not install troves matching REGEXP', 
+                                    'REGEXP'),
+            'install-label'      : ("Set the install label", "LABEL"),
+            'interactive'        : ('ask questions before performing actions '
+                                    'that change system or repository state'),
+            'flavors'            : 'Display complete flavors where applicable',
+            'full-versions'      : ('Always display complete version strings'),
+            'labels'             : 'Always display labels for versions',
+            'profile'            : optparse.SUPPRESS_HELP,
+            "pubring"            : '',
+            'skip-default-config': "Don't read default configs",
+            'quiet'              : ('do not display extra information when '
+                                    'running'),
+            'root'               : 'use conary database at location ROOT',
+            'trust-threshold'    : ('Set trust threshold', 'INT')
+            }
 
 
-    if context:
-        cfg.setContext(context)
+    def __init__(self):
+        self.parser = None
+
+    def usage(self, errNo=1):
+        if self.parser:
+            self.parser.print_help()
+        return errNo
+
+    def setParser(self, parser):
+        self.parser = parser
+
+    def addParameters(self, argDef):
+        d = {}
+        d["config"] = MULT_PARAM
+        d["config-file"] = ONE_PARAM
+        d["context"] = ONE_PARAM
+        d["install-label"] = MULT_PARAM
+        d["profile"] = NO_PARAM
+        d["skip-default-config"] = NO_PARAM
+        argDef[self.defaultGroup] = d
+
+    def addConfigOptions(self, cfgMap, argDef):
+        cfgMap["build-label"] = "buildLabel", ONE_PARAM
+        cfgMap["exclude-troves"] = "excludeTroves", ONE_PARAM
+        cfgMap["trust-threshold"] = "trustThreshold", ONE_PARAM
+        cfgMap["pubring"] = "pubRing", ONE_PARAM
+        cfgMap["root"] = "root", ONE_PARAM
+        cfgMap["quiet"] = "quiet", NO_PARAM
+
+        cfgMap['interactive'] = 'interactive', NO_PARAM,
+        cfgMap['full-versions'] = 'fullVersions', NO_PARAM
+        cfgMap['labels'] = 'showLabels', NO_PARAM,
+        cfgMap['flavors'] = 'fullFlavors', NO_PARAM,
+        cfgMap['components'] = 'showComponents', NO_PARAM
 
 
-    # command line configuration overrides contexts.
-    for (arg, (name, paramType)) in cfgMap.items():
-        value = argSet.pop(arg, None)
-        if value is not None:
-            if arg.startswith('no-'):
-                value = not value
+        for name, (cfgName, paramType)  in cfgMap.items():
+            # if it's a NO_PARAM
+            if paramType == NO_PARAM:
+                negName = 'no-' + name
+                argDef[self.defaultGroup][negName] = NO_PARAM, optparse.SUPPRESS_HELP
+                cfgMap[negName] = (cfgName, paramType)
 
-	    cfg.configLine("%s %s" % (name, value))
+            argDef[self.defaultGroup][name] = paramType
 
-    for line in argSet.pop('config', []):
-        cfg.configLine(line)
+    def processConfigOptions(self, cfg, cfgMap, argSet):
+        # command line configuration overrides contexts.
+        for (arg, (name, paramType)) in cfgMap.items():
+            value = argSet.pop(arg, None)
+            if value is not None:
+                if arg.startswith('no-'):
+                    value = not value
 
-    if not cfg.buildLabel and cfg.installLabelPath:
-        cfg.buildLabel = cfg.installLabelPath[0]
+                cfg.configLine("%s %s" % (name, value))
 
-    # now set the debug hook using the potentially new cfg.debugExceptions value
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+        for line in argSet.pop('config', []):
+            cfg.configLine(line)
 
-    l = []
-    for labelStr in argSet.get('install-label', []):
-        l.append(versions.Label(labelStr))
-    if l:
-        cfg.installLabelPath = l
-        del argSet['install-label']
+        l = []
+        for labelStr in argSet.get('install-label', []):
+            l.append(versions.Label(labelStr))
+        if l:
+            cfg.installLabelPath = l
+            del argSet['install-label']
 
-    if cfg.installLabelPath:
-        cfg.installLabel = cfg.installLabelPath[0]
-    
-    cfg.initializeFlavors()
+    def addDocs(self, argDef):
+        d = {}
+        for class_ in reversed(inspect.getmro(self.__class__)):
+            if not hasattr(class_, 'docs'):
+                continue
+            d.update(class_.docs)
 
-    profile = False
-    if argSet.has_key('profile'):
-	import hotshot
-	prof = hotshot.Profile('conary.prof')
-	prof.start()
-	profile = True
-	del argSet['profile']
+        commandDicts = [argDef]
+        while commandDicts:
+            commandDict = commandDicts.pop()
+            for name, value in commandDict.items():
+                if isinstance(value, dict):
+                    commandDicts.append(value)
+                    continue
+                if name in d:
+                    if not isinstance(value, (list, tuple)):
+                        value = [ value ]
+                    else:
+                        value = list(value)
+                    value.append(d[name])
+                    commandDict[name] = value
 
-    keyCache = openpgpkey.getKeyCache()
-    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                   cfg.pubRing[-1])
-    keyCache.setCallback(keyCacheCallback)
 
-    if (len(otherArgs) < 2):
-	return usage()
-    elif (otherArgs[1] == "changeset"):
+
+class ChangeSetCommand(ConaryCommand):
+    commands = ['changeset']
+    paramHelp = '''\
+conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>
+
+Creates a changeset with the specified troves and stores it in <outfile>'''
+
+    docs = {'no-recurse' : "Don't include child troves in changeset"}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef['no-recurse'] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
-        
+
         callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
@@ -353,26 +233,30 @@ def realMain(cfg, argv=sys.argv):
         kwargs['recurse'] = not(argSet.has_key('no-recurse'))
         if not kwargs['recurse']:
             del argSet['no-recurse']
-            
-	if len(otherArgs) < 4 or argSet:
-	    return usage()
+
+        if len(otherArgs) < 4 or argSet:
+            return self.usage()
 
         outFile = otherArgs[-1]
         del otherArgs[-1]
 
-	cscmd.ChangeSetCommand(cfg, otherArgs[2:], outFile, **kwargs)
-    elif (otherArgs[1] == "commit"):
-	targetBranch = None
-	if argSet.has_key('target-branch'):
-	    targetBranch  = argSet['target-branch']
-	    del argSet['target-branch']
-	if len(otherArgs) < 3: return usage()
-	for changeSet in otherArgs[2:]:
-	    commit.doCommit(cfg, changeSet, targetBranch)
-    elif (otherArgs[1] == "config"):
-        
-	showPasswords = argSet.pop('show-passwords', False)
-	showContexts = argSet.pop('show-contexts', False)
+        cscmd.ChangeSetCommand(cfg, otherArgs[2:], outFile, **kwargs)
+_register(ChangeSetCommand)
+
+class ConfigCommand(ConaryCommand):
+    commands = ['config']
+
+    docs = {'show-contexts'  : 'display contexts as well as current config',
+            'show-passwords' : 'do not mask passwords'}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["show-contexts"] = NO_PARAM
+        argDef["show-passwords"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        showPasswords = argSet.pop('show-passwords', False)
+        showContexts = argSet.pop('show-contexts', False)
         try:
             prettyPrint = sys.stdout.isatty()
         except AttributeError:
@@ -380,17 +264,50 @@ def realMain(cfg, argv=sys.argv):
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               showContexts=showContexts,
                               prettyPrint=prettyPrint)
-	if argSet: return usage()
-	if (len(otherArgs) > 2):
-	    return usage()
-	else:
-	    cfg.display()
-    elif (otherArgs[1] == "emerge"):
+        if argSet: return self.usage()
+        if (len(otherArgs) > 2):
+            return self.usage()
+        else:
+            cfg.display()
+_register(ConfigCommand)
+
+
+class CommitCommand(ConaryCommand):
+    commands = ['commit']
+    paramHelp = "<changeset>"
+
+    docs = {'target-branch' : ('commit to branch BRANCH', 'BRANCH')}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["target-branch"] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        targetBranch = None
+        if argSet.has_key('target-branch'):
+            targetBranch  = argSet['target-branch']
+            del argSet['target-branch']
+        if len(otherArgs) < 3: return self.usage()
+        for changeSet in otherArgs[2:]:
+            commit.doCommit(cfg, changeSet, targetBranch)
+_register(CommitCommand)
+
+class EmergeCommand(ConaryCommand):
+    commands = ['emerge']
+    paramHelp = "<troveName>+"
+
+    docs = {'no-deps' : 'Do not check to see if buildreqs are installed' }
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["no-deps"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
         # import this late to reduce the dependency set for
         # the main conary command in the common case.  This lets
         # conary run even if, for example, libelf is missing
         from conary.build import cook
-	log.setVerbosity(log.INFO)
+        log.setVerbosity(log.INFO)
 
         if not os.getuid():
             # if we're running as root, switch to the emergeUser
@@ -427,33 +344,190 @@ def realMain(cfg, argv=sys.argv):
             cookIds = None
 
         ignoreDeps = argSet.pop('no-deps', False)
-	if argSet: return usage()
+        if argSet: return self.usage()
 
         try:
-            return cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True,
-                                    cookIds=cookIds, ignoreDeps=ignoreDeps)
+            return cook.cookCommand(cfg, otherArgs[2:], False, {},
+                                    emerge = True, cookIds=cookIds,
+                                    ignoreDeps=ignoreDeps)
         except cook.CookError, msg:
             log.error(msg)
             return 1
-    elif (otherArgs[1] == "localcs"):
-	if len(otherArgs) != 4 and len(otherArgs) != 4:
-	    return usage()
+_register(EmergeCommand)
 
-	name = otherArgs[2]
-	outFile = otherArgs[3]
 
-	db = database.Database(cfg.root, cfg.dbPath)
-	cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
-    elif (otherArgs[1] == "localcommit"):
-	if len(otherArgs) < 3: return usage()
-	db = database.Database(cfg.root, cfg.dbPath)
-	for changeSet in otherArgs[2:]:
-	    commit.doLocalCommit(db, changeSet)
-    elif (otherArgs[1] == "pin" or otherArgs[1] == "unpin"):
-	if argSet: return usage()
+class LocalChangeSetCommand(ConaryCommand):
+    commands = ['localcs']
+    paramHelp = "<pkgname>[=<version>][[flavor]] <outfile>"
 
+    def runCommand(self, cfg, argSet, otherArgs):
+        if len(otherArgs) != 4 and len(otherArgs) != 4:
+            return self.usage()
+
+        name = otherArgs[2]
+        outFile = otherArgs[3]
+
+        db = database.Database(cfg.root, cfg.dbPath)
+        cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
+_register(LocalChangeSetCommand)
+
+
+class LocalCommitCommand(ConaryCommand):
+    commands = ['localcommit']
+    paramHelp = "<changeset>"
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if len(otherArgs) < 3: return self.usage()
+        db = database.Database(cfg.root, cfg.dbPath)
+        for changeSet in otherArgs[2:]:
+            commit.doLocalCommit(db, changeSet)
+_register(LocalCommitCommand)
+
+
+class PinCommand(ConaryCommand):
+    commands = ['pin', 'unpin']
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if argSet: return self.usage()
         updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
-    elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
+_register(PinCommand)
+
+
+class RemoveCommand(ConaryCommand):
+    commands = ['remove']
+    paramHelp = "<path>+"
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if len(otherArgs) != 3: return self.usage()
+        if argSet: return self.usage()
+        db = openDatabase(cfg.root, cfg.dbPath)
+        fullPath = util.joinPaths(cfg.root, otherArgs[2])
+        if os.path.exists(fullPath):
+            os.unlink(fullPath)
+        else:
+            log.warning("%s has already been removed", fullPath)
+        # this call should move into conaryclient; for now we need
+        # this to instantiate the log
+        from conary import conaryclient
+        client = conaryclient.ConaryClient(cfg)
+        log.syslog.command()
+        for path in otherArgs[2:]:
+            db.removeFile(otherArgs[2])
+        log.syslog.commandComplete()
+_register(RemoveCommand)
+
+
+class ListRollbackCommand(ConaryCommand):
+    commands = ['rblist']
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if argSet: return self.usage()
+        db = openDatabase(cfg.root, cfg.dbPath)
+        rollbacks.listRollbacks(db, cfg)
+_register(ListRollbackCommand)
+
+class RollbackCommand(ConaryCommand):
+    commands = ['rollback']
+    paramHelp = "<rollback>"
+
+    docs = {'replace-files' : ('replace files on system with files from'
+                               ' rollback if conflict')}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["replace-files"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        kwargs = {}
+        if argSet.has_key('replace-files'):
+            kwargs['replaceFiles'] = True
+            del argSet['replace-files']
+        kwargs['callback'] = updatecmd.UpdateCallback(cfg)
+        if argSet: return self.usage()
+        db = openDatabase(cfg.root, cfg.dbPath)
+        args = [db, cfg] + otherArgs[2:]
+        rollbacks.apply(*args, **kwargs)
+_register(RollbackCommand)
+
+
+class _AbstractQueryCommand(ConaryCommand):
+
+    docs = {'all-troves'    : '', # Meaning changes based on command
+            'buildreqs'     : ('Display troves used to satisfy buildreqs'
+                               ' of this trove'),
+            'deps'          : 'Display trove dependencies',
+            'file-deps'     : 'Display dependencies for individual files',
+            'file-versions' : 'Display file versions',
+            'ids'           : 'Display path and file ids for files',
+            'info'          : 'Display detailed trove info',
+            'ls'            : 'List files',
+            'lsl'           : 'List file details like ls -l',
+            'no-pristine'   : optparse.SUPPRESS_HELP,
+            'no-recurse'    : 'Force no recursive display of child troves',
+            'path'          : 'Display trove that owns PATH',
+            'recurse'       : 'Force recursive display of child troves',
+            'sha1s'         : 'Display checksums for original file contents',
+            'signatures'    : 'Display any signatures on this trove',
+            'tags'          : 'Display tags for files',
+            'troves'        : 'Display one level of child troves',
+            'trove-flags'   : 'Display trove flags (see man page)',
+            'trove-headers' : 'Display current trove name when listing info'
+                              ' from multiple troves',
+            'weak-refs'     : optparse.SUPPRESS_HELP,
+            }
+
+
+
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+
+        d = {}
+        d["ids"] = NO_PARAM
+        d["ls"] = NO_PARAM
+        d["lsl"] = NO_PARAM
+        d["tags"] = NO_PARAM
+        d["file-deps"] = NO_PARAM
+        d["file-versions"] = NO_PARAM
+        d["sha1s"] = NO_PARAM
+        argDef['File Display'] = d
+
+        d = {}
+        d["buildreqs"] = NO_PARAM
+        d["deps"] = NO_PARAM
+        d["info"] = NO_PARAM
+        d["signatures"] = NO_PARAM
+        d["trove-flags"] = NO_PARAM
+        argDef['Info Display'] = d
+
+        d = {}
+        d["all-troves"] = NO_PARAM
+        d["recurse"] = NO_PARAM
+        d["no-recurse"] = NO_PARAM
+        d["troves"] = NO_PARAM
+        d["trove-headers"] = NO_PARAM
+        d["weak-refs"] = NO_PARAM
+        argDef['Child Display'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        raise NotImplementedError
+
+class QueryCommand(_AbstractQueryCommand):
+
+    commands = [ 'query', 'q' ]
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    docs = {'all-troves' : 'Display troves that are not installed'}
+
+    def addParameters(self, argDef):
+        _AbstractQueryCommand.addParameters(self, argDef)
+        d = {}
+        d["no-pristine"] = NO_PARAM
+        d["path"] = MULT_PARAM
+        argDef['Trove Selection'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
@@ -471,18 +545,50 @@ def realMain(cfg, argv=sys.argv):
                 kw[opt] = argSet.pop(opt, False)
         kw['pathList'] = argSet.pop('path', [])
         kw['pristine'] = not argSet.pop('no-pristine', False)
-
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']
 
-	db = openDatabase(cfg.root, cfg.dbPath)
+        db = openDatabase(cfg.root, cfg.dbPath)
 
-	if argSet: return usage()
+        if argSet: return self.usage()
 
-        query.displayTroves(db, cfg, otherArgs[2:], **kw)
-    elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq"):
+        return query.displayTroves(db, cfg, otherArgs[2:], **kw)
+_register(QueryCommand)
+
+
+class RepQueryCommand(_AbstractQueryCommand):
+
+    commands = [ 'repquery', 'rq' ]
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    docs = { 'affinity'    : ('Use branch and flavor affinity when searching'
+                             ' for troves (behave like conary update)'),
+            'all-troves'   : 'Display byDefault False troves',
+            'all-flavors'  : 'Return all flavors of troves matching the query',
+            'all-versions' : 'Return all versions of troves that'
+                             ' match the query',
+            'available-flavors' : ('Return all flavors that match system flavor'
+                                  ' and the query (and affinity if specified)'),
+            'best-flavors' : optparse.SUPPRESS_HELP, # default
+            'latest-versions': optparse.SUPPRESS_HELP, # default
+            'leaves'         : 'Return latest version for each unique flavor'}
+
+
+    def addParameters(self, argDef):
+        _AbstractQueryCommand.addParameters(self, argDef)
+        d = {}
+        d["affinity"] = NO_PARAM
+        d["all-flavors"] = NO_PARAM
+        d["all-versions"] = NO_PARAM
+        d["available-flavors"] = NO_PARAM
+        d["best-flavors"] = NO_PARAM
+        d["latest-versions"] = NO_PARAM
+        d["leaves"] = NO_PARAM
+        argDef['Trove Selection'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
         versionOpts = [argSet.pop(x, False) for x in ['all-versions',
                                                       'latest-versions',
@@ -538,51 +644,34 @@ def realMain(cfg, argv=sys.argv):
             kw['recurse'] = False
             del argSet['no-recurse']
 
-        if argSet: return usage()
+        if argSet: return self.usage()
         troveList = otherArgs[2:]
 
-        queryrep.displayTroves(cfg, troveList, versionFilter, flavorFilter,
-                               **kw)
-    elif (otherArgs[1] == "rblist"):
-	if argSet: return usage()
-	db = openDatabase(cfg.root, cfg.dbPath)
-	rollbacks.listRollbacks(db, cfg)
-    elif (otherArgs[1] == "remove"):
-	if len(otherArgs) != 3: return usage()
-	if argSet: return usage()
-	db = openDatabase(cfg.root, cfg.dbPath)
-	fullPath = util.joinPaths(cfg.root, otherArgs[2])
-	if os.path.exists(fullPath):
-	    os.unlink(fullPath)
-	else:
-	    log.warning("%s has already been removed", fullPath)
-        # this call should move into conaryclient; for now we need
-        # this to instantiate the log
-        from conary import conaryclient
-        client = conaryclient.ConaryClient(cfg)
-        log.syslog.command()
-        for path in otherArgs[2:]:
-            db.removeFile(otherArgs[2])
-        log.syslog.commandComplete()
-    elif (otherArgs[1] == "rollback"):
-        kwargs = {}
-	if argSet.has_key('replace-files'):
-	    kwargs['replaceFiles'] = True
-	    del argSet['replace-files']
-        kwargs['callback'] = updatecmd.UpdateCallback(cfg)
-	if argSet: return usage()
-	db = openDatabase(cfg.root, cfg.dbPath)
-	args = [db, cfg] + otherArgs[2:]
-	rollbacks.apply(*args, **kwargs)
-    elif (otherArgs[1] == "verify"):
-	db = openDatabase(cfg.root, cfg.dbPath)
-        all = argSet.has_key('all')
-	if all: del argSet['all']
-        if len(otherArgs) < 2 or argSet:
-            return verify.usage()
-        troves = otherArgs[2:]
-        verify.verify(troves, db, cfg, all=all)
-    elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
+        queryrep.displayTroves(cfg, troveList, versionFilter, flavorFilter, 
+                              **kw)
+_register(RepQueryCommand)
+
+class ShowChangesetCommand(_AbstractQueryCommand):
+
+    commands = [ "showcs", "scs" ]
+    paramHelp = "<changeset> <pkgname>[=<version>][[flavor]]*"
+
+    docs = {'all'                : 'combine many common scs flags',
+            'all-troves'         : 'display not-by-default troves', 
+            'show-changes'       : ('(for relative changeset) display changes'
+                                    'that the relative changeset contains'),
+            'recurse-repository' : ('search the repository for troves not '
+                                    'contained in the changeset when recursing')
+           }
+
+    def addParameters(self, argDef):
+        _AbstractQueryCommand.addParameters(self, argDef)
+        d = {}
+        argDef['Changeset Display'] = {"all":          NO_PARAM,
+                                       "show-changes": NO_PARAM }
+        argDef['Child Display']["recurse-repository"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
         from conary.repository import changeset
         kw = {}
         # FIXME: organize
@@ -609,7 +698,7 @@ def realMain(cfg, argv=sys.argv):
             del argSet['no-recurse']
 
         if argSet or len(otherArgs) < 3:
-            showchangeset.usage()
+            self.usage()
             return 1
 
         cspath = otherArgs[2]
@@ -619,12 +708,55 @@ def realMain(cfg, argv=sys.argv):
         cs = changeset.ChangeSetFromFile(cspath)
         db = database.Database(cfg.root, cfg.dbPath)
         showchangeset.displayChangeSet(db, cs, component, cfg, **kw)
-    elif otherArgs[1] == "updateconary":
+_register(ShowChangesetCommand)
+
+
+class UpdateCommand(ConaryCommand):
+
+    commands = ["update", "erase", "sync", "syncchildren"]
+    paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
+
+    docs = {
+        'from-file'     : 'search changeset(s) for given troves',
+        'just-db'       : 'Update db only - Do not modify rest of file system',
+        'keep-existing' : 'Install new troves as new, leaving existing troves.',
+        'info'          : 'Display what update would have done',
+        'no-deps'       : 'Do not raise errors due to dependency failures', 
+        'no-recurse'    : 'Do not install/erase children of specified trove',
+        'no-resolve'    : 'Do not attempt to solve dependency problems',
+        'no-conflict-check' : 'Ignore potential path conflicts', 
+        'recurse'       : optparse.SUPPRESS_HELP,
+        'replace-files' : 'Replace existing files if file conflict found', 
+        'resolve'       : 'Add troves to update to solve dependency problems',
+        'sync-to-parents' : 'Install already referenced versions of troves',
+        'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
+        'test'      : 'Run through whole update but do not modify system',
+        'update-only' : 'Do not install any new troves', 
+    }
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        d = {}
+        d["from-file"] = MULT_PARAM
+        d["just-db"] = NO_PARAM
+        d["keep-existing"] = NO_PARAM
+        d["info"] = NO_PARAM
+        d["no-deps"] = NO_PARAM
+        d["no-recurse"] = NO_PARAM
+        d["no-resolve"] = NO_PARAM
+        d["no-conflict-check"] = NO_PARAM
+        d["recurse"] = NO_PARAM
+        d["replace-files"] = NO_PARAM
+        d["resolve"] = NO_PARAM
+        d["sync-to-parents"] = NO_PARAM
+        d["tag-script"] = ONE_PARAM
+        d["test"] = NO_PARAM
+        d["update-only"] = NO_PARAM
+        argDef['Update Options'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
-        updatecmd.updateConary(cfg, constants.version)
-    elif otherArgs[1] in ["update", "erase", "sync", "syncchildren"]:
-        cfg.requireInstallLabelPath()
-	kwargs = {}
+        kwargs = {}
 
         callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
@@ -634,13 +766,13 @@ def realMain(cfg, argv=sys.argv):
             del argSet['quiet']
         kwargs['callback'] = callback
 
-	if argSet.has_key('resolve'):
+        if argSet.has_key('resolve'):
             cfg.autoResolve = True
-	    del argSet['resolve']
+            del argSet['resolve']
 
-	if argSet.has_key('no-resolve'):
+        if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
-	    del argSet['no-resolve']
+            del argSet['no-resolve']
 
         kwargs['replaceFiles'] = argSet.pop('replace-files', False)
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
@@ -663,60 +795,238 @@ def realMain(cfg, argv=sys.argv):
             log.error("Only one of --sync and --from-file may be used")
             return 1
 
-	if argSet: return usage()
+        if argSet: return self.usage()
 
-	if len(otherArgs) >=3:
-	    updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
-	else:
-	    return usage()
-    elif (otherArgs[1] == "updateall"):
+        if len(otherArgs) >=3:
+            updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
+        else:
+            return self.usage()
+_register(UpdateCommand)
+
+class UpdateAllCommand(UpdateCommand):
+
+    commands = ['updateall']
+    docs = {'items': ('Display troves that conary updateall will update '
+                      'to upgrade your system')}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["items"] = NO_PARAM
+        argDef["info"] = NO_PARAM
+        argDef["no-conflict-check"] = NO_PARAM
+        argDef["no-deps"] = NO_PARAM
+        argDef["no-resolve"] = NO_PARAM
+        argDef["replace-files"] = NO_PARAM
+        argDef["resolve"] = NO_PARAM
+        argDef["test"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
-	kwargs = {}
+        kwargs = {}
 
-	if argSet.has_key('info'):
-	    kwargs['info'] = True
-	    del argSet['info']
+        if argSet.has_key('info'):
+            kwargs['info'] = True
+            del argSet['info']
 
-	if argSet.has_key('items'):
-	    kwargs['showItems'] = True
-	    del argSet['items']
+        if argSet.has_key('items'):
+            kwargs['showItems'] = True
+            del argSet['items']
 
-	if argSet.has_key('no-deps'):
-	    kwargs['depCheck'] = False
-	    del argSet['no-deps']
+        if argSet.has_key('no-deps'):
+            kwargs['depCheck'] = False
+            del argSet['no-deps']
 
-	if argSet.has_key('replace-files'):
-	    kwargs['replaceFiles'] = True
-	    del argSet['replace-files']
+        if argSet.has_key('replace-files'):
+            kwargs['replaceFiles'] = True
+            del argSet['replace-files']
 
-	if argSet.has_key('no-resolve'):
+        kwargs['checkPathConflicts'] = \
+                                not argSet.pop('no-conflict-check', False)
+        if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
-	    del argSet['no-resolve']
+            del argSet['no-resolve']
 
-	if argSet.has_key('resolve'):
+        if argSet.has_key('resolve'):
             cfg.autoResolve = True
-	    del argSet['resolve']
+            del argSet['resolve']
 
-	if argSet.has_key('test'):
-	    kwargs['test'] = argSet['test']
-	    del argSet['test']
+        if argSet.has_key('test'):
+            kwargs['test'] = argSet['test']
+            del argSet['test']
 
-	if argSet: return usage()
+        if argSet: return self.usage()
 
-	if len(otherArgs) == 2:
-	    updatecmd.updateAll(cfg, **kwargs)
-	else:
-	    return usage()
-    elif (otherArgs[1] == "return usage"):
-	return usage(rc = 0)
-    else:
-	return usage()
+        if len(otherArgs) == 2:
+            return updatecmd.updateAll(cfg, **kwargs)
+        else:
+            return self.usage()
+_register(UpdateAllCommand)
+
+
+class UpdateConaryCommand(ConaryCommand):
+    commands = ['updateconary']
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        cfg.requireInstallLabelPath()
+        updatecmd.updateConary(cfg, constants.version)
+_register(UpdateConaryCommand)
+
+
+class VerifyCommand(ConaryCommand):
+    commands = ['verify']
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    docs = {'all' : 'verify all troves on system'}
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["all"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        db = openDatabase(cfg.root, cfg.dbPath)
+        all = argSet.has_key('all')
+        if all: del argSet['all']
+        if len(otherArgs) < 2 or argSet:
+            return self.usage()
+        troves = otherArgs[2:]
+        verify.verify(troves, db, cfg, all=all)
+_register(VerifyCommand)
+
+def _getPreCommandOptions(argv, cfg):
+    """Allow the user to specify generic flags before they specify the
+       command to run.
+    """
+    cfgMap = {}
+    params = {}
+    thisCommand = ConaryCommand()
+    thisCommand.addParameters(params)
+    thisCommand.addConfigOptions(cfgMap, params)
+    thisCommand.addDocs(params)
+    defaultGroup = thisCommand.defaultGroup
+    argSet, otherArgs, parser, optionSet = options._processArgs(
+                                                params, {}, cfg,
+                                                usage,
+                                                argv=argv[1:],
+                                                version=constants.version,
+                                                useHelp=True,
+                                                defaultGroup=defaultGroup,
+                                                interspersedArgs=False)
+    return argSet, [argv[0]] + otherArgs
+
+
+def realMain(cfg, argv=sys.argv, debugAll=False, 
+             debuggerException=errors.InternalConaryError):
+    cfgMap = {}
+
+    if '--version' in argv or '-v' in argv:
+        print constants.version
+        return
+
+    try:
+        # get options before the command.  Only generic options are 
+        # allowed.
+        argSet, argv = _getPreCommandOptions(argv, cfg)
+    except debuggerException, e:
+        raise
+    except options.OptionError, e:
+        usage()
+        print >> sys.stderr, e
+        sys.exit(e.val)
+
+    if len(argv) < 2:
+        # no command specified
+        return usage()
+
+    commandName = argv[1]
+    if commandName == 'usage':
+        return usage(rc=0)
+    if commandName not in supportedCommands:
+        return usage()
+    
+    params = {}
+    thisCommand = supportedCommands[commandName]
+    thisCommand.addParameters(params)
+    thisCommand.addConfigOptions(cfgMap, params)
+    thisCommand.addDocs(params)
+
+    defaultGroup = thisCommand.defaultGroup
+    commandUsage = 'conary %s %s' % (commandName, thisCommand.paramHelp)
+
+    try:
+        newArgSet, otherArgs, parser, optionSet = options._processArgs(
+                                                    params, {}, cfg,
+                                                    commandUsage,
+                                                    argv=argv,
+                                                    version=constants.version,
+                                                    useHelp=True,
+                                                    defaultGroup=defaultGroup)
+    except debuggerException, e:
+        raise
+    except options.OptionError, e:
+        e.parser.print_help()
+        print >> sys.stderr, e
+        sys.exit(e.val)
+    except versions.ParseError, e:
+        print >> sys.stderr, e
+        sys.exit(1)
+
+    argSet.update(newArgSet)
+
+    context = cfg.context or argSet.pop('context', None)
+    if os.path.exists('CONARY'):
+        conaryState = state.ConaryStateFromFile('CONARY')
+        if conaryState.hasContext():
+            context = conaryState.getContext()
+
+    context = os.environ.get('CONARY_CONTEXT', context)
+    context = argSet.pop('context', context)
+
+    if context:
+        cfg.setContext(context)
+
+    thisCommand.processConfigOptions(cfg, cfgMap, argSet)
+
+    # the user might have specified --config debugExceptions on the commandline
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                        debugCtrlC=debugAll)
+
+    if not cfg.buildLabel and cfg.installLabelPath:
+        cfg.buildLabel = cfg.installLabelPath[0]
+
+    # now set the debug hook using the potentially new cfg.debugExceptions value
+    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                        debugCtrlC=debugAll)
+
+    if cfg.installLabelPath:
+        cfg.installLabel = cfg.installLabelPath[0]
+
+    cfg.initializeFlavors()
+
+    profile = False
+    if argSet.has_key('profile'):
+        import hotshot
+        prof = hotshot.Profile('conary.prof')
+        prof.start()
+        profile = True
+        del argSet['profile']
+
+    keyCache = openpgpkey.getKeyCache()
+    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
+                                                   cfg.pubRing[-1])
+    keyCache.setCallback(keyCacheCallback)
+
+    if (len(otherArgs) < 2):
+        return usage()
+
+    thisCommand.setParser(parser)
+    rv = thisCommand.runCommand(cfg, argSet, otherArgs)
 
     if profile:
-	prof.stop()
+        prof.stop()
 
     if log.errorOccurred():
-	sys.exit(1)
+        sys.exit(1)
+    return rv
 
 def main(argv=sys.argv):
     from conary.repository import errors
@@ -739,8 +1049,9 @@ def main(argv=sys.argv):
         if debugAll:
             ccfg.debugExceptions = True
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions)
-        return realMain(ccfg, argv)
+        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
+                                            debugCtrlC=debugAll)
+        return realMain(ccfg, argv, debugAll, debuggerException)
     except IOError, e:
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:

@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# -*- mode: python -*-
 #
 # Copyright (c) 2004 rPath, Inc.
 #
@@ -11,27 +13,22 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+#
 
-python_files =	__init__.py	\
-		branch.py       \
-		clone.py        \
-		cmdline.py      \
-		mirror.py	\
-		password.py	\
-		resolve.py	\
-                update.py
+import crypt
+import base64
+import getpass
+import sys
 
-extra_dist = Makefile
+rand = open("/dev/random", "r")
+salt = base64.encodestring(rand.read(6))[:-1]
+# $ is magic in md5
+salt.replace('$', '%')
 
-dist_files = $(python_files) $(extra_dist)
+pw = getpass.getpass('Password:')
+pw2 = getpass.getpass('Password (again):')
+if pw != pw2:
+    print "Passwords didn't match."
+    sys.exit(1)
 
-all: default-all
-
-install: pyfiles-install
-
-dist: default-dist
-
-clean: default-clean
-
-include ../../Make.rules
-
+print crypt.crypt(pw, '$1$%s' % salt)

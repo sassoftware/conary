@@ -93,6 +93,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getTroveLatestVersion',
                         'getChangeSet',
                         'getDepSuggestions',
+                        'getDepSuggestionsByTroves',
                         'prepareChangeSet',
                         'commitChangeSet',
                         'getFileVersions',
@@ -566,47 +567,48 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-            troveNameClause = "gtvlTbl JOIN Items using (item)"
+            troveNameClause = "gtvlTbl JOIN Items USING (item)"
 
-        getList = [ 'Items.item', 'permittedTrove']
+        getList = [ 'Items.item as item', 'UP.permittedTrove as acl']
         if dropTroveTable:
-            getList.append('gtvlTbl.flavorId')
+            getList.append('gtvlTbl.flavorId as flavorId')
         else:
-            getList.append('0')
+            getList.append('0 as flavorId')
         argList = [ ]
 
-        getList += [ 'Versions.version', 'Nodes.timeStamps', 'Nodes.branchId',
-                     'Nodes.finalTimestamp' ]
-        versionClause = "join Versions ON Nodes.versionId = Versions.versionId"
+        getList += [ 'Versions.version as version',
+                     'Nodes.timeStamps as timeStamps',
+                     'Nodes.branchId as branchId',
+                     'Nodes.finalTimestamp as finalTimestamp' ]
+        versionClause = "JOIN Versions ON Nodes.versionId = Versions.versionId"
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
-                labelClause = """ JOIN Labels ON
-                    Labels.labelId = LabelMap.labelId AND
-                    Labels.label = '%s'""" % singleVersionSpec
+                labelClause = """JOIN Labels ON
+                Labels.labelId = LabelMap.labelId
+                AND Labels.label = '%s'""" % singleVersionSpec
             else:
                 labelClause = """JOIN Labels ON
-                    Labels.labelId = LabelMap.labelId AND
-                    Labels.label = gtvlTbl.versionSpec"""
+                Labels.labelId = LabelMap.labelId
+                AND Labels.label = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
                 labelClause = """JOIN Branches ON
-                    Branches.branchId = LabelMap.branchId AND
-                    Branches.branch = '%s'""" % singleVersionSpec
+                Branches.branchId = LabelMap.branchId
+                AND Branches.branch = '%s'""" % singleVersionSpec
             else:
                 labelClause = """JOIN Branches ON
-                    Branches.branchId = LabelMap.branchId AND
-                    Branches.branch = gtvlTbl.versionSpec"""
+                Branches.branchId = LabelMap.branchId
+                AND Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
             labelClause = ""
             if singleVersionSpec:
                 vc = "Versions.version = '%s'" % singleVersionSpec
             else:
                 vc = "Versions.version = gtvlTbl.versionSpec"
-            versionClause = """%s AND
-            %s""" % (versionClause, vc)
+            versionClause = """%s AND %s""" % (versionClause, vc)
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             labelClause = ""
@@ -614,97 +616,93 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """join Latest as Domain using (itemId)
-            join Nodes using (itemId, branchId, versionId)"""
+            instanceClause = """JOIN Latest AS Domain USING (itemId)
+            JOIN Nodes USING (itemId, branchId, versionId)"""
         else:
-            instanceClause = """join Instances as Domain using (itemId)
-            join Nodes using (itemId, versionid)"""
+            instanceClause = """JOIN Instances AS Domain USING (itemId)
+            JOIN Nodes USING (itemId, versionid)"""
 
         if withFlavors:
-            getList.append("Flavors.flavor")
-            flavorClause = "join Flavors ON Flavors.flavorId = Domain.flavorId"
+            getList.append("Flavors.flavor as flavor")
+            flavorClause = "JOIN Flavors ON Flavors.flavorId = Domain.flavorId"
         else:
-            getList.append("NULL")
+            getList.append("NULL as flavor")
             flavorClause = ""
 
-        if flavorIndices:
-            assert(withFlavors)
-            if len(flavorIndices) > 1:
-                # if there is only one flavor we don't need to join based on
-                # the gtvlTbl.flavorId (which is good, since it may not exist)
-                extraJoin = """ffFlavor.flavorId = gtvlTbl.flavorId
-                      AND
-                """
-            else:
-                extraJoin = ""
-
-            flavorScoringClause = """
-            LEFT OUTER JOIN FlavorMap ON
-                FlavorMap.flavorId = Flavors.flavorId
-            LEFT OUTER JOIN ffFlavor ON
-                %s
-                ffFlavor.base = FlavorMap.base AND
-                (  ffFlavor.flag = FlavorMap.flag OR
-                   ( ffFlavor.flag is NULL AND FlavorMap.flag is NULL )
-                )
-            LEFT OUTER JOIN FlavorScores ON
-                FlavorScores.present = FlavorMap.sense AND
-                (    FlavorScores.request = ffFlavor.sense OR
-                     ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
-                )
-            """ % extraJoin
-                        #(FlavorScores.request = ffFlavor.sense OR
-                        #    (ffFlavor.sense is NULL AND
-                        #     FlavorScores.request = 0)
-                        #)
-
-            grouping = """GROUP BY
-            Domain.itemId, Domain.versionId, Domain.flavorId, aclId"""
-            if dropTroveTable:
-                grouping = grouping + ", gtvlTbl.flavorId"
-
-            # according to some SQL standard, the SUM in the case where all
-            # values are NULL is NULL. So we use coalesce to change NULL to 0
-            getList.append("SUM(coalesce(FlavorScores.value, 0)) "
-                           "as flavorScore")
-            flavorScoreCheck = "HAVING flavorScore > -500000"
-        else:
-            assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
-            flavorScoringClause = ""
-            grouping = ""
-            getList.append("NULL")
-            flavorScoreCheck = ""
-
-        fullQuery = """
-        SELECT
-            %s
-        FROM
-            %s
-            %s
-            join LabelMap using (itemid, branchId)
-            join (
-               select
+        mainQuery = """
+        SELECT %%(distinct)s %%(select)s
+        FROM %(troveName)s
+        %(instance)s
+        JOIN LabelMap USING (itemid, branchId)
+        JOIN ( SELECT
                    Permissions.labelId as labelId,
                    PerItems.item as permittedTrove,
                    Permissions.permissionId as aclId
-               from
+               FROM
                    Permissions
-                   join Items as PerItems using (itemId)
-               where
-                   Permissions.userGroupId in (%s)
-               ) as UP on
-                   ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            %s
-            %s
-            %s
-            %s
-        %s
-        %s
-        ORDER BY Items.item, Nodes.finalTimestamp
-        """ % (", ".join(getList), troveNameClause, instanceClause,
-               ", ".join("%d" % x for x in userGroupIds),
-               versionClause, labelClause, flavorClause, flavorScoringClause,
-               grouping, flavorScoreCheck)
+                   JOIN Items as PerItems USING (itemId)
+               WHERE
+                   Permissions.userGroupId IN (%(ugid)s)
+            ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        %(version)s
+        %(label)s
+        %(flavor)s
+        """ % {
+            "troveName" : troveNameClause,
+            "instance" : instanceClause,
+            "ugid" : ", ".join("%d" % x for x in userGroupIds),
+            "version" : versionClause,
+            "label" : labelClause,
+            "flavor" : flavorClause,
+            }
+
+        if flavorIndices:
+            assert(withFlavors)
+            extraJoin = extraGrouping = ""
+            if len(flavorIndices) > 1:
+                # if there is only one flavor we don't need to join based on
+                # the gtvlTbl.flavorId (which is good, since it may not exist)
+                extraJoin = """ffFlavor.flavorId = tmpQ.flavorId
+                AND """
+            if dropTroveTable:
+                extraGrouping = ", tmpQ.flavorId"
+
+            fullQuery = """
+            SELECT
+                tmpQ.item, tmpQ.acl, tmpQ.flavorId, tmpQ.version,
+                tmpQ.timeStamps, tmpQ.branchId, tmpQ.finalTimestamp,
+                tmpQ.flavor, SUM(coalesce(FlavorScores.value, 0)) as flavorScore
+            FROM ( %(mainQuery)s ) as tmpQ
+            JOIN Flavors ON tmpQ.flavor = Flavors.flavor
+            LEFT OUTER JOIN FlavorMap ON
+                FlavorMap.flavorId = Flavors.flavorId
+            LEFT OUTER JOIN ffFlavor ON
+                %(extraJoin)s ffFlavor.base = FlavorMap.base
+                AND ( ffFlavor.flag = FlavorMap.flag OR
+                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL)
+                    )
+            LEFT OUTER JOIN FlavorScores ON
+                FlavorScores.present = FlavorMap.sense
+                AND ( FlavorScores.request = ffFlavor.sense OR
+                      ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
+                    )
+            GROUP BY tmpQ.item, tmpQ.version, tmpQ.flavor, tmpQ.aclId %(extraGrouping)s
+            HAVING flavorScore > -500000
+            ORDER BY tmpQ.item, tmpQ.finalTimestamp
+            """ % {
+                "mainQuery" : mainQuery %{ "select" : ", ".join(getList+["UP.aclId as aclId"]),
+                                           "distinct" : "DISTINCT" },
+                "extraJoin" : extraJoin,
+                "extraGrouping" : extraGrouping,
+                }
+        else:
+            assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
+            fullQuery = """%(mainQuery)s
+            ORDER BY Items.item, Nodes.finalTimestamp
+            """ % {
+                "mainQuery" : mainQuery % {"select":", ".join(getList+["NULL as flavorScore"]),
+                                           "distinct" : ""}
+                }
         self.log(4, "execute query", fullQuery, argList)
         cu.execute(fullQuery, argList)
 
@@ -1242,6 +1240,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return result
 
+    def getDepSuggestionsByTroves(self, authToken, clientVersion, requiresList,
+                                  troveList):
+        troveList = [ self.toTroveTup(x) for x in troveList ]
+
+        for (n,v,f) in troveList:
+            if not self.auth.check(authToken, write = False,
+                                   label = v.branch().label()):
+                raise errors.InsufficientPermission
+        self.log(2, troveList, requiresList)
+        requires = {}
+        for dep in requiresList:
+            requires[self.toDepSet(dep)] = dep
+
+        sugDict = self.troveStore.resolveRequirements(None, requires.keys(),
+                                                      troveList)
+
+        result = {}
+        for (key, val) in sugDict.iteritems():
+            result[requires[key]] = val
+
+        return result
+
+
+
     def prepareChangeSet(self, authToken, clientVersion):
 	# make sure they have a valid account and permission to commit to
 	# *something*
@@ -1259,35 +1281,61 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
-        # FIXME: This general exception handler is to catch the case
-        # where we are retrying a commit as anonymous.  We should find
-        # a way to keep the changeset file from being deleted on the
-        # first try so we can retry it as anonymous.
-        try:
+        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
+        attempt = 1
+        while True:
+            # raise InsufficientPermission if we can't read the changeset
             try:
                 cs = changeset.ChangeSetFromFile(path)
-            finally:
+            except:
+                raise errors.InsufficientPermission
+            # because we have a temporary file we need to delete, we
+            # need to catch the DatabaseLocked errors here and retry
+            # the commit ourselves
+            try:
+                ret = self._commitChangeSet(authToken, cs, mirror)
+            except sqlerrors.DatabaseLocked, e:
+                # deadlock occured; we rollback and try again
+                log.error("Deadlock id %d: %s", attempt, str(e.args))
+                self.log(1, "Deadlock id %d: %s" %(attempt, str(e.args)))
+                if attempt < self.deadlockRetry:
+                    self.db.rollback()
+                    attempt += 1
+                    continue
+                break
+            except Exception, e:
+                break
+            else: # all went well
                 util.removeIfExists(path)
-        except Exception, e:
-            raise errors.InsufficientPermission
+                return ret
+        # we only reach here if we could not handle the exception above
+        util.removeIfExists(path)
+        # Figure out what to return back
+        if isinstance(e, sqlerrors.DatabaseLocked):
+            # too many retries
+            raise errors.CommitError("DeadlockError", e.args)
+        raise
+
+    def _commitChangeSet(self, authToken, cs, mirror = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
         items = {}
         for troveCs in cs.iterNewTroveList():
             name = troveCs.getName()
             version = troveCs.getNewVersion()
-            items[(name, version)] = True
+            flavor = troveCs.getNewFlavor()
             if not self.auth.check(authToken, write = True, mirror = mirror,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
-        self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
+            items.setdefault((version, flavor), []).append(name)
+        self.log(2, authToken[0], 'mirror=%s' % (mirror,),
+                 [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, self.name, mirror = mirror)
 	if not self.commitAction:
 	    return True
 
-        d = { 'reppath' : self.urlBase(),
-              'user' : authToken[0], }
+        d = { 'reppath' : self.urlBase(), 'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:
@@ -1704,53 +1752,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, mark)
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
+        # Since signatures are small blobs, it doesn't make a lot
+        # of sense to use a LIMIT on this query...
         query = """
-                SELECT UP.permittedTrove, item, version, flavor,
-                          Instances.changed FROM Instances
-                    JOIN TroveInfo USING (instanceId)
-                    JOIN Nodes ON
-                        Instances.itemId = Nodes.itemId AND
-                        Instances.versionId = Nodes.versionId
-                    JOIN LabelMap ON
-                        Nodes.itemId = LabelMap.itemId AND
-                        Nodes.branchId = LabelMap.branchId
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed <= ? AND
-                        Instances.isPresent = 1 AND
-                        TroveInfo.changed >= ? AND
-                        TroveInfo.infoType = ?
-                    ORDER BY
-                        TroveInfo.changed
-                    LIMIT
-                        1000
-                    """ % ",".join("%d" % x for x in userGroupIds)
-
+        SELECT UP.permittedTrove, item, version, flavor, Instances.changed
+        FROM Instances
+        JOIN TroveInfo USING (instanceId)
+        JOIN Nodes ON
+             Instances.itemId = Nodes.itemId AND
+             Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+             Nodes.itemId = LabelMap.itemId AND
+             Nodes.branchId = LabelMap.branchId
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
+              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed <= ?
+          AND Instances.isPresent = 1
+          AND TroveInfo.changed >= ?
+          AND TroveInfo.infoType = ?
+        ORDER BY TroveInfo.changed
+        """ % (",".join("%d" % x for x in userGroupIds), )
         cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
 
-        l = []
-
+        l = set()
         for pattern, name, version, flavor, mark in cu:
             if self.auth.checkTrove(pattern, name):
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+        return list(l)
 
     def getTroveSigs(self, authToken, clientVersion, infoList):
         if not self.auth.check(authToken, write = False, mirror = True):
@@ -1764,24 +1803,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.check(authToken, write = False, trove = name,
                        label = self.toVersion(version).branch().label()):
                 raise errors.InsufficientPermission
+
+            # When a mirror client is doing a full sig sync it is
+            # likely they'll ask for signatures of troves that are not
+            # signed. We return "" in that case.
             cu.execute("""
-                    SELECT data FROM Items
-                        JOIN Instances USING (itemId)
-                        JOIN Versions USING (versionId)
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN TroveInfo ON
-                            Instances.instanceId = TroveInfo.instanceId
-                        WHERE
-                            TroveInfo.infoType = ? AND
-                            item = ? AND
-                            version = ? AND
-                            flavor = ?
-                    """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
+            SELECT TroveInfo.data
+              FROM Items
+              JOIN Instances USING (itemId)
+              JOIN Versions USING (versionId)
+              JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+              LEFT OUTER JOIN TroveInfo ON
+                   Instances.instanceId = TroveInfo.instanceId
+                   AND TroveInfo.infoType = ?
+             WHERE item = ? AND version = ? AND flavor = ?
+               """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
             try:
-                result.append(cu.next()[0])
+                data = cu.fetchall()[0][0]
+                if data is None:
+                    data = ""
+                result.append(data)
             except:
-                raise errors.TroveMissing(name, version = version)
+                raise errors.TroveMissing(name, version = self.toVersion(version))
 
         return [ base64.encodestring(x) for x in result ]
 
@@ -1877,61 +1920,81 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
-        # first off, compute the max number of troves with the same mark for dynamic sizing;
-        # the client can get stuck if we keep returning a (same) subset
+        # compute the max number of troves with the same mark for
+        # dynamic sizing; the client can get stuck if we keep
+        # returning the same subset because of a LIMIT too low
         cu.execute("""
         SELECT MAX(c) + 1 AS lim
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
+           WHERE Instances.isPresent = 1
+             AND Instances.changed >= ?
            GROUP BY changed
            HAVING c>1
-        ) AS lims""")
+        ) AS lims""", mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
             lim = 1000 # for safety and efficiency
+
+        # To avoid using a LIMIT value too low on the big query below,
+        # we need to find out how many distinct permissions will
+        # likely grant access to a trove for this user
+        cu.execute("""
+        SELECT COUNT(*) AS perms
+        FROM UserGroups
+        JOIN Permissions USING(userGroupId)
+        WHERE UserGroups.canMirror = 1
+          AND UserGroups.userGroupId in (%s)
+        """ % (",".join("%d" % x for x in userGroupIds),))
+        permCount = cu.fetchall()[0][0]
+        if permCount == 0:
+	    raise errors.InsufficientPermission
+        if permCount is None:
+            permCount = 1
+
+        # multiply LIMIT by permCount so that after duplicate
+        # elimination we are sure to return at least 'lim' troves
+        # back to the client
         query = """
-                SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-                          timeStamps, Instances.changed FROM Instances
-                    JOIN Nodes USING (itemId, versionId)
-                    JOIN LabelMap USING (itemId, branchId)
-                    JOIN (SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           join Items as PerItems using (itemId)
-                       WHERE
-                           Permissions.userGroupId in (%s)
-                       ) as UP ON
-                       ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                    JOIN Items ON
-                        Instances.itemId = Items.itemId
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = flavors.flavorId
-                    WHERE
-                        Instances.changed >= ? AND
-                        Instances.isPresent = 1
-                    ORDER BY
-                        Instances.changed
-                    LIMIT
-                        %d
-                    """ % (",".join("%d" % x for x in userGroupIds), lim)
+        SELECT DISTINCT UP.permittedTrove, item, version, flavor,
+            timeStamps, Instances.changed
+        FROM Instances
+        JOIN Nodes USING (itemId, versionId)
+        JOIN LabelMap USING (itemId, branchId)
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
+              JOIN Items as PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+              ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed >= ?
+          AND Instances.isPresent = 1
+        ORDER BY Instances.changed
+        LIMIT %d
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
 
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
-        l = []
+        l = set()
 
         for pattern, name, version, flavor, timeStamps, mark in cu:
             if self.auth.checkTrove(pattern, name):
                 version = versions.strToFrozen(version,
                     [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.append((mark, (name, version, flavor)))
-
-        return l
+                l.add((mark, (name, version, flavor)))
+            if len(l) >= lim:
+                # we need to flush the cursor to stop a backend from complaining
+                junk = cu.fetchall()
+                break
+        return list(l)
 
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):

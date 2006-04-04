@@ -1,0 +1,2 @@
+shortDoc Use the gcj implementation of Java
+longDoc Include gcj (Java) support in gcc; use gcj to enable Java in other applications.

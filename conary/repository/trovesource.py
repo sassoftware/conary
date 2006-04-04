@@ -55,10 +55,22 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def resolveDependencies(self, label, depList):
-        return {}
+        results = {}
+        for depSet in depList:
+            results[depSet] = [ [] for x in depSet.iterDeps() ]
+        return results
+
+    def resolveDependenciesByGroups(self, troveList, depList):
+        results = {}
+        for depSet in depList:
+            results[depSet] = [ [] for x in depSet.iterDeps() ]
+        return results
 
     def hasTroves(self, troveList):
         raise NotImplementedError
+
+    def hasTrove(self, name, version, flavor):
+        return self.hasTroves(((name, version, flavor),))[0]
 
     def getTrove(self, name, version, flavor, withFiles = True):
         trv = self.getTroves([(name, version, flavor)], withFiles)[0]
@@ -133,6 +145,21 @@ class AbstractTroveSource:
 		if not ignoreMissing:
 		    raise
 
+
+    def mergeDepSuggestions(self, allSuggs, newSugg):
+        """
+            Given two suggestion lists, merge them so that
+            all the suggestions are together.
+        """
+        for depSet, trovesByDepList in newSugg.iteritems():
+            if depSet not in allSuggs:
+                lst = [ [] for x in trovesByDepList ]
+                allSuggs[depSet] = lst
+            else:
+                lst = r[depSet]
+
+            for i, troveList in enumerate(trovesByDepList):
+                lst[i].extend(troveList)
 
 
 # constants mostly stolen from netrepos/netserver
@@ -356,6 +383,9 @@ class SimpleTroveSource(SearchableTroveSource):
     def iterAllTroveNames(self):
         return iter(self._trovesByName)
 
+    def hasTroves(self, troveTups):
+        return [ x in self._trovesByName.get(x[0], []) for x in troveTups ]
+
     def __len__(self):
         return len(list(self))
         
@@ -395,6 +425,9 @@ class TroveListTroveSource(SimpleTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
+
 
 class GroupRecipeSource(SearchableTroveSource):
     """ A TroveSource that contains all the troves in a cooking 
@@ -415,6 +448,9 @@ class GroupRecipeSource(SearchableTroveSource):
     def getTroves(self, troveTups, withFiles=False):
         return self.source.getTroves(troveTups, withFiles)
 
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
+
     def trovesByName(self, name):
         return self._trovesByName.get(name, []) 
 
@@ -431,6 +467,9 @@ class ReferencedTrovesSource(SearchableTroveSource):
     def __init__(self, source):
         self.searchAsDatabase()
         self.source = source
+
+    def hasTroves(self, troveTups):
+        return self.source.hasTroves(troveTups)
 
     def getTroves(self, troveTups, *args, **kw):
         return self.source.getTroves(troveTups, *args, **kw)
@@ -506,6 +545,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 if info in self.troveCsMap:
                     # FIXME: there is no such exception in this context
                     raise DuplicateTrove
+                if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
+                    # we don't has the old version of this trove, don't 
+                    # use this changeset when updating this trove.
+                    continue
                 self.troveCsMap[info] = cs
                 self.jobMap[(info[0], (trvCs.getOldVersion(), 
                                        trvCs.getOldFlavor()), 
@@ -513,6 +556,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                                 (cs, includesFileContents)
 
         self.csList.append(cs)
+
+    def reset(self):
+        for cs in self.csList:
+            cs.reset()
 
     def trovesByName(self, name):
         l = []
@@ -570,7 +617,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         raise KeyError
 
     def getTroves(self, troveList, withFiles = True):
-        assert(not self.invalidated)
         retList = []
 
         for info in troveList:
@@ -616,7 +662,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         return self.getTroveChangeSets([job], withFiles)[0]
 
     def hasTroves(self, troveList):
-        assert(not self.invalidated)
         return [ x in self.troveCsMap for x in troveList ]
 
     def getChangeSet(self, job):
@@ -638,7 +683,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             suggMap[depSet] = newSolListList
         return suggMap
-            
+
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, useDatabase = True):
         # Returns the changeset plus a remainder list of the bits it
@@ -677,19 +722,21 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             inDatabase = self.db.hasTroves(troves)
         else:
             inDatabase = [ False ] * len(troves)
-            
+
         asChangeset = [ info in self.troveCsMap for info in troves ]
         trovesAvailable = dict((x[0], (x[1], x[2])) for x in 
                             itertools.izip(troves, inDatabase, asChangeset))
 
-        cs = changeset.ReadOnlyChangeSet()
         remainder = []
 
         # Track jobs we need to go get directly from change sets later, and
         # jobs which need to be rooted relative to a change set.
         changeSetJobs = set()
         needsRooting = []
-        
+
+        newCs = changeset.ChangeSet()
+        mergedCs = changeset.ReadOnlyChangeSet()
+
         jobFromCs = set()
 
         for job in jobList:
@@ -697,7 +744,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             newInfo = (job[0], job[2][0], job[2][1])
 
             if newInfo[1] is None:
-                cs.oldTrove(*oldInfo)
+                newCs.oldTrove(*oldInfo)
                 continue
 
             # if this job is available from a changeset already, just deliver
@@ -747,23 +794,25 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             changeSetJobs.add(relJob)
 
         if rootMap:
-            # we can't root changesets multiple times
+            # we can't root troves changesets multiple times
             for info in rootMap:
                 assert(info not in self.rooted)
 
             for subCs in self.csList:
-                if subCs.isAbsolute():
-                    subCs.rootChangeSet(self.db, rootMap)
+                subCs.rootChangeSet(self.db, rootMap)
 
             self.rooted.update(rootMap)
 
         # assemble jobs directly from changesets and update those changesets
         # to not have jobs we don't need
         if changeSetJobs:
-            # this trick only works once
-            self.invalidated = True
+            # Build up a changeset that contains exactly the trvCs objects
+            # we need. The file contents come from the changesets included
+            # in this trove (we don't reset() the underlying changesets
+            # because this isn't a good place to coordinate that reset when
+            # multiple threads are in use)
             for subCs in self.csList:
-                toDel = []
+                keep = False
                 for trvCs in subCs.iterNewTroveList():
                     if trvCs.getOldVersion() is None:
                         job = (trvCs.getName(), 
@@ -776,20 +825,32 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
 
-                    if job not in changeSetJobs:
-                        toDel.append((job[0], job[2][0], job[2][1]))
+                    if job in changeSetJobs:
+                        newCs.newTrove(trvCs)
+                        keep = True
 
-                for info in toDel:
-                    subCs.delNewTrove(*info)
+                if keep:
+                    mergedCs.merge(subCs)
 
-                # we generate our own deletions. we don't need to get them
-                # from here
-                for info in subCs.getOldTroveList():
-                    subCs.delOldTrove(*info)
+        # Remove all of the new and old job information from the merged
+        # changeset and replace it with the job information we assembled
+        # in newCs
+        mergedCs.clearTroves()
+        mergedCs.merge(newCs)
 
-                cs.merge(subCs)
+        return (mergedCs, remainder)
 
-        return (cs, remainder)
+    def merge(self, source):
+        assert(not self.storeDeps and not source.storeDeps)
+        self.troveCsMap.update(source.troveCsMap)
+        self.jobMap.update(source.jobMap)
+        self.providesMap.update(source.providesMap)
+        self.csList.extend(source.csList)
+        self.invalidated = self.invalidated or source.invalidated
+        self.erasuresMap.update(source.erasuresMap)
+        self.rooted.update(source.rooted)
+        self.idMap.update(source.idMap)
+        self.storeDeps = self.storeDeps or source.storeDeps
 
 
 class TroveSourceStack(SearchableTroveSource):
@@ -943,8 +1004,9 @@ class TroveSourceStack(SearchableTroveSource):
 
     def resolveDependencies(self, label, depList):
         results = {}
-
         depList = set(depList)
+        for depSet in depList:
+            results[depSet] = [ [] for x in depSet.iterDeps() ]
 
         for source in self.sources:
             if not depList:
@@ -952,10 +1014,23 @@ class TroveSourceStack(SearchableTroveSource):
 
             sugg = source.resolveDependencies(label, depList)
             for depSet, troves in sugg.iteritems():
-                depList.remove(depSet)
-                results[depSet] = troves
-        
+                if [ x for x in troves if x ]:
+                    # only consider this depSet 'solved' if at least
+                    # on of the deps had a trove suggested for it.
+                    # FIXME: We _could_ manipulate the depSet and send 
+                    # it back to get more responses from other trove sources.
+                    depList.remove(depSet)
+                    results[depSet] = troves
         return results
+    
+    def resolveDependenciesByGroups(self, troveList, depList):
+        allSugg = {}
+        for source in self.sources:
+            sugg = source.resolveDependenciesByGroups(troveList, depList)
+            # there's no ordering of suggestions when you're doing 
+            # resolveDependencies by groups
+            self.mergeDepSuggestions(allSugg, sugg)
+        return allSugg
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False):

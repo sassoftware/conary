@@ -1,3 +1,125 @@
+Changes in 1.0.11:
+  o Client Changes:
+    * Conary will now allow generic options to be placed before the command
+      you are giving to conary.  For example, 'conary --root=/foo query'
+      will now work.
+    * the remove command no longer removes file tags from files for no good 
+      reason
+    * rollbacks now restore files from other troves which are replaced as part
+      of an update (thanks to, say, --replace-files or identical contents)
+    * --replace-files now marks files as owned by the trove which used to
+      claim them
+    * You can now kill conary with SIGUSR1 to make conary enter a debugger
+      when you Ctrl-C (or a SIGINT is raised)
+    * --debug-all now enters a debugger in more situations, including option
+      parsing fails, and when you hit Ctrl-C.
+    * added ccs2tar, which will convert most absolute changesets (like those
+      that cook produces) into tarballs
+    * Troves now don't require dependencies that are provided by themselves.
+      As troves are built with this new behavior, it should significantly speed
+      up dependency resolution.
+    * added a script to recalculate the sha1s on a server (after a label
+      rename, for instance)
+    * added a script to calculate an md5 password (for use in an info recipe,
+      for example)
+
+  o Build Changes:
+    * Conary now supports a saltedPassword option to r.User in user info-
+      packages.  Full use of this option will require that a new shadow package
+      be installed.
+
+  o Bug Fixes:
+    * command-line configurations now override context settings
+
+  o Build Changes:
+
+Changes in 1.0.10:
+  o Client Changes
+    * Given a system based on rPath linux where you only installed
+      !smp kernels, conary would eventually start installing smp
+      kernels on your system, due to the way the update algorithm
+      would determine whether you should install a newly available
+      trove.  Conary now respects flavor affinity in this case and
+      does not install the smp kernel.
+    * Mirror configuration files can now specify uploadRateLimit and
+      downloadRateLimit.
+    * Updates utilizing changeset files are now split into multiple
+      jobs properly, allowing changeset files which create users to
+      work proprely.
+    * "conary rollback" now displays progress information that matches
+      the "conary update" progress information.
+    * added --with-sources option for clone
+
+  o Bug Fixes:
+    * A bug that caused an assertion error when switching from an
+      incomplete trove to a complete trove has been fixed.
+    * A bug in perl dependencies that caused extra directories to be
+      considered part of the dependency has been fixed.
+    * A bug affecting updates where a pinned, partially installed
+      package was supposed to be updated due to dependency resolution
+      has been fixed.
+    * A bug that prevented updates from working when part of a locally
+      cooked package was replaced with a non-locally cooked component
+      has been fixed.  The bug was introduced in Conary 1.0.8.
+    * A bug that caused a segfault when providing an invalid type to
+      StringStream has been fixed.
+    * The troveInfo web page in the repository browser now displays
+      useful error messages instead of traceback messages.  The
+      troveInfo page also handles both frozen and non-frozen version
+      strings.
+    * A bug that caused conary to download unnecessary files when checking out
+      shadow sources has been fixed.
+    * A bug that caused "cvc rdiff" between versions of a trove that
+      were on different hosts to fail has been fixed.
+    * Fixed a bug when determining local file system changes involving a file 
+      or directory with mtime 0.
+    * The --signature-key option was restored
+
+Changes in 1.0.9:
+  o Client Changes:
+    * A new dependency resolution method has been added which can be turned
+      on by setting resolveLevel to 2 in your conarycfg:  If updating trove 'a'
+      removes a dependency needed by trove 'b', attempt to update 'b' to
+      solve the dependency issue.  This will allow 'conary update conary'
+      to work as expected when you have conary-build installed, for example.
+    * Switched to using more of optparse's capabilities, including --help
+      messages.
+    * One short option has been added, cvc -m for message.
+
+  o Bug Fixes:
+    * Recipes that use loadRecipe('foo') and rely on conary to look upstream
+      to find their branch now work correctly when committing.
+    * A bug affecting systems with multiple groups referencing the same troves,
+      where the groups are out of sync, has been fixed.
+    * the mirror client now correctly handles duplicate items returned in
+      trove lists by older servers
+    * A bug that caused the mirror client to loop indefinitely when
+      doing a --full-trove-sync has been fixed
+    * conary rq --trove-flags will now display redirect info even if you
+      do not specify --troves (bug #877)
+    * dep resolution now support --flavors --full-versions output (bug #751)
+    * cvc merge no longer tracebacks if files were added on both upstream
+      and on the shadow
+    * admin web access for the server doesn't require write permission for
+      operations which also require admin access (bug #833)
+    * A bug that caused r.remove() in a group to fail if the trove being
+      removed was recursively included from another group has been fixed.
+    * Conary update tmpwatch -tmpwatch:debuginfo will now erase 
+      tmpwatch:debuginfo.
+    * An ordering bug that caused info packages to not be updated with their
+      components has been fixed.
+    * Updates will now happen in a more consistent order based on an
+      alphabetic sort.
+    * the repository server now handles database deadlocks when committing
+       changesets
+  o Server Changes:
+    * getNewSigList and getNewTroveList could return troveLists with
+      duplicate entries
+
+  o Documentation Changes:
+    * The inline documentation for recipes has been significantly
+      improved and expanded, including many new usage examples.
+
 Changes in 1.0.8
   o Client changes:
     * Conary will now replace symlinks and regular files as long as their

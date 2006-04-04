@@ -1,1 +1,3 @@
 buildRequired False
+shortDoc Build documentation as well as binaries
+longDoc Some packages have documentation that needs to be built, not just installed.  Examples include SGML, TeX, groff documents other than man pages, and texinfo (but not precompiled info pages).  This does not include man pages, precompiled info pages, and other files installed on the system in essentially the same form they are provided.  Simple substitution (sed -i 's/@FOO@/foo/) does not count as "building documentation".  The purpose of this flag is to disable unnecessary build depedencies for embedded targets.

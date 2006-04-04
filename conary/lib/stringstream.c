@@ -85,7 +85,7 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
 }
 
 static void StringStream_Dealloc(PyObject * self) {
-    Py_DECREF(((StringStreamObject *) self)->s);
+    Py_XDECREF(((StringStreamObject *) self)->s);
     self->ob_type->tp_free(self);
 }
 
