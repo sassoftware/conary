@@ -18,11 +18,17 @@
 import crypt
 import base64
 import getpass
+import sys
 
 rand = open("/dev/random", "r")
 salt = base64.encodestring(rand.read(6))[:-1]
 # $ is magic in md5
 salt.replace('$', '%')
 
-pw = getpass.getpass()
+pw = getpass.getpass('Password:')
+pw2 = getpass.getpass('Password (again):')
+if pw != pw2:
+    print "Passwords didn't match."
+    sys.exit(1)
+
 print crypt.crypt(pw, '$1$%s' % salt)
