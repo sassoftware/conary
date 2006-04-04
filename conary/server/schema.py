@@ -1432,6 +1432,13 @@ def setupTempTables(db):
         db.tempTables["tmpInstances"] = True
         db.createIndex("tmpInstances", "tmpInstancesIdx", "instanceId",
                        check = False)
+    if "tmpInstances2" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        tmpInstances2(
+            instanceId    INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpInstances2"] = True
 
     db.commit()
 
