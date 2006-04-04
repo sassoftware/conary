@@ -636,7 +636,8 @@ class Database(SqlDbRepository):
                 localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, threshold = threshold,
                     allowIncomplete = isRollback, 
-                    pathRemovedCheck = fsJob.pathRemoved)
+                    pathRemovedCheck = fsJob.pathRemoved,
+                    replaceFiles = replaceFiles)
             except DatabasePathConflicts, e:
                 for path, pathId, troveName, version, flavor in \
                                                 e.getConflicts():

@@ -851,38 +851,54 @@ order by
 
         return troveInstanceId
 
-    def checkPathConflicts(self, instanceIdList):
+    def checkPathConflicts(self, instanceIdList, replaceFiles):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
         for instanceId in instanceIdList:
             cu.execute("INSERT INTO NewInstances (instanceId) VALUES (?)",
                        instanceId)
 
-        cu.execute("""
-            SELECT NewFiles.path, NewFiles.pathId,
-                   troveName, version, flavor
-                FROM NewInstances
-                JOIN DBTroveFiles AS NewFiles USING (instanceId)
-                JOIN DBTroveFiles AS ExistingFiles ON
-                    NewFiles.path = ExistingFiles.path AND
-                    NewFiles.instanceId != ExistingFiles.instanceId
-                JOIN Instances ON
-                    ExistingFiles.instanceId = Instances.instanceId 
-                JOIN Versions ON
-                    Instances.versionId = Versions.versionId
-                JOIN Flavors ON
-                    Instances.flavorId = Flavors.flavorId
-                WHERE
-                    NewFiles.isPresent = 1 AND
-                    ExistingFiles.isPresent = 1
-        """)
-        conflicts = [ (x[0], x[1], x[2], versions.VersionFromString(x[3]),
-                       deps.deps.ThawDependencySet(x[4])) for x in cu ]
+        if replaceFiles:
+            # mark conflicting files as no longer present in the old trove
+            cu.execute("""
+                UPDATE DBTroveFiles SET isPresent = 0 WHERE instanceId IN
+                    (
+                        SELECT ExistingFiles.instanceId FROM NewInstances
+                            JOIN DBTroveFiles AS NewFiles USING (instanceId)
+                            JOIN DBTroveFiles AS ExistingFiles ON
+                                NewFiles.path = ExistingFiles.path AND
+                                NewFiles.instanceId != ExistingFiles.instanceId
+                            WHERE
+                                NewFiles.isPresent = 1 AND
+                                ExistingFiles.isPresent = 1
+                    )
+            """)
+        else:
+            cu.execute("""
+                SELECT NewFiles.path, NewFiles.pathId,
+                       troveName, version, flavor
+                    FROM NewInstances
+                    JOIN DBTroveFiles AS NewFiles USING (instanceId)
+                    JOIN DBTroveFiles AS ExistingFiles ON
+                        NewFiles.path = ExistingFiles.path AND
+                        NewFiles.instanceId != ExistingFiles.instanceId
+                    JOIN Instances ON
+                        ExistingFiles.instanceId = Instances.instanceId 
+                    JOIN Versions ON
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                    WHERE
+                        NewFiles.isPresent = 1 AND
+                        ExistingFiles.isPresent = 1
+            """)
+            conflicts = [ (x[0], x[1], x[2], versions.VersionFromString(x[3]),
+                           deps.deps.ThawDependencySet(x[4])) for x in cu ]
 
-        cu.execute("DROP TABLE NewInstances")
+            cu.execute("DROP TABLE NewInstances")
 
-        if conflicts:
-            raise errors.DatabasePathConflicts(conflicts)
+            if conflicts:
+                raise errors.DatabasePathConflicts(conflicts)
 
     def getFile(self, pathId, fileId, pristine = False):
 	stream = self.troveFiles.getFileByFileId(fileId,
