@@ -96,23 +96,23 @@ def openSysLog(root, path):
 
 def error(msg, *args):
     "Log an error"
-    m = "error: " + msg
+    m = "error: %s" % msg
     logger.error(m, *args)
     hdlr.error = True
 
 def warning(msg, *args):
     "Log a warning"
-    m = "warning: " + msg
+    m = "warning: %s" % msg
     logger.warning(m, *args)
 
 def info(msg, *args):
     "Log an informative message"
-    m = "+ " + msg
+    m = "+ %s" % msg
     logger.info(m, *args)
 
 def debug(msg, *args):
     "Log a debugging message"
-    m = "+ " + msg
+    m = "+ %s" % msg
     logger.debug(m, *args)
 
 def errorOccurred():
