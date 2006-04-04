@@ -18,6 +18,10 @@ Changes in @NEW@:
     * Troves now don't require dependencies that are provided by themselves.
       As troves are built with this new behavior, it should significantly speed
       up dependency resolution.
+    * added a script to recalculate the sha1s on a server (after a label
+      rename, for instance)
+    * added a script to calculate an md5 password (for use in an info recipe,
+      for example)
 
   o Bug Fixes:
     * command-line configurations now override context settings
