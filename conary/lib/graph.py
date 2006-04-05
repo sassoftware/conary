@@ -274,7 +274,7 @@ class DirectedGraph:
         start, finished, trees = self.doDFS()
         for node in self.edges.keys():
             seen = set()
-            children = self.edges.get(node, set()).copy()
+            children = set(self.edges.get(node, set()))
             while children:
                 child = children.pop()
                 if child in seen:

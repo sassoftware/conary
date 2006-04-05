@@ -960,7 +960,8 @@ class DependencyTables:
         """
         # LEFT join in case the instanceId we're given is not included in any
         # troves on this host and we wish to match it.
-        restrictJoin = """JOIN tmpInstances USING(instanceId)"""
+        restrictJoin = """JOIN tmpInstances
+                            ON (%(provides)s.instanceId = tmpInstances.instanceId)"""
         return restrictJoin, ''
 
     def _resolve(self, depSetList, selectTemplate, restrictor=None,
@@ -1017,6 +1018,7 @@ class DependencyTables:
         if troveList:
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
+            schema.resetTable(cu, "tmpInstances2")
             for (n,v,f) in troveList:
                 itemId = cu.execute('SELECT itemId FROM Items'
                                     ' WHERE item=?', n).next()[0]
@@ -1033,14 +1035,21 @@ class DependencyTables:
                                         versionId, flavorId).next()[0]
                 cu.execute('''INSERT INTO tmpInstances VALUES (?)''',
                            instanceId, start_transaction=False)
-                cu.execute('''INSERT INTO tmpInstances
-                                 SELECT DISTINCT includedId FROM TroveTroves
-                                  LEFT JOIN tmpInstances ON
-                                    includedId = tmpInstances.instanceId
-                                  WHERE
-                                    TroveTroves.instanceId=? AND
-                                    tmpInstances.instanceId IS NULL
-                               ''', instanceId, start_transaction=False)
+                cu.execute('''INSERT INTO tmpInstances2 
+                                       SELECT DISTINCT includedId 
+                                       FROM TroveTroves
+                                       LEFT JOIN tmpInstances ON
+                                         includedId = tmpInstances.instanceId
+                                       WHERE
+                                         TroveTroves.instanceId=? AND
+                                         tmpInstances.instanceId IS NULL
+                           ''', instanceId, start_transaction=False)
+                cu.execute('''INSERT INTO tmpInstances 
+                              SELECT instanceId FROM tmpInstances2''',
+                              start_transaction=False)
+                cu.execute('''DELETE FROM tmpInstances2''',
+                              start_transaction=False)
+
             restrictBy = None
             restrictor = self._restrictResolveByTrove
         else:

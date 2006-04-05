@@ -723,6 +723,8 @@ class UserGroupIdCache:
 	    return theId
 
 	if root and root != '/':
+            if root[0] != '/':
+                root = os.sep.join((os.getcwd(), root))
 	    curDir = os.open(".", os.O_RDONLY)
             # chdir to the current root to allow us to chroot
             # back out again
