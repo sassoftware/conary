@@ -109,13 +109,12 @@ the component that now contains \fI/foo/blah\fP instead of
 as a new file.)
 
 .TP
-.B rollback \fIrollback\fP
-Applies rollback \fIrollback\fP.  (Syntax may change in future versions
-of Conary.) The rollback can be a rollback number preceded by a \fBr.\fR
-(which is identical to how \fBrblist\fR displays them) or an integer. If
-a rollback number is given, all rollbacks up to and including the specified
-rollback are applied. If an integer is given, it specifies the number of
-rollbacks to apply from the top of the stack.
+.B rollback \fI<identifier>\fP
+Applies rollback \fI<identifier>\fP.  The \fI<identifier>\fP can be either
+an r.<sequence> rollback name as displayed by \fBrblist\fR, or a number.
+If an r.<sequence> rollback name is specified, the most recent rollbacks up
+to and including the one specified are applied.  If the number N is
+specified, the N most recent rollbacks are applied.
 
 Arguments include
 .RS 4
