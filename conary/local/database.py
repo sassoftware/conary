@@ -468,7 +468,7 @@ class Database(SqlDbRepository):
         if replaceFiles:
             flags |= update.REPLACEFILES
         if isRollback:
-            flags |= update.MISSINGFILESOKAY
+            flags |= update.MISSINGFILESOKAY | update.IGNOREINITIALCONTENTS
 
         self.db.begin()
 
