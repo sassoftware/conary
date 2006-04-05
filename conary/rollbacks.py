@@ -52,15 +52,39 @@ def listRollbacks(db, cfg):
 
 	print
 
-def apply(db, cfg, *names, **kwargs):
+def apply(db, cfg, rollbackSpec, **kwargs):
     client = conaryclient.ConaryClient(cfg)
 
     log.syslog.command()
 
     defaults = { 'replaceFiles': False }
     defaults.update(kwargs)
+
+    db.readRollbackStatus()
+    rollbackList = db.getRollbackList()
+
+    if rollbackSpec.startswith('r.'):
+        try:
+            i = rollbackList.index(rollbackSpec)
+        except:
+            log.error("rollback '%s' not present" % rollbackSpec)
+            return 1
+
+        rollbacks = rollbackList[i:]
+        rollbacks.reverse()
+    else:
+        try:
+            rollbackCount = int(rollbackSpec)
+        except:
+            log.error("integer rollback count expected instead of '%s'" %
+                    rollbackSpec)
+            return 1
+
+        rollbacks = rollbackList[-rollbackCount:]
+        rollbacks.reverse()
+
     try:
-	db.applyRollbackList(client.getRepos(), names, **defaults)
+	db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1

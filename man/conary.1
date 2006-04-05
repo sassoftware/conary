@@ -108,10 +108,15 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 
-
-.B rollback \fIrollback\fP [\fIargs\fP] 
+.TP
+.B rollback \fIrollback\fP
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
-of Conary.)
+of Conary.) The rollback can be a rollback number preceded by a \fBr.\fR
+(which is identical to how \fBrblist\fR displays them) or an integer. If
+a rollback number is given, all rollbacks up to and including the specified
+rollback are applied. If an integer is given, it specifies the number of
+rollbacks to apply from the top of the stack.
+
 Arguments include
 .RS 4
 .TP 4

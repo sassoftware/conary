@@ -14,6 +14,11 @@ Changes in @NEW@:
     * Patch treated lines-to-erase as normal patch conflicts, when they should
       instead cause patch to give up on the hunk to avoid erasing lines which
       didn't appear in the original version of the file (bz #949)
+  o Client changes:
+    * The rollback command now applies rollbacks up to and including the
+      rollback number specified on the command line. It also allows the
+      user to specify the number of rollbacks to apply (from the top of
+      the stack) instead of which rollback to apply (bz #884)
 
 Changes in 1.0.11:
   o Client Changes:
