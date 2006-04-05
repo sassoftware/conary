@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * Installing into a relative root <e.g. --root foo> when running as root
       no longer tracebacks (bz #873)
+    * Replaced files are now stored in rollback (bz #915)
+    * File conflicts are detected in the database, not just in the filesystem
+    * Conary will no longer allow multiple troves to own a file
 
 Changes in 1.0.11:
   o Client Changes:
