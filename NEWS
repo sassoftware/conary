@@ -11,6 +11,9 @@ Changes in @NEW@:
       cannot be unlinked (bz #887)
     * Rollbacks for initial contents files didn't work; applying rollbacks
       now ignores that flag to get the contents right on disk (bz #924)
+    * Patch treated lines-to-erase as normal patch conflicts, when they should
+      instead cause patch to give up on the hunk to avoid erasing lines which
+      didn't appear in the original version of the file (bz #949)
 
 Changes in 1.0.11:
   o Client Changes:
