@@ -626,7 +626,7 @@ class Database(SqlDbRepository):
             self.db.removeFilesFromTrove(troveName, troveVersion,
                                          troveFlavor, fileDict.keys())
 
-        errList = []
+        dbConflicts = []
 
         # Build A->B
         if updateDatabase:
@@ -642,8 +642,9 @@ class Database(SqlDbRepository):
             except DatabasePathConflicts, e:
                 for path, pathId, troveName, version, flavor in \
                                                 e.getConflicts():
-                    errList.append(DatabasePathConflictError(path, troveName,
-                                            version, flavor))
+                    dbConflicts.append(DatabasePathConflictError(
+                            util.joinPaths(self.root, path), 
+                            troveName, version, flavor))
 
             self.db.mapPinnedTroves(uJob.getPinMaps())
         else:
@@ -653,7 +654,27 @@ class Database(SqlDbRepository):
             # they were previously erased)
             localrep.markAddedFiles(self.db, cs)
 
-        errList.extend(fsJob.getErrorList())
+        errList = fsJob.getErrorList()
+
+        # Let DatabasePathConflictError mask FileInWayError (since they
+        # are really very similar)
+        newErrs = []
+        for err in dbConflicts:
+            found = None
+            for i, otherErr in enumerate(errList):
+                if isinstance(otherErr, FileInWayError) and \
+                                   err.path == otherErr.path:
+                    found = i
+                    break
+
+            if found is None:
+                newErrs.append(err)
+            else:
+                errList[found] = err
+
+        errList = newErrs + errList
+        del newErrs, dbConflicts
+
         if errList:
             raise CommitError, ('applying update would cause errors:\n' + 
                                 '\n\n'.join(str(x) for x in errList))
