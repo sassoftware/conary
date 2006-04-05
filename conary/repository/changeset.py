@@ -391,7 +391,8 @@ class ChangeSet(streams.StreamSet):
 		    if oper == '+':
 			invertedTrove.oldTroveVersion(name, version, flavor)
 		    elif oper == "-":
-			invertedTrove.newTroveVersion(name, version, flavor, True)
+			invertedTrove.newTroveVersion(name, version, flavor,
+                            trv.includeTroveByDefault(name, version, flavor))
 
 	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
