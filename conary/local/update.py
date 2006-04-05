@@ -630,8 +630,11 @@ class FilesystemJob:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 continue
 
-            try:
-                s = os.lstat(headRealPath)
+            s = util.lstat(headRealPath)
+            if s is None:
+                # the path doesn't exist, carry on with the restore
+                pass
+            else:
                 # if this file is a directory and the file on the file
                 # system is a directory, we're OK
                 if (isinstance(headFile, files.Directory)
@@ -701,10 +704,6 @@ class FilesystemJob:
                                troveCs.getNewFlavor()))
                         fullyUpdated = False
                         continue
-
-            except OSError:
-                # the path doesn't exist, carry on with the restore
-                pass
 
 	    self._restore(headFile, headRealPath, "creating %s")
 	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)

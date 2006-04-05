@@ -683,5 +683,21 @@ class IterableQueue:
     def __init__(self):
         self.l = []
 
+def lstat(path):
+    """
+    Return None if the path doesn't exist.
+    """
+    if not misc.exists(path):
+        return None
+
+    try:
+        sb = os.lstat(path)
+    except OSError, e:
+        if e.errno != errno.ENOENT:
+            raise
+        return None
+
+    return sb
+
 exists = misc.exists
 removeIfExists = misc.removeIfExists
