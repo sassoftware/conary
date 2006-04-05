@@ -5,6 +5,8 @@ Changes in @NEW@:
     * Replaced files are now stored in rollback (bz #915)
     * File conflicts are detected in the database, not just in the filesystem
     * Conary will no longer allow multiple troves to own a file
+    * Rollbacks of troves that are local cooks will no longer raise 
+      a TroveIntegrityError
 
 Changes in 1.0.11:
   o Client Changes:
