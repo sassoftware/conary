@@ -663,8 +663,7 @@ class Action(action.RecipeAction):
     NAME
     ====
 
-    B{C{r.addAction()}} - Performs the specified shell command in the first
-    pass of the build (similar to r.Run() but performed during the prep stage).
+    B{C{r.addAction()}} - Executes a shell command
 
     SYNOPSIS
     ========
@@ -674,8 +673,8 @@ class Action(action.RecipeAction):
     DESCRIPTION
     ===========
 
-    The C{r.addAction()} class copies an arbitrary file into the build
-    directory C{%(builddir)s}.
+    The C{r.addAction()} class executes a shell command during the source
+    preparation stage, in a manner similar to C{r.Run}.
 
     KEYWORDS
     ========
