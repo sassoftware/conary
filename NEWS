@@ -19,6 +19,8 @@ Changes in @NEW@:
       rollback number specified on the command line. It also allows the
       user to specify the number of rollbacks to apply (from the top of
       the stack) instead of which rollback to apply (bz #884)
+    * The path for installing files as part of a new trove involved taking
+      an exception. That's been reworked to avoid that overhead.
 
 Changes in 1.0.11:
   o Client Changes:
