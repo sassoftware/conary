@@ -404,7 +404,14 @@ class RemoveCommand(ConaryCommand):
         db = openDatabase(cfg.root, cfg.dbPath)
         fullPath = util.joinPaths(cfg.root, otherArgs[2])
         if os.path.exists(fullPath):
-            os.unlink(fullPath)
+            try:
+                os.unlink(fullPath)
+            except OSError, e:
+                log.error("cannot remove %s: %s" % (fullPath, e.strerror))
+                sys.exit(1)
+            except Exception, e:
+                log.error("cannot remove %s: %s" % (fullPath, str(e)))
+                sys.exit(1)
         else:
             log.warning("%s has already been removed", fullPath)
         # this call should move into conaryclient; for now we need
