@@ -494,16 +494,13 @@ class Source(_Source):
     interpolated into this command.
 
     B{dest} : If set, provides the target name of the file in the build
-    directory. A full pathname can be used. Absolute directories will be
-    considered relative to C{%(builddir)s}. Use either B{dir}, or B{dest} to
+    directory. A full pathname can be used. Use either B{dir}, or B{dest} to
     specify directory information, but not both. Useful mainly  when fetching
     the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
-    An absolute C{dest} value will be considered relative to  C{%(destdir)s},
-    whereas a relative C{dest} value will be considered relative to
+    An absolute C{dest} value will be considered relative to C{%(destdir)s},     whereas a relative C{dest} value will be considered relative to
     C{%(builddir)s}.
-
-
+    
     B{dir} : The directory in which to store the file, relative to the build
     directory. An absolute C{dir} value will be considered relative to 
     C{%(destdir)s}, whereas a relative C{dir} value will be considered
@@ -568,20 +565,15 @@ class Source(_Source):
         automatically by the PackageRecipe object. Passing in C{recipe} from
         within a recipe is unnecessary.
     @keyword dest: If set, provides the target name of the file in the build
-        directory. A full pathname can be used. Absolute directories will be
-        considered relative to C{%(builddir)s}. Use either B{dir}, or B{dest}
-        to specify directory information, but not both. Useful mainly  when
-        fetching the file from an source outside your direct control, such as
-        a URL to a third-party web site, or copying a file out of an RPM
-        package. An absolute C{dest} value will be considered relative to 
-        C{%(destdir)s}, whereas a relative C{dest} value will be
-        considered relative to C{%(builddir)s}.
-    @keyword dir: The directory in which to store the file, relative to the
-        build directory. Directories relative to the destination directory
-        will be considered absolute. Defaults to storing file directly in the
-        build directory. An absolute C{dir} value will be considered relative
-        to C{%(destdir)s}, whereas a relative C{dir} value will be considered
+        directory. A full pathname can be used. Use either B{dir}, or 
+        B{dest} to specify directory information, but not both. Useful mainly        when fetching the file from an source outside your direct control,
+        such as a URL to a third-party web site, or copying a file out of an         RPM package. An absolute C{dest} value will be considered relative to        C{%(destdir)s}, whereas a relative C{dest} value will be considered
         relative to C{%(builddir)s}.
+    @keyword dir: The directory in which to store the file, relative to
+        the build directory. An absolute C{dir} value will be considered
+        relative to C{%(destdir)s}, whereas a relative C{dir} value will be
+        considered relative to C{%(builddir)s}. Defaults to storing file
+        directly in the build directory.
     @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
@@ -589,9 +581,9 @@ class Source(_Source):
         I{sourcename}C{{.sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
-    @keyword macros: If True, interpolate recipe macros in the body of a patch
-        before applying it.  For example, you might have a patch that changes
-        C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause
+    @keyword macros: If True, interpolate recipe macros in the body of a
+        patch before applying it.  For example, you might have a patch that
+        changes C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause
         C{%(cflags)s} to be replaced with the current setting of
         C{recipe.macros.cflags}. Defaults to False.
     @keyword mode: If set, provides the mode to set on the file.
