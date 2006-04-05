@@ -44,13 +44,22 @@ class Hunk:
 	conflicts = 0
 	srcLen = len(src)
         srcLine = origSrcLine
-	for line in self.lines:
-	    if line[0] == " " or line[0] == "-":
-		if srcLine >= srcLen:
-		    conflicts += 1
-		elif src[srcLine] != line[1:]: 
-		    conflicts += 1
-		srcLine += 1
+        for line in self.lines:
+            if line[0] == " ":
+                if srcLine >= srcLen:
+                    conflicts += 1
+                elif src[srcLine] != line[1:]: 
+                    conflicts += 1
+                srcLine += 1
+            elif line[0] == "-":
+                # - lines need to be exact matches; we don't want to erase
+                # a line which has been changed. Return that every line
+                # conflicts to ensure we don't apply this.
+                if srcLine >= srcLen:
+                    return len(self.lines)
+                elif src[srcLine] != line[1:]:
+                    return len(self.lines)
+                srcLine += 1
 
         if conflicts:
             # has this patch already been applied?
