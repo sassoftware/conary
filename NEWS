@@ -10,7 +10,7 @@ Changes in @NEW@:
     * Conary doesn't traceback in conary remove when the filename passed
       cannot be unlinked (bz #887)
     * Rollbacks for initial contents files didn't work; applying rollbacks
-      now ignores that flag to get the contents right on disk
+      now ignores that flag to get the contents right on disk (bz #924)
 
 Changes in 1.0.11:
   o Client Changes:
