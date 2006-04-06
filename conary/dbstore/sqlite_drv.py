@@ -166,6 +166,8 @@ class Database(BaseDatabase):
             if str(e) == 'database is locked':
                 raise sqlerrors.DatabaseLocked(e)
             raise
+        except sqlite3.DatabaseError, e:
+            raise sqlerrors.DatabaseError(e)
         # add a regexp funtion to enable SELECT FROM bar WHERE bar REGEXP .*
         self.dbh.create_function('regexp', 2, _regexp)
         # add the serialized timestamp function
