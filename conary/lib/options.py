@@ -113,7 +113,6 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                 commonParams=None, useHelp=False, defaultGroup=None,
                 interspersedArgs=True):
-    otherArgs = [ argv[0] ]
     argSet = {}
     # don't mangle the command line
     argv = argv[:]
