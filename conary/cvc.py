@@ -204,6 +204,7 @@ _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):
     commands = ['annotate']
+    paramHelp = '<file>'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or len(args) != 2: return self.usage()
