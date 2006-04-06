@@ -9,6 +9,7 @@ Changes in @NEW@:
       a TroveIntegrityError
     * Conary doesn't traceback in conary remove when the filename passed
       cannot be unlinked (bz #887)
+    * cvc and conary w/ no commands work again.
 
 Changes in 1.0.11:
   o Client Changes:
