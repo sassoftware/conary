@@ -1368,17 +1368,16 @@ class Symlink(_FileAction):
     SYNOPSIS
     ========
 
-    C{r.Symlink(I{symlink}, I{realfile})}
+    C{r.Symlink(I{realfile}, I{symlink})}
 
     DESCRIPTION
     ===========
 
-    The C{r.Symlink()} class is called from within a Conary recipe to create a
-    symbolic link C{symlink} pointing to C{realfile}.
+    The C{r.Symlink()} class is called from within a Conary recipe to create     a symbolic link to a file.
 
     Multiple symlinks can be created if the destination path C{realfile} is a
-    directory. The destination path is determined to be a directory if it already
-    exists, or if the path ends with a slash (C{/}) character.
+    directory. The destination path is determined to be a directory if it
+    already exists, or if the path ends with a slash (C{/}) character.
 
     KEYWORDS
     ========
@@ -1387,15 +1386,16 @@ class Symlink(_FileAction):
     values shown in parentheses when applicable:
 
     B{allowDangling} : (False) Whether to allow dangling symbolic links.
-    That is, a symbolic link for which the target (C{realfile}) does not exist.
+    That is, a symbolic link for which the target (C{realfile}) does not
+    exist.
 
     EXAMPLES
     ========
 
     C{r.Symlink('enable', '%(bindir)s/cups-enable')}
 
-    Calls C{r.Symlink()} and creates a symbolic link named C{enable} to the
-    destination C{%(bindir)s/cups-enable}.
+    Calls C{r.Symlink()} to create a symbolic link named C{enable} from
+    the C{realfile} C{%(bindir)s/cups-enable}.
     """
     keywords = { 'allowDangling': False }
 
