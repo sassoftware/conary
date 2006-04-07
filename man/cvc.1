@@ -55,6 +55,9 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-no-deps] \e
 .PD 0
 .TP
+.B \ \ \ \ \ [\fR\-\-show-deps] \e
+.PD 0
+.TP
 .B \ \ \ \ \ [\fR\-\-signature-key <fingerprint>|None] \e
 .PD 0
 .TP
@@ -110,6 +113,8 @@ This can be useful for rerunning policy for a complete build using
 The \-\-no-deps option prevents conary from raising an error 
 if a component or package listed as a build requirement for the package
 is not installed on the build system.
+.IP
+The \-\-show-deps option can be used to get list of build dependencies.
 .IP
 If \-\-signature\-key is specified, the OpenPGP key in the local keyring with 
 that fingerprint will be used to create trove signatures for all troves created 

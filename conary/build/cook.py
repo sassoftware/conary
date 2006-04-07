@@ -1106,8 +1106,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
-             ignoreDeps = False, logBuild = False, crossCompile = None,
-             callback = None):
+             showBuildReqs = False, ignoreDeps = False, logBuild = False,
+             crossCompile = None, callback = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1218,6 +1218,13 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
         recipeClass = loader.getRecipe()
 
+    if showBuildReqs:
+        if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+            raise CookError("--show-deps is only useful with PackageRecipe sub-class")
+        for buildReq in recipeClass.buildRequires:
+            print buildReq
+        return None
+
     if emerge:
         (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
         os.close(fd)
@@ -1247,7 +1254,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
-                ignoreDeps = False, profile = False, logBuild = True,
+                showBuildReqs = False, ignoreDeps = False,
+                profile = False, logBuild = True,
                 crossCompile = None, cookIds=None):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
@@ -1306,6 +1314,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             built = cookItem(repos, cfg, item, prep=prep, macros=macros,
                              emerge = emerge, resume = resume, 
                              allowUnknownFlags = allowUnknownFlags, 
+                             showBuildReqs = showBuildReqs,
                              ignoreDeps = ignoreDeps, logBuild = logBuild,
                              crossCompile = crossCompile,
                              callback = CookCallback())

@@ -400,6 +400,7 @@ class CookCommand(CvcCommand):
             'no-clean': 'do not remove build directory even if build is'
                         ' successful',
             'no-deps' : 'do not check build requirements',
+            'show-deps': 'Show build requires for recipe',
             'prep'    : 'unpack, but do not build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
@@ -415,6 +416,7 @@ class CookCommand(CvcCommand):
         argDef['macros'] = ONE_PARAM
         argDef['no-clean'] = NO_PARAM
         argDef['no-deps'] = NO_PARAM
+        argDef['show-deps' ] = NO_PARAM
         argDef['prep'] = NO_PARAM
         argDef['resume'] = OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
@@ -446,6 +448,8 @@ class CookCommand(CvcCommand):
             ignoreDeps = True
         else:
             ignoreDeps = False
+
+        showBuildReqs = argSet.pop('show-deps', False)
 
         if argSet.has_key('quiet'):
             cfg.quiet = True
@@ -496,7 +500,8 @@ class CookCommand(CvcCommand):
 
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
-                         profile=profile, crossCompile=crossCompile)
+                         showBuildReqs=showBuildReqs, profile=profile,
+                         crossCompile=crossCompile)
         log.setVerbosity(level)
 _register(CookCommand)
 
