@@ -399,8 +399,8 @@ class CookCommand(CvcCommand):
             'macros'  : optparse.SUPPRESS_HELP, # can we get rid of this?
             'no-clean': 'do not remove build directory even if build is'
                         ' successful',
-            'no-deps' : 'do not check build requirements',
-            'show-deps': 'Show build requires for recipe',
+            'ignore-buildreqs' : 'do not check build requirements',
+            'show-buildreqs': 'show build requirements for recipe',
             'prep'    : 'unpack, but do not build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
@@ -416,7 +416,8 @@ class CookCommand(CvcCommand):
         argDef['macros'] = ONE_PARAM
         argDef['no-clean'] = NO_PARAM
         argDef['no-deps'] = NO_PARAM
-        argDef['show-deps' ] = NO_PARAM
+        argDef['ignore-buildreqs'] = NO_PARAM
+        argDef['show-buildreqs' ] = NO_PARAM
         argDef['prep'] = NO_PARAM
         argDef['resume'] = OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
@@ -443,13 +444,16 @@ class CookCommand(CvcCommand):
         if argSet.has_key('prep'):
             del argSet['prep']
             prep = 1
-        if argSet.has_key('no-deps'):
+        if argSet.has_key('ignore-buildreqs'):
+            del argSet['ignore-buildreqs']
+            ignoreDeps = True
+        elif argSet.has_key('no-deps'):
             del argSet['no-deps']
             ignoreDeps = True
         else:
             ignoreDeps = False
 
-        showBuildReqs = argSet.pop('show-deps', False)
+        showBuildReqs = argSet.pop('show-buildreqs', False)
 
         if argSet.has_key('quiet'):
             cfg.quiet = True

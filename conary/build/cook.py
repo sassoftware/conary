@@ -1220,9 +1220,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     if showBuildReqs:
         if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-            raise CookError("--show-deps is only useful with PackageRecipe sub-class")
-        for buildReq in recipeClass.buildRequires:
-            print buildReq
+            raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
+        print '\n'.join(recipeClass.buildRequires)
         return None
 
     if emerge:

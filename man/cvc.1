@@ -52,10 +52,10 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-no-deps] \e
+.B \ \ \ \ \ [\fR\-\-ignore-buildreqs] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-show-deps] \e
+.B \ \ \ \ \ [\fR\-\-show-buildreqs] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-signature-key <fingerprint>|None] \e
@@ -110,11 +110,15 @@ after the build is complete, even if the build is successful.
 This can be useful for rerunning policy for a complete build using 
 \-\-resume, or for examining the completed build directories.
 .IP 
-The \-\-no-deps option prevents conary from raising an error 
+The \-\-ignore-buildreqs option (also available as the \-\-no-deps
+option) prevents conary from raising an error 
 if a component or package listed as a build requirement for the package
 is not installed on the build system.
 .IP
-The \-\-show-deps option can be used to get list of build dependencies.
+The \-\-show-buildreqs option prints the complete list of build dependencies,
+one dependency per line.  This includes dependencies not explicitly
+specified in the recipe but instead inherited from superclasses.
+No other build actions are performed.
 .IP
 If \-\-signature\-key is specified, the OpenPGP key in the local keyring with 
 that fingerprint will be used to create trove signatures for all troves created 
