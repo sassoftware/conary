@@ -25,7 +25,7 @@ class User(build.BuildAction):
 
     SYNOPSIS
     ========
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}')}
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}')}}
 
     DESCRIPTION
     ===========
@@ -171,7 +171,7 @@ class SupplementalGroup(build.BuildAction):
     EXAMPLES
     ========
 
-    C{r.SupplementalGroup('breandon', 'ateam', 560)
+    C{r.SupplementalGroup('breandon', 'ateam', 560)}
 
     Uses C{r.SupplementalGroup} to add the user C{breandon} to the
     supplemental group C{ateam}, and specifies the preferred group
