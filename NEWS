@@ -15,6 +15,7 @@ Changes in @NEW@:
     * Patch treated lines-to-erase as normal patch conflicts, when they should
       instead cause patch to give up on the hunk to avoid erasing lines which
       didn't appear in the original version of the file (bz #949)
+
   o Client changes:
     * The rollback command now applies rollbacks up to and including the
       rollback number specified on the command line. It also allows the
@@ -22,6 +23,11 @@ Changes in @NEW@:
       the stack) instead of which rollback to apply (bz #884)
     * The path for installing files as part of a new trove involved taking
       an exception. That's been reworked to avoid that overhead.
+
+  o Build Changes:
+    * The cvc command now has a --show-buildreqs option that prints all
+      build requirements.  The --no-deps argument for cvc has been
+      aliased to --ignore-buildreqs for consistency.
 
 Changes in 1.0.11:
   o Client Changes:
