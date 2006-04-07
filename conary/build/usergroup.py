@@ -30,9 +30,10 @@ class User(build.BuildAction):
       - C{shell}: C{'/sbin/nologin'}
       - C{supplemental}: None (list of supplemental groups for this user)
 
-    The easiest way to get a salted password is to set that password for a 
-    user on your system and then cut and paste the salted value from the
-    /etc/shadow file.
+    The easiest way to get a salted password is to use the
+    /usr/share/conary/md5pw program installed with Conary.
+    Alternatively, set that password for a user on your system
+    and then cut and paste the salted value from the /etc/shadow file.
 
     NOTE: Pre-setting a salted password should be done with caution.  Anyone
     who is able to access the repository where this info file will be stored
