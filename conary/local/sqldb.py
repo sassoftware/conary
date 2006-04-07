@@ -875,25 +875,50 @@ order by
             """)
         else:
             cu.execute("""
-                SELECT NewFiles.path, NewFiles.pathId,
-                       troveName, version, flavor
+                SELECT AddedFiles.path,
+                       ExistingFiles.pathId, ExistingInstances.troveName,
+                       ExistingVersions.version, ExistingFlavors.flavor,
+                       AddedFiles.pathId, AddedInstances.troveName,
+                       AddedVersions.version, AddedFlavors.flavor
+
                     FROM NewInstances
-                    JOIN DBTroveFiles AS NewFiles USING (instanceId)
+                    JOIN DBTroveFiles AS AddedFiles USING (instanceId)
                     JOIN DBTroveFiles AS ExistingFiles ON
-                        NewFiles.path = ExistingFiles.path AND
-                        NewFiles.instanceId != ExistingFiles.instanceId
-                    JOIN Instances ON
-                        ExistingFiles.instanceId = Instances.instanceId 
-                    JOIN Versions ON
-                        Instances.versionId = Versions.versionId
-                    JOIN Flavors ON
-                        Instances.flavorId = Flavors.flavorId
+                        AddedFiles.path = ExistingFiles.path AND
+                        AddedFiles.instanceId != ExistingFiles.instanceId
+
+                    JOIN Instances AS ExistingInstances ON
+                        ExistingFiles.instanceId = ExistingInstances.instanceId
+                    JOIN Versions AS ExistingVersions ON
+                        ExistingInstances.versionId = ExistingVersions.versionId
+                    JOIN Flavors AS ExistingFlavors ON
+                        ExistingInstances.flavorId = ExistingFlavors.flavorId
+
+                    JOIN Instances AS AddedInstances ON
+                        AddedInstances.instanceId = NewInstances.instanceId
+                    JOIN Versions AS AddedVersions ON
+                        AddedInstances.versionId = AddedVersions.versionId
+                    JOIN Flavors AS AddedFlavors ON
+                        AddedInstances.flavorId = AddedFlavors.flavorId
+
                     WHERE
-                        NewFiles.isPresent = 1 AND
+                        AddedFiles.isPresent = 1 AND
                         ExistingFiles.isPresent = 1
             """)
-            conflicts = [ (x[0], x[1], x[2], versions.VersionFromString(x[3]),
-                           deps.deps.ThawDependencySet(x[4])) for x in cu ]
+
+            conflicts = []
+            for (path, existingPathId, existingTroveName, existingVersion,
+                 existingFlavor, addedPathId, addedTroveName, addedVersion,
+                 addedFlavor) in cu:
+                conflicts.append((path,
+                        (existingPathId, 
+                         (existingTroveName,
+                          versions.VersionFromString(existingVersion),
+                          deps.deps.ThawDependencySet(existingFlavor))),
+                        (addedPathId, 
+                         (addedTroveName,
+                          versions.VersionFromString(addedVersion),
+                          deps.deps.ThawDependencySet(addedFlavor)))))
 
             cu.execute("DROP TABLE NewInstances")
 

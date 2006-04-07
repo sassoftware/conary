@@ -640,8 +640,8 @@ class Database(SqlDbRepository):
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)
             except DatabasePathConflicts, e:
-                for path, pathId, troveName, version, flavor in \
-                                                e.getConflicts():
+                for (path, (pathId, (troveName, version, flavor)),
+                           newTroveInfo) in e.getConflicts():
                     dbConflicts.append(DatabasePathConflictError(
                             util.joinPaths(self.root, path), 
                             troveName, version, flavor))
