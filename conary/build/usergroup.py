@@ -18,17 +18,19 @@ from conary.lib import util
 
 class User(build.BuildAction):
     """
-    Provides information to use if Conary needs to create a user:
+    NAME
+    ====
+ 
+    B{C{r.User()}} - Provides user account creation information
+
+    SYNOPSIS
+    ========
     C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}')}
 
-    The defaults are::
-      - C{group}: same name as the user
-      - C{groupid}: same id as the user
-      - C{homedir}: None
-      - C{comment}: None
-      - C{saltedPassword}: None
-      - C{shell}: C{'/sbin/nologin'}
-      - C{supplemental}: None (list of supplemental groups for this user)
+    DESCRIPTION
+    ===========
+    The C{r.User} class provides user account information to Conary for the
+    purpose of user account creation.
 
     The easiest way to get a salted password is to use the
     /usr/share/conary/md5pw program installed with Conary.
@@ -40,6 +42,41 @@ class User(build.BuildAction):
     will have the salted password, and given enough time will be able to
     recover the original password.  Trust the security of this password as
     far as you trust the security of the repository it is stored in.
+    KEYWORDS
+    ========
+
+    The C{r.User} class accepts the following keyword arguments, with
+    default values shown in parentheses where applicable.
+
+    B{name} : (None) Specify a user name for the account to be created
+
+    B{preferred_uid} : The preferred user identification number for the
+    account
+
+    B{group} : (same as user name) Specify default group for the account
+
+    B{groupid} : (same as UID) Specify default group identification number
+    for the account
+
+    B{homedir} : (None) Specify the account home directory
+
+    B{comment} : (None) Add a comment to the account record
+
+    B{saltedPassword} : (None) Specify a salted password for the account
+ 
+    B{shell} : (C{'/sbin/nologin'}) Specify the user account shell
+
+    B{supplemental} : (None) Specify a list of additional group memberships
+    for the account.
+
+    EXAMPLES
+    ========
+
+    C{r.User('mysql', 27, comment='mysql', homedir='%(localstatedir)s/lib/mysql', shell='%(essentialbindir)s/bash')}
+
+    Uses C{r.User} to define a C{mysql} user with a specific UID value of
+    '27', a home directory value of C{/var/lib/mysql}, and the default shell
+    value of C{/bin/bash}. 
     """
     def __init__(self, recipe, *args, **keywords):
         if recipe.type != 'user':
@@ -101,9 +138,44 @@ class User(build.BuildAction):
 
 class SupplementalGroup(build.BuildAction):
     """
-    Requests the Conary ensure that a user be associated with a
-    supplemental group that is not associated with any user::
+    NAME
+    ====
+
+    B{C{r.SupplementalGroup()}} - Ensures a user is associated with a supplemental group
+
+    SYNOPSIS
+    ========
+
     C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
+
+    DESCRIPTION
+    ===========
+    
+    The C{r.SupplementalGroup} class ensures that a user is associated with a
+    supplemental group that is not associated with any user.
+
+    KEYWORDS
+    ========
+
+    The C{r.SupplementalGroup} class accepts the following keyword arguments,
+    with default values shown in parentheses where applicable. 
+ 
+    B{user} : (None) Specify the user name to be associated with a
+    supplemental group
+
+    B{group} : (None) Specify the supplemental group name
+
+    B{preferred_gid} : (None) Specify the supplemental group identification
+    number
+
+    EXAMPLES
+    ========
+
+    C{r.SupplementalGroup('breandon', 'ateam', 560)
+
+    Uses C{r.SupplementalGroup} to add the user C{breandon} to the
+    supplemental group C{ateam}, and specifies the preferred group
+    identification number value of '560'.
     """
     def __init__(self, recipe, *args, **keywords):
         if recipe.type != 'group':
@@ -134,10 +206,39 @@ class SupplementalGroup(build.BuildAction):
 
 class Group(build.BuildAction):
     """
-    Provides information to use if Conary needs to create a group:
+    NAME
+    ====
+
+    B{C{r.Group()}} - Provides group creation information
+
+    SYNOPSIS
+    ========
+    
     C{r.Group('I{group}', I{preferred_gid})}
-    This is used only for groups that exist independently, never
-    for a main group created by C{r.User()}
+
+    DESCRIPTION
+    ===========
+    
+    The C{r.Group} class provides group information to Conary for the purpose    of group creation, and should be used only for groups that exist
+    independently, never for a main group created by C{r.User()}.
+
+    KEYWORDS
+    ========
+
+    The C{r.User} class accepts the following keyword arguments, with
+    default values shown in parentheses where applicable.
+
+    B{group} : (None) Specify a group name
+
+    B{preferred_gid} : (None) Specify the group identification number
+
+    EXAMPLES
+    ========
+
+    C{r.Group('mem', 8)}
+
+    Uses C{r.Group} to created a group named C{mem} with a group 
+    identification number value of '8'.
     """
     def __init__(self, recipe, *args, **keywords):
         if recipe.type != 'group':
