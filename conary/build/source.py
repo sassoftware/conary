@@ -20,6 +20,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 
 import gzip
 import os
+import sys
 
 from conary.lib import log, magic
 from conary.build import lookaside
@@ -41,10 +42,23 @@ class _Source(action.RecipeAction):
 	self.rpm = self.rpm % recipe.macros
 
     def doPrep(self):
-	if self.keyid:
-	    self._addSignature()
-	if self.rpm:
-	    self._extractFromRPM()
+        if self.debug:
+            debugger.set_trace()
+        if self.use:
+            if self.linenum is None:
+                self._doPrep()
+            else:
+                oldexcepthook = sys.excepthook
+                sys.excepthook = action.genExcepthook(self)
+                self.recipe.buildinfo.lastline = self.linenum
+                self._doPrep()
+                sys.excepthook = oldexcepthook
+
+    def _doPrep(self):
+        if self.keyid:
+            self._addSignature()
+        if self.rpm:
+            self._extractFromRPM()
 
     def doAction(self):
 	self.builddir = self.recipe.macros.builddir
