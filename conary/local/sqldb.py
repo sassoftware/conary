@@ -858,6 +858,8 @@ order by
             cu.execute("INSERT INTO NewInstances (instanceId) VALUES (?)",
                        instanceId)
 
+        conflicts = []
+
         if replaceFiles:
             # mark conflicting files as no longer present in the old trove
             cu.execute("""
@@ -906,7 +908,6 @@ order by
                         ExistingFiles.isPresent = 1
             """)
 
-            conflicts = []
             for (path, existingPathId, existingTroveName, existingVersion,
                  existingFlavor, addedPathId, addedTroveName, addedVersion,
                  addedFlavor) in cu:
@@ -920,10 +921,10 @@ order by
                           versions.VersionFromString(addedVersion),
                           deps.deps.ThawDependencySet(addedFlavor)))))
 
-            cu.execute("DROP TABLE NewInstances")
+        cu.execute("DROP TABLE NewInstances")
 
-            if conflicts:
-                raise errors.DatabasePathConflicts(conflicts)
+        if conflicts:
+            raise errors.DatabasePathConflicts(conflicts)
 
     def getFile(self, pathId, fileId, pristine = False):
 	stream = self.troveFiles.getFileByFileId(fileId,
