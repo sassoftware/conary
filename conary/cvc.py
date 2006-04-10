@@ -821,6 +821,7 @@ def main(argv=sys.argv):
 
         if debugAll:
             ccfg.debugExceptions = True
+            ccfg.debugRecipeExceptions = True
 
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
