@@ -91,6 +91,8 @@ class Macros(dict):
 	    # update on access
 	    # okay for this to fail bc of no __macros
 	    # -- equivalent to missing dict value
+            if name not in self.__macros:
+                raise KeyError, 'Unknown macro "%s" - check for spelling mistakes' % name
 	    value = self.__macros[name]
 	    self[name] = value
 	    return self.__repmethod(value, repmethod)
