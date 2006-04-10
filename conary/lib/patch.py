@@ -56,9 +56,9 @@ class Hunk:
                 # a line which has been changed. Return that every line
                 # conflicts to ensure we don't apply this.
                 if srcLine >= srcLen:
-                    return len(self.lines)
+                    conflicts = len(self.lines)
                 elif src[srcLine] != line[1:]:
-                    return len(self.lines)
+                    conflicts = len(self.lines)
                 srcLine += 1
 
         if conflicts:
