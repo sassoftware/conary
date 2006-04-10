@@ -18,6 +18,8 @@
 checkdatabase examines each trove in a conary database and verifies
 its integrity by comparing with data downloaded from the repository.
 """
+import os
+import sys
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
@@ -29,15 +31,15 @@ else:
 
 sys.path.insert(0, os.path.dirname(fullPath))
 
-import conarycfg
-import datastore
-import deps
-import files
-from lib import options, sha1helper, util
-from repository import netclient, repository
-import sqlite3
-import trove
-from local import database
+from conary import conarycfg
+from conary import deps
+from conary import files
+from conary.lib import options, sha1helper, util
+from conary.repository import netclient, repository
+from conary import sqlite3
+from conary import trove
+from conary.local import database
+from conary import conaryclient
 
 def usage():
     print 'usage: %s [--root rootpath]' %sys.argv[0]
@@ -57,7 +59,8 @@ def main(argv):
         sys.exit(1)
 
     db = database.Database(cfg.root, cfg.dbPath)
-    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
 
     troveList = otherArgs[1:]
     if not troveList:
