@@ -17,6 +17,10 @@ Changes in @NEW@:
     * The patch mechanism now properly gives up on patch hunks which
       include changed lines-to-erase, which avoids erasing lines which
       did not appear in the origial version of the file. (bz #949)
+    * When normal errors occurred while prepping sources for cooking 
+      (extracting sources from changesets, for example), conary would treat 
+      it as a major internal error.  Now the error message will simply be 
+      printed to the screen instead.
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the
