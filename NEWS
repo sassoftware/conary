@@ -1,27 +1,36 @@
 Changes in @NEW@:
   o Bug Fixes:
     * Installing into a relative root <e.g. --root foo> when running as root
-      no longer tracebacks (bz #873)
-    * Replaced files are now stored in rollback (bz #915)
+      no longer generates a traceback. (bz #873)
+    * Replaced files are now stored in rollbacks. (bz #915)
     * File conflicts are detected in the database, not just in the filesystem
     * Conary will no longer allow multiple troves to own a file
     * Rollbacks of troves that are local cooks will no longer raise 
       a TroveIntegrityError
-    * Conary doesn't traceback in conary remove when the filename passed
-      cannot be unlinked (bz #887)
-    * cvc and conary w/ no commands work again.
+    * The conary remove command no longer generates a traceback when the
+      filename passed cannot be unlinked. (bz #887)
+    * The cvc and conary programs, when called with with no commands
+      specified, have been returned to their correct behavior of printing
+      a usage message.
     * Rollbacks for initial contents files didn't work; applying rollbacks
-      now ignores that flag to get the contents right on disk (bz #924)
-    * Patch treated lines-to-erase as normal patch conflicts, when they should
-      instead cause patch to give up on the hunk to avoid erasing lines which
-      didn't appear in the original version of the file (bz #949)
+      now ignores that flag to get the contents right on disk. (bz #924)
+    * The patch mechanism now properly gives up on patch hunks which
+      include changed lines-to-erase, which avoids erasing lines which
+      did not appear in the origial version of the file. (bz #949)
+
   o Client changes:
     * The rollback command now applies rollbacks up to and including the
       rollback number specified on the command line. It also allows the
       user to specify the number of rollbacks to apply (from the top of
-      the stack) instead of which rollback to apply (bz #884)
+      the stack) instead of which rollback to apply. (bz #884)
     * The path for installing files as part of a new trove involved taking
-      an exception. That's been reworked to avoid that overhead.
+      an exception. That has been changed to avoid that overhead and
+      thus speed up the install.
+
+  o Build Changes:
+    * The cvc command now has a --show-buildreqs option that prints all
+      build requirements.  The --no-deps argument for cvc has been
+      aliased to --ignore-buildreqs for consistency.
 
 Changes in 1.0.11:
   o Client Changes:

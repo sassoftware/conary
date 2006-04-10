@@ -90,7 +90,7 @@ for pathId, path, fileId in fileList:
         tarInfo.type = tarfile.SYMTYPE
         tarInfo.linkname = f.target()
     else:
-        print >> sys.stderr, "ccs2rpm doesn't know about file type %s", \
+        print >> sys.stderr, "ccs2tar doesn't know about file type %s", \
                     stream[0]
         sys.exit(0)
 

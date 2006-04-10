@@ -140,7 +140,7 @@ class Archive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive([I{dir},] [I{keyid},] [I{rpm},] [I{sourcename},] [I{use}])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -164,16 +164,13 @@ class Archive(_Source):
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcenameC{{.sig,sign,asc}}}, and
+    search for a file named I{archivename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file or URL specified by C{rpm} for an RPM
-    containing C{sourcename}.
-
-    B{sourcename} : The name of the source archive, which may be a
-    local filename or a Uniform Resource Locator. (URL)
+    containing I{archivename}.
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -209,13 +206,11 @@ class Archive(_Source):
         GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
         source code archive signature should be sought, and checked.
         If you provide the C{keyid} keyword, C{r.addArchive} will
-        search for a file named I{sourcenameC{{.sig,sign,asc}}} and
+        search for a file named I{archivename}C{.{sig,sign,asc}} and
         ensure it is signed with the appropriate GPG key. A missing signature
         results in a warning; a failed signature check is fatal.
     @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive} looks in the
-        file, or URL specified by C{rpm} for an RPM containing C{sourcename}.
-    @keyword sourcename: The name of the source archive, which may be a
-        local filename, or a Uniform Resource Locator. (URL)
+        file, or URL specified by C{rpm} for an RPM containing I{archivename}.
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
@@ -314,7 +309,7 @@ class Patch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch([I{backup},] [I{dir},] [I{extraArgs},] [I{keyid},] [I{level},] [I{macros},] [I{rpm},] [I{sourcename},] [I{use}])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -345,7 +340,7 @@ class Patch(_Source):
     Privacy Guard (GPG) key ID, without leading C{0x} for the source code
     archive signature should be sought, and checked. If you provide the
     C{keyid} keyword, {r.addPatch} will search for a file named
-    I{sourcenameC{{.sig,sign,asc}}}, and ensure it is signed with the
+    I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
     appropriate GPG key. A missing signature results in a warning; a failed
     signature check is fatal.
 
@@ -362,9 +357,7 @@ class Patch(_Source):
 
     B{rpm} : If the C{rpm} keyword is used, C{Archive}
     looks in the file, or URL specified by C{rpm} for an RPM
-    containing C{sourcename}.
-
-    B{sourcename} : The name of the patch file
+    containing I{patchname}.
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -414,21 +407,20 @@ class Patch(_Source):
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, {r.addPatch} will search for a file named
-        I{sourcenameC{{.sig,sign,asc}}}, and ensure it is signed with the
+        I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
     @keyword level: By default, one level of initial subdirectory names is
-    stripped out prior to applying the patch.  The C{level} keyword allows
-    specification of additional initial subdirectory levels to be removed.
+        stripped out prior to applying the patch.  The C{level} keyword allows
+        specification of additional initial subdirectory levels to be removed.
     @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
         macros in the body  of the patch will be interpolated before applying
         the patch. For example, a patch which modifies the value
         C{CFLAGS = -02} using C{CFLAGS = %(cflags)s} will update the C{CFLAGS}
         parameter based upon the current setting of C{recipe.macros.cflags}.
-    @keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
-        or URL specified by C{rpm} for an RPM containing C{sourcename}.
-    @keyword sourcename: The name of the patch file
+    @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
+        or URL specified by C{rpm} for an RPM containing I{patchname}.
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
@@ -477,7 +469,7 @@ class Source(_Source):
     SYNOPSIS
     ========
 
-    C{r.addSource([I{keyid},] [I{rpm},] [I{sourcename},] [I{use}])}
+    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -511,7 +503,7 @@ class Source(_Source):
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
     If you provide the C{keyid} keyword, C{r.addArchive} will
-    search for a file named I{sourcename}C{{.sig,sign,asc}}, and
+    search for a file named I{sourcename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
 
@@ -523,10 +515,8 @@ class Source(_Source):
 
     B{mode}: If set, provides the mode to set on the file.
 
-    B{rpm} : If the C{rpm} keyword is used, C{Archive} looks in the file, or
-    URL specified by C{rpm} for an RPM containing C{sourcename}.
-
-    B{sourcename} : The name of the file
+    B{rpm} : If the C{rpm} keyword is used, C{addArchive} looks in the file, or
+    URL specified by C{rpm} for an RPM containing I{sourcename}.
 
     B{use} : A Use flag or boolean, or a tuple of Use flags and/or booleans,
     that determine whether the archive is actually unpacked or merely stored
@@ -578,7 +568,7 @@ class Source(_Source):
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, C{r.addArchive} will search for a file named
-        I{sourcename}C{{.sig,sign,asc}}, and ensure it is signed with the
+        I{sourcename}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
     @keyword macros: If True, interpolate recipe macros in the body of a
@@ -590,9 +580,8 @@ class Source(_Source):
         use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
         values which determine whether the source code archive is actually
         unpacked, or merely stored in the archive.
-    @keyword rpm: If the C{rpm} keyword is used, C{Archive} looks in the file,
-        or URL specified by C{rpm} for an RPM containing C{sourcename}.
-    @keyword sourcename: The name of the file
+    @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
+        or URL specified by C{rpm} for an RPM containing I{sourcename}.
     @keyword use: A Use flag or boolean, or a tuple of Use flags and/or
         booleans, that determine whether the archive is actually unpacked or
         merely stored in the archive.
@@ -668,7 +657,7 @@ class Action(action.RecipeAction):
     SYNOPSIS
     ========
 
-    C{r.addAction([I{action},] [I{dir},] [I{use},])}
+    C{r.addAction([I{action},] [I{dir}=,] [I{use}=,])}
 
     DESCRIPTION
     ===========
@@ -680,9 +669,6 @@ class Action(action.RecipeAction):
     ========
 
     The following keywords are recognized by C{r.addAction}:
-
-    B{action} :  A command line which will be executed with macro
-    interpolation.
 
     B{dir} : Specify the directory where the file is to be located, relative
     to C{%(builddir)s}. By default, C{r.addAction} stores the file directly
@@ -716,8 +702,6 @@ class Action(action.RecipeAction):
 	@param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in  C{recipe} from
         within a recipe is unnecessary.
-    @keyword action:  A command line which will be executed with macro
-        interpolation.
     @keyword dir: Specify the directory where the file is to be located,
         relative to C{%(builddir)s}. By default, C{r.addAction} stores the
         file directly in C{%(builddir)s}. If an absolute directory is

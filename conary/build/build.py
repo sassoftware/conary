@@ -1164,10 +1164,10 @@ class SetModes(_FileAction):
     EXAMPLES
     ========
 
-    C{r.SetModes('%(sbindir)s/sendmail', 2755)}
+    C{r.SetModes('%(sbindir)s/sendmail', 02755)}
 
     Calls C{r.SetModes()} on the file C{%(sbindir)s/sendmail}, setting it to
-    mode C{2755}.
+    mode C{02755}.
     """
 
     def __init__(self, recipe, *args, **keywords):

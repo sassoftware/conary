@@ -52,7 +52,10 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-no-deps] \e
+.B \ \ \ \ \ [\fR\-\-ignore-buildreqs] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-show-buildreqs] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-signature-key <fingerprint>|None] \e
@@ -107,9 +110,15 @@ after the build is complete, even if the build is successful.
 This can be useful for rerunning policy for a complete build using 
 \-\-resume, or for examining the completed build directories.
 .IP 
-The \-\-no-deps option prevents conary from raising an error 
+The \-\-ignore-buildreqs option (also available as the \-\-no-deps
+option) prevents conary from raising an error 
 if a component or package listed as a build requirement for the package
 is not installed on the build system.
+.IP
+The \-\-show-buildreqs option prints the complete list of build dependencies,
+one dependency per line.  This includes dependencies not explicitly
+specified in the recipe but instead inherited from superclasses.
+No other build actions are performed.
 .IP
 If \-\-signature\-key is specified, the OpenPGP key in the local keyring with 
 that fingerprint will be used to create trove signatures for all troves created 
@@ -157,7 +166,7 @@ The commit will appear to originate from the individual who last committed the
 trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
 name. See the \fBExamples\fP section for more information.
 .TP
-.B commit [\-\-message \fI<message>\fP]\fP
+.B commit [\-\-message|\-m \fI<message>\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
 It will ask for a changelog message unless one is passed on the
