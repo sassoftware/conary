@@ -1400,15 +1400,16 @@ def _callSetup(cfg, recipeObj):
             debugger.post_mortem(sys.exc_info()[2])
             raise CookError(str(err))
 
+        filename = '<No File>'
+
         tb = sys.exc_info()[2]
         while tb.tb_next:
             tb = tb.tb_next
+            if tb.tb_frame.f_code.co_filename.endswith('.recipe'):
+                lastRecipeFrame = tb
+                break
 
-        if hasattr(sys.modules[recipeObj.__module__], 'filename'):
-            filename = sys.modules[recipeObj.__module__].filename
-        else:
-            filename = '<nofile>'
-
-	linenum = tb.tb_frame.f_lineno
-        del tb
+        filename = lastRecipeFrame.tb_frame.f_code.co_filename
+	linenum = lastRecipeFrame.tb_frame.f_lineno
+        del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
