@@ -21,6 +21,7 @@ Changes in @NEW@:
       (extracting sources from changesets, for example), conary would treat 
       it as a major internal error.  Now the error message will simply be 
       printed to the screen instead.
+    * A typo in a macro will now result in a more helpful error message.
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the
