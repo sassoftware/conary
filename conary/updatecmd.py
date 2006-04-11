@@ -170,6 +170,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             self.out.write('Applying update job %d of %d:\n' % self.updateHunk)
         # erase anything that is currently displayed
         self._message('')
+        self.formatter.prepareJobs(jobs)
         for line in self.formatter.formatJobTups(jobs, indent='    '):
             self.out.write(line + '\n')
 
