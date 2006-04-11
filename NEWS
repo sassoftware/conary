@@ -25,6 +25,9 @@ Changes in @NEW@:
     * A case where performing rq on an x86_64 box with a large installLabelPath
       where only an x86 flavor of a trove was availble on one label in the 
       installLabelPath has been fixed (bz #961). 
+    * Don't create a rollback status file when one isn't needed (this allows
+      /var/lib/conarydb to be on read-only media and have queries continue
+      to work)
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the
