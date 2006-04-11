@@ -961,7 +961,6 @@ class Database(SqlDbRepository):
             if not os.path.exists(self.rollbackStatus):
                 self.firstRollback = 0
                 self.lastRollback = -1
-                self.writeRollbackStatus()
             else:
                 self.readRollbackStatus()
             SqlDbRepository.__init__(self, root + path)
