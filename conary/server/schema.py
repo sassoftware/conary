@@ -128,7 +128,7 @@ def createFlavors(db):
             if value is None:
                 value = -1000000
             cu.execute("INSERT INTO FlavorScores (request, present, value) VALUES (?,?,?)",
-                       request, present, value)
+                       (request, present, value))
         commit = True
     db.createIndex("FlavorScores", "FlavorScoresIdx", "request, present", unique = True)
     if commit:
@@ -403,7 +403,7 @@ def createUsers(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Entitlements"] = []
         commit = True
-    db.createIndex("Entitlements", "EntitlementsEntGroupEntitlementIdx",
+    db.createIndex("Entitlements", "EntitlementsEgEIdx",
                    "entGroupId, entitlement", unique = True)
     if createTrigger(db, "Entitlements"):
         commit = True
@@ -442,7 +442,7 @@ def createPGPKeys(db):
         cu.execute("""
         CREATE TABLE PGPFingerprints(
             keyId           INTEGER NOT NULL,
-            fingerprint     CHAR(40) PRIMARY KEY,
+            fingerprint     CHAR(40) PRIMARY KEY NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT PGPFingerprints_keyId_fk
                 FOREIGN KEY (keyId) REFERENCES PGPKeys(keyId)
@@ -559,10 +559,10 @@ def createTroves(db):
             CONSTRAINT TroveRedirects_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT TroveRedirects_branchId_fk,
+            CONSTRAINT TroveRedirects_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT TroveRedirects_flavorId_fk,
+            CONSTRAINT TroveRedirects_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
