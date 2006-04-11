@@ -120,7 +120,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                            compressJobs=not cfg.showComponents)
 
         dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
-                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor)
+                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor,
+                             fullVersions=cfg.fullVersions)
 
 
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
