@@ -1403,11 +1403,17 @@ def _callSetup(cfg, recipeObj):
         filename = '<No File>'
 
         tb = sys.exc_info()[2]
+        lastRecipeFrame = None
         while tb.tb_next:
             tb = tb.tb_next
-            if tb.tb_frame.f_code.co_filename.endswith('.recipe'):
+            tbFileName = tb.tb_frame.f_code.co_filename
+            if tbFileName.endswith('.recipe'):
                 lastRecipeFrame = tb
-                break
+
+        if not lastRecipeFrame:
+            # too bad, we didn't find a file ending in .recipe in our 
+            # stack.  Let's just assume the lowest frame is the right one.
+            lastRecipeFrame = tb
 
         filename = lastRecipeFrame.tb_frame.f_code.co_filename
 	linenum = lastRecipeFrame.tb_frame.f_lineno
