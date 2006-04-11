@@ -27,8 +27,9 @@ if __name__ == "__main__":
     # ondemand importing for conary command line tool 
     # - but don't impose it on others!  They can load it on their own if they
     # want.
-    from conary.lib import importer
-    importer.install()
+    if '--debug-all' not in sys.argv:
+        from conary.lib import importer
+        importer.install()
 
 #stdlib
 import optparse
