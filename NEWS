@@ -14,6 +14,9 @@ Changes in @NEW@:
     * removed obsolete changemail script
     * Exceptions which display fileId's display them as hex sha1s now
       instead of as python strings
+    * A case where performing rq on an x86_64 box with a large installLabelPath
+      where only an x86 flavor of a trove was availble on one label in the 
+      installLabelPath has been fixed (bz #961). 
 
  o Build fixes:
     * The default ComponentSpec for :perl components now include files
