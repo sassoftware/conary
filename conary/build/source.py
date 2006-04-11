@@ -50,7 +50,8 @@ class _Source(action.RecipeAction):
             else:
                 oldexcepthook = sys.excepthook
                 sys.excepthook = action.genExcepthook(self)
-                self.recipe.buildinfo.lastline = self.linenum
+                if self.recipe.buildinfo:
+                    self.recipe.buildinfo.lastline = self.linenum
                 self._doPrep()
                 sys.excepthook = oldexcepthook
 
