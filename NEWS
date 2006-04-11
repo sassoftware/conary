@@ -22,6 +22,9 @@ Changes in @NEW@:
       it as a major internal error.  Now the error message will simply be 
       printed to the screen instead.
     * A typo in a macro will now result in a more helpful error message.
+    * A case where performing rq on an x86_64 box with a large installLabelPath
+      where only an x86 flavor of a trove was availble on one label in the 
+      installLabelPath has been fixed (bz #961). 
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the

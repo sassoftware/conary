@@ -276,7 +276,6 @@ class QueryByLabelPath(Query):
     def findAll(self, troveSource, missing, finalMap):
 
         index = 0
-        namesToFind = set(self.query)
         foundNames = set()
         if self.acrossLabels:
             foundNameLabels = set()
@@ -294,7 +293,6 @@ class QueryByLabelPath(Query):
                 except IndexError:
                     if name not in foundNames:
                         self.addMissing(missing, name)
-                        namesToFind.remove(name)
                     del(self.query[name])
                     continue
 
@@ -327,7 +325,6 @@ class QueryByLabelPath(Query):
 
                 # found name, don't search for it any more
                 foundNames.add(name)
-                namesToFind.remove(name)
 
                 pkgList = []
                 for version, flavorList in matches.iteritems():
