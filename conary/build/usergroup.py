@@ -25,7 +25,7 @@ class User(build.BuildAction):
 
     SYNOPSIS
     ========
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}')}}
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}'})}
 
     DESCRIPTION
     ===========
@@ -42,6 +42,7 @@ class User(build.BuildAction):
     will have the salted password, and given enough time will be able to
     recover the original password.  Trust the security of this password as
     far as you trust the security of the repository it is stored in.
+
     KEYWORDS
     ========
 
