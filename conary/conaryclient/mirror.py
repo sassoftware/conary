@@ -218,10 +218,12 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
 
 # While running under --test, we should not touch the mirror mark of the target repository
 CurrentTestMark = None
+LastBundleSet = None
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False):
     global CurrentTestMark
+    global LastBundleSet
 
     # find the latest timestamp stored on the target mirror
     if sync:
@@ -300,9 +302,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # of responses getNewTroveList() will return
         bundles = bundles[:-1]
 
+    if test and LastBundleSet == bundles:
+        log.debug("test mode detected a loop, ending...")
+        return 0
+    LastBundleSet = bundles
+
     for i, bundle in enumerate(bundles):
-        (outFd, tmpName) = util.mkstemp()
-        os.close(outFd)
         jobList = [ x[1] for x in bundle ]
         # XXX it's a shame we can't give a hint as to what server to use
         # to avoid having to open the changeset and read in bits of it
@@ -310,11 +315,13 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("test mode: skipping retrieval (%d of %d) %s" % (i + 1, len(bundles), jobList))
             log.debug("test mode: skipping commit")
         else:
+            (outFd, tmpName) = util.mkstemp()
+            os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), jobList))
             cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
-        os.unlink(tmpName)
+            os.unlink(tmpName)
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
         # compute the max mark of the bundles we comitted
