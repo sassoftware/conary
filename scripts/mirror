@@ -93,6 +93,6 @@ targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
 count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
                                 test = options.test, sync = options.sync,
                                 syncSigs = options.syncSigs)
-while not options.test and count:
+while count:
     count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
                                     test = options.test)
