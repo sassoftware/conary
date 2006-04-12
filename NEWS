@@ -31,6 +31,8 @@ Changes in @NEW@:
     * Reworked "conary remove" to improve error messages and fix problems
       with multiple files being specified, broken symlinks, and relative
       paths (bz #853, #854)
+    * the mirror client's --test mode now works correctly instead of doing 
+      a single iteration
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the

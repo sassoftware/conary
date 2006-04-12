@@ -216,14 +216,27 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
 
     return updateCount
 
+# While running under --test, we should not touch the mirror mark of the target repository
+CurrentTestMark = None
+
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False):
+    global CurrentTestMark
+
     # find the latest timestamp stored on the target mirror
     if sync:
         currentMark = -1
-        targetRepos.setMirrorMark(cfg.host, currentMark)
+        if test:
+            CurrentTestMark = currentMark
+        else:
+            targetRepos.setMirrorMark(cfg.host, currentMark)
     else:
-        currentMark = targetRepos.getMirrorMark(cfg.host)
+        if test and CurrentTestMark is not None:
+            currentMark = CurrentTestMark
+        else:
+            currentMark = targetRepos.getMirrorMark(cfg.host)
+            CurrentTestMark = currentMark
+
     log.debug("currently up to date through %d", int(currentMark))
 
     # first, mirror signatures for troves already mirrored
@@ -268,7 +281,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
         log.debug("advancing newMark to %d" % int(crtMaxMark))
-        targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+        if test:
+            CurrentTestMark = crtMaxMark
+        else:
+            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
         # try again
         return -1
 
@@ -288,13 +304,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         (outFd, tmpName) = util.mkstemp()
         os.close(outFd)
         jobList = [ x[1] for x in bundle ]
-        log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), jobList))
-        cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
         # XXX it's a shame we can't give a hint as to what server to use
         # to avoid having to open the changeset and read in bits of it
         if test:
-            log.debug("(skipping commit due to test mode)")
+            log.debug("test mode: skipping retrieval (%d of %d) %s" % (i + 1, len(bundles), jobList))
+            log.debug("test mode: skipping commit")
         else:
+            log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), jobList))
+            cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
         os.unlink(tmpName)
@@ -303,5 +320,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # compute the max mark of the bundles we comitted
         crtMaxMark = max([max([x[0] for x in bundle]) for bundle in bundles])
         log.debug("setting the mirror mark to %d", int(crtMaxMark))
-        targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+        if test:
+            CurrentTestMark = crtMaxMark
+        else:
+            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
     return updateCount
