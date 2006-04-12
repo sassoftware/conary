@@ -86,7 +86,7 @@ for pathId, path, fileId in fileList:
         fObj = cs.getFileContents(pathId)[1].get()
     elif isinstance(f, files.Directory):
         tarInfo.type = tarfile.DIRTYPE
-    elif isinstance(f, files.SymLink):
+    elif isinstance(f, files.SymbolicLink):
         tarInfo.type = tarfile.SYMTYPE
         tarInfo.linkname = f.target()
     else:
