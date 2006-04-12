@@ -28,6 +28,9 @@ Changes in @NEW@:
     * Don't create a rollback status file when one isn't needed (this allows
       /var/lib/conarydb to be on read-only media and have queries continue
       to work)
+    * Reworked "conary remove" to improve error messages and fix problems
+      with multiple files being specified, broken symlinks, and relative
+      paths (bz #853, #854)
 
   o Client changes:
     * The rollback command now applies rollbacks up to and including the

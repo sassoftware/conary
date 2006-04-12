@@ -400,28 +400,54 @@ class RemoveCommand(ConaryCommand):
     paramHelp = "<path>+"
 
     def runCommand(self, cfg, argSet, otherArgs):
-        if len(otherArgs) != 3: return self.usage()
+        if len(otherArgs) < 3: return self.usage()
         if argSet: return self.usage()
-        db = openDatabase(cfg.root, cfg.dbPath)
-        fullPath = util.joinPaths(cfg.root, otherArgs[2])
-        if os.path.exists(fullPath):
+
+        client = conaryclient.ConaryClient(cfg)
+        db = client.db
+        log.syslog.command()
+
+        rc = 0
+
+        for path in otherArgs[2:]:
+            if not path:
+                log.error("remove cannot handle an empty path")
+                return 1
+
+            if path[0] == '/':
+                fullPath = util.joinPaths(cfg.root, path)
+            else:
+                fullPath = os.path.realpath(path)
+                if fullPath.startswith(cfg.root) and cfg.root != '/':
+                    # fix up the path to be relative to the root dir
+                    path = fullPath[len(cfg.root):]
+                    if path[0] != '/':
+                        # the root ended with a /
+                        path = '/' + fullPath
+
+            matches = db.removeFile(path)
+            if not matches:
+                log.error('%s is not owned by any troves in the database', 
+                          path)
+                rc = 1
+                continue
+
             try:
-                os.unlink(fullPath)
+                try:
+                    os.unlink(fullPath)
+                except OSError, e:
+                    if e.errno != errno.ENOENT:
+                        raise
+
+                    log.warning("%s has already been removed from the "
+                                "filesystem", fullPath)
             except OSError, e:
                 log.error("cannot remove %s: %s" % (fullPath, e.strerror))
-                sys.exit(1)
+                rc = 1
             except Exception, e:
                 log.error("cannot remove %s: %s" % (fullPath, str(e)))
-                sys.exit(1)
-        else:
-            log.warning("%s has already been removed", fullPath)
-        # this call should move into conaryclient; for now we need
-        # this to instantiate the log
-        from conary import conaryclient
-        client = conaryclient.ConaryClient(cfg)
-        log.syslog.command()
-        for path in otherArgs[2:]:
-            db.removeFile(otherArgs[2])
+                rc = 1
+
         log.syslog.commandComplete()
 _register(RemoveCommand)
 
@@ -1033,7 +1059,8 @@ def realMain(cfg, argv=sys.argv, debugAll=False,
         prof.stop()
 
     if log.errorOccurred():
-        sys.exit(1)
+        return 1
+
     return rv
 
 def main(argv=sys.argv):
