@@ -774,7 +774,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	os._exit(1)
     os.close(rpipe)
     while 1:
-        buf = uncompressed.read(4096)
+        buf = uncompressed.read(16384)
 	if not buf:
 	    break
 	os.write(wpipe, buf)

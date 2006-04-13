@@ -24,7 +24,7 @@ from conary.lib import util
 def usage():
     print "Usage: rpm2cpio <rpmpackage> | cpio -ivumd"
     return 1
-            
+
 def main(argv):
     if len(argv) > 2 or len(argv) < 2:
         return usage()
@@ -60,11 +60,11 @@ def main(argv):
     rpmhelper.seekToData(r)
     uncompressed = decompressor(r)
     while 1:
-	buf = uncompressed.read(4096)
+	buf = uncompressed.read(16384)
 	if not buf:
 	    break
 	sys.stdout.write(buf)
-    
-                
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
