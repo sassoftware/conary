@@ -157,6 +157,14 @@ class DirectedGraph:
         return [ self.data.get(x[0])
                     for x in self.edges.iteritems() if not x[1] ]
 
+    def getDisconnected(self):
+        # gets nodes with neither edges pointing in or out
+        disconnected = set(x[0] for x in self.edges.iteritems() if not x[1])
+        for edges in self.edges.itervalues():
+            disconnected.difference_update(edges)
+            if not disconnected:
+                break
+        return self.data.getItemsByIndex(disconnected)
 
     def transpose(self):
         g = DirectedGraph()

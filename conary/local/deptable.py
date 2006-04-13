@@ -250,12 +250,35 @@ class DependencyChecker:
 
         return nodeId
 
-    def _buildEdges(self, oldOldEdges, newNewEdges):
+    def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges):
         for (reqNodeId, provNodeId, depId) in oldOldEdges:
             # remove the provider after removing the requirer
             self.g.addEdge(reqNodeId, provNodeId)
 
         for (reqNodeId, provNodeId, depId) in newNewEdges:
+            self.g.addEdge(provNodeId, reqNodeId)
+
+        for leafId in self.g.getDisconnected():
+            # if nothing depends on a node and the node 
+            # depends on nothing, tie the node to its
+            # parent.  This will create a cycle and ensure that
+            # they get installed together.
+            job = self.nodes[leafId][0]
+            if trove.troveIsCollection(job[0]): continue
+
+            newPkgInfo = (job[0].split(':', 1)[0], job[2][0], job[2][1])
+
+            parentId = self.newInfoToNodeId.get(newPkgInfo, 0)
+            if not parentId:
+                oldPkgInfo = (job[0].split(':', 1)[0], job[2][0], job[2][1])
+                parentId = self.oldInfoToNodeId.get(oldPkgInfo, 0)
+                if not parentId:
+                    continue
+
+            self.g.addEdge(parentId, leafId)
+
+
+        for (reqNodeId, provNodeId, depId) in collectionEdges:
             self.g.addEdge(provNodeId, reqNodeId)
 
     def _collapseEdges(self, oldOldEdges, oldNewEdges, newOldEdges, 
@@ -680,7 +703,7 @@ class DependencyChecker:
         # This forces collections to be installed after all of their
         # elements.  We include weak references in case the intermediate
         # trove is not part of the update job.
-        newNewEdges.update(self._createCollectionEdges())
+        collectionEdges =  (self._createCollectionEdges())
 
         resatisfied = set(brokenByErase) & set(satisfied)
         if resatisfied:
@@ -721,7 +744,7 @@ class DependencyChecker:
         # and the particular depId no longer matter. The direction here is
         # a bit different, and defines the ordering for the operation, not
         # the order of the dependency
-        self._buildEdges(oldOldEdges, newNewEdges)
+        self._buildEdges(oldOldEdges, newNewEdges, collectionEdges)
         del oldOldEdges
         del newNewEdges
 
