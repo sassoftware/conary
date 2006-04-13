@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.12:
   o Bug Fixes:
     * Installing into a relative root <e.g. --root foo> when running as root
       no longer generates a traceback. (bz #873)
@@ -23,7 +23,7 @@ Changes in @NEW@:
       printed to the screen instead.
     * A typo in a macro will now result in a more helpful error message.
     * A case where performing rq on an x86_64 box with a large installLabelPath
-      where only an x86 flavor of a trove was availble on one label in the 
+      where only an x86 flavor of a trove was available on one label in the 
       installLabelPath has been fixed (bz #961). 
     * Don't create a rollback status file when one isn't needed (this allows
       /var/lib/conarydb to be on read-only media and have queries continue
