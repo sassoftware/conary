@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -120,7 +120,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                            compressJobs=not cfg.showComponents)
 
         dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
-                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor)
+                             showLabels=cfg.showLabels, baseFlavors=cfg.flavor,
+                             fullVersions=cfg.fullVersions)
 
 
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,

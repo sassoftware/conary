@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -56,9 +56,9 @@ class Hunk:
                 # a line which has been changed. Return that every line
                 # conflicts to ensure we don't apply this.
                 if srcLine >= srcLen:
-                    return len(self.lines)
+                    conflicts = len(self.lines)
                 elif src[srcLine] != line[1:]:
-                    return len(self.lines)
+                    conflicts = len(self.lines)
                 srcLine += 1
 
         if conflicts:

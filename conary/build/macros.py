@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -89,8 +89,14 @@ class Macros(dict):
 	    return self.__repmethod(self.__overrides[name], repmethod)
 	if not name in self:
 	    # update on access
-	    # okay for this to fail bc of no __macros
-	    # -- equivalent to missing dict value
+            try:
+                value = self.__macros[name]
+            except KeyError:
+                # let's make this error message more helpful
+                # so our users will have a chance of debugging.
+                raise KeyError, ('Unknown macro "%s" - check for'
+                                 ' spelling mistakes' % name)
+
 	    value = self.__macros[name]
 	    self[name] = value
 	    return self.__repmethod(value, repmethod)

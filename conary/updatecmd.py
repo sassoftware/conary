@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -170,6 +170,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             self.out.write('Applying update job %d of %d:\n' % self.updateHunk)
         # erase anything that is currently displayed
         self._message('')
+        self.formatter.prepareJobs(jobs)
         for line in self.formatter.formatJobTups(jobs, indent='    '):
             self.out.write(line + '\n')
 

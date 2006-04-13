@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -59,9 +59,22 @@ class FilesystemJob:
     def _registerLinkGroup(self, linkGroup, target):
         self.linkGroups[linkGroup] = target
 
-    def _restore(self, fileObj, target, msg, contentsOverride = ""):
-	self.restores.append((fileObj.pathId(), fileObj, target, 
-                              contentsOverride, msg))
+    def _restore(self, fileObj, target, troveInfo, msg, contentsOverride = "",
+                 replaceFiles = False):
+        if target in self.restores:
+            pathId = self.restores[target][0]
+            troveInfo = self.restores[target][4]
+
+            if not replaceFiles:
+                self.errors.append(DatabasePathConflictError(
+                                   util.normpath(target),
+                                   troveInfo[0], troveInfo[1], troveInfo[2]))
+
+            self.userRemoval(troveInfo[0], troveInfo[1], troveInfo[2],
+                             pathId)
+
+        self.restores[target] = (fileObj.pathId(), fileObj, contentsOverride,
+                                 msg, troveInfo)
         if fileObj.hasContents:
             self.restoreSize += fileObj.contents.size()
 
@@ -243,8 +256,12 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	contents = None
-	# restore in the same order files appear in the change set
-        restores = self.restores[:]
+	# restore in the same order files appear in the change set (which
+        # is sorted by pathId
+        # pathId, fileObj, targetPath, contentsOverride, msg
+        restores = [ (x[1][0], x[1][1], x[0], x[1][2], x[1][3]) for x
+                            in self.restores.iteritems() ]
+
         restores.sort()
         delayedRestores = []
         ptrTargets = {}
@@ -602,6 +619,7 @@ class FilesystemJob:
         # errors occur, fsTrove gets updated to the new version of the trove
         # this doesn't matter for binary stuff, just source management
 	fullyUpdated = True
+        replaceFiles = (flags & REPLACEFILES) != 0
 
 	if (flags & IGNOREUGIDS) or os.getuid():
 	    noIds = True
@@ -610,6 +628,9 @@ class FilesystemJob:
 	else:
 	    noIds = False
             twmSkipList = {  "contents" : True }
+
+        newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
+                        troveCs.getNewFlavor())
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -686,7 +707,7 @@ class FilesystemJob:
                             fileConflict = \
                                     not silentlyReplace(headFile, existingFile)
 
-                    if fileConflict and (flags & REPLACEFILES):
+                    if fileConflict and replaceFiles:
                         # --replace-files was specified
                         fileConflict = False
 
@@ -705,7 +726,8 @@ class FilesystemJob:
                         fullyUpdated = False
                         continue
 
-	    self._restore(headFile, headRealPath, "creating %s")
+            self._restore(headFile, headRealPath, newTroveInfo, "creating %s",
+                          replaceFiles = replaceFiles)
 	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
 
         # get the baseFile which was originally installed
@@ -852,7 +874,7 @@ class FilesystemJob:
                         # something else instead of a directory
                         forceUpdate = True
                         attributesChanged = True
-                elif flags & REPLACEFILES or baseFile.lsTag == fsFile.lsTag:
+                elif replaceFiles or baseFile.lsTag == fsFile.lsTag:
                     # the file type changed between versions. Force an
                     # update because changes cannot be be merged
                     attributesChanged = True
@@ -864,7 +886,7 @@ class FilesystemJob:
                 # the user changed the file type. we could try and
                 # merge things a bit more intelligently then we do
                 # here, but it probably isn't worth the effort
-                if flags & REPLACEFILES:
+                if replaceFiles:
                     attributesChanged = True
                     fsFile = headFile
                     forceUpdate = True
@@ -918,7 +940,7 @@ class FilesystemJob:
                    headFile.flags.isInitialContents():
 		    log.debug("skipping new contents of InitialContents file"
                               "%s" % finalPath)
-		elif forceUpdate or (flags & REPLACEFILES) or \
+		elif forceUpdate or replaceFiles or \
                         (not flags & MERGE) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:
@@ -946,18 +968,20 @@ class FilesystemJob:
                         # once this is applied
                         fsFile.contents.sha1.set(sha1helper.sha1String(newContents))
                         fsFile.contents.size.set(len(newContents))
-			self._restore(fsFile, realPath, 
+                        self._restore(fsFile, realPath, newTroveInfo,
 				      "replacing %s with contents "
 				      "from repository",
-				      contentsOverride = headFileContents)
+				      contentsOverride = headFileContents,
+                                      replaceFiles = replaceFiles)
 		    else:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
                             fsFile.contents.sha1.set(headFile.contents.sha1())
                             fsFile.contents.size.set(headFile.contents.size())
-			self._restore(fsFile, realPath, 
+                        self._restore(fsFile, realPath, newTroveInfo,
 				      "replacing %s with contents "
-				      "from repository")
+				      "from repository",
+                                      replaceFiles = replaceFiles)
 
 		    beenRestored = True
 		elif headFile.contents == baseFile.contents:
@@ -987,9 +1011,9 @@ class FilesystemJob:
 
                     cont = filecontents.FromString("".join(newLines))
                     # XXX update fsFile.contents.{sha1,size}?
-                    self._restore(fsFile, realPath, 
+                    self._restore(fsFile, realPath, newTroveInfo,
                           "merging changes from repository into %s",
-                          contentsOverride = cont)
+                          contentsOverride = cont, replaceFiles = replaceFiles)
                     beenRestored = True
 
                     if failedHunks:
@@ -1012,9 +1036,9 @@ class FilesystemJob:
                 self._registerLinkGroup(headFile.linkGroup(), realPath)
 
 	    if attributesChanged and not beenRestored:
-		self._restore(fsFile, realPath, 
+                self._restore(fsFile, realPath, newTroveInfo,
 		      "merging changes from repository into %s",
-		      contentsOverride = None)
+                      contentsOverride = None, replaceFiles = replaceFiles)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
@@ -1050,7 +1074,7 @@ class FilesystemJob:
 	@type flags: int bitfield
 	"""
 	self.renames = []
-	self.restores = []
+	self.restores = {}
         self.restoreSize = 0
 	self.removes = {}
 	self.oldTroves = []

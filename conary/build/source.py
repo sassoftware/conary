@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -20,6 +20,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 
 import gzip
 import os
+import sys
 
 from conary.lib import log, magic
 from conary.build import lookaside
@@ -41,10 +42,24 @@ class _Source(action.RecipeAction):
 	self.rpm = self.rpm % recipe.macros
 
     def doPrep(self):
-	if self.keyid:
-	    self._addSignature()
-	if self.rpm:
-	    self._extractFromRPM()
+        if self.debug:
+            debugger.set_trace()
+        if self.use:
+            if self.linenum is None:
+                self._doPrep()
+            else:
+                oldexcepthook = sys.excepthook
+                sys.excepthook = action.genExcepthook(self)
+                if self.recipe.buildinfo:
+                    self.recipe.buildinfo.lastline = self.linenum
+                self._doPrep()
+                sys.excepthook = oldexcepthook
+
+    def _doPrep(self):
+        if self.keyid:
+            self._addSignature()
+        if self.rpm:
+            self._extractFromRPM()
 
     def doAction(self):
 	self.builddir = self.recipe.macros.builddir

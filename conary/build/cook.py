@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -1400,15 +1400,22 @@ def _callSetup(cfg, recipeObj):
             debugger.post_mortem(sys.exc_info()[2])
             raise CookError(str(err))
 
+        filename = '<No File>'
+
         tb = sys.exc_info()[2]
+        lastRecipeFrame = None
         while tb.tb_next:
             tb = tb.tb_next
+            tbFileName = tb.tb_frame.f_code.co_filename
+            if tbFileName.endswith('.recipe'):
+                lastRecipeFrame = tb
 
-        if hasattr(sys.modules[recipeObj.__module__], 'filename'):
-            filename = sys.modules[recipeObj.__module__].filename
-        else:
-            filename = '<nofile>'
+        if not lastRecipeFrame:
+            # too bad, we didn't find a file ending in .recipe in our 
+            # stack.  Let's just assume the lowest frame is the right one.
+            lastRecipeFrame = tb
 
-	linenum = tb.tb_frame.f_lineno
-        del tb
+        filename = lastRecipeFrame.tb_frame.f_code.co_filename
+	linenum = lastRecipeFrame.tb_frame.f_lineno
+        del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))

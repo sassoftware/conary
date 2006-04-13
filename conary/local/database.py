@@ -7,7 +7,7 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
@@ -739,6 +739,8 @@ class Database(SqlDbRepository):
 	self.commit()
 
     def removeFile(self, path, multipleMatches = False):
+        # returns the number of troves the path was removed from
+
 	if not multipleMatches:
 	    # make sure there aren't too many
 	    count = 0
@@ -747,11 +749,15 @@ class Database(SqlDbRepository):
 		if count > 1: 
 		    raise DatabaseError, "multiple troves own %s" % path
 
+        count = 0
 	for trv in self.db.iterFindByPath(path):
+            count += 1
 	    self.db.removeFileFromTrove(trv, path)
             log.syslog("removed file %s from %s", path, trv.getName())
 
         self.db.commit()
+
+        return count
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
@@ -961,7 +967,6 @@ class Database(SqlDbRepository):
             if not os.path.exists(self.rollbackStatus):
                 self.firstRollback = 0
                 self.lastRollback = -1
-                self.writeRollbackStatus()
             else:
                 self.readRollbackStatus()
             SqlDbRepository.__init__(self, root + path)
