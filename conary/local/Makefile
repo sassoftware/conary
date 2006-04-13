@@ -14,6 +14,7 @@
 
 python_files = database.py	\
 		deptable.py	\
+		errors.py	\
 		__init__.py	\
 		localrep.py	\
 		sqldb.py	\
