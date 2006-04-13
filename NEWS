@@ -1,52 +1,58 @@
-Changes in @NEW@:
-  o Bug Fixes:
-    * Installing into a relative root <e.g. --root foo> when running as root
-      no longer generates a traceback. (bz #873)
-    * Replaced files are now stored in rollbacks. (bz #915)
-    * File conflicts are detected in the database, not just in the filesystem
-    * Conary will no longer allow multiple troves to own a file
-    * Rollbacks of troves that are local cooks will no longer raise 
-      a TroveIntegrityError
-    * The conary remove command no longer generates a traceback when the
-      filename passed cannot be unlinked. (bz #887)
-    * The cvc and conary programs, when called with with no commands
-      specified, have been returned to their correct behavior of printing
-      a usage message.
-    * Rollbacks for initial contents files didn't work; applying rollbacks
-      now ignores that flag to get the contents right on disk. (bz #924)
-    * The patch mechanism now properly gives up on patch hunks which
-      include changed lines-to-erase, which avoids erasing lines which
-      did not appear in the origial version of the file. (bz #949)
-    * When normal errors occurred while prepping sources for cooking 
-      (extracting sources from changesets, for example), conary would treat 
-      it as a major internal error.  Now the error message will simply be 
-      printed to the screen instead.
-    * A typo in a macro will now result in a more helpful error message.
-    * A case where performing rq on an x86_64 box with a large installLabelPath
-      where only an x86 flavor of a trove was availble on one label in the 
-      installLabelPath has been fixed (bz #961). 
-    * Don't create a rollback status file when one isn't needed (this allows
-      /var/lib/conarydb to be on read-only media and have queries continue
-      to work)
-    * Reworked "conary remove" to improve error messages and fix problems
-      with multiple files being specified, broken symlinks, and relative
-      paths (bz #853, #854)
-    * the mirror client's --test mode now works correctly instead of doing 
-      a single iteration
-
+Changes in 1.0.12:
   o Client changes:
-    * The rollback command now applies rollbacks up to and including the
-      rollback number specified on the command line. It also allows the
-      user to specify the number of rollbacks to apply (from the top of
-      the stack) instead of which rollback to apply. (bz #884)
-    * The path for installing files as part of a new trove involved taking
-      an exception. That has been changed to avoid that overhead and
-      thus speed up the install.
+    * The rollback command now applies rollbacks up to and including
+      the rollback number specified on the command line. It also
+      allows the user to specify the number of rollbacks to apply
+      (from the top of the stack) instead of which rollback to
+      apply. (bz #884)
+    * Previously, the code path for installing files as part of a new
+      trove required an exception to be handled.  The code has been
+      refactored to eliminate the exception in order to reduce install
+      times.
 
   o Build Changes:
     * The cvc command now has a --show-buildreqs option that prints all
       build requirements.  The --no-deps argument for cvc has been
       aliased to --ignore-buildreqs for consistency.
+
+  o Bug Fixes:
+    * Installing into a relative root <e.g. --root foo> when running
+      as root no longer generates a traceback. (bz #873)
+    * Replaced files are now stored in rollbacks. (bz #915)
+    * File conflicts are now also detected via the database, not just
+      via real file conflicts in the filesystem.
+    * A bug that resulted in multiple troves owning a file has been fixed.
+    * Rollbacks of troves that were cooked locally will no longer
+      raise a TroveIntegrityError.
+    * The "conary remove" command no longer generates a traceback when
+      the filename given cannot be unlinked. (bz #887)
+    * The missing usage message displayed when "cvc" and "conary" are
+      run with no command line arguments has been restored.
+    * Rollbacks for initial contents files didn't work; applying
+      rollbacks now ignores that flag to get the correct contents on
+      disk. (bz #924)
+    * The patch implementation now properly gives up on patch hunks
+      which include changed lines-to-erase, which avoids erasing lines
+      which did not appear in the origial version of the file. (bz
+      #949)
+    * Previously, when a normal error occurred while prepping sources
+      for cooking (extracting sources from source archives, for
+      example), conary would treat it as a major internal error.  Now
+      the error message is simply printed to the screen instead.
+    * A typo in a macro will now result in a more helpful error
+      message.
+    * A bug that caused a traceback when performing "conary rq" on an
+      x86_64 box with a large installLabelPath where only an x86
+      flavor of a trove was available on one label in the
+      installLabelPath has been fixed (bz #961).
+    * Conary no longer creates a rollback status file when one isn't
+      needed.  This allows /var/lib/conarydb to be on read-only media
+      and have queries continue to work/.
+    * Reworked "conary remove" to improve error messages and fix
+      problems with multiple files being specified, broken symlinks,
+      and relative paths (bz #853, #854)
+    * The mirror script's --test mode now works correctly instead of
+      doing a single iteration and stopping.
 
 Changes in 1.0.11:
   o Client Changes:
