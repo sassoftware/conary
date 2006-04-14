@@ -189,11 +189,12 @@ def signAbsoluteChangeset(cs, fingerprint=None):
     return cs
 
 def cookObject(repos, cfg, recipeClass, sourceVersion,
-               changeSetFile = None, prep=True, macros={}, 
-               targetLabel = None, resume = None, alwaysBumpCount = False, 
+               changeSetFile = None, prep=True, macros={},
+               targetLabel = None, resume = None, alwaysBumpCount = False,
                allowUnknownFlags = False, allowMissingSource = False,
-               ignoreDeps = False, logBuild = False, 
-               crossCompile = None, callback = None):
+               ignoreDeps = False, logBuild = False,
+               crossCompile = None, callback = None, 
+               requireCleanSources = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -235,9 +236,12 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type logBuild: bool
     @param logBuild: if True, log the build to a file that will be included
     in the changeset
+    @param allowChangeSet: allow build of this trove when the source version
     specified does not point to an existing source trove.  Warning -- this
-    can lead to strange trove seupts
+    can lead to strange trove setups
     @type allowMissingSource: bool
+    @param requireCleanSources: require that this build be clean - that its 
+    sources all be from the repository.
     @rtype: list of strings
     """
 
@@ -316,7 +320,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
                                 ignoreDeps = ignoreDeps, logBuild = logBuild,
-                                crossCompile = crossCompile)
+                                crossCompile = crossCompile,
+                                requireCleanSources = requireCleanSources)
     elif recipeClass.getType() == recipe.RECIPE_TYPE_REDIRECT:
 	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
@@ -627,7 +632,8 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
-                      ignoreDeps=False, logBuild=False, crossCompile = None):
+                      ignoreDeps=False, logBuild=False, crossCompile = None,
+                      requireCleanSources = False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -666,7 +672,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                                  ignoreDeps=ignoreDeps, 
                                  logBuild=logBuild, 
                                  crossCompile=crossCompile,
-                                 enforceManagedPolicy=enforceManagedPolicy)
+                                 enforceManagedPolicy=enforceManagedPolicy,
+                                 requireCleanSources = requireCleanSources)
     if not result:
         return
 
@@ -684,7 +691,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
 def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		       macros={}, resume = None, ignoreDeps=False, 
                        logBuild=False, crossCompile=None, 
-                       enforceManagedPolicy=False):
+                       enforceManagedPolicy=False,  requireCleanSources = False):
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
@@ -692,8 +699,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     lcache = lookaside.RepositoryCache(repos)
 
-    srcdirs = [ os.path.dirname(recipeClass.filename),
-		cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
+    if requireCleanSources:
+        srcdirs = []
+    else:
+        srcdirs = [ os.path.dirname(recipeClass.filename),
+                    cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
 
     recipeObj.populateLcache()
@@ -1107,7 +1117,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
-             crossCompile = None, callback = None):
+             crossCompile = None, callback = None, requireCleanSources = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1147,6 +1157,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
 
 	pkgname = recipeFile.split('/')[-1].split('.')[0]
+
+        if requireCleanSources is None:
+            requireCleanSources = False
 
 	try:
 	    use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
@@ -1195,6 +1208,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
+        if requireCleanSources is None:
+            requireCleanSources = True
 
         if emerge:
             labelPath = cfg.installLabelPath
@@ -1236,12 +1251,13 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                             prep = prep, macros = macros,
 			    targetLabel = targetLabel,
                             sourceVersion = sourceVersion,
-			    resume = resume, 
+			    resume = resume,
                             allowUnknownFlags = allowUnknownFlags,
                             allowMissingSource=False, ignoreDeps=ignoreDeps,
-                            logBuild=logBuild, 
-                            crossCompile=crossCompile, 
-                            callback=callback)
+                            logBuild=logBuild,
+                            crossCompile=crossCompile,
+                            callback=callback,
+                            requireCleanSources=requireCleanSources)
         if troves:
             built = (tuple(troves), changeSetFile)
     except errors.RepositoryError, e:
