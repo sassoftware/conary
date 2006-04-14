@@ -1,3 +1,11 @@
+Changes in @NEW@:
+  o Build Changes:
+    * The addSource source action will now replace existing files,
+      rather than replacing their contents.  This implies that the
+      mode of the existing file will not be inherited, and an
+      existing readonly file will not prevent addSource from
+      working.
+
 Changes in 1.0.12:
   o Client changes:
     * The rollback command now applies rollbacks up to and including

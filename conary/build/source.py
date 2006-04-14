@@ -638,6 +638,7 @@ class Source(_Source):
                                                   defaultDir=defaultDir)
         util.mkdirChain(destDir)
         destFile = os.sep.join((destDir, self.dest))
+        util.removeIfExists(destFile)
 	if self.contents is not None:
 	    pout = file(destFile, "w")
 	    if self.applymacros:
