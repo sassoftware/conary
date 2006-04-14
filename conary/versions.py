@@ -742,6 +742,7 @@ class VersionSequence(AbstractVersion):
         i = 0
         for item in self.versions:
             if isinstance(item, AbstractRevision):
+                assert(isinstance(timeStamps[i], float))
                 item.timeStamp = timeStamps[i]
                 i += 1
 
