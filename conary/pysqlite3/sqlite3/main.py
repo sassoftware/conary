@@ -463,7 +463,6 @@ class LockJournal(object):
 
     def start(self):
         lj = open(self.path, 'w')
-        lj.write('db: /var/lib/conarydb/conarydb\n')
         lj.write('pid: %s\n' % os.getpid())
         lj.write('time: %s\n' % time.strftime('%X %x'))
 
