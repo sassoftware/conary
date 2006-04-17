@@ -615,7 +615,7 @@ class FilesystemJob:
 	if baseTrove:
 	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
 
-        # fully updated tracks whether any errors have occured; if no
+        # fully updated tracks whether any errors have occurred; if no
         # errors occur, fsTrove gets updated to the new version of the trove
         # this doesn't matter for binary stuff, just source management
 	fullyUpdated = True

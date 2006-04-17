@@ -2070,7 +2070,7 @@ class TroveError(errors.ConaryError):
 class ParseError(TroveError):
 
     """
-    Indicates that an error occured parsing a group file.
+    Indicates that an error occurred parsing a group file.
     """
 
     pass
@@ -2078,7 +2078,7 @@ class ParseError(TroveError):
 class PatchError(TroveError):
 
     """
-    Indicates that an error occured parsing a group file.
+    Indicates that an error occurred parsing a group file.
     """
 
     pass

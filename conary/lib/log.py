@@ -118,7 +118,7 @@ def debug(msg, *args):
 def errorOccurred():
     return hdlr.error
 
-def resetErrorOccured():
+def resetErrorOccurred():
     hdlr.error = False
 
 def setVerbosity(val):
