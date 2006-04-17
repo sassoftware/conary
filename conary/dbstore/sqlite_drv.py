@@ -160,6 +160,7 @@ class Database(BaseDatabase):
         assert(self.database)
         kwargs.setdefault("timeout", self.TIMEOUT)
         #kwargs.setdefault("command_logfile", open("/tmp/sqlite.log", "a"))
+        #kwargs.setdefault("lockJournal", True)
         try:
             self.dbh = sqlite3.connect(self.database, **kwargs)
         except sqlite3.InternalError, e:

@@ -4,6 +4,11 @@ import conary._sqlite3 as _sqlite
 import copy, new, sys, weakref
 from types import *
 
+import errno
+import os
+import time
+import traceback
+
 if _sqlite.sqlite_version_info() < (3,2,1):
     raise RuntimeError, "sqlite too old"
 
@@ -316,10 +321,17 @@ class Cursor:
             raise AttributeError, key
 
 class Connection:
-    def __init__(self, database=None, converters={}, autocommit=0, encoding=None, timeout=None, command_logfile=None, *arg, **kwargs):
+    def __init__(self, database=None, converters={}, autocommit=0, encoding=None, timeout=None, command_logfile=None, lockJournal=None, *arg, **kwargs):
         # Old parameter names, for backwards compatibility
         database = database or kwargs.get("db")
         encoding = encoding or kwargs.get("client_encoding")
+        if lockJournal:
+            if lockJournal is True:
+                lockJournal = database + '.lockjournal'
+
+            self.lockJournal = LockJournal(lockJournal)
+        else:
+            self.lockJournal = None
 
         self.db = _sqlite.connect(database)
 
@@ -374,6 +386,9 @@ class Connection:
         self._execute(_BEGIN)
         self.inTransaction = 1
 
+        if self.lockJournal:
+            self.lockJournal.start()
+
     #
     # PySQLite extensions:
     #
@@ -397,6 +412,8 @@ class Connection:
         if self.inTransaction:
             # shut down any pending sql statements
             self.__closeCursors(0)
+            if self.lockJournal:
+                self.lockJournal.stop()
             self._execute("COMMIT")
             self.inTransaction = 0
 
@@ -439,3 +456,30 @@ class Connection:
             return getattr(_sqlite, key)
         else:
             raise AttributeError, key
+
+class LockJournal(object):
+    def __init__(self, path):
+        self.path = path
+
+    def start(self):
+        lj = open(self.path, 'w')
+        lj.write('db: /var/lib/conarydb/conarydb\n')
+        lj.write('pid: %s\n' % os.getpid())
+        lj.write('time: %s\n' % time.strftime('%X %x'))
+
+        f = sys._getframe(2)
+        while f != None:
+            f = f.f_back
+            if f.f_code.co_filename != __file__:
+                break
+        lj.write('Stack:\n\n')
+        if f is not None:
+            traceback.print_stack(f, file=lj)
+
+
+    def stop(self):
+        try:
+            os.remove(self.path)
+        except OSError, err:
+            if err.errno != errno.ENOENT:
+                raise
