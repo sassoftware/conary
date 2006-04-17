@@ -16,11 +16,13 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug that caused conary to traceback in the face of a file on the 
       filesystem with an unknown uid/gid has been fixed, conary will now
-      print an error message instead.
+      print an error message instead (bz #977)
     * A bug that caused conary to traceback when an unknown Use flag was
-      used when cooking has been fixed.  For example, 
+      used when cooking has been fixed (bz #982).  For example, 
       cvc cook --flavor 'foobar', used to create a traceback, now it says
       instead 'Error setting build flag values: No Such Use Flag foobar'
+    * Pinned troves no longer are used to determine what troves are updated
+      when updateall is run. 
 
 Changes in 1.0.12:
   o Client changes:

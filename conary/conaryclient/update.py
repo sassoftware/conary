@@ -1392,6 +1392,10 @@ conary erase '%s=%s[%s]'
                       or x[1][0].branch() != x[2][0].branch()))
         items = [ (x[0], x[2][0], x[2][1]) for x in items
                    if not x[2][0].isOnLocalHost() ]
+        items = [ x[0] for x in itertools.izip(items,
+                                               self.db.trovesArePinned(items))
+                                                                  if not x[1] ]
+
 
         installed = self.db.findByNames(x[0] for x in items)
 
