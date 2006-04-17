@@ -1,4 +1,11 @@
 Changes in @NEW@:
+  o Client changes:
+    * Added a new command for updating troves:  the 'migrate' command -
+      'migrate' updates a trove if an update is available.  Whether or not
+      an update is available, the children of the given trove will be
+      updated to match the version of the trove installed.  Also, any not by
+      default children that are installed will be removed.
+
   o Build Changes:
     * The addSource source action will now replace existing files,
       rather than replacing their contents.  This implies that the

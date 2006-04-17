@@ -58,6 +58,7 @@ def usage(rc = 1):
     print "       conary erase        <pkgname>[=<version>][[flavor]]+"
     print "       conary localcs      <pkgname>[=<version>][[flavor]] <outfile>"
     print "       conary localcommit  <changeset>"
+    print "       conary migrate      <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary pin          <pkgname>[=<version>][[flavor]]*"
     print "       conary query        <pkgname>[=<version>][[flavor]]*"
     print "       conary remove       <path>+"
@@ -747,7 +748,7 @@ _register(ShowChangesetCommand)
 
 class UpdateCommand(ConaryCommand):
 
-    commands = ["update", "erase", "sync", "syncchildren"]
+    commands = ["update", "erase", "migrate", "sync", "syncchildren"]
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
     docs = {
@@ -755,12 +756,12 @@ class UpdateCommand(ConaryCommand):
         'just-db'       : 'Update db only - Do not modify rest of file system',
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
         'info'          : 'Display what update would have done',
-        'no-deps'       : 'Do not raise errors due to dependency failures', 
+        'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : 'Do not install/erase children of specified trove',
         'no-resolve'    : 'Do not attempt to solve dependency problems',
-        'no-conflict-check' : 'Ignore potential path conflicts', 
+        'no-conflict-check' : 'Ignore potential path conflicts',
         'recurse'       : optparse.SUPPRESS_HELP,
-        'replace-files' : 'Replace existing files if file conflict found', 
+        'replace-files' : 'Replace existing files if file conflict found',
         'resolve'       : 'Add troves to update to solve dependency problems',
         'sync-to-parents' : 'Install already referenced versions of troves',
         'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
@@ -821,9 +822,10 @@ class UpdateCommand(ConaryCommand):
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
-        kwargs['updateByDefault'] = (otherArgs[1] in ("update", "sync",
-                                                      "syncchildren"))
-        kwargs['syncChildren'] = otherArgs[1] in ('sync', 'syncchildren')
+
+        kwargs['updateByDefault']    = otherArgs[1] != 'erase'
+        kwargs['syncChildren']       = otherArgs[1] in ('sync', 'syncchildren')
+        kwargs['migrate']            = otherArgs[1] == 'migrate'
 
         if kwargs['sync'] and kwargs['fromFiles']:
             log.error("Only one of --sync and --from-file may be used")

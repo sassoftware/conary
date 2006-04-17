@@ -233,12 +233,21 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
                                checkPathConflicts = True, syncChildren = False,
-                               updateOnly = False):
+                               updateOnly = False, migrate = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
-    fromChangesets = []
+    if migrate or syncChildren:
+        installMissing = True
+    else:
+        installMissing = False
 
+    if migrate:
+        removeNotByDefault = True
+    else:
+        removeNotByDefault = False
+
+    fromChangesets = []
     for path in fromFiles:
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
@@ -276,7 +285,9 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   fromChangesets = fromChangesets,
                   checkPathConflicts = checkPathConflicts,
                   syncChildren = syncChildren,
-                  updateOnly = updateOnly)
+                  updateOnly = updateOnly,
+                  removeNotByDefault = removeNotByDefault, 
+                  installMissing = installMissing)
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -287,7 +298,9 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   fromChangesets = [],
                                   checkPathConflicts = True, 
                                   checkPrimaryPins = True, 
-                                  syncChildren = False, updateOnly = False):
+                                  syncChildren = False, updateOnly = False,
+                                  removeNotByDefault = False, 
+                                  installMissing = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -305,7 +318,9 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                checkPathConflicts = checkPathConflicts,
                                checkPrimaryPins = checkPrimaryPins,
                                syncChildren = syncChildren,
-                               updateOnly = updateOnly)
+                               updateOnly = updateOnly,
+                               installMissing = installMissing, 
+                               removeNotByDefault = removeNotByDefault)
     except:
         callback.done()
         raise
