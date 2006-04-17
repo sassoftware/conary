@@ -13,6 +13,11 @@ Changes in @NEW@:
       existing readonly file will not prevent addSource from
       working.
 
+  o Bug Fixes:
+    * A bug that caused conary to traceback in the face of a file on the 
+      filesystem with an unknown uid/gid has been fixed, conary will now
+      print an error message instead.
+
 Changes in 1.0.12:
   o Client changes:
     * The rollback command now applies rollbacks up to and including

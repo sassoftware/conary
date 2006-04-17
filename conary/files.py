@@ -22,7 +22,7 @@ import struct
 import tempfile
 import time
 
-from conary import streams
+from conary import errors, streams
 from conary.lib import util, sha1helper, log
 
 _FILE_FLAG_CONFIG = 1 << 0
@@ -608,7 +608,7 @@ def ThawFile(frz, pathId):
 
     raise AssertionError
 
-class FilesError(Exception):
+class FilesError(errors.ConaryError):
     def __init__(self, msg):
         Exception.__init__(self)
         self.msg = msg
