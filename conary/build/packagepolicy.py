@@ -1939,7 +1939,7 @@ class Requires(_addInfo):
     SYNOPSIS
     ========
 
-    C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]},] || [I{exceptions=filterexp)}])}
+    C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]}, I{filterexp}] || [I{exceptions=filterexp)}])}
 
     DESCRIPTION
     ===========
@@ -2004,6 +2004,17 @@ class Requires(_addInfo):
     Demonstrates using C{r.Requires} to specify a manual requirement of the
     file C{%(sbindir)s/sendmail} to the  C{:runtime} component of package
     C{mailbase}.
+    
+    C{r.Requires('file: %(sbindir)s/sendmail', '%(datadir)s/squirrelmail/index.php')}
+
+    Specifies that conary should require the file C{%(sbindir)s/sendmail} to
+    be present when trying to install C{%(datadir)s/squirrelmail/index.php}.
+
+    C{r.Requires('soname: %(libdir)/kde3/kgreet_classic.so', '%(bindir)/kdm')
+
+    Demonstrates using C{r.Requires} to specify a manual soname requirement
+    of the file C{%(bindir)s/kdm} to the soname
+    C{%(libdir)/kde3/kgreet_classic.so}.
 
     C{r.Requires(exceptions='/usr/share/vim/.*/doc/')}
 
@@ -2463,6 +2474,7 @@ class Requires(_addInfo):
                     if depType == 'abi':
                         flags = f
                         info = '%s/%s' %(dep, info.split(None, 1)[1])
+                        info = os.path.normpath(info)
             else: # by process of elimination, must be a trove
                 if info.startswith('group-'):
                     self.error('group dependency %s not allowed', info)
