@@ -14,7 +14,7 @@ Changes in @NEW@:
       working.
     * The internal setModes policy now reports "suid/sgid" only for
       files that are setuid or setgid, rather than all files which
-      have an explicitly set mode.
+      have an explicitly set mode (bz #935).
     * TagSpec no longer will print out ignored TagSpec matches twice,
       once for tags specified in the recipe, and once for tags
       discovered in /etc/conary/tags/* (bz #902).
