@@ -2024,7 +2024,7 @@ class Requires(_addInfo):
     Specifies that conary should require the file C{%(sbindir)s/sendmail} to
     be present when trying to install C{%(datadir)s/squirrelmail/index.php}.
 
-    C{r.Requires('soname: %(libdir)/kde3/kgreet_classic.so', '%(bindir)/kdm')
+    C{r.Requires('soname: %(libdir)/kde3/kgreet_classic.so', '%(bindir)/kdm')}
 
     Demonstrates using C{r.Requires} to specify a manual soname requirement
     of the file C{%(bindir)s/kdm} to the soname
