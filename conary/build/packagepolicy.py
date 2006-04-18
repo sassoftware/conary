@@ -832,7 +832,8 @@ class setModes(policy.Policy):
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
                 exceptions=util.literalRegex(path.replace('%', '%%')))
-            self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
+            if mode & 06000:
+                self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 

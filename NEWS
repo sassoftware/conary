@@ -12,6 +12,9 @@ Changes in @NEW@:
       mode of the existing file will not be inherited, and an
       existing readonly file will not prevent addSource from
       working.
+    * The internal setModes policy now reports "suid/sgid" only for
+      files that are setuid or setgid, rather than all files which
+      have an explicitly set mode.
 
   o Bug Fixes:
     * A bug that caused conary to traceback in the face of a file on the 
