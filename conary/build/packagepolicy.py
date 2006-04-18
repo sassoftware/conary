@@ -703,6 +703,7 @@ class TagSpec(_addInfo):
                                    %(tag, tagFile.tagFile, path, troveName))
 
     def runInfo(self, path):
+        excludedTags = {}
         for tag in self.included:
 	    for filt in self.included[tag]:
 		if filt.match(path):
@@ -710,8 +711,8 @@ class TagSpec(_addInfo):
                     if tag in self.excluded:
 		        for filt in self.excluded[tag]:
                             if filt.match(path):
-                                self.info('ignoring tag match for %s: %s',
-                                         tag, path)
+                                s = excludedTags.setdefault(tag, set())
+                                s.add(path)
                                 isExcluded = True
                                 break
                     if not isExcluded:
@@ -728,12 +729,16 @@ class TagSpec(_addInfo):
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
 			if filt.match(path):
-                            self.info('ignoring tag match for %s: %s',
-                                      name, path)
+                            s = excludedTags.setdefault(name, set())
+                            s.add(path)
                             isExcluded = True
 			    break
                 if not isExcluded:
 		    self.markTag(name, tag.tag, path, tag)
+        if excludedTags:
+            for tag in excludedTags:
+                self.info('ignoring tag match for %s: %s',
+                          tag, ', '.join(sorted(excludedTags[tag])))
 
 
 class MakeDevices(policy.Policy):
