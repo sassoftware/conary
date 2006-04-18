@@ -2015,6 +2015,9 @@ class Requires(_addInfo):
     Demonstrates using C{r.Requires} to specify a manual soname requirement
     of the file C{%(bindir)s/kdm} to the soname
     C{%(libdir)/kde3/kgreet_classic.so}.
+    These synthesized soname requirements are generally useful when an
+    application uses the C{dlopen()} function to load a library,
+    instead of linking to it directly.
 
     C{r.Requires(exceptions='/usr/share/vim/.*/doc/')}
 
