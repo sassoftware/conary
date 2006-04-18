@@ -161,7 +161,7 @@ class Archive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tar, cpio zip, or rpm archive, and unpacks it to
+    optionally compressed tar, cpio, zip, or rpm archive, and unpacks it to
     the proper directory.
 
     KEYWORDS
