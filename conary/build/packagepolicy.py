@@ -669,6 +669,7 @@ class TagSpec(_addInfo):
     )
     def doProcess(self, recipe):
 	self.tagList = []
+        self.suggestBuildRequires = set()
 	# read the system and %(destdir)s tag databases
 	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
 			  '/etc/conary/tags/'):
@@ -701,6 +702,7 @@ class TagSpec(_addInfo):
                         self.warn("%s assigned by %s to file %s, so add '%s'"
                                    ' to buildRequires or call r.TagSpec()'
                                    %(tag, tagFile.tagFile, path, troveName))
+                        self.suggestBuildRequires.add(troveName)
 
     def runInfo(self, path):
         excludedTags = {}
@@ -739,6 +741,12 @@ class TagSpec(_addInfo):
             for tag in excludedTags:
                 self.info('ignoring tag match for %s: %s',
                           tag, ', '.join(sorted(excludedTags[tag])))
+
+    def postProcess(self):
+        if self.suggestBuildRequires:
+            self.info('possibly add to buildRequires: %s',
+                      str(sorted(list(self.suggestBuildRequires))))
+            self.recipe.reportMissingBuildRequires(self.suggestBuildRequires)
 
 
 class MakeDevices(policy.Policy):
@@ -2617,6 +2625,32 @@ class Flavor(policy.Policy):
         for pkg in componentMap.values():
             pkg.flavor.union(f.flavor())
 
+
+
+class reportMissingBuildRequires(policy.Policy):
+    """
+    This policy is used to report together all suggestions for
+    additions to the C{buildRequires} list.
+    Do not call it directly; it is for internal use only.
+    """
+    bucket = policy.ERROR_REPORTING
+    filetree = policy.NO_FILES
+
+    def __init__(self, *args, **keywords):
+	self.warnings = set()
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+        for arg in args:
+            if type(arg) in (list, tuple, set):
+                self.warnings.update(arg)
+            else:
+                self.warnings.add(arg)
+
+    def do(self):
+	if self.warnings:
+            self.warn('Suggested buildRequires additions: %s',
+                      str(sorted(list(self.warnings))))
 
 
 class reportErrors(policy.Policy):

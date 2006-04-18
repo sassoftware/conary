@@ -18,6 +18,12 @@ Changes in @NEW@:
     * TagSpec no longer will print out ignored TagSpec matches twice,
       once for tags specified in the recipe, and once for tags
       discovered in /etc/conary/tags/* (bz #902).
+    * TagSpec will now summarize all its suggested additions to
+      buildRequires in a single line (bz #868).
+    * A new reportMissingBuildRequires policy has been added to summarize
+      all suggested additions to buildRequires in a single line at the
+      end of the entire build process, to make it easier to enhance the
+      buildRequires list via cut-and-paste (bz #869).
 
   o Bug Fixes:
     * A bug that caused conary to traceback in the face of a file on the 
