@@ -447,7 +447,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         retval = self.troveStore.updateMetadata(
             troveName, branch, shortDesc, longDesc,
             urls, categories, licenses, source, language)
-        self.troveStore.commit()
         return retval
 
     def getMetadata(self, authToken, clientVersion, troveList, language):
