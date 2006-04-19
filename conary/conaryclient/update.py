@@ -186,7 +186,8 @@ class ClientUpdate:
                            redirectHack, recurse, ineligible, checkPrimaryPins,
                            installedPrimaries, installMissingRefs=False, 
                            updateOnly=False, respectBranchAffinity=True,
-                           alwaysFollowLocalChanges=False):
+                           alwaysFollowLocalChanges=False,
+                           removeNotByDefault = False):
 
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse):
@@ -572,6 +573,11 @@ class ClientUpdate:
                                                          relativePrimaries))
 
         newJob = set()
+        notByDefaultRemovals = set()
+
+        # ensure the user-specified respect branch affinity setting is not 
+        # lost.
+        neverRespectBranchAffinity = not respectBranchAffinity
 
         while newTroves:
             # newTroves tuple values
@@ -982,9 +988,22 @@ conary erase '%s=%s[%s]'
 
             log.debug('recurseThis: %s\nrecurse: %s' % (recurseThis, recurse))
 
+            if jobAdded and removeNotByDefault and not byDefault:
+                job = (newInfo[0], replaced, (newInfo[1], newInfo[2]), False)
+                newJob.discard(job)
+                if replaced[0]:
+                    notByDefaultRemovals.add(
+                                (newInfo[0], replaced, (None, None), False))
+                elif newInfo in alreadyInstalled:
+                    notByDefaultRemovals.add(
+                                (newInfo[0], (newInfo[1], newInfo[2]),
+                                             (None, None), False))
+                    alreadyInstalled.discard(newInfo)
+
             if not recurseThis: continue
             if not recurse: continue
             if not trove.troveIsCollection(newInfo[0]): continue
+
 
             branchHint = None
             if replaced[0] and replaced[0].branch() == newInfo[1].branch():
@@ -993,7 +1012,8 @@ conary erase '%s=%s[%s]'
                 # did switch.  We assume the user at some point switched this 
                 # trove to the desired branch by hand already.
                 log.debug('respecting branch affinity for children')
-                respectBranchAffinity = True
+                if not neverRespectBranchAffinity:
+                    respectBranchAffinity = True
             elif replaced[0]:
                 branchHint = (replaced[0].branch(), newInfo[1].branch())
 
@@ -1047,6 +1067,10 @@ conary erase '%s=%s[%s]'
                                   childrenFollowLocalChanges,
                                   updateOnly))
 
+        for job in notByDefaultRemovals:
+            if job not in newJob:
+                erasePrimaries.add((job[0], job[1], (None, None), False))
+
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse)
         assert(not x for x in newJob if x[2][0] is None)
@@ -1063,7 +1087,8 @@ conary erase '%s=%s[%s]'
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, checkPrimaryPins = True,
                          forceJobClosure = False, ineligible = set(),
-                         syncChildren=False, updateOnly=False):
+                         syncChildren=False, updateOnly=False,
+                         installMissing = False, removeNotByDefault = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1122,6 +1147,8 @@ conary erase '%s=%s[%s]'
             return jobClosure
 
         # def _updateChangeSet -- body starts here
+        if syncChildren:
+            installMissing = True
 
         # This job describes updates from a networked repository. Duplicates
         # (including installing things already installed) are skipped.
@@ -1245,9 +1272,12 @@ conary erase '%s=%s[%s]'
         # Items which are already installed shouldn't be installed again. We
         # want to track them though to ensure they aren't removed by some
         # other action.
-        if not syncChildren:
+
+        if not installMissing:
             jobSet, oldItems = _separateInstalledItems(newJob)
         else:
+            # keep our original jobSet, we'll recurse through installed
+            # items as well.
             jobSet, oldItems = newJob, _separateInstalledItems(newJob)[1]
             
         log.debug("items already installed: %s", oldItems)
@@ -1288,7 +1318,6 @@ conary erase '%s=%s[%s]'
                                                 recurse = recurse)
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
-
         assert(not notFound)
         uJob.getTroveSource().addChangeSet(cs)
         transitiveClosure.update(cs.getJobSet(primaries = False))
@@ -1331,20 +1360,21 @@ conary erase '%s=%s[%s]'
             transitiveClosure = jobSet
         # else we trust the transitiveClosure which was passed in
 
-        if not syncChildren:
+        if not installMissing:
             # we know that all the troves in jobSet are already installed
             # (i.e. in oldItems) when syncing.  We don't want to exclude 
             # their children from syncing
             ineligible = ineligible | oldItems
 
         newJob = self._mergeGroupChanges(uJob, jobSet, transitiveClosure,
-                                         redirectHack, recurse, ineligible, 
-                                         checkPrimaryPins, 
-                                         installedPrimaries=oldItems, 
-                                         installMissingRefs=syncChildren,
-                                         updateOnly=updateOnly,
-                                         respectBranchAffinity=not syncChildren,
-                                         alwaysFollowLocalChanges=syncChildren)
+                                 redirectHack, recurse, ineligible, 
+                                 checkPrimaryPins, 
+                                 installedPrimaries=oldItems, 
+                                 installMissingRefs=installMissing,
+                                 updateOnly=updateOnly,
+                                 respectBranchAffinity=not installMissing,
+                                 alwaysFollowLocalChanges=installMissing,
+                                 removeNotByDefault = removeNotByDefault)
 
         if not newJob:
             raise NoNewTrovesError
@@ -1357,10 +1387,15 @@ conary erase '%s=%s[%s]'
         # ignore updates that just switch version, not flavor or 
         # branch
         items = ( x for x in self.getPrimaryLocalUpdates() 
-                  if (x[1][1] != x[2][1] 
+                  if (x[1][0] is None
+                      or not deps.compatibleFlavors(x[1][1], x[2][1])
                       or x[1][0].branch() != x[2][0].branch()))
         items = [ (x[0], x[2][0], x[2][1]) for x in items
                    if not x[2][0].isOnLocalHost() ]
+        items = [ x[0] for x in itertools.izip(items,
+                                               self.db.trovesArePinned(items))
+                                                                  if not x[1] ]
+
 
         installed = self.db.findByNames(x[0] for x in items)
 
@@ -1621,7 +1656,8 @@ conary erase '%s=%s[%s]'
                         split = True, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False, 
-                        updateOnly = False, resolveGroupList=None):
+                        updateOnly = False, resolveGroupList=None, 
+                        installMissing = False, removeNotByDefault = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1675,8 +1711,16 @@ conary erase '%s=%s[%s]'
         the references in the specified troves.
         @param updateOnly: If True, do not install missing troves, just
         update installed troves.
+        @param installMissing: If True, always install missing troves
+        @param removeNotByDefault: remove child troves that are not by default.
         @rtype: tuple
         """
+        # FIXME: this API has gotten far out of hand.  Refactor when 
+        # non backwards compatible API changes are acceptable. 
+        # In particular. installMissing and updateOnly have similar meanings,
+        # (but expanding updateOnly meaning would require making incompatible
+        # changes), split has lost meaning, keepExisting is also practically 
+        # meaningless at this level.
         assert(split)
         callback.preparingChangeSet()
 
@@ -1741,7 +1785,9 @@ conary erase '%s=%s[%s]'
                                        checkPrimaryPins = checkPrimaryPins,
                                        forceJobClosure = forceJobClosure,
                                        syncChildren = syncChildren,
-                                       updateOnly = updateOnly)
+                                       updateOnly = updateOnly,
+                                       installMissing = installMissing,
+                                       removeNotByDefault = removeNotByDefault)
         updateThreshold = self.cfg.updateThreshold
 
         # When keep existing is provided none of the changesets should

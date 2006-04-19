@@ -33,14 +33,16 @@ class PrintDatabase:
         self.statements = []
         self.driver = driver
         if self.driver == "sqlite":
-            from conary.dbstore import sqlite_drv
-            self.keywords = sqlite_drv.KeywordDict()
+            from conary.dbstore import sqlite_drv as drv
         elif driver =="mysql":
-            from conary.dbstore import mysql_drv
-            self.keywords = mysql_drv.KeywordDict()
+            from conary.dbstore import mysql_drv as drv
         elif driver == "postgresql":
-            from conary.dbstore import postgresql_drv
-            self.keywords = postgresql_drv.KeywordDict()
+            from conary.dbstore import postgresql_drv as drv
+        elif driver == "ingres":
+            from conary.dbstore import ingres_drv as drv
+        else:
+            raise AttributeError("unknown driver", driver)
+        self.keywords = drv.KeywordDict()
 
     def connect(self, *args, **kwargs):
         pass
@@ -163,6 +165,9 @@ class PrintDatabase:
             else:
                 sql = "SET NEW.%s = current_timestamp() + 0 ; " % (column,)
             create = "CREATE DEFINER = 'root'@'localhost' TRIGGER"
+        # XXX: FIXME!!! ingres does not support triggers yet
+        elif self.driver == "ingres":
+            return
         else:
             raise NotImplementedError
         sql = """
@@ -197,11 +202,19 @@ def getIndexes(driver = "sqlite"):
     schema.loadSchema(pd)
     return pd.statements
 
+def write_stmt(driver, stmt):
+    sys.stdout.write("%s ;" % (stmt,))
+    if driver == "ingres":
+        sys.stdout.write("\g")
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
 import getopt
+DRIVERS = ["sqlite", "mysql", "postgresql", "ingres"]
 if __name__ == '__main__':
     driver = os.environ.get("CONARY_DRIVER", "sqlite")
-    (opts, args) = getopt.getopt(sys.argv[1:], "msph", [
-        "mysql", "postgres", "postgresql", "sqlite", "help"])
+    (opts, args) = getopt.getopt(sys.argv[1:], "mspih", DRIVERS + ["help"])
     for opt, val in opts:
         if opt == "-m" or opt.startswith("--m"):
             driver = "mysql"
@@ -209,10 +222,15 @@ if __name__ == '__main__':
             driver = "sqlite"
         elif opt == "-p" or opt.startswith("--p"):
             driver = "postgresql"
+        elif opt == "-i" or opt.startswith("--i"):
+            driver = "ingres"
         elif opt in ["-h", "--help"]:
-            print "%s [--mysql | --postgresql | --sqlite ]" % (sys.argv[0],)
+            print "%s [--mysql | --postgresql | --sqlite | --ingres  ]" % (sys.argv[0],)
             print "Prints the network server repository schema"
             sys.exit(0)
-    assert(driver in ["sqlite", "mysql", "postgresql"])
-    for x in getTables(driver): print x
-    for x in getIndexes(driver): print x
+    assert(driver in DRIVERS)
+    for x in getTables(driver):
+        write_stmt(driver, x)
+    for x in getIndexes(driver):
+        write_stmt(driver, x)
+

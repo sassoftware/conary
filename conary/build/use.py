@@ -753,7 +753,10 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                     # local flag
                     parts = flag.split('.',1)
                     if len(parts) == 1:
-                        Use[flag]._set(value)
+                        try:
+                            Use[flag]._set(value)
+                        except KeyError:
+                            raise AttributeError, "No Such Use Flag %s" % flag
                     elif recipeName:
                         packageName, flag = parts
                         if packageName == recipeName:

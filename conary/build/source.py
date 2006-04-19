@@ -161,8 +161,8 @@ class Archive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tarball or zip file, and unpacks it to the proper
-    directory.
+    optionally compressed tar, cpio, zip, or rpm archive, and unpacks it to
+    the proper directory.
 
     KEYWORDS
     ========
@@ -638,6 +638,7 @@ class Source(_Source):
                                                   defaultDir=defaultDir)
         util.mkdirChain(destDir)
         destFile = os.sep.join((destDir, self.dest))
+        util.removeIfExists(destFile)
 	if self.contents is not None:
 	    pout = file(destFile, "w")
 	    if self.applymacros:
@@ -774,7 +775,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	os._exit(1)
     os.close(rpipe)
     while 1:
-        buf = uncompressed.read(4096)
+        buf = uncompressed.read(16384)
 	if not buf:
 	    break
 	os.write(wpipe, buf)

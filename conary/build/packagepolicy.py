@@ -669,6 +669,7 @@ class TagSpec(_addInfo):
     )
     def doProcess(self, recipe):
 	self.tagList = []
+        self.suggestBuildRequires = set()
 	# read the system and %(destdir)s tag databases
 	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
 			  '/etc/conary/tags/'):
@@ -701,8 +702,10 @@ class TagSpec(_addInfo):
                         self.warn("%s assigned by %s to file %s, so add '%s'"
                                    ' to buildRequires or call r.TagSpec()'
                                    %(tag, tagFile.tagFile, path, troveName))
+                        self.suggestBuildRequires.add(troveName)
 
     def runInfo(self, path):
+        excludedTags = {}
         for tag in self.included:
 	    for filt in self.included[tag]:
 		if filt.match(path):
@@ -710,8 +713,8 @@ class TagSpec(_addInfo):
                     if tag in self.excluded:
 		        for filt in self.excluded[tag]:
                             if filt.match(path):
-                                self.info('ignoring tag match for %s: %s',
-                                         tag, path)
+                                s = excludedTags.setdefault(tag, set())
+                                s.add(path)
                                 isExcluded = True
                                 break
                     if not isExcluded:
@@ -728,12 +731,22 @@ class TagSpec(_addInfo):
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
 			if filt.match(path):
-                            self.info('ignoring tag match for %s: %s',
-                                      name, path)
+                            s = excludedTags.setdefault(name, set())
+                            s.add(path)
                             isExcluded = True
 			    break
                 if not isExcluded:
 		    self.markTag(name, tag.tag, path, tag)
+        if excludedTags:
+            for tag in excludedTags:
+                self.info('ignoring tag match for %s: %s',
+                          tag, ', '.join(sorted(excludedTags[tag])))
+
+    def postProcess(self):
+        if self.suggestBuildRequires:
+            self.info('possibly add to buildRequires: %s',
+                      str(sorted(list(self.suggestBuildRequires))))
+            self.recipe.reportMissingBuildRequires(self.suggestBuildRequires)
 
 
 class MakeDevices(policy.Policy):
@@ -832,7 +845,8 @@ class setModes(policy.Policy):
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
                 exceptions=util.literalRegex(path.replace('%', '%%')))
-            self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
+            if mode & 06000:
+                self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 
@@ -1939,7 +1953,7 @@ class Requires(_addInfo):
     SYNOPSIS
     ========
 
-    C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]},] || [I{exceptions=filterexp)}])}
+    C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]}, I{filterexp}] || [I{exceptions=filterexp)}])}
 
     DESCRIPTION
     ===========
@@ -2004,6 +2018,17 @@ class Requires(_addInfo):
     Demonstrates using C{r.Requires} to specify a manual requirement of the
     file C{%(sbindir)s/sendmail} to the  C{:runtime} component of package
     C{mailbase}.
+    
+    C{r.Requires('file: %(sbindir)s/sendmail', '%(datadir)s/squirrelmail/index.php')}
+
+    Specifies that conary should require the file C{%(sbindir)s/sendmail} to
+    be present when trying to install C{%(datadir)s/squirrelmail/index.php}.
+
+    C{r.Requires('soname: %(libdir)/kde3/kgreet_classic.so', '%(bindir)/kdm')}
+
+    Demonstrates using C{r.Requires} to specify a manual soname requirement
+    of the file C{%(bindir)s/kdm} to the soname
+    C{%(libdir)/kde3/kgreet_classic.so}.
 
     C{r.Requires(exceptions='/usr/share/vim/.*/doc/')}
 
@@ -2463,6 +2488,7 @@ class Requires(_addInfo):
                     if depType == 'abi':
                         flags = f
                         info = '%s/%s' %(dep, info.split(None, 1)[1])
+                        info = os.path.normpath(info)
             else: # by process of elimination, must be a trove
                 if info.startswith('group-'):
                     self.error('group dependency %s not allowed', info)
@@ -2599,6 +2625,32 @@ class Flavor(policy.Policy):
         for pkg in componentMap.values():
             pkg.flavor.union(f.flavor())
 
+
+
+class reportMissingBuildRequires(policy.Policy):
+    """
+    This policy is used to report together all suggestions for
+    additions to the C{buildRequires} list.
+    Do not call it directly; it is for internal use only.
+    """
+    bucket = policy.ERROR_REPORTING
+    filetree = policy.NO_FILES
+
+    def __init__(self, *args, **keywords):
+	self.warnings = set()
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+        for arg in args:
+            if type(arg) in (list, tuple, set):
+                self.warnings.update(arg)
+            else:
+                self.warnings.add(arg)
+
+    def do(self):
+	if self.warnings:
+            self.warn('Suggested buildRequires additions: %s',
+                      str(sorted(list(self.warnings))))
 
 
 class reportErrors(policy.Policy):

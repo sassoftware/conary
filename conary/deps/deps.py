@@ -30,6 +30,7 @@ DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
+DEP_CLASS_SENTINEL      = 15
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -134,7 +135,6 @@ class Dependency(BaseDependency):
 	return (cmp(self.name, other.name) 
                 or cmp(sorted(self.flags.iteritems()),
                        sorted(other.flags.iteritems())))
-        
 
     def __str__(self):
 	if self.flags:
@@ -341,7 +341,7 @@ class DependencyClass(object):
 
     depFormat = 'WORD'
     flagFormat = 'WORD'
-    flagOption = DEP_CLASS_NO_FLAGS
+    flags = DEP_CLASS_NO_FLAGS
 
     depNameSignificant = True
     # if True, means that the name of the dependencies in the class hold
@@ -568,6 +568,16 @@ class DependencyClass(object):
 	return self.tag == other.tag and \
 	       self.members == other.members
 
+    def __cmp__(self, other):
+        rv = cmp(sorted(self.members), sorted(other.members))
+        if rv:
+            return rv
+        for name, dep in self.members.iteritems():
+            rv = cmp(dep, other.members[name])
+            if rv:
+                return rv
+        return 0
+
     def __ne__(self, other):
         return not self == other
 
@@ -586,8 +596,9 @@ class AbiDependency(DependencyClass):
     tagName = "abi"
     justOne = False
     depClass = Dependency
-    hasFlags = True
+    flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(AbiDependency)
+
 
 class InstructionSetDependency(DependencyClass):
 
@@ -879,12 +890,36 @@ class DependencySet(object):
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
-	    if tag not in self.members:
-		return False
 	    if not self.members[tag] == other.members[tag]:
 		return False
 
 	return True
+
+    def __cmp__(self, other):
+        if other is None:
+            return -1
+        myMembers = self.members
+        otherMembers = other.members
+        tags = []
+        for tag in xrange(DEP_CLASS_SENTINEL):
+            if tag in myMembers:
+                if tag in otherMembers: 
+                    tags.append(tag)
+                else:
+                    return -1
+            elif tag in otherMembers:
+                return 1
+
+        # at this point we know we have the same dep classes.
+        for tag in tags:
+            myDepClass = myMembers[tag]
+            otherDepClass = otherMembers[tag]
+            # depClass compares keys first, then values,
+            # exactly what we want here.
+            rv = cmp(myDepClass, otherDepClass)
+            if rv:
+                return rv
+        return 0
 
     def __ne__(self, other):
         return not self == other

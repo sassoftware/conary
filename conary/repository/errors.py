@@ -56,13 +56,13 @@ class RepositoryLocked(RepositoryError):
         return 'The repository is currently busy.  Try again in a few moments.'
 
 class OpenError(RepositoryError):
-    """Error occured opening the repository"""
+    """Error occurred opening the repository"""
 
 class CommitError(RepositoryError):
-    """Error occured commiting a trove"""
+    """Error occurred commiting a trove"""
 
 class DuplicateBranch(RepositoryError):
-    """Error occured commiting a trove"""
+    """Error occurred commiting a trove"""
 
 class TroveMissing(RepositoryError, InternalConaryError):
     troveType = "trove"

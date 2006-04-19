@@ -1,5 +1,42 @@
-* Applying rollbacks which included overlapping files would fail unless
-  --replace-files was used
+Changes in @NEW@:
+  o Client changes:
+    * Added a new command for updating troves:  the 'migrate' command -
+      'migrate' updates a trove if an update is available.  Whether or not
+      an update is available, the children of the given trove will be
+      updated to match the version of the trove installed.  Also, any not by
+      default children that are installed will be removed.
+    * Applying rollbacks which included overlapping files would fail unless
+      --replace-files was used
+
+  o Build Changes:
+    * The addSource source action will now replace existing files,
+      rather than replacing their contents.  This implies that the
+      mode of the existing file will not be inherited, and an
+      existing readonly file will not prevent addSource from
+      working.
+    * The internal setModes policy now reports "suid/sgid" only for
+      files that are setuid or setgid, rather than all files which
+      have an explicitly set mode (bz #935).
+    * TagSpec no longer will print out ignored TagSpec matches twice,
+      once for tags specified in the recipe, and once for tags
+      discovered in /etc/conary/tags/* (bz #902).
+    * TagSpec will now summarize all its suggested additions to
+      buildRequires in a single line (bz #868).
+    * A new reportMissingBuildRequires policy has been added to summarize
+      all suggested additions to buildRequires in a single line at the
+      end of the entire build process, to make it easier to enhance the
+      buildRequires list via cut-and-paste (bz #869).
+
+  o Bug Fixes:
+    * A bug that caused conary to traceback in the face of a file on the 
+      filesystem with an unknown uid/gid has been fixed, conary will now
+      print an error message instead (bz #977)
+    * A bug that caused conary to traceback when an unknown Use flag was
+      used when cooking has been fixed (bz #982).  For example, 
+      cvc cook --flavor 'foobar', used to create a traceback, now it says
+      instead 'Error setting build flag values: No Such Use Flag foobar'
+    * Pinned troves no longer are used to determine what troves are updated
+      when updateall is run. 
 
 Changes in 1.0.12:
   o Client changes:

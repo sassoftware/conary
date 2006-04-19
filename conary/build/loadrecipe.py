@@ -346,7 +346,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                             pkgs))
     sourceComponent = repos.getTrove(*pkgs[0])
 
-    (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
+    (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+				        dir=cfg.tmpDir)
     outF = os.fdopen(fd, "w")
 
     inF = None

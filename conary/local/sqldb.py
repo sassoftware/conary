@@ -1630,10 +1630,11 @@ order by
 
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
              parentName, parentVersion, parentTimeStamps, parentFlavor) in cu:
-            version = VFS(versionStr, timeStamps=timeStamps.split(':'))
+            version = VFS(versionStr,
+                          timeStamps=[ float(x) for x in timeStamps.split(':')])
             if parentName:
                 parentVersion = VFS(parentVersion, 
-                                    timeStamps=parentTimeStamps.split(':'))
+                    timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
                 parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
             else:
                 parentInfo = None

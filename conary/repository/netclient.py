@@ -284,7 +284,7 @@ class ServerCache:
             else:
                 errmsg = str(e)
             url = _cleanseUrl(protocol, url)
-            raise errors.OpenError('Error occured opening repository '
+            raise errors.OpenError('Error occurred opening repository '
                         '%s: %s' % (url, errmsg))
 
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)

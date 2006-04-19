@@ -195,7 +195,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
         is a Boolean stating whether the operation was performed as the
         anonymous user (due to a failure w/ the passed authToken). Exception
-        is a Boolean stating whether an error occured.
+        is a Boolean stating whether an error occurred.
         """
 	# reopens the sqlite db if it's changed
 	self.reopen()
@@ -227,7 +227,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     self.db.commit()
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
-                # deadlock occured; we rollback and try again
+                # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d while calling %s: %s",
                           attempt, methodname, str(e.args))
                 self.log(1, "Deadlock id %d while calling %s: %s" %(
@@ -1295,7 +1295,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             try:
                 ret = self._commitChangeSet(authToken, cs, mirror)
             except sqlerrors.DatabaseLocked, e:
-                # deadlock occured; we rollback and try again
+                # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d: %s", attempt, str(e.args))
                 self.log(1, "Deadlock id %d: %s" %(attempt, str(e.args)))
                 if attempt < self.deadlockRetry:

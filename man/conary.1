@@ -95,6 +95,13 @@ and pin status.
 Displays digital signatures for the specified troves.
 .RE
 .TP
+.B migrate [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Update or install \fItrovename\fP, and update the children of \fItrovename\fP 
+so that the versions of the child troves match the version specified by the 
+parent trove.  Also erase any children that are installed that are not by 
+default.
+.RE
+.TP
 .B rblist
 Lists available rollbacks.
 .TP

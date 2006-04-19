@@ -422,7 +422,7 @@ class CfgError(Exception):
 
 class ParseError(CfgError):
     """
-    Indicates that an error occured parsing the config file.
+    Indicates that an error occurred parsing the config file.
     """
     def __str__(self):
 	return self.val
