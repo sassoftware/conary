@@ -8,6 +8,8 @@ Changes in @NEW@:
     * Applying rollbacks which included overlapping files would fail unless
       --replace-files was used
     * includeConfigFiles now accepts http and https urls
+    * Trying replacing an empty directory with a file (w/o --replace-files)
+      now gives a directory-specific error message
 
   o Build Changes:
     * The addSource source action will now replace existing files,
