@@ -459,6 +459,8 @@ class ClientUpdate:
 
         installedTroves = installedNotReferenced | installedAndReferenced
         referencedNotInstalled = referencedStrong | referencedWeak
+        log.debug('referencedNotInstalled: %s' % (referencedNotInstalled,))
+        log.debug('ineligible: %s' % (ineligible,))
 
         installedTroves.difference_update(ineligible)
         installedTroves.difference_update(
@@ -566,7 +568,8 @@ class ClientUpdate:
         respectFlavorAffinity = True
         # thew newTroves parameters are described below.
         newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, None, respectBranchAffinity, 
+                            True, {}, False, False, None, 
+                            respectBranchAffinity, 
                             respectFlavorAffinity, True,
                             True, updateOnly) 
                                 for x in itertools.chain(absolutePrimaries,
@@ -588,6 +591,8 @@ class ClientUpdate:
             # parentInstalled: True if the parent of this trove was installed.
             #                  Used to determine whether to install troves 
             #                  with weak references.
+            # parentUpdated: True if the parent of this trove was installed.
+            #                or updated.
             # branchHint:  if newInfo's parent trove switched branches, this
             #              provides the to/from information on that switch.
             #              If this child trove is making the same switch, we 
@@ -611,22 +616,23 @@ class ClientUpdate:
             # updateOnly:  If true, only update troves, don't install them
             #              fresh.
 
-            (newInfo, isPrimary, byDefaultDict, parentInstalled, branchHint,
-               respectBranchAffinity, respectFlavorAffinity, installRedirects,
-               followLocalChanges, updateOnly) = newTroves.pop(0)
+            (newInfo, isPrimary, byDefaultDict, parentInstalled, parentUpdated,
+             branchHint, respectBranchAffinity, respectFlavorAffinity,
+             installRedirects, followLocalChanges, updateOnly) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
             log.debug('''\
 *******
 %s=%s[%s]
-primary: %s  byDefault:%s  parentInstalled: %s  updateOnly: %s
+primary: %s  byDefault:%s  parentUpdated: %s parentInstalled: %s  updateOnly: %s
 branchHint: %s
 branchAffinity: %s   flavorAffinity: %s installRedirects: %s
 followLocalChanges: %s
 
 ''' % (newInfo[0], newInfo[1], newInfo[2], isPrimary, byDefault, 
-       parentInstalled, updateOnly, branchHint, respectBranchAffinity,
+       parentUpdated, parentInstalled, 
+       updateOnly, branchHint, respectBranchAffinity,
        respectFlavorAffinity, installRedirects, followLocalChanges))
 
             trv = None
@@ -660,7 +666,7 @@ followLocalChanges: %s
                         # this entry from the already-installed @update trove
                         # so localUpdates already tells us the best match for it.
                         pass
-                    elif parentInstalled and newInfo in referencedWeak:
+                    elif parentUpdated and newInfo in referencedWeak:
                         # The only link to this trove is a weak reference.
                         # A weak-only reference means an intermediate trove 
                         # was missing.  But parentInstalled says we've now
@@ -717,7 +723,8 @@ followLocalChanges: %s
                         # trove as a fresh update. 
                         log.debug('replaced trove is not installed')
 
-                        if not followLocalChanges:
+                        if not (parentInstalled
+                                or followLocalChanges or installMissingRefs):
                             # followLocalChanges states that, even though
                             # the given trove is not a primary, we still want
                             # replace a localUpdate if available instead of 
@@ -730,7 +737,8 @@ followLocalChanges: %s
                             log.debug('SKIP: not following local changes')
                             break
 
-                        freshInstallOkay = (isPrimary or parentInstalled)
+                        freshInstallOkay = (isPrimary or parentInstalled 
+                                            or installMissingRefs)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
                         # if the trove's parent was just installed 
@@ -1047,6 +1055,7 @@ conary erase '%s=%s[%s]'
             # we do not install foo:runtime (though if it's installed, it
             # is reasonable to upgrade it).
 
+            jobInstall = jobAdded and not job[1][0]
             for info in sorted(trv.iterTroveList(strongRefs=True)):
 
                 if not isPrimary:
@@ -1060,10 +1069,10 @@ conary erase '%s=%s[%s]'
                                       and jobAdded)
                     byDefaultDict.setdefault(info, childByDefault)
 
-                newTroves.append((info, False, 
-                                  byDefaultDict, jobAdded, branchHint,
-                                  respectBranchAffinity, respectFlavorAffinity,
-                                  installRedirects,
+                newTroves.append((info, False,
+                                  byDefaultDict, jobInstall, jobAdded,
+                                  branchHint, respectBranchAffinity,
+                                  respectFlavorAffinity, installRedirects,
                                   childrenFollowLocalChanges,
                                   updateOnly))
 
