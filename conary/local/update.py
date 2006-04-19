@@ -632,6 +632,8 @@ class FilesystemJob:
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())
         removalList = removalHints.get(newTroveInfo, [])
+        if removalList is None:
+            removalList = []
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
