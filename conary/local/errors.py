@@ -22,7 +22,7 @@ class UpdateError:
 class DirectoryInWayError(UpdateError):
 
     def __str__(self):
-        return "non-empty directory %s is in the way of a newly created " \
+        return "directory %s is in the way of a newly created " \
                        "file in %s=%s[%s]" % \
                          (self.path, self.name, str(self.version),
                           deps.formatFlavor(self.flavor))
