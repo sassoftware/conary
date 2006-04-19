@@ -21,6 +21,7 @@ import inspect
 import os
 import sys
 import textwrap
+import urllib2
 
 from conary.lib import cfgtypes,util
 
@@ -237,33 +238,45 @@ class ConfigFile(_Config):
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
 
+    def readObject(self, path, f):
+        # path is used for generating error messages
+        try:
+            lineno = 1
+            while True:
+                line = f.readline()
+                if not line:
+                    break
+
+                lineCount = 1
+                while len(line) > 1 and '#' not in line and line[-2] == '\\':
+                    # handle \ at the end of the config line.
+                    # keep track of the lines we use so that we can
+                    # give accurate line #s for errors.  This config line
+                    # will be considered to live on its first line even 
+                    # though it spans multiple lines.
+
+                    line = line[:-2] + f.readline()
+                    lineCount += 1
+                self.configLine(line, path, lineno)
+                lineno = lineno + lineCount
+            f.close()
+        except urllib2.HTTPError, err:
+            raise CfgEnvironmentError(err.msg, err.filename)
+        except urllib2.URLError, err:
+            raise CfgEnvironmentError(err.reason.args[1], path)
+        except EnvironmentError, err:
+            raise CfgEnvironmentError(err.strerror, err.filename)
+
     def read(self, path, exception=True):
         if os.path.exists(path):
             try:
                 f = open(path, "r")
-                lineno = 1
-                while True:
-                    line = f.readline()
-                    if not line:
-                        break
-
-                    lineCount = 1
-                    while len(line) > 1 and '#' not in line and line[-2] == '\\':
-                        # handle \ at the end of the config line.
-                        # keep track of the lines we use so that we can
-                        # give accurate line #s for errors.  This config line
-                        # will be considered to live on its first line even 
-                        # though it spans multiple lines.
-
-                        line = line[:-2] + f.readline()
-                        lineCount += 1
-                    self.configLine(line, path, lineno)
-                    lineno = lineno + lineCount
-                f.close()
             except EnvironmentError, err:
-                raise CfgEnvironmentError(err.errno, err.strerror, err.filename)
+                raise CfgEnvironmentError(err.strerror, err.filename)
+
+            self.readObject(path, f)
         elif exception:
-            raise CfgEnvironmentError(errno.EEXIST, 
+            raise CfgEnvironmentError(
                           "No such file or directory: '%s'" % path, 
                           path)
 
@@ -301,9 +314,12 @@ class ConfigFile(_Config):
                                                                    msg, key)
 
     def includeConfigFile(self, val):
-        for cfgfile in util.braceGlob(val):
-            self.read(cfgfile)
-
+        if val.startswith("http://") or val.startswith("https://"):
+            f = urllib2.urlopen(val)
+            self.readObject(val, f)
+        else:
+            for cfgfile in util.braceGlob(val):
+                self.read(cfgfile)
 
 class ConfigSection(ConfigFile):
     """ A Config Section.  

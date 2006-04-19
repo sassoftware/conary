@@ -7,6 +7,7 @@ Changes in @NEW@:
       default children that are installed will be removed.
     * Applying rollbacks which included overlapping files would fail unless
       --replace-files was used
+    * includeConfigFiles now accepts http and https urls
 
   o Build Changes:
     * The addSource source action will now replace existing files,

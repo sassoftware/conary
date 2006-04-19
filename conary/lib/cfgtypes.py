@@ -430,7 +430,11 @@ class ParseError(CfgError):
     def __init__(self, val):
 	self.val = str(val)
 
-class CfgEnvironmentError(EnvironmentError, CfgError):
-    def __init__(self, errno, msg, path):
-        EnvironmentError.__init__(self, errno, 
-                                  'Error reading config file: ' + msg, path)
+class CfgEnvironmentError(CfgError):
+
+    def __str__(self):
+        return "Error reading config file %s: %s" % (self.msg, self.path)
+
+    def __init__(self, path, msg):
+        self.msg = msg
+        self.path = path
