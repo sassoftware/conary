@@ -245,6 +245,8 @@ class FilesystemJob:
 	    else:
 		fileObj.restore(contents, root, target, journal=journal)
 
+        assert(not self.errors)
+
 	# this is run after the changes are in the database (but before
 	# they are committed
 	tagCommands = TagCommand()
@@ -638,6 +640,8 @@ class FilesystemJob:
         # Create new files. If the files we are about to create already
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
+            # a continue anywhere in this loop means that the file does not
+            # get created
             if pathId in removalList:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
@@ -659,6 +663,8 @@ class FilesystemJob:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 continue
 
+            restoreFile = True
+
             s = util.lstat(headRealPath)
             if s is None:
                 # the path doesn't exist, carry on with the restore
@@ -673,7 +679,7 @@ class FilesystemJob:
 		    # already owned, we just assume those permissions are
 		    # right
 		    if repos.pathIsOwned(headPath):
-			continue
+			restoreFile = False
                 elif (not isinstance(headFile, files.Directory)
                       and stat.S_ISDIR(s.st_mode)
                       and (os.listdir(headRealPath) or not replaceFiles)):
@@ -692,7 +698,7 @@ class FilesystemJob:
                     # don't replace InitialContents files if they already
                     # have contents on disk
                     fullyUpdated = False
-                    continue
+                    restoreFile = False
                 elif not self.removes.has_key(headRealPath):
                     fileConflict = True
 
@@ -737,11 +743,12 @@ class FilesystemJob:
                                troveCs.getNewVersion(),
                                troveCs.getNewFlavor()))
                         fullyUpdated = False
-                        continue
+                        restoreFile = False
 
-            self._restore(headFile, headRealPath, newTroveInfo, "creating %s",
-                          replaceFiles = replaceFiles)
-	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+            if restoreFile:
+                self._restore(headFile, headRealPath, newTroveInfo, 
+                              "creating %s", replaceFiles = replaceFiles)
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
 
         # get the baseFile which was originally installed
         baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:]) 
