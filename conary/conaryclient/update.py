@@ -1969,9 +1969,11 @@ conary erase '%s=%s[%s]'
             callback.updateDone()
         else:
             # build a set of everything which is being removed
-            removeHints = set()
+            removeHints = dict()
             for job in allJobs:
-                removeHints.update([ (x[0], x[1][0], x[1][1])
+                # the None in this dict means that all files in this trove
+                # should be overridden
+                removeHints.update([ ((x[0], x[1][0], x[1][1]), None)
                                         for x in job if x[1][0] is not None ])
 
             if not self.cfg.threaded:

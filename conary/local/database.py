@@ -879,6 +879,16 @@ class Database(SqlDbRepository):
                 # this overwrites old with new
                 reposCs.merge(newCs)
 
+                # we need to go ahead and note files which were removed
+                # from in the local part of the changeset to prevent false
+                # conflicts
+                removalHints = {}
+                for trvCs in localCs.iterNewTroveList():
+                    info = (trvCs.getName(), trvCs.getOldVersion(),
+                            trvCs.getOldFlavor())
+                    l = removalHints.setdefault(info, [])
+                    l.extend(trvCs.getOldFileList())
+
                 try:
                     itemCount += 1
                     callback.setUpdateHunk(itemCount, totalCount)
@@ -886,6 +896,7 @@ class Database(SqlDbRepository):
                     self.commitChangeSet(reposCs, UpdateJob(None),
                                          isRollback = True,
                                          replaceFiles = replaceFiles,
+                                         removeHints = removalHints,
                                          callback = callback)
 
                     if not localCs.isEmpty():

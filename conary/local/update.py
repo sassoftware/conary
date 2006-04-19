@@ -607,7 +607,7 @@ class FilesystemJob:
         @param removalHints: set of (name, version, flavor) tuples which
         are being removed as part of this operation; troves which are
         scheduled to be removed won't generate file conflicts with new
-        troves
+        troves or install contents
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -631,10 +631,16 @@ class FilesystemJob:
 
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())
+        removalList = removalHints.get(newTroveInfo, [])
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
+            if pathId in removalList:
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+                self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
+                continue
+
 	    if headPath[0] == '/':
                 headRealPath = root + headPath
 	    else:
@@ -694,7 +700,11 @@ class FilesystemJob:
                         # for source control operations
                         for info in self.db.iterFindPathReferences(
                                             headPath, justPresent = True):
-                            if info[0:3] in removalHints:
+                            # info here is (name, version, flavor, pathID)
+                            # removalHints contains None to match all
+                            # files, or a list of pathIds
+                            match = removalHints.get(info[0:3], [])
+                            if match is None or info[3] in match:
                                 fileConflict = False
 
                     if fileConflict and \
@@ -739,12 +749,12 @@ class FilesystemJob:
         # far the most complicated case.
 	for (pathId, headPath, headFileId, headFileVersion), baseFile \
                 in itertools.izip(troveCs.getChangedFileList(), baseFileList):
+            assert(not(pathId in removalList))
+
 	    if not fsTrove.hasFile(pathId):
 		# the file was removed from the local system; we're not
 		# putting it back
-                self.userRemoval(troveCs.getName(), troveCs.getNewVersion(), 
-                                 troveCs.getNewFlavor(), pathId,
-                                 replaced = False)
+                self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
 		continue
 
 	    (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
