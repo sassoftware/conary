@@ -491,7 +491,7 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addAll(name, versionStr, flavor)} would be
-        equivalent to adding the c{r.addTrove} lines:
+        equivalent to adding the C{r.addTrove} lines:
 
         C{r.add('foo1', <version>)}
         C{r.add('foo2', <version>)}.
