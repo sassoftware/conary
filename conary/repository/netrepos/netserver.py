@@ -1542,13 +1542,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
-        version = self.toVersion(version)
-        flavor = self.toFlavor(flavor)
 	if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
 	    raise errors.InsufficientPermission
+        version = self.toVersion(version)
+        flavor = self.toFlavor(flavor)
         self.log(2, name, version, flavor)
-        trv = self.repos.getTrove(name, version, flavor)
+
         signature = DigitalSignature()
         signature.thaw(base64.b64decode(encSig))
         sig = signature.get()
@@ -1559,72 +1559,68 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if pubKey.isRevoked():
             raise errors.IncompatibleKey('Key %s has been revoked. '
                                   'Signature rejected' %sig[0])
-
         if (pubKey.getTimestamp()) and (pubKey.getTimestamp() < time.time()):
             raise errors.IncompatibleKey('Key %s has expired. '
                                   'Signature rejected' %sig[0])
 
+        # start a transaction now as a means of protecting against
+        # simultaneous signing by different clients. The real fix
+        # would need "SELECT ... FOR UPDATE" support in the SQL
+        # engine, which is not universally available
+        cu = self.db.transaction()
+
+        # get the instanceId that corresponds to this trove.
+        cu.execute("""
+        SELECT instanceId FROM Instances
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+        WHERE Items.item = ?
+          AND Versions.version = ?
+          AND Flavors.flavor = ?
+        """, (name, version.asString(), flavor.freeze()))
+        instanceId = cu.fetchone()[0]
+        # try to create a row lock for the signature record if needed
+        cu.execute("UPDATE TroveInfo SET changed = changed "
+                   "WHERE instanceId = ? AND infoType = ?",
+                   (instanceId, trove._TROVEINFO_TAG_SIGS))
+
+        # now we should have the proper locks
+        trv = self.repos.getTrove(name, version, flavor)
         #need to verify this key hasn't signed this trove already
         try:
             trv.getDigitalSignature(sig[0])
             foundSig = 1
         except KeyNotFound:
             foundSig = 0
-
         if foundSig:
             raise errors.AlreadySignedError("Trove already signed by key")
 
         trv.addPrecomputedDigitalSignature(sig)
-
         # verify the new signature is actually good
         trv.verifyDigitalSignatures(keyCache = keyCache)
 
-        cu = self.db.transaction()
-        # get the instanceId that corresponds to this trove.
-        # if this instance is unflavored, the magic value is ''
-        flavorStr = flavor.freeze()
-        cu.execute("SELECT flavorId from Flavors WHERE flavor=?", flavorStr)
-        flavorId = cu.fetchone()[0]
-        cu.execute("SELECT versionId FROM Versions WHERE version=?",
-                   version.asString())
-        versionId = cu.fetchone()[0]
-        cu.execute("SELECT itemId from Items WHERE item=?", name)
-        itemId = cu.fetchone()[0]
-
-        cu.execute("""SELECT instanceId FROM Instances
-                      WHERE itemId=? AND versionId=? AND flavorId=?""",
-                   itemId, versionId, flavorId)
-        instanceId = cu.fetchone()[0]
-
         # see if there's currently any troveinfo in the database
-        cu.execute("""SELECT COUNT(*) FROM TroveInfo
-                          WHERE instanceId=? AND infoType=?""",
-                   (instanceId, trove._TROVEINFO_TAG_SIGS))
+        cu.execute("""
+        SELECT COUNT(*) FROM TroveInfo WHERE instanceId=? AND infoType=?
+        """, (instanceId, trove._TROVEINFO_TAG_SIGS))
         trvInfo = cu.fetchone()[0]
-        # start a transaction now. ensures simultaneous signatures by separate
-        # clients won't cause a race condition.
-        try:
-            # add the signature while it's protected, to ensure no collissions
-            trv = self.repos.getTrove(name, version, flavor)
-            trv.addPrecomputedDigitalSignature(sig)
-            if trvInfo:
-                # we have TroveInfo, so update it
-                cu.execute("UPDATE TroveInfo SET data=? "
-                           "WHERE instanceId=? AND infoType=?", (
-                    cu.binary(trv.troveInfo.sigs.freeze()), instanceId,
-                    trove._TROVEINFO_TAG_SIGS))
-            else:
-                # otherwise we need to create a new row with the signatures
-                cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
-                           "VALUES (?, ?, ?)",
-                           (instanceId, trove._TROVEINFO_TAG_SIGS,
-                            cu.binary(trv.troveInfo.sigs.freeze())))
-            self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
-                                       trv.getFlavor())
-        except:
-            self.db.rollback()
-            raise
-        self.db.commit()
+        if trvInfo:
+            # we have TroveInfo, so update it
+            cu.execute("""
+            UPDATE TroveInfo SET data = ?
+            WHERE instanceId = ? AND infoType = ?
+            """, (cu.binary(trv.troveInfo.sigs.freeze()), instanceId,
+                  trove._TROVEINFO_TAG_SIGS))
+        else:
+            # otherwise we need to create a new row with the signatures
+            cu.execute("""
+            INSERT INTO TroveInfo (instanceId, infoType, data)
+            VALUES (?, ?, ?)
+            """, (instanceId, trove._TROVEINFO_TAG_SIGS,
+                  cu.binary(trv.troveInfo.sigs.freeze())))
+        self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
+                                   trv.getFlavor())
         return True
 
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
@@ -1738,10 +1734,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         result = cu.fetchall()
         if not result:
             cu.execute("insert into LatestMirror (host, mark) "
-                       "values (?, ?)", host, mark)
+                       "values (?, ?)", (host, mark))
         else:
             cu.execute("update LatestMirror set mark=? where host=?",
-                       mark, host)
+                       (mark, host))
 
         return ""
 
@@ -1782,7 +1778,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND TroveInfo.infoType = ?
         ORDER BY TroveInfo.changed
         """ % (",".join("%d" % x for x in userGroupIds), )
-        cu.execute(query, mark, mark, trove._TROVEINFO_TAG_SIGS)
+        cu.execute(query, (mark, mark, trove._TROVEINFO_TAG_SIGS))
 
         l = set()
         for pattern, name, version, flavor, mark in cu:
@@ -1807,20 +1803,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # likely they'll ask for signatures of troves that are not
             # signed. We return "" in that case.
             cu.execute("""
-            SELECT TroveInfo.data
-              FROM Items
-              JOIN Instances USING (itemId)
-              JOIN Versions USING (versionId)
+            SELECT COALESCE(TroveInfo.data, '')
+              FROM Instances
+              JOIN Items ON Instances.itemId = Items.itemId
+              JOIN Versions ON Instances.versionId = Versions.versionId
               JOIN Flavors ON Instances.flavorId = Flavors.flavorId
               LEFT OUTER JOIN TroveInfo ON
                    Instances.instanceId = TroveInfo.instanceId
                    AND TroveInfo.infoType = ?
              WHERE item = ? AND version = ? AND flavor = ?
-               """, trove._TROVEINFO_TAG_SIGS, name, version, flavor)
+               """, (trove._TROVEINFO_TAG_SIGS, name, version, flavor))
             try:
                 data = cu.fetchall()[0][0]
-                if data is None:
-                    data = ""
                 result.append(data)
             except:
                 raise errors.TroveMissing(name, version = self.toVersion(version))
@@ -1846,28 +1840,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sig = base64.decodestring(sig)
 
             cu.execute("""
-                    SELECT instanceId FROM Items
-                        JOIN Instances USING (itemId)
-                        JOIN Versions USING (versionId)
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        WHERE
-                            item = ? AND
-                            version = ? AND
-                            flavor = ?
-                    """, name, version, flavor)
+            SELECT instanceId FROM Instances
+             JOIN Items ON Instances.itemId = Items.itemId
+             JOIN Versions ON Instances.versionId = Versions.versionId
+             JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+            WHERE Items.item = ?
+              AND Versions.version = ?
+              AND Flavors.flavor = ?
+            """, (name, version, flavor))
             try:
                 instanceId = cu.next()[0]
             except StopIteration:
                 raise errors.TroveMissing(name, version = version)
 
             cu.execute("""
-                    SELECT data FROM Instances
-                        JOIN TroveInfo USING (instanceId)
-                        WHERE
-                            instanceId = ? AND
-                            infoType = ?
-            """, instanceId, trove._TROVEINFO_TAG_SIGS)
+            SELECT data FROM TroveInfo WHERE instanceId = ? AND infoType = ?
+            """, (instanceId, trove._TROVEINFO_TAG_SIGS))
             try:
                 currentSig = cu.next()[0]
             except StopIteration:
@@ -1875,15 +1863,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             if not currentSig:
                 cu.execute("""
-                    INSERT INTO TroveInfo
-                        (instanceId, infoType, data)
-                        VALUES (?, ?, ?)
+                INSERT INTO TroveInfo (instanceId, infoType, data)
+                VALUES (?, ?, ?)
                 """, instanceId, trove._TROVEINFO_TAG_SIGS, sig)
                 updateCount += 1
             elif currentSig != sig:
-                cu.execute("""UPDATE TroveInfo SET data=? WHERE
-                        infoType = ? AND instanceId=?""",
-                        sig, trove._TROVEINFO_TAG_SIGS, instanceId)
+                cu.execute("""
+                UPDATE TroveInfo SET data = ?
+                WHERE infoType = ? AND instanceId = ?
+                """, (sig, trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
 
         return updateCount
