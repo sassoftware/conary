@@ -199,7 +199,7 @@ use cvc co %s=<branch> for the following branches:
 
     conaryState.write(workDir + "/CONARY")
 
-def commit(repos, cfg, message, callback=None):
+def commit(repos, cfg, message, callback=None, test=False):
     if not callback:
         callback = CheckinCallback()
 
@@ -442,7 +442,13 @@ def commit(repos, cfg, message, callback=None):
 
             # writable changesets can't do merging, so create a parent
             # readonly one
-            repos.commitChangeSet(shadowCs, callback = callback)
+            if not test:
+                repos.commitChangeSet(shadowCs, callback = callback)
+
+    if test:
+        # everything past this point assumes the changeset has been
+        # committed
+        return
 
     repos.commitChangeSet(changeSet, callback = callback)
 
@@ -741,8 +747,8 @@ def diff(repos, versionStr = None):
 	oldTrove = repos.getTrove(*pkgList[0])
     else:
 	oldTrove = repos.getTrove(state.getName(), 
-                                    state.getVersion().canonicalVersion(), 
-                                    deps.deps.DependencySet())
+                                  state.getVersion(),
+                                  deps.deps.DependencySet())
 
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
