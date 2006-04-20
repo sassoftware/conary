@@ -21,26 +21,26 @@ Changes in 1.0.13:
       working.
     * The internal setModes policy now reports "suid/sgid" only for
       files that are setuid or setgid, rather than all files which
-      have an explicitly set mode (bz #935).
+      have an explicitly set mode.  (bz #935)
     * TagSpec no longer will print out ignored TagSpec matches twice,
       once for tags specified in the recipe, and once for tags
-      discovered in /etc/conary/tags/* (bz #902).
+      discovered in /etc/conary/tags/*.  (bz #902)
     * TagSpec will now summarize all its suggested additions to
-      buildRequires in a single line (bz #868).
+      buildRequires in a single line.  (bz #868)
     * A new reportMissingBuildRequires policy has been added to summarize
       all suggested additions to buildRequires in a single line at the
       end of the entire build process, to make it easier to enhance the
-      buildRequires list via cut-and-paste (bz #869).
+      buildRequires list via cut-and-paste.  (bz #869)
 
   o Bug Fixes:
     * A bug that caused conary to traceback when a file on the file
       system is owned by unknown uid/gid has been fixed.  Conary will
-      now print an error message instead (bz #977).
+      now print an error message instead.  (bz #977)
     * A bug that caused conary to traceback when an unknown Use flag
       was used when cooking has been fixed.  Previously, "cvc cook
       --flavor 'foobar'" would create a traceback.  Conary now says
-      'Error setting build flag values: No Such Use Flag foobar'. (bz
-      #982)
+      'Error setting build flag values: No Such Use Flag foobar'.
+      (bz #982)
     * Pinned troves are now excluded from updateall operations.
       Previously conary would try to find updates for pinned troves.
     * Conary now handles applying rollbacks which include overlapping
