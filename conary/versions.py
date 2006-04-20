@@ -1160,7 +1160,6 @@ class Version(VersionSequence):
         # if a binary was branched/shadowed onto this label
         while v.isBranchedBinary():
             v = v.parentVersion()
-        v = v.canonicalVersion()
         for item in v.versions:
             if isinstance(item, Revision):
                 item.buildCount = None
