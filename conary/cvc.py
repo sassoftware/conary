@@ -309,8 +309,8 @@ class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
 
-    docs = {'message': 'Use MESSAGE to describe why the commit was performed'}
-    docs = {'test':    ('Runs through all the steps of committing but does not'
+    docs = {'message': 'Use MESSAGE to describe why the commit was performed',
+           'test':    ('Runs through all the steps of committing but does not'
                         'modify the repository')}
 
     def addParameters(self, argDef):
