@@ -158,10 +158,33 @@ class CfgFingerPrint(CfgType):
         if not val or val.lower() == 'none':
             return None
         return val
-            
-    
-CfgInstallLabelPath = CfgLineList(CfgLabel)
-    
+
+class CfgLabelList(list):
+
+    def versionPriority(self, first, second):
+        return self.priority(first.trailingLabel(), second.trailingLabel())
+
+    def priority(self, first, second):
+        # returns -1 if the first label occurs earlier in the list than
+        # the second label does; None if either or both labels are missing
+        # from the path. If the labels are identical and both are in the
+        # path, we return 0 (I don't know how useful that is, but what the
+        # heck)
+        firstIdx = None
+        secondIdx = None
+
+        for i, l in enumerate(self):
+            if firstIdx is None and l == first:
+                firstIdx = i
+            if secondIdx is None and l == second:
+                secondIdx = i
+
+        if firstIdx is None or secondIdx is None:
+            return None 
+
+        return cmp(firstIdx, secondIdx)
+
+CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
 
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
