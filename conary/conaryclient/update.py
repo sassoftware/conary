@@ -851,9 +851,10 @@ followLocalChanges: %s
                                 # just made this move, then allow it.
                                 log.debug('INSTALL: matches parent\'s branch switch')
                                 pass
-                            elif (replacedInfo in installedAndReferenced
+                            elif ((replacedInfo in installedAndReferenced
+                                   or replacedInfo in sameBranchLocalUpdates)
                                   and not alreadyBranchSwitch
-                                  and parentInstalled):
+                                  and parentUpdated):
                                 # Exception: The user has not switched this
                                 # trove's branch explicitly, and now
                                 # we have an implicit request to switch 
