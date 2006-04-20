@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.13:
   o Client changes:
     * Added a new command for updating troves:  the 'migrate' command -
       'migrate' updates a trove if an update is available.  Whether or not
