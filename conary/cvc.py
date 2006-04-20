@@ -324,7 +324,7 @@ class CommitCommand(CvcCommand):
         if level > log.INFO:
             log.setVerbosity(log.INFO)
         message = argSet.pop("message", None)
-        test = argSet.pop("test")
+        test = argSet.pop("test", False)
         sourceCheck = True
 
         if argSet or len(args) != 1: return self.usage()
