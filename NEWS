@@ -1,15 +1,19 @@
 Changes in 1.0.13:
-  o Client changes:
-    * Added a new command for updating troves:  the 'migrate' command -
-      'migrate' updates a trove if an update is available.  Whether or not
-      an update is available, the children of the given trove will be
-      updated to match the version of the trove installed.  Also, any not by
-      default children that are installed will be removed.
+  o Client Changes:
+    * A new "conary migrate" command for updating troves has been
+      added.  "conary migrate" updates a trove if an update is
+      available.  Whether or not an update is available, the children
+      of the given trove will be updated to match the version of the
+      trove installed.  Also, any not-by-default children that are
+      installed will be removed.
     * Applying rollbacks which included overlapping files would fail unless
       --replace-files was used
-    * includeConfigFiles now accepts http and https urls
-    * Trying replacing an empty directory with a file (w/o --replace-files)
-      now gives a directory-specific error message
+    * The includeConfigFiles configuration directive now accepts http
+      and https URLs.  This allows organizations to set up centralized
+      site-wide conary configuration.
+    * Conary now gives a more detailed error message when a changeset
+      attempts to replace an empty directory with a file and
+      --replace-files is not specified.
 
   o Build Changes:
     * The addSource source action will now replace existing files,
