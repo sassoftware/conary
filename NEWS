@@ -1,11 +1,13 @@
 Changes in 1.0.13:
   o Client Changes:
     * A new "conary migrate" command for updating troves has been
-      added.  "conary migrate" updates a trove if an update is
-      available.  Whether or not an update is available, the children
-      of the given trove will be updated to match the version of the
-      trove installed.  Also, any not-by-default children that are
-      installed will be removed.
+      added.  "conary migrate" is useful for circumstances when you
+      want to update the software state on a system to be synchronized
+      with the default state of a group.  To do this, "conary migrate"
+      calculates the changeset required to: 1) update the trove (if an
+      update is available); 2) install any missing included troves; 3)
+      synchronize included troves that have a mismatched version; 4)
+      remove any referenced troves that are not installed by default.
     * The includeConfigFiles configuration directive now accepts http
       and https URLs.  This allows organizations to set up centralized
       site-wide conary configuration.
