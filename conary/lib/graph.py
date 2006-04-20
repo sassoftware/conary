@@ -119,8 +119,8 @@ class DirectedGraph:
     def delete(self, item):
         idx = self.data.getIndex(item)
         self.data.delete(item)
-        del self.edges[idx]
-        [ x.pop(idx, None) for x in self.edges.itervalues() ]
+        self.edges.pop(idx, 0)
+        [ x.pop(idx, 0) for x in self.edges.itervalues() ]
 
     def deleteEdges(self, item):
         self.edges[self.data.getIndex(item)] = {}
