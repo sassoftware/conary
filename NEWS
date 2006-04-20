@@ -17,7 +17,7 @@ Changes in 1.0.13:
     * The addSource source action will now replace existing files,
       rather than replacing their contents.  This implies that the
       mode of the existing file will not be inherited, and an
-      existing readonly file will not prevent addSource from
+      existing read-only file will not prevent addSource from
       working.
     * The internal setModes policy now reports "suid/sgid" only for
       files that are setuid or setgid, rather than all files which
@@ -33,17 +33,19 @@ Changes in 1.0.13:
       buildRequires list via cut-and-paste (bz #869).
 
   o Bug Fixes:
-    * A bug that caused conary to traceback in the face of a file on the 
-      filesystem with an unknown uid/gid has been fixed, conary will now
-      print an error message instead (bz #977)
-    * A bug that caused conary to traceback when an unknown Use flag was
-      used when cooking has been fixed (bz #982).  For example, 
-      cvc cook --flavor 'foobar', used to create a traceback, now it says
-      instead 'Error setting build flag values: No Such Use Flag foobar'
-    * Pinned troves no longer are used to determine what troves are updated
-      when updateall is run. 
-    * Applying rollbacks which included overlapping files would fail unless
-      --replace-files was used
+    * A bug that caused conary to traceback when a file on the file
+      system is owned by unknown uid/gid has been fixed.  Conary will
+      now print an error message instead (bz #977).
+    * A bug that caused conary to traceback when an unknown Use flag
+      was used when cooking has been fixed.  Previously, "cvc cook
+      --flavor 'foobar'" would create a traceback.  Conary now says
+      'Error setting build flag values: No Such Use Flag foobar'. (bz
+      #982)
+    * Pinned troves are now excluded from updateall operations.
+      Previously conary would try to find updates for pinned troves.
+    * Conary now handles applying rollbacks which include overlapping
+      files correctly.  Previously --replace-files was required to
+      apply these rollbacks.
 
 Changes in 1.0.12:
   o Client changes:
