@@ -1950,8 +1950,7 @@ conary erase '%s=%s[%s]'
                         journal = journal, callback = callback,
                         localRollbacks = localRollbacks,
                         removeHints = removeHints, autoPinList = autoPinList,
-                        threshold = threshold,
-                        filePriorityPath = self.cfg.installLabelPath)
+                        threshold = threshold)
             except Exception, e:
                 # an exception happened, clean up
                 rb = uJob.getRollback()
