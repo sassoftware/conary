@@ -124,7 +124,7 @@ class CfgFlavor(CfgType):
     def format(self, val, displayOptions=None):
         val = ', '.join(deps.formatFlavor(val).split(','))
 
-        if displayOptions.get('prettyPrint', False):
+        if displayOptions and displayOptions.get('prettyPrint', False):
             val = ('\n%26s'%'').join(textwrap.wrap(val, 48))
 
         return val
