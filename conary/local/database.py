@@ -23,7 +23,7 @@ from conary import trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.callbacks import UpdateCallback
-from conary.conarycfg import RegularExpressionList
+from conary.conarycfg import RegularExpressionList, CfgLabelList
 from conary.deps import deps
 from conary.lib import log, util
 from conary.local import localrep, sqldb, schema, update
@@ -461,9 +461,13 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        removeHints = {}, 
+                        removeHints = {}, filePriorityPath = None,
                         autoPinList = RegularExpressionList(), threshold = 0):
 	assert(not cs.isAbsolute())
+
+        if filePriorityPath is None:
+            filePriorityPath = CfgLabelList()
+
         flags = 0
         if replaceFiles:
             flags |= update.REPLACEFILES
@@ -522,8 +526,9 @@ class Database(SqlDbRepository):
                                redirectionRollbacks = (not localRollbacks))
             flags |= update.MERGE
 
-	fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root, 
-				     flags = flags, callback = callback,
+        fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root,
+                                     filePriorityPath, flags = flags,
+                                     callback = callback,
                                      removeHints = removeHints)
 
         if not isRollback:
@@ -638,7 +643,9 @@ class Database(SqlDbRepository):
             # an object for historical reasons
             try:
                 localrep.LocalRepositoryChangeSetJob(
-                    dbCache, cs, callback, autoPinList, threshold = threshold,
+                    dbCache, cs, callback, autoPinList, 
+                    filePriorityPath,
+                    threshold = threshold,
                     allowIncomplete = isRollback, 
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)

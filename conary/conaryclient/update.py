@@ -1944,14 +1944,13 @@ conary erase '%s=%s[%s]'
 
             try:
                 self.db.commitChangeSet(cs, uJob,
-                                        replaceFiles = replaceFiles,
-                                        tagScript = tagScript, test = test,
-                                        justDatabase = justDatabase,
-                                        journal = journal, callback = callback,
-                                        localRollbacks = localRollbacks,
-                                        removeHints = removeHints,
-                                        autoPinList = autoPinList,
-                                        threshold = threshold)
+                        replaceFiles = replaceFiles, tagScript = tagScript, 
+                        test = test, justDatabase = justDatabase,
+                        journal = journal, callback = callback,
+                        localRollbacks = localRollbacks,
+                        removeHints = removeHints, autoPinList = autoPinList,
+                        threshold = threshold,
+                        filePriorityPath = self.cfg.installLabelPath)
             except Exception, e:
                 # an exception happened, clean up
                 rb = uJob.getRollback()

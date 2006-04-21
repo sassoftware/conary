@@ -161,6 +161,12 @@ class CfgFingerPrint(CfgType):
 
 class CfgLabelList(list):
 
+    def __repr__(self):
+        return "CfgLabelList(%s)" % list.__repr__(self)
+
+    def __getslice__(self, i, j):
+        return CfgLabelList(list.__getslice__(self, i, j))
+
     def versionPriority(self, first, second):
         return self.priority(first.trailingLabel(), second.trailingLabel())
 
