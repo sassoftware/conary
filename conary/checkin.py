@@ -24,7 +24,7 @@ import time
 
 from conary import callbacks
 from conary import changelog
-from conary import conaryclient
+from conary import conarycfg, conaryclient
 from conary import deps
 from conary import errors
 from conary import files
@@ -874,6 +874,7 @@ def updateSrc(repos, versionStr = None, callback = None):
                                                withVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
+                                 conarycfg.CfgLabelList(),
 				 flags = update.IGNOREUGIDS | update.MERGE)
     errList = fsJob.getErrorList()
     if errList:
@@ -950,6 +951,7 @@ def merge(repos, callback=None):
                                                withVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
+                                 conarycfg.CfgLabelList(),
 				 flags = update.IGNOREUGIDS | update.MERGE)
     errList = fsJob.getErrorList()
     if errList:
