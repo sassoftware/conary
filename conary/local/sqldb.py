@@ -851,7 +851,8 @@ order by
 
         return troveInstanceId
 
-    def checkPathConflicts(self, instanceIdList, replaceFiles):
+    def checkPathConflicts(self, instanceIdList, filePriorityPath,
+                           replaceFiles):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
         for instanceId in instanceIdList:
@@ -878,9 +879,11 @@ order by
         else:
             cu.execute("""
                 SELECT AddedFiles.path,
-                       ExistingFiles.pathId, ExistingInstances.troveName,
-                       ExistingVersions.version, ExistingFlavors.flavor,
-                       AddedFiles.pathId, AddedInstances.troveName,
+                       ExistingInstances.instanceId, ExistingFiles.pathId,
+                       ExistingInstances.troveName, ExistingVersions.version,
+                       ExistingFlavors.flavor,
+                       AddedInstances.instanceId, AddedFiles.pathId, 
+                       AddedInstances.troveName,
                        AddedVersions.version, AddedFlavors.flavor
 
                     FROM NewInstances
@@ -908,18 +911,34 @@ order by
                         ExistingFiles.isPresent = 1
             """)
 
-            for (path, existingPathId, existingTroveName, existingVersion,
-                 existingFlavor, addedPathId, addedTroveName, addedVersion,
+            markNotPresent = []
+
+            for (path, existingInstanceId, existingPathId, existingTroveName,
+                 existingVersion, existingFlavor,
+                 addedInstanceId, addedPathId, addedTroveName, addedVersion,
                  addedFlavor) in cu:
-                conflicts.append((path,
-                        (existingPathId, 
-                         (existingTroveName,
-                          versions.VersionFromString(existingVersion),
-                          deps.deps.ThawDependencySet(existingFlavor))),
-                        (addedPathId, 
-                         (addedTroveName,
-                          versions.VersionFromString(addedVersion),
-                          deps.deps.ThawDependencySet(addedFlavor)))))
+                pri = filePriorityPath.versionPriority(
+                            versions.VersionFromString(existingVersion),
+                            versions.VersionFromString(addedVersion))
+                if pri == -1:
+                    markNotPresent.append((addedInstanceId, addedPathId))
+                elif pri == 1:
+                    markNotPresent.append((existingInstanceId, existingPathId))
+                else:
+                    conflicts.append((path,
+                            (existingPathId,
+                             (existingTroveName,
+                              versions.VersionFromString(existingVersion),
+                              deps.deps.ThawDependencySet(existingFlavor))),
+                            (addedPathId,
+                             (addedTroveName,
+                              versions.VersionFromString(addedVersion),
+                              deps.deps.ThawDependencySet(addedFlavor)))))
+
+            for instanceId, pathId in markNotPresent:
+                cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "
+                           "WHERE instanceId = ? AND pathId = ?",
+                           instanceId, pathId)
 
         cu.execute("DROP TABLE NewInstances")
 

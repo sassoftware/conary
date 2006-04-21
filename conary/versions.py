@@ -995,6 +995,15 @@ class Version(VersionSequence):
 	"""
 	return self.versions[-1]
 
+    def trailingLabel(self):
+        """
+        Returns the last label object in the version.
+
+        @rtype: AbstractLabel
+        """
+
+        return self.versions[-2]
+
     def isSourceVersion(self):
     	"""
 	Tests whether this version is a source or binary version.
