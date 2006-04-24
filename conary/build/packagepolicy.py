@@ -648,7 +648,7 @@ class TagSpec(_addInfo):
 
     The C{r.TagSpec()} policy automatically applies tags defined by tag
     descriptions in both the current system and C{%(destdir)s} to all
-    files in C{%(destdir)}.
+    files in C{%(destdir)s}.
 
     To apply tags manually (removing a dependency on the tag description
     file existing when the packages is cooked), use the syntax:
