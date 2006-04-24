@@ -48,6 +48,8 @@ Changes in 1.0.13:
     * Conary now handles applying rollbacks which include overlapping
       files correctly.  Previously --replace-files was required to
       apply these rollbacks.
+    * the config file directive includeConfigFile is no longer case sensitive 
+      (bz #995)
 
 Changes in 1.0.12:
   o Client changes:
