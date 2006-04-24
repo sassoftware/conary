@@ -1155,7 +1155,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not groupTroves:
             return {}
 
-        notMatching = []
         seen = []
         notMatching = [ x.getNameVersionFlavor() for x in groupTroves ]
 
