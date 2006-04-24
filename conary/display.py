@@ -22,6 +22,7 @@ import time
 from conary import files
 from conary import trove
 from conary.deps import deps
+from conary.lib import log
 from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary import metadata
 from conary.repository import errors
@@ -612,6 +613,13 @@ class TroveFormatter(TroveTupFormatter):
                 lines = cl.getMessage().split("\n")[:-1]
                 for l in lines:
                     yield "    " + l
+
+        if log.getVerbosity() <= log.DEBUG:
+            yield "%-30s %s" % (("Incomp.   : %s" %
+                                 bool(trove.troveInfo.incomplete())),
+                                ("TroveVer  : %s" %
+                                            trove.troveInfo.troveVersion()))
+
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
         """ Print information about this trove """
