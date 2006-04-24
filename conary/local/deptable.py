@@ -1037,11 +1037,11 @@ class DependencyTables:
                           ORDER BY
                             Nodes.finalTimestamp DESC
                         """
-        troveIds = []
         if troveList:
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
             schema.resetTable(cu, "tmpInstances2")
+            instanceIds = []
             for (n,v,f) in troveList:
                 itemId = cu.execute('SELECT itemId FROM Items'
                                     ' WHERE item=?', n).next()[0]
@@ -1058,6 +1058,9 @@ class DependencyTables:
                                         versionId, flavorId).next()[0]
                 cu.execute('''INSERT INTO tmpInstances VALUES (?)''',
                            instanceId, start_transaction=False)
+                instanceIds.append(instanceId)
+            
+            for instanceId in instanceIds:
                 cu.execute('''INSERT INTO tmpInstances2 
                                        SELECT DISTINCT includedId 
                                        FROM TroveTroves
