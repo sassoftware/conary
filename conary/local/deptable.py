@@ -917,9 +917,6 @@ class DependencyTables:
                 setFn(depSet)
 
     def add(self, cu, trove, troveId):
-        # FIXME: this is used by the server code as well and it is
-        # WAAAY too sqlite specific...
-        #assert(cu.con.inTransaction)
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
@@ -1020,6 +1017,9 @@ class DependencyTables:
             restricting by label and limiting to latest version for
             each (name, flavor) pair.
         """
+        # dep set list must be unique and indexable.
+        depSetList = list(set(depSetList))
+
         selectTemplate = """SELECT depNum, Items.item, Versions.version,
                              Nodes.timeStamps, flavor FROM
                             (%s) as DepsSelect
@@ -1116,6 +1116,9 @@ class DependencyTables:
     def _resolveToIds(self, depSetList, restrictor=None, restrictBy=None):
         """ Resolve dependencies, leaving the results as instanceIds
         """
+        # dep set list must be unique and indexable.
+        depSetList = list(set(depSetList))
+
         selectTemplate = """SELECT depNum, provInstanceId FROM (%s)"""
         depList, cu = self._resolve(depSetList, selectTemplate)
 
@@ -1138,6 +1141,9 @@ class DependencyTables:
 
 
     def getLocalProvides(self, depSetList):
+        # dep set list must be unique and indexable.
+        depSetList = list(set(depSetList))
+
         cu = self.db.cursor()
 
         workTables = DependencyWorkTables(cu)
