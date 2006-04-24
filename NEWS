@@ -1,45 +1,55 @@
-Changes in @NEW@:
-  o Client changes:
-    * Added a new command for updating troves:  the 'migrate' command -
-      'migrate' updates a trove if an update is available.  Whether or not
-      an update is available, the children of the given trove will be
-      updated to match the version of the trove installed.  Also, any not by
-      default children that are installed will be removed.
-    * Applying rollbacks which included overlapping files would fail unless
-      --replace-files was used
-    * includeConfigFiles now accepts http and https urls
-    * Trying replacing an empty directory with a file (w/o --replace-files)
-      now gives a directory-specific error message
+Changes in 1.0.13:
+  o Client Changes:
+    * A new "conary migrate" command for updating troves has been
+      added.  "conary migrate" is useful for circumstances when you
+      want to update the software state on a system to be synchronized
+      with the default state of a group.  To do this, "conary migrate"
+      calculates the changeset required to: 1) update the trove (if an
+      update is available); 2) install any missing included troves; 3)
+      synchronize included troves that have a mismatched version; 4)
+      remove any referenced troves that are not installed by default.
+    * The includeConfigFiles configuration directive now accepts http
+      and https URLs.  This allows organizations to set up centralized
+      site-wide conary configuration.
+    * Conary now gives a more detailed error message when a changeset
+      attempts to replace an empty directory with a file and
+      --replace-files is not specified.
 
   o Build Changes:
     * The addSource source action will now replace existing files,
       rather than replacing their contents.  This implies that the
       mode of the existing file will not be inherited, and an
-      existing readonly file will not prevent addSource from
+      existing read-only file will not prevent addSource from
       working.
     * The internal setModes policy now reports "suid/sgid" only for
       files that are setuid or setgid, rather than all files which
-      have an explicitly set mode (bz #935).
+      have an explicitly set mode.  (bz #935)
     * TagSpec no longer will print out ignored TagSpec matches twice,
       once for tags specified in the recipe, and once for tags
-      discovered in /etc/conary/tags/* (bz #902).
+      discovered in /etc/conary/tags/*.  (bz #902)
     * TagSpec will now summarize all its suggested additions to
-      buildRequires in a single line (bz #868).
+      buildRequires in a single line.  (bz #868)
     * A new reportMissingBuildRequires policy has been added to summarize
       all suggested additions to buildRequires in a single line at the
       end of the entire build process, to make it easier to enhance the
-      buildRequires list via cut-and-paste (bz #869).
+      buildRequires list via cut-and-paste.  (bz #869)
 
   o Bug Fixes:
-    * A bug that caused conary to traceback in the face of a file on the 
-      filesystem with an unknown uid/gid has been fixed, conary will now
-      print an error message instead (bz #977)
-    * A bug that caused conary to traceback when an unknown Use flag was
-      used when cooking has been fixed (bz #982).  For example, 
-      cvc cook --flavor 'foobar', used to create a traceback, now it says
-      instead 'Error setting build flag values: No Such Use Flag foobar'
-    * Pinned troves no longer are used to determine what troves are updated
-      when updateall is run. 
+    * A bug that caused conary to traceback when a file on the file
+      system is owned by unknown uid/gid has been fixed.  Conary will
+      now print an error message instead.  (bz #977)
+    * A bug that caused conary to traceback when an unknown Use flag
+      was used when cooking has been fixed.  Previously, "cvc cook
+      --flavor 'foobar'" would create a traceback.  Conary now says
+      'Error setting build flag values: No Such Use Flag foobar'.
+      (bz #982)
+    * Pinned troves are now excluded from updateall operations.
+      Previously conary would try to find updates for pinned troves.
+    * Conary now handles applying rollbacks which include overlapping
+      files correctly.  Previously --replace-files was required to
+      apply these rollbacks.
+    * the config file directive includeConfigFile is no longer case sensitive 
+      (bz #995)
 
 Changes in 1.0.12:
   o Client changes:

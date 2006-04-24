@@ -59,28 +59,47 @@ class FilesystemJob:
     def _registerLinkGroup(self, linkGroup, target):
         self.linkGroups[linkGroup] = target
 
-    def _restore(self, fileObj, target, troveInfo, msg, contentsOverride = "",
-                 replaceFiles = False):
+    def _restore(self, fileObj, target, troveInfo, filePriorityPath, msg, 
+                 contentsOverride = "", replaceFiles = False):
+        restoreFile = True
+
         if target in self.restores:
             pathId = self.restores[target][0]
-            troveInfo = self.restores[target][4]
+            formerTroveInfo = self.restores[target][4]
 
-            if not replaceFiles:
+            pri = filePriorityPath.versionPriority(formerTroveInfo[1],
+                                                   troveInfo[1])
+            if pri == -1:
+                # silently skip this file
+                restoreFile = False
+                self.userRemoval(troveInfo[0], troveInfo[1], troveInfo[2],
+                                 fileObj.pathId())
+            elif pri == 1:
+                # replace the file
+                self.userRemoval(formerTroveInfo[0], formerTroveInfo[1],
+                                 formerTroveInfo[2], pathId)
+            elif not replaceFiles:
+                # we're not going to be able to install this; record the
+                # error, but fix things up so we don't generate a duplicate
+                # error later on
                 self.errors.append(DatabasePathConflictError(
                                    util.normpath(target),
                                    troveInfo[0], troveInfo[1], troveInfo[2]))
+                self.userRemoval(formerTroveInfo[0], formerTroveInfo[1],
+                                 formerTroveInfo[2], pathId)
+            else:
+                self.userRemoval(formerTroveInfo[0], formerTroveInfo[1],
+                                 formerTroveInfo[2], pathId)
 
-            self.userRemoval(troveInfo[0], troveInfo[1], troveInfo[2],
-                             pathId)
+        if restoreFile:
+            self.restores[target] = (fileObj.pathId(), fileObj,
+                                     contentsOverride, msg, troveInfo)
+            if fileObj.hasContents:
+                self.restoreSize += fileObj.contents.size()
 
-        self.restores[target] = (fileObj.pathId(), fileObj, contentsOverride,
-                                 msg, troveInfo)
-        if fileObj.hasContents:
-            self.restoreSize += fileObj.contents.size()
-
-	for tag in fileObj.tags:
-            l = self.tagUpdates.setdefault(tag, [])
-            l.append(target)
+            for tag in fileObj.tags:
+                l = self.tagUpdates.setdefault(tag, [])
+                l.append(target)
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
@@ -244,6 +263,8 @@ class FilesystemJob:
 		assert(d.digest() == fileObj.contents.sha1())
 	    else:
 		fileObj.restore(contents, root, target, journal=journal)
+
+        assert(not self.errors)
 
 	# this is run after the changes are in the database (but before
 	# they are committed
@@ -584,7 +605,7 @@ class FilesystemJob:
 	    fsTrove.removeFile(pathId)
 
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
-                     removalHints, flags):
+                     removalHints, filePriorityPath, flags):
 	"""
 	Build up the todo list for applying a single trove to the
 	filesystem. 
@@ -608,6 +629,9 @@ class FilesystemJob:
         are being removed as part of this operation; troves which are
         scheduled to be removed won't generate file conflicts with new
         troves or install contents
+        @param filePriorityPath: list of labels; labels earlier in the list
+        get automatic priority over those later in the list
+        @type filePriorityPath: conarycfg.CfgLabelList
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -638,6 +662,8 @@ class FilesystemJob:
         # Create new files. If the files we are about to create already
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
+            # a continue anywhere in this loop means that the file does not
+            # get created
             if pathId in removalList:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
@@ -659,6 +685,8 @@ class FilesystemJob:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 continue
 
+            restoreFile = True
+
             s = util.lstat(headRealPath)
             if s is None:
                 # the path doesn't exist, carry on with the restore
@@ -673,7 +701,7 @@ class FilesystemJob:
 		    # already owned, we just assume those permissions are
 		    # right
 		    if repos.pathIsOwned(headPath):
-			continue
+			restoreFile = False
                 elif (not isinstance(headFile, files.Directory)
                       and stat.S_ISDIR(s.st_mode)
                       and (os.listdir(headRealPath) or not replaceFiles)):
@@ -692,29 +720,40 @@ class FilesystemJob:
                     # don't replace InitialContents files if they already
                     # have contents on disk
                     fullyUpdated = False
-                    continue
+                    restoreFile = False
                 elif not self.removes.has_key(headRealPath):
                     fileConflict = True
 
-                    if removalHints:
-                        # Don't go through the database if we know removalHints
-                        # won't help avoid this conflict. This avoids calling
+                    if hasattr(self.db, 'iterFindPathReferences'):
+                        # The hasattr check restricts these override checks
+                        # to system updates (they get skipped for source
+                        # updates). Yuck. This also avoids calling
                         # iterFindPathReferences() against a network server
-                        # for source control operations
+
+                        # removalHints contains None to match all
+                        # files, or a list of pathIds. If that doesn't
+                        # allow the update, see if a label-based priorities
+                        # resolve the conflict.
                         for info in self.db.iterFindPathReferences(
                                             headPath, justPresent = True):
                             # info here is (name, version, flavor, pathID)
-                            # removalHints contains None to match all
-                            # files, or a list of pathIds
                             match = removalHints.get(info[0:3], [])
                             if match is None or info[3] in match:
                                 fileConflict = False
+                                break
 
-                    if fileConflict and \
-                                hasattr(self.db, 'iterFindPathReferences'):
-                        # For system updates, we should look through the
-                        # database for file conflicts and handle those. For
-                        # source updates, we just give up.
+                            pri = filePriorityPath.versionPriority(
+                                        info[1], newTroveInfo[1])
+                            if pri == 1:
+                                # the new trove has priority
+                                fileConflict = False
+                            elif pri == -1:
+                                # the already installed trove has priority
+                                restoreFile = False
+                                self.userRemoval(replaced = False,
+                                                 *(newTroveInfo + (pathId,)))
+
+                        if restoreFile and fileConflict:
                             existingFile = files.FileFromFilesystem(
                                 headRealPath, pathId)
                             fileConflict = \
@@ -724,24 +763,26 @@ class FilesystemJob:
                         # --replace-files was specified
                         fileConflict = False
 
-                    if not fileConflict:
+                    if restoreFile and not fileConflict:
                         # mark the file as replaced in anything which used
                         # to own it
                         for info in self.db.iterFindPathReferences(
                                     headPath, justPresent = True):
                             self.userRemoval(replaced = True, *info)
-                    else:
+                    elif restoreFile:
                         self.errors.append(FileInWayError(
                                util.normpath(headRealPath),
                                troveCs.getName(),
                                troveCs.getNewVersion(),
                                troveCs.getNewFlavor()))
                         fullyUpdated = False
-                        continue
+                        restoreFile = False
 
-            self._restore(headFile, headRealPath, newTroveInfo, "creating %s",
-                          replaceFiles = replaceFiles)
-	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+            if restoreFile:
+                self._restore(headFile, headRealPath, newTroveInfo, 
+                              filePriorityPath,
+                              "creating %s", replaceFiles = replaceFiles)
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
 
         # get the baseFile which was originally installed
         baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:]) 
@@ -982,6 +1023,7 @@ class FilesystemJob:
                         fsFile.contents.sha1.set(sha1helper.sha1String(newContents))
                         fsFile.contents.size.set(len(newContents))
                         self._restore(fsFile, realPath, newTroveInfo,
+                                      filePriorityPath,
 				      "replacing %s with contents "
 				      "from repository",
 				      contentsOverride = headFileContents,
@@ -992,6 +1034,7 @@ class FilesystemJob:
                             fsFile.contents.sha1.set(headFile.contents.sha1())
                             fsFile.contents.size.set(headFile.contents.size())
                         self._restore(fsFile, realPath, newTroveInfo,
+                                      filePriorityPath,
 				      "replacing %s with contents "
 				      "from repository",
                                       replaceFiles = replaceFiles)
@@ -1025,6 +1068,7 @@ class FilesystemJob:
                     cont = filecontents.FromString("".join(newLines))
                     # XXX update fsFile.contents.{sha1,size}?
                     self._restore(fsFile, realPath, newTroveInfo,
+                          filePriorityPath,
                           "merging changes from repository into %s",
                           contentsOverride = cont, replaceFiles = replaceFiles)
                     beenRestored = True
@@ -1050,6 +1094,7 @@ class FilesystemJob:
 
 	    if attributesChanged and not beenRestored:
                 self._restore(fsFile, realPath, newTroveInfo,
+                      filePriorityPath,
 		      "merging changes from repository into %s",
                       contentsOverride = None, replaceFiles = replaceFiles)
 
@@ -1066,8 +1111,8 @@ class FilesystemJob:
 
 	return fsTrove
 
-    def __init__(self, db, changeSet, fsTroveDict, root, callback = None, 
-		 flags = MERGE, removeHints = {}):
+    def __init__(self, db, changeSet, fsTroveDict, root, filePriorityPath,
+                 callback = None, flags = MERGE, removeHints = {}):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -1082,6 +1127,10 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
+        @param filePriorityPath: list of labels; labels earlier in the list
+        get automatic priority over those later in the list
+        @type filePriorityPath: conarycfg.CfgLabelList
+	@param flags: flags which modify update behavior.  See L{update}
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -1142,8 +1191,8 @@ class FilesystemJob:
 					 baseTrove.getVersion(),
 					 baseTrove.getFlavor()))
 
-            self._singleTrove(db, troveCs, changeSet, baseTrove,
-                                      newFsTrove, root, removeHints, flags)
+            self._singleTrove(db, troveCs, changeSet, baseTrove, newFsTrove, 
+                              root, removeHints, filePriorityPath, flags)
 
             newFsTrove.mergeTroveListChanges(
                 troveCs.iterChangedTroves(strongRefs = True, weakRefs = False),

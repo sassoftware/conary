@@ -682,7 +682,8 @@ class Trove(streams.StreamSet):
                             self.version().copy(),
                             self.flavor().copy(),
                             None,
-                            isRedirect = self.isRedirect())
+                            isRedirect = self.isRedirect(), 
+                            setVersion = False)
         new.idMap = self.idMap.copy()
         new.strongTroves = self.strongTroves.copy()
         new.weakTroves = self.weakTroves.copy()

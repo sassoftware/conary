@@ -133,7 +133,7 @@ class _Config:
         option is read in, the function will be called with (key, value)
         where value is whatever was after the directive in the config file.
         """
-        self._directives[key] = fn
+        self._directives[key.lower()] = fn
 
     # --- Display options allow arbitrary display parameters to be set --
     # they can be picked up by the strings printing themselves
@@ -296,8 +296,8 @@ class ConfigFile(_Config):
         else:
             (key, val) = parts
 
-        if key in self._directives:
-            fn = getattr(self, self._directives[key])
+        if key.lower() in self._directives:
+            fn = getattr(self, self._directives[key.lower()])
             fn(val)
         else:
             try:

@@ -309,26 +309,27 @@ class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
 
-    docs = {'message': 'Use MESSAGE to describe why the commit was performed'}
+    docs = {'message': 'Use MESSAGE to describe why the commit was performed',
+           'test':    ('Runs through all the steps of committing but does not'
+                        'modify the repository')}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["message"] = '-m', ONE_PARAM
+        argDef["test"] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         level = log.getVerbosity()
         if level > log.INFO:
             log.setVerbosity(log.INFO)
-        message = argSet.get("message", None)
+        message = argSet.pop("message", None)
+        test = argSet.pop("test", False)
         sourceCheck = True
-
-        if message is not None:
-            del argSet['message']
 
         if argSet or len(args) != 1: return self.usage()
 
-        checkin.commit(repos, cfg, message, callback=callback)
+        checkin.commit(repos, cfg, message, callback=callback, test=test)
         log.setVerbosity(level)
 _register(CommitCommand)
 

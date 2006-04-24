@@ -1152,10 +1152,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return r
 
     def resolveDependenciesByGroups(self, groupTroves, depList):
-        if not groupTroves:
+        if not (groupTroves and depList):
             return {}
 
-        notMatching = []
         seen = []
         notMatching = [ x.getNameVersionFlavor() for x in groupTroves ]
 
@@ -1186,6 +1185,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         notMatching = set(notMatching)
         notMatching.difference_update(seen)
         del seen
+
+        # remove all components if their packages are in the set.
+        notMatching = set(x for x in notMatching 
+              if not ':' in x[0] 
+                 or not (x[0].split(':', 1)[0], x[1], x[2]) in notMatching)
 
         trovesByHost = {}
         for info in notMatching:

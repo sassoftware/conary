@@ -221,7 +221,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     int offset;
     PyObject * retList, * dataObj;
     int intVal;
-    PyObject * formatArg, * offsetArg, * dataArg;
+    PyObject * formatArg, * offsetArg, * dataArg, * retVal;
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
     if (PyTuple_GET_SIZE(args) != 3) {
@@ -331,7 +331,10 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
         }
     }
 
-    return Py_BuildValue("iO", dataPtr - data, retList);
+    retVal = Py_BuildValue("iO", dataPtr - data, retList);
+    Py_DECREF(retList);
+
+    return retVal;
 }
 
 PyMODINIT_FUNC
