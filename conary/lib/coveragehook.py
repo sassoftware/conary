@@ -63,6 +63,7 @@ def _run(coverage):
     sys.settrace(coverage.t)
 
 origOsFork = os.fork
+origOsExit = os._exit
 def _installOsForkWrapper():
     """
         wrap fork to automatically start a new coverage
@@ -79,6 +80,10 @@ def _installOsForkWrapper():
             return 0
     if os.fork is origOsFork:
         os.fork = fork_wrapper
+
+    def exit_wrapper(*args):
+        sys.modules['coverage'].the_coverage.save()
+        os._exit(*args)
 
 def _reset(coverage):
     sys.settrace(None)
