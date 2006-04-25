@@ -142,14 +142,6 @@ component.
 Show the version, date, and author of each of the lines in \fI<file>.
 \fI<file> must be a file in a conary source dir.
 .TP
-.B branch \fInewbranch [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
-Creates a new branch (identified by the label \fInewbranch\fP) in the
-repository, relative to the branch specified in \fIversion\fP.
-By default, if a binary trove is given, the binary and its source are
-branched.  If \fB-\-source-only\fR is specified, the source
-trove for each binary trove is branched, instead of the binary trove.
-If \fB-\-binary-only\fR is specified, no source troves are branched.
-.TP
 .B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
 Check the \fI<trove>\fB:source\fR component out of the repository
 and put it in directory \fI<dir>\fP if specified, and directory

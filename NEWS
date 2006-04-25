@@ -3,6 +3,8 @@ Changes in @NEW@:
     * Conary now creates shadows instead of branches when cooking onto
       a target label.  This means, for example, that local cooks will
       result in a shadow instead of a branch.
+    * The branch command has been removed.  Any potential branch should be 
+      done with a shadow instead.
 
 Changes in 1.0.13:
   o Client Changes:

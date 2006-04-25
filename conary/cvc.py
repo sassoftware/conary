@@ -49,7 +49,6 @@ class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
-    print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout <trove>[=<version>]"
     print "       cvc clone <target-branch> <trove>[=<version>][[flavor]]+ "
     print "       cvc commit"
@@ -216,7 +215,7 @@ _register(AnnotateCommand)
 
 class BranchShadowCommand(CvcCommand):
 
-    commands = ['branch', 'shadow']
+    commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
 
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
