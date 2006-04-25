@@ -19,6 +19,7 @@ and committing changes back to the repository.
 """
 import difflib
 import os
+import stat
 import sys
 import time
 
@@ -976,6 +977,10 @@ def addFiles(fileList, ignoreExisting=False):
         return
 
     for file in fileList:
+        if file == "." or file == "..":
+            log.error("cannot add special directory %s to trove" % file)
+            continue
+
 	try:
 	    os.lstat(file)
 	except OSError:
@@ -1010,9 +1015,18 @@ def removeFile(file):
     conaryState = ConaryStateFromFile("CONARY")
     if not conaryState.getSourceState().removeFilePath(file):
 	log.error("file %s is not under management" % file)
+        return 1
 
-    if os.path.exists(file):
-	os.unlink(file)
+    if util.exists(file):
+        sb = os.lstat(file)
+        try:
+            if sb.st_mode & stat.S_IFDIR:
+                os.rmdir(file)
+            else:
+                os.unlink(file)
+        except OSError, e:
+            log.error("cannot remove %s: %s" % (file, e.strerror))
+            return 1
 
     conaryState.write("CONARY")
 
