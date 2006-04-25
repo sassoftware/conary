@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Conary now creates shadows instead of branches when cooking onto
+      a target label.  This means, for example, that local cooks will
+      result in a shadow instead of a branch.
+
 Changes in 1.0.13:
   o Client Changes:
     * A new "conary migrate" command for updating troves has been

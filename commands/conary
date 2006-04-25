@@ -1008,7 +1008,7 @@ def realMain(cfg, argv=sys.argv, debugAll=False,
 
     argSet.update(newArgSet)
 
-    context = cfg.context or argSet.pop('context', None)
+    context = cfg.context
     if os.path.exists('CONARY'):
         conaryState = state.ConaryStateFromFile('CONARY')
         if conaryState.hasContext():
