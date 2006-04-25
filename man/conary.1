@@ -722,20 +722,20 @@ shell globs, in which case all files matching the glob will be read in.
 .B Configuration Contexts
 A Configuration context is a section of a config file delimited by a section
 name in square brackets, like \fI[foo]\fR.  Options that can be specified after
-the brackets are limited to \fBbuildFlavor, buildLabel, flavor,
-installLabelPath, contact, name, excludeTroves, repositoryMap, signatureKey,
-and signatureKeyMap\fR.  When a context is selected, the configuration values
-specified in the context override the default values.   If any values are 
-not specified, the values defined in the main configuration section are used.
-
+the brackets are limited to \fBbuildFlavor, buildLabel, buildPath, contact,
+excludeTroves, flavor, lookaside, installLabelPath, name, repositoryMap, 
+root, signatureKey, signatureKeyMap, and user\fR.  When a context is selected, 
+the configuration values specified in the context override the default values.
+   If any values are not specified, the values defined in the main 
+configuration section are used.  
 .RS 4
 .TP 4
 .B Specifying the context
-The context to be used by conary can be specified in two ways:  first, through
-the environment variable CONARY_CONTEXT, and second, through the command line 
-option \fB--context\fR \fI<context>\fR, which is accepted for all conary 
-commands.  If both the environment variable and the command line option are 
-provided, the command line option is used.
+The context to be used by conary can be specified in four ways:  It can be specified directly in any conaryrc file.  It can also be specified in a CONARY file,
+which is created and modified by using cvc context.  You may also set 
+the environment variable CONARY_CONTEXT, and finally it can be set through 
+the command line option \fB--context\fR \fI<context>\fR, which is accepted for 
+all conary commands.  If the context is specified in multiple ways, the command line parameter overrides, followed by the environment variable, followed by a CONARY file created by cvc context, followed by a conary configuration setting.
 
 .TP
 .B Viewing available contexts
