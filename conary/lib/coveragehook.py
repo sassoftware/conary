@@ -52,7 +52,7 @@ def _install():
     elif hasattr(the_coverage, 'pid'):
         _reset(coverage)
 
-    _installOsForkWrapper(origOsFork)
+    _installOsForkWrapper()
     _run(coverage)
     return
 
@@ -63,7 +63,7 @@ def _run(coverage):
     sys.settrace(coverage.t)
 
 origOsFork = os.fork
-def _installOsForkWrapper(origOsFork):
+def _installOsForkWrapper():
     """
         wrap fork to automatically start a new coverage
         file with the forked pid.
