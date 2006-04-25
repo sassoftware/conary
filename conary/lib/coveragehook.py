@@ -82,7 +82,7 @@ def _installOsWrapper():
 
     def exit_wrapper(*args):
         sys.modules['coverage'].the_coverage.save()
-        os._exit(*args)
+        origOsExit(*args)
 
     if os.fork is origOsFork:
         os.fork = fork_wrapper
