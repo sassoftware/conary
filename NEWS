@@ -11,6 +11,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary will not traceback if you try to update to a trove with a name
       that matches a filesystem path that you don't have access to (bz #1010).
+    * Conary will not raise an exception if a standard config file (~/.conaryrc,
+      for example) exists but is not accessible.
 
 Changes in 1.0.13:
   o Client Changes:
