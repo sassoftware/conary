@@ -34,6 +34,7 @@ else:
     mainPath = "../.."
 mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
+from conary.lib import coveragehook
 
 from conary import dbstore
 from conary.lib import options

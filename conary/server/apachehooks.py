@@ -23,6 +23,7 @@ import traceback
 import xmlrpclib
 import zlib
 
+from conary.lib import coveragetool
 from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
