@@ -64,7 +64,7 @@ def verifyTrove(trove, db, cfg):
         ver = trove.getVersion()
         origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                               pristine = True)
-        ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
+        ver = ver.createShadow(versions.LocalLabel())
         l.append((trove, origTrove, ver, 0))
 	    
     try:
@@ -78,8 +78,8 @@ def verifyTrove(trove, db, cfg):
         troveSpecs = []
 	for item in l:
             trove = item[0]
-            ver = trove.getVersion().createBranch(versions.LocalLabel(), 
-                                                  withVerRel=1)
+            ver = trove.getVersion().createShadow(versions.LocalLabel())
+                                                  
                   
             trvCs = cs.getNewTroveVersion(trove.getName(), 
                                           ver, trove.getFlavor())
