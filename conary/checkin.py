@@ -870,8 +870,7 @@ def updateSrc(repos, versionStr = None, callback = None):
     troveCs = troveChanges.next()
     assert(util.assertIteratorAtEnd(troveChanges))
 
-    localVer = state.getVersion().createBranch(versions.LocalLabel(), 
-                                               withVerRel = 1)
+    localVer = state.getVersion().createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
                                  conarycfg.CfgLabelList(),
@@ -947,8 +946,7 @@ def merge(repos, callback=None):
     troveCs = troveChanges.next()
     assert(util.assertIteratorAtEnd(troveChanges))
 
-    localVer = parentRootVersion.createBranch(versions.LocalLabel(), 
-                                               withVerRel = 1)
+    localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
                                  conarycfg.CfgLabelList(),
