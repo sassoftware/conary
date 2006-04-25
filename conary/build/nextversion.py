@@ -44,6 +44,14 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     # strip off any components and remove duplicates
     pkgNames = set([x.split(':')[0] for x in troveNames])
 
+    if targetLabel:
+        # we want to make sure this version is unique...but it must
+        # be unique on the target label!  Instead of asserting that
+        # this is a direct shadow of a binary that is non-existant
+        # we look at binary numbers on the target label.
+        sourceVersion = sourceVersion.createShadow(targetLabel)
+        targetLabel = None
+
     # search for all the packages that are being created by this cook - 
     # we take the max of all of these versions as our latest.
     query = dict.fromkeys(pkgNames, 
@@ -76,7 +84,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         latest = latest.copy()
 
         if targetLabel:
-            latest = latest.createBranch(targetLabel, withVerRel = True)
+            latest = latest.createShadow(targetLabel)
 
         if alwaysBumpCount:
             # case 1.  There is a binary trove with this source
@@ -96,10 +104,6 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         # version.  
         latest = sourceVersion.copy()
 
-        if targetLabel:
-            latest = latest.createBranch(targetLabel, withVerRel = True)
-        else:
-            latest = sourceVersion
         latest = latest.getBinaryVersion()
         latest.incrementBuildCount()
     if latest.isOnLocalHost():

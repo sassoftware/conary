@@ -218,7 +218,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @param macros: set of macros for the build
     @type macros: dict
     @param targetLabel: label to use for the cooked troves; it is used
-    as a new branch from whatever version was previously built
+    as a new shadow from whatever version was previously built
     default), the sourceVersion label is used
     @type targetLabel: versions.Label
     @param resume: indicates whether to resume the previous build.  If True,
