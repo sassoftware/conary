@@ -324,7 +324,7 @@ class ServerConfig(netserver.ServerConfig):
 
 def usage():
     print "usage: %s" % sys.argv[0]
-    print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
+    print "       %s --add-user <username> [--admin] [--mirror]" % sys.argv[0]
     print "       %s --analyze" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
