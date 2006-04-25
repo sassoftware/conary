@@ -255,7 +255,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
     # Look for items which look like files in the applyList and convert
     # them into fromChangesets w/ the primary sets
     for item in changeSpecs[:]:
-        if util.exists(item):
+        if os.access(item, os.W_OK):
             try:
                 cs = changeset.ChangeSetFromFile(item)
             except:

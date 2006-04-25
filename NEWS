@@ -6,6 +6,10 @@ Changes in @NEW@:
     * The branch command has been removed.  Any potential branch should be 
       done with a shadow instead.
 
+  o Bug Fixes:
+    * Conary will not traceback if you try to update to a trove with a name
+      that matches a filesystem path that you don't have access to.
+
 Changes in 1.0.13:
   o Client Changes:
     * A new "conary migrate" command for updating troves has been
