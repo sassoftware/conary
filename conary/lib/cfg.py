@@ -272,8 +272,10 @@ class ConfigFile(_Config):
             try:
                 f = open(path, "r")
             except EnvironmentError, err:
-                raise CfgEnvironmentError(err.strerror, err.filename)
-
+                if exception:
+                    raise CfgEnvironmentError(err.strerror, err.filename)
+                else:
+                    return
             self.readObject(path, f)
         elif exception:
             raise CfgEnvironmentError(
