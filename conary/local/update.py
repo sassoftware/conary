@@ -139,8 +139,8 @@ class FilesystemJob:
             localTrove = self.db.getTrove(*info)
             updatedTrove = localTrove.copy()
             localTrove.changeVersion(
-                localTrove.getVersion().createBranch(
-                        label = versions.LocalLabel(), withVerRel = True))
+                localTrove.getVersion().createShadow(
+                                            label = versions.LocalLabel()))
             hasChanges = False
             for (pathId, replaced) in fileDict.iteritems():
                 if not replaced: continue
@@ -1166,8 +1166,7 @@ class FilesystemJob:
 	for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
 	    if old:
-		localVer = old.createBranch(versions.LocalLabel(), 
-                                            withVerRel = 1)
+		localVer = old.createShadow(versions.LocalLabel())
                 newFsTrove = fsTroveDict[(troveCs.getName(), localVer)].copy()
                 baseTrove = db.getTrove(troveCs.getName(), old, 
                                          troveCs.getOldFlavor())

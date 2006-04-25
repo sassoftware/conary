@@ -491,7 +491,7 @@ class Database(SqlDbRepository):
 	    old = newTrove.getOldVersion()
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
-		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
+		ver = old.createShadow(versions.LocalLabel())
 		trove = dbCache.getTrove(name, old, flavor, pristine = False)
 		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
 		assert(trove)
@@ -499,8 +499,7 @@ class Database(SqlDbRepository):
                                   flags & update.MISSINGFILESOKAY))
 
         for (name, version, flavor) in cs.getOldTroveList():
-            rollbackVersion = version.createBranch(versions.RollbackLabel(), 
-                                                withVerRel = 1)
+            rollbackVersion = version.createShadow(versions.RollbackLabel())
             trove = dbCache.getTrove(name, version, flavor, pristine = False)
             origTrove = dbCache.getTrove(name, version, flavor, 
                                          pristine = True)
