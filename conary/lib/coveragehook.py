@@ -70,6 +70,7 @@ def _installOsWrapper():
         file with the forked pid.
     """
     global origOsFork
+    global origOsExit
     def fork_wrapper():
         pid = origOsFork()
         if pid:
