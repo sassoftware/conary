@@ -95,7 +95,7 @@ def LocalChangeSetCommand(db, cfg, item, outFileName):
 	    ver = trove.getVersion()
 	    origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                                     pristine = True)
-	    ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
+	    ver = ver.createShadow(versions.LocalLabel())
 	    list.append((trove, origTrove, ver, 0))
 
     incomplete = [ db.troveIsIncomplete(x[1].getName(), x[1].getVersion(), 
@@ -115,8 +115,8 @@ you have the latest conary and then reinstall these troves:
 
     for outerTrove in troveList:
 	cs.addPrimaryTrove(outerTrove.getName(), 
-                           outerTrove.getVersion().createBranch(
-            versions.LocalLabel(), withVerRel = 1),
+                           outerTrove.getVersion().createShadow(
+                                                        versions.LocalLabel()),
                            outerTrove.getFlavor())
 
     for (changed, fsTrove) in result[1]:

@@ -571,10 +571,10 @@ class ChangeSet(streams.StreamSet):
 
 	return rollback
 
-    def setTargetBranch(self, repos, targetBranchLabel):
+    def setTargetShadow(self, repos, targetShadowLabel):
 	"""
 	Retargets this changeset to create troves and files on
-	branch targetLabel off of the parent of the source node. Version
+	shadow targetLabel off of the parent of the source node. Version
         calculations aren't quite right for source troves 
         (s/incrementBuildCount).
 
@@ -583,8 +583,8 @@ class ChangeSet(streams.StreamSet):
 	@param targetBranchLabel: label of the branch to commit to
 	@type targetBranchLabel: versions.Label
 	"""
-	assert(not targetBranchLabel == versions.LocalLabel())
-        # if it's local, Versoin.parentVersion() has to work everywhere
+	assert(not targetShadowLabel == versions.LocalLabel())
+        # if it's local, Version.parentVersion() has to work everywhere
         assert(self.isLocal())
         assert(not self.isAbsolute())
 
@@ -608,15 +608,11 @@ class ChangeSet(streams.StreamSet):
 
 	    oldVer = troveCs.getOldVersion()
             assert(oldVer is not None)
-	    newVer = oldVer.createBranch(targetBranchLabel, withVerRel = 1)
+            newVer = oldVer.createShadow(targetShadowLabel)
+            newVer.incrementBuildCount()
 
-	    # try and reuse the version number we created; if
-	    # it's already in use we won't be able to though
-            troveTup = (name, newVer, troveCs.getNewFlavor())
-            exists = repos.hasTroves([ troveTup ])[troveTup]
-            if exists:
-		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
-		newVer = repos.getTroveLatestVersion(name, branch)
+            if repos.hasTrove(name, newVer, troveCs.getNewFlavor()):
+                newVer = repos.getTroveLatestVersion(name, newVer.branch())
                 newVer.incrementBuildCount()
 
             newTrv = oldTrv.copy()

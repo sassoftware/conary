@@ -35,7 +35,7 @@ def doCommit(cfg, changeSetFile, targetLabel):
         if not targetLabel:
             log.error("committing local changesets requires a targetLabel")
         label = versions.Label(targetLabel)
-        cs.setTargetBranch(repos, label)
+        cs.setTargetShadow(repos, label)
         commitCs = cs.makeAbsolute(repos)
 
         (fd, changeSetFile) = tempfile.mkstemp()

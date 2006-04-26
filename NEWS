@@ -9,6 +9,8 @@ Changes in @NEW@:
       done with a shadow instead.
     * The verify command now shows local changes on a local shadow instead
       of a local branch
+    * Local changesets create diffs against a local shadow (instead of
+      a branch) and --target for the commit command retargets to a shadow
 
 Changes in 1.0.13:
   o Client Changes:
