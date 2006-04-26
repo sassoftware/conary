@@ -196,6 +196,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
             return False
 
     def __getattr__(self, name):
+        #from conary.lib import log
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
