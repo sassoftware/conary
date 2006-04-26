@@ -70,23 +70,14 @@ def usage(rc = 1):
     print "type 'cvc <command> --help' for command-specific usage"
     return rc
 
+_commands = []
+def _register(cmd):
+    _commands.append(cmd)
+
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
-supportedCommands = {}
-def _register(commandClass):
-    inst = commandClass()
-    if isinstance(commandClass.commands, str):
-        supportedCommands[commandClass.commands] = inst
-    else:
-        for cmdName in commandClass.commands:
-            supportedCommands[cmdName] = inst
-
-
-class CvcCommand(object):
-
-    paramHelp = ''
-    defaultGroup = 'Common Options'
+class CvcCommand(options.AbstractCommand):
 
     docs = {'build-label'        : ('Use build label LABEL as default search'
                                     ' loc', 'LABEL'),
@@ -106,22 +97,10 @@ class CvcCommand(object):
             'root'               : 'use conary database at location ROOT'
             }
 
-    def __init__(self):
-        self.parser = None
-
-
-    def usage(self, errNo=1):
-        if self.parser:
-            self.parser.print_help()
-        return errNo
-
-    def setParser(self, parser):
-        self.parser = parser
-
     def addParameters(self, argDef):
         d = {}
         d["config"] = MULT_PARAM
-        d["config-file"] = ONE_PARAM
+        d["config-file"] = MULT_PARAM
         d["context"] = ONE_PARAM
         d["install-label"] = MULT_PARAM
         d["profile"] = NO_PARAM
@@ -137,30 +116,25 @@ class CvcCommand(object):
         cfgMap["quiet"]         = "quiet", NO_PARAM,
         cfgMap["root"]          = "root", ONE_PARAM,
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
+        options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
+    def setContext(self, cfg, argSet):
+        context = cfg.context
+        if os.path.exists('CONARY'):
+            conaryState = state.ConaryStateFromFile('CONARY')
+            if conaryState.hasContext():
+                context = conaryState.getContext()
 
-        for name, (cfgName, paramType)  in cfgMap.items():
-            # if it's a NO_PARAM
-            if paramType == NO_PARAM:
-                negName = 'no-' + name
-                argDef[self.defaultGroup][negName] = NO_PARAM, optparse.SUPPRESS_HELP
-                cfgMap[negName] = (cfgName, paramType)
+        context = os.environ.get('CONARY_CONTEXT', context)
+        context = argSet.pop('context', context)
 
-            argDef[self.defaultGroup][name] = paramType
+        if context:
+            cfg.setContext(context)
 
     def processConfigOptions(self, cfg, cfgMap, argSet):
-        # command line configuration overrides contexts.
-        for (arg, (name, paramType)) in cfgMap.items():
-            value = argSet.pop(arg, None)
-            if value is not None:
-                if arg.startswith('no-'):
-                    value = not value
+        self.setContext(cfg, argSet)
 
-                cfg.configLine("%s %s" % (name, value))
-
-        for line in argSet.pop('config', []):
-            cfg.configLine(line)
-
+        options.AbstractCommand.processConfigOptions(self, cfg, cfgMap, argSet)
         l = []
         for labelStr in argSet.get('install-label', []):
             l.append(versions.Label(labelStr))
@@ -168,28 +142,6 @@ class CvcCommand(object):
             cfg.installLabelPath = l
             del argSet['install-label']
 
-
-    def addDocs(self, argDef):
-        d = {}
-        for class_ in reversed(inspect.getmro(self.__class__)):
-            if not hasattr(class_, 'docs'):
-                continue
-            d.update(class_.docs)
-
-        commandDicts = [argDef]
-        while commandDicts:
-            commandDict = commandDicts.pop()
-            for name, value in commandDict.items():
-                if isinstance(value, dict):
-                    commandDicts.append(value)
-                    continue
-                if name in d:
-                    if not isinstance(value, (list, tuple)):
-                        value = [ value ]
-                    else:
-                        value = list(value)
-                    value.append(d[name])
-                    commandDict[name] = value
 
 class AddCommand(CvcCommand):
     commands = ['add']
@@ -648,159 +600,84 @@ class UpdateCommand(CvcCommand):
         checkin.updateSrc(*args, **kwargs)
 _register(UpdateCommand)
 
+
+class CvcMain(options.MainHandler):
+    name = 'cvc'
+    abstractCommand = CvcCommand
+    version = constants.version
+    commandList = _commands
+    hobbleShortOpts = True
+
+    def usage(self, rc = 1):
+        return usage(rc)
+
+    def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
+        callback = CheckinCallback(cfg)
+
+        context = cfg.context
+        if os.path.exists('CONARY'):
+            conaryState = state.ConaryStateFromFile('CONARY')
+            if conaryState.hasContext():
+                context = conaryState.getContext()
+
+        context = os.environ.get('CONARY_CONTEXT', context)
+        context = argSet.pop('context', context)
+
+        if context:
+            cfg.setContext(context)
+
+
+        if not cfg.buildLabel and cfg.installLabelPath:
+            cfg.buildLabel = cfg.installLabelPath[0]
+
+        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                            debugCtrlC=debugAll)
+
+        if cfg.installLabelPath:
+            cfg.installLabel = cfg.installLabelPath[0]
+
+        cfg.initializeFlavors()
+
+        # set the build flavor here, just to set architecture information 
+        # which is used when initializing a recipe class
+        use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
+
+        profile = False
+        if argSet.has_key('profile'):
+            import hotshot
+            prof = hotshot.Profile('conary.prof')
+            prof.start()
+            profile = True
+            del argSet['profile']
+
+        keyCache = openpgpkey.getKeyCache()
+        keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
+                                                       cfg.pubRing[-1])
+        keyCache.setCallback(keyCacheCallback)
+
+        rv = options.MainHandler.runCommand(self, thisCommand, client,
+                                            cfg, argSet, args[1:],
+                                            callback=callback)
+
+        if profile:
+            prof.stop()
+        if log.errorOccurred():
+            sys.exit(1)
+        return rv
+
+
 def sourceCommand(cfg, args, argSet, profile=False, callback = None,
                   thisCommand = None):
     if thisCommand is None:
-        thisCommand = supportedCommands[args[0]]
+        thisCommand = CvcMain()._supportedCommands[args[0]]
     if not callback:
         callback = CheckinCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
     return thisCommand.runCommand(repos, cfg, argSet, args, profile, callback)
-
-def _getPreCommandOptions(argv, cfg):
-    """Allow the user to specify generic flags before they specify the
-       command to run.
-    """
-    cfgMap = {}
-    params = {}
-    thisCommand = CvcCommand()
-    thisCommand.addParameters(params)
-    thisCommand.addConfigOptions(cfgMap, params)
-    thisCommand.addDocs(params)
-    defaultGroup = thisCommand.defaultGroup
-    argSet, otherArgs, parser, optionSet = options._processArgs(
-                                                params, {}, cfg,
-                                                usage,
-                                                argv=argv[1:],
-                                                version=constants.version,
-                                                useHelp=True,
-                                                defaultGroup=defaultGroup,
-                                                interspersedArgs=False)
-    return argSet, [argv[0]] + otherArgs
-
-def realMain(cfg, argv=sys.argv, debugAll=False, 
-             debuggerException = errors.InternalConaryError):
-    argDef = {}
-    if '--version' in argv or '-v' in argv:
-        print constants.version
-        return
-
-    try:
-        # get options before the command.  Only generic options are 
-        # allowed.
-        argSet, argv = _getPreCommandOptions(argv, cfg)
-    except debuggerException:
-        raise
-    except options.OptionError, e:
-        usage()
-        print >>sys.stderr, e
-        sys.exit(e.val)
-
-    if len(argv) < 2:
-        # no command specified
-        return usage()
-
-    commandName = argv[1]
-    if commandName == 'usage':
-        return usage(rc=0)
-
-    if commandName not in supportedCommands:
-        return usage()
-
-    params = {}
-    cfgMap = {}
-
-    thisCommand = supportedCommands[commandName]
-    thisCommand.addParameters(params)
-    thisCommand.addConfigOptions(cfgMap, params)
-    thisCommand.addDocs(params)
-
-    defaultGroup = thisCommand.defaultGroup
-    commandUsage = 'cvc %s %s' % (commandName, thisCommand.paramHelp)
-
-    try:
-        newArgSet, otherArgs, parser, optionSet = options._processArgs(
-                                                    params, {}, cfg,
-                                                    commandUsage,
-                                                    argv=argv,
-                                                    version=constants.version,
-                                                    useHelp=True,
-                                                    defaultGroup=defaultGroup)
-    except debuggerException, e:
-        raise
-    except options.OptionError, e:
-        e.parser.print_help()
-        print >> sys.stderr, e
-        sys.exit(e.val)
-    except versions.ParseError, e:
-        print >> sys.stderr, e
-        sys.exit(1)
-
-    argSet.update(newArgSet)
-
-    thisCommand.processConfigOptions(cfg, cfgMap, argSet)
-
-    # the user might have specified --config debugExceptions on the commandline
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
-                                        debugCtrlC=debugAll)
-
-    context = cfg.context
-    if os.path.exists('CONARY'):
-        conaryState = state.ConaryStateFromFile('CONARY')
-        if conaryState.hasContext():
-            context = conaryState.getContext()
-
-    context = os.environ.get('CONARY_CONTEXT', context)
-    context = argSet.pop('context', context)
-
-    if context:
-        cfg.setContext(context)
-
-
-    if not cfg.buildLabel and cfg.installLabelPath:
-        cfg.buildLabel = cfg.installLabelPath[0]
-
-    # now set the debug hook using the potentially new cfg.debugExceptions value
-    sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
-                                        debugCtrlC=debugAll)
-
-    if cfg.installLabelPath:
-        cfg.installLabel = cfg.installLabelPath[0]
-
-    cfg.initializeFlavors()
-
-    # set the build flavor here, just to set architecture information 
-    # which is used when initializing a recipe class
-    use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
-
-    profile = False
-    if argSet.has_key('profile'):
-        import hotshot
-        prof = hotshot.Profile('conary.prof')
-        prof.start()
-        profile = True
-        del argSet['profile']
-
-    keyCache = openpgpkey.getKeyCache()
-    keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                   cfg.pubRing[-1])
-    keyCache.setCallback(keyCacheCallback)
-
-    if (len(otherArgs) < 2):
-        return usage()
-
-    thisCommand.setParser(parser)
-
-    rv = sourceCommand(cfg, otherArgs[1:], argSet, profile, thisCommand=thisCommand)
-
-    if profile:
-        prof.stop()
-
-    if log.errorOccurred():
-        sys.exit(1)
-    return rv
 
 def main(argv=sys.argv):
     try:
@@ -826,7 +703,7 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
                                             debugCtrlC=debugAll)
-        return realMain(ccfg, argv, debugAll, debuggerException)
+        return CvcMain().main(ccfg, argv, debuggerException, debugAll=debugAll)
     except debuggerException, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:

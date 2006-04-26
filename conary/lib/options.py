@@ -15,6 +15,7 @@
 Command-line option handling
 """
 
+import inspect
 import optparse
 import StringIO
 
@@ -38,7 +39,7 @@ class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
 
     def __init__(self, *args, **kw):
-        self.hobbleShortOpts = kw.pop('hobbleShortOpts', True)
+        self.hobbleShortOpts = kw.pop('hobbleShortOpts', False)
         optparse.OptionParser.__init__(self, *args, **kw)
 
     def error(self, msg):
@@ -112,7 +113,7 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
 def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                 commonParams=None, useHelp=False, defaultGroup=None,
-                interspersedArgs=True):
+                interspersedArgs=True, hobbleShortOpts=False):
     argSet = {}
     # don't mangle the command line
     argv = argv[:]
@@ -145,15 +146,18 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         d[arg] = ONE_PARAM
 
     parser = getOptionParser(params, cfgMap, cfg, usage, version, useHelp,
-                             defaultGroup, interspersedArgs)
+                             defaultGroup, interspersedArgs,
+                             hobbleShortOpts=hobbleShortOpts)
     argSet, otherArgs, options = getArgSet(params, parser, argv)
 
-    if 'config-file' in argSet:
+    configFileList = argSet.pop('config-file', [])
+    if not isinstance(configFileList, list):
+        configFileList = [configFileList]
+    for path in configFileList:
         try:
-            cfg.read(argSet['config-file'], exception = True)
+            cfg.read(path, exception = True)
         except IOError, msg:
             raise OptionError(msg, parser)
-	del argSet['config-file']
 	
     for (arg, name) in cfgMap.items():
 	if argSet.has_key(arg):
@@ -176,8 +180,10 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
     return argSet, otherArgs, parser, options
 
 def getOptionParser(params, cfgMap, cfg, usage, version=None, useHelp=False,
-                    defaultGroup=None, interspersedArgs=True):
-    parser = OptionParser(usage=usage, add_help_option=useHelp, version=version)
+                    defaultGroup=None, interspersedArgs=True, 
+                    hobbleShortOpts=False):
+    parser = OptionParser(usage=usage, add_help_option=useHelp, version=version,
+                          hobbleShortOpts=hobbleShortOpts)
     if not interspersedArgs:
         parser.disable_interspersed_args()
 
@@ -223,3 +229,223 @@ def getArgSet(params, parser, argv=sys.argv):
                 continue
             argSet[name] = val
     return argSet, otherArgs, options
+
+
+class AbstractCommand(object):
+    """
+        Abstract command object to be subclassed used to represent commands
+        in a command line interface.  To be used with MainHandler below.
+        Assumes use of a lib.cfg.ConfigFile type configuration object.
+    """
+    commands = []
+    paramHelp = '' # for each command will display <command> + paramHelp
+                   # as part of usage.
+    defaultGroup = 'Common Options' # The heading for options that aren't
+                                    # put in any other group.
+
+    docs = {} # add docs in the form 'long-option' : 'description'
+              # or 'long-option' : ('description', 'KEYWORD').
+
+    def __init__(self):
+        self.parser = None
+
+    def usage(self, errNo=1):
+        if self.parser:
+            self.parser.print_help()
+        return errNo
+
+    def setParser(self, parser):
+        self.parser = parser
+
+    def addParameters(self, argDef):
+        pass
+
+    def addConfigOptions(self, cfgMap, argDef):
+        for name, (cfgName, paramType)  in cfgMap.items():
+            # if it's a NO_PARAM
+            if paramType == NO_PARAM:
+                negName = 'no-' + name
+                argDef[self.defaultGroup][negName] = NO_PARAM, optparse.SUPPRESS_HELP
+                cfgMap[negName] = (cfgName, paramType)
+
+            argDef[self.defaultGroup][name] = paramType
+
+    def addDocs(self, argDef):
+        """ Parse a docs dict assigned at the class level
+            and add those docs to the parameters being sent to 
+            parseOptions.
+        """
+        d = {}
+        for class_ in reversed(inspect.getmro(self.__class__)):
+            if not hasattr(class_, 'docs'):
+                continue
+            d.update(class_.docs)
+
+        commandDicts = [argDef]
+        while commandDicts:
+            commandDict = commandDicts.pop()
+            for name, value in commandDict.items():
+                if isinstance(value, dict):
+                    commandDicts.append(value)
+                    continue
+                if name in d:
+                    if not isinstance(value, (list, tuple)):
+                        value = [ value ]
+                    else:
+                        value = list(value)
+                    value.append(d[name])
+                    commandDict[name] = value
+
+
+    def prepare(self):
+        params = {}
+        cfgMap = {}
+        self.addParameters(params)
+        self.addConfigOptions(cfgMap, params)
+        self.addDocs(params)
+        return params, cfgMap
+
+    def processConfigOptions(self, cfg, cfgMap, argSet):
+        """
+            Manage any config maps we've set up, converting 
+            assigning them to the config object.
+        """ 
+        configFileList = argSet.pop('config-file', [])
+        if not isinstance(configFileList, list):
+            configFileList = list(configFileList)
+
+        for line in configFileList:
+            cfg.read(path, exception=True)
+
+        for (arg, (name, paramType)) in cfgMap.items():
+            value = argSet.pop(arg, None)
+            if value is not None:
+                if arg.startswith('no-'):
+                    value = not value
+
+                cfg.configLine("%s %s" % (name, value))
+
+        for line in argSet.pop('config', []):
+            cfg.configLine(line)
+
+
+
+    def runCommand(self, *args, **kw):
+        raise NotImplementedError
+
+
+class MainHandler(object):
+    """
+        Class to handle parsing and executing commands set up to use
+        AbstractCommands
+    """
+
+    abstractCommand = None   # class to grab generic options from.  These
+                             # can be used in front of 
+    commandList = []         # list of commands to support.
+    name = None              # name to use when showing usage messages.
+    version = '<no version>' # version to return to --version
+
+    hobbleShortOpts = False # whether or not to allow -mn to be used, or to
+                            # require -m -n.
+
+    def __init__(self):
+        self._supportedCommands = {}
+        for command in self.commandList:
+            self._registerCommand(command)
+
+    def _registerCommand(self, commandClass):
+        supportedCommands = self._supportedCommands
+        inst = commandClass()
+        if isinstance(commandClass.commands, str):
+            supportedCommands[commandClass.commands] = inst
+        else:
+            for cmdName in commandClass.commands:
+                supportedCommands[cmdName] = inst
+
+    def _getPreCommandOptions(self, argv, cfg):
+        """Allow the user to specify generic flags before they specify the
+           command to run.
+        """
+        thisCommand = self.abstractCommand()
+        params, cfgMap = thisCommand.prepare()
+        defaultGroup = thisCommand.defaultGroup
+        argSet, otherArgs, parser, optionSet = _processArgs(
+                                                    params, {}, cfg,
+                                                    self.usage,
+                                                    argv=argv[1:],
+                                                    version=self.version,
+                                                    useHelp=True,
+                                                    defaultGroup=defaultGroup,
+                                                    interspersedArgs=False,
+                                    hobbleShortOpts=self.hobbleShortOpts)
+        return argSet, [argv[0]] + otherArgs
+
+    def main(self, cfg, argv=sys.argv,
+             debuggerException=Exception, **kw):
+        """
+            Process argv and execute commands as specified.
+        """
+
+        from conary import versions
+        supportedCommands = self._supportedCommands
+
+        if '--version' in argv or '-v' in argv:
+            print self.version
+            return
+
+        try:
+            argSet, argv = self._getPreCommandOptions(argv, cfg)
+        except debuggerException:
+            raise
+        except OptionError, e:
+            self.usage()
+            print >>sys.stderr, e
+            sys.exit(e.val)
+
+        if len(argv) < 2:
+            # no command specified
+            return self.usage()
+
+
+        commandName = argv[1]
+        if commandName not in self._supportedCommands:
+            return self.usage()
+
+        thisCommand = self._supportedCommands[commandName]
+        params, cfgMap = thisCommand.prepare()
+        defaultGroup = thisCommand.defaultGroup
+        if self.name:
+            progName = self.name
+        else:
+            progName = argv[0]
+        commandUsage = '%s %s %s' % (progName, commandName,
+                                     thisCommand.paramHelp)
+        try:
+            newArgSet, otherArgs, parser, optionSet = _processArgs(
+                                        params, {}, cfg,
+                                        commandUsage,
+                                        argv=argv,
+                                        version=self.version,
+                                        useHelp=True,
+                                        defaultGroup=defaultGroup,
+                                        hobbleShortOpts=self.hobbleShortOpts)
+        except debuggerException, e:
+            raise
+        except OptionError, e:
+            e.parser.print_help()
+            print >> sys.stderr, e
+            sys.exit(e.val)
+        except versions.ParseError, e:
+            print >> sys.stderr, e
+            sys.exit(1)
+
+        thisCommand.setParser(parser)
+        argSet.update(newArgSet)
+        thisCommand.processConfigOptions(cfg, cfgMap, argSet)
+        self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
+
+    def runCommand(self, thisCommand, *args, **kw):
+        thisCommand.runCommand(*args, **kw)
+
+
