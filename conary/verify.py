@@ -79,7 +79,7 @@ def verifyTrove(trove, db, cfg):
 	for item in l:
             trove = item[0]
             ver = trove.getVersion().createShadow(versions.LocalLabel())
-                  
+
             trvCs = cs.getNewTroveVersion(trove.getName(), 
                                           ver, trove.getFlavor())
             if trvCs.hasChangedFiles():

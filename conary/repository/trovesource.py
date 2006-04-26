@@ -961,11 +961,13 @@ class TroveSourceStack(SearchableTroveSource):
             # TroveFinder should be cleaned up
             if someRequireLabel and source._allowNoLabel:
                 sourceLabelPath = None
+                sourceDefaultFlavor = None
             else:
                 sourceLabelPath = labelPath
+                sourceDefaultFlavor = defaultFlavor
                 
             troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
-                                            defaultFlavor, acrossLabels,
+                                            sourceDefaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=source._allowNoLabel,
                                             bestFlavor=source._bestFlavor,

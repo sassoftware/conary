@@ -1542,10 +1542,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
+        version = self.toVersion(version)
 	if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
 	    raise errors.InsufficientPermission
-        version = self.toVersion(version)
         flavor = self.toFlavor(flavor)
         self.log(2, name, version, flavor)
 

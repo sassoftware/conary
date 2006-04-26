@@ -34,6 +34,7 @@ else:
     mainPath = "../.."
 mainPath = os.path.realpath(mainPath)
 sys.path.insert(0, mainPath)
+from conary.lib import coveragehook
 
 from conary import dbstore
 from conary.lib import options
@@ -324,7 +325,7 @@ class ServerConfig(netserver.ServerConfig):
 
 def usage():
     print "usage: %s" % sys.argv[0]
-    print "       %s --add-user [--admin] [--mirror] <username>" % sys.argv[0]
+    print "       %s --add-user <username> [--admin] [--mirror]" % sys.argv[0]
     print "       %s --analyze" % sys.argv[0]
     print ""
     print "server flags: --config-file <path>"

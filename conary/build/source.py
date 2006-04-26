@@ -161,8 +161,8 @@ class Archive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tar, cpio, zip, or rpm archive, and unpacks it to
-    the proper directory.
+    optionally compressed tar, cpio, or zip archive, or binary/source RPM,
+    and unpacks it to the proper directory.
 
     KEYWORDS
     ========
@@ -184,8 +184,8 @@ class Archive(_Source):
     results in a warning; a failed signature check is fatal.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
-    looks in the file or URL specified by C{rpm} for an RPM
-    containing I{archivename}.
+    looks in the file or URL specified by C{rpm} for a binary or
+    source RPM containing I{archivename}.
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -205,6 +205,10 @@ class Archive(_Source):
     C{r.addArchive('ftp://ftp.visi.com/users/hawkeyd/X/Xaw3d-%(version)s.tar.gz')}
 
     Demonstrates use with a source code archive accessed via an FTP URL.
+
+    C{r.addArchive('ftp://ftp.pbone.net/mirror/ftp.sourceforge.net/pub/sourceforge/g/gc/gcompris/gcompris-7.4-1.i586.rpm')}
+
+    Demonstrates use with a binary RPM file accessed via an FTP URL.
     """
 
     def __init__(self, recipe, *args, **keywords):

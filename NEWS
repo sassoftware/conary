@@ -12,6 +12,14 @@ Changes in @NEW@:
     * Local changesets create diffs against a local shadow (instead of
       a branch) and --target for the commit command retargets to a shadow
 
+  o Bug Fixes:
+    * Conary will not traceback if you try to update to a trove with a name
+      that matches a filesystem path that you don't have access to (bz #1010).
+    * Conary will not raise an exception if a standard config file (~/.conaryrc,
+      for example) exists but is not accessible.
+    * cvc no longer allows . and .. to be added to source troves (bz #1014)
+    * cvc remove handles removing directories (bz #1014)
+
 Changes in 1.0.13:
   o Client Changes:
     * A new "conary migrate" command for updating troves has been
