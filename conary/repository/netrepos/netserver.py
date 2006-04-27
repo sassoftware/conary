@@ -234,6 +234,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     raise
                 else:
                     self.db.commit()
+
+                    if self.callLog:
+                        self.callLog.log(self, remoteIp, authToken, 
+                                         methodName, args)
+
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
