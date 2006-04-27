@@ -14,6 +14,10 @@ Changes in @NEW@:
     * User conaryrc entries are now searched from most specific target to
       least specific (bz #997)
 
+  o Server Changes:
+    * Removed the ability for the server to log updates to its contents
+      store (mirroring has made this capability obsolete)
+
   o Bug Fixes:
     * Conary will not traceback if you try to update to a trove with a name
       that matches a filesystem path that you don't have access to (bz #1010).

@@ -177,7 +177,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
         self.repos = fsrepos.FilesystemRepository(
             self.name, self.troveStore, self.contentsDir, self.map,
-            logFile = self.logFile, requireSigs = self.requireSigs)
+            requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name, self.log)
         self.log.reset()
 

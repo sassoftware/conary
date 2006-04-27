@@ -51,7 +51,7 @@ class FilesystemChangeSetJob(ChangeSetJob):
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def __init__(self, name, troveStore, contentsDir, repositoryMap,
-                 logFile = None, requireSigs = False):
+                 requireSigs = False):
 	self.name = name
 	map = dict(repositoryMap)
 	map[name] = self
@@ -67,9 +67,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             util.mkdirChain(dir)
 
         if len(contentsDir) == 1:
-            store = DataStore(contentsDir[0], logFile = logFile)
+            store = DataStore(contentsDir[0])
         else:
-            assert(not logFile)
             storeList = []
             for dir in contentsDir:
                 storeList.append(DataStore(dir))

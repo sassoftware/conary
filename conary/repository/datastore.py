@@ -135,9 +135,6 @@ class DataStore(AbstractDataStore):
 
         os.rename(tmpName, path)
 
-        if self.logFile:
-            open(self.logFile, "a").write(path + "\n")
-
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
 	path = self.hashToPath(hash)
@@ -152,9 +149,8 @@ class DataStore(AbstractDataStore):
 	f = open(path, "r")
 	return f
 
-    def __init__(self, topPath, logFile = None):
+    def __init__(self, topPath):
 	self.top = topPath
-        self.logFile = logFile
 
 	if (not os.path.isdir(self.top)):
 	    raise IOError, ("path is not a directory: %s" % topPath)
