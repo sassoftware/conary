@@ -233,7 +233,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
 	try:
-	    result = netRepos.callWrapper(None, None, method, authToken, params)
+	    result = netRepos.callWrapper(None, None, method, authToken, params,
+                              remoteIp = self.connection.getpeername()[0])
 	except errors.InsufficientPermission:
 	    self.send_error(403)
 	    return None

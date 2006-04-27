@@ -58,7 +58,8 @@ def post(port, isSecure, repos, req):
                   "%.3f" % (time.time()-startTime))
         try:
             result = repos.callWrapper(protocol, port, method, authToken,
-                                       params)
+                                       params,
+                                       remoteIp = req.connection.remote_ip)
         except errors.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         usedAnonymous = result[0]

@@ -17,6 +17,7 @@ Changes in @NEW@:
   o Server Changes:
     * Removed the ability for the server to log updates to its contents
       store (mirroring has made this capability obsolete)
+    * logFile configuration directive now logs all XML calls
 
   o Bug Fixes:
     * Conary will not traceback if you try to update to a trove with a name

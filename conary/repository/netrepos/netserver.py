@@ -28,7 +28,7 @@ from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
-from conary.repository.netrepos import cacheset
+from conary.repository.netrepos import cacheset, calllog
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
@@ -130,6 +130,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.commitAction = cfg.commitAction
         self.troveStore = None
         self.logFile = cfg.logFile
+        self.callLog = None
         self.requireSigs = cfg.requireSigs
         self.deadlockRetry = cfg.deadlockRetry
         self.repDB = cfg.repositoryDB
@@ -145,6 +146,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if cfg.traceLog:
             (l, f) = cfg.traceLog
             self.log = tracelog.getLog(filename=f, level=l)
+
+        if self.logFile:
+            self.callLog = calllog.CallLogger(self.logFile, self.name)
 
         if not db:
             self.open()
@@ -190,7 +194,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    self.troveStore = self.repos = self.auth = None
             self.open(connect=False)
 
-    def callWrapper(self, protocol, port, methodname, authToken, args):
+    def callWrapper(self, protocol, port, methodname, authToken, args,
+                    remoteIp = None):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
         is a Boolean stating whether the operation was performed as the
@@ -221,6 +226,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         # the operation as anonymous
                         r = method(('anonymous', 'anonymous', None, None), *args)
                         self.db.commit()
+                        if self.callLog:
+                            self.callLog.log(self, remoteIp, authToken, 
+                                             methodName, args)
+
                         return (True, False, r)
                     raise
                 else:
@@ -245,6 +254,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # if there wasn't an exception, we would've returned before now.
         # This means if we reach here, we have an exception in e
         self.db.rollback()
+
+        if self.callLog:
+            self.callLog.log(remoteIp, authToken, methodname, args,
+                             exception = e)
 
         if isinstance(e, errors.TroveMissing):
 	    if not e.troveName:
