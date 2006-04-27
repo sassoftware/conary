@@ -20,6 +20,8 @@ class CallLogger:
 
     def log(self, remoteIp, authToken, methodName, args, exception = None):
         (user, entitlement) = authToken[0], authToken[2]
+	import epdb
+	epdb.st()
         logStr = cPickle.dumps((self.logFormatRevision, self.serverName,
                                 time.time(), remoteIp, (user, entitlement),
                                 methodName, args, str(exception)))

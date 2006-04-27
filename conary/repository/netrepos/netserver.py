@@ -227,8 +227,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         r = method(('anonymous', 'anonymous', None, None), *args)
                         self.db.commit()
                         if self.callLog:
-                            self.callLog.log(self, remoteIp, authToken, 
-                                             methodName, args)
+                            self.callLog.log(remoteIp, authToken, methodname, 
+                                             args)
 
                         return (True, False, r)
                     raise
@@ -236,8 +236,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     self.db.commit()
 
                     if self.callLog:
-                        self.callLog.log(self, remoteIp, authToken, 
-                                         methodName, args)
+                        self.callLog.log(remoteIp, authToken, methodname, args)
 
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
