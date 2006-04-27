@@ -31,9 +31,11 @@ def install():
         _install()
 
 def save():
-    sys.modules['coverage'].the_coverage.save()
-    
+    if 'coverage' in sys.modules:
+        sys.modules['coverage'].the_coverage.save()
 
+def _save():
+    sys.modules['coverage'].the_coverage.save()
 
 def _install():
     coverageLoc = os.environ.get('COVERAGE_TOOL', None)
@@ -59,11 +61,10 @@ def _install():
 
 def _saveState(signal, f):
     save()
-    sys.exit(0)
+    sys.exit(1)
 
 def _run(coverage):
-    signal.signal(signal.SIGQUIT, _saveState)
-    signal.signal(signal.SIGTERM, _saveState)
+    signal.signal(signal.SIGUSR2, _saveState)
     atexit.register(coverage.the_coverage.save)
     coverage.the_coverage.get_ready()
     sys.settrace(coverage.t)

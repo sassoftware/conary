@@ -267,6 +267,12 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
              cfg.bugsEmailSubject, body)
 
 def handler(req):
+    try:
+        return _handler(req)
+    finally:
+        coveragehook.save()
+
+def _handler(req):
     repName = req.filename
     if not repositories.has_key(repName):
         cfg = netserver.ServerConfig()
