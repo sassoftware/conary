@@ -14,15 +14,28 @@
 
 import cPickle, mmap, os, struct, time
 
+class CallLogEntry:
+
+    def __init__(self, info):
+        revision = info[0]
+        assert(revision == 1)
+
+        (self.serverName, self.timeStamp, self.remoteIp,
+         (self.user, self.entitlement), 
+         self.methodName, self.args, self.exceptionStr) = info[1:]
+
 class CallLogger:
 
     logFormatRevision = 1
 
     def log(self, remoteIp, authToken, methodName, args, exception = None):
+        if exception:
+            exception = str(exception)
+
         (user, entitlement) = authToken[0], authToken[2]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverName,
                                 time.time(), remoteIp, (user, entitlement),
-                                methodName, args, str(exception)))
+                                methodName, args, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 
     def __iter__(self):
@@ -33,9 +46,8 @@ class CallLogger:
         while i < size:
             length = struct.unpack("!I", map[i: i + 4])[0]
             i += 4
-            item = cPickle.loads(map[i:i + length])
+            yield CallLogEntry(cPickle.loads(map[i:i + length]))
             i += length
-            yield item
 
     def __init__(self, logPath, serverName):
         self.serverName = serverName

@@ -1,0 +1,54 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import os
+import sys
+import time
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+import optparse, tarfile
+
+from conary.lib import util
+from conary.repository.netrepos import calllog
+
+sys.excepthook = util.genExcepthook(debug=True)
+
+parser = optparse.OptionParser(version = '%prog 0.1')
+(options, args) = parser.parse_args()
+
+if len(args) != 1:
+    print >> sys.stderr, "logcat: a single file name was expected"
+    sys.exit(1)
+
+log = calllog.CallLogger(args[0], None)
+for entry in log:
+    print "%s %s %s %s %s" % (
+        time.strftime("%Y %B %d %H:%M", time.localtime(entry.timeStamp)),
+        entry.serverName,
+        entry.user,
+        entry.entitlement,
+        entry.methodName,
+    )
