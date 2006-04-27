@@ -659,7 +659,8 @@ class CvcMain(options.MainHandler):
                                                        cfg.pubRing[-1])
         keyCache.setCallback(keyCacheCallback)
 
-        rv = options.MainHandler.runCommand(self, thisCommand, client,
+        rv = options.MainHandler.runCommand(self, thisCommand,
+                                            client.getRepos(),
                                             cfg, argSet, args[1:],
                                             callback=callback)
 
