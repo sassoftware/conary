@@ -604,6 +604,8 @@ _register(UpdateCommand)
 class CvcMain(options.MainHandler):
     name = 'cvc'
     abstractCommand = CvcCommand
+    configClass = conarycfg.ConaryConfiguration
+
     version = constants.version
     commandList = _commands
     hobbleShortOpts = True
@@ -681,21 +683,16 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
 
 def main(argv=sys.argv):
     try:
+        argv = list(argv)
         debugAll = '--debug-all' in argv
         if debugAll:
-            argv = argv[:]
-            argv.remove('--debug-all')
             debuggerException = Exception
+            argv.remove('--debug-all')
         else:
             debuggerException = errors.InternalConaryError
 
-        if '--skip-default-config' in argv:
-            argv = argv[:]
-            argv.remove('--skip-default-config')
-            ccfg = conarycfg.ConaryConfiguration()
-        else:
-            ccfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
-
+        cvcMain = CvcMain()
+        ccfg = cvcMain.getConfigFile(argv)
         if debugAll:
             ccfg.debugExceptions = True
             ccfg.debugRecipeExceptions = True
@@ -703,7 +700,8 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
                                             debugCtrlC=debugAll)
-        return CvcMain().main(ccfg, argv, debuggerException, debugAll=debugAll)
+        return cvcMain.main(argv, debuggerException, debugAll=debugAll,
+                            cfg=ccfg)
     except debuggerException, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:

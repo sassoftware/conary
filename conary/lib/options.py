@@ -348,6 +348,7 @@ class MainHandler(object):
 
     hobbleShortOpts = False # whether or not to allow -mn to be used, or to
                             # require -m -n.
+    configClass = None
 
     def __init__(self):
         self._supportedCommands = {}
@@ -381,14 +382,31 @@ class MainHandler(object):
                                     hobbleShortOpts=self.hobbleShortOpts)
         return argSet, [argv[0]] + otherArgs
 
-    def main(self, cfg, argv=sys.argv,
-             debuggerException=Exception, **kw):
+    def getConfigFile(self, argv):
+        """
+            Find the appropriate config file
+        """
+        if not self.configClass:
+            raise RuntimeError, ('Must define a configClass to use with this'
+                                 ' main handler')
+        if '--skip-default-config' in argv:
+            argv.remove('--skip-default-config')
+            ccfg = self.configClass(readConfigFiles=False)
+        else:
+            ccfg = self.configClass(readConfigFiles=True)
+        return ccfg
+
+    def main(self, argv=sys.argv, debuggerException=Exception,
+             cfg=None, **kw):
         """
             Process argv and execute commands as specified.
         """
 
         from conary import versions
         supportedCommands = self._supportedCommands
+
+        if cfg is None:
+            cfg = self.getConfigFile(argv)
 
         if '--version' in argv or '-v' in argv:
             print self.version

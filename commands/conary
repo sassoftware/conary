@@ -891,6 +891,8 @@ _register(VerifyCommand)
 class ConaryMain(options.MainHandler):
     name = 'conary'
     abstractCommand = ConaryCommand
+    configClass = conarycfg.ConaryConfiguration
+
     version = constants.version
     commandList = _commands
     hobbleShortOpts = True
@@ -943,20 +945,16 @@ def main(argv=sys.argv):
         else:
             debuggerException = errors.InternalConaryError
 
-        if '--skip-default-config' in argv:
-            argv = argv[:]
-            argv.remove('--skip-default-config')
-            ccfg = conarycfg.ConaryConfiguration()
-        else:
-            ccfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
+        conaryMain = ConaryMain()
+        ccfg = conaryMain.getConfigFile(argv)
 
         if debugAll:
             ccfg.debugExceptions = True
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
                                             debugCtrlC=debugAll)
-        return ConaryMain().main(ccfg, argv, debuggerException, 
-                                 debugAll=debugAll)
+        return conaryMain.main(argv, debuggerException, 
+                               debugAll=debugAll, cfg=ccfg)
     except IOError, e:
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:
