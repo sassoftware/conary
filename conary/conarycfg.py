@@ -36,6 +36,25 @@ class UserInformation(list):
 
         return None
 
+    def extend(self, itemList):
+        # Look for the first item which globs to this, and insert the new
+        # item before it. That makes sure find always matches on the
+        # most-specific instance
+        for newItem in itemList:
+            self.append(newItem)
+
+    def append(self, newItem):
+        location = None
+        for i, (serverGlob, user, password) in enumerate(self):
+            if fnmatch.fnmatch(newItem[0], serverGlob):
+                location = i
+                break
+
+        if location is None:
+            list.append(self, newItem)
+        else:
+            self.insert(location, newItem)
+
     def addServerGlob(self, serverGlob, user, password):
         self.append((serverGlob, user, password))
 
@@ -61,8 +80,10 @@ class CfgUserInfoItem(CfgType):
             return '%s %s %s' % (serverGlob, user, password)
 
 class CfgUserInfo(CfgList):
+
     def __init__(self, default=[]):
-        CfgList.__init__(self, CfgUserInfoItem, UserInformation)
+        CfgList.__init__(self, CfgUserInfoItem, UserInformation,
+                         default = default)
 
 class CfgLabel(CfgType):
 

@@ -11,6 +11,8 @@ Changes in @NEW@:
       of a local branch
     * Local changesets create diffs against a local shadow (instead of
       a branch) and --target for the commit command retargets to a shadow
+    * User conaryrc entries are now searched from most specific target to
+      least specific (bz #997)
 
   o Bug Fixes:
     * Conary will not traceback if you try to update to a trove with a name
