@@ -19,6 +19,8 @@ Changes in @NEW@:
       for example) exists but is not accessible.
     * cvc no longer allows . and .. to be added to source troves (bz #1014)
     * cvc remove handles removing directories (bz #1014)
+    * conary rollback no longer tracebacks if you do not have write access to
+      the conary database.
 
 Changes in 1.0.13:
   o Client Changes:

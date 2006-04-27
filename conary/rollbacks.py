@@ -54,6 +54,7 @@ def listRollbacks(db, cfg):
 
 def apply(db, cfg, rollbackSpec, **kwargs):
     client = conaryclient.ConaryClient(cfg)
+    client.checkWriteableRoot()
 
     log.syslog.command()
 
