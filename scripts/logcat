@@ -38,6 +38,8 @@ from conary.repository.netrepos import calllog
 sys.excepthook = util.genExcepthook(debug=True)
 
 parser = optparse.OptionParser(version = '%prog 0.1')
+parser.add_option("--params", "-p", dest = "showParams", default = False,
+                  action = "store_true", help = "display method parameters")
 parser.add_option("-n", dest = "noReverseDNS", default = False,
                   action = "store_true", help = "skip reverse dns")
 (options, args) = parser.parse_args()
@@ -75,10 +77,16 @@ for entry in log:
     else:
         userStr = ""
 
-    print "%s %s %s %s%s" % (
+    if options.showParams:
+        params = str(entry.args)
+    else:
+        params = ""
+
+    print "%s %s %s %s%s%s" % (
         hostname,
         time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
         entry.serverName,
         userStr,
         entry.methodName,
+        params
     )
