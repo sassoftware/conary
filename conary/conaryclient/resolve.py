@@ -164,6 +164,9 @@ class DepResolutionByLabelPath(DepResolutionMethod):
         self.db = db
         self.installLabelPath = installLabelPath
 
+    def setLabelPath(self, labelPath):
+        self.installLabelPath = labelPath
+
     def prepareForResolution(self, depList):
         if not depList:
             return False
