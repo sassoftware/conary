@@ -38,10 +38,12 @@ from conary.repository.netrepos import calllog
 sys.excepthook = util.genExcepthook(debug=True)
 
 parser = optparse.OptionParser(version = '%prog 0.1')
-parser.add_option("--params", "-p", dest = "showParams", default = False,
-                  action = "store_true", help = "display method parameters")
+parser.add_option("--follow", "-f", dest = "follow", default = False,
+                  action = "store_true", help = "follow updates to the log")
 parser.add_option("-n", dest = "noReverseDNS", default = False,
                   action = "store_true", help = "skip reverse dns")
+parser.add_option("--params", "-p", dest = "showParams", default = False,
+                  action = "store_true", help = "display method parameters")
 (options, args) = parser.parse_args()
 
 if len(args) != 1:
@@ -50,8 +52,13 @@ if len(args) != 1:
 
 hostnameCache = {}
 
-log = calllog.CallLogger(args[0], None)
-for entry in log:
+log = calllog.CallLogger(args[0], None, readOnly = True)
+if options.follow:
+    iterator = log.follow()
+else:
+    iterator = iter(log)
+
+for entry in iterator:
     if not entry.remoteIp:
         hostname = "(unknown)"
     elif options.noReverseDNS:
