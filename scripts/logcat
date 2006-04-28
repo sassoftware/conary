@@ -38,7 +38,7 @@ from conary.repository.netrepos import calllog
 sys.excepthook = util.genExcepthook(debug=True)
 
 parser = optparse.OptionParser(version = '%prog 0.1')
-parser.add_option("-n", dest = "noReverseDNS", default = True, 
+parser.add_option("-n", dest = "noReverseDNS", default = False,
                   action = "store_true", help = "skip reverse dns")
 (options, args) = parser.parse_args()
 
@@ -50,12 +50,18 @@ hostnameCache = {}
 
 log = calllog.CallLogger(args[0], None)
 for entry in log:
-    if options.noReverseDNS:
+    if not entry.remoteIp:
+        hostname = "(unknown)"
+    elif options.noReverseDNS:
         hostname = entry.remoteIp
     else:
         hostname = hostnameCache.get(entry.remoteIp, None)
         if hostname is None:
-            hostname = socket.gethostbyaddr(entry.remoteIp)[0]
+            try:
+                hostname = socket.gethostbyaddr(entry.remoteIp)[0]
+            except socket.herror:
+                hostname = entry.remoteIp
+
             hostnameCache[entry.remoteIp] = hostname
 
     userInfo = []
