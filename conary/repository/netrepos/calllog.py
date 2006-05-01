@@ -57,8 +57,6 @@ class CallLogger:
 
     def follow(self):
         where = os.lseek(self.logFd, 0, 2)
-        import epdb
-        epdb.st()
         while True:
             size = os.fstat(self.logFd).st_size
             while where < size:
