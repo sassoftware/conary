@@ -15,5 +15,6 @@
 
 bindir=$(dirname $0)
 bin=$(basename $0)
-export PYTHONPATH=$bindir/..
+importdir=$(cd $bindir/.. 2> /dev/null && pwd -P;)
+export PYTHONPATH=$importdir
 exec $bindir/../commands/$bin "$@"
