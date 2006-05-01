@@ -1633,7 +1633,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
-        uid = self.auth.getUserIdByName(user)
+        uid = self.auth.userAuth.getUserIdByName(user)
         self.repos.troveStore.keyTable.addNewAsciiKey(uid, keyData)
         return True
 
@@ -1643,7 +1643,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
-        uid = self.auth.getUserIdByName(user)
+        uid = self.auth.userAuth.getUserIdByName(user)
         keyData = base64.b64decode(encKeyData)
         self.repos.troveStore.keyTable.addNewKey(uid, keyData)
         return True
@@ -1652,7 +1652,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         if user:
-            uid = self.auth.getUserIdByName(user)
+            uid = self.auth.userAuth.getUserIdByName(user)
         else:
             uid = None
         self.log(2, authToken[0], label, user, str(key))
@@ -1668,7 +1668,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # a valid userId to valid fingerprints. neither of these pieces of
         # information is sensitive separately.
         if (not self.auth.check(authToken, admin = True)
-            and (userId != self.auth.getUserIdByName(authToken[0]) or
+            and (userId != self.auth.userAuth.getUserIdByName(authToken[0]) or
                  not self.auth.check(authToken))
             ):
             raise errors.InsufficientPermission
