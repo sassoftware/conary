@@ -69,10 +69,11 @@ class UserAuthorization:
 
         return False
 
-    def getAuthGroups(self, cu, user, password):
+    def getAuthorizedGroups(self, cu, user, password):
         cu.execute("""
-        SELECT salt, password, userGroupId
-        FROM Users JOIN UserGroupMembers USING(userId)
+        SELECT salt, password, userGroup FROM Users 
+        JOIN UserGroupMembers USING(userId)
+        JOIN UserGroups USING (userGroupId)
         WHERE userName = ?
         """, user)
 
@@ -92,13 +93,32 @@ class UserAuthorization:
 
         return groupsFromUser
 
+    def getGroupsByUser(self, user):
+        cu = self.db.cursor()
+        cu.execute("""SELECT userGroup FROM Users
+                        JOIN UserGroupMembers USING (userId)
+                        JOIN UserGroups USING (userGroupId)
+                        WHERE Users.userName = ?""", user)
+
+        return [ x[0] for x in cu ]
+
+    def getUserList(self):
+        cu = self.db.cursor()
+        cu.execute("SELECT userName FROM Users")
+        return [ x[0] for x in cu ]
+
+    def __init__(self, db):
+        self.db = db
+
 class EntitlementAuthorization:
 
-    def getAuthGroups(self, cu, entitlementGroup, entitlement):
+    def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId
-        FROM EntitlementGroups JOIN Entitlements USING(entGroupId)
+        SELECT userGroup FROM EntitlementGroups
+        JOIN Entitlements USING (entGroupId)
+        JOIN UserGroups ON
+            EntitlementGroups.userGroupId = UserGroups.userGroupId
         WHERE
         entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
@@ -111,7 +131,7 @@ class NetworkAuthorization:
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
-        self.userAuth = UserAuthorization()
+        self.userAuth = UserAuthorization(self.db)
         self.entitlementAuth = EntitlementAuthorization()
 
     def getAuthGroups(self, cu, authToken):
@@ -119,15 +139,20 @@ class NetworkAuthorization:
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
-        groupsFromUser = self.userAuth.getAuthGroups(cu, authToken[0],
-                                                     authToken[1])
+        groupsFromUser = self.userAuth.getAuthorizedGroups(cu, authToken[0],
+                                                           authToken[1])
         if authToken[2] is not None:
             groupsFromEntitlement = \
-                        self.entitlementAuth.getAuthGroups(cu, authToken[2],
+                  self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
                                                            authToken[3])
             groupsFromUser.update(groupsFromEntitlement)
 
-        return groupsFromUser
+        # We have lists of symbolic names; get lists of group ids
+        cu.execute("SELECT userGroupId FROM UserGroups WHERE "
+                   "userGroup IN (%s)" %
+                        ",".join("'%s'" % x for x in groupsFromUser) )
+
+        return [ x[0] for x in cu ]
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):
@@ -219,22 +244,6 @@ class NetworkAuthorization:
             return True
         return False
 
-    def checkIsFullAdmin(self, user, password):
-        self.log(3, user)
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT salt, password
-        FROM Users as U
-        JOIN UserGroupMembers as UGM USING(userId)
-        JOIN Permissions as P USING(userGroupId)
-        WHERE U.userName = ? and P.admin = 1
-        """, user)
-        for (salt, cryptPassword) in cu:
-            if not self.userAuth.checkPassword(salt, cryptPassword, password):
-                return False
-            return True
-        return False
-
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
         self.log(3, userGroup, trovePattern, label, write, admin)
         cu = self.db.cursor()
@@ -279,9 +288,7 @@ class NetworkAuthorization:
         else:
             labelId = 0
 
-        cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
-                   userGroup)
-        userGroupId = cu.next()[0]
+        userGroupId = self.getGroupIdByName(userGroup)
 
         try:
             cu.execute("""
@@ -382,18 +389,6 @@ class NetworkAuthorization:
             raise errors.UserNotFound(user)
         return self.deleteUser(userId, user, commit)
 
-    def deleteUserById(self, userId, commit = True):
-        self.log(3, userId)
-        cu = self.db.cursor()
-        sql = "SELECT userName FROM Users WHERE userId=?"
-        cu.execute(sql, userId)
-        try:
-            user = cu.next()[0]
-        except StopIteration:
-            raise errors.UserNotFound(user)
-
-        return self.deleteUser(userId, user, commit)
-
     def deleteUser(self, userId, user, commit = True):
         # Need to do a lot of stuff:
         # UserGroups, Users, and all ACLs
@@ -409,10 +404,7 @@ class NetworkAuthorization:
             #Then delete the UserGroup created with the name of that user
             try:
                 self.deleteGroup(user, False)
-            except StopIteration, e:
-                # Ignore the StopIteration error as it means there was no
-                # Group matching that name.  Probably because the group
-                # was deleted beforehand
+            except errors.GroupNotFound, e:
                 pass
 
             #Now delete the user-self
@@ -449,24 +441,9 @@ class NetworkAuthorization:
                             Users.userName = ?""", user)
         return [row[0] for row in cu]
 
-    def iterUsers(self):
-        cu = self.db.cursor()
-        cu.execute("SELECT userId, userName FROM Users")
-        for row in cu:
-            yield row
-
     def iterGroups(self):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId, userGroup FROM UserGroups")
-        for row in cu:
-            yield row
-
-    def iterGroupsByUserId(self, userId):
-        cu = self.db.cursor()
-        cu.execute("""SELECT UserGroups.userGroupId, UserGroups.userGroup
-                      FROM UserGroups INNER JOIN UserGroupMembers ON
-                      UserGroups.userGroupId = UserGroupMembers.userGroupId
-                      WHERE UserGroupMembers.userId=?""", userId)
         for row in cu:
             yield row
 
@@ -478,31 +455,30 @@ class NetworkAuthorization:
         for row in cu:
             yield row[0]
 
-    def iterPermsByGroupId(self, userGroupId):
+    def iterPermsByGroup(self, userGroupName):
         cu = self.db.cursor()
         cu.execute("""SELECT Permissions.labelId, Labels.label,
                              PerItems.itemId, PerItems.item,
                              canwrite, capped, admin
-                      FROM Permissions
+                      FROM UserGroups
+                      JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
                           PerItems.itemId = Permissions.itemId
                       LEFT OUTER JOIN Labels ON
                           Permissions.labelId = Labels.labelId
-                      WHERE userGroupId=?""", userGroupId)
+                      WHERE userGroup=?""", userGroupName)
         for row in cu:
             yield row
-
-    def getGroupNameById(self, userGroupId):
-        cu = self.db.cursor()
-        cu.execute("SELECT userGroup from UserGroups WHERE userGroupId=?",
-            userGroupId)
-        return cu.next()[0]
 
     def getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
             userGroupName)
-        return cu.next()[0]
+
+        try:
+            return cu.next()[0]
+        except:
+            raise errors.GroupNotFound
 
     def getUserIdByName(self, userName):
         cu = self.db.cursor()
@@ -536,10 +512,15 @@ class NetworkAuthorization:
         self.db.commit()
         return ugid;
 
-    def renameGroup(self, userGroupId, userGroupName):
+    def renameGroup(self, currentGroupName, userGroupName):
         cu = self.db.cursor()
         #See if we're actually going to do any work:
-        currentGroupName = self.getGroupNameById(userGroupId)
+
+        try:
+            userGroupId = self.getGroupIdByName(currentGroupName)
+        except errors.GroupNotFound:
+            return
+
         if currentGroupName != userGroupName:
             try:
                 cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
