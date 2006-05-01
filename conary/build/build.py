@@ -1642,8 +1642,8 @@ class Replace(BuildAction):
 
     C{r.Replace('-lgphoto2', '-lgphoto2 -lgphoto2_port', 'gphoto2-config')}
 
-    Calls C{r.Replace()} to change C{-lgphoto2 -lgphoto2_port} to C{-lgphoto2}
-    in the path C{gphoto2-config}.
+    Calls C{r.Replace()} to change C{-lgphoto2} to 
+    C{-lgphoto2 -lgphoto2_port} in the path C{gphoto2-config}.
     """
 
 
