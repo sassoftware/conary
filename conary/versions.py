@@ -277,8 +277,8 @@ class Revision(AbstractRevision):
             implying that the upstream version # has been changed
         """
         i = shadowLength - 1
-        if (self.sourceCount.shadowCount() and
-            [ x for x in self.sourceCount.iterCounts()][i] == 0):
+        shadowCounts = list(self.sourceCount.iterCounts())
+        if len(shadowCounts) >= shadowLength and shadowCounts[i] == 0:
             # 0 means there's no corresponding parent
             # source with this version number
             return True

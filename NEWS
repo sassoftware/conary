@@ -32,6 +32,9 @@ Changes in @NEW@:
     * cvc remove handles removing directories (bz #1014)
     * conary rollback no longer tracebacks if you do not have write access to
       the conary database.
+    * deeply shadowed versions would fail when performing some version 
+      operations.  This caused, for example, local cooks of shadowed troves
+      to fail.
 
 Changes in 1.0.13:
   o Client Changes:
