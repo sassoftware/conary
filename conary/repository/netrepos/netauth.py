@@ -23,23 +23,86 @@ from conary.dbstore import sqlerrors
 UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
-class NetworkAuthorization:
-    def __init__(self, db, name, log = None):
-        self.name = name
-        self.db = db
-        self.reCache = {}
-        self.log = log or tracelog.getLog(None)
+class UserAuthorization:
 
-    def getAuthGroups(self, cu, authToken):
-        self.log(3, authToken[0], authToken[2], authToken[3])
-        # Find what group this user belongs to
-        # anonymous users should come through as anonymous, not None
-        assert(authToken[0])
+    def _uniqueUser(self, cu, user):
+        """
+        Returns True if the username is unique.  Raises UserAlreadyExists
+        if it is not unique
+        """
+        cu.execute("""
+            SELECT COUNT(userId)
+            FROM Users WHERE LOWER(userName)=LOWER(?)
+        """, user)
+        if cu.next()[0]:
+            raise errors.UserAlreadyExists, 'user: %s' % user
+        return True
+
+    def addUserByMD5(self, cu, user, salt, password):
+        #Insert the UserGroup first, but since usergroups can be added
+        #and deleted at will, and sqlite uses a MAX(id)+1 approach to
+        #sequencing, use max(userId, userGroupId)+1 so that userId and
+        #userGroupId can be in sync.  This will leave lots of holes, and
+        #will probably need to be changed if conary moves to another db.
+
+        #Check to make sure the user is unique in both the user and UserGroup
+        #tables
+        self._uniqueUser(cu, user)
+
+        # FIXME: race condition - fix it using sequences once they are
+        # provisioned
+        cu.execute("""
+        SELECT MAX(maxId)+1 FROM (
+            SELECT COALESCE(MAX(userId),0) as maxId FROM Users
+            UNION
+            SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
+        ) as MaxList
+        """)
+        ugid = cu.fetchone()[0]
+        # XXX: ahhh, how we miss real sequences...
+        try:
+            cu.execute("INSERT INTO UserGroups (userGroupId, userGroup) "
+                       "VALUES (?, ?)",
+                       (ugid, user))
+        except sqlerrors.ColumnNotUnique:
+            raise errors.GroupAlreadyExists, 'group: %s' % user
+        try:
+            cu.execute("INSERT INTO Users (userId, userName, salt, password) "
+                       "VALUES (?, ?, ?, ?)",
+                       (ugid, user, cu.binary(salt), cu.binary(password)))
+        except sqlerrors.ColumnNotUnique:
+            raise errors.UserAlreadyExists, 'user: %s' % user
+        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
+                   "VALUES (?, ?)",
+                   (ugid, ugid))
+
+        return ugid
+
+    def checkPassword(self, salt, password, challenge):
+        m = md5.new()
+        m.update(salt)
+        m.update(challenge)
+        return m.hexdigest() == password
+
+    def checkUserPass(self, cu, authToken):
+        cu.execute("SELECT salt, password FROM Users WHERE userName=?", 
+                   authToken[0])
+
+        for (salt, password) in cu:
+            m = md5.new()
+            m.update(salt)
+            m.update(authToken[1])
+            if m.hexdigest() == password:
+                return True
+
+        return False
+
+    def getAuthGroups(self, cu, user, password):
         cu.execute("""
         SELECT salt, password, userGroupId
         FROM Users JOIN UserGroupMembers USING(userId)
         WHERE userName = ?
-        """, authToken[0])
+        """, user)
 
         groupsFromUser = [ x for x in cu ]
 
@@ -48,20 +111,49 @@ class NetworkAuthorization:
             # need to validate the password once
             if not self.checkPassword(cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
-                                      authToken[1]):
+                                      password):
                 raise errors.InsufficientPermission
 
-            groupsFromUser = [ x[2] for x in groupsFromUser ]
+            groupsFromUser = set(x[2] for x in groupsFromUser)
+        else:
+            return set()
 
+        return groupsFromUser
+
+class EntitlementAuthorization:
+
+    def getAuthGroups(self, cu, entitlementGroup, entitlement):
+        # look up entitlements
+        cu.execute("""
+        SELECT userGroupId
+        FROM EntitlementGroups JOIN Entitlements USING(entGroupId)
+        WHERE
+        entGroup=? AND entitlement=?
+        """, entitlementGroup, entitlement)
+
+        return set(x[0] for x in cu)
+
+class NetworkAuthorization:
+    def __init__(self, db, name, log = None):
+        self.name = name
+        self.db = db
+        self.reCache = {}
+        self.log = log or tracelog.getLog(None)
+        self.userAuth = UserAuthorization()
+        self.entitlementAuth = EntitlementAuthorization()
+
+    def getAuthGroups(self, cu, authToken):
+        self.log(3, authToken[0], authToken[2], authToken[3])
+        # Find what group this user belongs to
+        # anonymous users should come through as anonymous, not None
+        assert(authToken[0])
+        groupsFromUser = self.userAuth.getAuthGroups(cu, authToken[0],
+                                                     authToken[1])
         if authToken[2] is not None:
-            # look up entitlements
-            cu.execute("""
-            SELECT userGroupId
-            FROM EntitlementGroups JOIN Entitlements USING(entGroupId)
-            WHERE
-            entGroup=? AND entitlement=?
-            """, authToken[2], authToken[3])
-            groupsFromUser += [ x[0] for x in cu ]
+            groupsFromEntitlement = \
+                        self.entitlementAuth.getAuthGroups(cu, authToken[2],
+                                                           authToken[3])
+            groupsFromUser.update(groupsFromEntitlement)
 
         return groupsFromUser
 
@@ -155,27 +247,6 @@ class NetworkAuthorization:
             return True
         return False
 
-    def checkPassword(self, salt, password, challenge):
-        m = md5.new()
-        m.update(salt)
-        m.update(challenge)
-        return m.hexdigest() == password
-
-    def checkUserPass(self, authToken, label = None):
-        if label and label.getHost() != self.name:
-            raise errors.RepositoryMismatch(self.name, label.getHost())
-        self.log(3, authToken[0], label)
-        cu = self.db.cursor()
-        stmt = "SELECT salt, password FROM Users WHERE userName=?"
-        cu.execute(stmt, authToken[0])
-        for (salt, password) in cu:
-            m = md5.new()
-            m.update(salt)
-            m.update(authToken[1])
-            if m.hexdigest() == password:
-                return True
-        return False
-
     def checkIsFullAdmin(self, user, password):
         self.log(3, user)
         cu = self.db.cursor()
@@ -187,7 +258,7 @@ class NetworkAuthorization:
         WHERE U.userName = ? and P.admin = 1
         """, user)
         for (salt, cryptPassword) in cu:
-            if not self.checkPassword(salt, cryptPassword, password):
+            if not self.userAuth.checkPassword(salt, cryptPassword, password):
                 return False
             return True
         return False
@@ -298,19 +369,6 @@ class NetworkAuthorization:
         cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
         self.db.commit()
 
-    def _uniqueUser(self, cu, user):
-        """
-        Returns True if the username is unique.  Raises UserAlreadyExists
-        if it is not unique
-        """
-        cu.execute("""
-            SELECT COUNT(userId)
-            FROM Users WHERE LOWER(userName)=LOWER(?)
-        """, user)
-        if cu.next()[0]:
-            raise errors.UserAlreadyExists, 'user: %s' % user
-        return True
-
     def _uniqueUserGroup(self, cu, usergroup):
         """
         Returns True if the username is unique.  Raises UserAlreadyExists
@@ -326,60 +384,36 @@ class NetworkAuthorization:
 
     def addUser(self, user, password):
         self.log(3, user)
+        cu = self.db.cursor()
+
         salt = os.urandom(4)
         m = md5.new()
         m.update(salt)
         m.update(password)
-        return self.addUserByMD5(user, salt, m.hexdigest())
+
+        self._uniqueUserGroup(cu, user)
+
+        ugid = self.userAuth.addUserByMD5(cu, user, salt, m.hexdigest())
+        self.db.commit()
+
+        return ugid
 
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
-        cu = self.db.cursor()
+        cu = self.db.transaction()
         cu.execute("update userGroups set canMirror=? where userGroup=?",
                    canMirror, userGroup)
         self.db.commit()
 
     def addUserByMD5(self, user, salt, password):
         self.log(3, user)
-        #Insert the UserGroup first, but since usergroups can be added
-        #and deleted at will, and sqlite uses a MAX(id)+1 approach to
-        #sequencing, use max(userId, userGroupId)+1 so that userId and
-        #userGroupId can be in sync.  This will leave lots of holes, and
-        #will probably need to be changed if conary moves to another db.
         cu = self.db.transaction()
 
-        #Check to make sure the user is unique in both the user and UserGroup
-        #tables
         self._uniqueUserGroup(cu, user)
-        self._uniqueUser(cu, user)
 
-        # FIXME: race condition - fix it using sequences once they are
-        # provisioned
-        cu.execute("""
-        SELECT MAX(maxId)+1 FROM (
-            SELECT COALESCE(MAX(userId),0) as maxId FROM Users
-            UNION
-            SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
-        ) as MaxList
-        """)
-        ugid = cu.fetchone()[0]
-        # XXX: ahhh, how we miss real sequences...
-        try:
-            cu.execute("INSERT INTO UserGroups (userGroupId, userGroup) "
-                       "VALUES (?, ?)",
-                       (ugid, user))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.GroupAlreadyExists, 'group: %s' % user
-        try:
-            cu.execute("INSERT INTO Users (userId, userName, salt, password) "
-                       "VALUES (?, ?, ?, ?)",
-                       (ugid, user, cu.binary(salt), cu.binary(password)))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.UserAlreadyExists, 'user: %s' % user
-        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
-                   "VALUES (?, ?)",
-                   (ugid, ugid))
+        ugid = self.userAuth.addUserByMD5(cu, user, salt, password)
         self.db.commit()
+
         return ugid
 
     def deleteUserByName(self, user, commit = True):
@@ -647,7 +681,7 @@ class NetworkAuthorization:
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
-        if not self.checkUserPass(authToken):
+        if not self.userAuth.checkUserPass(cu, authToken):
             raise errors.InsufficientPermission
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
@@ -712,7 +746,7 @@ class NetworkAuthorization:
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
-        if not self.checkUserPass(authToken):
+        if not self.userAuth.checkUserPass(cu, authToken):
             return errors.InsufficientPermission
         cu = self.db.cursor()
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
