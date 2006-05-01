@@ -25,58 +25,30 @@ GroupAlreadyExists = errors.GroupAlreadyExists
 
 class UserAuthorization:
 
-    def _uniqueUser(self, cu, user):
-        """
-        Returns True if the username is unique.  Raises UserAlreadyExists
-        if it is not unique
-        """
+    def addUserByMD5(self, cu, user, salt, password, ugid):
+        try:
+            cu.execute("INSERT INTO Users (userName, salt, password) "
+                       "VALUES (?, ?, ?)",
+                       (user, cu.binary(salt), cu.binary(password)))
+            uid = cu.lastrowid
+        except sqlerrors.ColumnNotUnique:
+            raise errors.UserAlreadyExists, 'user: %s' % user
+
+        # make sure we don't conflict with another entry based on case; this
+        # avoids races from other processes adding case differentiated
+        # duplicates
         cu.execute("""
             SELECT COUNT(userId)
             FROM Users WHERE LOWER(userName)=LOWER(?)
         """, user)
-        if cu.next()[0]:
+        if cu.next()[0] > 1:
             raise errors.UserAlreadyExists, 'user: %s' % user
-        return True
 
-    def addUserByMD5(self, cu, user, salt, password):
-        #Insert the UserGroup first, but since usergroups can be added
-        #and deleted at will, and sqlite uses a MAX(id)+1 approach to
-        #sequencing, use max(userId, userGroupId)+1 so that userId and
-        #userGroupId can be in sync.  This will leave lots of holes, and
-        #will probably need to be changed if conary moves to another db.
-
-        #Check to make sure the user is unique in both the user and UserGroup
-        #tables
-        self._uniqueUser(cu, user)
-
-        # FIXME: race condition - fix it using sequences once they are
-        # provisioned
-        cu.execute("""
-        SELECT MAX(maxId)+1 FROM (
-            SELECT COALESCE(MAX(userId),0) as maxId FROM Users
-            UNION
-            SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
-        ) as MaxList
-        """)
-        ugid = cu.fetchone()[0]
-        # XXX: ahhh, how we miss real sequences...
-        try:
-            cu.execute("INSERT INTO UserGroups (userGroupId, userGroup) "
-                       "VALUES (?, ?)",
-                       (ugid, user))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.GroupAlreadyExists, 'group: %s' % user
-        try:
-            cu.execute("INSERT INTO Users (userId, userName, salt, password) "
-                       "VALUES (?, ?, ?, ?)",
-                       (ugid, user, cu.binary(salt), cu.binary(password)))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.UserAlreadyExists, 'user: %s' % user
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
                    "VALUES (?, ?)",
-                   (ugid, ugid))
+                   (ugid, uid))
 
-        return ugid
+        return uid
 
     def checkPassword(self, salt, password, challenge):
         m = md5.new()
@@ -369,32 +341,15 @@ class NetworkAuthorization:
         cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
         self.db.commit()
 
-    def _uniqueUserGroup(self, cu, usergroup):
-        """
-        Returns True if the username is unique.  Raises UserAlreadyExists
-        if it is not unique
-        """
-        cu.execute("""
-            SELECT COUNT(userGroupId)
-            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
-        """, usergroup)
-        if cu.next()[0]:
-            raise errors.GroupAlreadyExists, 'usergroup: %s' % usergroup
-        return True
-
     def addUser(self, user, password):
         self.log(3, user)
-        cu = self.db.cursor()
 
         salt = os.urandom(4)
         m = md5.new()
         m.update(salt)
         m.update(password)
 
-        self._uniqueUserGroup(cu, user)
-
-        ugid = self.userAuth.addUserByMD5(cu, user, salt, m.hexdigest())
-        self.db.commit()
+        return self.addUserByMD5(user, salt, m.hexdigest())
 
         return ugid
 
@@ -409,12 +364,12 @@ class NetworkAuthorization:
         self.log(3, user)
         cu = self.db.transaction()
 
-        self._uniqueUserGroup(cu, user)
+        ugid = self._addGroup(cu, user)
+        uid = self.userAuth.addUserByMD5(cu, user, salt, password, ugid)
 
-        ugid = self.userAuth.addUserByMD5(cu, user, salt, password)
         self.db.commit()
 
-        return ugid
+        return uid
 
     def deleteUserByName(self, user, commit = True):
         self.log(3, user)
@@ -555,33 +510,50 @@ class NetworkAuthorization:
                    userName)
         return cu.next()[0]
 
-    def addGroup(self, userGroupName):
-        cu = self.db.cursor()
-        #Check to make sure the group is unique
-        self._uniqueUserGroup(cu, userGroupName)
+    def _addGroup(self, cu, userGroupName):
+        cu = self.db.transaction()
         try:
-            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
+            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", 
+                       userGroupName)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-        self.db.commit()
+
+        # check for case insensitive user conflicts -- avoids race with
+        # other adders on case-differentiated names
+        cu.execute("""
+            SELECT COUNT(userGroupId)
+            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
+        """, userGroupName)
+        if cu.next()[0] > 1:
+            raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
+
         return cu.lastrowid
+
+    def addGroup(self, userGroupName):
+        cu = self.db.transaction()
+        ugid = self._addGroup(cu, userGroupName)
+        self.db.commit()
+        return ugid;
 
     def renameGroup(self, userGroupId, userGroupName):
         cu = self.db.cursor()
         #See if we're actually going to do any work:
         currentGroupName = self.getGroupNameById(userGroupId)
         if currentGroupName != userGroupName:
-            if currentGroupName.lower() != userGroupName.lower():
-                #Check to make sure the group is unique
-                self._uniqueUserGroup(cu, userGroupName)
-            #else we're just changing case.
-
             try:
                 cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
             except sqlerrors.ColumnNotUnique:
                 self.db.rollback()
                 raise errors.GroupAlreadyExists, "group: %s" % userGroupName
+
+            # check for case-differentiated duplicates
+            cu.execute("""
+                SELECT COUNT(userGroupId)
+                FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
+            """, userGroupName)
+            if cu.next()[0] > 1:
+                raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
 
             self.db.commit()
 
@@ -746,9 +718,9 @@ class NetworkAuthorization:
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
+        cu = self.db.cursor()
         if not self.userAuth.checkUserPass(cu, authToken):
             return errors.InsufficientPermission
-        cu = self.db.cursor()
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
