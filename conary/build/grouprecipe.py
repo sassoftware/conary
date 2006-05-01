@@ -1261,9 +1261,13 @@ def buildGroups(recipeObj, cfg, repos, callback):
         addTrovesToGroup(group, troveMap, cache, childGroups, repos)
 
         log.debug('Troves in %s:' % group.name)
-        for troveTup in sorted(group.iterTroveList(strongRefs=True)):
-            log.debug(' %s=%s[%s]' % troveTup)
-
+        for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
+            extra = ''
+            if not byDefault:
+                extra += '[NotByDefault]'
+            if not isStrong:
+                extra += '[Weak]'
+            log.debug(' %s=%s[%s] %s' % (troveTup + (extra,)))
 
         if group.autoResolve:
             callback.done()
@@ -1706,10 +1710,19 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList
                 if not ((n,v,f) in cache and cache.isRedirect((n,v,f)))]
 
+    # there's nothing worse than seeing a bunch of nice group debugging
+    # information and then having your screen filled up with all 
+    # of the update code's debug mess.  Until that logging is moved
+    # to it's own private location, turn it off.
+    resetVerbosity = (log.getVerbosity() == log.DEBUG)
+    if resetVerbosity:
+        log.setVerbosity(log.INFO)
     updJob, suggMap = client.updateChangeSet(troves, recurse = False,
                                              resolveDeps = True,
                                              test = True,
                                              checkPathConflicts=False)
+    if resetVerbosity:
+        log.setVerbosity(log.DEBUG)
 
     for trove, needs in suggMap.iteritems():
         if cfg.fullVersions:

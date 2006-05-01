@@ -568,7 +568,7 @@ class ClientUpdate:
         respectFlavorAffinity = True
         # thew newTroves parameters are described below.
         newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, False, None, 
+                            True, {}, False, False, False, None, 
                             respectBranchAffinity, 
                             respectFlavorAffinity, True,
                             True, updateOnly) 
@@ -593,6 +593,8 @@ class ClientUpdate:
             #                  with weak references.
             # parentUpdated: True if the parent of this trove was installed.
             #                or updated.
+            # primaryInstalled: True if the primary that led to this update
+            #                   was an install.
             # branchHint:  if newInfo's parent trove switched branches, this
             #              provides the to/from information on that switch.
             #              If this child trove is making the same switch, we 
@@ -617,7 +619,8 @@ class ClientUpdate:
             #              fresh.
 
             (newInfo, isPrimary, byDefaultDict, parentInstalled, parentUpdated,
-             branchHint, respectBranchAffinity, respectFlavorAffinity,
+             primaryInstalled, branchHint, respectBranchAffinity, 
+             respectFlavorAffinity,
              installRedirects, followLocalChanges, updateOnly) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
@@ -625,13 +628,13 @@ class ClientUpdate:
             log.debug('''\
 *******
 %s=%s[%s]
-primary: %s  byDefault:%s  parentUpdated: %s parentInstalled: %s  updateOnly: %s
+primary: %s  byDefault:%s  parentUpdated: %s parentInstalled: %s primaryInstalled: %s updateOnly: %s
 branchHint: %s
 branchAffinity: %s   flavorAffinity: %s installRedirects: %s
 followLocalChanges: %s
 
 ''' % (newInfo[0], newInfo[1], newInfo[2], isPrimary, byDefault, 
-       parentUpdated, parentInstalled, 
+       parentUpdated, parentInstalled, primaryInstalled,
        updateOnly, branchHint, respectBranchAffinity,
        respectFlavorAffinity, installRedirects, followLocalChanges))
 
@@ -661,7 +664,7 @@ followLocalChanges: %s
                     # meaning: this trove is referenced by something 
                     # installed, but is not installed itself.
 
-                    if isPrimary or installMissingRefs:
+                    if isPrimary or installMissingRefs or primaryInstalled:
                         # They really want it installed this time. We removed
                         # this entry from the already-installed @update trove
                         # so localUpdates already tells us the best match for it.
@@ -669,8 +672,8 @@ followLocalChanges: %s
                     elif parentUpdated and newInfo in referencedWeak:
                         # The only link to this trove is a weak reference.
                         # A weak-only reference means an intermediate trove 
-                        # was missing.  But parentInstalled says we've now
-                        # installed an intermediate trove, so install
+                        # was missing.  But parentUpdated says we've now
+                        # updated an intermediate trove, so install
                         # this trove too.
                         pass
                     else:
@@ -1056,7 +1059,11 @@ conary erase '%s=%s[%s]'
             # we do not install foo:runtime (though if it's installed, it
             # is reasonable to upgrade it).
 
-            jobInstall = jobAdded and not job[1][0]
+            if isPrimary:
+                primaryInstalled = jobAdded and not job[1][0]
+            
+            jobInstall = primaryInstalled or (jobAdded and not job[1][0])
+
             for info in sorted(trv.iterTroveList(strongRefs=True)):
 
                 if not isPrimary:
@@ -1072,6 +1079,7 @@ conary erase '%s=%s[%s]'
 
                 newTroves.append((info, False,
                                   byDefaultDict, jobInstall, jobAdded,
+                                  primaryInstalled,
                                   branchHint, respectBranchAffinity,
                                   respectFlavorAffinity, installRedirects,
                                   childrenFollowLocalChanges,

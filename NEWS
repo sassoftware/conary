@@ -13,6 +13,10 @@ Changes in @NEW@:
       a branch) and --target for the commit command retargets to a shadow
     * User conaryrc entries are now searched from most specific target to
       least specific (bz #997)
+    * A fresh install of a group will cause all of its contained components 
+      to be installed or upgraded as well, without reference to what is 
+      currently installed on your system -- no trove will be skipped because
+      it is referenced by other troves on your system but not installed.
 
   o Server Changes:
     * Removed the ability for the server to log updates to its contents
@@ -28,6 +32,9 @@ Changes in @NEW@:
     * cvc remove handles removing directories (bz #1014)
     * conary rollback no longer tracebacks if you do not have write access to
       the conary database.
+    * deeply shadowed versions would fail when performing some version 
+      operations.  This caused, for example, local cooks of shadowed troves
+      to fail.
 
 Changes in 1.0.13:
   o Client Changes:
