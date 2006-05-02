@@ -32,6 +32,7 @@ Changes in @NEW@:
     * cvc remove handles removing directories (bz #1014)
     * conary rollback no longer tracebacks if you do not have write access to
       the conary database.
+    * using loadInstalled with a multiarch trove no longer tracebacks (bz #1039)
 
 Changes in 1.0.13:
   o Client Changes:
