@@ -24,6 +24,8 @@ Changes in @NEW@:
     * logFile configuration directive now logs all XML calls
     * Split user management out from core authorization object
     * All user management calls are based on user and group names now
+    * The user management web interface for the repository now allows
+      the administrator to enable and disable mirroring for groups
 
   o Bug Fixes:
     * Conary will not traceback if you try to update to a trove with a name

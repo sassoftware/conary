@@ -86,7 +86,7 @@
 
             <h2>Groups</h2>
             <table class="user-admin" id="groups">
-                <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
+                <thead><tr><td style="width: 25%;">Group Name</td><td>Mirror</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
                 <tbody>
                     <tr py:for="i, group in enumerate(netAuth.getGroupList())"
                         class="${i % 2 and 'even' or 'odd'}">
@@ -94,6 +94,8 @@
                     rows = list(enumerate(netAuth.iterPermsByGroup(group)))
                     ?>
                         <td><b>${group}</b></td>
+                        <td py:if="netAuth.groupCanMirror(group)" py:content="'yes'"/>
+                        <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
                         <td py:if="rows" py:content="permTable(group, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
                         <td style="text-align: right;">

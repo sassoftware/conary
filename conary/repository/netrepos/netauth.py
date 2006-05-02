@@ -394,6 +394,17 @@ class NetworkAuthorization:
 
         self.addUserByMD5(user, salt, m.hexdigest())
 
+    def groupCanMirror(self, userGroup):
+        cu = self.db.cursor()
+        cu.execute("SELECT canMirror FROM UserGroups WHERE userGroup=?",
+                   userGroup)
+        try:
+            canMirror = cu.next()[0]
+        except:
+            raise errors.GroupNotFound
+
+        return canMirror != 0
+
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
         cu = self.db.transaction()

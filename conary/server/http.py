@@ -440,20 +440,23 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     def addGroupForm(self, auth):
         users = self.repServer.auth.userAuth.getUserList()
-        return self._write("add_group", modify = False, userGroupName = None, users = users, members = [])
+        return self._write("add_group", modify = False, userGroupName = None, users = users, members = [], canMirror = False)
 
     @checkAuth(admin = True)
     @strFields(userGroupName = None)
     def manageGroupForm(self, auth, userGroupName):
         users = self.repServer.auth.userAuth.getUserList()
         members = set(self.repServer.auth.getGroupMembers(userGroupName))
+        canMirror = self.repServer.auth.groupCanMirror(userGroupName)
 
-        return self._write("add_group", userGroupName = userGroupName, users = users, members = members, modify = True)
+        return self._write("add_group", userGroupName = userGroupName, users = users, members = members, canMirror = canMirror, modify = True)
 
     @checkAuth(admin = True)
     @strFields(userGroupName = None, newUserGroupName = None)
     @listFields(str, memberList = [])
-    def manageGroup(self, auth, userGroupName, newUserGroupName, memberList):
+    @intFields(canMirror = False)
+    def manageGroup(self, auth, userGroupName, newUserGroupName, memberList,
+                    canMirror):
         if userGroupName != newUserGroupName:
             try:
                 self.repServer.auth.renameGroup(userGroupName, newUserGroupName)
@@ -464,13 +467,15 @@ class HttpHandler(WebHandler):
             userGroupName = newUserGroupName
 
         self.repServer.auth.updateGroupMembers(userGroupName, memberList)
+        self.repServer.auth.setMirror(userGroupName, canMirror)
 
         self._redirect("userlist")
 
     @checkAuth(admin = True)
     @strFields(newUserGroupName = None)
     @listFields(str, memberList = [])
-    def addGroup(self, auth, newUserGroupName, memberList):
+    @intFields(canMirror = False)
+    def addGroup(self, auth, newUserGroupName, memberList, canMirror):
         try:
             self.repServer.auth.addGroup(newUserGroupName)
         except GroupAlreadyExists:
@@ -478,6 +483,7 @@ class HttpHandler(WebHandler):
                 error = "The group name you have chosen is already in use.")
 
         self.repServer.auth.updateGroupMembers(newUserGroupName, memberList)
+        self.repServer.auth.setMirror(newUserGroupName, canMirror)
 
         self._redirect("userlist")
 

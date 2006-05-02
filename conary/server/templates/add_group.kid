@@ -40,6 +40,13 @@
                             </select>
                         </td>
                     </tr>
+                    <tr>
+                        <td id="header">User can mirror:</td>
+                        <td>
+                            <input type="radio" name="canMirror" value="1" py:attrs="{'checked' : canMirror and 'checked' or None }"/>Yes
+                            <input type="radio" name="canMirror" value="0" py:attrs="{'checked' : (not canMirror) and 'checked' or None }"/>No
+                        </td>
+                    </tr>
                 </table>
                 <p>
                     <input py:if="not modify" type="submit" value="Add Group" />
