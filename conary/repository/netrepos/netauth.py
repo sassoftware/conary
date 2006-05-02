@@ -361,15 +361,27 @@ class NetworkAuthorization:
 
         self.db.commit()
 
-    def deleteAcl(self, userGroupId, labelId, itemId):
+    def deleteAcl(self, userGroup, label, item):
         cu = self.db.cursor()
 
-        stmt = """DELETE FROM Permissions
-                  WHERE userGroupId=? AND
-                        (labelId=? OR (labelId IS NULL AND ? IS NULL)) AND
-                        (itemId=? OR (itemId IS NULL AND ? IS NULL))"""
+        userGroupId = self._getGroupIdByName(userGroup)
 
-        cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
+        if label is None:
+            labelId = 0
+        else:
+            labelId = cu.execute("SELECT labelId FROM Labels WHERE label=?", 
+                                 label).next()[0]
+
+        if item is None:
+            itemId = 0
+        else:
+            itemId = cu.execute("SELECT itemId FROM Items WHERE item=?", 
+                                item).next()[0]
+
+        stmt = """DELETE FROM Permissions
+                  WHERE userGroupId=? AND labelId=? AND itemId=?"""
+
+        cu.execute(stmt, userGroupId, labelId, itemId)
         self.db.commit()
 
     def addUser(self, user, password):
@@ -380,9 +392,7 @@ class NetworkAuthorization:
         m.update(salt)
         m.update(password)
 
-        return self.addUserByMD5(user, salt, m.hexdigest())
-
-        return ugid
+        self.addUserByMD5(user, salt, m.hexdigest())
 
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
@@ -399,8 +409,6 @@ class NetworkAuthorization:
         uid = self.userAuth.addUserByMD5(cu, user, salt, password, ugid)
 
         self.db.commit()
-
-        return uid
 
     def deleteUserByName(self, user):
         self.log(3, user)
@@ -442,13 +450,13 @@ class NetworkAuthorization:
         cu.execute("SELECT userGroup FROM UserGroups")
         return [ x[0] for x in cu ]
 
-    def iterGroupMembers(self, userGroupId):
+    def getGroupMembers(self, userGroup):
         cu = self.db.cursor()
-        cu.execute("""SELECT Users.userName FROM UserGroupMembers, Users
-                      WHERE Users.userId = UserGroupMembers.userId AND
-                      UserGroupMembers.userGroupId=?""", userGroupId)
-        for row in cu:
-            yield row[0]
+        cu.execute("""SELECT Users.userName FROM UserGroups
+                            JOIN UserGroupMembers USING (userGroupId)
+                            JOIN Users USING (userId)
+                            WHERE userGroup = ? """, userGroup)
+        return [ x[0] for x in cu ]
 
     def iterPermsByGroup(self, userGroupName):
         cu = self.db.cursor()
@@ -499,7 +507,6 @@ class NetworkAuthorization:
         cu = self.db.transaction()
         ugid = self._addGroup(cu, userGroupName)
         self.db.commit()
-        return ugid;
 
     def renameGroup(self, currentGroupName, userGroupName):
         cu = self.db.cursor()
@@ -536,18 +543,25 @@ class NetworkAuthorization:
         cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         #now add the new members
         for userId in members:
-            self.addGroupMember(userGroupId, userId, False)
+            self.addGroupMember(userGroup, userId, False)
         self.db.commit()
 
-    def addGroupMember(self, userGroupId, userId, commit = True):
+    def addGroupMember(self, userGroup, userName, commit = True):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) VALUES(?, ?)",
-                   (userGroupId, userId))
+        # we do this in multiple select to let us generate the proper 
+        # exceptions when the names don't xist
+        userGroupId = self._getGroupIdByName(userGroup)
+        userId = self.userAuth.getUserIdByName(userName)
+
+        cu.execute("""INSERT INTO UserGroupMembers (userGroupId, userId)
+                        VALUES (?, ?)""", userGroupId, userId)
+
         if commit:
             self.db.commit()
 
     def deleteGroup(self, userGroupName, commit = True):
-        return self.deleteGroupById(self._getGroupIdByName(userGroupName), commit)
+        return self.deleteGroupById(self._getGroupIdByName(userGroupName), 
+                                    commit)
 
     def deleteGroupById(self, userGroupId, commit = True):
         cu = self.db.cursor()
