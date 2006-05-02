@@ -69,7 +69,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     publicCalls = set([ 'addUser',
                         'addUserByMD5',
                         'deleteUserByName',
-                        'deleteUserById',
                         'setUserGroupCanMirror',
                         'addAcl',
                         'editAcl',
@@ -327,7 +326,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addUser(self, authToken, clientVersion, user, newPassword):
         # adds a new user, with no acls. for now it requires full admin
         # rights
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.addUser(user, newPassword)
@@ -336,7 +335,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addUserByMD5(self, authToken, clientVersion, user, salt, newPassword):
         # adds a new user, with no acls. for now it requires full admin
         # rights
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         #Base64 decode salt
@@ -344,27 +343,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def deleteUserByName(self, authToken, clientVersion, user):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.deleteUserByName(user)
         return True
 
-    def deleteUserById(self, authToken, clientVersion, userId):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise errors.InsufficientPermission
-        self.log(2, authToken[0], userId)
-        error = self.auth.deleteUserById(userId)
-        if error:
-            print >>sys.stderr, error
-            sys.stderr.flush()
-            return False
-        else:
-            return True
-
     def setUserGroupCanMirror(self, authToken, clientVersion, userGroup,
                               canMirror):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, canMirror)
         self.auth.setMirror(userGroup, canMirror)
@@ -372,7 +359,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
                  "write=%s admin=%s" % (write, admin))
@@ -389,7 +376,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
                 oldLabel, trovePattern, label, write, capped, admin):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
                  "old=%s new=%s" % ((oldTrovePattern, oldLabel),
@@ -414,7 +401,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def changePassword(self, authToken, clientVersion, user, newPassword):
-        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+        if (not self.auth.check(authToken, admin = True)
             and not self.auth.check(authToken)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
@@ -422,7 +409,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def getUserGroups(self, authToken, clientVersion):
-        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+        if (not self.auth.check(authToken, admin = True)
             and not self.auth.check(authToken)):
             raise errors.InsufficientPermission
         self.log(2)
@@ -1641,31 +1628,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
-        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+        if (not self.auth.check(authToken, admin = True)
             and (not self.auth.check(authToken) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
-        uid = self.auth.getUserIdByName(user)
+        uid = self.auth.userAuth.getUserIdByName(user)
         self.repos.troveStore.keyTable.addNewAsciiKey(uid, keyData)
         return True
 
     def addNewPGPKey(self, authToken, label, user, encKeyData):
-        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
+        if (not self.auth.check(authToken, admin = True)
             and (not self.auth.check(authToken) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
-        uid = self.auth.getUserIdByName(user)
+        uid = self.auth.userAuth.getUserIdByName(user)
         keyData = base64.b64decode(encKeyData)
         self.repos.troveStore.keyTable.addNewKey(uid, keyData)
         return True
 
     def changePGPKeyOwner(self, authToken, label, user, key):
-        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+        if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         if user:
-            uid = self.auth.getUserIdByName(user)
+            uid = self.auth.userAuth.getUserIdByName(user)
         else:
             uid = None
         self.log(2, authToken[0], label, user, str(key))
@@ -1680,8 +1667,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # the only reason to lock this fuction down is because it correlates
         # a valid userId to valid fingerprints. neither of these pieces of
         # information is sensitive separately.
-        if (not self.auth.checkIsFullAdmin(authToken[0], authToken[1])
-            and (userId != self.auth.getUserIdByName(authToken[0]) or
+        if (not self.auth.check(authToken, admin = True)
+            and (userId != self.auth.userAuth.getUserIdByName(authToken[0]) or
                  not self.auth.check(authToken))
             ):
             raise errors.InsufficientPermission

@@ -16,6 +16,7 @@
 #
 
 import os
+import socket
 import sys
 import time
 
@@ -37,18 +38,62 @@ from conary.repository.netrepos import calllog
 sys.excepthook = util.genExcepthook(debug=True)
 
 parser = optparse.OptionParser(version = '%prog 0.1')
+parser.add_option("--follow", "-f", dest = "follow", default = False,
+                  action = "store_true", help = "follow updates to the log")
+parser.add_option("-n", dest = "noReverseDNS", default = False,
+                  action = "store_true", help = "skip reverse dns")
+parser.add_option("--params", "-p", dest = "showParams", default = False,
+                  action = "store_true", help = "display method parameters")
 (options, args) = parser.parse_args()
 
 if len(args) != 1:
     print >> sys.stderr, "logcat: a single file name was expected"
     sys.exit(1)
 
-log = calllog.CallLogger(args[0], None)
-for entry in log:
-    print "%s %s %s %s %s" % (
-        time.strftime("%Y %B %d %H:%M", time.localtime(entry.timeStamp)),
+hostnameCache = {}
+
+log = calllog.CallLogger(args[0], None, readOnly = True)
+if options.follow:
+    iterator = log.follow()
+else:
+    iterator = iter(log)
+
+for entry in iterator:
+    if not entry.remoteIp:
+        hostname = "(unknown)"
+    elif options.noReverseDNS:
+        hostname = entry.remoteIp
+    else:
+        hostname = hostnameCache.get(entry.remoteIp, None)
+        if hostname is None:
+            try:
+                hostname = socket.gethostbyaddr(entry.remoteIp)[0]
+            except socket.herror:
+                hostname = entry.remoteIp
+
+            hostnameCache[entry.remoteIp] = hostname
+
+    userInfo = []
+    if entry.user is not None:
+        userInfo.append("user=%s" % entry.user)
+    if entry.entitlement is not None:
+        userInfo.append("entitlement=%s" % entry.user)
+
+    if userInfo:
+        userStr = " ".join(userInfo) + " "
+    else:
+        userStr = ""
+
+    if options.showParams:
+        params = str(entry.args)
+    else:
+        params = ""
+
+    print "%s %s %s %s%s%s" % (
+        hostname,
+        time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
         entry.serverName,
-        entry.user,
-        entry.entitlement,
+        userStr,
         entry.methodName,
+        params
     )

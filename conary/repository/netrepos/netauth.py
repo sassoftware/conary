@@ -23,23 +23,74 @@ from conary.dbstore import sqlerrors
 UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
-class NetworkAuthorization:
-    def __init__(self, db, name, log = None):
-        self.name = name
-        self.db = db
-        self.reCache = {}
-        self.log = log or tracelog.getLog(None)
+class UserAuthorization:
 
-    def getAuthGroups(self, cu, authToken):
-        self.log(3, authToken[0], authToken[2], authToken[3])
-        # Find what group this user belongs to
-        # anonymous users should come through as anonymous, not None
-        assert(authToken[0])
+    def addUserByMD5(self, cu, user, salt, password, ugid):
+        try:
+            cu.execute("INSERT INTO Users (userName, salt, password) "
+                       "VALUES (?, ?, ?)",
+                       (user, cu.binary(salt), cu.binary(password)))
+            uid = cu.lastrowid
+        except sqlerrors.ColumnNotUnique:
+            raise errors.UserAlreadyExists, 'user: %s' % user
+
+        # make sure we don't conflict with another entry based on case; this
+        # avoids races from other processes adding case differentiated
+        # duplicates
         cu.execute("""
-        SELECT salt, password, userGroupId
-        FROM Users JOIN UserGroupMembers USING(userId)
+            SELECT COUNT(userId)
+            FROM Users WHERE LOWER(userName)=LOWER(?)
+        """, user)
+        if cu.next()[0] > 1:
+            raise errors.UserAlreadyExists, 'user: %s' % user
+
+        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
+                   "VALUES (?, ?)",
+                   (ugid, uid))
+
+        return uid
+
+    def changePassword(self, cu, user, salt, password):
+        cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
+                   cu.binary(password), cu.binary(salt), user)
+
+    def checkPassword(self, salt, password, challenge):
+        m = md5.new()
+        m.update(salt)
+        m.update(challenge)
+        return m.hexdigest() == password
+
+    def checkUserPass(self, cu, authToken):
+        cu.execute("SELECT salt, password FROM Users WHERE userName=?", 
+                   authToken[0])
+
+        for (salt, password) in cu:
+            m = md5.new()
+            m.update(salt)
+            m.update(authToken[1])
+            if m.hexdigest() == password:
+                return True
+
+        return False
+
+    def deleteUser(self, cu, user):
+        userId = self.getUserIdByName(user)
+
+        # First delete the user from all the groups
+        sql = "DELETE from UserGroupMembers WHERE userId=?"
+        cu.execute(sql, userId)
+
+        # Now delete the user itself
+        sql = "DELETE from Users WHERE userId=?"
+        cu.execute(sql, userId)
+
+    def getAuthorizedGroups(self, cu, user, password):
+        cu.execute("""
+        SELECT salt, password, userGroup FROM Users 
+        JOIN UserGroupMembers USING(userId)
+        JOIN UserGroups USING (userGroupId)
         WHERE userName = ?
-        """, authToken[0])
+        """, user)
 
         groupsFromUser = [ x for x in cu ]
 
@@ -48,22 +99,84 @@ class NetworkAuthorization:
             # need to validate the password once
             if not self.checkPassword(cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
-                                      authToken[1]):
+                                      password):
                 raise errors.InsufficientPermission
 
-            groupsFromUser = [ x[2] for x in groupsFromUser ]
-
-        if authToken[2] is not None:
-            # look up entitlements
-            cu.execute("""
-            SELECT userGroupId
-            FROM EntitlementGroups JOIN Entitlements USING(entGroupId)
-            WHERE
-            entGroup=? AND entitlement=?
-            """, authToken[2], authToken[3])
-            groupsFromUser += [ x[0] for x in cu ]
+            groupsFromUser = set(x[2] for x in groupsFromUser)
+        else:
+            return set()
 
         return groupsFromUser
+
+    def getGroupsByUser(self, user):
+        cu = self.db.cursor()
+        cu.execute("""SELECT userGroup FROM Users
+                        JOIN UserGroupMembers USING (userId)
+                        JOIN UserGroups USING (userGroupId)
+                        WHERE Users.userName = ?""", user)
+
+        return [ x[0] for x in cu ]
+
+    def getUserIdByName(self, userName):
+        cu = self.db.cursor()
+
+        cu.execute("SELECT userId FROM Users WHERE userName=?", userName)
+        try:
+            return cu.next()[0]
+        except:
+            raise errors.UserNotFound(userName)
+
+    def getUserList(self):
+        cu = self.db.cursor()
+        cu.execute("SELECT userName FROM Users")
+        return [ x[0] for x in cu ]
+
+    def __init__(self, db):
+        self.db = db
+
+class EntitlementAuthorization:
+
+    def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
+        # look up entitlements
+        cu.execute("""
+        SELECT userGroup FROM EntitlementGroups
+        JOIN Entitlements USING (entGroupId)
+        JOIN UserGroups ON
+            EntitlementGroups.userGroupId = UserGroups.userGroupId
+        WHERE
+        entGroup=? AND entitlement=?
+        """, entitlementGroup, entitlement)
+
+        return set(x[0] for x in cu)
+
+class NetworkAuthorization:
+    def __init__(self, db, name, log = None):
+        self.name = name
+        self.db = db
+        self.reCache = {}
+        self.log = log or tracelog.getLog(None)
+        self.userAuth = UserAuthorization(self.db)
+        self.entitlementAuth = EntitlementAuthorization()
+
+    def getAuthGroups(self, cu, authToken):
+        self.log(3, authToken[0], authToken[2], authToken[3])
+        # Find what group this user belongs to
+        # anonymous users should come through as anonymous, not None
+        assert(authToken[0])
+        groupsFromUser = self.userAuth.getAuthorizedGroups(cu, authToken[0],
+                                                           authToken[1])
+        if authToken[2] is not None:
+            groupsFromEntitlement = \
+                  self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
+                                                           authToken[3])
+            groupsFromUser.update(groupsFromEntitlement)
+
+        # We have lists of symbolic names; get lists of group ids
+        cu.execute("SELECT userGroupId FROM UserGroups WHERE "
+                   "userGroup IN (%s)" %
+                        ",".join("'%s'" % x for x in groupsFromUser) )
+
+        return [ x[0] for x in cu ]
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):
@@ -155,43 +268,6 @@ class NetworkAuthorization:
             return True
         return False
 
-    def checkPassword(self, salt, password, challenge):
-        m = md5.new()
-        m.update(salt)
-        m.update(challenge)
-        return m.hexdigest() == password
-
-    def checkUserPass(self, authToken, label = None):
-        if label and label.getHost() != self.name:
-            raise errors.RepositoryMismatch(self.name, label.getHost())
-        self.log(3, authToken[0], label)
-        cu = self.db.cursor()
-        stmt = "SELECT salt, password FROM Users WHERE userName=?"
-        cu.execute(stmt, authToken[0])
-        for (salt, password) in cu:
-            m = md5.new()
-            m.update(salt)
-            m.update(authToken[1])
-            if m.hexdigest() == password:
-                return True
-        return False
-
-    def checkIsFullAdmin(self, user, password):
-        self.log(3, user)
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT salt, password
-        FROM Users as U
-        JOIN UserGroupMembers as UGM USING(userId)
-        JOIN Permissions as P USING(userGroupId)
-        WHERE U.userName = ? and P.admin = 1
-        """, user)
-        for (salt, cryptPassword) in cu:
-            if not self.checkPassword(salt, cryptPassword, password):
-                return False
-            return True
-        return False
-
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
         self.log(3, userGroup, trovePattern, label, write, admin)
         cu = self.db.cursor()
@@ -236,9 +312,7 @@ class NetworkAuthorization:
         else:
             labelId = 0
 
-        cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
-                   userGroup)
-        userGroupId = cu.next()[0]
+        userGroupId = self._getGroupIdByName(userGroup)
 
         try:
             cu.execute("""
@@ -257,7 +331,7 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        userGroupId = self.getGroupIdByName(userGroup)
+        userGroupId = self._getGroupIdByName(userGroup)
 
         if write:
             write = 1
@@ -298,157 +372,60 @@ class NetworkAuthorization:
         cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
         self.db.commit()
 
-    def _uniqueUser(self, cu, user):
-        """
-        Returns True if the username is unique.  Raises UserAlreadyExists
-        if it is not unique
-        """
-        cu.execute("""
-            SELECT COUNT(userId)
-            FROM Users WHERE LOWER(userName)=LOWER(?)
-        """, user)
-        if cu.next()[0]:
-            raise errors.UserAlreadyExists, 'user: %s' % user
-        return True
-
-    def _uniqueUserGroup(self, cu, usergroup):
-        """
-        Returns True if the username is unique.  Raises UserAlreadyExists
-        if it is not unique
-        """
-        cu.execute("""
-            SELECT COUNT(userGroupId)
-            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
-        """, usergroup)
-        if cu.next()[0]:
-            raise errors.GroupAlreadyExists, 'usergroup: %s' % usergroup
-        return True
-
     def addUser(self, user, password):
         self.log(3, user)
+
         salt = os.urandom(4)
         m = md5.new()
         m.update(salt)
         m.update(password)
+
         return self.addUserByMD5(user, salt, m.hexdigest())
+
+        return ugid
 
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
-        cu = self.db.cursor()
+        cu = self.db.transaction()
         cu.execute("update userGroups set canMirror=? where userGroup=?",
                    canMirror, userGroup)
         self.db.commit()
 
     def addUserByMD5(self, user, salt, password):
         self.log(3, user)
-        #Insert the UserGroup first, but since usergroups can be added
-        #and deleted at will, and sqlite uses a MAX(id)+1 approach to
-        #sequencing, use max(userId, userGroupId)+1 so that userId and
-        #userGroupId can be in sync.  This will leave lots of holes, and
-        #will probably need to be changed if conary moves to another db.
         cu = self.db.transaction()
 
-        #Check to make sure the user is unique in both the user and UserGroup
-        #tables
-        self._uniqueUserGroup(cu, user)
-        self._uniqueUser(cu, user)
+        ugid = self._addGroup(cu, user)
+        uid = self.userAuth.addUserByMD5(cu, user, salt, password, ugid)
 
-        # FIXME: race condition - fix it using sequences once they are
-        # provisioned
-        cu.execute("""
-        SELECT MAX(maxId)+1 FROM (
-            SELECT COALESCE(MAX(userId),0) as maxId FROM Users
-            UNION
-            SELECT COALESCE(MAX(userGroupId),0) as maxId FROM UserGroups
-        ) as MaxList
-        """)
-        ugid = cu.fetchone()[0]
-        # XXX: ahhh, how we miss real sequences...
-        try:
-            cu.execute("INSERT INTO UserGroups (userGroupId, userGroup) "
-                       "VALUES (?, ?)",
-                       (ugid, user))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.GroupAlreadyExists, 'group: %s' % user
-        try:
-            cu.execute("INSERT INTO Users (userId, userName, salt, password) "
-                       "VALUES (?, ?, ?, ?)",
-                       (ugid, user, cu.binary(salt), cu.binary(password)))
-        except sqlerrors.ColumnNotUnique:
-            raise errors.UserAlreadyExists, 'user: %s' % user
-        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
-                   "VALUES (?, ?)",
-                   (ugid, ugid))
         self.db.commit()
-        return ugid
 
-    def deleteUserByName(self, user, commit = True):
+        return uid
+
+    def deleteUserByName(self, user):
         self.log(3, user)
-        cu = self.db.cursor()
-        sql = "SELECT userId FROM Users WHERE userName=?"
-        cu.execute(sql, user)
-        try:
-            userId = cu.next()[0]
-        except StopIteration:
-            raise errors.UserNotFound(user)
-        return self.deleteUser(userId, user, commit)
 
-    def deleteUserById(self, userId, commit = True):
-        self.log(3, userId)
-        cu = self.db.cursor()
-        sql = "SELECT userName FROM Users WHERE userId=?"
-        cu.execute(sql, userId)
-        try:
-            user = cu.next()[0]
-        except StopIteration:
-            raise errors.UserNotFound(user)
-
-        return self.deleteUser(userId, user, commit)
-
-    def deleteUser(self, userId, user, commit = True):
-        # Need to do a lot of stuff:
-        # UserGroups, Users, and all ACLs
-        self.log(3, userId, user)
         cu = self.db.cursor()
 
+        # delete the UserGroup created with the name of that user
         try:
-            #First delete the user from all the groups
-            sql = "DELETE from UserGroupMembers WHERE userId=?"
-            cu.execute(sql, userId)
+            self.deleteGroup(user, False)
+        except errors.GroupNotFound, e:
+            pass
 
+        self.userAuth.deleteUser(cu, user)
 
-            #Then delete the UserGroup created with the name of that user
-            try:
-                self.deleteGroup(user, False)
-            except StopIteration, e:
-                # Ignore the StopIteration error as it means there was no
-                # Group matching that name.  Probably because the group
-                # was deleted beforehand
-                pass
-
-            #Now delete the user-self
-            sql = "DELETE from Users WHERE userId=?"
-            cu.execute(sql, userId)
-
-            if commit:
-                self.db.commit()
-        except Exception, e:
-            if commit:
-                self.db.rollback()
-
-            raise e
-        return True
+        self.db.commit()
 
     def changePassword(self, user, newPassword):
         self.log(3, user)
-        cu = self.db.cursor()
         salt = os.urandom(4)
         m = md5.new()
         m.update(salt)
         m.update(newPassword)
-        password = m.hexdigest()
-        cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
-                   cu.binary(password), cu.binary(salt), user)
+
+        cu = self.db.cursor()
+        self.userAuth.changePassword(cu, user, salt, m.hexdigest())
         self.db.commit()
 
     def getUserGroups(self, user):
@@ -460,26 +437,10 @@ class NetworkAuthorization:
                             Users.userName = ?""", user)
         return [row[0] for row in cu]
 
-    def iterUsers(self):
+    def getGroupList(self):
         cu = self.db.cursor()
-        cu.execute("SELECT userId, userName FROM Users")
-        for row in cu:
-            yield row
-
-    def iterGroups(self):
-        cu = self.db.cursor()
-        cu.execute("SELECT userGroupId, userGroup FROM UserGroups")
-        for row in cu:
-            yield row
-
-    def iterGroupsByUserId(self, userId):
-        cu = self.db.cursor()
-        cu.execute("""SELECT UserGroups.userGroupId, UserGroups.userGroup
-                      FROM UserGroups INNER JOIN UserGroupMembers ON
-                      UserGroups.userGroupId = UserGroupMembers.userGroupId
-                      WHERE UserGroupMembers.userId=?""", userId)
-        for row in cu:
-            yield row
+        cu.execute("SELECT userGroup FROM UserGroups")
+        return [ x[0] for x in cu ]
 
     def iterGroupMembers(self, userGroupId):
         cu = self.db.cursor()
@@ -489,71 +450,88 @@ class NetworkAuthorization:
         for row in cu:
             yield row[0]
 
-    def iterPermsByGroupId(self, userGroupId):
+    def iterPermsByGroup(self, userGroupName):
         cu = self.db.cursor()
-        cu.execute("""SELECT Permissions.labelId, Labels.label,
-                             PerItems.itemId, PerItems.item,
+        cu.execute("""SELECT Labels.label,
+                             PerItems.item,
                              canwrite, capped, admin
-                      FROM Permissions
+                      FROM UserGroups
+                      JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
                           PerItems.itemId = Permissions.itemId
                       LEFT OUTER JOIN Labels ON
                           Permissions.labelId = Labels.labelId
-                      WHERE userGroupId=?""", userGroupId)
+                      WHERE userGroup=?""", userGroupName)
         for row in cu:
             yield row
 
-    def getGroupNameById(self, userGroupId):
-        cu = self.db.cursor()
-        cu.execute("SELECT userGroup from UserGroups WHERE userGroupId=?",
-            userGroupId)
-        return cu.next()[0]
-
-    def getGroupIdByName(self, userGroupName):
+    def _getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
             userGroupName)
-        return cu.next()[0]
 
-    def getUserIdByName(self, userName):
-        cu = self.db.cursor()
-        cu.execute("SELECT userId FROM Users WHERE userName=?",
-                   userName)
-        return cu.next()[0]
-
-    def addGroup(self, userGroupName):
-        cu = self.db.cursor()
-        #Check to make sure the group is unique
-        self._uniqueUserGroup(cu, userGroupName)
         try:
-            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
+            return cu.next()[0]
+        except:
+            raise errors.GroupNotFound
+
+    def _addGroup(self, cu, userGroupName):
+        cu = self.db.transaction()
+        try:
+            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", 
+                       userGroupName)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-        self.db.commit()
+
+        # check for case insensitive user conflicts -- avoids race with
+        # other adders on case-differentiated names
+        cu.execute("""
+            SELECT COUNT(userGroupId)
+            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
+        """, userGroupName)
+        if cu.next()[0] > 1:
+            raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
+
         return cu.lastrowid
 
-    def renameGroup(self, userGroupId, userGroupName):
+    def addGroup(self, userGroupName):
+        cu = self.db.transaction()
+        ugid = self._addGroup(cu, userGroupName)
+        self.db.commit()
+        return ugid;
+
+    def renameGroup(self, currentGroupName, userGroupName):
         cu = self.db.cursor()
         #See if we're actually going to do any work:
-        currentGroupName = self.getGroupNameById(userGroupId)
-        if currentGroupName != userGroupName:
-            if currentGroupName.lower() != userGroupName.lower():
-                #Check to make sure the group is unique
-                self._uniqueUserGroup(cu, userGroupName)
-            #else we're just changing case.
 
+        try:
+            userGroupId = self._getGroupIdByName(currentGroupName)
+        except errors.GroupNotFound:
+            return
+
+        if currentGroupName != userGroupName:
             try:
                 cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
             except sqlerrors.ColumnNotUnique:
                 self.db.rollback()
                 raise errors.GroupAlreadyExists, "group: %s" % userGroupName
 
+            # check for case-differentiated duplicates
+            cu.execute("""
+                SELECT COUNT(userGroupId)
+                FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
+            """, userGroupName)
+            if cu.next()[0] > 1:
+                raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
+
             self.db.commit()
 
-    def updateGroupMembers(self, userGroupId, members):
+    def updateGroupMembers(self, userGroup, members):
         #Do this in a transaction
         cu = self.db.cursor()
+        userGroupId = self._getGroupIdByName(userGroup)
+
         #First drop all the current members
         cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         #now add the new members
@@ -569,7 +547,7 @@ class NetworkAuthorization:
             self.db.commit()
 
     def deleteGroup(self, userGroupName, commit = True):
-        return self.deleteGroupById(self.getGroupIdByName(userGroupName), commit)
+        return self.deleteGroupById(self._getGroupIdByName(userGroupName), commit)
 
     def deleteGroupById(self, userGroupId, commit = True):
         cu = self.db.cursor()
@@ -647,7 +625,7 @@ class NetworkAuthorization:
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
-        if not self.checkUserPass(authToken):
+        if not self.userAuth.checkUserPass(cu, authToken):
             raise errors.InsufficientPermission
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
@@ -712,9 +690,9 @@ class NetworkAuthorization:
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
-        if not self.checkUserPass(authToken):
-            return errors.InsufficientPermission
         cu = self.db.cursor()
+        if not self.userAuth.checkUserPass(cu, authToken):
+            return errors.InsufficientPermission
         entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
