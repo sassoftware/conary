@@ -40,6 +40,9 @@ Changes in @NEW@:
       operations.  This caused, for example, local cooks of shadowed troves
       to fail.
     * using loadInstalled with a multiarch trove no longer tracebacks (bz #1039)
+    * group recipes that include a trove explicitly byDefault False could result
+      in a trove when cooked that had the components of that trove byDefault
+      True.
 
 Changes in 1.0.13:
   o Client Changes:
