@@ -569,26 +569,30 @@ class HttpHandler(WebHandler):
     @checkAuth(write = True)
     def pgpAdminForm(self, auth):
         admin = self.repServer.auth.check(self.authToken,admin=True)
-        userId = self.repServer.auth.getUserIdByName(self.authToken[0])
 
         if admin:
-            users = dict(self.repServer.auth.iterUsers())
-            users[None] = '--Nobody--'
+            users = self.repServer.auth.userAuth.getUserList()
+            users.append('--Nobody--')
         else:
-            users = {userId: self.authToken[0]}
+            users = [ self.authToken[0] ]
 
         # build a dict of useful information about each user's OpenPGP Keys
         # xml-rpc calls must be made before kid template is invoked
         openPgpKeys = {}
-        for userId in users.keys():
+        for user in users:
             keys = []
-            for fingerprint in self.repServer.listUsersMainKeys(self.authToken, 0, userId):
+            if user == '--Nobody--':
+                userLookup = None
+            else:
+                userLookup = user
+
+            for fingerprint in self.repServer.listUsersMainKeys(self.authToken, 0, userLookup):
                 keyPacket = {}
                 keyPacket['fingerprint'] = fingerprint
                 keyPacket['subKeys'] = self.repServer.listSubkeys(self.authToken, 0, fingerprint)
                 keyPacket['uids'] = self.repServer.getOpenPGPKeyUserIds(self.authToken, 0, fingerprint)
                 keys.append(keyPacket)
-            openPgpKeys[userId] = keys
+            openPgpKeys[user] = keys
 
         return self._write("pgp_admin", users = users, admin=admin, openPgpKeys = openPgpKeys)
 

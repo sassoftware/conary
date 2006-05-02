@@ -145,11 +145,12 @@ class OpenPGPKeyTable:
             keyData += '='
         return "-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: Conary "+version+"\n\n%s\n-----END PGP PUBLIC KEY BLOCK-----" % keyData
 
-    def getUsersMainKeys(self, userId):
+    def getUsersMainKeys(self, user):
         cu = self.db.cursor()
-        if not userId is None:
-            r = cu.execute('SELECT fingerprint FROM PGPKeys '
-                           'WHERE userId=?', (userId,))
+        if user is not None:
+            r = cu.execute('''SELECT fingerprint FROM Users
+                                JOIN PGPKeys USING (userId)
+                              WHERE userName=?''', (user,))
         else:
             r = cu.execute('SELECT fingerprint FROM PGPKeys '
                            'WHERE userId IS NULL')

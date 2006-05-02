@@ -15,12 +15,12 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    <div py:def="generateOwnerListForm(fingerprint, users, userid = None)" py:strip="True">
+    <div py:def="generateOwnerListForm(fingerprint, users, targUser = None)" py:strip="True">
       <form action="pgpChangeOwner" method="post">
         <input type="hidden" name="key" value="${fingerprint}"/>
         <select name="owner">
-            <option py:for="userId, userName in users.items()" value="${userName}"
-                    py:attrs="{'selected': (userId==userid) and 'selected' or None}"
+            <option py:for="userName in sorted(users)" value="${userName}"
+                    py:attrs="{'selected': (userName==targUser) and 'selected' or None}"
                     py:content="userName" />
         </select>
         <button type="submit" value="Change">Change Association</button>
@@ -36,14 +36,14 @@
         ${brokenkey}
     </div>
 
-    <div py:def="printKeyTableEntry(keyEntry, userId)" py:strip="True">
+    <div py:def="printKeyTableEntry(keyEntry, userName)" py:strip="True">
      <tr class="key-ids">
       <td>
         <div>pub: ${breakKey(keyEntry['fingerprint'])}</div>
         <div py:for="id in keyEntry['uids']"> uid: &#160; &#160; ${id}</div>
         <div py:for="subKey in keyEntry['subKeys']">sub: ${breakKey(subKey)}</div>
       </td>
-      <td py:if="admin" style="text-align: right;">${generateOwnerListForm(keyEntry['fingerprint'], users, userId)}</td>
+      <td py:if="admin" style="text-align: right;">${generateOwnerListForm(keyEntry['fingerprint'], users, userName)}</td>
      </tr>
     </div>
 
@@ -62,9 +62,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <div py:for="userId, userName in users.items()" py:strip="True">
-                      <div py:for="keyEntry in openPgpKeys[userId]" py:strip="True">
-                          ${printKeyTableEntry(keyEntry, userId)}
+                    <div py:for="userName in sorted(users)" py:strip="True">
+                      <div py:for="keyEntry in openPgpKeys[userName]" py:strip="True">
+                          ${printKeyTableEntry(keyEntry, userName)}
                       </div>
                     </div>
                 </tbody>

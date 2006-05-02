@@ -1663,17 +1663,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # don't check auth. this is a public function
         return self.repos.troveStore.keyTable.getAsciiPGPKeyData(keyId)
 
-    def listUsersMainKeys(self, authToken, label, userId = None):
+    def listUsersMainKeys(self, authToken, label, user = None):
         # the only reason to lock this fuction down is because it correlates
-        # a valid userId to valid fingerprints. neither of these pieces of
+        # a valid user to valid fingerprints. neither of these pieces of
         # information is sensitive separately.
         if (not self.auth.check(authToken, admin = True)
-            and (userId != self.auth.userAuth.getUserIdByName(authToken[0]) or
-                 not self.auth.check(authToken))
-            ):
+            and (user != authToken[0]) or not self.auth.check(authToken)):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], label, userId)
-        return self.repos.troveStore.keyTable.getUsersMainKeys(userId)
+        self.log(2, authToken[0], label, user)
+        return self.repos.troveStore.keyTable.getUsersMainKeys(user)
 
     def listSubkeys(self, authToken, label, fingerprint):
         self.log(2, authToken[0], label, fingerprint)
