@@ -1385,9 +1385,12 @@ class Symlink(_FileAction):
     The C{r.Symlink()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{allowDangling} : (False) Whether to allow dangling symbolic links.
+    B{allowDangling} : (False) Whether to create dangling symbolic links.
     That is, a symbolic link for which the target (C{realfile}) does not
-    exist.
+    exist.  (The C{r.DanglingSymlinks} policy disallows some dangling
+    symbolic links; you may also need to call
+    C{r.DanglingSymlinks(exceptions='...')} if the symbolic link
+    should still be dangling when packaging is complete.)
 
     EXAMPLES
     ========
@@ -1435,12 +1438,14 @@ class Symlink(_FileAction):
             if not sources and not self.allowDangling:
                 raise TypeError, 'symlink to "%s" would be dangling' %source
             for expanded in sources:
+                if not util.exists(expanded) and not self.allowDangling:
+                    raise TypeError, 'symlink to "%s" would be dangling' %source
                 if os.sep in source:
-                    expandedSources.append(
-			util.joinPaths(os.path.dirname(source),
-				       os.path.basename(expanded)))
+                    thisSource = util.joinPaths(os.path.dirname(source),
+				                os.path.basename(expanded))
                 else:
-                    expandedSources.append(os.path.basename(expanded))
+                    thisSource = os.path.basename(expanded)
+                expandedSources.append(thisSource)
         sources = expandedSources
 
         if len(sources) > 1 and not targetIsDir:

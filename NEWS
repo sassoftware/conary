@@ -43,6 +43,9 @@ Changes in @NEW@:
     * group recipes that include a trove explicitly byDefault False could result
       in a trove when cooked that had the components of that trove byDefault
       True.
+    * The Symlink() build action will now refuse to create dangling
+      symlinks without the allowDangling keyword argument set when
+      no globbing characters are used to create the symlink.
 
 Changes in 1.0.13:
   o Client Changes:
