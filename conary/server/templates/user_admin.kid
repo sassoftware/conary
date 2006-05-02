@@ -16,7 +16,7 @@
  full details.
 -->
     <!-- table of permissions -->
-    <table class="user-admin" id="permissions" py:def="permTable(groupId, group, rows)">
+    <table class="user-admin" id="permissions" py:def="permTable(group, rows)">
         <thead>
             <tr>
                 <td style="width: 55%;">Label</td>
@@ -33,21 +33,21 @@
                 class="${i % 2 and 'even' or 'odd'}">
                 <?python
                 if row[1]:
-                    label = row[1]
+                    label = row[0]
                 else:
                     label = "ALL"
                 if row[3]:
-                    item = row[3]
+                    item = row[1]
                 else:
                     item = "ALL"
                 ?> 
                 <td py:content="label"/>
                 <td py:content="item"/>
+                <td py:content="row[2] and 'yes' or 'no'"/>
+                <td py:content="row[3] and 'yes' or 'no'"/>
                 <td py:content="row[4] and 'yes' or 'no'"/>
-                <td py:content="row[5] and 'yes' or 'no'"/>
-                <td py:content="row[6] and 'yes' or 'no'"/>
-                <td><a href="deletePerm?groupId=${groupId};labelId=${row[0]}&amp;itemId=${row[2]}" title="Delete Permission">X</a></td>
-                <td><a href="editPermForm?group=${group};label=${label};trove=${item};writeperm=${row[4]};capped=${row[5]};admin=${row[6]}" title="Edit Permission">E</a></td>
+                <td><a href="deletePerm?group=${group};label=${row[0]}&amp;item=${row[1]}" title="Delete Permission">X</a></td>
+                <td><a href="editPermForm?group=${group};label=${label};trove=${item};writeperm=${row[2]};capped=${row[3]};admin=${row[4]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
                 <td>Group has no permissions.</td>
@@ -68,16 +68,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr py:for="i, user in enumerate(netAuth.iterUsers())"
+                    <tr py:for="i, user in enumerate(netAuth.userAuth.getUserList())"
                         class="${i % 2 and 'even' or 'odd'}">
-                        <td>${user[1]}</td>
-                        <td><div py:for="group in netAuth.iterGroupsByUserId(user[0])"
-                                 py:content="group[1]" />
+                        <td>${user}</td>
+                        <td><div py:for="group in netAuth.userAuth.getGroupsByUser(user)"
+                                 py:content="group" />
                         </td>
                         <td style="text-align: right;">
-                            <a href="chPassForm?username=${user[1]}">Change Password</a> | 
+                            <a href="chPassForm?username=${user}">Change Password</a> | 
                             <u>Groups</u> | 
-                            <a href="deleteUser?username=${user[1]}">Delete</a>
+                            <a href="deleteUser?username=${user}">Delete</a>
                         </td>
                     </tr>
                 </tbody>
@@ -88,18 +88,18 @@
             <table class="user-admin" id="groups">
                 <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
                 <tbody>
-                    <tr py:for="i, group in enumerate(netAuth.iterGroups())"
+                    <tr py:for="i, group in enumerate(netAuth.getGroupList())"
                         class="${i % 2 and 'even' or 'odd'}">
                     <?python #
-                    rows = list(enumerate(netAuth.iterPermsByGroupId(group[0])))
+                    rows = list(enumerate(netAuth.iterPermsByGroup(group)))
                     ?>
-                        <td><b>${group[1]}</b></td>
-                        <td py:if="rows" py:content="permTable(group[0], group[1], rows)"/>
+                        <td><b>${group}</b></td>
+                        <td py:if="rows" py:content="permTable(group, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
                         <td style="text-align: right;">
-                            <a href="addPermForm?userGroupName=${group[1]}">Add Permission</a><br />
-                            <a href="deleteGroup?userGroupId=${group[0]}">Delete</a> | 
-                            <a href="manageGroupForm?userGroupName=${group[1]}">Manage</a>
+                            <a href="addPermForm?userGroupName=${group}">Add Permission</a><br />
+                            <a href="deleteGroup?userGroupName=${group}">Delete</a> | 
+                            <a href="manageGroupForm?userGroupName=${group}">Manage</a>
                         </td>
                     </tr>
                 </tbody>

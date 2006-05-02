@@ -21,19 +21,19 @@
             <h2 py:content="modify and 'Edit Group' or 'Add Group'"></h2>
 
             <form method="post" action="${modify and 'manageGroup' or 'addGroup'}">
-                <input py:if="modify" type="hidden" name="userGroupId" value="${userGroupId}" />
+                <input py:if="modify" type="hidden" name="userGroupName" value="${userGroupName}" />
                 <table class="add-form">
                     <tr>
                         <td id="header">Group Name:</td>
-                        <td><input type="text" name="userGroupName" value="${userGroupName}"/></td>
+                        <td><input type="text" name="newUserGroupName" value="${userGroupName}"/></td>
                     </tr>
                     <tr>
                         <td id="header">Initial Users:</td>
                         <td>
-                            <select name="initialUserIds" multiple="multiple" size="10"
+                            <select name="memberList" multiple="multiple" size="10"
                                     style="width: 100%;">
-                                <option py:for="userId, userName in users.items()"
-                                        value="${userId}"
+                                <option py:for="userName in sorted(users)"
+                                        value="${userName}"
                                         py:attrs="{'selected': (userName in members) and 'selected' or None}">
                                     ${userName}
                                 </option>

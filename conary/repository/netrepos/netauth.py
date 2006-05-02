@@ -575,17 +575,15 @@ class NetworkAuthorization:
         if commit:
             self.db.commit()
 
-    def iterItems(self):
+    def getItemList(self):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId, item FROM Items")
-        for row in cu:
-            yield row
+        cu.execute("SELECT item FROM Items")
+        return [ x[0] for x in cu ]
 
-    def iterLabels(self):
+    def getLabelList(self):
         cu = self.db.cursor()
-        cu.execute("SELECT labelId, label FROM Labels")
-        for row in cu:
-            yield row
+        cu.execute("SELECT label FROM Labels")
+        return [ x[0] for x in cu ]
 
     def __checkEntitlementOwner(self, cu, userName, entGroup):
         """
