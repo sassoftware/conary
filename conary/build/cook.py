@@ -1405,7 +1405,14 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 os.unlink(csFile)
 
         # make sure that we are the foreground process again
-        os.tcsetpgrp(0, os.getpgrp())
+        try:
+            # the child should control stdin -- if stdin is a tty
+            # that can be controlled
+            if sys.stdin.isatty():
+                os.tcsetpgrp(0, os.getpgrp())
+        except AttributeError:
+            # stdin might not even have an isatty method
+            pass
 
 def _callSetup(cfg, recipeObj):
     try:
