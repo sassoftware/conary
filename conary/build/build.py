@@ -1385,13 +1385,6 @@ class Symlink(_FileAction):
     The C{r.Symlink()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{allowDangling} : (False) Whether to create dangling symbolic links.
-    That is, a symbolic link for which the target (C{realfile}) does not
-    exist.  (The C{r.DanglingSymlinks} policy disallows some dangling
-    symbolic links; you may also need to call
-    C{r.DanglingSymlinks(exceptions='...')} if the symbolic link
-    should still be dangling when packaging is complete.)
-
     EXAMPLES
     ========
 
@@ -1400,7 +1393,10 @@ class Symlink(_FileAction):
     Calls C{r.Symlink()} to create a symbolic link named C{enable} from
     the C{realfile} C{%(bindir)s/cups-enable}.
     """
-    keywords = { 'allowDangling': False }
+    # This keyword is preserved only for compatibility for existing
+    # recipes; DanglingSymlinks policy should enforce non-dangling
+    # status when it matters.
+    keywords = { 'allowDangling': True }
 
     def do(self, macros):
 	dest = action._expandOnePath(self.toFile, macros)
@@ -1435,11 +1431,7 @@ class Symlink(_FileAction):
                 expand = util.joinPaths(baseDir, source)
 
             sources = fixedglob.glob(expand)
-            if not sources and not self.allowDangling:
-                raise TypeError, 'symlink to "%s" would be dangling' %source
             for expanded in sources:
-                if not util.exists(expanded) and not self.allowDangling:
-                    raise TypeError, 'symlink to "%s" would be dangling' %source
                 if os.sep in source:
                     thisSource = util.joinPaths(os.path.dirname(source),
 				                os.path.basename(expanded))
@@ -1473,9 +1465,6 @@ class Symlink(_FileAction):
         @keyword toFile: path to create the symlink, or a directory in which
                        to create multiple symlinks
         @type toFile: str
-        @keyword allowDangling: Optional argument; set to True to allow the
-        creation of dangling symlinks
-        @type allowDangling: bool
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
