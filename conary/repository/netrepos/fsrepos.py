@@ -110,6 +110,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# FilesystemRepository (it needs to create a change set which gets
 	# passed)
 	if fileVersion.getHost() != self.name:
+            # XXX This code is not needed as of version 1.0.14 of the client.
 	    assert(not withContents)
 	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
@@ -179,6 +180,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
             else:
+                # XXX This code is not needed as of version 1.0.14 of the 
+                # client.
+                #
                 # a bit of sleight of hand here... we look for this file in
                 # the trove it was first built in
                 #
@@ -364,7 +368,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    # name
 	    serverIdx = {}
             getList = []
-            newFilesNeeded = []
+            localFilesNeeded = []
 
 	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
@@ -376,25 +380,23 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                          (oldVersion, oldFlavor, oldFileId, oldFileVersion),
                          (newVersion, newFlavor, newFileId, newFileVersion)))
                 else:
-                    newFilesNeeded.append((pathId, oldFileId, oldFileVersion,
+                    localFilesNeeded.append((pathId, oldFileId, oldFileVersion,
                                              newFileId, newFileVersion))
                     if oldFileVersion:
                         getList.append((pathId, oldFileId, oldFileVersion))
                     getList.append((pathId, newFileId, newFileVersion))
-
-            filesNeeded = newFilesNeeded
-            del newFilesNeeded
 
             # Walk this in reverse order. This may seem odd, but the
             # order in the final changeset is set by sorting that happens
             # in the change set object itself. The only reason we sort
             # here at all is to make sure PTR file types come before the
             # file they refer to. Reverse shorting makes this a bit easier.
-            filesNeeded.sort()
-            filesNeeded.reverse()
+            localFilesNeeded.sort()
+            localFilesNeeded.reverse()
 
             ptrTable = {}
-	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
+            for (pathId, oldFileId, oldFileVersion, newFileId, \
+                 newFileVersion) in localFilesNeeded:
 		oldFile = None
 		if oldFileVersion:
 		    #oldFile = idIdx[(pathId, oldFileId)]

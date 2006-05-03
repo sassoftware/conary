@@ -109,7 +109,8 @@ you have the latest conary and then reinstall these troves:
 '''   % '\n    '.join('%s=%s[%s]' % (x.getName(),x.getVersion(),x.getFlavor()) for x in incomplete))
 
     result = update.buildLocalChanges(db, list, root = cfg.root,
-                                      updateContainers = True)
+                                      updateContainers = True,
+                                      crossRepositoryDeltas = False)
     if not result: return
     cs = result[0]
 

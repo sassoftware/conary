@@ -17,6 +17,10 @@ Changes in @NEW@:
       to be installed or upgraded as well, without reference to what is 
       currently installed on your system -- no trove will be skipped because
       it is referenced by other troves on your system but not installed.
+    * Changeset generation across distributed shadows now force file 
+      information to be absolute instead of relative when the files are on
+      different servers, eliminating server crosstalk on source checkin and
+      when committing local changesets. (bz #1033)
 
   o Server Changes:
     * Removed the ability for the server to log updates to its contents

@@ -1201,8 +1201,9 @@ class FilesystemJob:
         self.newTroves = [ x[2] for x in troveList ]
 
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
-                  withFileContents=True, forceSha1=False, 
-                  ignoreTransient=False, ignoreAutoSource = False):
+                  withFileContents=True, forceSha1=False,
+                  ignoreTransient=False, ignoreAutoSource=False,
+                  crossRepositoryDeltas = True):
     """
     Populates a change set against the files in the filesystem and builds
     a trove object which describes the files installed.  The return
@@ -1233,6 +1234,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     @type ignoreTransient: bool
     @param ignoreAutoSource: ignore automatically added source files 
     @type ignoreAutoSource: bool
+    @type crossRepositoryDeltas: If set, deltas between file streams and
+            file contents can be used even when the old and new versions
+            of that file are on different repositories.
     """
 
     noIds = ((flags & IGNOREUGIDS) != 0)
@@ -1350,20 +1354,34 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             newFileId = f.fileId()
 	    newTrove.addFile(pathId, path, newVersion, newFileId)
 
-	    (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
+            needAbsolute = (not crossRepositoryDeltas and
+                    (srcFileVersion.trailingLabel().getHost() !=
+                            newVersion.trailingLabel().getHost()))
+
+            if needAbsolute:
+                (filecs, hash) = changeset.fileChangeSet(pathId, None, f)
+            else:
+                (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
+
 	    changeSet.addFile(srcFileId, newFileId, filecs)
+
 	    if hash and withFileContents:
 		newCont = filecontents.FromFilesystem(realPath)
 
 		if srcFile.hasContents:
-		    srcCont = repos.getFileContents(
+                    if needAbsolute:
+                        changeSet.addFileContents(pathId,
+                                          changeset.ChangedFileTypes.file,
+                                          newCont, f.flags.isConfig())
+                    else:
+                        srcCont = repos.getFileContents(
                                         [ (srcFileId, srcFileVersion) ])[0]
 
-                    (contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
-                                                                  f, newCont)
+                        (contType, cont) = changeset.fileContentsDiff(
+                                    srcFile, srcCont, f, newCont)
 
-                    changeSet.addFileContents(pathId, contType, cont, 
-                                              f.flags.isConfig())
+                        changeSet.addFileContents(pathId, contType, cont,
+                                                  f.flags.isConfig())
 
     # anything left in pathIds has been newly added
     for pathId in pathIds.iterkeys():
@@ -1433,7 +1451,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
-                      ignoreAutoSource = False, updateContainers = False):
+                      ignoreAutoSource = False, updateContainers = False,
+                      crossRepositoryDeltas = True):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -1466,12 +1485,13 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     changedTroves = {}
     returnList = []
     for (curTrove, srcTrove, newVersion, flags) in pkgList: 
-	result = _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, 
-			       root, flags, 
+	result = _localChanges(repos, changeSet, curTrove, srcTrove,
+                               newVersion, root, flags,
                                withFileContents = withFileContents,
                                forceSha1 = forceSha1, 
                                ignoreTransient = ignoreTransient,
-                               ignoreAutoSource = ignoreAutoSource)
+                               ignoreAutoSource = ignoreAutoSource,
+                               crossRepositoryDeltas = crossRepositoryDeltas)
         if result is None:
             # an error occurred
             return None

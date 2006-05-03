@@ -420,23 +420,27 @@ class ChangeSetJob:
                     else:
                         restoreContents = 1
                         if oldVersion:
-                            oldfile = repos.getFileVersion(pathId, oldFileId,
-                                                           oldVersion)
                             if diff[0] == "\x01":
-                                # stored as a diff (the file type is the same)
+                                # stored as a diff (the file type is the same
+                                # and (for *repository* commits) the file
+                                # is in the same repository between versions
+                                oldfile = repos.getFileVersion(pathId,
+                                                    oldFileId, oldVersion)
                                 fileObj = oldfile.copy()
                                 fileObj.twm(diff, oldfile)
                                 assert(fileObj.pathId() == pathId)
                                 fileStream = fileObj.freeze()
+
+                                if (fileObj.hasContents and
+                                    fileObj.contents.sha1() ==
+                                        oldfile.contents.sha1() and
+                                    not (fileObj.flags.isConfig() and 
+                                            not oldfile.flags.isConfig())):
+                                    restoreContents = 0
                             else:
                                 fileObj = files.ThawFile(diff, pathId)
                                 fileStream = diff
-
-                            if fileObj.hasContents and oldfile.hasContents and \
-                               fileObj.contents.sha1() == oldfile.contents.sha1() and \
-                               not (fileObj.flags.isConfig() and not 
-                                                        oldfile.flags.isConfig()):
-                                restoreContents = 0
+                                oldfile = None
                         else:
                             #fileObj = files.ThawFile(diff, pathId)
                             fileObj = None

@@ -350,7 +350,8 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
-                    forceSha1=True)
+                    forceSha1=True,
+                    crossRepositoryDeltas = False)
 
     # an error occurred.  buildLocalChanges() should have a useful
     # message, so we just return
