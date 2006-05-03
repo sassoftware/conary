@@ -31,23 +31,13 @@
         <tbody>
             <tr py:for="i, row in rows"
                 class="${i % 2 and 'even' or 'odd'}">
-                <?python
-                if row[0]:
-                    label = row[0]
-                else:
-                    label = "ALL"
-                if row[1]:
-                    item = row[1]
-                else:
-                    item = "ALL"
-                ?> 
-                <td py:content="label"/>
-                <td py:content="item"/>
+                <td py:content="row[0]"/>
+                <td py:content="row[1]"/>
                 <td py:content="row[2] and 'yes' or 'no'"/>
                 <td py:content="row[3] and 'yes' or 'no'"/>
                 <td py:content="row[4] and 'yes' or 'no'"/>
                 <td><a href="deletePerm?group=${group};label=${row[0]}&amp;item=${row[1]}" title="Delete Permission">X</a></td>
-                <td><a href="editPermForm?group=${group};label=${label};trove=${item};writeperm=${row[2]};capped=${row[3]};admin=${row[4]}" title="Edit Permission">E</a></td>
+                <td><a href="editPermForm?group=${group};label=${row[0]};trove=${row[1]};writeperm=${row[2]};capped=${row[3]};admin=${row[4]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
                 <td>Group has no permissions.</td>
