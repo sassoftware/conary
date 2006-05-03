@@ -32,11 +32,11 @@
             <tr py:for="i, row in rows"
                 class="${i % 2 and 'even' or 'odd'}">
                 <?python
-                if row[1]:
+                if row[0]:
                     label = row[0]
                 else:
                     label = "ALL"
-                if row[3]:
+                if row[1]:
                     item = row[1]
                 else:
                     item = "ALL"
