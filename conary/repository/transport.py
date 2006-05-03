@@ -94,6 +94,8 @@ class XMLOpener(urllib.FancyURLopener):
             h.putheader('Authorization', 'Basic %s' % auth)
         if realhost:
             h.putheader('Host', realhost)
+        else:
+            h.putheader('Host', host)
         for args in self.addheaders:
             h.putheader(*args)
         h.endheaders()
@@ -157,7 +159,6 @@ class Transport(xmlrpclib.Transport):
 
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
-	opener.addheader('Host', host)
 	if extra_headers:
 	    if isinstance(extra_headers, dict):
 		extra_headers = extra_headers.items()
