@@ -64,12 +64,12 @@ class CallLogger:
                 where = os.lseek(self.logFd, 0, 1)
 
             time.sleep(1)
-                
+
     def __init__(self, logPath, serverName, readOnly = False):
         self.serverName = serverName
         self.path = logPath
         if readOnly:
             self.logFd = os.open(logPath, os.O_RDONLY)
         else:
-            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND)
+            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND | os.O_RDWR)
 
