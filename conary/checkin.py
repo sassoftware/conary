@@ -895,7 +895,8 @@ def _determineRootVersion(repos, state):
     ver = state.getVersion()
     assert(ver.isShadow())
     if ver.hasParentVersion():
-        return ver.parentVersion()
+        d = {state.getName(): {ver.parentVersion() : None}}
+        return repos.getTroveVersionFlavors(d)[state.getName()].keys()[0]
     else:
         branch = ver.branch()
         name = state.getName()
@@ -949,8 +950,9 @@ def merge(repos, versionSpec=None, callback=None):
             for disallowedChar in ':@/':
                 if disallowedChar in versionSpec:
                     log.error("Can only specify upstream version,"
-                              " upstream versoion + source count"
+                              " upstream version + source count"
                               " or full versions to merge")
+                    return
         versionList = repos.findTrove(parentLabel,
                                      (troveName, versionSpec, None), None)
         # we can only use findTrove by label, not by branch, but if there
@@ -969,7 +971,8 @@ def merge(repos, versionSpec=None, callback=None):
                                       troveBranch.parentBranch())
     parentRootVersion = _determineRootVersion(repos, state)
 
-    if not parentHeadVersion > parentRootVersion:
+    if parentHeadVersion < parentRootVersion:
+        # our head is earlier than the base.  The user specified something wacky.
         assert(versionSpec) # otherwise something is very wrong
         log.error("Cannot merge: version specified is before the last "
                   "merge point, would be merging backwards")
