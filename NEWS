@@ -44,6 +44,15 @@ Changes in @NEW@:
       operations.  This caused, for example, local cooks of shadowed troves
       to fail.
     * using loadInstalled with a multiarch trove no longer tracebacks (bz #1039)
+    * group recipes that include a trove explicitly byDefault False could result
+      in a trove when cooked that had the components of that trove byDefault
+      True.
+    * Stop sending duplicate Host: headers, proxies (at least squid) mangle 
+      these into one host header, causing failures when accessing rbuilder
+      repositories that depend on that host header (bz #795)
+    * The Symlink() build action should not enforce symlinks not
+      dangling, and should instead rely solely on the DanglingSymlinks
+      policy.
 
 Changes in 1.0.13:
   o Client Changes:

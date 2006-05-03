@@ -1436,9 +1436,9 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             groupAsSource.delTrove(*troveTup)
 
         # replace troves
-        toRemoveSpecs = dict(((x[0][0], None, None), x) for x in replaceSpecs)
+        toReplaceSpecs = dict(((x[0][0], None, None), x) for x in replaceSpecs)
 
-        toRemove = groupAsSource.findTroves(None, toRemoveSpecs,
+        toReplace = groupAsSource.findTroves(None, toReplaceSpecs,
                                             allowMissing=True)
         replaceSpecsByName = {}
         for troveSpec, ref in replaceSpecs:
@@ -1446,7 +1446,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                                                                     ref))
 
         for troveName, replaceSpecs in replaceSpecsByName.iteritems():
-            troveTups = toRemove.get((troveName, None, None), [])
+            troveTups = toReplace.get((troveName, None, None), [])
 
             if not troveTups:
                 continue
@@ -1483,24 +1483,26 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             # children of redirect troves are special, and not included.
             continue
 
-        for (childTup, byDefault, _) in cache.iterTroveListInfo(troveTup):
+        for (childTup, childByDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
 
             addAllDefault = group.checkAddAllForByDefault(troveTup, childTup)
             if addAllDefault is not None:
-                byDefault = addAllDefault
+                childByDefault = addAllDefault
+            else:
+                childByDefault = childByDefault and byDefault
 
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):
-                byDefault = False
+                childByDefault = False
 
             if components:
                 if _componentMatches(childName, components):
-                    byDefault = True
+                    childByDefault = byDefault
                 else:
-                    byDefault = False
+                    childByDefault = False
 
-            group.addTrove(childTup, False, byDefault, [])
+            group.addTrove(childTup, False, childByDefault, [])
 
     # add implicit troves from new groups (added with r.addNewGroup())
     for childGroup, childByDefault, grpIsExplicit in childGroups:
