@@ -59,7 +59,7 @@ def usage(rc = 1):
     print "       cvc diff"
     print "       cvc log"
     print "       cvc newpkg <name>"
-    print "       cvc merge"
+    print "       cvc merge [<revision>]"
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
@@ -582,9 +582,12 @@ class MergeCommand(CvcCommand):
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
-        if argSet or not args or len(args) > 1: return self.usage()
-
-        checkin.merge(repos)
+        if argSet or not args or len(args) > 2: return self.usage()
+        if len(args) == 2:
+            kw = dict(versionSpec=args[1])
+        else:
+            kw = {}
+        checkin.merge(repos, **kw)
 _register(MergeCommand)
 
 class UpdateCommand(CvcCommand):

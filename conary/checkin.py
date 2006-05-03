@@ -908,7 +908,7 @@ def _determineRootVersion(repos, state):
         # We must have done a shadow at some point.
         assert(0)
 
-def merge(repos, callback=None):
+def merge(repos, versionSpec=None, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
@@ -934,9 +934,46 @@ def merge(repos, callback=None):
         return
 
     # safe to call parentBranch() b/c a shadow will always have a parent branch
-    parentHeadVersion = repos.getTroveLatestVersion(troveName,
-                                  troveBranch.parentBranch())
+    if versionSpec:
+        parentBranch = troveBranch.parentBranch()
+        parentLabel = parentBranch.label()
+        if versionSpec[0] == '/':
+            version = versions.VersionFromString(versionSpec)
+            if isinstance(version, versions.Branch):
+                log.error("Cannot specify branches to merge")
+                return
+            elif version.branch() != parentBranch:
+                log.error("Can only merge from parent branch %s" % parentBranch)
+                return
+        else:
+            for disallowedChar in ':@/':
+                if disallowedChar in versionSpec:
+                    log.error("Can only specify upstream version,"
+                              " upstream versoion + source count"
+                              " or full versions to merge")
+        versionList = repos.findTrove(parentLabel,
+                                     (troveName, versionSpec, None), None)
+        # we can only use findTrove by label, not by branch, but if there
+        # are multiple branches with the same label they'll all be returned
+        # in the result, we can filter them here.
+        # we use findTrove so we can support both upstream version and 
+        # upstream version + release.
+        versionList = [ x[1] for x in versionList
+                         if x[1].branch() == parentBranch ]
+        if not versionList:
+            log.error("Revision %s of %s not found on branch %s" % (versionSpec, troveName, parentBranch))
+            return
+        parentHeadVersion = versionList[0]
+    else:
+        parentHeadVersion = repos.getTroveLatestVersion(troveName,
+                                      troveBranch.parentBranch())
     parentRootVersion = _determineRootVersion(repos, state)
+
+    if not parentHeadVersion > parentRootVersion:
+        assert(versionSpec) # otherwise something is very wrong
+        log.error("Cannot merge: version specified is before the last "
+                  "merge point, would be merging backwards")
+        return
 
     changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.DependencySet()), 

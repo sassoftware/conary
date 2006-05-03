@@ -191,10 +191,13 @@ or for \fI<branch>\fP if specified.
 .B newpkg \fI<name\fP[=\fIlabel\fP]>\fP
 Creates a new package.
 .TP
-.B merge
+.B merge [\fI<revision>\fP]
 Run from a source directory containing a shadow, this merges changes made
 on the parent branch since the last \fBshadow\fP or \fBmerge\fP command
 into the shadow.
+
+If <revision> is specified, changes made to the upstream branch up to that 
+revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
 .TP
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
