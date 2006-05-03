@@ -45,7 +45,10 @@ Changes in @NEW@:
       True.
     * Stop sending duplicate Host: headers, proxies (at least squid) mangle 
       these into one host header, causing failures when accessing rbuilder
-      repositories that depend on that host header.
+      repositories that depend on that host header (bz #795)
+    * The Symlink() build action should not enforce symlinks not
+      dangling, and should instead rely solely on the DanglingSymlinks
+      policy.
 
 Changes in 1.0.13:
   o Client Changes:
