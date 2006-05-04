@@ -1618,18 +1618,25 @@ order by
         SELECT Instances.isPresent, Instances.troveName, Versions.version,
                Instances.timeStamps, Flavors.flavor,
                Parent.troveName, ParentVersion.version, Parent.timeStamps,
-               ParentFlavor.flavor
+               ParentFlavor.flavor, TroveTroves.flags
         %s
+        /* There must be something with this name that is present */
         JOIN Instances AS InstPresent ON
             (InstPresent.troveName=Instances.troveName and
              InstPresent.isPresent)
+        /* And that thing must not be referenced
+         * or any reference must be weak
+         * (we ensure later that this TroveTroves.instanceId != NULL)
+         */
         LEFT JOIN TroveTroves AS NotReferenced ON
             (InstPresent.instanceId=NotReferenced.includedId
-             AND NotReferenced.inPristine=1)
+             AND NotReferenced.inPristine=1
+             AND NotReferenced.flags IN (0,2))
         JOIN Versions ON
             Instances.versionId = Versions.versionId
         JOIN Flavors ON
             Instances.flavorId = Flavors.flavorId
+        /* Find the actual parents for this trove */
         LEFT OUTER JOIN TroveTroves ON
             (Instances.instanceId = TroveTroves.includedId
              AND TroveTroves.inPristine=1)
@@ -1639,25 +1646,38 @@ order by
             ParentVersion.versionId=Parent.versionId
         LEFT OUTER JOIN Flavors AS ParentFlavor ON
             ParentFlavor.flavorId=Parent.flavorId
+        /* Conditions:
+            1. These must be a trove with the same name
+               that is not referenced or is only referenced
+               weakly.
+            2. We only want parents that are pristine
+         */
         WHERE (NotReferenced.instanceId IS NULL
-               AND ((TroveTroves.inPristine=1 AND Instances.isPresent=0)
-                     OR TroveTroves.inPristine is NULL))
+              AND (TroveTroves.inPristine=1 
+                    OR TroveTroves.inPristine is NULL)
+                    )
         """ % fromClause)
 
         VFS = versions.VersionFromString
         Flavor = deps.deps.ThawDependencySet
 
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
-             parentName, parentVersion, parentTimeStamps, parentFlavor) in cu:
-            version = VFS(versionStr,
-                          timeStamps=[ float(x) for x in timeStamps.split(':')])
+             parentName, parentVersion, parentTimeStamps, parentFlavor,
+             flags) in cu:
             if parentName:
+                weakRef = flags & schema.TROVE_TROVES_WEAKREF
+                if isPresent and not weakRef:
+                    continue
                 parentVersion = VFS(parentVersion, 
                     timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
                 parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
             else:
+                weakRef = False
                 parentInfo = None
-            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent)
+
+            version = VFS(versionStr,
+                          timeStamps=[ float(x) for x in timeStamps.split(':')])
+            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent, weakRef)
 
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)

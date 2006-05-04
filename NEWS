@@ -55,6 +55,9 @@ Changes in 1.0.14:
     * The Symlink() build action should not enforce symlinks not
       dangling, and should instead rely solely on the DanglingSymlinks
       policy.
+    * A bug that caused conary to treat a reference as an install when it
+      should have been an update due to a miscalculation of what local updates
+      had been made on the system has been fixed.
 
 Changes in 1.0.13:
   o Client Changes:
