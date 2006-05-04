@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.14:
   o Client Changes:
     * Conary now creates shadows instead of branches when cooking onto
       a target label.  This means, for example, that local cooks will
