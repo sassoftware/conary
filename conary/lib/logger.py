@@ -49,6 +49,8 @@ class Logger:
         and writes stdout and stderr both to the screen and to the logfile 
         at path.  
         """
+        self.restoreTerminalControl = os.tcgetpgrp(0) == os.getpid()
+
         masterFd, slaveFd = pty.openpty()
         directRd, directWr = os.pipe()
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
@@ -72,7 +74,8 @@ class Logger:
             logFile = gzip.GZipFile(self.path, 'w')
         else:
             logFile = open(self.path, 'w')
-        logger = _ChildLogger(masterFd, logFile, directRd)
+        logger = _ChildLogger(masterFd, logFile, directRd, 
+                              controlTerminal=self.restoreTerminalControl)
         try:
             logger.log()
         finally:
@@ -124,7 +127,7 @@ class Logger:
         try:
             # control stdin -- if stdin is a tty
             # that can be controlled
-            if sys.stdin.isatty():
+            if sys.stdin.isatty() and self.restoreTerminalControl:
                 os.tcsetpgrp(0, os.getpgrp())
         except AttributeError:
             # stdin might not even have an isatty method
@@ -133,7 +136,7 @@ class Logger:
         os.waitpid(self.loggerPid, 0)
 
 class _ChildLogger:
-    def __init__(self, ptyFd, logFile, directRd):
+    def __init__(self, ptyFd, logFile, directRd, controlTerminal):
         # ptyFd is the fd of the pseudo tty master 
         self.ptyFd = ptyFd
         # logFile is a python file-like object that supports the write
@@ -142,6 +145,7 @@ class _ChildLogger:
         # directRd is for input that goes directly to the log 
         # without being output to screen
         self.directRd = directRd
+        self.shouldControlTerminal = controlTerminal
 
     def _controlTerminal(self):
         try:
@@ -169,7 +173,8 @@ class _ChildLogger:
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 
     def log(self):
-        self._controlTerminal()
+        if self.shouldControlTerminal:
+            self._controlTerminal()
     
         # standardize terminal size at 24, 80 for those programs that 
         # access it.  This should ensure that programs that look at 
