@@ -85,7 +85,7 @@ class SysLog:
     def __init__(self, root, path):
         self.root = root
         if not isinstance(path, (list, tuple)):
-            path = list(path)
+            path = [path]
         self.path = path
         self.indent = ""
         self.f = None
