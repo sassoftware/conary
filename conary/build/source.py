@@ -690,10 +690,9 @@ class Action(action.RecipeAction):
 
     The following keywords are recognized by C{r.addAction}:
 
-    B{dir} : Specify the directory where the file is to be located, relative
-    to C{%(builddir)s}. By default, C{r.addAction} stores the file directly
-    in C{%(builddir)s}. If an absolute directory is specified, it will be
-    considered relative to C{%(builddir)s}.
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}. 
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -713,6 +712,11 @@ class Action(action.RecipeAction):
     C{r.addAction('mv lib/util/shhopt.h lib/util/pbmshhopt.h')}
 
     Demonstrates renaming a file via the C{mv} command.
+
+    C{r.addAction('sh ./prep.sh', dir='/tmp')}
+
+    Demonstrates changing into the directory C{%(destdir)s/var/log} and
+    executing the script C{prep.sh}.
     """
 
     keywords = {'dir': '' }
@@ -722,10 +726,9 @@ class Action(action.RecipeAction):
 	@param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in  C{recipe} from
         within a recipe is unnecessary.
-    @keyword dir: Specify the directory where the file is to be located,
-        relative to C{%(builddir)s}. By default, C{r.addAction} stores the
-        file directly in C{%(builddir)s}. If an absolute directory is
-        specified, it will be considered relative to C{%(builddir)s}.
+    @keyword dir: Specify a directory to change into prior to executing the
+        command. An absolute directory specified as the C{dir} value 
+        is considered relative to C{%(destdir)s}.
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked or merely stored in the archive.
