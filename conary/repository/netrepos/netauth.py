@@ -171,12 +171,16 @@ class NetworkAuthorization:
                                                            authToken[3])
             groupsFromUser.update(groupsFromEntitlement)
 
+        if not groupsFromUser:
+            return []
+
         # We have lists of symbolic names; get lists of group ids
         cu.execute("SELECT userGroupId FROM UserGroups WHERE "
                    "userGroup IN (%s)" %
                         ",".join("'%s'" % x for x in groupsFromUser) )
 
         return [ x[0] for x in cu ]
+
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):

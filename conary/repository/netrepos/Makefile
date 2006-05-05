@@ -14,6 +14,7 @@
 
 python_files = __init__.py	\
 		cacheset.py	\
+		calllog.py	\
 		cltable.py	\
 		flavors.py	\
 		fsrepos.py	\

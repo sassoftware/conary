@@ -1480,7 +1480,7 @@ conary erase '%s=%s[%s]'
                             # unknown local updates.
 
         troves = []         # troveId -> troveInfo map (troveId == index)
-                            # contains (troveTup, isPresent, hasParent)
+                            # contains (troveTup, isPresent, hasParent, isWeak)
 
         maxId = 0           # next index for troves list
         troveIdsByInfo = {} # (name,ver,flavor) -> troveId 
@@ -1490,22 +1490,24 @@ conary erase '%s=%s[%s]'
 
         # 1. Create needed data structures
         #    troves, parentIds, childIds
-        for (troveInfo, parentInfo, isPresent) \
+        for (troveInfo, parentInfo, isPresent, weakRef) \
                                 in self.db.iterUpdateContainerInfo(troveNames):
             troveId = troveIdsByInfo.setdefault(troveInfo, maxId)
             if troveId == maxId:
                 maxId += 1
-                troves.append([troveInfo, isPresent, bool(parentInfo)])
+                troves.append([troveInfo, isPresent, bool(parentInfo), weakRef])
             else:
                 if isPresent:
                     troves[troveId][1] = True
                 if parentInfo:
                     troves[troveId][2] = True
+                if not weakRef:
+                    troves[troveId][3] = False
 
             parentId = troveIdsByInfo.setdefault(parentInfo, maxId)
             if parentId == maxId:
                 maxId += 1
-                troves.append([parentInfo, False, False])
+                troves.append([parentInfo, False, False, False])
 
             l = parentIds.setdefault(troveInfo[0], (set(), []))
             l[1].append(troveId)
@@ -1514,7 +1516,7 @@ conary erase '%s=%s[%s]'
                 childIds.setdefault(parentId, []).append(troveId)
                 l[0].add(parentId)
 
-        del troveIdsByInfo, maxId
+        del maxId
 
         # remove troves that don't are not present and have no parents - they 
         # won't be part of local updates.
@@ -1532,7 +1534,7 @@ conary erase '%s=%s[%s]'
                                deps.DependencySet(), None)
 
             for troveId in noParents:
-                info, isPresent, hasParent = troves[troveId] 
+                info, isPresent, hasParent, isWeak = troves[troveId]
                 if isPresent:
                     exists.addTrove(presentOkay=True, *info)
                 else:
@@ -1540,7 +1542,16 @@ conary erase '%s=%s[%s]'
 
             updateJobs = [  ]
 
-            allJobs.extend(x for x in exists.diff(refd)[2] if x[2][0])
+            for job in exists.diff(refd)[2]:
+                if not job[2][0]:
+                    continue
+                newIsWeak = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]][3]
+                if newIsWeak:
+                    if not job[1][0]:
+                        continue
+                    elif troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]][3]:
+                        continue
+                allJobs.append(job)
 
             # we've created all local updates related to this set of
             # troves - remove them as parents of other troves to generate
