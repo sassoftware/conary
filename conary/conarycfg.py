@@ -230,6 +230,7 @@ class ConaryContext(ConfigSection):
     lookaside             =  CfgPath
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
+    recipeTemplate        =  (CfgString, 'default')
     repositoryMap         =  CfgRepoMap
     root                  =  CfgPath
     signatureKey          =  CfgFingerPrint
@@ -285,6 +286,8 @@ class ConaryConfiguration(SectionedConfigFile):
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
     resolveLevel          =  (CfgInt, 1)
+    recipeTemplateDirs    =  (CfgPathList, ('/etc/conary/recipeTemplates',
+                                            '~/.conary/recipeTemplates'))
     showLabels            =  CfgBool
     showComponents        =  CfgBool
     sourceSearchDir       =  (CfgPath, '.')
