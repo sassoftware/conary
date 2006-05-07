@@ -1,5 +1,5 @@
 #
-# Copyright (c) %(year)s %(user)s
+# Copyright (c) %(year)s %(contactName)s (%(contact)s)
 #
 
 class %(upperName)s(PackageRecipe):
