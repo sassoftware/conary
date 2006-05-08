@@ -1130,8 +1130,8 @@ def newTrove(repos, cfg, name, dir = None):
 
         try:
             recipe.write(template % macros)
-        except KeyError:
-            log.error("could not replace all macros in recipe template '%s'" % path)
+        except builderrors.MacroKeyError, e:
+            log.error("could not replace '%s' in recipe template '%s'" % (e.args[0], path))
         recipe.close()
 
     if os.path.exists(recipeFile):

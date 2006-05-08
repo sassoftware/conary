@@ -77,3 +77,7 @@ class GroupAddAllError(CookError):
         lns.append('are included.')
             
         self.args = '\n  '.join(lns)
+
+class MacroKeyError(KeyError):
+    def __str__(self):
+        return 'Unknown macro "%s" - check for spelling mistakes' % self.args[0]

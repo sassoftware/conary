@@ -17,6 +17,7 @@ Module implementing the "macro" dictionary class
 """
 
 from conary.lib import util
+from conary.build.errors import MacroKeyError
 
 class Macros(dict):
     def __init__(self, macros={}, shadow=False):
@@ -94,8 +95,7 @@ class Macros(dict):
             except KeyError:
                 # let's make this error message more helpful
                 # so our users will have a chance of debugging.
-                raise KeyError, ('Unknown macro "%s" - check for'
-                                 ' spelling mistakes' % name)
+                raise MacroKeyError(name)
 
 	    value = self.__macros[name]
 	    self[name] = value
