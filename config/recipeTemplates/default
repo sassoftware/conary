@@ -1,0 +1,10 @@
+#
+# Copyright (c) %(year)s %(contactName)s (%(contact)s)
+#
+
+class %(upperName)s(PackageRecipe):
+    name = '%(name)s'
+    version = ''
+
+    def setup(r):
+        pass
