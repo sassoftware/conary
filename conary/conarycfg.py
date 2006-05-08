@@ -230,7 +230,7 @@ class ConaryContext(ConfigSection):
     lookaside             =  CfgPath
     installLabelPath      =  CfgInstallLabelPath
     name                  =  None
-    recipeTemplate        =  (CfgString, 'default')
+    recipeTemplate        =  None
     repositoryMap         =  CfgRepoMap
     root                  =  CfgPath
     signatureKey          =  CfgFingerPrint
