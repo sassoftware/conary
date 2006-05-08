@@ -94,6 +94,8 @@ def openSysLog(root, path):
     global syslog
     if not path:
         path = '/dev/null'
+    if root == ':memory:':
+        root = '/'
     syslog = SysLog(root, path)
 
 def error(msg, *args):
