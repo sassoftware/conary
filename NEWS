@@ -3,6 +3,9 @@ Changes in @VERSION@
     * Added support for recipe templates.  Now when running cvc newpkg cvc 
       will automatically create a recipe from a template specified by the 
       recipeTemplate configuration option. (bz #671, #1059)
+    * Policy objects can now accept globs and brace expansions when
+      specifying subtrees.
+
 Changes in 1.0.14:
   o Client Changes:
     * Conary now creates shadows instead of branches when cooking onto
