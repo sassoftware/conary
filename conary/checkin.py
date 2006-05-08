@@ -1132,7 +1132,7 @@ def newTrove(repos, cfg, name, dir = None):
         recipe.write(template % macros)
         recipe.close()
 
-    if os.path.exists(recipeFile)
+    if os.path.exists(recipeFile):
         pathId = makePathId()
         sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20)
 
