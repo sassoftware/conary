@@ -167,7 +167,7 @@ def genExcepthook(debug=True,
             tmpfd, stackfile = tempfile.mkstemp('.txt', prefix)
             os.write(tmpfd, ''.join(lines))
             os.close(tmpfd)
-            sys.stderr.write(errorMessage % dict(command=' '.join(sys.argv),
+            sys.stderr.write(error % dict(command=' '.join(sys.argv),
                                                  filename=filename,
                                                  lineno=lineno,
                                                  errtype=type.__name__,
