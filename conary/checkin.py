@@ -1096,7 +1096,7 @@ def newTrove(repos, cfg, name, dir = None):
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel(
                         { component : { label : None } }).get(component, []):
-        log.error("package %s already exists" % name)
+        log.error("package %s already exists" % component)
         return
 
     if dir is None:
@@ -1119,8 +1119,6 @@ def newTrove(repos, cfg, name, dir = None):
             return
 
         macros = Macros()
-        baseMacros = loadMacros(cfg.defaultMacros)
-        macros.update(baseMacros)
         macros.update({'contactName': cfg.name,
                        'contact': cfg.contact,
                        'year': str(time.localtime()[0]),
@@ -1129,7 +1127,11 @@ def newTrove(repos, cfg, name, dir = None):
 
         template = open(path).read()
         recipe = open(recipeFile, 'w')
-        recipe.write(template % macros)
+
+        try:
+            recipe.write(template % macros)
+        except KeyError:
+            log.error("could not replace all macros in recipe template '%s'" % path)
         recipe.close()
 
     if os.path.exists(recipeFile):
