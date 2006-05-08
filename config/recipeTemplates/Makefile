@@ -12,7 +12,9 @@
 # full details.
 #
 
-template_files = default
+template_files = \
+	default \
+	rpath
 
 dist_files = Makefile $(template_files)
 
