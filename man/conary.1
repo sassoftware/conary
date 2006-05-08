@@ -653,6 +653,9 @@ components.
 .B pubRing
 The filename of the OpenPGP Keyring to refer to for signature keys.
 .TP
+.B recipeTemplate
+The filename of the recipe template to use.
+.TP
 .B repositoryMap
 Maps a hostname from a label to a full URL for a networked repository.
 Multiple maps can be given for a single label. (If no mapping is found,
@@ -723,9 +726,10 @@ shell globs, in which case all files matching the glob will be read in.
 A Configuration context is a section of a config file delimited by a section
 name in square brackets, like \fI[foo]\fR.  Options that can be specified after
 the brackets are limited to \fBbuildFlavor, buildLabel, buildPath, contact,
-excludeTroves, flavor, lookaside, installLabelPath, name, repositoryMap, 
-root, signatureKey, signatureKeyMap, and user\fR.  When a context is selected, 
-the configuration values specified in the context override the default values.
+excludeTroves, flavor, lookaside, installLabelPath, name, recipeTemplates, 
+repositoryMap, root, signatureKey, signatureKeyMap, and user\fR.  When a 
+context is selected, the configuration values specified in the context 
+override the default values.
    If any values are not specified, the values defined in the main 
 configuration section are used.  
 .RS 4
@@ -767,6 +771,8 @@ rblist\fP).
 .I /etc/conary/arch
 Directory containing architecture definition files.
 .\" FIXME: need a man page describing architecture definition files
+.I /etc/conary/recipeTemplates
+Directory containing recipe templates.
 .I /etc/conary/use
 Directory containing use flag definition files.
 .\" FIXME: need a man page describing use flag definition files
