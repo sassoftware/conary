@@ -1144,7 +1144,7 @@ def newTrove(repos, cfg, name, dir = None):
         finally:
             os.chdir(cwd)
 
-    conaryState.write("CONARY")
+    conaryState.write(os.path.join(dir, "CONARY"))
 
 def renameFile(oldName, newName):
     conaryState = ConaryStateFromFile("CONARY")
