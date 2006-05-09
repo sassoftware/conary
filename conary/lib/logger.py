@@ -49,7 +49,8 @@ class Logger:
         and writes stdout and stderr both to the screen and to the logfile 
         at path.  
         """
-        self.restoreTerminalControl = os.tcgetpgrp(0) == os.getpid()
+        self.restoreTerminalControl = (sys.stdin.isatty() and
+            os.tcgetpgrp(0) == os.getpid())
 
         masterFd, slaveFd = pty.openpty()
         directRd, directWr = os.pipe()
