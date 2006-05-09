@@ -1109,9 +1109,9 @@ def newTrove(repos, cfg, name, dir = None):
             log.error("cannot create directory %s/%s", os.getcwd(), dir)
             return
 
-    os.chdir(dir)
     recipeFile = '%s.recipe' % name
-    if not os.path.exists(recipeFile) and cfg.recipeTemplate:
+    recipeFileDir = os.path.join(dir, recipeFile)
+    if not os.path.exists(recipeFileDir) and cfg.recipeTemplate:
         try:
             path = util.findFile(cfg.recipeTemplate, cfg.recipeTemplateDirs)
         except OSError:
@@ -1126,17 +1126,23 @@ def newTrove(repos, cfg, name, dir = None):
                        'upperName': name.capitalize()})
 
         template = open(path).read()
-        recipe = open(recipeFile, 'w')
+        recipe = open(recipeFileDir, 'w')
 
         try:
             recipe.write(template % macros)
         except builderrors.MacroKeyError, e:
             log.error("could not replace '%s' in recipe template '%s'" % (e.args[0], path))
+            return
         recipe.close()
 
-    if os.path.exists(recipeFile):
-        pathId = makePathId()
-        sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20)
+    if os.path.exists(recipeFileDir):
+        cwd = os.getcwd()
+        try:
+            os.chdir(dir)
+            pathId = makePathId()
+            sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20)
+        finally:
+            os.chdir(cwd)
 
     conaryState.write("CONARY")
 
