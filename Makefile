@@ -79,4 +79,13 @@ clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
 	rm -rf sqlite sqlite3
 
+ccs: dist
+	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
+	sed -i "s,version = '.*',version = '$(VERSION)'," \
+                                        conary-$(VERSION)/conary.recipe;
+	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
+	cd conary-$(VERSION); ../bin/cvc cook conary.recipe
+	mv conary-$(VERSION)/conary-$(VERSION)*.ccs .
+	rm -rf conary-$(VERSION)
+
 include Make.rules
