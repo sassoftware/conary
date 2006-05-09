@@ -606,9 +606,8 @@ the \fB\-\-build-label \fI<label>\fR command-line option.
 .B buildFlavor
 The flavor that Conary will use when building troves.  This flavor
 will be used when no flavor is specified in group and fileset
-recipes.  
-.\" FIXME: add It is also used to set the values of Use and Arch flags
-.\" when building (once conary actually does this)
+recipes.  It is also used to set the values of Use and Arch flags
+when building.
 .TP
 .B buildPath
 The path packages are built under; default \fI/usr/src/conary/builds
@@ -701,6 +700,11 @@ default setting of None). It is a GOOD idea to specify a signatureKey line
 before specifying any signatureKeyMap lines if you use them--unless you really
 meant to NOT override signatureKeyMap lines specified in a previously processed
 config file!
+.TP
+.B siteConfigPath
+The list of paths that cvc searches for files to add to the \fCSITE_CONFIG\fP
+environment variable when cross-compiling.  The defaults are packaged with
+cvc.
 .TP
 .B updateThreshold
 Defines the upper limit on the number of unrelated troves that will be

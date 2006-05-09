@@ -235,6 +235,7 @@ class ConaryContext(ConfigSection):
     root                  =  CfgPath
     signatureKey          =  CfgFingerPrint
     signatureKeyMap       =  CfgFingerPrintMap
+    siteConfigPath        =  CfgPathList
     user                  =  CfgUserInfo
 
     def _resetSigMap(self):
@@ -290,6 +291,9 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '/etc/conary/recipeTemplates'))
     showLabels            =  CfgBool
     showComponents        =  CfgBool
+    siteConfigPath        =  (CfgPathList, ('/etc/conary/site',
+                                            '/etc/conary/distro/site',
+                                            '~/.conary/site'))
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')
