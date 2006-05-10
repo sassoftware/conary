@@ -587,8 +587,29 @@ class _AbstractPackageRecipe(Recipe):
             tmpArch = copy.deepcopy(use.Arch)
             _setArchFlags(hostFlavor)
             macros['hostarch'] = use.Arch._getMacro('targetarch')
+            macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
+                
             use.Arch = tmpArch
 
+        def _setSiteConfig(macros):
+            archConfig = None
+            osConfig = None
+            for siteDir in self.cfg.siteConfigPath:
+                ac = '/'.join((siteDir, macros.hostmajorarch))
+                if util.exists(ac):
+                    archConfig = ac
+                oc = '/'.join((siteDir, macros.hostos))
+                if util.exists(oc):
+                    osConfig = oc
+            if not archConfig and not osConfig:
+                return
+
+            siteConfig = None
+            if 'SITE_CONFIG' in os.environ:
+                siteConfig = os.environ['SITE_CONFIG']
+            siteConfig = ' '.join((x for x in [siteConfig, archConfig, osConfig]
+                                   if x is not None))
+            os.environ['SITE_CONFIG'] = siteConfig
 
         macros = self.macros
         macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
@@ -603,10 +624,12 @@ class _AbstractPackageRecipe(Recipe):
                 # we want the resulting binaries to run on
                 # this machine.
                 macros['hostarch'] = macros['buildarch']
+                macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
             else:
                 # we want the resulting binaries to run
                 # on the target machine.
                 macros['hostarch'] = macros['targetarch']
+                _setHostMacros(crossTarget, macros)
         else:
             _setHostMacros(crossHost, macros)
 
@@ -652,6 +675,9 @@ class _AbstractPackageRecipe(Recipe):
             # for the build system may use the target compiler.
             self.macros.buildcc = '%(bindir)s/' + self.macros.buildcc
             self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
+        
+        # locate the correct config.site files
+        _setSiteConfig(macros)
 
         # set the bootstrap flag
         # FIXME: this should probably be a cross flag instead.

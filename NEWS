@@ -5,6 +5,10 @@ Changes in @VERSION@
       recipeTemplate configuration option. (bz #671, #1059)
     * Policy objects can now accept globs and brace expansions when
       specifying subtrees.
+    * Cross-compile builds now provide CONFIG_SITE files to enable
+      cross-compiling programs that require external site config
+      files.  The default site config files are included.
+
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
       traceback. (bz #1066)
