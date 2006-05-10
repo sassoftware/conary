@@ -1,5 +1,10 @@
 Changes in @VERSION@
-  o Build Changes
+  o Client Changes:
+    * When installing as non-root, Conary will no longer create
+      files setuid or setgid unless the uid/gid creating the
+      file matches the username/groupname in the package.
+
+  o Build Changes:
     * Added support for recipe templates.  Now when running cvc newpkg cvc 
       will automatically create a recipe from a template specified by the 
       recipeTemplate configuration option. (bz #671, #1059)
