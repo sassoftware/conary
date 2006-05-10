@@ -1925,7 +1925,7 @@ class MakeDirs(_FileAction):
     SYNOPSIS
     ========
 
-    C{r.MakeDirs(I{dir(s)}, [I{component}])}
+    C{r.MakeDirs(I{dir(s)}, [I{component}], [I{mode}])}
 
     DESCRIPTION
     ===========
@@ -1939,8 +1939,10 @@ class MakeDirs(_FileAction):
     The C{r.MakeDirs()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    B{component} : Set to component name if package is responsible for the
+    B{component} : (None) Set to component name if package is responsible for the
     directory.
+
+    B{mode} : (0755) Specify directory access permissions
 
     EXAMPLES
     ========
@@ -1949,6 +1951,11 @@ class MakeDirs(_FileAction):
 
     Demonstrates C{r.MakeDirs()} creating the C{/misc} directory while
     specifying the C{:runtime} component is responsible for this directory.
+
+    C{r.MakeDirs('/afs', mode=0700)}
+
+    Demonstrates C{r.MakeDirs()} creating the C{/afs} directory and setting
+    access permissions to C{0700}.
     """
     keywords = { 'mode': 0755 }
 
