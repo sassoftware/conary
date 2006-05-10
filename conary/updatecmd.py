@@ -429,9 +429,11 @@ def updateConary(cfg, conaryVersion):
                               callback = callback, replaceFiles = True)
     
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              test = False, showItems = False, checkPathConflicts = True):
+              test = False, showItems = False, checkPathConflicts = True,
+              migrate = False):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
+
 
     applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
 
@@ -449,11 +451,23 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
         return
 
+    if migrate or syncChildren:
+        installMissing = True
+    else:
+        installMissing = False
+
+    if migrate:
+        removeNotByDefault = True
+    else:
+        removeNotByDefault = False
+
     callback = UpdateCallback(cfg)
     _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
                   depCheck = depCheck, test = test, info = info, 
                   callback = callback, checkPrimaryPins = False,
-                  checkPathConflicts = checkPathConflicts)
+                  checkPathConflicts = checkPathConflicts,
+                  installMissing = installMissing, 
+                  removeNotByDefault = removeNotByDefault)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
