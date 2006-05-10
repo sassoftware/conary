@@ -1319,6 +1319,9 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath,
         for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
 
+        for (troveSpec, ref) in group.iterReplaceSpecs():
+            toFind.setdefault(ref, set()).add(troveSpec)
+
     results = {}
 
     callback.findingTroves(len(list(chain(*toFind.itervalues()))))

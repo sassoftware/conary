@@ -5,6 +5,9 @@ Changes in @VERSION@
       recipeTemplate configuration option. (bz #671, #1059)
     * Policy objects can now accept globs and brace expansions when
       specifying subtrees.
+  o Bug Fixes:
+    * Fixed a bug that caused using groupName parameter with r.replace() to
+      traceback. (bz #1066)
 
 Changes in 1.0.14:
   o Client Changes:
