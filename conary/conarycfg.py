@@ -16,7 +16,9 @@ Implements conaryrc handling.
 """
 import fnmatch
 import os
+import StringIO
 import sys
+import xml
 
 from conary.deps import deps, arch
 from conary.lib import util
@@ -453,47 +455,46 @@ def loadEntitlement(dirName, serverName):
     else:
         return None
 
-    contents = "".join([ x[:-1] for x in f.readlines()])
-    key = None
-    keyGroup = None
+    xmlContent = f.read()
 
-    tokens = []
+    p = EntitlementParser()
 
-    while contents:
-        if contents[0] == '<':
-            i = contents.find('>')
-            tag = contents[1:i]
-            tag.strip()
-            contents = contents[i + 1:]
-            tokens.append(tag)
-        else:
-            i = contents.find('<')
-            if i == -1:
-                # okay by xml, not by us
-                raise SyntaxError
-            else:
-                tokens.append(contents[:i])
-                contents = contents[i:]
+    # wrap this in an <entitlement> top level tag (making it optional
+    # [but recommended!] in the entitlement itself)
+    p.parse("<entitlement>" + xmlContent + "</entitlement>")
 
-    d = {}
-    while tokens:
-        openTag = tokens.pop(0)
-        contents = tokens.pop(0)
-        closeTag = tokens.pop(0)
+    entServer = p['server']
+    entClass = p['class']
+    endKey = p['key']
 
-        if closeTag != '/' and closeTag[1:] != openTag:
-            raise SyntaxError
-
-        d[openTag] = contents
-
-    if not 'class' in d or not 'key' in d: 
-        raise SyntaxError
-
-    entServer = d.pop('server')
-    entClass = d.pop('class')
-    endKey = d.pop('key')
-
-    if d: raise SyntaxError
     if entServer != serverName: raise SyntaxError
 
     return (entClass, endKey)
+
+class EntitlementParser(dict):
+
+    def StartElementHandler(self, name, attrs):
+        if name not in [ 'entitlement', 'server', 'class', 'key' ]:
+            raise SyntaxError
+        self.state.append(str(name))
+        self.data = None
+
+    def EndElementHandler(self, name):
+        state = self.state.pop()
+        # str() converts from unicode
+        self[state] = str(self.data)
+
+    def CharacterDataHandler(self, data):
+        self.data = data
+
+    def parse(self, s):
+        self.state = []
+        return self.p.Parse(s)
+
+    def __init__(self):
+        self.p = xml.parsers.expat.ParserCreate()
+        self.p.StartElementHandler = self.StartElementHandler
+        self.p.EndElementHandler = self.EndElementHandler
+        self.p.CharacterDataHandler = self.CharacterDataHandler
+        dict.__init__(self)
+

@@ -5,6 +5,8 @@ Changes in @VERSION@
       file matches the username/groupname in the package.
     * Check rollback count argument for non-positive numbers and numbers
       greater then the number of rollbacks available (bz #1072)
+    * Reworked entitlement parsing using expat instead of a hand-coded
+      parser.
 
   o Build Changes:
     * Added support for recipe templates.  Now when running cvc newpkg cvc 
