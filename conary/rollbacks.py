@@ -81,6 +81,14 @@ def apply(db, cfg, rollbackSpec, **kwargs):
                     rollbackSpec)
             return 1
 
+        if rollbackCount < 1:
+            log.error("rollback count must be positive")
+            return 1
+        elif rollbackCount > len(rollbackList):
+            log.error("rollback count higher then number of rollbacks "
+                      "available")
+            return 1
+
         rollbacks = rollbackList[-rollbackCount:]
         rollbacks.reverse()
 

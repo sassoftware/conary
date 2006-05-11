@@ -3,6 +3,8 @@ Changes in @VERSION@
     * When installing as non-root, Conary will no longer create
       files setuid or setgid unless the uid/gid creating the
       file matches the username/groupname in the package.
+    * Check rollback count argument for non-positive numbers and numbers
+      greater then the number of rollbacks available (bz #1072)
 
   o Build Changes:
     * Added support for recipe templates.  Now when running cvc newpkg cvc 
