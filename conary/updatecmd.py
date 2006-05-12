@@ -451,14 +451,11 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
         return
 
-    if migrate or syncChildren:
-        installMissing = True
-    else:
-        installMissing = False
-
     if migrate:
+        installMissing = True
         removeNotByDefault = True
     else:
+        installMissing = False
         removeNotByDefault = False
 
     callback = UpdateCallback(cfg)
