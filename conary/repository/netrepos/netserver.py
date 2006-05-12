@@ -268,6 +268,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    elif not e.version:
 		return (False, True, ("TroveMissing", e.troveName, ""))
 	    else:
+                if isinstance(e.version, str):
+                    return (False, True,
+                            ("TroveMissing", e.troveName, e.version))
 		return (False, True, ("TroveMissing", e.troveName,
 			self.fromVersion(e.version)))
         elif isinstance(e, errors.FileContentsNotFound):
@@ -1819,7 +1822,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 data = cu.fetchall()[0][0]
                 result.append(data)
             except:
-                raise errors.TroveMissing(name, version = self.toVersion(version))
+                raise errors.TroveMissing(name, version = version)
 
         return [ base64.encodestring(x) for x in result ]
 
