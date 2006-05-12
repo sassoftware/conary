@@ -15,6 +15,8 @@ import md5
 import os
 import re
 import time
+import urllib
+import xml
 
 from conary.repository import errors
 from conary.lib import tracelog
@@ -52,14 +54,32 @@ class UserAuthorization:
         return uid
 
     def changePassword(self, cu, user, salt, password):
+        if self.pwCheckUrl:
+            raise errors.CannotChangePassword
+
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
 
-    def _checkPassword(self, salt, password, challenge):
-        m = md5.new()
-        m.update(salt)
-        m.update(challenge)
-        return m.hexdigest() == password
+    def _checkPassword(self, user, salt, password, challenge):
+        if self.pwCheckUrl:
+            try:
+                url = "%s?user=%s;password=%s" \
+                        % (self.pwCheckUrl, urllib.quote(user),
+                           urllib.quote(challenge))
+                f = urllib.urlopen(url)
+                xmlResponse = f.read()
+            except:
+                return False
+
+            p = PasswordCheckParser()
+            p.parse(xmlResponse)
+
+            return p.validPassword()
+        else:
+            m = md5.new()
+            m.update(salt)
+            m.update(challenge)
+            return m.hexdigest() == password
 
     def deleteUser(self, cu, user):
         userId = self.getUserIdByName(user)
@@ -84,7 +104,8 @@ class UserAuthorization:
         if groupsFromUser:
             # each user can only appear once (by constraint), so we only
             # need to validate the password once
-            if not self._checkPassword(cu.frombinary(groupsFromUser[0][0]),
+            if not self._checkPassword(user,
+                                      cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
                                       password):
                 raise errors.InsufficientPermission
@@ -118,8 +139,9 @@ class UserAuthorization:
         cu.execute("SELECT userName FROM Users")
         return [ x[0] for x in cu ]
 
-    def __init__(self, db):
+    def __init__(self, db, pwCheckUrl = None):
         self.db = db
+        self.pwCheckUrl = pwCheckUrl
 
 class EntitlementAuthorization:
 
@@ -135,17 +157,22 @@ class EntitlementAuthorization:
         return set(x[0] for x in cu)
 
 class NetworkAuthorization:
-    def __init__(self, db, name, cacheTimeout = None, log = None):
+    def __init__(self, db, name, cacheTimeout = None, log = None,
+                 passwordURL = None):
         """
         @param cacheTimeout: Timeout, in seconds, for authorization cache
         entries. If None, no cache is used.
         @type cacheTimeout: int
+        @param passwordURL: URL base to use for an http get request to
+        externally validate user passwords. When this is specified, the
+        passwords int the local database are ignored, and the changePassword()
+        call is disabled.
         """
         self.name = name
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
-        self.userAuth = UserAuthorization(self.db)
+        self.userAuth = UserAuthorization(self.db, passwordURL)
         self.entitlementAuth = EntitlementAuthorization()
         self.authCache = {}
 
@@ -719,4 +746,35 @@ class NetworkAuthorization:
                    "entGroupId = ?", entGroupId)
 
         return [ x[0] for x in cu ]
+
+class PasswordCheckParser(dict):
+
+    def StartElementHandler(self, name, attrs):
+        if name not in [ 'auth' ]:
+            raise SyntaxError
+
+        val = attrs.get('valid', None)
+
+        self.valid = (val == '1' or str(val).lower() == 'true')
+
+    def EndElementHandler(self, name):
+        pass
+
+    def CharacterDataHandler(self, data):
+        if data:
+            self.valid = False
+
+    def parse(self, s):
+        return self.p.Parse(s)
+
+    def validPassword(self):
+        return self.valid
+
+    def __init__(self):
+        self.p = xml.parsers.expat.ParserCreate()
+        self.p.StartElementHandler = self.StartElementHandler
+        self.p.EndElementHandler = self.EndElementHandler
+        self.p.CharacterDataHandler = self.CharacterDataHandler
+        self.valid = False
+        dict.__init__(self)
 

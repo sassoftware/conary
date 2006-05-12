@@ -135,6 +135,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.repDB = cfg.repositoryDB
         self.contentsDir = cfg.contentsDir.split(" ")
         self.authCacheTimeout = cfg.authCacheTimeout
+        self.externalPasswordURL = cfg.externalPasswordURL
 
         if cfg.cacheDB:
             self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
@@ -183,7 +184,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.name, self.troveStore, self.contentsDir, self.map,
             requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name, log = self.log,
-                                         cacheTimeout = self.authCacheTimeout)
+                                         cacheTimeout = self.authCacheTimeout,
+                                         passwordURL = self.externalPasswordURL)
+
         self.log.reset()
 
     def reopen(self):
@@ -2021,6 +2024,7 @@ class ServerConfig(ConfigFile):
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
+    externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
     repositoryDB            = dbstore.CfgDriver
