@@ -178,7 +178,7 @@ class ConaryStateFromFile(ConaryState):
         contextList = [ x for x in lines if x.startswith('context ') ]
         if contextList:
             contextLine = contextList[-1]
-            self.context = contextLine.split(None, 1)[1]
+            self.context = contextLine.split(None, 1)[1].strip()
             lines = [ x for x in lines if not x.startswith('context ')]
         else:
             self.context = None
