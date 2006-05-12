@@ -208,11 +208,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
             if authToken is None:
                 return
 
-            # verify that the user/password actually exists in the database
-            if not netRepos.auth.checkUserPass(authToken):
-                self.send_error(403)
-                return None
-
 	return authToken
 
     def requestAuth(self):

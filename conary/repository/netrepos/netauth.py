@@ -60,19 +60,6 @@ class UserAuthorization:
         m.update(challenge)
         return m.hexdigest() == password
 
-    def checkUserPass(self, cu, authToken):
-        cu.execute("SELECT salt, password FROM Users WHERE userName=?", 
-                   authToken[0])
-
-        for (salt, password) in cu:
-            m = md5.new()
-            m.update(salt)
-            m.update(authToken[1])
-            if m.hexdigest() == password:
-                return True
-
-        return False
-
     def deleteUser(self, cu, user):
         userId = self.getUserIdByName(user)
 
@@ -600,27 +587,27 @@ class NetworkAuthorization:
         cu.execute("SELECT label FROM Labels")
         return [ x[0] for x in cu ]
 
-    def __checkEntitlementOwner(self, cu, userName, entGroup):
+    def __checkEntitlementOwner(self, cu, authGroupIds, entGroup):
         """
         Raises an error or returns the group Id.
         """
+        if not authGroupIds:
+            raise errors.InsufficientPermission
+
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
                 SELECT entGroupId, admin
-                    FROM Users JOIN UserGroupMembers ON
-                        UserGroupMembers.userId = Users.userId
-                    LEFT OUTER JOIN Permissions ON
-                        UserGroupMembers.userGroupId = Permissions.userGroupId
+                    FROM Permissions
                     LEFT OUTER JOIN EntitlementOwners ON
-                        UserGroupMembers.userGroupId = \
+                        Permissions.userGroupId =
                                 EntitlementOwners.ownerGroupId
                     WHERE
-                        Users.userName = ?
+                        Permissions.userGroupId IN (%s)
                         AND
                           (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin = 1)
-                """, userName)
+                """ % ",".join(str(x) for x in authGroupIds))
 
         isAdmin = False
         entGroupsEditable = []
@@ -652,14 +639,14 @@ class NetworkAuthorization:
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
-        if not self.userAuth.checkUserPass(cu, authToken):
-            raise errors.InsufficientPermission
+
+        authGroupIds = self.getAuthGroups(cu, authToken)
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
         if len(entitlement) > 64:
             raise errors.InvalidEntitlement
 
-        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+        entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # check for duplicates
         cu.execute("""
@@ -718,10 +705,11 @@ class NetworkAuthorization:
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
         cu = self.db.cursor()
-        if not self.userAuth.checkUserPass(cu, authToken):
-            return errors.InsufficientPermission
-        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+
+        authGroupIds = self.getAuthGroups(cu, authToken)
+        entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
+
         return [ x[0] for x in cu ]
 
