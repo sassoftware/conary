@@ -17,6 +17,8 @@ Changes in @VERSION@
     * Cross-compile builds now provide CONFIG_SITE files to enable
       cross-compiling programs that require external site config
       files.  The default site config files are included.
+    * The cvc checkout command can now check out multiple source
+      troves in a single invocation.
 
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
