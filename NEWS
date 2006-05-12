@@ -20,6 +20,15 @@ Changes in @VERSION@
     * The cvc checkout command can now check out multiple source
       troves in a single invocation.
 
+  o Server Changes:
+    * Implemented authorization cache, which is enabled by setting The
+      authCacheTimeout configuration to the number of seconds the cache
+      entry should be valid for.
+    * Added externalPasswordURL configuration option, which tells the server
+      to call that URL for password verification. When this option is used,
+      user passwords stored in the repository are ignored, and those passwords
+      cannot be changed.
+
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
       traceback. (bz #1066)

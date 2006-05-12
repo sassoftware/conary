@@ -14,6 +14,9 @@
 import md5
 import os
 import re
+import time
+import urllib
+import xml
 
 from conary.repository import errors
 from conary.lib import tracelog
@@ -51,27 +54,32 @@ class UserAuthorization:
         return uid
 
     def changePassword(self, cu, user, salt, password):
+        if self.pwCheckUrl:
+            raise errors.CannotChangePassword
+
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
 
-    def checkPassword(self, salt, password, challenge):
-        m = md5.new()
-        m.update(salt)
-        m.update(challenge)
-        return m.hexdigest() == password
+    def _checkPassword(self, user, salt, password, challenge):
+        if self.pwCheckUrl:
+            try:
+                url = "%s?user=%s;password=%s" \
+                        % (self.pwCheckUrl, urllib.quote(user),
+                           urllib.quote(challenge))
+                f = urllib.urlopen(url)
+                xmlResponse = f.read()
+            except:
+                return False
 
-    def checkUserPass(self, cu, authToken):
-        cu.execute("SELECT salt, password FROM Users WHERE userName=?", 
-                   authToken[0])
+            p = PasswordCheckParser()
+            p.parse(xmlResponse)
 
-        for (salt, password) in cu:
+            return p.validPassword()
+        else:
             m = md5.new()
             m.update(salt)
-            m.update(authToken[1])
-            if m.hexdigest() == password:
-                return True
-
-        return False
+            m.update(challenge)
+            return m.hexdigest() == password
 
     def deleteUser(self, cu, user):
         userId = self.getUserIdByName(user)
@@ -86,9 +94,8 @@ class UserAuthorization:
 
     def getAuthorizedGroups(self, cu, user, password):
         cu.execute("""
-        SELECT salt, password, userGroup FROM Users 
+        SELECT salt, password, userGroupId FROM Users
         JOIN UserGroupMembers USING(userId)
-        JOIN UserGroups USING (userGroupId)
         WHERE userName = ?
         """, user)
 
@@ -97,7 +104,8 @@ class UserAuthorization:
         if groupsFromUser:
             # each user can only appear once (by constraint), so we only
             # need to validate the password once
-            if not self.checkPassword(cu.frombinary(groupsFromUser[0][0]),
+            if not self._checkPassword(user,
+                                      cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
                                       password):
                 raise errors.InsufficientPermission
@@ -131,18 +139,17 @@ class UserAuthorization:
         cu.execute("SELECT userName FROM Users")
         return [ x[0] for x in cu ]
 
-    def __init__(self, db):
+    def __init__(self, db, pwCheckUrl = None):
         self.db = db
+        self.pwCheckUrl = pwCheckUrl
 
 class EntitlementAuthorization:
 
     def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
         # look up entitlements
         cu.execute("""
-        SELECT userGroup FROM EntitlementGroups
+        SELECT userGroupId FROM EntitlementGroups
         JOIN Entitlements USING (entGroupId)
-        JOIN UserGroups ON
-            EntitlementGroups.userGroupId = UserGroups.userGroupId
         WHERE
         entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
@@ -150,37 +157,51 @@ class EntitlementAuthorization:
         return set(x[0] for x in cu)
 
 class NetworkAuthorization:
-    def __init__(self, db, name, log = None):
+    def __init__(self, db, name, cacheTimeout = None, log = None,
+                 passwordURL = None):
+        """
+        @param cacheTimeout: Timeout, in seconds, for authorization cache
+        entries. If None, no cache is used.
+        @type cacheTimeout: int
+        @param passwordURL: URL base to use for an http get request to
+        externally validate user passwords. When this is specified, the
+        passwords int the local database are ignored, and the changePassword()
+        call is disabled.
+        """
         self.name = name
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
-        self.userAuth = UserAuthorization(self.db)
+        self.userAuth = UserAuthorization(self.db, passwordURL)
         self.entitlementAuth = EntitlementAuthorization()
+        self.authCache = {}
 
     def getAuthGroups(self, cu, authToken):
         self.log(3, authToken[0], authToken[2], authToken[3])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
-        groupsFromUser = self.userAuth.getAuthorizedGroups(cu, authToken[0],
+
+        # we need a hashable tuple, a list won't work
+        authToken = tuple(authToken)
+
+        now = time.time()
+
+        groupSet, entryExpires = self.authCache.get(authToken, (None, None))
+        if groupSet and now < entryExpires:
+                return groupSet
+
+        groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
         if authToken[2] is not None:
             groupsFromEntitlement = \
                   self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
                                                            authToken[3])
-            groupsFromUser.update(groupsFromEntitlement)
+            groupSet.update(groupsFromEntitlement)
 
-        if not groupsFromUser:
-            return []
+        self.authCache[authToken] = (groupSet, now + 60 * 60)
 
-        # We have lists of symbolic names; get lists of group ids
-        cu.execute("SELECT userGroupId FROM UserGroups WHERE "
-                   "userGroup IN (%s)" %
-                        ",".join("'%s'" % x for x in groupsFromUser) )
-
-        return [ x[0] for x in cu ]
-
+        return groupSet
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):
@@ -600,27 +621,27 @@ class NetworkAuthorization:
         cu.execute("SELECT label FROM Labels")
         return [ x[0] for x in cu ]
 
-    def __checkEntitlementOwner(self, cu, userName, entGroup):
+    def __checkEntitlementOwner(self, cu, authGroupIds, entGroup):
         """
         Raises an error or returns the group Id.
         """
+        if not authGroupIds:
+            raise errors.InsufficientPermission
+
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
                 SELECT entGroupId, admin
-                    FROM Users JOIN UserGroupMembers ON
-                        UserGroupMembers.userId = Users.userId
-                    LEFT OUTER JOIN Permissions ON
-                        UserGroupMembers.userGroupId = Permissions.userGroupId
+                    FROM Permissions
                     LEFT OUTER JOIN EntitlementOwners ON
-                        UserGroupMembers.userGroupId = \
+                        Permissions.userGroupId =
                                 EntitlementOwners.ownerGroupId
                     WHERE
-                        Users.userName = ?
+                        Permissions.userGroupId IN (%s)
                         AND
                           (EntitlementOwners.ownerGroupId IS NOT NULL OR
                            Permissions.admin = 1)
-                """, userName)
+                """ % ",".join(str(x) for x in authGroupIds))
 
         isAdmin = False
         entGroupsEditable = []
@@ -652,14 +673,14 @@ class NetworkAuthorization:
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
-        if not self.userAuth.checkUserPass(cu, authToken):
-            raise errors.InsufficientPermission
+
+        authGroupIds = self.getAuthGroups(cu, authToken)
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
         if len(entitlement) > 64:
             raise errors.InvalidEntitlement
 
-        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+        entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # check for duplicates
         cu.execute("""
@@ -718,10 +739,42 @@ class NetworkAuthorization:
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
         cu = self.db.cursor()
-        if not self.userAuth.checkUserPass(cu, authToken):
-            return errors.InsufficientPermission
-        entGroupId = self.__checkEntitlementOwner(cu, authToken[0], entGroup)
+
+        authGroupIds = self.getAuthGroups(cu, authToken)
+        entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
+
         return [ x[0] for x in cu ]
+
+class PasswordCheckParser(dict):
+
+    def StartElementHandler(self, name, attrs):
+        if name not in [ 'auth' ]:
+            raise SyntaxError
+
+        val = attrs.get('valid', None)
+
+        self.valid = (val == '1' or str(val).lower() == 'true')
+
+    def EndElementHandler(self, name):
+        pass
+
+    def CharacterDataHandler(self, data):
+        if data:
+            self.valid = False
+
+    def parse(self, s):
+        return self.p.Parse(s)
+
+    def validPassword(self):
+        return self.valid
+
+    def __init__(self):
+        self.p = xml.parsers.expat.ParserCreate()
+        self.p.StartElementHandler = self.StartElementHandler
+        self.p.EndElementHandler = self.EndElementHandler
+        self.p.CharacterDataHandler = self.CharacterDataHandler
+        self.valid = False
+        dict.__init__(self)
 
