@@ -3,10 +3,10 @@
 #
 
 class %(upperName)s(PackageRecipe):
-    buildRequires = []
-
     name = '%(name)s'
     version = ''
+
+    buildRequires = []
 
     def setup(r):
         pass
