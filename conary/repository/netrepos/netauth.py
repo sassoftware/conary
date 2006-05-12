@@ -14,6 +14,7 @@
 import md5
 import os
 import re
+import time
 
 from conary.repository import errors
 from conary.lib import tracelog
@@ -54,7 +55,7 @@ class UserAuthorization:
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
 
-    def checkPassword(self, salt, password, challenge):
+    def _checkPassword(self, salt, password, challenge):
         m = md5.new()
         m.update(salt)
         m.update(challenge)
@@ -73,9 +74,8 @@ class UserAuthorization:
 
     def getAuthorizedGroups(self, cu, user, password):
         cu.execute("""
-        SELECT salt, password, userGroup FROM Users 
+        SELECT salt, password, userGroupId FROM Users
         JOIN UserGroupMembers USING(userId)
-        JOIN UserGroups USING (userGroupId)
         WHERE userName = ?
         """, user)
 
@@ -84,7 +84,7 @@ class UserAuthorization:
         if groupsFromUser:
             # each user can only appear once (by constraint), so we only
             # need to validate the password once
-            if not self.checkPassword(cu.frombinary(groupsFromUser[0][0]),
+            if not self._checkPassword(cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
                                       password):
                 raise errors.InsufficientPermission
@@ -126,10 +126,8 @@ class EntitlementAuthorization:
     def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
         # look up entitlements
         cu.execute("""
-        SELECT userGroup FROM EntitlementGroups
+        SELECT userGroupId FROM EntitlementGroups
         JOIN Entitlements USING (entGroupId)
-        JOIN UserGroups ON
-            EntitlementGroups.userGroupId = UserGroups.userGroupId
         WHERE
         entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
@@ -137,37 +135,46 @@ class EntitlementAuthorization:
         return set(x[0] for x in cu)
 
 class NetworkAuthorization:
-    def __init__(self, db, name, log = None):
+    def __init__(self, db, name, cacheTimeout = None, log = None):
+        """
+        @param cacheTimeout: Timeout, in seconds, for authorization cache
+        entries. If None, no cache is used.
+        @type cacheTimeout: int
+        """
         self.name = name
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
         self.userAuth = UserAuthorization(self.db)
         self.entitlementAuth = EntitlementAuthorization()
+        self.authCache = {}
 
     def getAuthGroups(self, cu, authToken):
         self.log(3, authToken[0], authToken[2], authToken[3])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
-        groupsFromUser = self.userAuth.getAuthorizedGroups(cu, authToken[0],
+
+        # we need a hashable tuple, a list won't work
+        authToken = tuple(authToken)
+
+        now = time.time()
+
+        groupSet, entryExpires = self.authCache.get(authToken, (None, None))
+        if groupSet and now < entryExpires:
+                return groupSet
+
+        groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
         if authToken[2] is not None:
             groupsFromEntitlement = \
                   self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
                                                            authToken[3])
-            groupsFromUser.update(groupsFromEntitlement)
+            groupSet.update(groupsFromEntitlement)
 
-        if not groupsFromUser:
-            return []
+        self.authCache[authToken] = (groupSet, now + 60 * 60)
 
-        # We have lists of symbolic names; get lists of group ids
-        cu.execute("SELECT userGroupId FROM UserGroups WHERE "
-                   "userGroup IN (%s)" %
-                        ",".join("'%s'" % x for x in groupsFromUser) )
-
-        return [ x[0] for x in cu ]
-
+        return groupSet
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False):

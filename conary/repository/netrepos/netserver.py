@@ -134,6 +134,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.deadlockRetry = cfg.deadlockRetry
         self.repDB = cfg.repositoryDB
         self.contentsDir = cfg.contentsDir.split(" ")
+        self.authCacheTimeout = cfg.authCacheTimeout
 
         if cfg.cacheDB:
             self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
@@ -181,7 +182,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.repos = fsrepos.FilesystemRepository(
             self.name, self.troveStore, self.contentsDir, self.map,
             requireSigs = self.requireSigs)
-	self.auth = NetworkAuthorization(self.db, self.name, self.log)
+	self.auth = NetworkAuthorization(self.db, self.name, log = self.log,
+                                         cacheTimeout = self.authCacheTimeout)
         self.log.reset()
 
     def reopen(self):
@@ -2009,6 +2011,7 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
         self.cfg = cfg
 
 class ServerConfig(ConfigFile):
+    authCacheTimeout        = CfgInt
     bugsToEmail             = CfgString
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository Bugs')

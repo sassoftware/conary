@@ -18,6 +18,11 @@ Changes in @VERSION@
       cross-compiling programs that require external site config
       files.  The default site config files are included.
 
+  o Server Changes:
+    * Implemented authorization cache, which is enabled by setting The
+      authCacheTimeout configuration to the number of seconds the cache
+      entry should be valid for.
+
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
       traceback. (bz #1066)
