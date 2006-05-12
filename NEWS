@@ -23,6 +23,8 @@ Changes in @VERSION@
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
       traceback. (bz #1066)
+    * Minimally corrupted/incorrect conary state files will no longer cause 
+      conary to traceback (bz #1107)
 
 Changes in 1.0.14:
   o Client Changes:
