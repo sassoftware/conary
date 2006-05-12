@@ -19,7 +19,7 @@ import urllib
 import xml
 
 from conary.repository import errors
-from conary.lib import tracelog
+from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
 
 # FIXME: remove these compatibilty error classes later
@@ -61,6 +61,12 @@ class UserAuthorization:
                    cu.binary(password), cu.binary(salt), user)
 
     def _checkPassword(self, user, salt, password, challenge):
+        if self.cacheTimeout:
+            cacheEntry = sha1helper.sha1String("%s%s" % (user, challenge))
+            timeout = self.pwCache.get(cacheEntry, None)
+            if timeout is not None and timeout < time.time():
+                return True
+
         if self.pwCheckUrl:
             try:
                 url = "%s?user=%s;password=%s" \
@@ -74,12 +80,18 @@ class UserAuthorization:
             p = PasswordCheckParser()
             p.parse(xmlResponse)
 
-            return p.validPassword()
+            isValid = p.validPassword()
         else:
             m = md5.new()
             m.update(salt)
             m.update(challenge)
-            return m.hexdigest() == password
+            isValid = m.hexdigest() == password
+
+        if isValid and self.cacheTimeout:
+            # cacheEntry is still around from above
+            self.pwCache[cacheEntry] = time.time() + self.cacheTimeout
+
+        return isValid
 
     def deleteUser(self, cu, user):
         userId = self.getUserIdByName(user)
@@ -139,9 +151,11 @@ class UserAuthorization:
         cu.execute("SELECT userName FROM Users")
         return [ x[0] for x in cu ]
 
-    def __init__(self, db, pwCheckUrl = None):
+    def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
         self.db = db
         self.pwCheckUrl = pwCheckUrl
+        self.cacheTimeout = cacheTimeout
+        self.pwCache = {}
 
 class EntitlementAuthorization:
 
@@ -172,9 +186,9 @@ class NetworkAuthorization:
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
-        self.userAuth = UserAuthorization(self.db, passwordURL)
+        self.userAuth = UserAuthorization(self.db, passwordURL,
+                                          cacheTimeout = cacheTimeout)
         self.entitlementAuth = EntitlementAuthorization()
-        self.authCache = {}
 
     def getAuthGroups(self, cu, authToken):
         self.log(3, authToken[0], authToken[2], authToken[3])
@@ -185,12 +199,6 @@ class NetworkAuthorization:
         # we need a hashable tuple, a list won't work
         authToken = tuple(authToken)
 
-        now = time.time()
-
-        groupSet, entryExpires = self.authCache.get(authToken, (None, None))
-        if groupSet and now < entryExpires:
-                return groupSet
-
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
         if authToken[2] is not None:
@@ -198,8 +206,6 @@ class NetworkAuthorization:
                   self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
                                                            authToken[3])
             groupSet.update(groupsFromEntitlement)
-
-        self.authCache[authToken] = (groupSet, now + 60 * 60)
 
         return groupSet
 
