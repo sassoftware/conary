@@ -5,6 +5,8 @@
 #
 
 class %(upperName)s(PackageRecipe):
+    buildRequires = []
+
     name = '%(name)s'
     version = ''
 
