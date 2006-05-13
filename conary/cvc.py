@@ -201,9 +201,9 @@ _register(BranchShadowCommand)
 
 class CheckoutCommand(CvcCommand):
     commands = ['checkout', 'co']
-    paramHelp = '<trove>[=<version>]'
+    paramHelp = '<trove>[=<version>]+'
 
-    docs = {'dir': 'Check out trove in directory DIR'}
+    docs = {'dir': 'Check out single trove in directory DIR'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -216,9 +216,11 @@ class CheckoutCommand(CvcCommand):
             del argSet['dir']
         else:
             dir = None
-        if argSet or (len(args) != 2): return self.usage()
-        args = [repos, cfg, dir, args[1], callback]
-        checkin.checkout(*args)
+        if argSet or (len(args) < 2) or (dir and len(args) != 2):
+            # no args other than --dir, and --dir implies only one trove
+            return self.usage()
+        coArgs = [repos, cfg, dir, args[1:], callback]
+        checkin.checkout(*coArgs)
 _register(CheckoutCommand)
 
 

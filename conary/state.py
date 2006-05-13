@@ -175,14 +175,19 @@ class ConaryStateFromFile(ConaryState):
         lines = f.readlines()
 
 	fields = lines[0][:-1].split()
-        if fields[0] == 'context':
-            self.context = fields[1]
-            lines = lines[1:]
+        contextList = [ x for x in lines if x.startswith('context ') ]
+        if contextList:
+            contextLine = contextList[-1]
+            self.context = contextLine.split(None, 1)[1].strip()
+            lines = [ x for x in lines if not x.startswith('context ')]
         else:
             self.context = None
 
         if lines:
-            self.source = SourceStateFromLines(lines)
+            try:
+                self.source = SourceStateFromLines(lines)
+            except ConaryStateError, err:
+                raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
         else:
             self.source = None
 
@@ -229,6 +234,9 @@ class SourceStateFromLines(SourceState):
 
 	    what = fields[0]
             assert(not kwargs.has_key(what))
+            if what not in self.fields:
+                raise ConaryStateError('Invalid field "%s"' % what)
+                
             isVer = self.fields[what][0]
 
 	    if isVer:

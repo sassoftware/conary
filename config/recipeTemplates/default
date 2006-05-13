@@ -6,5 +6,7 @@ class %(upperName)s(PackageRecipe):
     name = '%(name)s'
     version = ''
 
+    buildRequires = []
+
     def setup(r):
         pass

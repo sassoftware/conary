@@ -97,7 +97,11 @@ def verifyAbsoluteChangeset(cs, trustThreshold = 0):
         r = min(verTuple[0], r)
     return r
 
-def checkout(repos, cfg, workDir, name, callback=None):
+def checkout(repos, cfg, workDir, nameList, callback=None):
+    for name in nameList:
+        _checkout(repos, cfg, workDir, name, callback)
+
+def _checkout(repos, cfg, workDir, name, callback):
     if not callback:
         callback = CheckinCallback()
 

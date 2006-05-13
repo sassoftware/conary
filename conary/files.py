@@ -314,23 +314,43 @@ class File(streams.StreamSet):
     def setMtime(self, target):
 	os.utime(target, (self.inode.mtime(), self.inode.mtime()))
 
-    def chmod(self, target):
+    def chmod(self, target, mask=0):
         if not self.skipChmod:
-            os.chmod(target, self.inode.perms())
+            mode = self.inode.perms()
+            mode &= ~mask
+            os.chmod(target, mode)
 
     def setPermissions(self, root, target, journal=None):
+        # do the chmod after the chown because some versions of Linux
+        # remove setuid/gid flags when changing ownership to root 
         if journal:
             journal.lchown(root, target, self.inode.owner(),
                            self.inode.group())
+            self.chmod(target)
+            return
+
+        global userCache, groupCache
+        uid = gid = 0
+        owner = self.inode.owner()
+        group = self.inode.group()
+        # not all file types have owners
+        if owner:
+            uid = userCache.lookupName(root, owner)
+        if group:
+            gid = groupCache.lookupName(root, group)
+        ruid = os.getuid()
+        mask = 0
+
+        if ruid == 0:
+            os.lchown(target, uid, gid)
         else:
-            if os.getuid() == 0:
-                global userCache, groupCache
-                uid = userCache.lookupName(root, self.inode.owner())
-                gid = groupCache.lookupName(root, self.inode.group())
-                os.lchown(target, uid, gid)
-        # do the chmod after the chown because some versions of Linux
-        # remove setuid/gid flags when changing ownership to root 
-        self.chmod(target)
+            # do not ever make a file setuid or setgid the wrong user
+            rgid = os.getgid()
+            if uid != ruid:
+                mask |= 04000
+            if gid != rgid:
+                mask |= 02000
+        self.chmod(target, mask)
 
     def twm(self, diff, base, skip = None):
 	sameType = struct.unpack("B", diff[0])
@@ -722,7 +742,10 @@ class UserGroupIdCache:
 	if theId is not None:
 	    return theId
 
-	if root and root != '/':
+        # if not root, cannot chroot and so fall back to system ids
+        getChrootIds = root and root != '/' and not os.getuid()
+
+	if getChrootIds:
             if root[0] != '/':
                 root = os.sep.join((os.getcwd(), root))
 	    curDir = os.open(".", os.O_RDONLY)
@@ -737,7 +760,7 @@ class UserGroupIdCache:
 	    log.warning('%s %s does not exist - using root', self.name, name)
 	    theId = 0
 
-	if root and root != '/':
+	if getChrootIds:
 	    os.chroot(".")
 	    os.fchdir(curDir)
 

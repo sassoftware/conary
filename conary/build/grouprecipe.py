@@ -1435,6 +1435,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
 
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
+            log.info('Removing %s=%s[%s]' % troveTup)
             group.delTrove(*troveTup)
             groupAsSource.delTrove(*troveTup)
 
@@ -1457,6 +1458,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             allComponents = set()
             byDefault = False
             for troveTup in troveTups:
+                log.info('Removing %s=%s[%s] due to replaceSpec' % troveTup)
                 if allComponents is not None:
                     components = group.getComponents(*troveTup)
                     if not components:
@@ -1470,6 +1472,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
 
             for troveSpec, ref in replaceSpecs:
                 for newTup in troveMap[ref][troveSpec]:
+                    log.info('Adding %s=%s[%s] due to replaceSpec' % newTup)
                     group.addTrove(newTup, True, byDefault, allComponents)
                     groupAsSource.addTrove(*newTup)
 

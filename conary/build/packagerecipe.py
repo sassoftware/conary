@@ -605,11 +605,11 @@ class _AbstractPackageRecipe(Recipe):
                 return
 
             siteConfig = None
-            if 'SITE_CONFIG' in os.environ:
-                siteConfig = os.environ['SITE_CONFIG']
+            if 'CONFIG_SITE' in os.environ:
+                siteConfig = os.environ['CONFIG_SITE']
             siteConfig = ' '.join((x for x in [siteConfig, archConfig, osConfig]
                                    if x is not None))
-            os.environ['SITE_CONFIG'] = siteConfig
+            os.environ['CONFIG_SITE'] = siteConfig
 
         macros = self.macros
         macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
