@@ -35,7 +35,7 @@ Changes in @VERSION@
     * Minimally corrupted/incorrect conary state files will no longer cause 
       conary to traceback (bz #1107)
     * A bug that prevented upload progress from being displayed when
-      using "cvc commit" has been fixed.
+      using "cvc commit" has been fixed. (bz #969)
 
 Changes in 1.0.14:
   o Client Changes:
