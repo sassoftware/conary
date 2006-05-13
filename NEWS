@@ -12,6 +12,8 @@ Changes in @VERSION@
   o Bug Fixes:
     * Fixed a bug that caused using groupName parameter with r.replace() to
       traceback. (bz #1066)
+    * A bug that prevented upload progress from being displayed when
+      using "cvc commit" has been fixed.
 
 Changes in 1.0.14:
   o Client Changes:
