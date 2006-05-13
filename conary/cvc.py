@@ -41,7 +41,7 @@ from conary.lib import util
 sys.excepthook = util.genExcepthook()
 
 # mix UpdateCallback and CookCallback, since we use both.
-class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
+class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
     def __init__(self, cfg=None):
         updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
