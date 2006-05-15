@@ -415,6 +415,8 @@ class CfgRegExpList(CfgList):
                      [self.valueType.parseString(x) for x in newStr.split()])
 
     def parseString(self, val):
+        if val == '[]':
+            return []
         return self.listType(
                     [self.valueType.parseString(x) for x in val.split()])
 
