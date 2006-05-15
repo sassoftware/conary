@@ -1,39 +1,46 @@
 Changes in @VERSION@
   o Client Changes:
-    * When installing as non-root, Conary will no longer create
-      files setuid or setgid unless the uid/gid creating the
-      file matches the username/groupname in the package.
-    * Check rollback count argument for non-positive numbers and numbers
-      greater then the number of rollbacks available (bz #1072)
-    * Reworked entitlement parsing using expat instead of a hand-coded
-      parser.
+    * When writing files as non-root, Conary will no longer create
+      files setuid or setgid unless the uid/gid creating the file
+      matches the username/groupname in the package.
+    * Conary now checks the rollback count argument for non-positive
+      numbers and numbers greater then the number of rollbacks
+      available. (bz #1072)
+    * The entitlement parser has been reimplemented using expat
+      instead of a hand-coded parser.  A correctly formatted
+      entitlement file should now be enclosed in an
+      <entitlement></entitlement> element.  Conary will continue to
+      work with files that do not contain the toplevel <entitlement>
+      element.
 
   o Build Changes:
-    * Added support for recipe templates.  Now when running cvc newpkg cvc 
-      will automatically create a recipe from a template specified by the 
-      recipeTemplate configuration option. (bz #671, #1059)
+    * Support has been added for recipe templates.  Now when running
+      "cvc newpkg", cvc will automatically create a recipe from a
+      template specified by the recipeTemplate configuration
+      option. (bz #671, #1059)
     * Policy objects can now accept globs and brace expansions when
       specifying subtrees.
     * Cross-compile builds now provide CONFIG_SITE files to enable
       cross-compiling programs that require external site config
       files.  The default site config files are included.
-    * The cvc checkout command can now check out multiple source
+    * The "cvc checkout" command can now check out multiple source
       troves in a single invocation.
 
   o Server Changes:
-    * Implemented authorization cache, which is enabled by setting The
-      authCacheTimeout configuration to the number of seconds the cache
-      entry should be valid for.
-    * Added externalPasswordURL configuration option, which tells the server
-      to call that URL for password verification. When this option is used,
-      user passwords stored in the repository are ignored, and those passwords
-      cannot be changed.
+    * An "externalPasswordURL" configuration option has been added,
+      which tells the server to call an external URL for password
+      verification.  When this option is used, user passwords stored
+      in the repository are ignored, and those passwords cannot be
+      changed.
+    * An authentication cache has been added, which is enabled by
+      setting The authCacheTimeout configuration to the number of
+      seconds the cache entry should be valid for.
 
   o Bug Fixes:
-    * Fixed a bug that caused using groupName parameter with r.replace() to
-      traceback. (bz #1066)
+    * A bug that caused using groupName parameter with r.replace() to
+      traceback has been fixed. (bz #1066)
     * Minimally corrupted/incorrect conary state files will no longer cause 
-      conary to traceback (bz #1107)
+      conary to traceback. (bz #1107)
     * A bug that prevented upload progress from being displayed when
       using "cvc commit" has been fixed. (bz #969)
 
