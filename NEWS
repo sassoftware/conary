@@ -1,4 +1,4 @@
-Changes in @VERSION@
+Changes in 1.0.15
   o Client Changes:
     * When writing files as non-root, Conary will no longer create
       files setuid or setgid unless the uid/gid creating the file
