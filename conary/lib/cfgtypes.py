@@ -279,7 +279,7 @@ class CfgList(CfgType):
 
     def parseString(self, val):
         if val == '[]':
-            return []
+            return self.listType()
         return self.listType([self.valueType.parseString(val)])
 
     def updateFromString(self, val, str):
@@ -416,7 +416,7 @@ class CfgRegExpList(CfgList):
 
     def parseString(self, val):
         if val == '[]':
-            return []
+            return self.listType()
         return self.listType(
                     [self.valueType.parseString(x) for x in val.split()])
 
