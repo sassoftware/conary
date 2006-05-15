@@ -16,7 +16,6 @@ Implements conaryrc handling.
 """
 import fnmatch
 import os
-import StringIO
 import sys
 import xml
 
