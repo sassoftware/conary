@@ -148,9 +148,8 @@ def get(port, isSecure, repos, req):
                             lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(req, name, tag, size, f,
                                                  sizeCb))
-                except IOError:
-                    # ignore errors writing to the client
-                    pass
+                except IOError, e:
+                    log.error('IOError dumping changeset: %s' % e)
 
                 del cs
             else:
