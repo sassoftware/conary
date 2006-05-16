@@ -103,7 +103,8 @@ class DataStore(AbstractDataStore):
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
-    def addFile(self, fileObj, hash, precompressed = False):
+    def addFile(self, fileObj, hash, precompressed = False, 
+                integrityCheck = True):
 	path = self.hashToPath(hash)
         self.makeDir(path)
         if os.path.exists(path): return
@@ -129,7 +130,7 @@ class DataStore(AbstractDataStore):
         # this closes tmpFd for us
         outFileObj.close()
 
-        if contentSha1.hexdigest() != hash:
+        if integrityCheck and contentSha1.hexdigest() != hash:
             os.unlink(tmpName)
             raise errors.IntegrityError
 
