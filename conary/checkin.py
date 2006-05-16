@@ -1077,7 +1077,7 @@ def removeFile(file):
 
     conaryState.write("CONARY")
 
-def newTrove(repos, cfg, name, dir = None):
+def newTrove(repos, cfg, name, dir = None, template = None):
     parts = name.split('=', 1) 
     if len(parts) == 1:
         label = cfg.buildLabel
@@ -1105,6 +1105,9 @@ def newTrove(repos, cfg, name, dir = None):
 
     if dir is None:
         dir = name
+
+    if template:
+        cfg.recipeTemplate = template
 
     if not os.path.isdir(dir):
         try:

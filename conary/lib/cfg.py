@@ -173,6 +173,9 @@ class _Config:
     def setValue(self, key, value):
         self[key] = value
 
+    def getDefaultValue(self, name):
+        return self._options[name].getDefault()
+
     def keys(self):
         return self._options.keys()
 
@@ -484,6 +487,9 @@ class ConfigOption:
 
     def getValueType(self):
         return self.valueType
+
+    def getDefault(self):
+        return self.default
 
     def addListener(self, listenFn):
         self.listeners.append(listenFn)

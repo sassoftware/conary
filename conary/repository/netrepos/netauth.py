@@ -637,24 +637,31 @@ class NetworkAuthorization:
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
-                SELECT entGroupId, admin
+            SELECT entGroupId FROM EntitlementGroups 
+                JOIN EntitlementOwners USING (entGroupId)
+                WHERE 
+                    ownerGroupId IN (%s)
+                  AND
+                    entGroup = ?
+        """ % ",".join(str(x) for x in authGroupIds), entGroup)
+
+        entGroupIdList = [ x[0] for x in cu ]
+        if entGroupIdList:
+            assert(max(entGroupIdList) == min(entGroupIdList))
+            return entGroupIdList[0]
+
+        # admins can do everything
+        cu.execute("""
+                SELECT COUNT(*)
                     FROM Permissions
-                    LEFT OUTER JOIN EntitlementOwners ON
-                        Permissions.userGroupId =
-                                EntitlementOwners.ownerGroupId
                     WHERE
                         Permissions.userGroupId IN (%s)
-                        AND
-                          (EntitlementOwners.ownerGroupId IS NOT NULL OR
-                           Permissions.admin = 1)
-                """ % ",".join(str(x) for x in authGroupIds))
+                      AND
+                       Permissions.admin = 1
+        """ % ",".join(str(x) for x in authGroupIds))
 
-        isAdmin = False
-        entGroupsEditable = []
-        for (entGroupId, rowIsAdmin) in cu:
-            if entGroupId is not None:
-                entGroupsEditable.append(entGroupId)
-            isAdmin = isAdmin or rowIsAdmin
+        if cu.next()[0] == 0:
+            raise errors.InsufficientPermission
 
         cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE "
                    "entGroup = ?", entGroup)
@@ -666,15 +673,7 @@ class NetworkAuthorization:
             assert(not entGroupIds)
             entGroupId = -1
 
-        if isAdmin:
-            if not entGroupIds:
-                raise errors.UnknownEntitlementGroup
-
-            return entGroupId
-        elif entGroupId in entGroupsEditable:
-            return entGroupId
-
-        raise errors.InsufficientPermission
+        return entGroupId
 
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()

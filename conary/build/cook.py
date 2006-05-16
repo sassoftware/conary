@@ -789,6 +789,10 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             else:
                 raise
         if logBuild:
+            if recipeObj.isatty():
+                out = logFile
+            else:
+                out = sys.stdout
             logBuildEnvironment(logFile, sourceVersion, policyTroves,
                                 recipeObj.macros, cfg)
     try:

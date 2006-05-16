@@ -325,7 +325,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
         # compute the max mark of the bundles we comitted
-        crtMaxMark = max([max([x[0] for x in bundle]) for bundle in bundles])
+        crtMaxMark = max([min([x[0] for x in bundle]) for bundle in bundles])
         log.debug("setting the mirror mark to %d", int(crtMaxMark))
         if test:
             CurrentTestMark = crtMaxMark
