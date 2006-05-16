@@ -76,7 +76,9 @@ class TroveMissing(RepositoryError, InternalConaryError):
             if isinstance(self.version, versions.Branch):
                 return ("%s %s does not exist on branch %s" % \
                     (self.troveType, self.troveName, self.version.asString()))
-
+            if type(self.version) == str:
+                return "version %s of %s %s does not exist" % \
+                       (self.version, self.troveType, self.troveName)
             return "version %s of %s %s does not exist" % \
                 (self.version.asString(), self.troveType, self.troveName)
 	else:
@@ -89,7 +91,7 @@ class TroveMissing(RepositoryError, InternalConaryError):
 	@param troveName: trove which could not be found
 	@type troveName: str
 	@param version: version of the trove which does not exist
-	@type version: versions.Version
+	@type version: versions.Version, VFS string or [versions.Version]
 	"""
 	self.troveName = troveName
 	self.version = version
