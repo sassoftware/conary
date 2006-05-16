@@ -81,11 +81,12 @@ clean: clean-subdirs default-clean
 
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
-	sed -i "s,version = '.*',version = '$(VERSION)'," \
+	sed -i 's,version = ".*",version = "$(VERSION)",' \
+                                        conary-$(VERSION)/conary.recipe;
+	sed -i 's,r.addArchive.*,r.addArchive("conary-$(VERSION).tar.bz2"),' \
                                         conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
-	cd conary-$(VERSION); ../bin/cvc cook conary.recipe
-	mv conary-$(VERSION)/conary-$(VERSION)*.ccs .
+	bin/cvc cook conary-$(VERSION)/conary.recipe
 	rm -rf conary-$(VERSION)
 
 include Make.rules
