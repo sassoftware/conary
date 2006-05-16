@@ -12,7 +12,7 @@
 # full details.
 #
 
-SUBDIRS=arch recipeTemplates use
+SUBDIRS=arch recipeTemplates use site
 
 dist_files = Makefile pubring.gpg trustdb.gpg macros
 
