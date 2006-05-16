@@ -305,9 +305,9 @@ class ConfigFile(_Config):
             fn = getattr(self, self._directives[key.lower()])
             fn(val)
         else:
-            self.configKey(key, val)
+            self.configKey(key, val, fileName, lineno)
 
-    def configKey(key, val):
+    def configKey(self, key, val, fileName = "override", lineno = '<No line>'):
         try:
             key = self._lowerCaseMap[key.lower()]
             self[key] = self._options[key].parseString(self[key], val)
