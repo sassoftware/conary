@@ -1263,7 +1263,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
 
-    nonCfgExt = ('bz2', 'ccs', 'eps', 'gif', 'gz', 'ico', 'img',
+    nonCfgExt = ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
                  'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
                  'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
 
