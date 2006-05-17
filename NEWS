@@ -1,3 +1,8 @@
+Changes in @NEW@
+  o Client Changes:
+    * When running "cvc log" on a newly created source component, cvc now
+      errors gracefully instead of tracing back (bz #538).
+
 Changes in 1.0.15
   o Client Changes:
     * When writing files as non-root, Conary will no longer create
