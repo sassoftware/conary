@@ -305,18 +305,19 @@ class ConfigFile(_Config):
             fn = getattr(self, self._directives[key.lower()])
             fn(val)
         else:
-            try:
-                key = self._lowerCaseMap[key.lower()]
-                self[key] = self._options[key].parseString(self[key], val)
-            except KeyError, msg:
-                raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
-                                                                      lineno, 
-                                                                      key)
-            except ParseError, msg:
-                raise ParseError, "%s:%s: %s for configuration item '%s'" \
-                                                                % (fileName,
-                                                                   lineno, 
-                                                                   msg, key)
+            self.configKey(key, val, fileName, lineno)
+
+    def configKey(self, key, val, fileName = "override", lineno = '<No line>'):
+        try:
+            key = self._lowerCaseMap[key.lower()]
+            self[key] = self._options[key].parseString(self[key], val)
+        except KeyError, msg:
+            raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
+                                                                  lineno, key)
+        except ParseError, msg:
+            raise ParseError, "%s:%s: %s for configuration item '%s'" \
+                                                            % (fileName,
+                                                               lineno, msg, key)
 
     def includeConfigFile(self, val):
         if val.startswith("http://") or val.startswith("https://"):
