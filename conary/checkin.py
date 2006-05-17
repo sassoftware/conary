@@ -1192,6 +1192,9 @@ def showLog(repos, branch = None):
 
     verList = repos.getTroveVersionsByLabel(
                             { troveName : { branch.label() : None } } )
+    if not verList:
+        log.error('it appears nothing has yet been committed')
+        return
     verList = verList[troveName].keys()
     verList.sort()
     verList.reverse()
