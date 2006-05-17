@@ -318,7 +318,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
                           '--recv-key', keyId)
             except:
                 os._exit(-1)
-        newPid, status = os.wait()
+        pid, status = os.waitpid(pid, 0)
         if os.WEXITSTATUS(status) == 255:
             self.hasGPG = False
             log.warning('gpg does not appear to be installed.  gpg is required'
