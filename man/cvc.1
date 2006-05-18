@@ -226,8 +226,7 @@ trove for each binary trove is shadowed, instead of the binary trove. Note that
 if called without a specific version, this will pull the source component from
 the most recently cooked binary. To get the most recent source version, use
 yourpackage:source as the trove. If \fB-\-binary-only\fR is specified, no
-source troves are shadowed. The shadow command works just like the branch
-command, except that it creates a shadow instead of a branch.
+source troves are shadowed.
 .TP
 .B sign [\fR\-\-signature\-key <fingerprint>\fB] 
 [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
@@ -279,16 +278,16 @@ All refer to the exact same OpenPGP Key
 .SH EXAMPLES
 .TP 4
 .B Branching
-cvc branch conary.example.com@rpl:example-foo foo:source=conary.rpath.com@rpl:devel
+cvc shadow conary.example.com@rpl:example-foo foo:source=conary.rpath.com@rpl:devel
 .br
-This creates a branch in the conary.example.com repository of the
+This creates a shadow in the conary.example.com repository of the
 foo:source trove, based on the version of foo in the main rpath repository.
-You can now check out this branch and work on it:
+You can now check out this shadow and work on it:
 .br
 cvc checkout --build-label conary.example.com@rpl:example-foo foo
 .br
 Committing changes to that copy of foo:source will go into the
-conary.example.com repository on the rpl:example-foo branch.
+conary.example.com repository on the rpl:example-foo shadow.
 .P
 .TP 4
 .B Cloning
