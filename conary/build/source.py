@@ -655,7 +655,7 @@ class Source(_Source):
 		log.info('applying macros to source %s' %f)
 		pin = file(f)
 		pout = file(destFile, "w")
-                log.debug('copying %s to %s' %(f, destFile))
+                log.info('copying %s to %s' %(f, destFile))
 		pout.write(pin.read()%self.recipe.macros)
 		pin.close()
 		pout.close()

@@ -310,7 +310,7 @@ def remove(paths, quiet=False):
 def copyfile(sources, dest, verbose=True):
     for source in braceGlob(sources):
 	if verbose:
-	    log.debug('copying %s to %s', source, dest)
+	    log.info('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None,
