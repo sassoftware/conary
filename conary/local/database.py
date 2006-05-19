@@ -859,8 +859,8 @@ class Database(SqlDbRepository):
                 if not localCs.isEmpty():
                     totalCount += 1
 
+        itemCount = 0
         for i, name in enumerate(names):
-            itemCount = i * 2
 	    rb = self.getRollback(name)
 
             # we don't want the primary troves from reposCs to win, so get
