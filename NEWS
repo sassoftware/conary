@@ -1,4 +1,8 @@
 Changes in @NEW@
+  o Build Changes:
+    * Add check for "cvc commit" to make sure a .recipe file exists in 
+      the CONARY state file.
+
   o Bug Fixes:
     * When running "cvc log" on a newly created source component, cvc now
       errors gracefully instead of tracing back (bz #538).
