@@ -125,9 +125,9 @@ To get a debug prompt, rerun this command with --config 'debugExceptions True'
 '''
 _debugAll = False
 
-def genExcepthook(debug=True, dumpStack=False, 
-                  debugCtrlC=False, prefix='conary-stack-',
-                  catchSIGUSR1=True):
+def genExcepthook(debug=True,
+                  debugCtrlC=False, prefix='conary-error-',
+                  catchSIGUSR1=True, error=errorMessage):
     def SIGUSR1Handler(signum, frame):
         global _debugAll
         _debugAll = True
@@ -164,10 +164,10 @@ def genExcepthook(debug=True, dumpStack=False,
             while tb.tb_next: tb = tb.tb_next
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
-            tmpfd, stackfile = tempfile.mkstemp('.txt', 'conary-error-')
+            tmpfd, stackfile = tempfile.mkstemp('.txt', prefix)
             os.write(tmpfd, ''.join(lines))
             os.close(tmpfd)
-            sys.stderr.write(errorMessage % dict(command=' '.join(sys.argv),
+            sys.stderr.write(error % dict(command=' '.join(sys.argv),
                                                  filename=filename,
                                                  lineno=lineno,
                                                  errtype=type.__name__,
@@ -310,7 +310,7 @@ def remove(paths, quiet=False):
 def copyfile(sources, dest, verbose=True):
     for source in braceGlob(sources):
 	if verbose:
-	    log.debug('copying %s to %s', source, dest)
+	    log.info('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None,

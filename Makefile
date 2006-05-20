@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.0.14
+export VERSION = 1.0.15
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -78,5 +78,15 @@ tag:
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
 	rm -rf sqlite sqlite3
+
+ccs: dist
+	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
+	sed -i 's,version = ".*",version = "$(VERSION)",' \
+                                        conary-$(VERSION)/conary.recipe;
+	sed -i 's,r.addArchive.*,r.addArchive("conary-$(VERSION).tar.bz2"),' \
+                                        conary-$(VERSION)/conary.recipe;
+	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
+	bin/cvc cook conary-$(VERSION)/conary.recipe
+	rm -rf conary-$(VERSION)
 
 include Make.rules

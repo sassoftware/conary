@@ -1263,7 +1263,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
 
-    nonCfgExt = ('bz2', 'ccs', 'eps', 'gif', 'gz', 'ico', 'img',
+    nonCfgExt = ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
                  'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
                  'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
 
@@ -1902,19 +1902,20 @@ class TagCommand:
                 p = os.pipe()
                 pid = os.fork()
                 if not pid:
-                    os.close(p[1])
-                    os.dup2(p[0], 0)
-                    os.close(p[0])
-                    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
-                    if root != '/':
-                        os.chdir(root)
-                        os.chroot(root)
-
                     try:
+                        os.close(p[1])
+                        os.dup2(p[0], 0)
+                        os.close(p[0])
+                        os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
+                        os.chdir(root)
+                        if root != '/':
+                            os.chroot(root)
                         os.execv(command[0], command)
                     except Exception, e:
-                        sys.stderr.write('%s\n' %e)
-                    os._exit(1)
+                        try:
+                            sys.stderr.write('%s\n' %e)
+                        finally:
+                            os._exit(1)
 
                 os.close(p[0])
                 if datasource == 'stdin':

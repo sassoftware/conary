@@ -24,8 +24,7 @@
                 items.remove('ALL')
                 items.insert(0, 'ALL')
         ?>
-        <option py:for="value in items"
-                py:content="value" value="${value}" py:attrs="{'selected': (selected == value) and 'selected' or None}" />
+        <option py:for="value in items" py:content="value" value="${value}" py:attrs="{'selected': (selected == value) and 'selected' or None}" />
     </select>
 
     <head/>

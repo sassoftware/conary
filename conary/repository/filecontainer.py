@@ -164,7 +164,7 @@ class FileContainer:
 
     def reset(self):
         """
-        Reset the current position in the filecontainer to the beginning."
+        Reset the current position in the filecontainer to the beginning.
         """
         assert(not self.mutable)
         self.file.seek(self.contentsStart, SEEK_SET)

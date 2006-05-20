@@ -85,7 +85,7 @@ class SysLog:
     def __init__(self, root, path):
         self.root = root
         if not isinstance(path, (list, tuple)):
-            path = list(path)
+            path = [path]
         self.path = path
         self.indent = ""
         self.f = None
@@ -94,6 +94,8 @@ def openSysLog(root, path):
     global syslog
     if not path:
         path = '/dev/null'
+    if root == ':memory:':
+        root = '/'
     syslog = SysLog(root, path)
 
 def error(msg, *args):

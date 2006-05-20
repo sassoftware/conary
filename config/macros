@@ -98,3 +98,4 @@ buildcxx            = '%(cxx)s'
 #crossprefix	= '/opt/%(crossdir)s'
 #sysroot        = '%(crossprefix)s/sys-root'
 #headerpath     = '%(sysroot)s/%(includedir)s'
+#hostmajorarch  = 

@@ -41,7 +41,7 @@ from conary.lib import util
 sys.excepthook = util.genExcepthook()
 
 # mix UpdateCallback and CookCallback, since we use both.
-class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
+class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
     def __init__(self, cfg=None):
         updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
@@ -201,9 +201,9 @@ _register(BranchShadowCommand)
 
 class CheckoutCommand(CvcCommand):
     commands = ['checkout', 'co']
-    paramHelp = '<trove>[=<version>]'
+    paramHelp = '<trove>[=<version>]+'
 
-    docs = {'dir': 'Check out trove in directory DIR'}
+    docs = {'dir': 'Check out single trove in directory DIR'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -216,9 +216,11 @@ class CheckoutCommand(CvcCommand):
             del argSet['dir']
         else:
             dir = None
-        if argSet or (len(args) != 2): return self.usage()
-        args = [repos, cfg, dir, args[1], callback]
-        checkin.checkout(*args)
+        if argSet or (len(args) < 2) or (dir and len(args) != 2):
+            # no args other than --dir, and --dir implies only one trove
+            return self.usage()
+        coArgs = [repos, cfg, dir, args[1:], callback]
+        checkin.checkout(*coArgs)
 _register(CheckoutCommand)
 
 
@@ -562,19 +564,22 @@ class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
 
-    docs = {'dir' : 'create new package in DIR' }
+    docs = {'dir' : 'create new package in DIR',
+            'template' : 'set recipe template to use'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef['dir'] = ONE_PARAM
+        argDef['template'] = ONE_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                 callback = None):
         dir = argSet.pop('dir', None)
+        template = argSet.pop('template', None)
 
         if len(args) != 2 or argSet: return self.usage()
-        
-        checkin.newTrove(repos, cfg, args[1], dir = dir)
+
+        checkin.newTrove(repos, cfg, args[1], dir = dir, template = template)
 _register(NewPkgCommand)
 
 class MergeCommand(CvcCommand):

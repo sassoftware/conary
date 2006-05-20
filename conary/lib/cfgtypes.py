@@ -278,6 +278,8 @@ class CfgList(CfgType):
         self.default = default
 
     def parseString(self, val):
+        if val == '[]':
+            return self.listType()
         return self.listType([self.valueType.parseString(val)])
 
     def updateFromString(self, val, str):
@@ -293,8 +295,11 @@ class CfgList(CfgType):
         return self.listType(self.valueType.copy(x) for x in val)
 
     def toStrings(self, value, displayOptions=None):
-        for val in value:
-            yield self.valueType.format(val, displayOptions)
+        if not value:
+            yield '[]'
+        else:
+            for val in value:
+                yield self.valueType.format(val, displayOptions)
 
 
 
@@ -323,7 +328,7 @@ class CfgDict(CfgType):
         if dkey in val:
             val[dkey] = self.valueType.updateFromString(val[dkey], dvalue)
         else:
-            val[dkey] = self.valueType.parseString(dvalue)
+            val[dkey] = self.parseValueString(dkey, dvalue)
         return val
 
     def parseString(self, val):
@@ -334,8 +339,11 @@ class CfgDict(CfgType):
         else:
             (dkey, dvalue) = vals
 
-        dvalue = self.valueType.parseString(dvalue)
+        dvalue = self.parseValueString(dkey, dvalue)
         return {dkey : dvalue}
+
+    def parseValueString(self, key, value):
+        return self.valueType.parseString(value)
 
     def getDefault(self, default=None):
         if default is None: 
@@ -407,6 +415,8 @@ class CfgRegExpList(CfgList):
                      [self.valueType.parseString(x) for x in newStr.split()])
 
     def parseString(self, val):
+        if val == '[]':
+            return self.listType()
         return self.listType(
                     [self.valueType.parseString(x) for x in val.split()])
 

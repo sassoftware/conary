@@ -291,12 +291,14 @@ class Policy(action.RecipeAction):
 	    self.invariantsubtrees.append('/')
 	for self.currentsubtree in self.invariantsubtrees:
 	    fullpath = (self.rootdir+self.currentsubtree) %self.macros
-	    if self.recursive:
-		os.path.walk(fullpath, self.walkDir, None)
-	    else:
-		# only one level
-		if os.path.isdir(fullpath):
-		    self.walkDir(None, fullpath, os.listdir(fullpath))
+            dirs = util.braceGlob(fullpath)
+            for d in dirs:
+                if self.recursive:
+                    os.path.walk(d, self.walkDir, None)
+                else:
+                    # only one level
+                    if os.path.isdir(d):
+                        self.walkDir(None, d, os.listdir(d))
 
     def walkDir(self, ignore, dirname, names):
 	# chop off bit not useful for comparison

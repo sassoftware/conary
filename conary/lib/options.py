@@ -37,10 +37,17 @@ class OptionError(Exception):
 
 class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
+    matchPartialOptions = False
 
     def __init__(self, *args, **kw):
         self.hobbleShortOpts = kw.pop('hobbleShortOpts', False)
         optparse.OptionParser.__init__(self, *args, **kw)
+
+    def _match_long_opt(self, opt):
+        match = optparse._match_abbrev(opt, self._long_opt)
+        if not self.matchPartialOptions and opt != match:
+            raise optparse.BadOptionError("no such option: %s" % opt)
+        return match
 
     def error(self, msg):
         raise OptionError(msg, self)

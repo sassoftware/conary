@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,18 +12,24 @@
 # full details.
 #
 
-SUBDIRS=arch recipeTemplates use site
+site_files =	x86	\
+		x86_64	\
+		linux	
 
-dist_files = Makefile pubring.gpg trustdb.gpg macros
+dist_files = Makefile $(site_files)
+# not sizeof.c or sizeof
 
-all: default-subdirs
+all: default-all
 
-install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
+install:
+	mkdir -p $(DESTDIR)/etc/conary/site/; \
+	for f in $(site_files); do \
+		cp -a $$f $(DESTDIR)/etc/conary/site/$$f; \
+	done
 
 dist: default-dist
 
 clean: default-clean
+	rm -f sizeof
 
-include ../Make.rules
-
+include ../../Make.rules

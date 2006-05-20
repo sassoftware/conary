@@ -606,9 +606,8 @@ the \fB\-\-build-label \fI<label>\fR command-line option.
 .B buildFlavor
 The flavor that Conary will use when building troves.  This flavor
 will be used when no flavor is specified in group and fileset
-recipes.  
-.\" FIXME: add It is also used to set the values of Use and Arch flags
-.\" when building (once conary actually does this)
+recipes.  It is also used to set the values of Use and Arch flags
+when building.
 .TP
 .B buildPath
 The path packages are built under; default \fI/usr/src/conary/builds
@@ -652,6 +651,9 @@ components.
 .TP
 .B pubRing
 The filename of the OpenPGP Keyring to refer to for signature keys.
+.TP
+.B recipeTemplate
+The filename of the recipe template to use.
 .TP
 .B repositoryMap
 Maps a hostname from a label to a full URL for a networked repository.
@@ -699,17 +701,18 @@ before specifying any signatureKeyMap lines if you use them--unless you really
 meant to NOT override signatureKeyMap lines specified in a previously processed
 config file!
 .TP
+.B siteConfigPath
+The list of paths that cvc searches for files to add to the \fCCONFIG_SITE\fP
+environment variable when cross-compiling.  The defaults are packaged with
+cvc.
+.TP
 .B updateThreshold
 Defines the upper limit on the number of unrelated troves that will be
 downloaded at one time from the repository.  Setting updateThreshold to a 
 low value tends to result in many small downloads, while setting it to a high 
 value tends to result in fewer, larger downloads.  Defaults to 10.
 .TP
-.BR "Use.<useflag> " or " Arch.<archflag> " or " Flags.<package>.<packageflag>"
-Assigns the given boolean value to the flag. 
-Can be overridden by the \fB\-\-use-flag \fI"<flag> <bool>"\fR command-line option.
-.TP
-.B Macros.<macro>
+.B Macros <macro> <definition>
 Assigns the given string to <macro>, for use in cooking.  Useful especially for setting march, os, target, and parallelmflags.
 Can be overridden by the \fB\-\-use-macro \fI"<macro> <value>"\fR command-line option.  Note that all values are assumed to be strings -- no quotes are necessary around <value> on the command line or in the config file.
 .TP
@@ -723,9 +726,10 @@ shell globs, in which case all files matching the glob will be read in.
 A Configuration context is a section of a config file delimited by a section
 name in square brackets, like \fI[foo]\fR.  Options that can be specified after
 the brackets are limited to \fBbuildFlavor, buildLabel, buildPath, contact,
-excludeTroves, flavor, lookaside, installLabelPath, name, repositoryMap, 
-root, signatureKey, signatureKeyMap, and user\fR.  When a context is selected, 
-the configuration values specified in the context override the default values.
+excludeTroves, flavor, lookaside, installLabelPath, name, recipeTemplates, 
+repositoryMap, root, signatureKey, signatureKeyMap, and user\fR.  When a 
+context is selected, the configuration values specified in the context 
+override the default values.
    If any values are not specified, the values defined in the main 
 configuration section are used.  
 .RS 4
@@ -767,6 +771,8 @@ rblist\fP).
 .I /etc/conary/arch
 Directory containing architecture definition files.
 .\" FIXME: need a man page describing architecture definition files
+.I /etc/conary/recipeTemplates
+Directory containing recipe templates.
 .I /etc/conary/use
 Directory containing use flag definition files.
 .\" FIXME: need a man page describing use flag definition files
