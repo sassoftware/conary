@@ -213,6 +213,10 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     troveName = state.getName()
 
+    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
+        log.error("recipe not in CONARY state file, please run cvc add")
+        return
+
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
         if repos.getTroveLeavesByBranch(
