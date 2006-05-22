@@ -355,7 +355,6 @@ class ClientClone:
                     sourceVersion = sourceVersion.parentVersion()
                     if targetBranch == sourceVersion.branch():
                         newSourceVersion = sourceVersion
-                        break
                 else:
                     try:
                         currentVersionList = \
