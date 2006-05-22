@@ -81,7 +81,7 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
 
 class UserInfoRecipe(UserGroupInfoRecipe):
     type = 'user'
-    abstractBaseClass = 1
+    internalAbstractBaseClass = 1
 
     def addProvides(self, f):
         depSet = deps.DependencySet()
@@ -93,7 +93,7 @@ class UserInfoRecipe(UserGroupInfoRecipe):
 
 class GroupInfoRecipe(UserGroupInfoRecipe):
     type = 'group'
-    abstractBaseClass = 1
+    internalAbstractBaseClass = 1
 
     def addProvides(self, f):
         depSet = deps.DependencySet()
