@@ -24,7 +24,7 @@ import itertools
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
     _recipeType = RECIPE_TYPE_REDIRECT
-    ignore = 1
+    abstractBaseClass = 1
 
     def addRedirect(self, name, branchStr = None, sourceFlavor = None,
                     targetFlavor = None, fromTrove = None, 
