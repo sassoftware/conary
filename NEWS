@@ -7,6 +7,8 @@ Changes in @NEW@
     * When running "cvc log" on a newly created source component, cvc now
       errors gracefully instead of tracing back (bz #538).
     * Conary now changes to / before running tag scripts. (bz #1134)
+    * "cvc co foo=invalidversionstring" now gives a more helpful error message
+      (bz #1037)
 
 Changes in 1.0.15
   o Client Changes:
