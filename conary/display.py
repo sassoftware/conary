@@ -728,8 +728,16 @@ class TroveFormatter(TroveTupFormatter):
         else:
             name = path
 
-        if dcfg.tags and fileObj.tags:
-            taglist = ' [' + ' '.join(fileObj.tags) + ']' 
+        if dcfg.tags:
+            tags = []
+            if fileObj.tags:
+                tags.extend(fileObj.tags)
+            if fileObj.flags.isInitialContents():
+                tags.append('initialContents')
+            if fileObj.flags.isConfig():
+                tags.append('config')
+            if tags:
+                taglist = ' [' + ' '.join(tags) + ']' 
         if dcfg.sha1s:
             if hasattr(fileObj, 'contents') and fileObj.contents:
                 sha1 = sha1ToString(fileObj.contents.sha1()) + ' '
