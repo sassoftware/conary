@@ -272,7 +272,12 @@ def commit(repos, cfg, message, callback=None, test=False):
         recipeObj.loadPolicy()
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
-        recipeObj.setup()
+        if not 'abstractBaseClass' in recipeObj.__dict__ or not recipeObj.abstractBaseClass:
+            try:
+                recipeObj.setup()
+            except AttributeError:
+                log.error('you need a setup method for your recipe')
+                
         srcFiles = recipeObj.fetchAllSources()
         log.setVerbosity(level)
 
