@@ -20,9 +20,8 @@ from conary.build import usergroup
 from conary.deps import deps
 
 class UserGroupInfoRecipe(_AbstractPackageRecipe):
-    # abstract base class
     _recipeType = RECIPE_TYPE_INFO
-    ignore = 1
+    abstraceBaseClass = 1
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
                  crossCompile=None):
@@ -82,8 +81,7 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
 
 class UserInfoRecipe(UserGroupInfoRecipe):
     type = 'user'
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
 
     def addProvides(self, f):
         depSet = deps.DependencySet()
@@ -95,8 +93,7 @@ class UserInfoRecipe(UserGroupInfoRecipe):
 
 class GroupInfoRecipe(UserGroupInfoRecipe):
     type = 'group'
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
 
     def addProvides(self, f):
         depSet = deps.DependencySet()

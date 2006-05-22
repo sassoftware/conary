@@ -2,7 +2,7 @@
 # Copyright (c) %(year)s %(contactName)s (%(contact)s)
 #
 
-class %(upperName)s(PackageRecipe):
+class %(className)s(PackageRecipe):
     name = '%(name)s'
     version = ''
 

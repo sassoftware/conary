@@ -752,8 +752,7 @@ class PackageRecipe(_AbstractPackageRecipe):
 
     FIXME example
     """
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
     # these initial buildRequires need to be cleared where they would
     # otherwise create a requirement loop.  Also, note that each instance
     # of :lib in here is only for runtime, not to link against.
@@ -830,8 +829,7 @@ class BuildPackageRecipe(PackageRecipe):
         'diffutils:runtime',
     ]
     Flags = use.LocalFlags
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
 _addRecipeToCopy(BuildPackageRecipe)
 
 
@@ -886,8 +884,7 @@ class CPackageRecipe(BuildPackageRecipe):
         'elfutils:runtime',
     ]
     Flags = use.LocalFlags
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
 _addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
@@ -946,8 +943,7 @@ class AutoPackageRecipe(CPackageRecipe):
     C{AutoPackageRecipe}.
     """
     Flags = use.LocalFlags
-    # abstract base class
-    ignore = 1
+    abstractBaseClass = 1
 
     def setup(r):
         r.unpack()
