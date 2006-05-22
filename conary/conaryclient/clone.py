@@ -350,6 +350,12 @@ class ClientClone:
                 # the source version which was used when the source was cloned
                 if targetBranch == sourceVersion.branch():
                     newSourceVersion = sourceVersion
+                elif (sourceVersion.isShadow()
+                      and not sourceVersion.isModifiedShadow()):
+                    sourceVersion = sourceVersion.parentVersion()
+                    if targetBranch == sourceVersion.branch():
+                        newSourceVersion = sourceVersion
+                        break
                 else:
                     try:
                         currentVersionList = \
