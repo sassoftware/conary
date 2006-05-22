@@ -2,6 +2,8 @@ Changes in @NEW@
   o Build Changes:
     * Add check for "cvc commit" to make sure a .recipe file exists in 
       the CONARY state file.
+    * Give the option to declare a abstractBaseClass as an instance variable in
+      a recipe so that superclasses do not need a setup() method.
 
   o Bug Fixes:
     * When running "cvc log" on a newly created source component, cvc now
