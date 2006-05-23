@@ -13,6 +13,8 @@ Changes in @NEW@
       (bz #1037)
     * Cloning binary troves uphill now correctly checks for the source
       trove uphill
+    * Fixed a bug that would cause migrate to raise a KeyError when updating
+      a group that referenced the same trove twice, through two subgroups.
 
 Changes in 1.0.15
   o Client Changes:
