@@ -272,7 +272,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         recipeObj.loadPolicy()
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
-        if not 'abstractBaseClass' in recipeObj.__dict__ or not recipeObj.abstractBaseClass:
+        if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
             try:
                 recipeObj.setup()
             except AttributeError:
