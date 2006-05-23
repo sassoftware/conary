@@ -136,6 +136,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.contentsDir = cfg.contentsDir.split(" ")
         self.authCacheTimeout = cfg.authCacheTimeout
         self.externalPasswordURL = cfg.externalPasswordURL
+        self.entitlementCheckURL = cfg.entitlementCheckURL
 
         if cfg.cacheDB:
             self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
@@ -185,7 +186,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             requireSigs = self.requireSigs)
 	self.auth = NetworkAuthorization(self.db, self.name, log = self.log,
                                          cacheTimeout = self.authCacheTimeout,
-                                         passwordURL = self.externalPasswordURL)
+                                         passwordURL = self.externalPasswordURL,
+                                         entCheckURL = self.entitlementCheckURL)
 
         self.log.reset()
 
@@ -2027,6 +2029,7 @@ class ServerConfig(ConfigFile):
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
+    entitlementCheckURL     = CfgString
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
