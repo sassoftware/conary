@@ -15,6 +15,7 @@ Changes in @NEW@
       trove uphill
     * Fixed a bug that would cause migrate to raise a KeyError when updating
       a group that referenced the same trove twice, through two subgroups.
+    * Fixed a bug when calculating whether a shadow has been modified.
 
   o Server Changes:
     * Added entitlementCheckURL to allow external validation of entitlements

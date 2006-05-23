@@ -1024,7 +1024,7 @@ class Version(VersionSequence):
         if self.isShadow():
             tr = self.trailingRevision()
 
-            if tr.sourceCount.shadowCount():
+            if tr.sourceCount.shadowCount() == self.shadowLength():
                 return True
             if tr.buildCount and tr.buildCount.shadowCount():
                 return True
