@@ -129,6 +129,7 @@ class FromFile(FileContents):
         return self.__class__(self.f)
 
     def get(self):
+        self.f.seek(0)
 	return self.f
 
     def __init__(self, f):
@@ -142,6 +143,7 @@ class FromGzFile(FileContents):
         return self.__class__(self.f)
 
     def get(self):
+        self.f.seek(0)
 	return self.f
 
     def __init__(self, f):

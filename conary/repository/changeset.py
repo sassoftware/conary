@@ -1146,6 +1146,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 util.tupleListBsearchInsert(self.fileQueue, entry + (csf,),
                                             self.fileQueueCmp)
 
+        self.filesRead = False
+
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
 	self.configCache = {}
@@ -1310,7 +1312,7 @@ class DictAsCsf:
         gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
         util.copyfileobj(f, gzf)
         gzf.close()
-        f.close()
+        # don't close the result of contObj.get(); we may need it again
         os.lseek(fd, 0, 0)
         f = os.fdopen(fd, "r")
         return (name, contType, f)
