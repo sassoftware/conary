@@ -637,7 +637,6 @@ followLocalChanges: %s
        parentUpdated, parentInstalled, primaryInstalled,
        updateOnly, branchHint, respectBranchAffinity,
        respectFlavorAffinity, installRedirects, followLocalChanges))
-
             trv = None
             jobAdded = False
             replaced = (None, None)
@@ -1010,7 +1009,6 @@ conary erase '%s=%s[%s]'
                     notByDefaultRemovals.add(
                                 (newInfo[0], (newInfo[1], newInfo[2]),
                                              (None, None), False))
-                    alreadyInstalled.discard(newInfo)
 
             if not recurseThis: continue
             if not recurse: continue
@@ -1088,6 +1086,7 @@ conary erase '%s=%s[%s]'
         for job in notByDefaultRemovals:
             if job not in newJob:
                 erasePrimaries.add((job[0], job[1], (None, None), False))
+            alreadyInstalled.discard((job[0], job[1][0], job[1][1]))
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse)
