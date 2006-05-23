@@ -219,6 +219,10 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     troveName = state.getName()
 
+    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
+        log.error("recipe not in CONARY state file, please run cvc add")
+        return
+
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
         if repos.getTroveLeavesByBranch(
@@ -268,7 +272,12 @@ def commit(repos, cfg, message, callback=None, test=False):
         recipeObj.loadPolicy()
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
-        recipeObj.setup()
+        if not 'abstractBaseClass' in recipeObj.__dict__ or not recipeObj.abstractBaseClass:
+            try:
+                recipeObj.setup()
+            except AttributeError:
+                log.error('you need a setup method for your recipe')
+                
         srcFiles = recipeObj.fetchAllSources()
         log.setVerbosity(level)
 
@@ -1126,11 +1135,14 @@ def newTrove(repos, cfg, name, dir = None, template = None):
             return
 
         macros = Macros()
+        if '-' in name: className = ''.join([ x.capitalize() for x in name.split('-') ])
+        else: className = name.capitalize()
         macros.update({'contactName': cfg.name,
                        'contact': cfg.contact,
                        'year': str(time.localtime()[0]),
                        'name': name,
-                       'upperName': name.capitalize()})
+                       'upperName': className,
+                       'className': className})
 
         template = open(path).read()
         recipe = open(recipeFileDir, 'w')

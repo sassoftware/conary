@@ -1,8 +1,25 @@
 Changes in @NEW@
+  o Build Changes:
+    * Add check for "cvc commit" to make sure a .recipe file exists in 
+      the CONARY state file.
+    * Give the option to declare a abstractBaseClass as an instance variable in
+      a recipe so that superclasses do not need a setup() method.
+
   o Bug Fixes:
     * When running "cvc log" on a newly created source component, cvc now
       errors gracefully instead of tracing back (bz #538).
     * Conary now changes to / before running tag scripts. (bz #1134)
+    * "cvc co foo=invalidversionstring" now gives a more helpful error message
+      (bz #1037)
+    * Cloning binary troves uphill now correctly checks for the source
+      trove uphill
+    * Fixed a bug that would cause migrate to raise a KeyError when updating
+      a group that referenced the same trove twice, through two subgroups.
+    * Fixed a bug when calculating whether a shadow has been modified.
+    * A number of bugs with resetting distributed changesets have been fixed.
+
+  o Server Changes:
+    * Added entitlementCheckURL to allow external validation of entitlements
 
 Changes in 1.0.15
   o Client Changes:

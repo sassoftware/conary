@@ -34,7 +34,7 @@ class _BaseGroupRecipe(Recipe):
     """ Defines a group recipe as collection of groups and provides
         operations on those groups.
     """
-    ignore = 1
+    internalAbstractBaseClass = 1
     def __init__(self):
         self.groups = {}
         self.defaultGroup = None
@@ -184,7 +184,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     """
     Flags = use.LocalFlags
-    ignore = 1
+    internalAbstractBaseClass = 1
     _recipeType = RECIPE_TYPE_GROUP
 
     depCheck = False

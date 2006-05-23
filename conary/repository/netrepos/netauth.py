@@ -15,9 +15,10 @@ import md5
 import os
 import re
 import time
-import urllib
+import urllib, urllib2
 import xml
 
+from conary import conarycfg
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
@@ -72,7 +73,7 @@ class UserAuthorization:
                 url = "%s?user=%s;password=%s" \
                         % (self.pwCheckUrl, urllib.quote(user),
                            urllib.quote(challenge))
-                f = urllib.urlopen(url)
+                f = urllib2.urlopen(url)
                 xmlResponse = f.read()
             except:
                 return False
@@ -120,7 +121,7 @@ class UserAuthorization:
                                       cu.frombinary(groupsFromUser[0][0]),
                                       groupsFromUser[0][1],
                                       password):
-                raise errors.InsufficientPermission
+                return set()
 
             groupsFromUser = set(x[2] for x in groupsFromUser)
         else:
@@ -160,6 +161,37 @@ class UserAuthorization:
 class EntitlementAuthorization:
 
     def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
+        if self.cacheTimeout:
+            cacheEntry = sha1helper.sha1String("%s%s" %
+                                        (entitlementGroup, entitlement))
+            userGroupIds, timeout = self.cache.get(cacheEntry, (None, None))
+            if timeout is not None and (timeout < time.time()):
+                return userGroupIds
+
+        if self.entCheckUrl:
+            try:
+                url = "%s?server=%s;class=%s;key=%s" \
+                        % (self.entCheckUrl, urllib.quote(self.serverName),
+                           urllib.quote(entitlementGroup),
+                           urllib.quote(entitlement))
+                f = urllib2.urlopen(url)
+                xmlResponse = f.read()
+            except Exception, e:
+                return set()
+
+            p = conarycfg.EntitlementParser()
+
+            try:
+                p.parse(xmlResponse)
+            except:
+                return set()
+
+            if p['server'] != self.serverName:
+                return set()
+
+            entitlementGroup = p['class']
+            entitlement = p['key']
+
         # look up entitlements
         cu.execute("""
         SELECT userGroupId FROM EntitlementGroups
@@ -168,11 +200,23 @@ class EntitlementAuthorization:
         entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
 
-        return set(x[0] for x in cu)
+        userGroupIds = set(x[0] for x in cu)
+        if self.cacheTimeout:
+            # cacheEntry is still set from the cache check above
+            self.cache[cacheEntry] = (userGroupIds,
+                                      time.time() + self.cacheTimeout)
+
+        return userGroupIds
+
+    def __init__(self, serverName, entCheckUrl = None, cacheTimeout = None):
+        self.serverName = serverName
+        self.entCheckUrl = entCheckUrl
+        self.cacheTimeout = cacheTimeout
+        self.cache = {}
 
 class NetworkAuthorization:
     def __init__(self, db, name, cacheTimeout = None, log = None,
-                 passwordURL = None):
+                 passwordURL = None, entCheckURL = None):
         """
         @param cacheTimeout: Timeout, in seconds, for authorization cache
         entries. If None, no cache is used.
@@ -181,6 +225,8 @@ class NetworkAuthorization:
         externally validate user passwords. When this is specified, the
         passwords int the local database are ignored, and the changePassword()
         call is disabled.
+        @param entCheckURL: URL base for mapping an entitlement received
+        over the network to an entitlement to check for in the database.
         """
         self.name = name
         self.db = db
@@ -188,7 +234,9 @@ class NetworkAuthorization:
         self.log = log or tracelog.getLog(None)
         self.userAuth = UserAuthorization(self.db, passwordURL,
                                           cacheTimeout = cacheTimeout)
-        self.entitlementAuth = EntitlementAuthorization()
+        self.entitlementAuth = EntitlementAuthorization(name,
+                                          cacheTimeout = cacheTimeout,
+                                          entCheckUrl = entCheckURL)
 
     def getAuthGroups(self, cu, authToken):
         self.log(3, authToken[0], authToken[2], authToken[3])

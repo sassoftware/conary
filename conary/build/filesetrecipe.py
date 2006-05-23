@@ -23,7 +23,7 @@ from conary.lib import util
 
 class FilesetRecipe(Recipe):
     _recipeType = RECIPE_TYPE_FILESET
-    ignore = 1
+    internalAbstractBaseClass = 1
 
     # XXX need to work on adding files from different flavors of troves
     def addFileFromPackage(self, pattern, pkg, recurse, remapList):

@@ -4,7 +4,7 @@
 # A copy is available at http://www.rpath.com/permanent/mit-license.html
 #
 
-class %(upperName)s(PackageRecipe):
+class %(className)s(PackageRecipe):
     name = '%(name)s'
     version = ''
 

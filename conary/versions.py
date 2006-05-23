@@ -398,8 +398,9 @@ class Revision(AbstractRevision):
 	    try:
 		self.sourceCount = SerialNumber(sourceCount)
 	    except:
-		raise ParseError("source count numbers must be all "
-                                 "numeric: %s" % sourceCount)
+		raise ParseError("invalid source version string. "
+                    "Source versions must be a label and/or number-containing "
+                    "release string: %s" % sourceCount)
 	if buildCount is not None:
 	    try:
 		self.buildCount = SerialNumber(buildCount)
@@ -1023,7 +1024,7 @@ class Version(VersionSequence):
         if self.isShadow():
             tr = self.trailingRevision()
 
-            if tr.sourceCount.shadowCount():
+            if tr.sourceCount.shadowCount() == self.shadowLength():
                 return True
             if tr.buildCount and tr.buildCount.shadowCount():
                 return True

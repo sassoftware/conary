@@ -214,7 +214,7 @@ class RecipeLoader:
             # it was loaded from another recipe by loadRecipe()
             # (don't use hasattr here, we want to check only the recipe
             # class itself, not any parent class
-            if 'ignore' in obj.__dict__:
+            if 'internalAbstractBaseClass' in obj.__dict__:
                 continue
             # make sure the class is derived from Recipe
             if not issubclass(obj, recipe.Recipe):
@@ -559,8 +559,9 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
-        # a recipe that has been loaded by loadRecipe
-        recipe.ignore = 1
+        # a recipe that has been loaded by loadRecipe, so we treat them
+        # for these purposes as if they are abstract base classes
+        recipe.internalAbstractBaseClass = 1
         callerGlobals[name] = recipe
         if recipe._trove:
             # create a tuple with the version and flavor information needed to 

@@ -124,7 +124,6 @@ class Logger:
         os.close(self.oldStdout)
         os.close(self.oldStderr)
         os.close(self.directWr)
-        os.setpgrp()
         try:
             # control stdin -- if stdin is a tty
             # that can be controlled
