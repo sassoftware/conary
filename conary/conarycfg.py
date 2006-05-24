@@ -416,6 +416,25 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
+def emitEntitlement(serverName, className, key):
+
+    # XXX This probably should be emitted using a real XML DOM writer,
+    # but this will probably do for now. And yes, all that mess is required
+    # to be well-formed and valid XML.
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<!DOCTYPE entitlement [
+    <!ELEMENT entitlement (server, class, key)>
+    <!ELEMENT server (#PCDATA)>
+    <!ELEMENT class (#PCDATA)>
+    <!ELEMENT key (#PCDATA)>
+]>
+<entitlement>
+    <server>%s</server>
+    <class>%s</class>
+    <key>%s</key>
+</entitlement>
+""" % (serverName, className, key)
+
 def loadEntitlement(dirName, serverName):
     # XXX this should be replaced with a real xml parser
 
@@ -460,7 +479,13 @@ def loadEntitlement(dirName, serverName):
 
     # wrap this in an <entitlement> top level tag (making it optional
     # [but recommended!] in the entitlement itself)
-    p.parse("<entitlement>" + xmlContent + "</entitlement>")
+    #
+    # XXX This synthetic wrapping should probably be made obsolete; everyone
+    # should use emitEntitlement, which does the right thing.
+    if '<entitlement>' not in xmlContent:
+        p.parse("<entitlement>" + xmlContent + "</entitlement>")
+    else:
+        p.parse(xmlContent)
 
     entServer = p['server']
     entClass = p['class']
