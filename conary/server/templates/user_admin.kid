@@ -64,11 +64,7 @@
                         <td><div py:for="group in netAuth.userAuth.getGroupsByUser(user)"
                                  py:content="group" />
                         </td>
-                        <td style="text-align: right;">
-                            <a href="chPassForm?username=${user}">Change Password</a> | 
-                            <u>Groups</u> | 
-                            <a href="deleteUser?username=${user}">Delete</a>
-                        </td>
+                        <td style="text-align: right;"><a href="chPassForm?username=${user}">Change Password</a>&nbsp;|&nbsp;<a href="deleteUser?username=${user}">Delete</a></td>
                     </tr>
                 </tbody>
             </table>
@@ -88,11 +84,7 @@
                         <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
                         <td py:if="rows" py:content="permTable(group, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
-                        <td style="text-align: right;">
-                            <a href="addPermForm?userGroupName=${group}">Add Permission</a><br />
-                            <a href="deleteGroup?userGroupName=${group}">Delete</a> | 
-                            <a href="manageGroupForm?userGroupName=${group}">Manage</a>
-                        </td>
+                        <td style="text-align: right;"><a href="addPermForm?userGroupName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteGroup?userGroupName=${group}">Delete&nbsp;Group</a>&nbsp;|&nbsp;<a href="manageGroupForm?userGroupName=${group}">Edit&nbsp;Group</a></td>
                     </tr>
                 </tbody>
             </table>
