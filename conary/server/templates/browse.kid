@@ -43,7 +43,7 @@ from urllib import quote
                     char = "'%c'" % char
             ?>
             <h3>Troves beginning with ${char}</h3>
-            <ul>
+            <ul py:if="packages">
                 <li py:for="package in packages">
                     <a href="troveInfo?t=${quote(package)}">${package}</a> <span py:if="package in components">[+]</span>
                     <ul id="components" py:if="package in components">
@@ -53,6 +53,7 @@ from urllib import quote
                     </ul>
                 </li>
             </ul>
+            <p py:if="not packages">No matching troves found.</p>
         </div>
     </body>
 </html>
