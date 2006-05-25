@@ -15,8 +15,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 ?>
+    <head />
     <body>
-        <div id="content">
+        <div id="inner">
             <h2>Error</h2>
             <pre class="error">${error}</pre>
             <p>Please go back and try again.</p>
