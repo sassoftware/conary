@@ -15,7 +15,7 @@
 from urllib import quote
 import time
 ?>
-<html xmlns:html="http://www.w3.org/1999/xhtml"
+<html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
     <table py:def="sourceTroveInfo(trove)" class="vheader">

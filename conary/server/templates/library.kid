@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns:py="http://purl.org/kid/ns#" xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns:py="http://purl.org/kid/ns#"
+      xmlns="http://www.w3.org/1999/xhtml">
 <!--
  Copyright (c) 2005 rPath, Inc.
 
@@ -13,14 +14,14 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    <head py:match="item.tag == 'head'">
+    <head py:match="item.tag == '{http://www.w3.org/1999/xhtml}head'">
         <title></title>
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/common.css" />
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/repository.css" />
         <script language="javascript1.2" src="${cfg.staticPath}/javascript/library.js"/>
         <script language="javascript1.2" src="${cfg.staticPath}/javascript/repository.js"/>
     </head>
-    <body py:match="item.tag == 'body'" xmlns="http://www.w3.org/1999/xhtml">
+    <body py:match="item.tag == '{http://www.w3.org/1999/xhtml}body'">
         <h1>Conary Repository</h1>
         <ul class="menu"><li class="highlighted">Conary Repository</li></ul>
         <ul class="menu submenu"> </ul>

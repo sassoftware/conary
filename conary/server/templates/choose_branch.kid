@@ -12,7 +12,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 ?>
-<html xmlns:html="http://www.w3.org/1999/xhtml"
+<html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
     <head/>

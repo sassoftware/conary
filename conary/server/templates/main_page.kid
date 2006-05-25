@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns:html="http://www.w3.org/1999/xhtml"
+<html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -15,7 +15,7 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    <head/>
+    <head />
     <body>
         <div id="inner">
             <h2>Main Menu</h2>
