@@ -21,7 +21,6 @@ kid_files =	add_group.kid		\
 		files.kid		\
 		group_contents.kid	\
 		library.kid		\
-		main_page.kid		\
 		metadata.kid		\
 		notice.kid		\
 		permission.kid		\

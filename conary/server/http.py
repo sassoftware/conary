@@ -111,6 +111,10 @@ class HttpHandler(WebHandler):
 
         d = dict(self.fields)
         d['auth'] = auth
+
+        self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
+        self.isAdmin = self.repServer.auth.check(self.authToken, admin=True)
+
         try:
             output = method(**d)
             self.req.write(output)
@@ -140,11 +144,21 @@ class HttpHandler(WebHandler):
     def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
-        return t.serialize(encoding="utf-8", cfg = self.cfg, **values)
+        return t.serialize(encoding = "utf-8",
+                           cfg = self.cfg,
+                           req = self.req,
+                           hasWrite = self.hasWrite,
+                           isAdmin = self.isAdmin,
+                           currentUser = self.authToken[0],
+                           **values)
+
+    @checkAuth(write=False)
+    def main(self, auth):
+        self._redirect("browse")
 
     @checkAuth(write=True)
-    def main(self, auth):
-        return self._write("main_page")
+    def login(self, auth):
+        self._redirect("browse")
 
     @strFields(char = '')
     @checkAuth(write=False)
@@ -555,13 +569,15 @@ class HttpHandler(WebHandler):
         elif oldPassword == password1:
             return self._write("error", error = "Error: old and new passwords identical, not changing")
         else:
+            message = "Password successfully changed."
             self.repServer.auth.changePassword(username, password1)
             if admin:
                 returnLink = ("User Administration", "userlist")
             else:
+                message += " You should close your web browser and log back in again for changes to take effect."
                 returnLink = ("Main Menu", "main")
 
-            return self._write("notice", message = "Password successfully changed",
+            return self._write("notice", message = message,
                 link = returnLink[0], url = returnLink[1])
 
     @checkAuth(admin=True)
