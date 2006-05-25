@@ -18,7 +18,7 @@
     <head/>
     <body>
         <div id="inner">
-            <h2>Pick Trove</h2>
+            <h2>Update Metadata</h2>
             <form action="chooseBranch" method="post">
                 <p>
                     <div class="formHeader">Pick a trove:</div>
