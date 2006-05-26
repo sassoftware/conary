@@ -1,4 +1,4 @@
-Changes in @NEW@
+Changes in 1.0.16
   o Build Changes:
     * Add check for "cvc commit" to make sure a .recipe file exists in 
       the CONARY state file.
