@@ -1,25 +1,32 @@
 Changes in 1.0.16
   o Build Changes:
-    * Add check for "cvc commit" to make sure a .recipe file exists in 
-      the CONARY state file.
-    * Give the option to declare a abstractBaseClass as an instance variable in
-      a recipe so that superclasses do not need a setup() method.
+    * A check has been added to "cvc commit" that insures a .recipe
+      file exists in the CONARY state file.
+    * Recipe classes can now set an "abstractBaseClass" class
+      variable.  When set, Conary will not requite a setup() method in
+      the class.  This is used for creating superclass recipes where
+      setup() methods are not needed.
 
   o Bug Fixes:
     * When running "cvc log" on a newly created source component, cvc now
-      errors gracefully instead of tracing back (bz #538).
-    * Conary now changes to / before running tag scripts. (bz #1134)
-    * "cvc co foo=invalidversionstring" now gives a more helpful error message
-      (bz #1037)
+      errors gracefully instead of tracing back. (bz #538)
+    * Conary now changes to the / directory before running tag
+      scripts. (bz #1134)
+    * "cvc co foo=invalidversionstring" now gives a more helpful error
+      message. (bz #1037)
     * Cloning binary troves uphill now correctly checks for the source
-      trove uphill
-    * Fixed a bug that would cause migrate to raise a KeyError when updating
-      a group that referenced the same trove twice, through two subgroups.
-    * Fixed a bug when calculating whether a shadow has been modified.
-    * A number of bugs with resetting distributed changesets have been fixed.
+      trove uphill.
+    * A bug that would cause "conary migrate" to raise a KeyError when
+      updating a group that referenced the same trove twice (through
+      two subgroups) has been fixed.
+    * A bug that caused miscalculations when determining whether a
+      shadow has been modified has been fixed.
+    * A number of bugs affecting resetting distributed changesets have
+      been fixed.
 
   o Server Changes:
-    * Added entitlementCheckURL to allow external validation of entitlements
+    * A new "entitlementCheckURL" configuration option has been added.
+      This is a hook that allows external validation of entitlements.
 
 Changes in 1.0.15
   o Client Changes:
