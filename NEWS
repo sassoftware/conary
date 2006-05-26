@@ -1,9 +1,9 @@
 Changes in 1.0.16
   o Build Changes:
-    * A check has been added to "cvc commit" that insures a .recipe
+    * A check has been added to "cvc commit" that ensures a .recipe
       file exists in the CONARY state file.
     * Recipe classes can now set an "abstractBaseClass" class
-      variable.  When set, Conary will not requite a setup() method in
+      variable.  When set, Conary will not require a setup() method in
       the class.  This is used for creating superclass recipes where
       setup() methods are not needed.
 
