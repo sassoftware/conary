@@ -102,6 +102,13 @@ class Database(BaseDatabase):
     keywords = KeywordDict()
     tempTableStorage = {}
 
+    def _setCharSet(self, cu):
+        cu.execute("SELECT default_character_set_name "
+                   "FROM INFORMATION_SCHEMA.SCHEMATA "
+                   "where schema_name=?", self.dbName)
+        self.characterSet = cu.fetchone()[0]
+        cu.execute("set character set %s" % self.characterSet)
+
     def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData(["user", "passwd", "host", "port", "db"])
@@ -119,11 +126,7 @@ class Database(BaseDatabase):
             raise sqlerrors.DatabaseError(e.args[1], e.args)
         self.dbName = cdb['db']
         cu = self.cursor()
-        cu.execute("SELECT default_character_set_name "
-                   "FROM INFORMATION_SCHEMA.SCHEMATA "
-                   "where schema_name=?", self.dbName)
-        self.characterSet = cu.fetchone()[0]
-        cu.execute("set character set %s" % self.characterSet)
+        self._setCharSet(cu)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -207,7 +210,8 @@ class Database(BaseDatabase):
                 raise sqlerrors.UnknownDatabase(e.args[1], e.args)
             else:
                 raise
-
+        self.dbName = dbName
+        self._setCharSet(cu)
         self.loadSchema()
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)

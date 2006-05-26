@@ -23,6 +23,9 @@ Changes in 1.0.16
       shadow has been modified has been fixed.
     * A number of bugs affecting resetting distributed changesets have
       been fixed.
+    * A bug in the MySQL dbstore driver that caused the wrong
+      character encoding to be used when switching databases has been
+      fixed.
 
   o Server Changes:
     * A new "entitlementCheckURL" configuration option has been added.
