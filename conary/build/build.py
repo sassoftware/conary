@@ -1276,7 +1276,7 @@ class Install(_PutFiles):
 
     C{r.Install('am-utils.conf', '%(sysconfdir)s/amd.conf')}
 
-    Demonstrates calling C{r.Environment()} to install the file
+    Demonstrates calling C{r.Install()} to install the file
     C{am-utils.conf} to the location C{%(sysconfdir)s/amd.conf}.
     """
     keywords = { 'mode': -2 }
