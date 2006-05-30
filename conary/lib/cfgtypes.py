@@ -27,7 +27,7 @@ class CfgType:
         NOTE: most subclasses probably don't have to implement all of these
         methods, for most it will be enough to implement parseString.
 
-        If the subclass is a list or a dictionary, subclassing from 
+        If the subclass is a list or a dictionary, subclassing from
         CfgDict should mean that parseString is still all that needs
         to be overridden.
     """
@@ -43,19 +43,19 @@ class CfgType:
         return copy.deepcopy(val)
 
     def parseString(self, str):
-        """ Parse the given value.  
-            The return value should be as is expected to be assigned to a 
+        """ Parse the given value.
+            The return value should be as is expected to be assigned to a
             configuration item.
         """
         return str
 
     def updateFromString(self, val, str):
         """ Parse the given value, and apply it to the current value.
-            The return value should be as is expected to be assigned to a 
+            The return value should be as is expected to be assigned to a
             configuration item.
 
             It's possible for many simple configuration items that if you
-            set a config value twice, the second assignment overwrites the 
+            set a config value twice, the second assignment overwrites the
             first.   In this case, val can be ignored.
 
             Modifying val in place is acceptable.
@@ -66,11 +66,11 @@ class CfgType:
         """ Parse the given value, and return the value that you'd expect
             if the parsed value were supposed to replace val.
 
-            The return value should be as is expected to be assigned to a 
+            The return value should be as is expected to be assigned to a
             configuration item where val is currently.
 
             It's possible for many simple configuration items that if you
-            set a config value twice, the second assignment overwrites the 
+            set a config value twice, the second assignment overwrites the
             first.   In this case, val can be ignored.
 
             Modifying val in place is acceptable.
@@ -89,7 +89,7 @@ class CfgType:
             return self.copy(self.default)
 
     def format(self, val, displayOptions=None):
-        """ Return a formated version of val in a format determined by 
+        """ Return a formated version of val in a format determined by
             displayOptions.
         """
         return str(val)
@@ -98,8 +98,8 @@ class CfgType:
         return [self.format(val, displayOptions)]
 
 #---------- simple configuration item types
-# A configuration type converts from string -> ConfigValue and from 
-# ConfigValue -> string, and may store information about how to make that 
+# A configuration type converts from string -> ConfigValue and from
+# ConfigValue -> string, and may store information about how to make that
 # change, but does NOT contain actual configuration values.
 CfgString = CfgType
 
@@ -108,7 +108,7 @@ class Path(str):
     def __new__(cls, origString):
         string = os.path.expanduser(os.path.expandvars(origString))
         return str.__new__(cls, string)
-        
+
     def __init__(self, origString):
         self.__origString = origString
 
@@ -119,7 +119,7 @@ class Path(str):
         return "<Path '%s'>" % self
 
 class CfgPath(CfgType):
-    """ 
+    """
         String configuration option that accepts ~ as a substitute for $HOME
     """
 
@@ -140,7 +140,7 @@ class CfgPath(CfgType):
             return val
 
 class CfgInt(CfgType):
-     
+
     def parseString(self, val):
         try:
             return int(val)
@@ -161,13 +161,13 @@ class CfgBool(CfgType):
 
 
 class CfgRegExp(CfgType):
-    """ RegularExpression type.  
+    """ RegularExpression type.
         Stores the value as (origVal, compiledVal)
     """
-    
+
     def copy(self, val):
         return (val[0], re.compile(val[0]))
-        
+
     def parseString(self, val):
         try:
             return (val, re.compile(val))
@@ -256,7 +256,7 @@ class CfgCallBack(CfgType):
 # ---- configuration structures
 
 # Below here are more complicated configuration structures.
-# They allow you to go from string -> container 
+# They allow you to go from string -> container
 # The abstract containers can all be modified to change their container
 # type, and their item type.
 
@@ -276,9 +276,9 @@ class CfgLineList(CfgType):
                              for x in val.split(self.separator) if x)
 
     def getDefault(self, default=None):
-        if default is None: 
+        if default is None:
             default = self.default
-        return [ self.valueType.getDefault(x) for x in default ] 
+        return [ self.valueType.getDefault(x) for x in default ]
 
     def updateFromString(self, val, str):
         return self.parseString(str)
@@ -313,7 +313,7 @@ class CfgList(CfgType):
         return val
 
     def getDefault(self, default=None):
-        if default is None: 
+        if default is None:
             default = self.default
         return self.listType(self.valueType.getDefault(x) for x in default)
 
@@ -372,10 +372,10 @@ class CfgDict(CfgType):
         return self.valueType.parseString(value)
 
     def getDefault(self, default=None):
-        if default is None: 
+        if default is None:
             default = self.default
         return self.dictType((x,self.valueType.getDefault(y)) \
-                             for (x,y) in default.iteritems()) 
+                             for (x,y) in default.iteritems())
 
 
     def toStrings(self, value, displayOptions):
@@ -398,10 +398,10 @@ class CfgEnumDict(CfgDict):
         k = k.lower()
         v = v.lower()
         if k not in self.validValues:
-            raise ParseError, 'invalid key "%s" not in "%s"' % (k, 
+            raise ParseError, 'invalid key "%s" not in "%s"' % (k,
                                         '|'.join(self.validValues.keys()))
         if v not in self.validValues[k]:
-            raise ParseError, 'invalid value "%s" for key %s not in "%s"' % (v, 
+            raise ParseError, 'invalid value "%s" for key %s not in "%s"' % (v,
                                 k, '|'.join(self.validValues[k]))
 
     def parseString(self, val):
