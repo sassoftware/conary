@@ -177,6 +177,32 @@ class CfgRegExp(CfgType):
     def format(self, val, displayOptions=None):
         return val[0]
 
+
+class CfgSignedRegExp(CfgRegExp):
+    """SignedRegularExpression type.
+    Allows for positive and negative regexp matching.
+    Stores the value as (origVal, sense, compiledVal)
+    """
+    def copy(self, val):
+        return (val[0], val[1], re.compile(val[0]))
+
+    def parseString(self, val):
+        sense = 0
+        if val[0] == "+":
+            sense = 1
+        elif val[0] == "-":
+            sense = -1
+        else:
+            raise ParseError, "regexp value '%s' needs to start with + or -" % (val,)
+        try:
+            return (val, sense, re.compile(val[1:]))
+        except sre_constants.error, e:
+            raise ParseError, "regexp '%s' parse error\n" % (val[1:],) + str(e)
+
+    def format(self, val, displayOptions=None):
+        return "%s%s" % ("- +"[val[1]+1], val[0])
+
+
 class CfgEnum(CfgType):
     """ Enumerated value type. Checks to ensure the strings passed in are
         matched in self.validValues
@@ -362,7 +388,6 @@ class CfgDict(CfgType):
         return dict((k, self.valueType.copy(v)) for k,v in val.iteritems())
 
 class CfgEnumDict(CfgDict):
-
     validValues = {}
 
     def __init__(self, valueType=CfgString, default={}):
@@ -391,13 +416,8 @@ class RegularExpressionList(list):
     """
     def __init__(self, *args, **kw):
         list.__init__(self, *args, **kw)
-
     def __repr__(self):
         return 'RegularExpressionList(%s)' % list.__repr__(self)
-
-    def addExp(self, val):
-        list.append(self, (val, re.compile(val)))
-
     def match(self, s):
         for reStr, regExp in self:
             if regExp.match(s):
@@ -405,20 +425,45 @@ class RegularExpressionList(list):
 
         return False
 
+class SignedRegularExpressionList(list):
+    """
+    Like a RegularExpressionList, but each member regexp is tagged with a
+    + or - to signify a positive or negative match. Match return values
+    are -1, 0 or 1 for a negative, unknown or positive match, respectively
+    First match wins.
+    """
+    def __init__(self, *args):
+        list.__init__(self, *args)
+    def __repr__(self):
+        return "SignedRegularExpressionList(%s)" % list.__repr__(self)
+
+    def match(self, s):
+        for reStr, sense, regExp in self:
+            if regExp.match(s):
+                return sense
+        return 0
+
 class CfgRegExpList(CfgList):
-    def __init__(self, default=RegularExpressionList()):
-        CfgList.__init__(self, CfgRegExp,  listType=RegularExpressionList, 
+    listType = RegularExpressionList
+    valueType = CfgRegExp
+    def __init__(self, default=listType()):
+        CfgList.__init__(self, valueType=self.valueType, listType=self.listType,
                          default=default)
 
     def updateFromString(self, val, newStr):
-        return self.listType(val +
-                     [self.valueType.parseString(x) for x in newStr.split()])
+        return self.listType(val + [self.valueType.parseString(x)
+                                    for x in newStr.split()])
 
     def parseString(self, val):
         if val == '[]':
             return self.listType()
-        return self.listType(
-                    [self.valueType.parseString(x) for x in val.split()])
+        return self.listType([self.valueType.parseString(x)
+                              for x in val.split()])
+
+class CfgSignedRegExpList(CfgRegExpList):
+    listType = SignedRegularExpressionList
+    valueType = CfgSignedRegExp
+    pass
 
 CfgPathList  = CfgLineList(CfgPath, ':')
 
