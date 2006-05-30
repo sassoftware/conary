@@ -30,7 +30,7 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
     entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
     labels                =  conarycfg.CfgInstallLabelPath
-    excludeTroves         =  cfg.CfgRegExpList
+    matchTroves           =  cfg.CfgSignedRegExpList
     source                =  MirrorConfigurationSection
     target                =  MirrorConfigurationSection
     uploadRateLimit       =  (conarycfg.CfgInt, 0)
@@ -273,11 +273,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                       if x[1][1].branch().label() in cfg.labels ]
         log.debug("after label filtering %d troves are needed", len(troveList))
 
-    # filter out troves we want excluded
-    if cfg.excludeTroves:
+    # filter out troves based on the matchTroves value
+    if cfg.matchTroves:
         troveList = [ x for x in troveList
-                      if not cfg.excludeTroves.match(x[1][0]) ]
-        log.debug("after excludeTroves %d troves are needed", len(troveList))
+                      if cfg.matchTroves.match(x[1][0]) > 0 ]
+        log.debug("after matchTroves %d troves are needed", len(troveList))
 
     if len(troveList):
         # now filter the ones already existing
