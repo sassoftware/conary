@@ -19,7 +19,7 @@ import os
 import shutil
 
 #conary
-from conary import trove, versions
+from conary import files, trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.callbacks import UpdateCallback
@@ -747,26 +747,51 @@ class Database(SqlDbRepository):
         callback.committingTransaction()
 	self.commit()
 
-    def removeFile(self, path, multipleMatches = False):
+    def removeFile(self, path):
         # returns the number of troves the path was removed from
 
-	if not multipleMatches:
-	    # make sure there aren't too many
-	    count = 0
-	    for trv in self.db.iterFindByPath(path):
-		count += 1
-		if count > 1: 
-		    raise DatabaseError, "multiple troves own %s" % path
+        trvs = [ x for x in self.db.iterFindByPath(path) ]
+        if len(trvs) > 1:
+            raise DatabaseError, "multiple troves own %s" % path
+        elif not trvs:
+            return 0
 
-        count = 0
-	for trv in self.db.iterFindByPath(path):
-            count += 1
-	    self.db.removeFileFromTrove(trv, path)
-            log.syslog("removed file %s from %s", path, trv.getName())
+        trv = trvs[0]
+
+        rb = self.createRollback()
+
+        reposCs = changeset.ChangeSet()
+        localCs = changeset.ChangeSet()
+
+        newTrv = trv.copy()
+        newTrv.changeVersion(
+                    trv.getVersion().createShadow(versions.RollbackLabel()))
+        fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
+                                            if x[1] == path ]
+        assert(len(fileList) == 1)
+        pathId, fileId, fileVersion = fileList[0]
+        trv.removeFile(pathId)
+        newTrv.removeFile(pathId)
+
+        fullPath = os.path.join(self.root, path)
+
+        f = files.FileFromFilesystem(fullPath, pathId)
+        fileId = f.fileId()
+        newTrv.addFile(pathId, path, fileVersion, fileId)
+
+        localCs.newTrove(newTrv.diff(trv)[0])
+        localCs.addFile(None, fileId, f.freeze())
+        localCs.addFileContents(pathId, changeset.ChangedFileTypes.file,
+                                filecontents.FromFilesystem(fullPath), False)
+
+        rb.add(reposCs, localCs)
+
+        self.db.removeFileFromTrove(trv, path)
+        log.syslog("removed file %s from %s", path, trv.getName())
 
         self.db.commit()
 
-        return count
+        return 1
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
