@@ -31,6 +31,7 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
     labels                =  conarycfg.CfgInstallLabelPath
     matchTroves           =  cfg.CfgSignedRegExpList
+    recurseGroups         =  (cfg.CfgBool, False)
     source                =  MirrorConfigurationSection
     target                =  MirrorConfigurationSection
     uploadRateLimit       =  (conarycfg.CfgInt, 0)
@@ -154,10 +155,63 @@ def buildJobList(repos, groupList):
 
     return jobList
 
+recursedGroups = set()
+def recurseTrove(sourceRepos, name, version, flavor):
+    global recursedGroups
+    assert(name.startswith("group-"))
+    # there's nothing much we can recurse from the source
+    if name.endswith(":source"):
+        return []
+    # avoid grabbing the same group multiple times
+    if (name, version, flavor) in recursedGroups:
+        return []
+    # we need to grab the trove list recursively for
+    # mirroring. Unfortunately the netclient does not wire the
+    # repsoitory's getChangeSet parameters, so we need to cheat a
+    # little to keep the roundtrips to a minimum
+    log.debug("recursing group trove: %s=%s[%s]" % (name, version, flavor))
+    groupCs = sourceRepos.createChangeSet(
+        [(name, (None, None), (version, flavor), True)],
+        withFiles=False, withFileContents = False, recurse = True)
+    recursedGroups.add((name, version, flavor))
+    ret = []
+    for troveCs in groupCs.iterNewTroveList():
+        (trvName, trvVersion, trvFlavor) = troveCs.getNewNameVersionFlavor()
+        # keep track of groups we have already recursed through
+        if trvName.startswith("group-"):
+            recursedGroups.add((trvName, trvVersion, trvFlavor))
+        ret.append((trvName, trvVersion, trvFlavor))
+    return ret
+
+# format a bundle for display
+def displayBundle(bundle):
+    minMark = min([x[0] for x in bundle])
+    names = [x[1][0] for x in bundle]
+    names.sort()
+    oldVF = set([x[1][1] for x in bundle])
+    newVF = set([x[1][2] for x in bundle])
+    if len(oldVF) > 1 or len(newVF) > 1:
+        # this bundle doesn't use common version/flavors
+        # XXX: find out why? for now, return old style display
+        return [ x[1] for x in bundle ]
+    oldVF = list(oldVF)[0]
+    newVF = list(newVF)[0]
+    ret = []
+    markLine = "mark: %.0f " % (minMark,)
+    if oldVF == (None, None):
+        markLine += "absolute changeset"
+        ret.append(markLine)
+    else:
+        markLine += "relative changeset"
+        ret.append(markLine)
+        ret.append("oldVF: %s" % (oldVF,))
+    ret.append("newVF: %s" % (newVF,))
+    ret.append("troves: " + ' '.join(names))
+    return "\n  ".join(ret)
+
 # this is to keep track of PGP keys we already added to avoid repeated
 # add operation into the target
 addedKeys = set()
-
 def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
                      test = False, syncSigs = False):
     global addedKeys
@@ -279,6 +333,20 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                       if cfg.matchTroves.match(x[1][0]) > 0 ]
         log.debug("after matchTroves %d troves are needed", len(troveList))
 
+    # figure out if we need to recurse the group-troves
+    if cfg.recurseGroups:
+        # avoid adding duplicates
+        troveSetList = set([x[1] for x in troveList])
+        for (mark, (name, version, flavor)) in troveList:
+            if name.startswith("group-"):
+                recTroves = recurseTrove(sourceRepos, name, version, flavor)
+                # add the results at the end with the current mark
+                for (n,v,f) in recTroves:
+                    if (n,v,f) not in troveSetList:
+                        troveList.append((mark, (n,v,f)))
+                        troveSetList.add((n,v,f))
+        log.debug("after group recursion %d troves are needed", len(troveList))
+
     if len(troveList):
         # now filter the ones already existing
         troveList = filterAlreadyPresent(targetRepos, troveList)
@@ -324,7 +392,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         else:
             (outFd, tmpName) = util.mkstemp()
             os.close(outFd)
-            log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), jobList))
+            log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
             cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
             log.debug("committing")
             targetRepos.commitChangeSetFile(tmpName, mirror = True)
