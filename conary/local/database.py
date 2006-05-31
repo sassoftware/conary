@@ -814,9 +814,6 @@ class Database(SqlDbRepository):
 
             rb.add(reposCs, localCs)
 
-        import epdb
-        epdb.st('f')
-
         rb = self.createRollback()
         try:
             _doRemove(self, rb, pathList)
