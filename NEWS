@@ -2,6 +2,11 @@ Changes in 1.0.17:
   o Client Changes:
     * Individual file removals now result in one rollback per file removed
       (CNY-7)
+  o Server Changes:
+    * A single conary repository can host multiple serverNames. In the
+      Conary repository's configuration file, the serverName directive can
+      now specify a space separated list of valid server names which will be
+      accepted and served from that repository. (CNY-16)
 
 Changes in 1.0.16
   o Build Changes:
