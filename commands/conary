@@ -32,16 +32,17 @@ if __name__ == "__main__":
         importer.install()
 
 #stdlib
+import itertools
 import optparse
 import os
 import pwd
 import xmlrpclib
 import errno
 
-from conary.repository import errors
 #conary
+import conary
 from conary import callbacks, commit, conarycfg, constants
-from conary import cscmd, deps, flavorcfg, query
+from conary import cscmd, deps, flavorcfg, query, repository
 from conary import queryrep, conaryclient, rollbacks, showchangeset, state
 from conary import trove, updatecmd, verify, versions
 from conary.lib import cfg,cfgtypes,log, openpgpkey, options, util
@@ -370,6 +371,8 @@ class RemoveCommand(ConaryCommand):
 
         rc = 0
 
+        pathList = []
+
         for path in otherArgs[2:]:
             if not path:
                 log.error("remove cannot handle an empty path")
@@ -386,13 +389,18 @@ class RemoveCommand(ConaryCommand):
                         # the root ended with a /
                         path = '/' + fullPath
 
-            matches = db.removeFile(path)
-            if not matches:
-                log.error('%s is not owned by any troves in the database', 
-                          path)
-                rc = 1
-                continue
+            pathList.append((fullPath, path))
 
+        try:
+            db.removeFiles([ x[1] for x in pathList ])
+        except conary.errors.DatabaseError, e:
+            log.error(str(e))
+            return 1
+        except OSError, e:
+            import epdb
+            epdb.st()
+
+        for (fullPath, path) in pathList:
             try:
                 try:
                     os.unlink(fullPath)
@@ -935,7 +943,6 @@ class ConaryMain(options.MainHandler):
             return 1
 
 def main(argv=sys.argv):
-    from conary.repository import errors
     try:
         debugAll = '--debug-all' in argv
         if debugAll:
@@ -943,7 +950,7 @@ def main(argv=sys.argv):
             argv.remove('--debug-all')
             debuggerException = Exception
         else:
-            debuggerException = errors.InternalConaryError
+            debuggerException = conary.repository.errors.InternalConaryError
 
         conaryMain = ConaryMain()
         ccfg = conaryMain.getConfigFile(argv)
@@ -965,7 +972,7 @@ def main(argv=sys.argv):
         if log.getVerbosity() == log.DEBUG:
             raise
         log.error(str(e))
-    except errors.ConaryError, e:
+    except conary.repository.errors.ConaryError, e:
         if not str(e):
             raise
         else:
