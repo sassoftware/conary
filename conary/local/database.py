@@ -747,51 +747,84 @@ class Database(SqlDbRepository):
         callback.committingTransaction()
 	self.commit()
 
-    def removeFile(self, path):
-        # returns the number of troves the path was removed from
+    def removeFiles(self, pathList):
 
-        trvs = [ x for x in self.db.iterFindByPath(path) ]
-        if len(trvs) > 1:
-            raise DatabaseError, "multiple troves own %s" % path
-        elif not trvs:
-            return 0
+        def _doRemove(self, rb, pathList):
+            pathsByTrove = {}
+            troves = {}
 
-        trv = trvs[0]
+            for path in pathList:
+                trvs = [ x for x in self.db.iterFindByPath(path) ]
+                if len(trvs) > 1:
+                    raise DatabaseError, "multiple troves own %s" % path
+                elif not trvs:
+                    raise DatabaseError, "no trove owns %s" % path
 
-        rb = self.createRollback()
+                trv = trvs[0]
+                trvInfo = trv.getNameVersionFlavor()
 
-        reposCs = changeset.ChangeSet()
-        localCs = changeset.ChangeSet()
+                troves[trvInfo] = trv
+                pathsByTrove.setdefault(trvInfo, []).append(path)
 
-        newTrv = trv.copy()
-        newTrv.changeVersion(
-                    trv.getVersion().createShadow(versions.RollbackLabel()))
-        fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
-                                            if x[1] == path ]
-        assert(len(fileList) == 1)
-        pathId, fileId, fileVersion = fileList[0]
-        trv.removeFile(pathId)
-        newTrv.removeFile(pathId)
+            reposCs = changeset.ChangeSet()
+            localCs = changeset.ChangeSet()
 
-        fullPath = os.path.join(self.root, path)
+            for trvInfo, pathList in pathsByTrove.iteritems():
+                trv = troves[trvInfo]
 
-        f = files.FileFromFilesystem(fullPath, pathId)
-        fileId = f.fileId()
-        newTrv.addFile(pathId, path, fileVersion, fileId)
+                newTrv = trv.copy()
+                newTrv.changeVersion(
+                            trv.getVersion().createShadow(versions.RollbackLabel()))
 
-        localCs.newTrove(newTrv.diff(trv)[0])
-        localCs.addFile(None, fileId, f.freeze())
-        localCs.addFileContents(pathId, changeset.ChangedFileTypes.file,
+                for path in pathList:
+                    fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
+                                                        if x[1] in path ]
+                    assert(len(fileList) == 1)
+                    pathId, fileId, fileVersion = fileList[0]
+                    trv.removeFile(pathId)
+                    newTrv.removeFile(pathId)
+
+                    fullPath = util.joinPaths(self.root, path)
+
+                    try:
+                        f = files.FileFromFilesystem(fullPath, pathId)
+                    except OSError, e:
+                        if e.errno != errno.ENOENT:
+                            raise
+
+                        stream = self.db.getFileStream(fileId)
+                        newTrv.addFile(pathId, path, fileVersion, fileId)
+                        localCs.addFile(None, fileId, stream)
+                        localCs.addFileContents(pathId,
+                                changeset.ChangedFileTypes.hldr,
+                                filecontents.FromString(""), False)
+                    else:
+                        fileId = f.fileId()
+                        newTrv.addFile(pathId, path, fileVersion, fileId)
+                        localCs.addFile(None, fileId, f.freeze())
+                        localCs.addFileContents(pathId,
+                                changeset.ChangedFileTypes.file,
                                 filecontents.FromFilesystem(fullPath), False)
 
-        rb.add(reposCs, localCs)
+                    self.db.removeFileFromTrove(trv, path)
 
-        self.db.removeFileFromTrove(trv, path)
-        log.syslog("removed file %s from %s", path, trv.getName())
+                    log.syslog("removed file %s from %s", path, trv.getName())
+
+                localCs.newTrove(newTrv.diff(trv)[0])
+
+            rb.add(reposCs, localCs)
+
+        import epdb
+        epdb.st('f')
+
+        rb = self.createRollback()
+        try:
+            _doRemove(self, rb, pathList)
+        except Exception, e:
+            self.removeRollback("r." + rb.dir.split("/")[-1])
+            raise
 
         self.db.commit()
-
-        return 1
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
