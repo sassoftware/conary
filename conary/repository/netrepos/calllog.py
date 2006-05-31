@@ -21,19 +21,26 @@ class CallLogEntry:
         assert(revision == 1)
 
         (self.serverName, self.timeStamp, self.remoteIp,
-         (self.user, self.entitlement), 
+         (self.user, self.entitlement),
          self.methodName, self.args, self.exceptionStr) = info[1:]
 
 class CallLogger:
-
     logFormatRevision = 1
+
+    def __init__(self, logPath, serverNameList, readOnly = False):
+        self.serverNameList = serverNameList
+        self.path = logPath
+        if readOnly:
+            self.logFd = os.open(logPath, os.O_RDONLY)
+        else:
+            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND | os.O_RDWR)
 
     def log(self, remoteIp, authToken, methodName, args, exception = None):
         if exception:
             exception = str(exception)
 
         (user, entitlement) = authToken[0], authToken[2]
-        logStr = cPickle.dumps((self.logFormatRevision, self.serverName,
+        logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
                                 time.time(), remoteIp, (user, entitlement),
                                 methodName, args, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
@@ -64,12 +71,4 @@ class CallLogger:
                 where = os.lseek(self.logFd, 0, 1)
 
             time.sleep(1)
-
-    def __init__(self, logPath, serverName, readOnly = False):
-        self.serverName = serverName
-        self.path = logPath
-        if readOnly:
-            self.logFd = os.open(logPath, os.O_RDONLY)
-        else:
-            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND | os.O_RDWR)
 

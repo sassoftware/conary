@@ -125,7 +125,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
-	self.name = cfg.serverName
+	self.serverNameList = cfg.serverName
 	self.commitAction = cfg.commitAction
         self.troveStore = None
         self.logFile = cfg.logFile
@@ -150,7 +150,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.log = tracelog.getLog(filename=f, level=l)
 
         if self.logFile:
-            self.callLog = calllog.CallLogger(self.logFile, self.name)
+            self.callLog = calllog.CallLogger(self.logFile, self.serverNameList)
 
         if not db:
             self.open()
@@ -158,7 +158,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db = db
             self.open(connect = False)
 
-        self.log(1, "url=%s" % basicUrl, "name=%s" % self.name,
+        self.log(1, "url=%s" % basicUrl, "name=%s" % self.serverNameList,
               self.repDB, self.contentsDir)
 
     def __del__(self):
@@ -182,13 +182,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         depSchema.setupTempDepTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
         self.repos = fsrepos.FilesystemRepository(
-            self.name, self.troveStore, self.contentsDir, self.map,
-            requireSigs = self.requireSigs)
-	self.auth = NetworkAuthorization(self.db, self.name, log = self.log,
-                                         cacheTimeout = self.authCacheTimeout,
-                                         passwordURL = self.externalPasswordURL,
-                                         entCheckURL = self.entitlementCheckURL)
-
+            self.serverNameList, self.troveStore, self.contentsDir,
+            self.map, requireSigs = self.requireSigs)
+	self.auth = NetworkAuthorization(
+            self.db, self.serverNameList, log = self.log,
+            cacheTimeout = self.authCacheTimeout,
+            passwordURL = self.externalPasswordURL,
+            entCheckURL = self.entitlementCheckURL)
         self.log.reset()
 
     def reopen(self):
@@ -1344,7 +1344,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             items.setdefault((version, flavor), []).append(name)
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, self.name, mirror = mirror)
+	self.repos.commitChangeSet(cs, mirror = mirror)
 	if not self.commitAction:
 	    return True
 
@@ -2036,7 +2036,7 @@ class ServerConfig(ConfigFile):
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
-    serverName              = CfgString
+    serverName              = CfgLineList(CfgString)
     staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog

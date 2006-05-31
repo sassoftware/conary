@@ -46,7 +46,10 @@ def checkAuth(write = False, admin = False):
         def wrapper(self, **kwargs):
             # XXX two xmlrpc calls here could possibly be condensed to one
             # first check the password only
-            if not self.repos.getUserGroups(self.serverName):
+            ugList = []
+            for serverName in self.serverNameList:
+                ugList += self.repos.getUserGroups(serverName)
+            if not ugList:
                 raise InvalidPassword
             # now check for proper permissions
             if write or admin:
@@ -93,13 +96,14 @@ class HttpHandler(WebHandler):
         if type(auth) is int:
             raise apache.SERVER_RETURN, auth
 
+        self.serverNameList = self.repServer.serverNameList
         cfg = conarycfg.ConaryConfiguration(readConfigFiles = False)
         cfg.repositoryMap = self.repServer.map
-        cfg.user.addServerGlob(self.repServer.name, auth[0], auth[1])
+        for serverName in self.serverNameList:
+            cfg.user.addServerGlob(serverName, auth[0], auth[1])
         self.repos = shimclient.ShimNetClient(
             self.repServer, self._protocol, self._port, auth,
             cfg.repositoryMap, cfg.user)
-        self.serverName = self.repServer.name
 
         if not self.cmd:
             self.cmd = "main"
@@ -167,7 +171,9 @@ class HttpHandler(WebHandler):
         if not char:
             char = 'A'
             defaultPage = True
-        troves = self.repos.troveNamesOnServer(self.serverName)
+        troves = []
+        for serverName in self.serverNameList:
+            troves += self.repos.troveNamesOnServer(serverName)
 
         # keep a running total of each letter we see so that the display
         # code can skip letters that have no troves
@@ -210,13 +216,17 @@ class HttpHandler(WebHandler):
             for component in components[x]:
                 packages.append(x + ":" + component)
 
-        return self._write("browse", packages = sorted(packages), components = components, char = char, totals = totals)
+        return self._write("browse", packages = sorted(packages),
+                           components = components, char = char, totals = totals)
 
     @strFields(t = None, v = "")
     @checkAuth(write=False)
     def troveInfo(self, auth, t, v):
         t = unquote(t)
-        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]})
+        leaves = {}
+        for serverName in self.serverNameList:
+            newLeaves = self.repos.getTroveVersionList(serverName, {t: [None]})
+            leaves.update(newLeaves)
         if t not in leaves:
             return self._write("error",
                                error = '%s was not found on this server.' %t)

@@ -28,6 +28,12 @@ UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 class UserAuthorization:
+    def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
+        self.db = db
+        self.pwCheckUrl = pwCheckUrl
+        self.cacheTimeout = cacheTimeout
+        self.pwCache = {}
+
 
     def addUserByMD5(self, cu, user, salt, password, ugid):
         try:
@@ -152,18 +158,17 @@ class UserAuthorization:
         cu.execute("SELECT userName FROM Users")
         return [ x[0] for x in cu ]
 
-    def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
-        self.db = db
-        self.pwCheckUrl = pwCheckUrl
-        self.cacheTimeout = cacheTimeout
-        self.pwCache = {}
 
 class EntitlementAuthorization:
+    def __init__(self, entCheckUrl = None, cacheTimeout = None):
+        self.entCheckUrl = entCheckUrl
+        self.cacheTimeout = cacheTimeout
+        self.cache = {}
 
-    def getAuthorizedGroups(self, cu, entitlementGroup, entitlement):
+    def getAuthorizedGroups(self, cu, serverName, entitlementGroup, entitlement):
         if self.cacheTimeout:
-            cacheEntry = sha1helper.sha1String("%s%s" %
-                                        (entitlementGroup, entitlement))
+            cacheEntry = sha1helper.sha1String("%s%s%s" % (
+                serverName, entitlementGroup, entitlement))
             userGroupIds, timeout = self.cache.get(cacheEntry, (None, None))
             if timeout is not None and (timeout < time.time()):
                 return userGroupIds
@@ -171,7 +176,7 @@ class EntitlementAuthorization:
         if self.entCheckUrl:
             try:
                 url = "%s?server=%s;class=%s;key=%s" \
-                        % (self.entCheckUrl, urllib.quote(self.serverName),
+                        % (self.entCheckUrl, urllib.quote(serverName),
                            urllib.quote(entitlementGroup),
                            urllib.quote(entitlement))
                 f = urllib2.urlopen(url)
@@ -186,7 +191,7 @@ class EntitlementAuthorization:
             except:
                 return set()
 
-            if p['server'] != self.serverName:
+            if p['server'] != serverName:
                 return set()
 
             entitlementGroup = p['class']
@@ -196,8 +201,7 @@ class EntitlementAuthorization:
         cu.execute("""
         SELECT userGroupId FROM EntitlementGroups
         JOIN Entitlements USING (entGroupId)
-        WHERE
-        entGroup=? AND entitlement=?
+        WHERE entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
 
         userGroupIds = set(x[0] for x in cu)
@@ -208,14 +212,9 @@ class EntitlementAuthorization:
 
         return userGroupIds
 
-    def __init__(self, serverName, entCheckUrl = None, cacheTimeout = None):
-        self.serverName = serverName
-        self.entCheckUrl = entCheckUrl
-        self.cacheTimeout = cacheTimeout
-        self.cache = {}
 
 class NetworkAuthorization:
-    def __init__(self, db, name, cacheTimeout = None, log = None,
+    def __init__(self, db, serverNameList, cacheTimeout = None, log = None,
                  passwordURL = None, entCheckURL = None):
         """
         @param cacheTimeout: Timeout, in seconds, for authorization cache
@@ -228,15 +227,14 @@ class NetworkAuthorization:
         @param entCheckURL: URL base for mapping an entitlement received
         over the network to an entitlement to check for in the database.
         """
-        self.name = name
+        self.serverNameList = serverNameList
         self.db = db
         self.reCache = {}
         self.log = log or tracelog.getLog(None)
-        self.userAuth = UserAuthorization(self.db, passwordURL,
-                                          cacheTimeout = cacheTimeout)
-        self.entitlementAuth = EntitlementAuthorization(name,
-                                          cacheTimeout = cacheTimeout,
-                                          entCheckUrl = entCheckURL)
+        self.userAuth = UserAuthorization(
+            self.db, passwordURL, cacheTimeout = cacheTimeout)
+        self.entitlementAuth = EntitlementAuthorization(
+            cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
 
     def getAuthGroups(self, cu, authToken):
         self.log(3, authToken[0], authToken[2], authToken[3])
@@ -250,10 +248,10 @@ class NetworkAuthorization:
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
         if authToken[2] is not None:
-            groupsFromEntitlement = \
-                  self.entitlementAuth.getAuthorizedGroups(cu, authToken[2],
-                                                           authToken[3])
-            groupSet.update(groupsFromEntitlement)
+            for serverName in self.serverNameList:
+                groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
+                    cu, serverName, authToken[2], authToken[3])
+                groupSet.update(groupsFromEntitlement)
 
         return groupSet
 
@@ -263,8 +261,8 @@ class NetworkAuthorization:
                  "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
 
-        if label and label.getHost() != self.name:
-            raise errors.RepositoryMismatch(self.name, label.getHost())
+        if label and label.getHost() not in self.serverNameList:
+            raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
 
         if not authToken[0]:
             return False

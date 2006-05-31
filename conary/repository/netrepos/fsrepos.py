@@ -50,16 +50,16 @@ class FilesystemChangeSetJob(ChangeSetJob):
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
-    def __init__(self, name, troveStore, contentsDir, repositoryMap,
+    def __init__(self, serverNameList, troveStore, contentsDir, repositoryMap,
                  requireSigs = False):
-	self.name = name
+	self.serverNameList = serverNameList
 	map = dict(repositoryMap)
-	map[name] = self
+        for serverName in serverNameList:
+            map[serverName] = self
         # XXX this client needs to die
         from conary import conarycfg
         self.reposSet = netclient.NetworkRepositoryClient(map,
                                     conarycfg.UserInformation())
-
 	self.troveStore = troveStore
 
         self.requireSigs = requireSigs
@@ -109,7 +109,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# the get trove netclient provides doesn't work with a
 	# FilesystemRepository (it needs to create a change set which gets
 	# passed)
-	if fileVersion.getHost() != self.name:
+	if fileVersion.getHost() not in self.serverNameList:
             # XXX This code is not needed as of version 1.0.14 of the client.
 	    assert(not withContents)
 	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
@@ -133,7 +133,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, serverName, mirror=False):
+    def commitChangeSet(self, cs, mirror=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -148,7 +148,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             threshold = TRUST_UNTRUSTED
         try:
             # reset time stamps only if we're not mirroring.
-            FilesystemChangeSetJob(self, cs, [ serverName ],
+            FilesystemChangeSetJob(self, cs, self.serverNameList,
                                    resetTimestamps = not mirror,
                                    keyCache = self.troveStore.keyTable.keyCache,
                                    threshold = threshold,
@@ -175,7 +175,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # the get trove netclient provides doesn't work with a
             # FilesystemRepository (it needs to create a change set which gets
             # passed)
-            if fileVersion.getHost() == self.name:
+            if fileVersion.getHost() in self.serverNameList:
                 fileObj = item[2]
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
@@ -332,7 +332,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				    [(oldVersion, newVersion)]
 
 	    if not newVersion:
-                if oldVersion.getHost() != self.name:
+                if oldVersion.getHost() not in self.serverNameList:
                     externalTroveList.append((troveName,
                                          (oldVersion, oldFlavor),
                                          (None, None), absolute))
@@ -345,8 +345,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                                 (None, None), absolute))
 		continue
 
-            if (newVersion.getHost() != self.name
-                or (oldVersion and oldVersion.getHost() != self.name)):
+            if (newVersion.getHost() not in self.serverNameList
+                or (oldVersion and oldVersion.getHost() not in self.serverNameList)):
                 # don't try to make changesets between repositories; the
                 # client can do that itself
                 externalTroveList.append((troveName, (oldVersion, oldFlavor),
@@ -373,9 +373,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
-                if (newFileVersion.getHost() != self.name
+                if (newFileVersion.getHost() not in self.serverNameList
                     or (oldFileVersion and
-                        oldFileVersion.getHost() != self.name)):
+                        oldFileVersion.getHost() not in self.serverNameList)):
                     externalFileList.append((pathId, troveName,
                          (oldVersion, oldFlavor, oldFileId, oldFileVersion),
                          (newVersion, newFlavor, newFileId, newFileVersion)))
