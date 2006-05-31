@@ -419,7 +419,7 @@ class RegularExpressionList(list):
     def __repr__(self):
         return 'RegularExpressionList(%s)' % list.__repr__(self)
     def addExp(self, val):
-        list.append(self, CfgRegExp.parseString(val))
+        list.append(self, CfgRegExp().parseString(val))
     def match(self, s):
         for reStr, regExp in self:
             if regExp.match(s):
@@ -439,7 +439,7 @@ class SignedRegularExpressionList(list):
     def __repr__(self):
         return "SignedRegularExpressionList(%s)" % list.__repr__(self)
     def addExp(self, val):
-        list.append(self, CfgSignedRegExp.parseString(val))
+        list.append(self, CfgSignedRegExp().parseString(val))
     def match(self, s):
         for reStr, sense, regExp in self:
             if regExp.match(s):
