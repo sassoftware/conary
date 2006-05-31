@@ -63,7 +63,7 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
 
     if cfg.interactive:
         print troveStr
-        print "Total: %d troves" % len(troves)
+        print "Total: %d troves" % len(jobList)
         answer = cmdline.askYn('Are you sure you want to digitally sign these troves [y/N]?', default=False)
         if not answer:
             return
