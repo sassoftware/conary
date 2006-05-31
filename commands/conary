@@ -396,9 +396,6 @@ class RemoveCommand(ConaryCommand):
         except conary.errors.DatabaseError, e:
             log.error(str(e))
             return 1
-        except OSError, e:
-            import epdb
-            epdb.st()
 
         for (fullPath, path) in pathList:
             try:
