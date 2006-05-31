@@ -204,9 +204,10 @@ def displayBundle(bundle):
     else:
         markLine += "relative changeset"
         ret.append(markLine)
+    ret.append("troves: " + ' '.join(names))
+    if oldVF != (None, None):
         ret.append("oldVF: %s" % (oldVF,))
     ret.append("newVF: %s" % (newVF,))
-    ret.append("troves: " + ' '.join(names))
     return "\n  ".join(ret)
 
 # this is to keep track of PGP keys we already added to avoid repeated
