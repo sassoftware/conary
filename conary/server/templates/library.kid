@@ -53,7 +53,7 @@
                         <span py:if="not hasWrite" py:strip="True"><a href="login">Login</a></span>
                         <span py:if="hasWrite" py:strip="True">Welcome, <b>${currentUser}</b><span py:if="isAdmin">&nbsp;(administrator)</span>.</span>
                     </div>
-                    <p><span style="font-size:x-large;">${cfg.serverName}</span><br /><span style="font-size: smaller;">Conary Repository Server ${constants.version}</span></p>
+                    <p style="font-size: smaller;"><span style="font-weight:bold;" py:content="', '.join(cfg.serverName)" /><br />Conary Repository Server ${constants.version}</p>
                 </div>
             </div>
             <ul class="menu">
