@@ -933,7 +933,10 @@ class DependencySet(object):
 	return self.hash
 
     def __nonzero__(self):
-	return not(not(self.members))
+	#return not(not(self.members))
+        # avoid evaluating DependencySets in a boolean context
+        raise NotImplementedError, \
+              "DependencySet objects can not be evaluated in a boolean context"
 
     def __str__(self):
         if self.isFlavor():
