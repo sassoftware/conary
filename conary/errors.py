@@ -80,3 +80,14 @@ class DatabasePathConflicts(DatabaseError):
 
     def __init__(self, l):
         self.l = l
+
+class ShadowRedirect(ConaryError):
+    """User attempted to create a shadow (or branch, but branch's aren't
+       really supported anymore) or a redirect"""
+
+    def __str__(self):
+        return "cannot create a shadow of %s=%s[%s] because it is a redirect" \
+                    % self.info
+
+    def __init__(self, n, v, f):
+        self.info = (n, v, f)
