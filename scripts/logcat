@@ -38,6 +38,8 @@ from conary.repository.netrepos import calllog
 sys.excepthook = util.genExcepthook(debug=True)
 
 parser = optparse.OptionParser(version = '%prog 0.1')
+parser.add_option("--exceptions", "-e", dest = "showExcepts", default = False,
+                  action = "store_true", help = "display only entries which generated exceptions")
 parser.add_option("--follow", "-f", dest = "follow", default = False,
                   action = "store_true", help = "follow updates to the log")
 parser.add_option("-n", dest = "noReverseDNS", default = False,
@@ -89,11 +91,19 @@ for entry in iterator:
     else:
         params = ""
 
-    print "%s %s %s %s%s%s" % (
+    if entry.exceptionStr is not None:
+        excpt = " " + str(entry.exceptionStr)
+    elif options.showExcepts:
+        continue
+    else:
+        excpt =""
+
+    print "%s %s %s %s%s%s%s" % (
         hostname,
         time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
         entry.serverName,
         userStr,
         entry.methodName,
-        params
+        params,
+        excpt
     )
