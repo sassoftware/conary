@@ -283,7 +283,6 @@ class DependenciesStream(InfoStream):
     """
 
     __slots__ = 'deps'
-    _thawFunc = deps.ThawDependencySet
 
     def __call__(self):
 	return self.deps
@@ -304,7 +303,7 @@ class DependenciesStream(InfoStream):
 	return None
 
     def thaw(self, frz):
-        self.deps = self._thawFunc(frz)
+        self.deps = deps._Thaw(deps.DependencySet(), frz)
 
     def twm(self, diff, base):
         self.thaw(diff)
@@ -318,8 +317,8 @@ class DependenciesStream(InfoStream):
         self.thaw(dep)
 
 class FlavorsStream(DependenciesStream):
-    _thawFunc = deps.ThawFlavor
-    pass
+    def thaw(self, frz):
+        self.deps = deps._Thaw(deps.Flavor(), frz)
 
 class StringsStream(list, InfoStream):
     """
