@@ -47,12 +47,12 @@ def displayBranchJob(cs, shadow=False):
     for csTrove in cs.iterNewTroveList():
         newInfo = str(csTrove.getNewVersion())
         flavor = csTrove.getNewFlavor()
-        if flavor:
+        if flavor is not None:
             newInfo += '[%s]' % flavor
 
         print "%s%s  %-20s (%s)" % (indent, branchOp, csTrove.getName(),
                                         newInfo)
-                                       
+
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
            sourceOnly = False, binaryOnly = False, info = False,
