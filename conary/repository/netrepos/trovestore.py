@@ -251,7 +251,7 @@ class TroveStore:
 	# to some extent with the file table creation below, but there are
 	# normally very few flavors per trove so this probably better
 	flavorsNeeded = {}
-	if troveFlavor:
+	if troveFlavor is not None:
 	    flavorsNeeded[troveFlavor] = True
 
 	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
@@ -721,7 +721,7 @@ class TroveStore:
                     idxA, name, version, flavor, flags, timeStamps = \
                                                 troveTrovesCursor.next()
                     version = versions.VersionFromString(version)
-                    flavor = deps.ThawDependencySet(flavor)
+                    flavor = deps.ThawFlavor(flavor)
 
                     version.setTimeStamps(
                             [ float(x) for x in timeStamps.split(":") ])
@@ -754,7 +754,7 @@ class TroveStore:
                             troveRedirectsCursor.next()
                     targetBranch = versions.VersionFromString(targetBranch)
                     if targetFlavor is not None:
-                        targetFlavor = deps.deps.ThawDependencySet(targetFlavor)
+                        targetFlavor = deps.deps.ThawFlavor(targetFlavor)
 
                     trv.addRedirect(targetName, targetBranch, targetFlavor)
             except StopIteration:

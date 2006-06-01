@@ -57,12 +57,12 @@ class Flavors:
 
     def getId(self, flavorId):
 	if flavorId == 0:
-	    return deps.DependencySet()
+	    return deps.Flavor()
 
 	cu = self.db.cursor()
 	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?",
 		   flavorId)
 	try:
-	    return deps.ThawDependencySet(cu.next()[0])
+	    return deps.ThawFlavor(cu.next()[0])
 	except StopIteration:
             raise KeyError, flavorId

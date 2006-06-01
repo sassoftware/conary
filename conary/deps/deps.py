@@ -792,7 +792,7 @@ class DependencySet(object):
         self.members[tag] = depClass()
 
     def copy(self):
-        new = DependencySet()
+        new = self.__class__()
         add = new.addDep
         for depClass in self.members.itervalues():
             cls = depClass.__class__
@@ -800,43 +800,13 @@ class DependencySet(object):
                 add(cls, dep)
         return new
 
-    def toStrongFlavor(self):
-        newDep = DependencySet()
-        for tag, depClass in self.members.iteritems():
-            newDep.members[tag] = depClass.toStrongFlavor()
-        return newDep
-
-    def score(self,other):
-        score = 0
-	for tag in other.members:
-            # ignore empty dep classes when scoring
-            if not other.members[tag].members:
-                continue
-	    if tag not in self.members: 
-                thisScore = other.members[tag].emptyDepsScore()
-            else:
-                thisScore = self.members[tag].score(other.members[tag])
-            if thisScore is False:
-		return False
-
-            score += thisScore
-
-        return score
-
-    def satisfies(self, other):
-        return self.score(other) is not False
-
-    def stronglySatisfies(self, other):
-        return self.toStrongFlavor().score(
-                    other.toStrongFlavor()) is not False
-
     def getDepClasses(self):
         return self.members
 
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
-        if not other:
+        if other is None:
             return
-
+        assert(isinstance(other, self.__class__))
         self.hash = None
         a = self.addDep
 	for tag, members in other.members.iteritems():
@@ -855,7 +825,8 @@ class DependencySet(object):
                     a(c, dep)
 
     def intersection(self, other, strict=True):
-        newDep = DependencySet()
+        assert(isinstance(other, self.__class__))
+        newDep = self.__class__()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
                 dep = depClass.intersection(other.members[tag], strict=strict)
@@ -868,7 +839,8 @@ class DependencySet(object):
         return self.intersection(other)
 
     def difference(self, other, strict=True):
-        newDep = DependencySet()
+        assert(isinstance(other, self.__class__))
+        newDep = self.__class__()
         a = newDep.addDep
         for tag, depClass in self.members.iteritems():
             c = depClass.__class__
@@ -898,12 +870,13 @@ class DependencySet(object):
     def __cmp__(self, other):
         if other is None:
             return -1
+        assert(isinstance(other, self.__class__))
         myMembers = self.members
         otherMembers = other.members
         tags = []
         for tag in xrange(DEP_CLASS_SENTINEL):
             if tag in myMembers:
-                if tag in otherMembers: 
+                if tag in otherMembers:
                     tags.append(tag)
                 else:
                     return -1
@@ -933,18 +906,12 @@ class DependencySet(object):
 	return self.hash
 
     def __nonzero__(self):
-	#return not(not(self.members))
-        # avoid evaluating DependencySets in a boolean context
-        raise NotImplementedError, \
-              "DependencySet objects can not be evaluated in a boolean context"
+	return not(not(self.members))
 
     def __str__(self):
-        if self.isFlavor():
-            return formatFlavor(self)
-        else:
-            memberList = self.members.items()
-            memberList.sort()
-            return "\n".join([ str(x[1]) for x in memberList])
+        memberList = self.members.items()
+        memberList.sort()
+        return "\n".join([ str(x[1]) for x in memberList])
 
     def freeze(self):
         rc = []
@@ -953,27 +920,59 @@ class DependencySet(object):
                 rc.append('%d#%s' %(tag, dep.freeze()))
         return '|'.join(rc)
 
-    def isFlavor(self):
-        for key in self.getDepClasses().iterkeys():
-            if key not in (DEP_CLASS_IS, DEP_CLASS_USE):
-                return False
-        return True
-
     def __repr__(self):
-        if self.isFlavor():
-            return "Flavor('%s')" % formatFlavor(self)
-        else:
-            return "ThawDep('%s')" % self.freeze()
+        return "ThawDep('%s')" % self.freeze()
 
     def __init__(self):
 	self.members = {}
         self.hash = None
 
-def ThawDependencySet(frz):
-    depSet = DependencySet()
+
+# A special class for representing Flavors
+class Flavor(DependencySet):
+    def __repr__(self):
+        return "Flavor('%s')" % formatFlavor(self)
+    def __nonzero__(self):
+        # prohibit evaluating Flavor instances in boolean contexts
+        raise NotImplementedError, \
+              "Flavor objects can't be evaluated in a boolean context"
+    def __str__(self):
+        return formatFlavor(self)
+
+    def toStrongFlavor(self):
+        newDep = self.__class__()
+        for tag, depClass in self.members.iteritems():
+            newDep.members[tag] = depClass.toStrongFlavor()
+        return newDep
+    def score(self, other):
+        assert(isinstance(other, self.__class__))
+        score = 0
+	for tag in other.members:
+            # ignore empty dep classes when scoring
+            if not other.members[tag].members:
+                continue
+	    if tag not in self.members:
+                thisScore = other.members[tag].emptyDepsScore()
+            else:
+                thisScore = self.members[tag].score(other.members[tag])
+            if thisScore is False:
+		return False
+
+            score += thisScore
+
+        return score
+
+    def satisfies(self, other):
+        return self.score(other) is not False
+
+    def stronglySatisfies(self, other):
+        return self.toStrongFlavor().score(
+                    other.toStrongFlavor()) is not False
+
+
+def _Thaw(depSet, frz):
     if not frz:
         return depSet
-
     i = 0
     a = depSet.addDep
     depSetSplit = misc.depSetSplit
@@ -981,8 +980,13 @@ def ThawDependencySet(frz):
         (i, tag, frozen) = depSetSplit(i, frz)
         depClass = dependencyClasses[tag]
         a(depClass, depClass.thawDependency(frozen))
-
     return depSet
+
+def ThawDependencySet(frz):
+    _Thaw(DependencySet(), frz)
+
+def ThawFlavor(frz):
+    _Thaw(Flavor(), frz)
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """ 
@@ -1083,8 +1087,8 @@ def _mergeDeps(depList, mergeType):
 
 def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
     for flavor in flavors:
-        assert(isinstance(flavor, DependencySet))
-    finalDep = DependencySet()
+        assert(isinstance(flavor, Flavor))
+    finalDep = Flavor()
 
     depClasses = set()
     for flavor in flavors:
@@ -1178,7 +1182,7 @@ def formatFlavor(flavor):
     return ""
 
 def parseFlavor(s, mergeBase = None):
-    # return a DependencySet for the string passed. format is
+    # return a Flavor dep set for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
     #
     # if mergeBase is set, the parsed flavor is merged into it. The
@@ -1207,7 +1211,7 @@ def parseFlavor(s, mergeBase = None):
 
     groups = match.groups()
 
-    set = DependencySet()
+    set = Flavor()
 
     if groups[3]:
         # groups[3] is base instruction set, groups[4] is the flags, and

@@ -433,7 +433,7 @@ class _AbstractPackageRecipe(Recipe):
             srcName = rclass._trove.getName()
             srcVersion = rclass._trove.getVersion()
             for f in repos.iterFilesInTrove(srcName, srcVersion,
-                                            deps.DependencySet(),
+                                            deps.Flavor(),
                                             withFiles=True):
                 pathId, path, fileId, version, fileObj = f
                 assert(path[0] != "/")
@@ -537,7 +537,7 @@ class _AbstractPackageRecipe(Recipe):
                  architecture.
         """
         def _parseArch(archSpec):
-            if isinstance(archSpec, deps.DependencySet):
+            if isinstance(archSpec, deps.Flavor):
                 return archSpec, None, None
 
             if '-' in archSpec:

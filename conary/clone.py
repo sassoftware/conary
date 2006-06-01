@@ -59,7 +59,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
             for trove in troves:
                 trovesToClone.append((trove.getSourceName(),
                                       trove.getVersion().getSourceVersion(),
-                                      deps.DependencySet()))
+                                      deps.Flavor()))
                 for troveTup in trove.iterTroveList(strongRefs=True,
                                                     weakRefs=True):
                     if troveTup not in seen:

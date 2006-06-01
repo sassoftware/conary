@@ -448,7 +448,7 @@ class TroveTupFormatter:
             @param v: trove version
             @type v: versions.Version
             @param f: trove flavor
-            @type f: deps.deps.DependencySet (flavor)
+            @type f: deps.deps.Flavor
             @rtype: (vStr, fStr) where vStr is the version string to display
             for this trove and fStr is the flavor string (may be empty)
         """
@@ -558,9 +558,8 @@ class TroveFormatter(TroveTupFormatter):
                 if sourceVer.isOnLocalHost():
                     sourceVer = sourceVer.parentVersion()
 
-                sourceTrove = troveSource.getTrove(sourceName, 
-                                sourceVer, deps.DependencySet(),
-                                withFiles = False)
+                sourceTrove = troveSource.getTrove(
+                    sourceName, sourceVer, deps.Flavor(), withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
                 # on failed getTrove calls 
             except errors.TroveMissing:

@@ -283,8 +283,7 @@ class Flavors(idtable.IdTable):
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
 
     def getId(self, flavorId):
-	return deps.deps.ThawDependencySet(idtable.IdTable.getId(self,
-								 flavorId))
+	return deps.deps.ThawFlavor(idtable.IdTable.getId(self, flavorId))
 
     def get(self, flavor, defValue):
         if not flavor:
@@ -417,7 +416,7 @@ class Database:
             if withFlavors:
                 f = flavors.get(flavorStr, None)
                 if f is None:
-                    f = deps.deps.ThawDependencySet(flavorStr)
+                    f = deps.deps.ThawFlavor(flavorStr)
                     flavors[flavorStr] = f
 
                 yield (version, f)
@@ -442,7 +441,7 @@ class Database:
                 ts = [float(x) for x in timeStamps.split(':')]
                 version = versions.VersionFromString(match, timeStamps=ts)
                 if outD[name].has_key(version):
-                    outD[name][version].append(deps.deps.ThawDependencySet(flavor))
+                    outD[name][version].append(deps.deps.ThawFlavor(flavor))
         return outD
 
     def pinTroves(self, name, version, flavor, pin = True):
@@ -719,17 +718,17 @@ order by
         """ % nameClause, instanceId)
 
         pristineTrv = trove.Trove('foo', versions.NewVersion(),
-                                  deps.deps.DependencySet(), None)
+                                  deps.deps.Flavor(), None)
         currentTrv = trove.Trove('foo', versions.NewVersion(),
-                                  deps.deps.DependencySet(), None)
+                                  deps.deps.Flavor(), None)
         instanceDict = {}
         origIncluded = set()
         for (includedId, name, version, flavor, isPresent,
                                             inPristine, timeStamps) in cu:
             if flavor is None:
-                flavor = deps.deps.DependencySet()
+                flavor = deps.deps.Flavor()
             else:
-                flavor = deps.deps.ThawDependencySet(flavor)
+                flavor = deps.deps.ThawFlavor(flavor)
 
             version = versions.VersionFromString(version)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
@@ -929,11 +928,11 @@ order by
                             (existingPathId,
                              (existingTroveName,
                               versions.VersionFromString(existingVersion),
-                              deps.deps.ThawDependencySet(existingFlavor))),
+                              deps.deps.ThawFlavor(existingFlavor))),
                             (addedPathId,
                              (addedTroveName,
                               versions.VersionFromString(addedVersion),
-                              deps.deps.ThawDependencySet(addedFlavor)))))
+                              deps.deps.ThawFlavor(addedFlavor)))))
 
             for instanceId, pathId in markNotPresent:
                 cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "
@@ -1077,7 +1076,7 @@ order by
 
 	if troveFlavor is 0:
 	    if troveFlavorId == 0:
-		troveFlavor = deps.deps.DependencySet()
+		troveFlavor = deps.deps.Flavor()
 	    else:
 		troveFlavor = self.flavors.getId(troveFlavorId)
 
@@ -1119,11 +1118,11 @@ order by
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
 	    if not flavorId:
-		flavor = deps.deps.DependencySet()
+		flavor = deps.deps.Flavor()
 	    else:
 		flavor = flavorCache.get(flavorId, None)
 		if flavor is None:
-		    flavor = deps.deps.ThawDependencySet(flavorStr)
+		    flavor = deps.deps.ThawFlavor(flavorStr)
 		    flavorCache[flavorId] = flavor
 
             byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
@@ -1283,9 +1282,9 @@ order by
 
             version = versions.VersionFromString(version)
             if flavor is None:
-                flavor = deps.deps.DependencySet()
+                flavor = deps.deps.Flavor()
             else:
-                flavor = deps.deps.ThawDependencySet(flavor)
+                flavor = deps.deps.ThawFlavor(flavor)
 
             yield (name, version, flavor, pathId)
 
@@ -1452,7 +1451,7 @@ order by
                 continue
 
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
 
         cu.execute("DROP TABLE ftc", start_transaction = False)
 
@@ -1484,7 +1483,7 @@ order by
         result = [ [] for x in names ]
         for (idx, name, version, flavor) in cu:
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
 
         cu.execute("DROP TABLE ftc", start_transaction = False)
 
@@ -1524,7 +1523,7 @@ order by
         result = [ [] for x in names ]
         for (idx, name, version, flavor) in cu:
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
         cu.execute("DROP TABLE ftc", start_transaction = False)
         return result
 
@@ -1546,9 +1545,9 @@ order by
         l = []
         for (name, version, flavorStr) in cu:
             if flavorStr is None:
-                flavorStr = deps.deps.DependencySet()
+                flavorStr = deps.deps.Flavor()
             else:
-                flavorStr = deps.deps.ThawDependencySet(flavorStr)
+                flavorStr = deps.deps.ThawFlavor(flavorStr)
 
             l.append((name, versions.VersionFromString(version), flavorStr))
 
@@ -1659,7 +1658,7 @@ order by
         """ % fromClause)
 
         VFS = versions.VersionFromString
-        Flavor = deps.deps.ThawDependencySet
+        Flavor = deps.deps.ThawFlavor
 
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
              parentName, parentVersion, parentTimeStamps, parentFlavor,
@@ -1699,7 +1698,7 @@ order by
                                 troveName = (?)""", name)
 
         return [ (n, versions.VersionFromString(v),
-                  deps.deps.ThawDependencySet(f)) for (n, v, f) in cu ]
+                  deps.deps.ThawFlavor(f)) for (n, v, f) in cu ]
 
     def findByNames(self, nameList):
         cu = self.db.cursor()
@@ -1718,7 +1717,7 @@ order by
         for (name, version, flavor, timeStamps) in cu:
             version = versions.VersionFromString(version)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-            flavor = deps.deps.ThawDependencySet(flavor)
+            flavor = deps.deps.ThawFlavor(flavor)
             l.append((name, version, flavor))
 
         return l
@@ -1801,7 +1800,7 @@ order by
             v = versions.VersionFromString(version)
 	    v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
-            info = (name, v, deps.deps.ThawDependencySet(flavor))
+            info = (name, v, deps.deps.ThawFlavor(flavor))
 
             if isPresent:
                 if hasParent:

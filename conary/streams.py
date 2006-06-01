@@ -283,6 +283,7 @@ class DependenciesStream(InfoStream):
     """
 
     __slots__ = 'deps'
+    _thawFunc = deps.ThawDependencySet
 
     def __call__(self):
 	return self.deps
@@ -303,8 +304,8 @@ class DependenciesStream(InfoStream):
 	return None
 
     def thaw(self, frz):
-        self.deps = deps.ThawDependencySet(frz)
-        
+        self.deps = self._thawFunc(frz)
+
     def twm(self, diff, base):
         self.thaw(diff)
         return False
@@ -315,6 +316,10 @@ class DependenciesStream(InfoStream):
     def __init__(self, dep = ''):
         assert(type(dep) is str)
         self.thaw(dep)
+
+class FlavorsStream(DependenciesStream):
+    _thawFunc = deps.ThawFlavor
+    pass
 
 class StringsStream(list, InfoStream):
     """
@@ -389,7 +394,7 @@ class ReferencedTroveList(list, InfoStream):
 	    version = versions.ThawVersion(l[i + 1])
 	    flavor = l[i + 2]
 
-            flavor = deps.ThawDependencySet(flavor)
+            flavor = deps.ThawFlavor(flavor)
 
 	    self.append((name, version, flavor))
 	    i += 3

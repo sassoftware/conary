@@ -388,7 +388,7 @@ class Database(SqlDbRepository):
 
         names = {}
         newGroup = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         for name, version, flavor in l:
             names[name] = True
             newGroup.addTrove(name, version, flavor)
@@ -407,7 +407,7 @@ class Database(SqlDbRepository):
         # diff tells us how to match them up. anything which doesn't get
         # a match gets removed. got that? 
         instGroup = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         for info in instList:
             if info not in ineligible:
                 instGroup.addTrove(*info)

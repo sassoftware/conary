@@ -286,8 +286,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if repos:
         try: 
-            trove = repos.getTrove(srcName, sourceVersion, 
-                                   deps.DependencySet(), withFiles = False)
+            trove = repos.getTrove(srcName, sourceVersion, deps.Flavor(),
+                                   withFiles = False)
             sourceVersion = trove.getVersion()
         except errors.TroveMissing:
             if not allowMissingSource and targetLabel != versions.CookLabel():
@@ -477,7 +477,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     _callSetup(cfg, recipeObj)
     use.track(False)
 
-    flavors = [buildpackage._getUseDependencySet(recipeObj)]
+    flavors = [buildpackage._getUseFlavor(recipeObj)]
 
     grouprecipe.buildGroups(recipeObj, cfg, repos, callback)
 
@@ -571,7 +571,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
 
     l = []
-    flavor = deps.DependencySet()
+    flavor = deps.Flavor()
     size = 0
     fileObjList = repos.getFileVersions([ (x[0], x[2], x[3]) for x in 
                                                 recipeObj.iterFileList() ])
@@ -729,7 +729,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             unmanagedPolicyFiles.append(policyPath)
             ver = versions.VersionFromString('/local@local:LOCAL/0-0')
             ver.resetTimeStamps()
-            policyTroves.add((policyPath, ver, deps.DependencySet()))
+            policyTroves.add((policyPath, ver, deps.Flavor()))
     del db
     if unmanagedPolicyFiles and enforceManagedPolicy:
         raise CookError, ('Cannot cook into repository with'

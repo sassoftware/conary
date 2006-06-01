@@ -141,9 +141,7 @@ cannot shadow earlier trove
                     else:
                         sourceName = trove.getSourceName()
 
-                    key  = (sourceName, 
-                            trove.getVersion().getSourceVersion(),
-                            deps.DependencySet())
+                    key  = (sourceName, trove.getVersion().getSourceVersion(), deps.Flavor())
                     if key not in seen:
                         troveList.add(key)
                         seen.add(key)

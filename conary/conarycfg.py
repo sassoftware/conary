@@ -129,7 +129,7 @@ class CfgRepoMap(CfgDict):
 
 class CfgFlavor(CfgType):
 
-    default = deps.DependencySet()
+    default = deps.Flavor()
 
     def copy(self, val):
         return val.copy()
@@ -376,7 +376,7 @@ class ConaryConfiguration(SectionedConfigFile):
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
         if self.flavor == []:
-            self.flavor = [deps.DependencySet()]
+            self.flavor = [deps.Flavor()]
 
         self.flavor = self.flavorConfig.toDependency(override=self.flavor)
 
@@ -393,7 +393,7 @@ class ConaryConfiguration(SectionedConfigFile):
             # use all the flavors for the main arch first
             for depList in arch.currentArch:
                 for flavor in self.flavor:
-                    insSet = deps.DependencySet()
+                    insSet = deps.Flavor()
                     for dep in depList:
                         insSet.addDep(deps.InstructionSetDependency, dep)
                     newFlavor = flavor.copy()

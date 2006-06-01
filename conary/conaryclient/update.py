@@ -401,7 +401,7 @@ class ClientUpdate:
         # we may need to install. Build a set of all of the trove names
         # in that trove as well.
         availableTrove = trove.Trove("@update", versions.NewVersion(),
-                                     deps.DependencySet(), None)
+                                     deps.Flavor(), None)
 
         names = set()
         for job in transitiveClosure:
@@ -535,7 +535,7 @@ class ClientUpdate:
 
 
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
@@ -1213,7 +1213,7 @@ conary erase '%s=%s[%s]'
                     removeJob.add((troveInfo[0], (troveInfo[1], troveInfo[2]),
                                    (None, None), False))
                 # skip ahead to the next itemList
-                continue                    
+                continue
 
             if len(oldTroves) > 2:
                 raise UpdateError, "Update of %s specifies multiple " \
@@ -1225,7 +1225,7 @@ conary erase '%s=%s[%s]'
             del oldTroves
 
             if isinstance(newVersionStr, versions.Version):
-                assert(isinstance(newFlavorStr, deps.DependencySet))
+                assert(isinstance(newFlavorStr, deps.Flavor))
                 jobToAdd = (troveName, oldTrove,
                             (newVersionStr, newFlavorStr), isAbsolute)
                 newJob.add(jobToAdd)
@@ -1528,9 +1528,9 @@ conary erase '%s=%s[%s]'
 
         while noParents:
             exists = trove.Trove('@update', versions.NewVersion(),
-                                 deps.DependencySet(), None)
+                                 deps.Flavor(), None)
             refd = trove.Trove('@update', versions.NewVersion(),
-                               deps.DependencySet(), None)
+                               deps.Flavor(), None)
 
             for troveId in noParents:
                 info, isPresent, hasParent, isWeak = troves[troveId]
@@ -1623,12 +1623,8 @@ conary erase '%s=%s[%s]'
             # that contains only those parts of newTrove that are actually
             # installed.
 
-            notExistsOldTrove = trove.Trove('@update',
-                                            versions.NewVersion(),
-                                            deps.DependencySet())
-            existsNewTrove = trove.Trove('@update',
-                                         versions.NewVersion(),
-                                         deps.DependencySet())
+            notExistsOldTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
+            existsNewTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
 
             # only create local updates between old troves that
             # don't exist and new troves that do.

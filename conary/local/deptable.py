@@ -445,7 +445,7 @@ class DependencyChecker:
             for (troveName, troveVersion, troveFlavor, depClass, depName,
                             flag, depNum) in cu:
                 info = (troveName, versions.VersionFromString(troveVersion),
-                        deps.ThawDependencySet(troveFlavor))
+                        deps.ThawFlavor(troveFlavor))
 
                 if info not in failedSets:
                     failedSets[info] = (deps.DependencySet(), [])
@@ -483,7 +483,7 @@ class DependencyChecker:
                         flavor = ""
                     provideList.append((name,
                                         versions.VersionFromString(version),
-                                        deps.ThawDependencySet(flavor)))
+                                        deps.ThawFlavor(flavor)))
         # def _gatherDependencyErrors starts here
 
         # things which are listed in satisfied should be removed from
@@ -1177,7 +1177,7 @@ class DependencyTables:
             # remember the first version for each troveName/flavorStr pair
             ts = [ float(x) for x in timeStamps.split(":") ]
             v = versions.VersionFromString(versionStr, timeStamps=ts)
-            f = deps.ThawDependencySet(flavorStr)
+            f = deps.ThawFlavor(flavorStr)
             depSolutions[depId].append((troveName, v, f))
 
         result = {}

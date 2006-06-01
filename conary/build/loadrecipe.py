@@ -332,7 +332,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 	labelPath = [cfg.buildLabel]
     try:
 	pkgs = repos.findTrove(labelPath,
-                               (component, versionStr, deps.DependencySet()))
+                               (component, versionStr, deps.Flavor()))
     except errors.TroveNotFound:
         raise builderrors.LoadRecipeError(
                                 'cannot find source component %s' % component)

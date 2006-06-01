@@ -55,7 +55,7 @@ class AbstractTroveDatabase:
 	@param version: version
 	@type version: versions.Version
 	@param flavor: flavor
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
 	@rtype: trove.Trove
 	"""
 	raise NotImplementedError

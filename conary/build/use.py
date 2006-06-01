@@ -534,7 +534,7 @@ class MajorArch(CollectionWithFlag):
             self[subArch]._set()
 
     def _toDependency(self):
-        set = deps.DependencySet() 
+        set = deps.Flavor()
         sense = self._getDepSense()
         dep = deps.Dependency(self._name, [])
         set.addDep(deps.InstructionSetDependency, dep)
@@ -571,12 +571,12 @@ class SubArch(Flag):
             currentArch._setUsed()
 
     def _toDependency(self):
-        """ Creates a DependencySet with the subarch in it.
+        """ Creates a Flavor dep set with the subarch in it.
             Also includes any subsumed subarches if the 
             value of this subarch is true
             (better comment about why we do that here) 
         """
-        set = deps.DependencySet() 
+        set = deps.Flavor()
         sense = self._getDepSense()
         depFlags = [ (self._name, sense) ]
         parent = self._parent
@@ -591,7 +591,7 @@ class SubArch(Flag):
 
 class UseFlag(Flag):
     def _toDependency(self):
-        set = deps.DependencySet() 
+        set = deps.Flavor()
         sense = self._getDepSense()
         depFlags = [ (self._name, sense) ]
         dep = deps.Dependency('use', depFlags)
@@ -631,11 +631,11 @@ class LocalFlag(Flag):
     def _toDependency(self, recipeName):
         depFlags =  [('.'.join((recipeName, self._name)), 
                                               self._getDepSense())]
-        set = deps.DependencySet() 
+        set = deps.Flavor()
         dep = deps.Dependency('use', depFlags)
         set.addDep(deps.UseDependency, dep)
         return set
-                    
+
 class LocalFlagCollection(Collection):
     def __init__(self):
         self._collectionType = LocalFlag
@@ -716,7 +716,7 @@ def createFlavor(recipeName, *flagIterables):
     archFlags = {}
     subsumed = {}
     useFlags = []
-    set = deps.DependencySet()
+    set = deps.Flavor()
     for flag in itertools.chain(*flagIterables):
         flagType = type(flag)
         if flagType == MajorArch:
