@@ -253,8 +253,14 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
     # left after this isn't that big a deal, so we  don't have to return
     if cfg.labels and len(sigList):
         sigList = [ x for x in sigList if
-                            x[1][1].branch().label() in cfg.labels ]
+                    x[1][1].branch().label() in cfg.labels ]
         log.debug("after label filtering %d sigs are needed", len(sigList))
+    # filter out signatures for troves we aren't interested in because
+    # of the matchTroves setting
+    if cfg.matchTroves and len(sigList):
+        sigList = [x for x in sigList if
+                   cfg.matchTroves.match(x[1][0]) > 0]
+        log.debug("after matchTroves %d sigs are needed", len(sigList))
 
     log.debug("removing signatures for troves not yet mirrored")
     sigList = filterSigsWithoutTroves(targetRepos, currentMark, sigList)
