@@ -409,8 +409,9 @@ class ConaryConfiguration(SectionedConfigFile):
 def selectSignatureKey(cfg, label):
     if not cfg.signatureKeyMap:
         return cfg.signatureKey
-    if isinstance(label, versions.Label):
-        label = str(label)
+    label = str(label)
+    if "local@local" in label:
+        label = str(cfg.buildLabel)
     for sigLabel, fingerprint in cfg.signatureKeyMap:
         if re.match(sigLabel, label):
             return fingerprint
