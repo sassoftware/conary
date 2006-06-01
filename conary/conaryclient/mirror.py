@@ -212,24 +212,32 @@ def displayBundle(bundle):
 
 # this is to keep track of PGP keys we already added to avoid repeated
 # add operation into the target
-addedKeys = set()
+addedKeys = {}
+def mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test = False):
+    global addedKeys
+    # avoid duplicate effort
+    if addedKeys.has_key(host):
+        return
+    log.debug("mirroring pgp keys for %s", host)
+    # we mirror the entire set of GPG keys in one step to avoid
+    # multiple roundtrips to the sourceRepos. Also, mirroring new
+    # signatures for old troves is the first mirroring step, so we
+    # need to have the PGP keys available early on
+    keyList = sourceRepos.getNewPGPKeys(host, -1)
+    if test:
+        log.debug("(not adding %d keys due to test mode)", len(keyList))
+        return
+    if len(keyList):
+        log.debug("adding %d keys to target", len(keyList))
+        targetRepos.addPGPKeyList(cfg.host, keyList)
+    else:
+        keyList = [ False ]
+    addedKeys[host] = set(keyList)
+
 def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
                      test = False, syncSigs = False):
-    global addedKeys
-    # when mirroring keylist, the first time we ask we should get all
-    # of the newly available, since that's when the mark will be the
-    # lowest. That's why really, just one round of getNew/add should suffice
-    if not len(addedKeys):
-        log.debug("looking for new pgp keys")
-        keyList = sourceRepos.getNewPGPKeys(cfg.host, currentMark)
-        if test:
-            log.debug("(not adding %d keys due to test mode)", len(keyList))
-        elif len(keyList):
-            log.debug("adding %d keys to target", len(keyList))
-            targetRepos.addPGPKeyList(cfg.host, keyList)
-        else:
-            keyList = [ False ]
-        addedKeys = set(keyList)
+    # miror the GPG keys for the main source repo
+    mirrorGPGKeys(sourceRepos, targetRepos, cfg, cfg.host, test)
 
     if syncSigs:
         log.debug("getting full trove list for signature sync")
@@ -353,6 +361,9 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                         troveList.append((mark, (n,v,f)))
                         troveSetList.add((n,v,f))
         log.debug("after group recursion %d troves are needed", len(troveList))
+        # we need to make sure we mirror the GPG keys of any newly added troves
+        for host in set([x[1].getHost() for x in troveSetList]) - set([cfg.host]):
+            mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test)
 
     if len(troveList):
         # now filter the ones already existing
