@@ -256,7 +256,7 @@ class TroveStore:
 
 	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
                                                            weakRefs = True):
-	    if flavor:
+	    if flavor is not None:
 		flavorsNeeded[flavor] = True
 
 	flavorIndex = {}
@@ -291,7 +291,7 @@ class TroveStore:
 
 	del flavorIndex
 
-	if troveFlavor:
+	if troveFlavor is not None:
 	    troveFlavorId = flavors[troveFlavor]
 	else:
 	    troveFlavorId = 0
@@ -549,26 +549,25 @@ class TroveStore:
         md["language"] = language
         return metadata.Metadata(md)
 
-    def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
+    def hasTrove(self, troveName, troveVersion = None, troveFlavor = None):
         self.log(3, troveName, troveVersion, troveFlavor)
 
 	if not troveVersion:
 	    return self.items.has_key(troveName)
 
-	assert(troveFlavor is not 0)
+	assert(troveFlavor is not None)
 
+        # if we can not find the ids for the troveName, troveVersion
+        # or troveFlavor in their respective tables, than this troove
+        # can't possibly exist...
 	troveItemId = self.items.get(troveName, None)
 	if troveItemId is None:
 	    return False
-
 	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is None:
-            # there is no version in the versionId for this version
-            # in the table, so we can't have a trove with that version
             return False
-
-	troveFlavorId = self.flavors.get(troveFlavor, 0)
-	if troveFlavorId == 0:
+	troveFlavorId = self.flavors.get(troveFlavor, None)
+	if troveFlavorId is None:
             return False
 
 	return self.instances.isPresent((troveItemId, troveVersionId,
