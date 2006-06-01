@@ -908,9 +908,12 @@ class Database(SqlDbRepository):
         totalCount = 0
         for name in names:
             rb = self.getRollback(name)
-            totalCount += rb.getCount()
+            totalCount += 0
+
             for i in xrange(rb.getCount()):
-                localCs = rb.getLocalChangeset(i)
+                (reposCs, localCs) = rb.getLast() 
+                if not reposCs.isEmpty():
+                    totalCount += 1
                 if not localCs.isEmpty():
                     totalCount += 1
 
@@ -951,14 +954,15 @@ class Database(SqlDbRepository):
                     l.extend(trvCs.getOldFileList())
 
                 try:
-                    itemCount += 1
-                    callback.setUpdateHunk(itemCount, totalCount)
-                    callback.setUpdateJob(reposCs.getJobSet())
-                    self.commitChangeSet(reposCs, UpdateJob(None),
-                                         isRollback = True,
-                                         replaceFiles = replaceFiles,
-                                         removeHints = removalHints,
-                                         callback = callback)
+                    if not reposCs.isEmpty():
+                        itemCount += 1
+                        callback.setUpdateHunk(itemCount, totalCount)
+                        callback.setUpdateJob(reposCs.getJobSet())
+                        self.commitChangeSet(reposCs, UpdateJob(None),
+                                             isRollback = True,
+                                             replaceFiles = replaceFiles,
+                                             removeHints = removalHints,
+                                             callback = callback)
 
                     if not localCs.isEmpty():
                         itemCount += 1
