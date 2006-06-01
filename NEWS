@@ -1,3 +1,7 @@
+Changes in 1.0.18:
+  o Client Changes:
+    * Trying to shadow a cooked redirect now results in an error (CNY-447)
+
 Changes in 1.0.17:
   o Client Changes:
     * Individual file removals performed by "conary remove" now create
