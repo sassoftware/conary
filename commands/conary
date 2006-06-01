@@ -396,6 +396,9 @@ class RemoveCommand(ConaryCommand):
         except conary.errors.DatabaseError, e:
             log.error(str(e))
             return 1
+        except OSError, e:
+            log.error("cannot remove %s: %s" % (fullPath, e.strerror))
+            return 1
 
         for (fullPath, path) in pathList:
             try:

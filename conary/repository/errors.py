@@ -29,16 +29,16 @@ class RepositoryMismatch(RepositoryError):
             if isinstance(right, list):
                 # turn multiple server names into something more readable
                 if len(right) > 1:
-                    detail = 'one of'
-                    right = ''.join('"%s", ' %x for x in right)
+                    right = ', '.join('"%s"' %x for x in right)
+                    right = 'one of ' + right
                 else:
                     right = '"%s"' %right[0]
             else:
                 right = '"%s"' %right
             msg = ('Repository name mismatch.  The correct repository name '
-                   'is %s%s, but it was accessed as "%s".  Check for '
+                   'is %s, but it was accessed as "%s".  Check for '
                    'incorrect repositoryMap configuration entries.'
-                   % (detail, right, wrong))
+                   % (right, wrong))
         else:
             msg = ('Repository name mismatch.  Check for incorrect '
                    'repositoryMap entries.')
