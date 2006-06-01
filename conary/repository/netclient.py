@@ -208,6 +208,13 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__altHost = None
 
 class ServerCache:
+    def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
+	self.cache = {}
+	self.map = repMap
+	self.userMap = userMap
+	self.pwPrompt = pwPrompt
+        self.entitlementDir = entitlementDir
+
 
     def __getitem__(self, item):
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
@@ -302,13 +309,6 @@ class ServerCache:
         transporter.setCompress(True)
 
 	return server
-
-    def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
-	self.cache = {}
-	self.map = repMap
-	self.userMap = userMap
-	self.pwPrompt = pwPrompt
-        self.entitlementDir = entitlementDir
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
