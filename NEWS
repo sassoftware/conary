@@ -1,19 +1,24 @@
+Changes in 1.0.18:
+  o Client Changes:
+    * Trying to shadow a cooked redirect now results in an error (CNY-447)
+
 Changes in 1.0.17:
   o Client Changes:
-    * Individual file removals now result in rollbacks (CNY-7)
-    * the mirroring client supports two new configuration options:
+    * Individual file removals performed by "conary remove" now create
+      rollbacks. (CNY-7)
+    * The repository mirroring client supports two new configuration
+      options:
       - matchTroves is a regexp list that limits what troves will be
         mirrored based on the trove names;
       - recurseGroups takes a boolean value (True/False) which will
-        cause the miror client to recursively expand the definition of the
-	group-* troves and mirror the group definition and all its component
-	troves into the target repository.
+        cause the miror client to recurse through a groups and mirror
+        everything that they include into the target repository.
 
   o Server Changes:
     * A single conary repository can host multiple serverNames. In the
-      Conary repository's configuration file, the serverName directive can
-      now specify a space separated list of valid server names which will be
-      accepted and served from that repository. (CNY-16)
+      Conary repository's configuration file, the serverName directive
+      can now specify a space separated list of valid server names
+      which will be accepted and served from that repository. (CNY-16)
 
 Changes in 1.0.16
   o Build Changes:
@@ -33,7 +38,7 @@ Changes in 1.0.16
 
   o Bug Fixes:
     * When running "cvc log" on a newly created source component, cvc now
-      errors gracefully instead of tracing back. (bz #538)
+      errors gracefully instead of tracing back. (bz #863)
     * Conary now changes to the / directory before running tag
       scripts. (bz #1134)
     * "cvc co foo=invalidversionstring" now gives a more helpful error

@@ -115,6 +115,9 @@ cannot shadow earlier trove
                     raise BranchError('\n\n'.join(msg))
 
 	    for trove in troves:
+                if trove.isRedirect():
+                    raise errors.ShadowRedirect(*trove.getNameVersionFlavor())
+
                 # add contained troves to the todo-list
                 newTroves = [ x for x in 
                         trove.iterTroveList(strongRefs=True,
