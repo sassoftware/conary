@@ -125,7 +125,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
-	self.serverNameList = cfg.serverName
+        if isinstance(cfg.serverName, str):
+            self.serverNameList = [ cfg.serverName ]
+        else:
+            self.serverNameList = cfg.serverName
 	self.commitAction = cfg.commitAction
         self.troveStore = None
         self.logFile = cfg.logFile
