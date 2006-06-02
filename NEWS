@@ -4,6 +4,14 @@ Changes in 1.0.18:
     * Added --keep-required option to tell conary to leave troves installed
       when removing them would break dependencies. This used to be the
       default behaviour; conary now issues a dependency error instead (CNY-6).
+    * Added delete-entitlement and list-entitlements to manageents script
+    * Fixed list-groups in manageents to list the groups the user can
+      manage instead of the groups that user belongs to
+
+  o Server Changes:
+    * Added support for deleting entitlements, listing the entitlement
+      groups a user can manage, and removing the acl which lets a group
+      manage an entitlement group group
 
 Changes in 1.0.17:
   o Client Changes:

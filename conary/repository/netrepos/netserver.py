@@ -77,7 +77,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'addEntitlement',
                         'addEntitlementGroup',
                         'addEntitlementOwnerAcl',
+                        'deleteEntitlementOwnerAcl',
+                        'deleteEntitlement',
                         'listEntitlements',
+                        'listEntitlementGroups',
                         'updateMetadata',
                         'getMetadata',
                         'troveNames',
@@ -435,6 +438,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.addEntitlement(authToken, entGroup, entitlement)
         return True
 
+    def deleteEntitlement(self, authToken, clientVersion, entGroup, 
+                          entitlement):
+        # self.auth does its own authentication check
+        entitlement = self.toEntitlement(entitlement)
+        self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+        return True
+
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,
                             userGroup):
         # self.auth does its own authentication check
@@ -447,10 +457,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
         return True
 
+    def deleteEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,
+                                  entGroup):
+        # self.auth does its own authentication check
+        self.auth.deleteEntitlementOwnerAcl(authToken, userGroup, entGroup)
+        return True
+
     def listEntitlements(self, authToken, clientVersion, entGroup):
         # self.auth does its own authentication check
         return [ self.fromEntitlement(x) for x in
                         self.auth.iterEntitlements(authToken, entGroup) ]
+
+    def listEntitlementGroups(self, authToken, clientVersion):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to those the user has
+        # permissions to manage
+        return self.auth.listEntitlementGroups(authToken)
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,

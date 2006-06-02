@@ -747,6 +747,32 @@ class NetworkAuthorization:
 
         self.db.commit()
 
+    def deleteEntitlement(self, authToken, entGroup, entitlement):
+        cu = self.db.cursor()
+        # validate the password
+
+        authGroupIds = self.getAuthGroups(cu, authToken)
+        self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
+
+        if len(entitlement) > 64:
+            raise errors.InvalidEntitlement
+
+        entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
+
+        # if the entitlement doesn't exist, return an error
+        cu.execute("""
+                SELECT COUNT(*) FROM Entitlements WHERE
+                    entGroupId = ? AND entitlement = ?
+                """, entGroupId, entitlement)
+        count = cu.next()[0]
+        if not count:
+            raise errors.InvalidEntitlement
+
+        cu.execute("DELETE FROM Entitlements WHERE entGroupId=? AND "
+                   "entitlement=?", (entGroupId, entitlement))
+
+        self.db.commit()
+
     def addEntitlementGroup(self, authToken, entGroup, userGroup):
         cu = self.db.cursor()
         if not self.check(authToken, admin = True):
@@ -787,6 +813,19 @@ class NetworkAuthorization:
                    "VALUES (?, ?)",
                    (entGroupId, userGroupId))
 
+    def deleteEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, "userGroup=%s entGroup=%s" % (userGroup, entGroup))
+        cu = self.db.cursor()
+        entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
+                                "WHERE entGroup = ?", entGroup).next()[0]
+        userGroupId = cu.execute("SELECT userGroupId FROM userGroups "
+                                 "WHERE userGroup = ?", userGroup).next()[0]
+        cu.execute("DELETE FROM EntitlementOwners WHERE "
+                   "entGroupId=? AND ownerGroupId=?",
+                   entGroupId, userGroupId)
+
     def iterEntitlements(self, authToken, entGroup):
         # validate the password
         cu = self.db.cursor()
@@ -795,6 +834,24 @@ class NetworkAuthorization:
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entGroupId)
+
+        return [ x[0] for x in cu ]
+
+    def listEntitlementGroups(self, authToken):
+        cu = self.db.cursor()
+
+        if self.check(authToken, admin = True):
+            # admins can see everything
+            cu.execute("SELECT entGroup FROM EntitlementGroups")
+        else:
+            authGroupIds = self.getAuthGroups(cu, authToken)
+            if not authGroupIds:
+                return []
+
+            cu.execute("""SELECT entGroup FROM EntitlementOwners
+                            JOIN EntitlementGroups USING (entGroupId)
+                            WHERE ownerGroupId IN (%s)""" % 
+                       ",".join([ "%d" % x for x in authGroupIds ]))
 
         return [ x[0] for x in cu ]
 
