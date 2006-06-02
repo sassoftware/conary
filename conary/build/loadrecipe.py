@@ -506,6 +506,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             localfile = name + '.recipe'
 
         if os.path.exists(localfile):
+            # XXX: FIXME: this test will never be true on this
+            # branch.,.. what's the point?!
             if flavor:
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
