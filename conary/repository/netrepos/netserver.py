@@ -518,10 +518,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                start_transaction = False)
                 else:
                     for flavorSpec in flavorList:
-                        if flavorSpec is None:
-                            flavorId = None
-                        else:
+                        if flavorSpec:
                             flavorId = flavorIndices[flavorSpec]
+                        else:
+                            flavorId = None
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
