@@ -24,12 +24,16 @@ if os.path.dirname(sys.argv[0]) != ".":
 else:
     fullPath = os.getcwd()
 
+sys.path.insert(0, os.path.dirname(fullPath))
+
 from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
 def usage():
     print "manageents [--config <value>] add-entitlement <server> <class> <entitlement>"
     print "manageents [--config <value>] create-class <server> <class> <group>"
+    print "manageents [--config <value>] delete-entitlement <server> <class> <entitlement>"
+    print "manageents [--config <value>] list-entitlements <server> <class>"
     print "manageents [--config <value>] list-groups <server>"
     sys.exit(1)
 
@@ -65,9 +69,14 @@ if otherArgs[1] == 'add-entitlement':
 elif otherArgs[1] == 'create-class':
     if len(otherArgs) != 5: usage()
     repos.addEntitlementGroup(otherArgs[2], otherArgs[3], otherArgs[4])
+elif otherArgs[1] == 'delete-entitlement':
+    if len(otherArgs) != 5: usage()
+    repos.deleteEntitlement(otherArgs[2], otherArgs[3], otherArgs[4])
+elif otherArgs[1] == 'list-entitlements':
+    if len(otherArgs) != 4: usage()
+    print "\n".join(repos.listEntitlements(otherArgs[2], otherArgs[3]))
 elif otherArgs[1] == 'list-groups':
     if len(otherArgs) != 3: usage()
-    print "\n".join(repos.getUserGroups(
-                            versions.Label('%s@foo:bar' % otherArgs[2])))
+    print "\n".join(repos.listEntitlementGroups(otherArgs[2]))
 else:
     usage()
