@@ -81,17 +81,18 @@ class OpenPGPKey:
 
     def _getRelPrime(self, q):
         # We /dev/random instead of /dev/urandom. This was not a mistake;
-        # we want the most random data available
-        rand=open('/dev/random','r')
+        # we want the most random data available. use os module to ensure
+        # reads are unbuffered.
+        randFD = os.open('/dev/random', os.O_RDONLY)
         b = self._bitLen(q)/8 + 1
         r = 0L
         while r < 2:
             for i in range(b):
-                r = r*256 + ord(rand.read(1))
+                r = r*256 + ord(os.read(randFD, 1))
                 r %= q
             while self._gcf(r, q-1) != 1:
                 r = (r+1) % q
-        rand.close()
+        os.close(randFD)
         return r
 
     def signString(self, data):
