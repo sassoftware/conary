@@ -60,7 +60,7 @@ cu.execute("""
            """)
 
 allTroves = [ (x[0], (x[1], versions.VersionFromString(x[2]),
-                   deps.ThawDependencySet(x[3]))) for x in cu ]
+                   deps.ThawFlavor(x[3]))) for x in cu ]
 
 fixes = []
 for count, (instanceId, trv) in enumerate(itertools.izip(
