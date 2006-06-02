@@ -220,10 +220,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
 
-        if flavor:
-            flavorTest = "== '%s'" % flavor.freeze()
+        if flavor is None or flavor.isEmpty():
+            flavorTest = "is NULL"
         else:
-            flavorTest = "is NULL";
+            flavorTest = "== '%s'" % flavor.freeze()
 
         cu.execute("""SELECT count(*) FROM Instances
                         JOIN Versions ON
@@ -239,7 +239,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
         result = cu.next()[0] != 0
 
-	return result;
+	return result
 
     def getTroveVersionList(self, name, withFlavors = False):
 	"""

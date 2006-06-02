@@ -12,8 +12,8 @@
 # full details.
 #
 
-from conary import deps, errors, files, streams, trove, versions
 from conary import dbstore
+from conary import deps, errors, files, streams, trove, versions
 from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
 
@@ -278,7 +278,10 @@ class Flavors(idtable.IdTable):
 	return idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
-        if not flavor:
+        if flavor is None:
+            raise KeyError, "Can not lookup deps.Flavor(None)"
+        assert(isinstance(flavor, deps.deps.Flavor))
+        if flavor.isEmpty():
             return 0
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
 
@@ -286,12 +289,17 @@ class Flavors(idtable.IdTable):
 	return deps.deps.ThawFlavor(idtable.IdTable.getId(self, flavorId))
 
     def get(self, flavor, defValue):
-        if not flavor:
+        if flavor is None:
+            return 0
+        assert(isinstance(flavor, deps.deps.Flavor))
+        if flavor.isEmpty():
             return 0
 	return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
-        assert(flavor)
+        assert(isinstance(flavor, deps.deps.Flavor))
+        if flavor.isEmpty():
+            return
 	idtable.IdTable.__delitem__(self, flavor.freeze())
 
     def getItemDict(self, itemSeq):
@@ -538,12 +546,12 @@ order by
 	self.addVersionCache[troveVersion] = troveVersionId
 
 	troveFlavor = trove.getFlavor()
-	if troveFlavor:
+        if not troveFlavor.isEmpty():
 	    self.flavorsNeeded[troveFlavor] = True
 
 	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
-	    if flavor:
+            if not flavor.isEmpty():
 		self.flavorsNeeded[flavor] = True
 
 	if self.flavorsNeeded:
@@ -572,21 +580,20 @@ order by
 	# would get faster if we just added the files to a temporary table
 	# first and insert'd into the final table???
 	flavors = {}
-	if troveFlavor:
+        if not troveFlavor.isEmpty():
 	    flavors[troveFlavor] = True
-
 	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
-	    if flavor:
+	    if not flavor.isEmpty():
 		flavors[flavor] = True
 
 	flavorMap = self.flavors.getItemDict(flavors.iterkeys())
 	del flavors
 
-	if troveFlavor:
-	    troveFlavorId = flavorMap[troveFlavor.freeze()]
-	else:
+        if troveFlavor.isEmpty():
 	    troveFlavorId = 0
+	else:
+	    troveFlavorId = flavorMap[troveFlavor.freeze()]
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added, or it may be in the database as
@@ -615,10 +622,10 @@ order by
 	for (name, version, flavor), byDefault, isStrong \
                                                 in trove.iterTroveListInfo():
 	    versionId = self.getVersionId(version, self.addVersionCache)
-	    if flavor:
-		flavorId = flavorMap[flavor.freeze()]
-	    else:
+	    if flavor.isEmpty():
 		flavorId = 0
+	    else:
+		flavorId = flavorMap[flavor.freeze()]
 
             flags = 0
             if not isStrong:
@@ -778,10 +785,10 @@ order by
                         instanceId=? and includedId=?""",
                     instanceId, oldIncludedId).next()[0]
 
-            if newFlavor:
-                flavorStr = "= '%s'" % newFlavor.freeze()
-            else:
+            if newFlavor.isEmpty():
                 flavorStr = "IS NULL"
+            else:
+                flavorStr = "= '%s'" % newFlavor.freeze()
 
             cu.execute("""
                 INSERT INTO TroveTroves SELECT ?, instanceId, ?, 0
@@ -1030,8 +1037,8 @@ order by
                    """ % self.db.keywords, start_transaction = False)
 
         for i, (name, version, flavor) in enumerate(troveList):
-            flavorId = self.flavors.get(flavor, "")
-            if flavorId == "":
+            flavorId = self.flavors.get(flavor, None)
+            if flavorId is None:
                 continue
 
             cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
@@ -1317,7 +1324,7 @@ order by
 	cu = self.db.cursor()
 
 	troveVersionId = self.versionTable[version]
-	if flavor is None:
+        if flavor.isEmpty():
 	    troveFlavorId = 0
 	else:
 	    troveFlavorId = self.flavors[flavor]
@@ -1725,7 +1732,7 @@ order by
     def troveIsIncomplete(self, name, version, flavor):
         cu = self.db.cursor()
 
-        if flavor:
+        if isinstance(flavor, deps.deps.Flavor) and not flavor.isEmpty():
             flavorStr = 'flavor = ?'
             flavorArgs = [flavor.freeze()]
         else:
@@ -1748,7 +1755,7 @@ order by
                          name, str(version)] + flavorArgs)
         frzIncomplete = cu.next()[0]
         return streams.ByteStream(frzIncomplete)() != 0
-                    
+
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 
