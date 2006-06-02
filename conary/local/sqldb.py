@@ -462,7 +462,7 @@ class Database:
         return outD
 
     def pinTroves(self, name, version, flavor, pin = True):
-        if flavor.freeze() == "":
+        if flavor is None or flavor.isEmpty():
             flavorClause = "IS NULL"
         else:
             flavorClause = "= '%s'" % flavor.freeze()

@@ -439,10 +439,9 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
-            if version and flavor:
-                print "'%s=%s[%s]'" % (name, version.asString(),
-                                     deps.formatFlavor(flavor))
-            elif flavor:
+            if version and (flavor is not None) and not flavor.isEmpty():
+                print "'%s=%s[%s]'" % (name, version.asString(), deps.formatFlavor(flavor))
+            elif (flavor is not None) and not flavor.isEmpty():
                 print "'%s[%s]'" % (name, deps.formatFlavor(flavor))
             elif version:
                 print "%s=%s" % (name, version.asString())

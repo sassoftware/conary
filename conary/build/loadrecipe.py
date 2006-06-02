@@ -554,7 +554,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         # If they used the old-style specification of label, we should 
         # convert to new style for purposes of storing in troveInfo
         troveSpec = '%s=%s' % (name, label)
-        if flavorSpec:
+        if flavorSpec is not None and not troveSpec.isEmpty():
             troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
 
     for name, recipe in loader.allRecipes().items():

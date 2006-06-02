@@ -26,7 +26,7 @@ def displayCloneJob(cs):
     for csTrove in cs.iterNewTroveList():
         newInfo = str(csTrove.getNewVersion())
         flavor = csTrove.getNewFlavor()
-        if flavor:
+        if not flavor.isEmpty():
             newInfo += '[%s]' % flavor
 
         print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)

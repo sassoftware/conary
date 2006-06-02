@@ -107,7 +107,7 @@ def _checkout(repos, cfg, workDir, name, callback):
 
     # We have to be careful with labels
     name, versionStr, flavor = cmdline.parseTroveSpec(name)
-    if flavor:
+    if flavor is not None:
         log.error('source troves do not have flavors')
         return
 
