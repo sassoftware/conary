@@ -115,10 +115,13 @@ class IdTable:
 	except StopIteration:
             raise KeyError, theId
 
+    def __select(self):
+        return "SELECT %s FROM %s WHERE %s=?" %(
+            self.keyName, self.tableName, self.strName)
+
     def has_key(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   %(self.keyName, self.tableName, self.strName), (item,))
+        cu.execute(self.__select(), (item,))
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
@@ -129,8 +132,7 @@ class IdTable:
 
     def __getitem__(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   %(self.keyName, self.tableName, self.strName), (item,))
+        cu.execute(self.__select(), (item,))
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -138,8 +140,7 @@ class IdTable:
 
     def get(self, item, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   %(self.keyName, self.tableName, self.strName), (item,))
+        cu.execute(self.__select(), (item,))
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -245,12 +246,14 @@ class IdPairMapping:
                    % (self.tableName, self.tup1, self.tup2, self.item),
                    (first, second, val))
 
+    def __select(self):
+        return "SELECT %s FROM %s WHERE %s=? AND %s=?" % (
+            self.item, self.tableName, self.tup1, self.tup2)
+
     def __getitem__(self, key):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
-                   % (self.item, self.tableName, self.tup1, self.tup2),
-		   (first, second))
+        cu.execute(self.__select(), (first, second))
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -259,9 +262,7 @@ class IdPairMapping:
     def get(self, key, defValue):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
-                   % (self.item, self.tableName, self.tup1, self.tup2),
-		   (first, second))
+        cu.execute(self.__select(), (first, second))
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -270,9 +271,7 @@ class IdPairMapping:
     def has_key(self, key):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
-                   % (self.item, self.tableName, self.tup1, self.tup2),
-		   (first, second))
+        cu.execute(self.__select(), (first, second))
 	item = cu.fetchone()
 	return item != None
 
@@ -300,11 +299,13 @@ class IdMapping:
 		   % (self.tableName, self.key, self.item),
                    (key, val))
 
+    def __select(self):
+        return "SELECT %s FROM %s WHERE %s=?" % (
+            self.item, self.tableName, self.key)
+
     def __getitem__(self, key):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   % (self.item, self.tableName, self.key),
-		   key)
+        cu.execute(self.__select(), key)
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -312,9 +313,7 @@ class IdMapping:
 
     def get(self, key, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   % (self.item, self.tableName, self.key),
-		   key)
+        cu.execute(self.__select, key)
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -322,9 +321,7 @@ class IdMapping:
 
     def has_key(self, key):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   % (self.item, self.tableName, self.key),
-		   key)
+        cu.execute(self.__select, key)
 	item = cu.fetchone()
 	return (item != None)
 
@@ -346,12 +343,14 @@ class IdPairSet(IdPairMapping):
 	for match in cu:
 	    yield match[0]
 
+    def __select(self):
+        return "SELECT %s FROM %s WHERE %s=? AND %s=?" % (
+            self.item, self.tableName, self.tup1, self.tup2)
+
     def __getitem__(self, key):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
-                   % (self.item, self.tableName, self.tup1, self.tup2),
-		   (first, second))
+        cu.execute(self.__select(), (first, second))
 	first = cu.fetchone()
 	if not first:
 	    raise KeyError, key
@@ -360,9 +359,7 @@ class IdPairSet(IdPairMapping):
     def get(self, key, default):
 	(first, second) = key
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
-                   % (self.item, self.tableName, self.tup1, self.tup2),
-		   (first, second))
+        cu.execute(self.__select(), (first, second))
 	first = cu.fetchone()
 	if not first:
             return default
