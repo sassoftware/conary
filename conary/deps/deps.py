@@ -1216,7 +1216,7 @@ def parseFlavor(s, mergeBase = None):
         return (flag, sense)
 
     # make it a noop if we get a Flavor object in here
-    if isinstance(s, Flavor):
+    if isinstance(s, DependencySet):
         return s
 
     s = s.strip()
