@@ -313,7 +313,7 @@ class IdMapping:
 
     def get(self, key, defValue):
         cu = self.db.cursor()
-        cu.execute(self.__select, key)
+        cu.execute(self.__select(), key)
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -321,7 +321,7 @@ class IdMapping:
 
     def has_key(self, key):
         cu = self.db.cursor()
-        cu.execute(self.__select, key)
+        cu.execute(self.__select(), key)
 	item = cu.fetchone()
 	return (item != None)
 
