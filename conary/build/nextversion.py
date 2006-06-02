@@ -25,7 +25,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     @param sourceVersion: the source version that we are incrementing
     @type sourceVersion: Version
     @param troveFlavor: flavor of the trove being built
-    @type troveFlavor: deps.DependencySet
+    @type troveFlavor: deps.Flavor
     @param alwaysBumpCount: if True, then do not return a version that 
     matches an existing trove, even if their flavors would differentiate 
     them, instead, increase the appropriate count.  

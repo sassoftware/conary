@@ -51,7 +51,7 @@ def getTroveInfo(db, instanceId):
                '        ON DBInstances.flavorId = DBFlavors.flavorId '
                'WHERE instanceId=?', (instanceId))
     troveName, frozenFlavor = cu.next()
-    flavor = deps.deps.ThawDependencySet(frozenFlavor)
+    flavor = deps.deps.ThawFlavor(frozenFlavor)
     version = db.db.instances.getVersion(instanceId)
     return troveName, version, flavor
 

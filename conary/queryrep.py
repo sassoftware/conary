@@ -270,7 +270,7 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                             # FIXME: switch to stronglySatisfies
                             # in order to implement primary flavor support
                             # here at least?
-                            if not fS or f.satisfies(fS):
+                            if (fS is None) or f.satisfies(fS):
                                 foundMatch = True
                                 break
                         if not foundMatch:

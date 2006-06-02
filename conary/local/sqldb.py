@@ -12,8 +12,8 @@
 # full details.
 #
 
-from conary import deps, errors, files, streams, trove, versions
 from conary import dbstore
+from conary import deps, errors, files, streams, trove, versions
 from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
 
@@ -278,21 +278,37 @@ class Flavors(idtable.IdTable):
 	return idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
-        if not flavor:
+        if flavor is None:
+            raise KeyError, "Can not lookup deps.Flavor(None)"
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
+        if flavor.isEmpty():
             return 0
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
 
     def getId(self, flavorId):
-	return deps.deps.ThawDependencySet(idtable.IdTable.getId(self,
-								 flavorId))
+	return deps.deps.ThawFlavor(idtable.IdTable.getId(self, flavorId))
 
     def get(self, flavor, defValue):
-        if not flavor:
+        if flavor is None:
+            return 0
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
+        if flavor.isEmpty():
             return 0
 	return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
-        assert(flavor)
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
+        if flavor.isEmpty():
+            return
 	idtable.IdTable.__delitem__(self, flavor.freeze())
 
     def getItemDict(self, itemSeq):
@@ -417,7 +433,7 @@ class Database:
             if withFlavors:
                 f = flavors.get(flavorStr, None)
                 if f is None:
-                    f = deps.deps.ThawDependencySet(flavorStr)
+                    f = deps.deps.ThawFlavor(flavorStr)
                     flavors[flavorStr] = f
 
                 yield (version, f)
@@ -442,11 +458,11 @@ class Database:
                 ts = [float(x) for x in timeStamps.split(':')]
                 version = versions.VersionFromString(match, timeStamps=ts)
                 if outD[name].has_key(version):
-                    outD[name][version].append(deps.deps.ThawDependencySet(flavor))
+                    outD[name][version].append(deps.deps.ThawFlavor(flavor))
         return outD
 
     def pinTroves(self, name, version, flavor, pin = True):
-        if flavor.freeze() == "":
+        if flavor is None or flavor.isEmpty():
             flavorClause = "IS NULL"
         else:
             flavorClause = "= '%s'" % flavor.freeze()
@@ -539,12 +555,12 @@ order by
 	self.addVersionCache[troveVersion] = troveVersionId
 
 	troveFlavor = trove.getFlavor()
-	if troveFlavor:
+        if not troveFlavor.isEmpty():
 	    self.flavorsNeeded[troveFlavor] = True
 
 	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
-	    if flavor:
+            if not flavor.isEmpty():
 		self.flavorsNeeded[flavor] = True
 
 	if self.flavorsNeeded:
@@ -573,21 +589,20 @@ order by
 	# would get faster if we just added the files to a temporary table
 	# first and insert'd into the final table???
 	flavors = {}
-	if troveFlavor:
+        if not troveFlavor.isEmpty():
 	    flavors[troveFlavor] = True
-
 	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
-	    if flavor:
+	    if not flavor.isEmpty():
 		flavors[flavor] = True
 
 	flavorMap = self.flavors.getItemDict(flavors.iterkeys())
 	del flavors
 
-	if troveFlavor:
-	    troveFlavorId = flavorMap[troveFlavor.freeze()]
-	else:
+        if troveFlavor.isEmpty():
 	    troveFlavorId = 0
+	else:
+	    troveFlavorId = flavorMap[troveFlavor.freeze()]
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added, or it may be in the database as
@@ -616,10 +631,10 @@ order by
 	for (name, version, flavor), byDefault, isStrong \
                                                 in trove.iterTroveListInfo():
 	    versionId = self.getVersionId(version, self.addVersionCache)
-	    if flavor:
-		flavorId = flavorMap[flavor.freeze()]
-	    else:
+	    if flavor.isEmpty():
 		flavorId = 0
+	    else:
+		flavorId = flavorMap[flavor.freeze()]
 
             flags = 0
             if not isStrong:
@@ -719,17 +734,17 @@ order by
         """ % nameClause, instanceId)
 
         pristineTrv = trove.Trove('foo', versions.NewVersion(),
-                                  deps.deps.DependencySet(), None)
+                                  deps.deps.Flavor(), None)
         currentTrv = trove.Trove('foo', versions.NewVersion(),
-                                  deps.deps.DependencySet(), None)
+                                  deps.deps.Flavor(), None)
         instanceDict = {}
         origIncluded = set()
         for (includedId, name, version, flavor, isPresent,
                                             inPristine, timeStamps) in cu:
             if flavor is None:
-                flavor = deps.deps.DependencySet()
+                flavor = deps.deps.Flavor()
             else:
-                flavor = deps.deps.ThawDependencySet(flavor)
+                flavor = deps.deps.ThawFlavor(flavor)
 
             version = versions.VersionFromString(version)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
@@ -779,10 +794,10 @@ order by
                         instanceId=? and includedId=?""",
                     instanceId, oldIncludedId).next()[0]
 
-            if newFlavor:
-                flavorStr = "= '%s'" % newFlavor.freeze()
-            else:
+            if newFlavor.isEmpty():
                 flavorStr = "IS NULL"
+            else:
+                flavorStr = "= '%s'" % newFlavor.freeze()
 
             cu.execute("""
                 INSERT INTO TroveTroves SELECT ?, instanceId, ?, 0
@@ -929,11 +944,11 @@ order by
                             (existingPathId,
                              (existingTroveName,
                               versions.VersionFromString(existingVersion),
-                              deps.deps.ThawDependencySet(existingFlavor))),
+                              deps.deps.ThawFlavor(existingFlavor))),
                             (addedPathId,
                              (addedTroveName,
                               versions.VersionFromString(addedVersion),
-                              deps.deps.ThawDependencySet(addedFlavor)))))
+                              deps.deps.ThawFlavor(addedFlavor)))))
 
             for instanceId, pathId in markNotPresent:
                 cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "
@@ -1031,8 +1046,8 @@ order by
                    """ % self.db.keywords, start_transaction = False)
 
         for i, (name, version, flavor) in enumerate(troveList):
-            flavorId = self.flavors.get(flavor, "")
-            if flavorId == "":
+            flavorId = self.flavors.get(flavor, None)
+            if flavorId is None:
                 continue
 
             cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
@@ -1077,7 +1092,7 @@ order by
 
 	if troveFlavor is 0:
 	    if troveFlavorId == 0:
-		troveFlavor = deps.deps.DependencySet()
+		troveFlavor = deps.deps.Flavor()
 	    else:
 		troveFlavor = self.flavors.getId(troveFlavorId)
 
@@ -1119,11 +1134,11 @@ order by
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
 	    if not flavorId:
-		flavor = deps.deps.DependencySet()
+		flavor = deps.deps.Flavor()
 	    else:
 		flavor = flavorCache.get(flavorId, None)
 		if flavor is None:
-		    flavor = deps.deps.ThawDependencySet(flavorStr)
+		    flavor = deps.deps.ThawFlavor(flavorStr)
 		    flavorCache[flavorId] = flavor
 
             byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
@@ -1283,9 +1298,9 @@ order by
 
             version = versions.VersionFromString(version)
             if flavor is None:
-                flavor = deps.deps.DependencySet()
+                flavor = deps.deps.Flavor()
             else:
-                flavor = deps.deps.ThawDependencySet(flavor)
+                flavor = deps.deps.ThawFlavor(flavor)
 
             yield (name, version, flavor, pathId)
 
@@ -1318,7 +1333,7 @@ order by
 	cu = self.db.cursor()
 
 	troveVersionId = self.versionTable[version]
-	if flavor is None:
+        if flavor.isEmpty():
 	    troveFlavorId = 0
 	else:
 	    troveFlavorId = self.flavors[flavor]
@@ -1363,12 +1378,12 @@ order by
 
         for (name, pinnedInfo, mapInfo) in mapList:
             assert(sum(mapInfo[0].timeStamps()) > 0)
-            if not pinnedInfo[1]:
+            if pinnedInfo[1] is None or pinnedInfo[1].isEmpty():
                 pinnedFlavor = None
             else:
                 pinnedFlavor = pinnedInfo[1].freeze()
 
-            if not mapInfo[1]:
+            if mapInfo[1] is None or mapInfo[1].isEmpty():
                 mapFlavor = None
             else:
                 mapFlavor = mapInfo[1].freeze()
@@ -1376,8 +1391,7 @@ order by
             cu.execute("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)",
                        name, pinnedInfo[0].asString(), pinnedFlavor,
                        mapInfo[0].asString(),
-                        ":".join([ "%.3f" % x for x in
-                                    mapInfo[0].timeStamps()]),
+                        ":".join([ "%.3f" % x for x in mapInfo[0].timeStamps()]),
                        mapFlavor)
 
         # now add link collections to these troves
@@ -1452,7 +1466,7 @@ order by
                 continue
 
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
 
         cu.execute("DROP TABLE ftc", start_transaction = False)
 
@@ -1484,7 +1498,7 @@ order by
         result = [ [] for x in names ]
         for (idx, name, version, flavor) in cu:
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
 
         cu.execute("DROP TABLE ftc", start_transaction = False)
 
@@ -1524,7 +1538,7 @@ order by
         result = [ [] for x in names ]
         for (idx, name, version, flavor) in cu:
             result[idx].append((name, versions.VersionFromString(version),
-                                deps.deps.ThawDependencySet(flavor)))
+                                deps.deps.ThawFlavor(flavor)))
         cu.execute("DROP TABLE ftc", start_transaction = False)
         return result
 
@@ -1546,9 +1560,9 @@ order by
         l = []
         for (name, version, flavorStr) in cu:
             if flavorStr is None:
-                flavorStr = deps.deps.DependencySet()
+                flavorStr = deps.deps.Flavor()
             else:
-                flavorStr = deps.deps.ThawDependencySet(flavorStr)
+                flavorStr = deps.deps.ThawFlavor(flavorStr)
 
             l.append((name, versions.VersionFromString(version), flavorStr))
 
@@ -1659,7 +1673,7 @@ order by
         """ % fromClause)
 
         VFS = versions.VersionFromString
-        Flavor = deps.deps.ThawDependencySet
+        Flavor = deps.deps.ThawFlavor
 
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
              parentName, parentVersion, parentTimeStamps, parentFlavor,
@@ -1699,7 +1713,7 @@ order by
                                 troveName = (?)""", name)
 
         return [ (n, versions.VersionFromString(v),
-                  deps.deps.ThawDependencySet(f)) for (n, v, f) in cu ]
+                  deps.deps.ThawFlavor(f)) for (n, v, f) in cu ]
 
     def findByNames(self, nameList):
         cu = self.db.cursor()
@@ -1718,7 +1732,7 @@ order by
         for (name, version, flavor, timeStamps) in cu:
             version = versions.VersionFromString(version)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-            flavor = deps.deps.ThawDependencySet(flavor)
+            flavor = deps.deps.ThawFlavor(flavor)
             l.append((name, version, flavor))
 
         return l
@@ -1726,7 +1740,7 @@ order by
     def troveIsIncomplete(self, name, version, flavor):
         cu = self.db.cursor()
 
-        if flavor:
+        if isinstance(flavor, deps.deps.Flavor) and not flavor.isEmpty():
             flavorStr = 'flavor = ?'
             flavorArgs = [flavor.freeze()]
         else:
@@ -1749,7 +1763,7 @@ order by
                          name, str(version)] + flavorArgs)
         frzIncomplete = cu.next()[0]
         return streams.ByteStream(frzIncomplete)() != 0
-                    
+
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 
@@ -1801,7 +1815,7 @@ order by
             v = versions.VersionFromString(version)
 	    v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
-            info = (name, v, deps.deps.ThawDependencySet(flavor))
+            info = (name, v, deps.deps.ThawFlavor(flavor))
 
             if isPresent:
                 if hasParent:

@@ -249,11 +249,11 @@ class ChangeSet(streams.StreamSet):
     def formatToFile(self, cfg, f):
 	f.write("primary troves:\n")
 	for (troveName, version, flavor) in self.primaryTroveList:
-	    if flavor:
-		f.write("\t%s %s %s\n" % (troveName, version.asString(), 
-					  flavor.freeze()))
-	    else:
+	    if flavor.isEmpty():
 		f.write("\t%s %s\n" % (troveName, version.asString()))
+	    else:
+		f.write("\t%s %s %s\n" % (
+                    troveName, version.asString(), flavor.freeze()))
 	f.write("\n")
 
 	for trv in self.newTroves.itervalues():

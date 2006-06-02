@@ -55,7 +55,7 @@ class AbstractTroveDatabase:
 	@param version: version
 	@type version: versions.Version
 	@param flavor: flavor
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
 	@rtype: trove.Trove
 	"""
 	raise NotImplementedError
@@ -352,7 +352,7 @@ class ChangeSetJob:
 
 	    if repos.hasTrove(troveName, newVersion, troveFlavor):
 		raise errors.CommitError, \
-		       "version %s of %s is already installed" % \
+		       "version %s of %s already exists" % \
 			(newVersion.asString(), csTrove.getName())
 
 	    if oldTroveVersion:

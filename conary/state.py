@@ -157,13 +157,13 @@ class SourceState(trove.Trove):
             new.lastMerged = None
         return new
 
-    def __init__(self, name, version, branch, changeLog = None, 
+    def __init__(self, name, version, branch, changeLog = None,
                  lastmerged = None, isRedirect = False, **kw):
         assert(not isRedirect)
         assert(not changeLog)
 
-	trove.Trove.__init__(self, name, version, 
-                             deps.DependencySet(), None, **kw)
+	trove.Trove.__init__(self, name, version, deps.Flavor(),
+                             None, **kw)
         self.branch = branch
         self.pathMap = {}
         self.lastMerged = lastmerged

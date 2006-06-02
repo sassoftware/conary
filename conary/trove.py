@@ -28,7 +28,7 @@ from conary.lib import misc, sha1helper
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
 from conary.lib import openpgpkey
 from conary.streams import ByteStream
-from conary.streams import DependenciesStream
+from conary.streams import DependenciesStream, FlavorsStream
 from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
@@ -47,7 +47,7 @@ class TroveTuple(streams.StreamSet):
     streamDict = {
         _SINGLE_TROVE_TUP_NAME    : (SMALL, streams.StringStream,        'name'    ),
         _SINGLE_TROVE_TUP_VERSION : (SMALL, streams.StringVersionStream, 'version' ),
-        _SINGLE_TROVE_TUP_FLAVOR  : (SMALL, streams.DependenciesStream,  'flavor'  )
+        _SINGLE_TROVE_TUP_FLAVOR  : (SMALL, streams.FlavorsStream,       'flavor'  )
     }
 
     def __cmp__(self, other):
@@ -79,19 +79,19 @@ class TroveTupleList(streams.StreamCollection):
     def iter(self):
         return ( x[1] for x in self.iterAll() )
 
-class OptionalFlavorStream(streams.DependenciesStream):
+class OptionalFlavorStream(streams.FlavorsStream):
 
     def freeze(self, skipSet = None):
         if self.deps is None:
             return '\0'
 
-        return streams.DependenciesStream.freeze(self)
+        return streams.FlavorsStream.freeze(self)
 
     def thaw(self, s):
         if s == '\0':
             self.deps = None
         else:
-            streams.DependenciesStream.thaw(self, s)
+            streams.FlavorsStream.thaw(self, s)
 
     def diff(self, other, skipSet = None):
         if self.deps is None and other.deps is None:
@@ -99,7 +99,7 @@ class OptionalFlavorStream(streams.DependenciesStream):
         elif self.deps is None:
             return '\0';
 
-        return streams.DependenciesStream.diff(self, other)
+        return streams.FlavorsStream.diff(self, other)
 
     def set(self, val):
         # None is okay
@@ -505,7 +505,7 @@ class Trove(streams.StreamSet):
         _STREAM_TRV_VERSION       : 
                     (SMALL, streams.FrozenVersionStream, "version"      ), 
         _STREAM_TRV_FLAVOR        : 
-                    (LARGE, streams.DependenciesStream,  "flavor"       ), 
+                    (LARGE, streams.FlavorsStream,       "flavor"       ), 
         _STREAM_TRV_PROVIDES      : 
                     (LARGE, streams.DependenciesStream,  "provides"     ), 
         _STREAM_TRV_REQUIRES      : 
@@ -777,7 +777,7 @@ class Trove(streams.StreamSet):
 	@param version: version of the trove
 	@type version: versions.Version
 	@param flavor: flavor of the trove to include
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
@@ -800,7 +800,7 @@ class Trove(streams.StreamSet):
 	@param version: version of the trove
 	@type version: versions.Version
 	@param flavor: flavor of the trove to include
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
 	@param missingOkay: should we raise an error if the version isn't
 	part of this trove?
 	@type missingOkay: boolean
@@ -1375,7 +1375,7 @@ class Trove(streams.StreamSet):
 
                         # empty flavors don't score properly; handle them
                         # here
-                        if not newFlavor:
+                        if newFlavor.isEmpty():
                             if newFlavor in removedFlavors:
                                 maxScore = (9999, newFlavor, newFlavor)
                                 break
@@ -1383,12 +1383,11 @@ class Trove(streams.StreamSet):
                                 continue
 
                         for oldFlavor in removedFlavors:
-                            if not oldFlavor or oldFlavor in usedFlavors:
+                            if oldFlavor.isEmpty() or oldFlavor in usedFlavors:
                                 # again, empty flavors don't score properly
                                 continue
 
-                            myMax = scoreCache.get((newFlavor, 
-                                                     oldFlavor), None)
+                            myMax = scoreCache.get((newFlavor, oldFlavor), None)
                             if myMax is None:
                                 # check for superset matching and subset
                                 # matching.  Currently we don't consider 
@@ -1591,10 +1590,10 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 	    subL = []
 	    for (change, version, flavor, byDefault) in sorted(troveList):
 		version = version.freeze()
-		if flavor:
-		    flavor = flavor.freeze()
-		else:
+		if flavor is None or flavor == deps.Flavor():
 		    flavor = "-"
+		else:
+		    flavor = flavor.freeze()
 
 		subL.append(change)
 		subL.append(version)
@@ -1628,9 +1627,9 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 		flavor = l[i + 2]
 
 		if flavor == "-":
-		    flavor = deps.DependencySet()
+		    flavor = deps.Flavor()
 		else:
-		    flavor = deps.ThawDependencySet(flavor)
+		    flavor = deps.ThawFlavor(flavor)
 
                 if change == '-':
                     byDefault = None
@@ -1767,8 +1766,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
                                   (LARGE, ReferencedTroveSet,   "weakTroves" ),
         _STREAM_TCS_NEW_FILES   : (LARGE, ReferencedFileList,   "newFiles"   ),
         _STREAM_TCS_CHG_FILES   : (LARGE, ReferencedFileList,   "changedFiles"),
-        _STREAM_TCS_OLD_FLAVOR  : (SMALL, DependenciesStream,   "oldFlavor"  ),
-        _STREAM_TCS_NEW_FLAVOR  : (SMALL, DependenciesStream,   "newFlavor"  ),
+        _STREAM_TCS_OLD_FLAVOR  : (SMALL, FlavorsStream,        "oldFlavor"  ),
+        _STREAM_TCS_NEW_FLAVOR  : (SMALL, FlavorsStream,        "newFlavor"  ),
         _STREAM_TCS_IS_REDIRECT : (SMALL, ByteStream,           "isRedirect" ),
         _STREAM_TCS_TROVEINFO   : (LARGE, streams.StringStream, "troveInfoDiff"),
         _STREAM_TCS_OLD_SIGS    : (LARGE, TroveSignatures,      "oldSigs"    ),
@@ -1872,7 +1871,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@param version: new version
 	@type version: versions.Version
 	@param flavor: new flavor
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
         @param byDefault: value of byDefault
         @param weakRef: is this a weak references?
         @type weakRef: boolean
@@ -1895,7 +1894,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@param version: old version
 	@type version: versions.Version
 	@param flavor: old flavor
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
         @param weakRef: is this a weak reference?
         @type weakRef: boolean
 	"""
@@ -1916,7 +1915,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	@param version: version
 	@type version: versions.Version
 	@param flavor: flavor
-	@type flavor: deps.deps.DependencySet
+	@type flavor: deps.deps.Flavor
         @param byDefault: New value of byDefault
         @type byDefault: boolean
         @param weakRef: is this a weak reference?
@@ -2034,8 +2033,8 @@ class TroveChangeSet(AbstractTroveChangeSet):
                  troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))
-	assert(isinstance(newFlavor, deps.DependencySet))
-	assert(oldFlavor is None or isinstance(oldFlavor, deps.DependencySet))
+	assert(isinstance(newFlavor, deps.Flavor))
+	assert(oldFlavor is None or isinstance(oldFlavor, deps.Flavor))
 	self.name.set(name)
 	self.oldVersion.set(oldVersion)
 	self.newVersion.set(newVersion)

@@ -67,7 +67,7 @@ def collectTroves(db):
                '       AND DBInstances.flavorid=DBFlavors.flavorid '
                '       AND DBInstances.isPresent = 1')
     for name, versionStr, flavorStr in cu:
-        flavor = deps.ThawDependencySet(flavorStr)
+        flavor = deps.ThawFlavor(flavorStr)
         version = versions.VersionFromString(versionStr)
         if not version.isOnLocalHost():
             yield (name, version, flavor)

@@ -258,7 +258,7 @@ class File(streams.StreamSet):
         FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),
         FILE_STREAM_PROVIDES : (DYNAMIC, streams.DependenciesStream, 'provides'),
         FILE_STREAM_REQUIRES : (DYNAMIC, streams.DependenciesStream, 'requires'),
-        FILE_STREAM_FLAVOR   : (SMALL, streams.DependenciesStream, 'flavor'),
+        FILE_STREAM_FLAVOR   : (SMALL, streams.FlavorsStream, 'flavor'),
         FILE_STREAM_TAGS     : (SMALL, streams.StringsStream, "tags")
         }
 

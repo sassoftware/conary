@@ -448,7 +448,7 @@ class TroveTupFormatter:
             @param v: trove version
             @type v: versions.Version
             @param f: trove flavor
-            @type f: deps.deps.DependencySet (flavor)
+            @type f: deps.deps.Flavor
             @rtype: (vStr, fStr) where vStr is the version string to display
             for this trove and fStr is the flavor string (may be empty)
         """
@@ -519,21 +519,17 @@ class TroveTupFormatter:
         """ Print a name, version, flavor tuple
         """
         vStr, fStr = self.getTupleStrings(name, version, flavor)
-
         if format:
             return format % (name, vStr, fStr)
-
-        args = []
-        format = ''
+        format = '' # reuse it for indentation
         if indent:
-            if fStr:
-                return '%s%s=%s[%s]' % ('  ' * indent, name, vStr, fStr)
-            else:
-                return '%s%s=%s' % ('  ' * indent, name, vStr)
-        elif fStr:
-            return '%s=%s[%s]' % (name, vStr, fStr)
+            format = '  ' * indent
+        if isinstance(fStr, deps.Flavor):
+            fStr = str(fStr)
+        if fStr:
+            return '%s%s=%s[%s]' % (format, name, vStr, fStr)
         else:
-            return '%s=%s' % (name, vStr)
+            return '%s%s=%s' % (format, name, vStr)
 
 class TroveFormatter(TroveTupFormatter):
     """ 
@@ -558,9 +554,8 @@ class TroveFormatter(TroveTupFormatter):
                 if sourceVer.isOnLocalHost():
                     sourceVer = sourceVer.parentVersion()
 
-                sourceTrove = troveSource.getTrove(sourceName, 
-                                sourceVer, deps.DependencySet(),
-                                withFiles = False)
+                sourceTrove = troveSource.getTrove(
+                    sourceName, sourceVer, deps.Flavor(), withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
                 # on failed getTrove calls 
             except errors.TroveMissing:
@@ -943,11 +938,11 @@ class JobTupFormatter(TroveFormatter):
             name = '%s(:%s)' % (name, ' :'.join(sorted(components)))
 
         if oldInfo:
-            if oldFla:
+            if oldFla is not None and not oldFla.isEmpty():
                 oldInfo += '[%s]' % oldFla
 
         if newInfo:
-            if newFla:
+            if newFla is not None and not newFla.isEmpty():
                 newInfo += '[%s]' % newFla
 
         if not oldInfo:

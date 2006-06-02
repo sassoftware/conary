@@ -265,7 +265,7 @@ class HttpHandler(WebHandler):
     @checkAuth(write=False)
     def files(self, auth, t, v, f):
         v = versions.ThawVersion(v)
-        f = deps.ThawDependencySet(f)
+        f = deps.ThawFlavor(f)
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
         # non-source group troves only show contained troves
         if t.startswith('group-') and not t.endswith(':source'):

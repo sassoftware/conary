@@ -185,7 +185,7 @@ class bugzMine:
             sourceVerList = sorted(sourceVerList[sourceName].keys())
             l = []
             for sourceVer in sourceVerList:
-                l.extend(((sourceName, sourceVer, deps.DependencySet()),))
+                l.extend(((sourceName, sourceVer, deps.Flavor()),))
             sourceTroves = self.repos.getTroves(l)
 
             personMap = {}

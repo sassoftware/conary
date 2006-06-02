@@ -44,14 +44,14 @@ def verify(troveNameList, db, cfg, all=False):
                 verifyTrove(trove, db, cfg)
         except errors.TroveNotFound:
             if versionStr:
-                if flavor:
+                if flavor is not None and not flavor.isEmpty():
                     flavorStr = deps.formatFlavor(flavor)
                     log.error("version %s with flavor '%s' of trove %s is not"
                               " installed", versionStr, flavorStr, troveName)
                 else:
                     log.error("version %s of trove %s is not installed", 
                                                       versionStr, troveName)
-            elif flavor:
+            elif flavor is not None and not flavor.isEmpty():
                 flavorStr = deps.formatFlavor(flavor)
                 log.error("flavor '%s' of trove %s is not installed", 
                                                           flavorStr, troveName)
@@ -66,7 +66,7 @@ def verifyTrove(trove, db, cfg):
                               pristine = True)
         ver = ver.createShadow(versions.LocalLabel())
         l.append((trove, origTrove, ver, 0))
-	    
+
     try:
         result = update.buildLocalChanges(db, l, root = cfg.root, 
                                           withFileContents=False,
