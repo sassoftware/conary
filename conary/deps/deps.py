@@ -953,12 +953,14 @@ class DependencySet(object):
 class Flavor(DependencySet):
     def __repr__(self):
         return "Flavor('%s')" % formatFlavor(self)
+    def __str__(self):
+        return formatFlavor(self)
     def __nonzero__(self):
         # prohibit evaluating Flavor instances in boolean contexts
         raise SyntaxError, \
               "Flavor objects can't be evaluated in a boolean context"
-    def __str__(self):
-        return formatFlavor(self)
+    def isEmpty(self):
+        return not(self.members)
 
     def toStrongFlavor(self):
         newDep = self.__class__()
@@ -1122,7 +1124,7 @@ def mergeFlavor(flavor, mergeBase):
     """
     if flavor is None:
         return mergeBase
-    if not mergeBase:
+    if mergeBase is None:
         return flavor
     needsIns = not flavor.hasDepClass(InstructionSetDependency)
     needsUse = not flavor.hasDepClass(UseDependency)
