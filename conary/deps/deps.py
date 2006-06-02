@@ -955,7 +955,7 @@ class Flavor(DependencySet):
         return "Flavor('%s')" % formatFlavor(self)
     def __nonzero__(self):
         # prohibit evaluating Flavor instances in boolean contexts
-        raise NotImplementedError, \
+        raise SyntaxError, \
               "Flavor objects can't be evaluated in a boolean context"
     def __str__(self):
         return formatFlavor(self)
