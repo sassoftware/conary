@@ -984,10 +984,10 @@ def _Thaw(depSet, frz):
     return depSet
 
 def ThawDependencySet(frz):
-    _Thaw(DependencySet(), frz)
+    return _Thaw(DependencySet(), frz)
 
 def ThawFlavor(frz):
-    _Thaw(Flavor(), frz)
+    return _Thaw(Flavor(), frz)
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """ 
