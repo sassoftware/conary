@@ -506,9 +506,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             localfile = name + '.recipe'
 
         if os.path.exists(localfile):
-            # XXX: FIXME: this test will never be true on this
-            # branch.,.. what's the point?!
-            if flavor:
+            # XXX: FIXME: this next test is unreachable
+            if flavor is not None and not flavor.isEmpty():
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
