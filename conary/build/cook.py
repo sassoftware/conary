@@ -70,7 +70,7 @@ def _createComponent(repos, bldPkg, newVersion, ident):
             flavor = None
         (pathId, fileVersion, oldFileId) = ident(path, newVersion, flavor)
 	f.pathId(pathId)
-        
+
         linkGroupId = linkGroups.get(path, None)
         if linkGroupId:
             f.linkGroup.set(linkGroupId)
@@ -1148,7 +1148,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     use.track(True)
 
     (name, versionStr, flavor) = parseTroveSpec(item)
-    if flavor:
+    if flavor is not None:
         cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
@@ -1345,7 +1345,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             components, csFile = built
             for component, version, flavor in components:
                 print "Created component:", component, version,
-                if flavor:
+                if flavor is not None:
                     print str(flavor).replace("\n", " "),
                 print
             if csFile is None:
