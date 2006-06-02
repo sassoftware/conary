@@ -106,7 +106,7 @@ class DepResolutionMethod(object):
         # 3. pick the best flavor out of the remaining
 
 
-        if installFlavor:
+        if not installFlavor.isEmpty():
             flavoredList = []
             for troveTup in troveTups:
                 f = installFlavor.copy()

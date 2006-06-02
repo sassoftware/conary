@@ -370,7 +370,7 @@ class ReferencedTroveList(list, InfoStream):
 	l = []
 	for (name, version, flavor) in self:
 	    version = version.freeze()
-	    if flavor:
+	    if flavor is not None:
 		flavor = flavor.freeze()
 	    else:
 		flavor = ""

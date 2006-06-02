@@ -786,8 +786,7 @@ followLocalChanges: %s
                         installedBranch = replacedInfo[1].branch()
 
                         if replacedInfo in localUpdatesByPresent:
-                            notInstalledVer = \
-                                        localUpdatesByPresent[replacedInfo][0]
+                            notInstalledVer = localUpdatesByPresent[replacedInfo][0]
                             notInstalledBranch = notInstalledVer.branch()
                             # create alreadyBranchSwitch variable for 
                             # readability
@@ -807,9 +806,7 @@ followLocalChanges: %s
                             # install a downgrade, skip it.
                             if not isPrimary:
                                 if replacedInfo in sameBranchLocalUpdates:
-                                    notInstalledFlavor = \
-                                        sameBranchLocalUpdates[replacedInfo][1]
-
+                                    notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                                 if (newInfo[1] < replaced[0]
                                     and replacedInfo in sameBranchLocalUpdates):
                                     log.debug('SKIP: avoiding downgrade')
@@ -881,23 +878,18 @@ followLocalChanges: %s
 
                         if replaced[0] and respectFlavorAffinity:
                             if replacedInfo in localUpdatesByPresent:
-                                notInstalledFlavor = \
-                                        localUpdatesByPresent[replacedInfo][1]
+                                notInstalledFlavor = localUpdatesByPresent[replacedInfo][1]
                                 # create alreadyBranchSwitch variable for 
                                 # readability
                                 alreadyFlavorSwitch = True
                             elif replacedInfo in sameBranchLocalUpdates:
-                                notInstalledFlavor = \
-                                        sameBranchLocalUpdates[replacedInfo][1]
+                                notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                             else:
                                 notInstalledFlavor = None
 
-                            if (notInstalledFlavor
-                                and not deps.compatibleFlavors(
-                                                           notInstalledFlavor,
-                                                           replacedInfo[2])
-                                and not deps.compatibleFlavors(replacedInfo[2],
-                                                               newInfo[2])):
+                            if (notInstalledFlavor is not None
+                                and not deps.compatibleFlavors(notInstalledFlavor, replacedInfo[2])
+                                and not deps.compatibleFlavors(replacedInfo[2], newInfo[2])):
                                 if isPrimary:
                                     respectFlavorAffinity = False
                                 else:
@@ -1184,15 +1176,15 @@ conary erase '%s=%s[%s]'
 
             if troveName[0] == '-':
                 needsOld = True
-                needsNew = newVersionStr or newFlavorStr
+                needsNew = newVersionStr or (newFlavorStr is not None)
                 troveName = troveName[1:]
             elif troveName[0] == '+':
                 needsNew = True
-                needsOld = oldVersionStr or oldFlavorStr
+                needsOld = oldVersionStr or (oldFlavorStr is not None)
                 troveName = troveName[1:]
             else:
-                needsOld = oldVersionStr or oldFlavorStr
-                needsNew = newVersionStr or newFlavorStr
+                needsOld = oldVersionStr or (oldFlavorStr is not None)
+                needsNew = newVersionStr or (newFlavorStr is not None)
                 if not (needsOld or needsNew):
                     if updateMode:
                         needsNew = True
@@ -1206,7 +1198,7 @@ conary erase '%s=%s[%s]'
                 oldTroves = []
 
             if not needsNew:
-                assert(not newFlavorStr)
+                assert(newFlavorStr is None)
                 assert(not isAbsolute)
                 for troveInfo in oldTroves:
                     log.debug("set up removal of %s", troveInfo)

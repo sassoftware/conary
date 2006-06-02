@@ -1375,7 +1375,7 @@ class Trove(streams.StreamSet):
 
                         # empty flavors don't score properly; handle them
                         # here
-                        if not newFlavor:
+                        if newFlavor.isEmpty():
                             if newFlavor in removedFlavors:
                                 maxScore = (9999, newFlavor, newFlavor)
                                 break
@@ -1383,12 +1383,11 @@ class Trove(streams.StreamSet):
                                 continue
 
                         for oldFlavor in removedFlavors:
-                            if not oldFlavor or oldFlavor in usedFlavors:
+                            if oldFlavor.isEmpty() or oldFlavor in usedFlavors:
                                 # again, empty flavors don't score properly
                                 continue
 
-                            myMax = scoreCache.get((newFlavor, 
-                                                     oldFlavor), None)
+                            myMax = scoreCache.get((newFlavor, oldFlavor), None)
                             if myMax is None:
                                 # check for superset matching and subset
                                 # matching.  Currently we don't consider 
@@ -1591,10 +1590,10 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 	    subL = []
 	    for (change, version, flavor, byDefault) in sorted(troveList):
 		version = version.freeze()
-		if flavor:
-		    flavor = flavor.freeze()
-		else:
+		if flavor is None or flavor == deps.Flavor():
 		    flavor = "-"
+		else:
+		    flavor = flavor.freeze()
 
 		subL.append(change)
 		subL.append(version)

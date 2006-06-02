@@ -203,15 +203,14 @@ class DependencyWorkTables:
                     Dependencies.depId = Requires.depId
         """)
 
-    def removeTrove(self, troveInfo, nodeId):
-        if troveInfo[2]:
-            flavor = troveInfo[2].freeze()
-        else:
+    def removeTrove(self, (name, version, flavor), nodeId):
+        if flavor is None or flavor.isEmpty():
             flavor = None
+        else:
+            flavor = flavor.freeze()
 
         self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
-                        (troveInfo[0], troveInfo[1].asString(), flavor, 
-                         nodeId))
+                        (name, version.asString(), flavor, nodeId))
 
     def __init__(self, cu, removeTables = False):
         self.cu = cu

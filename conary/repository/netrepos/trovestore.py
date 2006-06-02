@@ -389,7 +389,7 @@ class TroveStore:
                                itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
 	    itemId = self.getItemId(name)
 
-	    if flavor:
+	    if flavor is not None:
 		flavorId = flavors[flavor]
 	    else:
 		flavorId = 0
