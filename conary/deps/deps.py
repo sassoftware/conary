@@ -856,6 +856,27 @@ class DependencySet(object):
     def __sub__(self, other):
         return self.difference(other)
 
+    def score(self, other):
+        assert(isinstance(other, self.__class__))
+        score = 0
+	for tag in other.members:
+            # ignore empty dep classes when scoring
+            if not other.members[tag].members:
+                continue
+	    if tag not in self.members:
+                thisScore = other.members[tag].emptyDepsScore()
+            else:
+                thisScore = self.members[tag].score(other.members[tag])
+            if thisScore is False:
+		return False
+
+            score += thisScore
+
+        return score
+
+    def satisfies(self, other):
+        return self.score(other) is not False
+
     def __eq__(self, other):
         if other is None:
             return False
@@ -944,26 +965,6 @@ class Flavor(DependencySet):
         for tag, depClass in self.members.iteritems():
             newDep.members[tag] = depClass.toStrongFlavor()
         return newDep
-    def score(self, other):
-        assert(isinstance(other, self.__class__))
-        score = 0
-	for tag in other.members:
-            # ignore empty dep classes when scoring
-            if not other.members[tag].members:
-                continue
-	    if tag not in self.members:
-                thisScore = other.members[tag].emptyDepsScore()
-            else:
-                thisScore = self.members[tag].score(other.members[tag])
-            if thisScore is False:
-		return False
-
-            score += thisScore
-
-        return score
-
-    def satisfies(self, other):
-        return self.score(other) is not False
 
     def stronglySatisfies(self, other):
         return self.toStrongFlavor().score(
