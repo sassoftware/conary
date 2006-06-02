@@ -233,7 +233,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
                                checkPathConflicts = True, syncChildren = False,
-                               updateOnly = False, migrate = False):
+                               updateOnly = False, migrate = False,
+                               keepRequired = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -276,7 +277,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                 return
 
     _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                  tagScript = tagScript, 
+                  tagScript = tagScript, keepRequired = keepRequired,
                   keepExisting = keepExisting, depCheck = depCheck,
                   test = test, justDatabase = justDatabase, 
                   recurse = recurse, info = info, 
@@ -294,7 +295,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   test = False, justDatabase = False, 
                                   recurse = True, info = False, 
                                   updateByDefault = True, callback = None, 
-                                  split=True, sync = False, 
+                                  split=True, sync = False, keepRequired = False,
                                   fromChangesets = [],
                                   checkPathConflicts = True, 
                                   checkPrimaryPins = True, 
@@ -311,6 +312,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         (updJob, suggMap) = \
         client.updateChangeSet(applyList, resolveDeps = depCheck,
                                keepExisting = keepExisting,
+                               keepRequired = keepRequired,
                                test = test, recurse = recurse,
                                updateByDefault = updateByDefault,
                                callback = callback, split = split,

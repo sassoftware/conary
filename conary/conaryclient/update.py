@@ -47,11 +47,12 @@ class ClientUpdate:
 
     def _resolveDependencies(self, uJob, jobSet, split = False,
                              resolveDeps = True, useRepos = True,
-                             resolveSource = None):
+                             resolveSource = None, keepRequired = True):
         return self.resolver.resolveDependencies(uJob, jobSet, split=split,
                                                  resolveDeps=resolveDeps,
                                                  useRepos=useRepos,
-                                                 resolveSource=resolveSource)
+                                                 resolveSource=resolveSource,
+                                                 keepRequired = keepRequired)
 
     def _processRedirects(self, csSource, uJob, jobSet, transitiveClosure,
                           recurse):
@@ -1685,7 +1686,8 @@ conary erase '%s=%s[%s]'
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False, 
                         updateOnly = False, resolveGroupList=None, 
-                        installMissing = False, removeNotByDefault = False):
+                        installMissing = False, removeNotByDefault = False,
+                        keepRequired = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1704,6 +1706,9 @@ conary erase '%s=%s[%s]'
 	of the same trove, as long as there are no conflicting files in either
 	trove.
         @type keepExisting: bool
+	@param keepRequired: If True, troves are not erased when they
+        are the target of a dependency for a trove which is retained.
+        @type keepRequired: bool
         @param recurse: Apply updates/erases to troves referenced by containers.
         @type recurse: bool
         @param resolveDeps: Should dependencies error be flagged or silently
@@ -1835,7 +1840,8 @@ conary erase '%s=%s[%s]'
             self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
                                       useRepos = resolveRepos,
-                                      resolveSource = resolveSource)
+                                      resolveSource = resolveSource,
+                                      keepRequired = keepRequired)
 
         if keepList:
             callback.done()

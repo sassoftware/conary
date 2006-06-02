@@ -175,6 +175,12 @@ If two versions from the same branch are
 installed at the same time, this may confuse future update
 operations.
 .TP
+.B \-\-keep-required
+When troves are being erased from the system, conary checks the dependencies
+of the remaining troves to ensure those dependencies remain satisfied. If
+those dependencies are broken, a dependency error is generated. This option
+tells conary to try and leave troves in place to resolve those dependencies.
+.TP
 .B \-\-info
 Display a summary of what troves will be affected by the update.
 .TP

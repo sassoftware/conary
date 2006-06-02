@@ -218,7 +218,7 @@ class DependencySolver(object):
 
     def resolveDependencies(self, uJob, jobSet, split = False,
                             resolveDeps = True, useRepos = True,
-                            resolveSource = None):
+                            resolveSource = None, keepRequired = True):
         """
             Determine and possibly resolve dependency problems.
             @param uJob: update job we are resolving dependencies for
@@ -227,12 +227,17 @@ class DependencySolver(object):
             @type jobSet: list of job tuples
             @param split: if True, find an ordering for the jobs in 
             jobSet plus any resolved jobs. 
-            @type split: boolean
+            @type split: bool
             @param resolveDeps: If True, try to resolve any dependency problems
             by modifying the given job.
-            @type resolveDeps: boolean
+            @type resolveDeps: bool
             @param useRepos: If True, search for dependency solutions in the 
             repository after searching the update job search source.
+            @param keepRequired: If True, the resolver will attempt to remove
+            erase jobs from the job set to resolve dependency problems
+            created by the erasure. If False, those problems will be reported
+            instead.
+            @type keepRequired: bool
         """
         troveSource = uJob.getSearchSource()
         if useRepos:
@@ -244,7 +249,8 @@ class DependencySolver(object):
                              = self.checkDeps(uJob, jobSet, troveSource,
                                               findOrdering = split,
                                               resolveDeps = resolveDeps,
-                                              ineligible=ineligible)
+                                              ineligible=ineligible,
+                                              keepRequired = keepRequired)
 
 
         if not resolveDeps:
@@ -279,7 +285,8 @@ class DependencySolver(object):
                                            uJob.getTroveSource(),
                                            findOrdering = True,
                                            resolveDeps = True,
-                                           ineligible = ineligible)
+                                           ineligible = ineligible,
+                                           keepRequired = keepRequired)
             keepList.extend(newKeepList)
 
         return (depList, suggMap, cannotResolve, changeSetList, keepList)
@@ -324,8 +331,8 @@ class DependencySolver(object):
         jobSet.update(newJob)
         return True
 
-    def checkDeps(self, uJob, jobSet, trvSrc, findOrdering, 
-                  resolveDeps, ineligible):
+    def checkDeps(self, uJob, jobSet, trvSrc, findOrdering,
+                  resolveDeps, ineligible, keepRequired = True):
         """
             Given a jobSet, use its dependencies to determine an
             ordering, resolve problems with jobs that have difficult
@@ -363,7 +370,7 @@ class DependencySolver(object):
                     jobSet |= newJobSet
                     changeMade = True
 
-            if not changeMade and cannotResolve:
+            if not changeMade and cannotResolve and keepRequired:
                 # second: attempt to keep packages that were being erased
                 cannotResolve, newKeepList = self.resolveEraseByKeeping(
                                                          trvSrc,

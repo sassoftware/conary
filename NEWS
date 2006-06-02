@@ -1,6 +1,9 @@
 Changes in 1.0.18:
   o Client Changes:
     * Trying to shadow a cooked redirect now results in an error (CNY-447)
+    * Added --keep-required option to tell conary to leave troves installed
+      when removing them would break dependencies. This used to be the
+      default behaviour; conary now issues a dependency error instead (CNY-6).
 
 Changes in 1.0.17:
   o Client Changes:
