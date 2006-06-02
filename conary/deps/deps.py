@@ -1206,8 +1206,11 @@ def parseFlavor(s, mergeBase = None):
 
         return (flag, sense)
 
-    s = s.strip()
+    # make it a noop if we get a Flavor object in here
+    if isinstance(s, Flavor):
+        return s
 
+    s = s.strip()
     match = flavorRegexp.match(s)
     if not match:
         return None
