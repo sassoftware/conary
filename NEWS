@@ -1,4 +1,7 @@
 Changes in 1.0.18:
+  o Bugs Fixed:
+    * Server code returns an error to a client when committing
+      duplicate troves with empty flavor strings (CNY-476)
   o Client Changes:
     * Trying to shadow a cooked redirect now results in an error (CNY-447)
     * Added --keep-required option to tell conary to leave troves installed
