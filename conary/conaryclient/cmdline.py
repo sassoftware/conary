@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -150,7 +150,8 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
             else:
                 newVersion, newFlavor = None, None
 
-            if (newVersion or newFlavor) and not (oldVersion or oldFlavor):
+            if (newVersion or (newFlavor is not None)) and \
+                   not (oldVersion or (oldFlavor is not None)):
                 # foo=--1.2
                 oldVersion, oldFlavor = None, None
 
@@ -170,7 +171,7 @@ def toTroveSpec(name, versionStr, flavor):
     disp = [name]
     if versionStr:
         disp.extend(('=', versionStr))
-    if flavor:
+    if flavor is not None and not flavor.isEmpty():
         disp.extend(('[', deps.formatFlavor(flavor), ']'))
     return ''.join(disp)
 

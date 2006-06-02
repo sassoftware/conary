@@ -220,7 +220,7 @@ class _AbstractPackageRecipe(Recipe):
 
         def _filterBuildReqsByFlavor(flavor, troves):
             troves.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
-            if not flavor:
+            if flavor is None:
                 return troves[-1]
             for trove in reversed(versionMatches):
                 troveFlavor = trove.getFlavor()
@@ -552,7 +552,7 @@ class _AbstractPackageRecipe(Recipe):
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
 
-            if not flavor:
+            if flavor is None:
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
             return flavor, vendor, hostOs
