@@ -938,11 +938,11 @@ class JobTupFormatter(TroveFormatter):
             name = '%s(:%s)' % (name, ' :'.join(sorted(components)))
 
         if oldInfo:
-            if oldFla:
+            if oldFla is not None and not oldFla.isEmpty():
                 oldInfo += '[%s]' % oldFla
 
         if newInfo:
-            if newFla:
+            if newFla is not None and not newFla.isEmpty():
                 newInfo += '[%s]' % newFla
 
         if not oldInfo:

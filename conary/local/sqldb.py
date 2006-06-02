@@ -280,7 +280,10 @@ class Flavors(idtable.IdTable):
     def __getitem__(self, flavor):
         if flavor is None:
             raise KeyError, "Can not lookup deps.Flavor(None)"
-        assert(isinstance(flavor, deps.deps.Flavor))
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return 0
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
@@ -291,13 +294,19 @@ class Flavors(idtable.IdTable):
     def get(self, flavor, defValue):
         if flavor is None:
             return 0
-        assert(isinstance(flavor, deps.deps.Flavor))
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return 0
 	return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
-        assert(isinstance(flavor, deps.deps.Flavor))
+        # XXX: We really should be testing for a deps.deps.Flavor
+        # instance, but the split of Flavor from DependencySet would
+        # cause too much code breakage right now....
+        assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return
 	idtable.IdTable.__delitem__(self, flavor.freeze())
@@ -1369,12 +1378,12 @@ order by
 
         for (name, pinnedInfo, mapInfo) in mapList:
             assert(sum(mapInfo[0].timeStamps()) > 0)
-            if not pinnedInfo[1]:
+            if pinnedInfo[1] is None or pinnedInfo[1].isEmpty():
                 pinnedFlavor = None
             else:
                 pinnedFlavor = pinnedInfo[1].freeze()
 
-            if not mapInfo[1]:
+            if mapInfo[1] is None or mapInfo[1].isEmpty():
                 mapFlavor = None
             else:
                 mapFlavor = mapInfo[1].freeze()
@@ -1382,8 +1391,7 @@ order by
             cu.execute("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)",
                        name, pinnedInfo[0].asString(), pinnedFlavor,
                        mapInfo[0].asString(),
-                        ":".join([ "%.3f" % x for x in
-                                    mapInfo[0].timeStamps()]),
+                        ":".join([ "%.3f" % x for x in mapInfo[0].timeStamps()]),
                        mapFlavor)
 
         # now add link collections to these troves

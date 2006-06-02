@@ -857,7 +857,11 @@ class DependencySet(object):
         return self.difference(other)
 
     def score(self, other):
-        assert(isinstance(other, self.__class__))
+        # XXX this should force the classes to be the same, but the
+        # flavor and DependencySet split would cause too much breakage
+        # right now if we enforced that. We test for DependencySet
+        # instead of self.__class__
+        assert(isinstance(other, DependencySet))
         score = 0
 	for tag in other.members:
             # ignore empty dep classes when scoring
@@ -891,7 +895,11 @@ class DependencySet(object):
     def __cmp__(self, other):
         if other is None:
             return -1
-        assert(isinstance(other, self.__class__))
+        # XXX this should force the classes to be the same, but the
+        # flavor and DependencySet split would cause too much breakage
+        # right now if we enforced that. We test for DependencySet
+        # instead of self.__class__
+        assert(isinstance(other, DependencySet))
         myMembers = self.members
         otherMembers = other.members
         tags = []
@@ -941,6 +949,9 @@ class DependencySet(object):
                 rc.append('%d#%s' %(tag, dep.freeze()))
         return '|'.join(rc)
 
+    def isEmpty(self):
+        return not(self.members)
+
     def __repr__(self):
         return "ThawDep('%s')" % self.freeze()
 
@@ -959,8 +970,6 @@ class Flavor(DependencySet):
         # prohibit evaluating Flavor instances in boolean contexts
         raise SyntaxError, \
               "Flavor objects can't be evaluated in a boolean context"
-    def isEmpty(self):
-        return not(self.members)
 
     def toStrongFlavor(self):
         newDep = self.__class__()
