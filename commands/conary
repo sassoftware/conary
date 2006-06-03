@@ -170,7 +170,7 @@ class ConaryCommand(options.AbstractCommand):
 
 
 class ChangeSetCommand(ConaryCommand):
-    commands = ['changeset']
+    commands = ['changeset', 'cs' ]
     paramHelp = '''\
 conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>
 

@@ -187,22 +187,22 @@ use cvc co %s=<branch> for the following branches:
             continue
 
 	if not fileObj.hasContents:
-	    fileObj.restore(None, '/', fullPath)
+	    fileObj.restore(None, '/', fullPath, nameLookup=False)
 	else:
 	    # tracking the pathId separately from the fileObj lets
 	    # us sort the list of files by fileid
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileObj, ('/', fullPath)))
+		earlyRestore.append((pathId, fileObj, '/', fullPath))
 	    else:
-		lateRestore.append((pathId, fileObj, ('/', fullPath)))
+		lateRestore.append((pathId, fileObj, '/', fullPath))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for pathId, fileObj, tup in earlyRestore + lateRestore:
+    for pathId, fileObj, root, target in earlyRestore + lateRestore:
 	contents = cs.getFileContents(pathId)[1]
-	fileObj.restore(*((contents,) + tup))
+	fileObj.restore(contents, root, target, nameLookup=False)
 
     conaryState.write(workDir + "/CONARY")
 
