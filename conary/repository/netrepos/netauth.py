@@ -721,6 +721,21 @@ class NetworkAuthorization:
 
         return entGroupId
 
+    def deleteEntitlementGroup(self, authToken, entGroup):
+        cu = self.db.cursor()
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+
+        entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
+                                "WHERE entGroup = ?", entGroup).next()[0]
+        cu.execute("DELETE FROM Entitlements WHERE entGroupId=?",
+                   entGroupId)
+        cu.execute("DELETE FROM EntitlementOwners WHERE entGroupId=?",
+                   entGroupId)
+        cu.execute("DELETE FROM EntitlementGroups WHERE entGroupId=?",
+                   entGroupId)
+        self.db.commit()
+
     def addEntitlement(self, authToken, entGroup, entitlement):
         cu = self.db.cursor()
         # validate the password
@@ -796,6 +811,41 @@ class NetworkAuthorization:
                    (entGroup, userGroupId))
         self.db.commit()
 
+    def getEntitlementPermGroup(self, authToken, entGroup):
+        """
+        Returns the user group which controls the permissions for a group.
+        """
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        cu.execute("""SELECT userGroup FROM EntitlementGroups
+                        JOIN UserGroups USING (userGroupId)
+                        WHERE entGroup = ?""", entGroup)
+        try:
+            return cu.next()[0]
+        except:
+            return None
+
+    def getEntitlementOwnerAcl(self, authToken, entGroup):
+        """
+        Returns the user group which owns the entitlement group
+        """
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        cu.execute("""SELECT userGroup FROM EntitlementGroups
+                        JOIN EntitlementOwners USING (entGroupId)
+                        JOIN UserGroups ON
+                            UserGroups.userGroupId =
+                                EntitlementOwners.ownerGroupId
+                        WHERE entGroup = ?""", entGroup)
+        try:
+            return cu.next()[0]
+        except:
+            return None
+
     def addEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
         """
         Gives the userGroup ownership permission for the entGroup entitlement
@@ -812,6 +862,7 @@ class NetworkAuthorization:
         cu.execute("INSERT INTO EntitlementOwners (entGroupId, ownerGroupId) "
                    "VALUES (?, ?)",
                    (entGroupId, userGroupId))
+        self.db.commit()
 
     def deleteEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
         if not self.check(authToken, admin = True):
@@ -825,6 +876,7 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM EntitlementOwners WHERE "
                    "entGroupId=? AND ownerGroupId=?",
                    entGroupId, userGroupId)
+        self.db.commit()
 
     def iterEntitlements(self, authToken, entGroup):
         # validate the password

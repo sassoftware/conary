@@ -118,6 +118,10 @@ class HttpHandler(WebHandler):
 
         self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
         self.isAdmin = self.repServer.auth.check(self.authToken, admin=True)
+        self.hasEntitlements = False
+        self.isAnonymous = self.authToken[0] != 'anonymous'
+        self.hasEntitlements = self.repServer.auth.listEntitlementGroups(
+                                                        self.authToken)
 
         try:
             output = method(**d)
@@ -153,6 +157,8 @@ class HttpHandler(WebHandler):
                            req = self.req,
                            hasWrite = self.hasWrite,
                            isAdmin = self.isAdmin,
+                           isAnonymous = self.isAnonymous,
+                           hasEntitlements = self.hasEntitlements,
                            currentUser = self.authToken[0],
                            **values)
 
@@ -589,6 +595,82 @@ class HttpHandler(WebHandler):
 
             return self._write("notice", message = message,
                 link = returnLink[0], url = returnLink[1])
+
+    @checkAuth()
+    @strFields(entGroup = None)
+    def addEntitlementForm(self, auth, entGroup):
+        return self._write("add_ent", entGroup = entGroup)
+
+    @checkAuth()
+    @strFields(entGroup = None)
+    def deleteEntGroup(self, auth, entGroup):
+        self.repServer.auth.deleteEntitlementGroup(auth, entGroup)
+        self._redirect('manageEntitlements')
+
+    @checkAuth()
+    @strFields(entGroup = None, entitlement = None)
+    def addEntitlement(self, auth, entGroup, entitlement):
+        self.repServer.auth.addEntitlement(auth, entGroup, entitlement)
+        self._redirect('manageEntitlementForm?entGroup=%s' % entGroup)
+
+    @checkAuth()
+    @strFields(entGroup = None, entitlement = None)
+    def deleteEntitlement(self, auth, entGroup, entitlement):
+        self.repServer.auth.deleteEntitlement(auth, entGroup, entitlement)
+        self._redirect('manageEntitlementForm?entGroup=%s' % entGroup)
+
+    @checkAuth()
+    def manageEntitlements(self, auth):
+        entGroupList = self.repServer.listEntitlementGroups(auth, 0)
+
+        if self.isAdmin:
+            entGroupInfo = [
+                (x, self.repServer.auth.getEntitlementOwnerAcl(auth, x),
+                 self.repServer.auth.getEntitlementPermGroup(auth, x)) for
+                x in entGroupList ]
+        else:
+            entGroupInfo = [ (x, None) for x in entGroupList ]
+
+        groups = self.repServer.auth.getGroupList()
+
+        return self._write("manage_ents", entGroups = entGroupInfo,
+                           groups = groups)
+
+    @checkAuth()
+    @strFields(entGroup = None, entOwner = None)
+    def entSetOwner(self, auth, entGroup, entOwner):
+        oldOwner = self.repServer.auth.getEntitlementOwnerAcl(auth, entGroup)
+        if oldOwner:
+            self.repServer.auth.deleteEntitlementOwnerAcl(auth, oldOwner,
+                                                          entGroup)
+        if entOwner != '*none*':
+            self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
+                                                       entGroup)
+
+        self._redirect('manageEntitlements')
+
+    @checkAuth()
+    def addEntGroupForm(self, auth):
+        groups = self.repServer.auth.getGroupList()
+        return self._write("add_ent_group", groups = groups)
+
+    @checkAuth()
+    @strFields(entGroup = None, entOwner = None, userGroup = None)
+    def addEntGroup(self, auth, entOwner, userGroup, entGroup):
+        self.repServer.auth.addEntitlementGroup(auth, entGroup, userGroup)
+        if entOwner != '*none*':
+            self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
+                                                       entGroup)
+
+        self._redirect('manageEntitlements')
+
+    @checkAuth()
+    @strFields(entGroup = None)
+    def manageEntitlementForm(self, auth, entGroup):
+        entitlements = [ x for x in
+            self.repServer.auth.iterEntitlements(auth, entGroup) ]
+        return self._write("entlist", entitlements = entitlements,
+                           entGroup = entGroup)
 
     @checkAuth(admin=True)
     @strFields(key=None, owner="")
