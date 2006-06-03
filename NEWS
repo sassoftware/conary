@@ -12,6 +12,7 @@ Changes in 1.0.18:
     * Added support for deleting entitlements, listing the entitlement
       groups a user can manage, and removing the acl which lets a group
       manage an entitlement group group
+    * Added support for entitlement management to the web UI
 
 Changes in 1.0.17:
   o Client Changes:
