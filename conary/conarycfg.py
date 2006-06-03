@@ -340,7 +340,9 @@ class ConaryConfiguration(SectionedConfigFile):
         context = self.getSection(name)
 
         for key, value in context.iteritems():
-            if value:
+            if isinstance(value, deps.Flavor):
+                    self.__dict__[key] = value
+            elif value:
                 if isinstance(value, dict):
                     self.__dict__[key].update(value)
                 else:
