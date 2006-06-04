@@ -510,7 +510,7 @@ class TroveTupFormatter:
                                               fStr.iterDepsByClass(ISD))
                     for depName in allDeps:
                         fStr.addDep(ISD, deps.Dependency(depName))
-                fStr = str(f)
+                fStr = str(fStr)
             else:
                 fStr = ''
 
