@@ -510,6 +510,7 @@ class TroveTupFormatter:
                                               fStr.iterDepsByClass(ISD))
                     for depName in allDeps:
                         fStr.addDep(ISD, deps.Dependency(depName))
+                fStr = str(f)
             else:
                 fStr = ''
 
@@ -524,16 +525,13 @@ class TroveTupFormatter:
         format = '' # reuse it for indentation
         if indent:
             format = '  ' * indent
-        if isinstance(fStr, deps.Flavor):
-            fStr = str(fStr)
         if fStr:
             return '%s%s=%s[%s]' % (format, name, vStr, fStr)
         else:
             return '%s%s=%s' % (format, name, vStr)
 
 class TroveFormatter(TroveTupFormatter):
-    """ 
-        Formats trove objects (displaying more than just NVF)
+    """ Formats trove objects (displaying more than just NVF)
     """
 
     def formatInfo(self, trove):
@@ -938,11 +936,11 @@ class JobTupFormatter(TroveFormatter):
             name = '%s(:%s)' % (name, ' :'.join(sorted(components)))
 
         if oldInfo:
-            if oldFla is not None and not oldFla.isEmpty():
+            if oldFla:
                 oldInfo += '[%s]' % oldFla
 
         if newInfo:
-            if newFla is not None and not newFla.isEmpty():
+            if newFla:
                 newInfo += '[%s]' % newFla
 
         if not oldInfo:
