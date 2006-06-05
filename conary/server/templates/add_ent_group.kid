@@ -25,19 +25,19 @@
                     <tr><td>Entitlement Group:</td><td><input name="entGroup"/></td></tr>
                     <tr>
                         <td>Permissions Group:</td>
+                        <td>
                             <select name="userGroup">
                                 <option py:for="group in groups" py:content="group" py:value="${group}"/>
                             </select>
-                        <td>
                         </td>
                     </tr>
                     <tr>
                         <td>Managing Group:</td>
+                        <td>
                             <select name="entOwner">
                                 <option value="*none*" selected="selected">(none)</option>
                                 <option py:for="group in groups" py:content="group" py:value="${group}"/>
                             </select>
-                        <td>
                         </td>
                     </tr>
                 </table>

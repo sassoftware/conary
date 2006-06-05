@@ -50,7 +50,7 @@
                     </tr>
                 </tbody>
             </table>
-            <p py:if="isAdmin"><a href="addEntGroupForm">Add Entitlement Group</a></p>
+            <p><a py:if="isAdmin" href="addEntGroupForm">Add Entitlement Group</a></p>
         </div>
     </body>
 </html>

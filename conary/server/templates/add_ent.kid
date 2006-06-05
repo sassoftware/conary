@@ -24,7 +24,7 @@
             <input type="hidden" value="${entGroup}" name="entGroup"/>
                 <table>
                     <tr><td>Entitlement Group:</td><td><span py:content="entGroup"/></td></tr>
-                    <tr><td>Entitlement:</td><td><input name="entitlement"/></td></tr>
+                    <tr><td>Entitlement:</td><td><input size="64" name="entitlement"/></td></tr>
                 </table>
                 <p><input type="submit" value="Add Entitlement"/></p>
             </form>
