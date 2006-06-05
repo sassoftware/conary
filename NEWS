@@ -1,18 +1,24 @@
 Changes in 1.0.18:
   o Client Changes:
-    * Trying to shadow a cooked redirect now results in an error (CNY-447)
-    * Added --keep-required option to tell conary to leave troves installed
-      when removing them would break dependencies. This used to be the
-      default behaviour; conary now issues a dependency error instead (CNY-6).
-    * Added delete-entitlement and list-entitlements to manageents script
-    * Fixed list-groups in manageents to list the groups the user can
-      manage instead of the groups that user belongs to
+    * Trying to shadow a cooked redirect now results in an error. (CNY-447)
+    * A --keep-required option has been added to tell Conary to leave
+      troves installed when removing them would break
+      dependencies. This used to be the default behavior; Conary now
+      issues a dependency error instead. (CNY-6)
+    * "delete-entitlement" and "list-entitlements" options have been
+      added to the "manageents" script.
 
   o Server Changes:
-    * Added support for deleting entitlements, listing the entitlement
-      groups a user can manage, and removing the acl which lets a group
-      manage an entitlement group group
-    * Added support for entitlement management to the web UI (CNY-483)
+    * Support for deleting entitlements, listing the entitlement
+      groups a user can manage, and removing the ACL which lets a group
+      manage an entitlement group has been added.
+    * Entitlement management has been added to the Conary repository
+      web interface. (CNY-483)
+
+  o Bug Fixes:
+    * The "list-groups" option to the "manageents" script has been
+      corrected to list the groups the user can manage instead of the
+      groups that user belongs to.
 
 Changes in 1.0.17:
   o Client Changes:
