@@ -8,6 +8,10 @@ Changes in 1.0.18:
     * "delete-entitlement" and "list-entitlements" options have been
       added to the "manageents" script.
 
+  o Build Changes:
+    * Python dependencies are now generated for .pyc files as well as
+      for .py files. (CNY-459)
+
   o Server Changes:
     * Support for deleting entitlements, listing the entitlement
       groups a user can manage, and removing the ACL which lets a group
@@ -19,10 +23,6 @@ Changes in 1.0.18:
     * The "list-groups" option to the "manageents" script has been
       corrected to list the groups the user can manage instead of the
       groups that user belongs to.
-
-  o Build Changes:
-    * Python dependencies are now generated for .pyc files as well as
-      for .py files.
 
 Changes in 1.0.17:
   o Client Changes:
