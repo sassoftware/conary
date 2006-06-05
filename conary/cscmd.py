@@ -32,11 +32,11 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
             n = n[1:]
 
         found = False
-        if oldVer or oldFla:
+        if oldVer or (oldFla is not None):
             toFind.append((n, oldVer,oldFla))
             found = True
 
-        if newVer or newFla:
+        if newVer or (newFla is not None):
             toFind.append((n, newVer, newFla))
             found = True
 
@@ -62,11 +62,11 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
             n = n[1:]
             
         found = False
-        if oldVer or oldFla:
+        if oldVer or (oldFla is not None):
             oldVer, oldFla = results[n, oldVer, oldFla][0][1:]
             found = True
 
-        if newVer or newFla:
+        if newVer or (newFla is not None):
             newVer, newFla = results[n, newVer, newFla][0][1:]
             found = True
 
