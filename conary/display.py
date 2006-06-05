@@ -448,7 +448,7 @@ class TroveTupFormatter:
             @param v: trove version
             @type v: versions.Version
             @param f: trove flavor
-            @type f: deps.deps.DependencySet (flavor)
+            @type f: deps.deps.Flavor
             @rtype: (vStr, fStr) where vStr is the version string to display
             for this trove and fStr is the flavor string (may be empty)
         """
@@ -510,6 +510,7 @@ class TroveTupFormatter:
                                               fStr.iterDepsByClass(ISD))
                     for depName in allDeps:
                         fStr.addDep(ISD, deps.Dependency(depName))
+                fStr = str(fStr)
             else:
                 fStr = ''
 
@@ -519,25 +520,18 @@ class TroveTupFormatter:
         """ Print a name, version, flavor tuple
         """
         vStr, fStr = self.getTupleStrings(name, version, flavor)
-
         if format:
             return format % (name, vStr, fStr)
-
-        args = []
-        format = ''
+        format = '' # reuse it for indentation
         if indent:
-            if fStr:
-                return '%s%s=%s[%s]' % ('  ' * indent, name, vStr, fStr)
-            else:
-                return '%s%s=%s' % ('  ' * indent, name, vStr)
-        elif fStr:
-            return '%s=%s[%s]' % (name, vStr, fStr)
+            format = '  ' * indent
+        if fStr:
+            return '%s%s=%s[%s]' % (format, name, vStr, fStr)
         else:
-            return '%s=%s' % (name, vStr)
+            return '%s%s=%s' % (format, name, vStr)
 
 class TroveFormatter(TroveTupFormatter):
-    """ 
-        Formats trove objects (displaying more than just NVF)
+    """ Formats trove objects (displaying more than just NVF)
     """
 
     def formatInfo(self, trove):
@@ -558,9 +552,8 @@ class TroveFormatter(TroveTupFormatter):
                 if sourceVer.isOnLocalHost():
                     sourceVer = sourceVer.parentVersion()
 
-                sourceTrove = troveSource.getTrove(sourceName, 
-                                sourceVer, deps.DependencySet(),
-                                withFiles = False)
+                sourceTrove = troveSource.getTrove(
+                    sourceName, sourceVer, deps.Flavor(), withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
                 # on failed getTrove calls 
             except errors.TroveMissing:

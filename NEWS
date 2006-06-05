@@ -1,3 +1,11 @@
+Changes in @NEW@:
+  o Bugs Fixed:
+    * Server code returns an error to a client when committing
+      duplicate troves with empty flavor strings (CNY-476)
+    * When checking out a source trove from a repository using "cvc checkout"
+      the  user is no longer warned about not being able to change the 
+      ownership of the files checked out.
+
 Changes in 1.0.18:
   o Client Changes:
     * Trying to shadow a cooked redirect now results in an error. (CNY-447)

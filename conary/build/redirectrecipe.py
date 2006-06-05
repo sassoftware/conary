@@ -29,8 +29,8 @@ class RedirectRecipe(Recipe):
     def addRedirect(self, name, branchStr = None, sourceFlavor = None,
                     targetFlavor = None, fromTrove = None, 
                     skipTargetMatching = False):
-        if (sourceFlavor and not targetFlavor) or \
-           (targetFlavor and not sourceFlavor):
+        if ((sourceFlavor is not None) and (targetFlavor is None)) or \
+           ((targetFlavor is not None) and (sourceFlavor is None)):
             raise builderrors.RecipeFileError, \
                 "sourceFlavor and targetFlavor must be specified jointly"
 
@@ -72,7 +72,7 @@ class RedirectRecipe(Recipe):
              fromTrove, skipTargetMatching) in self.addTroveList:
             l = fromRule.setdefault(fromTrove, list())
             # the catch-all (with no sourceFlavor) has to be at the end
-            if not sourceFlavor:
+            if sourceFlavor is None:
                 l.append((name, branchStr, sourceFlavor, targetFlavor,
                           skipTargetMatching))
             else:
@@ -181,7 +181,7 @@ class RedirectRecipe(Recipe):
                                 targetFlavor != targetFlavorRestriction):
                                 continue
 
-                            if (sourceFlavorRestriction
+                            if ((sourceFlavorRestriction is not None)
                                 or skipTargetMatching
                                 or sourceFlavor.score(targetFlavor) is not False):
                                 match = targetVersion

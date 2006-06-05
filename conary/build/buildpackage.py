@@ -44,15 +44,14 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
 
     return f
 
-def _getUseDependencySet(recipe):
+def _getUseFlavor(recipe):
     """
-    Returns a deps.DependencySet instance that represents the Use flags
+    Returns a deps.Flavor instance that represents the Use flags
     that have been used.
     """
     return use.createFlavor(recipe.name, use.Use._iterUsed(), 
                                          recipe.Flags._iterUsed(), 
                                          use.Arch._iterUsed())
-    
 class BuildComponent(dict):
 
     def addFile(self, path, realPath):
@@ -185,7 +184,7 @@ class BuildComponent(dict):
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
         self.provides.addDep(deps.TroveDependencies, deps.Dependency(name))
-        self.flavor = _getUseDependencySet(recipe)
+        self.flavor = _getUseFlavor(recipe)
         self.linkGroups = {}
         self.requiresMap = {}
         self.providesMap = {}

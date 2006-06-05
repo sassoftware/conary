@@ -400,10 +400,10 @@ class QueryByBranch(Query):
                     self._addLocalTrove(troveTup)
                     continue
 
-                if flavor:
-                    flavorList = self.overrideFlavors(flavor)
-                else:
+                if flavor is None:
                     flavorList = self.overrideFlavors(afFlavor)
+                else:
+                    flavorList = self.overrideFlavors(flavor)
 
                 self.addQuery(troveTup, afVersion.branch(), flavorList)
 

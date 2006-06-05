@@ -197,7 +197,7 @@ class FlavorConfig:
                        self.arches[arch].read(os.path.join(archDir, arch))
 
     def toDependency(self, override=None):
-        useFlags = deps.DependencySet()
+        useFlags = deps.Flavor()
         flags = [x.toDepFlag() for x in self.flags.values() ] 
 
         useFlags.addDep(deps.UseDependency, 

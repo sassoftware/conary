@@ -93,12 +93,12 @@ class CacheSet:
             if oldVersionId is None:
                 return None
 
-        if oldFlavor:
+        if oldFlavor is not None:
             oldFlavorId = self.flavors.get(oldFlavor, None)
             if oldFlavorId is None:
                 return None
 
-        if newFlavor:
+        if newFlavor is not None:
             newFlavorId = self.flavors.get(newFlavor, None)
             if newFlavorId is None:
                 return None
@@ -153,12 +153,12 @@ class CacheSet:
                 if oldVersionId is None:
                     oldVersionId = self.versions.addId(oldVersion)
 
-            if oldFlavor:
+            if oldFlavor is not None:
                 oldFlavorId = self.flavors.get(oldFlavor, None)
                 if oldFlavorId is None:
                     oldFlavorId = self.flavors.addId(oldFlavor)
 
-            if newFlavor:
+            if newFlavor is not None:
                 newFlavorId = self.flavors.get(newFlavor, None)
                 if newFlavorId is None:
                     newFlavorId = self.flavors.addId(newFlavor)

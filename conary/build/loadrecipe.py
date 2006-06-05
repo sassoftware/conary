@@ -332,7 +332,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 	labelPath = [cfg.buildLabel]
     try:
 	pkgs = repos.findTrove(labelPath,
-                               (component, versionStr, deps.DependencySet()))
+                               (component, versionStr, deps.Flavor()))
     except errors.TroveNotFound:
         raise builderrors.LoadRecipeError(
                                 'cannot find source component %s' % component)
@@ -499,14 +499,15 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     #first check to see if a filename was specified, and if that 
     #recipe actually exists.   
     loader = None
-    if not (label or versionStr or flavor):
+    if not (label or versionStr or (flavor is not None)):
         if name[0] != '/':
             localfile = parentDir + '/' + file
         else:
             localfile = name + '.recipe'
 
         if os.path.exists(localfile):
-            if flavor:
+            # XXX: FIXME: this next test is unreachable
+            if flavor is not None and not flavor.isEmpty():
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
@@ -528,15 +529,14 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             # matches this loadrecipe request.  Use that trove's version
             # and flavor information to grab the source out of the repository
             db = database.Database(cfg.root, cfg.dbPath)
-            parts = _findInstalledVersion(db, labelPath, name, 
-                                          versionStr, flavor)
+            parts = _findInstalledVersion(db, labelPath, name, versionStr, flavor)
             if parts:
                 version, flavor = parts
                 while version.isOnLocalHost():
                     version = version.parentVersion()
                 versionStr = str(version)
 
-        if flavor:
+        if flavor is not None:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
             # trove was found.  
@@ -554,7 +554,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         # If they used the old-style specification of label, we should 
         # convert to new style for purposes of storing in troveInfo
         troveSpec = '%s=%s' % (name, label)
-        if flavorSpec:
+        if flavorSpec is not None and not troveSpec.isEmpty():
             troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
 
     for name, recipe in loader.allRecipes().items():
@@ -577,7 +577,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
-    if flavor:
+    if flavor is not None:
         cfg.buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
         use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)

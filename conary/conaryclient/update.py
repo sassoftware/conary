@@ -402,7 +402,7 @@ class ClientUpdate:
         # we may need to install. Build a set of all of the trove names
         # in that trove as well.
         availableTrove = trove.Trove("@update", versions.NewVersion(),
-                                     deps.DependencySet(), None)
+                                     deps.Flavor(), None)
 
         names = set()
         for job in transitiveClosure:
@@ -536,7 +536,7 @@ class ClientUpdate:
 
 
         existsTrv = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
@@ -787,8 +787,7 @@ followLocalChanges: %s
                         installedBranch = replacedInfo[1].branch()
 
                         if replacedInfo in localUpdatesByPresent:
-                            notInstalledVer = \
-                                        localUpdatesByPresent[replacedInfo][0]
+                            notInstalledVer = localUpdatesByPresent[replacedInfo][0]
                             notInstalledBranch = notInstalledVer.branch()
                             # create alreadyBranchSwitch variable for 
                             # readability
@@ -808,9 +807,7 @@ followLocalChanges: %s
                             # install a downgrade, skip it.
                             if not isPrimary:
                                 if replacedInfo in sameBranchLocalUpdates:
-                                    notInstalledFlavor = \
-                                        sameBranchLocalUpdates[replacedInfo][1]
-
+                                    notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                                 if (newInfo[1] < replaced[0]
                                     and replacedInfo in sameBranchLocalUpdates):
                                     log.debug('SKIP: avoiding downgrade')
@@ -882,23 +879,18 @@ followLocalChanges: %s
 
                         if replaced[0] and respectFlavorAffinity:
                             if replacedInfo in localUpdatesByPresent:
-                                notInstalledFlavor = \
-                                        localUpdatesByPresent[replacedInfo][1]
+                                notInstalledFlavor = localUpdatesByPresent[replacedInfo][1]
                                 # create alreadyBranchSwitch variable for 
                                 # readability
                                 alreadyFlavorSwitch = True
                             elif replacedInfo in sameBranchLocalUpdates:
-                                notInstalledFlavor = \
-                                        sameBranchLocalUpdates[replacedInfo][1]
+                                notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                             else:
                                 notInstalledFlavor = None
 
-                            if (notInstalledFlavor
-                                and not deps.compatibleFlavors(
-                                                           notInstalledFlavor,
-                                                           replacedInfo[2])
-                                and not deps.compatibleFlavors(replacedInfo[2],
-                                                               newInfo[2])):
+                            if (notInstalledFlavor is not None
+                                and not deps.compatibleFlavors(notInstalledFlavor, replacedInfo[2])
+                                and not deps.compatibleFlavors(replacedInfo[2], newInfo[2])):
                                 if isPrimary:
                                     respectFlavorAffinity = False
                                 else:
@@ -1185,15 +1177,15 @@ conary erase '%s=%s[%s]'
 
             if troveName[0] == '-':
                 needsOld = True
-                needsNew = newVersionStr or newFlavorStr
+                needsNew = newVersionStr or (newFlavorStr is not None)
                 troveName = troveName[1:]
             elif troveName[0] == '+':
                 needsNew = True
-                needsOld = oldVersionStr or oldFlavorStr
+                needsOld = oldVersionStr or (oldFlavorStr is not None)
                 troveName = troveName[1:]
             else:
-                needsOld = oldVersionStr or oldFlavorStr
-                needsNew = newVersionStr or newFlavorStr
+                needsOld = oldVersionStr or (oldFlavorStr is not None)
+                needsNew = newVersionStr or (newFlavorStr is not None)
                 if not (needsOld or needsNew):
                     if updateMode:
                         needsNew = True
@@ -1207,14 +1199,14 @@ conary erase '%s=%s[%s]'
                 oldTroves = []
 
             if not needsNew:
-                assert(not newFlavorStr)
+                assert(newFlavorStr is None)
                 assert(not isAbsolute)
                 for troveInfo in oldTroves:
                     log.debug("set up removal of %s", troveInfo)
                     removeJob.add((troveInfo[0], (troveInfo[1], troveInfo[2]),
                                    (None, None), False))
                 # skip ahead to the next itemList
-                continue                    
+                continue
 
             if len(oldTroves) > 2:
                 raise UpdateError, "Update of %s specifies multiple " \
@@ -1226,7 +1218,7 @@ conary erase '%s=%s[%s]'
             del oldTroves
 
             if isinstance(newVersionStr, versions.Version):
-                assert(isinstance(newFlavorStr, deps.DependencySet))
+                assert(isinstance(newFlavorStr, deps.Flavor))
                 jobToAdd = (troveName, oldTrove,
                             (newVersionStr, newFlavorStr), isAbsolute)
                 newJob.add(jobToAdd)
@@ -1529,9 +1521,9 @@ conary erase '%s=%s[%s]'
 
         while noParents:
             exists = trove.Trove('@update', versions.NewVersion(),
-                                 deps.DependencySet(), None)
+                                 deps.Flavor(), None)
             refd = trove.Trove('@update', versions.NewVersion(),
-                               deps.DependencySet(), None)
+                               deps.Flavor(), None)
 
             for troveId in noParents:
                 info, isPresent, hasParent, isWeak = troves[troveId]
@@ -1624,12 +1616,8 @@ conary erase '%s=%s[%s]'
             # that contains only those parts of newTrove that are actually
             # installed.
 
-            notExistsOldTrove = trove.Trove('@update',
-                                            versions.NewVersion(),
-                                            deps.DependencySet())
-            existsNewTrove = trove.Trove('@update',
-                                         versions.NewVersion(),
-                                         deps.DependencySet())
+            notExistsOldTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
+            existsNewTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
 
             # only create local updates between old troves that
             # don't exist and new troves that do.

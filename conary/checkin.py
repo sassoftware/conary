@@ -107,7 +107,7 @@ def _checkout(repos, cfg, workDir, name, callback):
 
     # We have to be careful with labels
     name, versionStr, flavor = cmdline.parseTroveSpec(name)
-    if flavor:
+    if flavor is not None:
         log.error('source troves do not have flavors')
         return
 
@@ -187,22 +187,22 @@ use cvc co %s=<branch> for the following branches:
             continue
 
 	if not fileObj.hasContents:
-	    fileObj.restore(None, '/', fullPath)
+	    fileObj.restore(None, '/', fullPath, nameLookup=False)
 	else:
 	    # tracking the pathId separately from the fileObj lets
 	    # us sort the list of files by fileid
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileObj, ('/', fullPath)))
+		earlyRestore.append((pathId, fileObj, '/', fullPath))
 	    else:
-		lateRestore.append((pathId, fileObj, ('/', fullPath)))
+		lateRestore.append((pathId, fileObj, '/', fullPath))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for pathId, fileObj, tup in earlyRestore + lateRestore:
+    for pathId, fileObj, root, target in earlyRestore + lateRestore:
 	contents = cs.getFileContents(pathId)[1]
-	fileObj.restore(*((contents,) + tup))
+	fileObj.restore(contents, root, target, nameLookup=False)
 
     conaryState.write(workDir + "/CONARY")
 
@@ -232,9 +232,7 @@ def commit(repos, cfg, message, callback=None, test=False):
 	    return
 	srcPkg = None
     else:
-        srcPkg = repos.getTrove(troveName,
-                                state.getVersion(),
-                                deps.deps.DependencySet())
+        srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
         if not _verifyAtHead(repos, srcPkg, state):
             log.error("contents of working directory are not all "
                       "from the head of the branch; use update")
@@ -441,7 +439,7 @@ def commit(repos, cfg, message, callback=None, test=False):
     if state.getLastMerged():
         shadowLabel = state.getVersion().branch().label()
         shadowedVer = state.getLastMerged().createShadow(shadowLabel)
-        noDeps = deps.deps.DependencySet()
+        noDeps = deps.deps.Flavor()
 
         # Conary requires that if you're committing a source change that 
         # contains an upstream merge, you also commit a shadow of that
@@ -535,7 +533,7 @@ def annotate(repos, filename):
     while verList:
         # iterate backwards from newest to oldest through verList
         oldV = verList.pop()
-        oldTrove = repos.getTrove(troveName, oldV, deps.deps.DependencySet())
+        oldTrove = repos.getTrove(troveName, oldV, deps.deps.Flavor())
 
         try:
             name, oldFileId, oldFileV = oldTrove.getFile(pathId)
@@ -693,7 +691,7 @@ def findRelativeVersion(repos, troveName, count, newV):
         old = None
     else:
         oldV = branchList[-count]
-        old = (troveName, oldV, deps.deps.DependencySet())
+        old = (troveName, oldV, deps.deps.Flavor())
 
     return old, oldV
 
@@ -734,8 +732,8 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     else:
         new = repos.getTrove(*new)
 
-    cs = repos.createChangeSet([(troveName, (oldV, deps.deps.DependencySet()),
-					    (newV, deps.deps.DependencySet()), 
+    cs = repos.createChangeSet([(troveName, (oldV, deps.deps.Flavor()),
+					    (newV, deps.deps.Flavor()), 
                                  False)])
 
     _showChangeSet(repos, cs, old, new)
@@ -763,9 +761,7 @@ def diff(repos, versionStr = None):
 
 	oldTrove = repos.getTrove(*pkgList[0])
     else:
-	oldTrove = repos.getTrove(state.getName(), 
-                                  state.getVersion(),
-                                  deps.deps.DependencySet())
+	oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
@@ -852,8 +848,7 @@ def updateSrc(repos, versionStr = None, callback = None):
     
     if not versionStr:
 	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
-	head = repos.getTrove(pkgName, headVersion, 
-                              deps.deps.DependencySet())
+	head = repos.getTrove(pkgName, headVersion, deps.deps.Flavor())
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion == baseVersion:
@@ -876,9 +871,9 @@ def updateSrc(repos, versionStr = None, callback = None):
 	headVersion = pkgList[0][1]
 	newBranch = fullLabel(None, headVersion, versionStr)
 
-    changeSet = repos.createChangeSet([(pkgName, 
-                                (baseVersion, deps.deps.DependencySet()), 
-                                (headVersion, deps.deps.DependencySet()), 
+    changeSet = repos.createChangeSet([(pkgName,
+                                (baseVersion, deps.deps.Flavor()),
+                                (headVersion, deps.deps.Flavor()),
                                 0)],
                                       excludeAutoSource = True,
                                       callback = callback)
@@ -994,8 +989,8 @@ def merge(repos, versionSpec=None, callback=None):
         return
 
     changeSet = repos.createChangeSet([(troveName,
-                            (parentRootVersion, deps.deps.DependencySet()), 
-                            (parentHeadVersion, deps.deps.DependencySet()), 
+                            (parentRootVersion, deps.deps.Flavor()), 
+                            (parentHeadVersion, deps.deps.Flavor()), 
                             0)], excludeAutoSource = True, callback = callback)
 
     # make sure there are changes to apply
@@ -1213,7 +1208,7 @@ def showLog(repos, branch = None):
     l = []
     for version in verList:
 	if version.branch() != branch: return
-	l.append((troveName, version, deps.deps.DependencySet()))
+	l.append((troveName, version, deps.deps.Flavor()))
 
     print "Name  :", troveName
     print "Branch:", branch.asString()

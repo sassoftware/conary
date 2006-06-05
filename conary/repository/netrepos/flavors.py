@@ -36,16 +36,16 @@ class Flavors:
 			       flavorId, dep.name, sense, flag)
 
     def __getitem__(self, flavor):
-	val = self.get(flavor, 0)
+	val = self.get(flavor, None)
 
-	if val == '0':
+        if val is None:
             raise KeyError, flavor
 
 	return val
 
     def get(self, flavor, defValue):
 	if flavor is None:
-	    return 0
+	    return None
 
 	cu = self.db.cursor()
 	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?",
@@ -57,12 +57,12 @@ class Flavors:
 
     def getId(self, flavorId):
 	if flavorId == 0:
-	    return deps.DependencySet()
+	    return deps.Flavor()
 
 	cu = self.db.cursor()
 	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?",
 		   flavorId)
 	try:
-	    return deps.ThawDependencySet(cu.next()[0])
+	    return deps.ThawFlavor(cu.next()[0])
 	except StopIteration:
             raise KeyError, flavorId

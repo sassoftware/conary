@@ -2618,7 +2618,7 @@ class Flavor(policy.Policy):
         else:
             return
 
-	set = deps.DependencySet()
+	set = deps.Flavor()
         set.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies
         set.union(use.createFlavor(None, use.Arch._iterUsed()))
