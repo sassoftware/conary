@@ -811,7 +811,7 @@ class BuildPackageRecipe(PackageRecipe):
     EXAMPLE
     =======
 
-    C{class DocbookDtds(BuidlPackageRecipe):}
+    C{class DocbookDtds(BuildPackageRecipe):}
 
     Uses C{BuildPackageRecipe} to define the class for a Docbook Document Type
     Definition collection recipe.
