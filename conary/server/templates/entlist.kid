@@ -23,7 +23,7 @@
             <table class="entlist" id="entitlements">
                 <thead>
                     <tr>
-                        <td style="width: 25%;">Entitlement Group</td>
+                        <td style="width: 25%;">Entitlement</td>
                         <td style="width: 25%;">Delete</td>
                     </tr>
                 </thead>

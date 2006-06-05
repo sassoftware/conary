@@ -629,7 +629,7 @@ class HttpHandler(WebHandler):
                  self.repServer.auth.getEntitlementPermGroup(auth, x)) for
                 x in entGroupList ]
         else:
-            entGroupInfo = [ (x, None) for x in entGroupList ]
+            entGroupInfo = [ (x, None, None) for x in entGroupList ]
 
         groups = self.repServer.auth.getGroupList()
 
