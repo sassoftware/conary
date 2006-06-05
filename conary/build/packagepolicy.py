@@ -1729,7 +1729,7 @@ class Provides(policy.Policy):
 
     def _addPythonProvides(self, path, m, pkg, macros):
 
-        if not (path.endswith('.py') or path.endswith('.so')):
+        if not (path.endswith('.py') or path.endswith('.pyc') or path.endswith('.so')):
             return
 
         if self.sysPath is None:
@@ -1749,7 +1749,9 @@ class Provides(policy.Policy):
         if not depPath:
             return
 
-        depPath = depPath[:-3]
+        # remove extension
+        depPath = depPath.rsplit('.', 1)[0]
+
         if depPath.endswith('/__init__'):
             depPath = depPath.replace('/__init__', '')
         depPath = depPath.replace('/', '.')
@@ -1859,7 +1861,7 @@ class Provides(policy.Policy):
             if m and m.name == 'ELF':
                 self._ELFPathProvide(path, m, pkg)
 
-            if path.endswith('.so') or path.endswith('.py'):
+            if path.endswith('.so') or path.endswith('.py') or path.endswith('.pyc'):
                 self._addPythonProvides(path, m, pkg, macros)
 
             elif m and m.name == 'CIL':
@@ -2281,8 +2283,9 @@ class Requires(_addInfo):
                 # a python file not found in sys.path will not have been
                 # provided, so we must not depend on it either
                 return
-            if depPath.endswith('.py') or depPath.endswith('.so'):
-                depPath = depPath[:-3]
+            if depPath.endswith('.py') or depPath.endswith('.pyc') or depPath.endswith('.so'):
+                # remove extension
+                depPath = depPath.rsplit('.', 1)[0]
             else:
                 # Not something we provide, so not something we can
                 # require either.  Drop it and go on.  We have seen
@@ -2415,7 +2418,7 @@ class Requires(_addInfo):
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('python')):
             self._addPythonRequirements(path, fullpath, pkg, script=True)
-        elif path.endswith('.py'):
+        elif path.endswith('.py') or path.endswith('.pyc'):
             self._addPythonRequirements(path, fullpath, pkg, script=False)
 
         if m and m.name == 'CIL':

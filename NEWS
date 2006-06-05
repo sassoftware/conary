@@ -20,6 +20,10 @@ Changes in 1.0.18:
       corrected to list the groups the user can manage instead of the
       groups that user belongs to.
 
+  o Build Changes:
+    * Python dependencies are now generated for .pyc files as well as
+      for .py files.
+
 Changes in 1.0.17:
   o Client Changes:
     * Individual file removals performed by "conary remove" now create

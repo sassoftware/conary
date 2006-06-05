@@ -12,7 +12,10 @@
 # full details.
 #
 
+import os.path
+import imp
 import modulefinder
+from modulefinder import READ_MODE
 
 class DirBasedModuleFinder(modulefinder.ModuleFinder):
     def __init__(self, baseDir, *args, **kw):
@@ -45,6 +48,19 @@ class DirBasedModuleFinder(modulefinder.ModuleFinder):
         if self.caller and m and m.__file__:
             self.deps.setdefault(self.caller, set()).add(m.__file__)
         return m
+
+    def load_file(self, pathname):
+        dir, name = os.path.split(pathname)
+        name, ext = os.path.splitext(name)
+        if pathname.endswith('.pyc'):
+            fileType = imp.PY_COMPILED
+            mode = 'rb'
+        else:
+            fileType = imp.PY_SOURCE
+            mode = READ_MODE
+        fp = open(pathname, mode)
+        stuff = (ext, mode, fileType)
+        self.load_module(name, fp, pathname, stuff)
 
     def getDepsForPath(self, path):
         return self.deps.get(path, [])
