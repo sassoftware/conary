@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Add the Ant, JavaCompile, and ClassPath build actions to support build 
+      java with conary.
+
   o Bugs Fixed:
     * Server code returns an error to a client when committing
       duplicate troves with empty flavor strings (CNY-476)
