@@ -21,9 +21,9 @@
             <h2>Add Entitlement</h2>
 
             <form method="post" action="addEntitlement">
-            <input type="hidden" value="${entGroup}" name="entGroup"/>
+            <input type="hidden" value="${entClass}" name="entClass"/>
                 <table>
-                    <tr><td>Entitlement Group:</td><td><span py:content="entGroup"/></td></tr>
+                    <tr><td>Entitlement Class:</td><td><span py:content="entClass"/></td></tr>
                     <tr><td>Entitlement:</td><td><input size="64" name="entitlement"/></td></tr>
                 </table>
                 <p><input type="submit" value="Add Entitlement"/></p>

@@ -5,6 +5,9 @@ Changes in @NEW@:
     * When checking out a source trove from a repository using "cvc checkout"
       the  user is no longer warned about not being able to change the 
       ownership of the files checked out.
+  o Server Changes:
+    * Use the term Entitlement Class in all conary repository web interfaces
+      replacing Entitlement Group.
 
 Changes in 1.0.18:
   o Client Changes:

@@ -19,7 +19,7 @@
     <head/>
     <body>
         <div id="inner">
-            <h2>Entitlements for <span py:content="entGroup"/></h2>
+            <h2>Entitlements for <span py:content="entClass"/></h2>
             <table class="entlist" id="entitlements">
                 <thead>
                     <tr>
@@ -32,13 +32,13 @@
                         class="${i % 2 and 'even' or 'odd'}">
                         <td py:content="entitlement"/>
                         <td>
-                            <a href="deleteEntitlement?entGroup=${entGroup};entitlement=${entitlement}">X</a>
+                            <a href="deleteEntitlement?entClass=${entClass};entitlement=${entitlement}">X</a>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <p>
-                <a href="addEntitlementForm?entGroup=${entGroup}">Add Entitlement</a>
+                <a href="addEntitlementForm?entClass=${entClass}">Add Entitlement</a>
             </p>
         </div>
     </body>

@@ -18,11 +18,11 @@
     <head/>
     <body>
         <div id="inner">
-            <h2>Add Entitlement Group</h2>
+            <h2>Add Entitlement Class</h2>
 
-            <form method="post" action="addEntGroup">
+            <form method="post" action="addEntClass">
                 <table>
-                    <tr><td>Entitlement Group:</td><td><input name="entGroup"/></td></tr>
+                    <tr><td>Entitlement Class:</td><td><input name="entClass"/></td></tr>
                     <tr>
                         <td>Permissions Group:</td>
                         <td>
@@ -41,7 +41,7 @@
                         </td>
                     </tr>
                 </table>
-                <p><input type="submit" value="Add Entitlement Group"/></p>
+                <p><input type="submit" value="Add Entitlement Class"/></p>
             </form>
         </div>
     </body>
