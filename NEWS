@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Client Changes:
+    * The default resolveLevel is now 2, this means that conary will try 
+      to update troves that would otherwise cause an update to fail.  
+      See the conary man page for more details.
   o Bugs Fixed:
     * Server code returns an error to a client when committing
       duplicate troves with empty flavor strings (CNY-476)

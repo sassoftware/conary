@@ -287,7 +287,7 @@ class ConaryConfiguration(SectionedConfigFile):
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
     root                  =  (CfgPath, '/')
-    resolveLevel          =  (CfgInt, 1)
+    resolveLevel          =  (CfgInt, 2)
     recipeTemplateDirs    =  (CfgPathList, ('~/.conary/recipeTemplates',
                                             '/etc/conary/recipeTemplates'))
     showLabels            =  CfgBool
