@@ -3,6 +3,15 @@ Changes in @NEW@:
     * The default resolveLevel is now 2, this means that conary will try 
       to update troves that would otherwise cause an update to fail.  
       See the conary man page for more details.
+
+  o Build Changes:
+    * Add the Ant, JavaCompile, and ClassPath build actions to support build 
+      java with conary.
+
+  o Server Changes:
+    * Use the term Entitlement Class in all conary repository web interfaces
+      replacing Entitlement Group.
+
   o Bugs Fixed:
     * Server code returns an error to a client when committing
       duplicate troves with empty flavor strings (CNY-476)
@@ -13,9 +22,6 @@ Changes in @NEW@:
       locally.  This bug caused updateall to consider many x86 troves as
       needing to be updated separately instead of as a part of group-dist.
       This could cause updateall failures. (CNY-497)
-  o Server Changes:
-    * Use the term Entitlement Class in all conary repository web interfaces
-      replacing Entitlement Group.
 
 Changes in 1.0.18:
   o Client Changes:

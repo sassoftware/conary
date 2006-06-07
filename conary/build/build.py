@@ -352,7 +352,8 @@ class Configure(BuildCommand):
     template = (
 	'cd %%(actionDir)s; '
 	'%%(mkObjdir)s '
-	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
+    'CLASSPATH="%%(classpath)s"'
+	' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preConfigure)s %%(configure)s'
@@ -466,7 +467,8 @@ class ManualConfigure(Configure):
     """
     template = ('cd %%(actionDir)s; '
                 '%%(mkObjdir)s '
-                'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
+                'CLASSPATH="%%(classpath)s"'
+                ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
                 ' CPPFLAGS="%%(cppflags)s"'
                 ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	        ' %(preConfigure)s %%(configure)s %(args)s')
@@ -549,7 +551,7 @@ class Make(BuildCommand):
     # them.
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
-		' CPPFLAGS="%%(cppflags)s"'
+		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s %(makeName)s %%(overrides)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
@@ -622,7 +624,7 @@ class MakeParallelSubdir(Make):
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
-		' CPPFLAGS="%%(cppflags)s"'
+		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s '
@@ -675,7 +677,7 @@ class MakeInstall(Make):
     """
     template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
-		' CPPFLAGS="%%(cppflags)s"'
+		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(rootVarArgs)s'
@@ -723,7 +725,7 @@ class MakePathsInstall(Make):
     template = (
 	'cd %%(actionDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
-	' CPPFLAGS="%%(cppflags)s"'
+	' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preMake)s make %%(overrides)s'
 	' %%(mflags)s'
@@ -742,6 +744,91 @@ class MakePathsInstall(Make):
 	' infodir=%%(destdir)s/%%(infodir)s'
 	' %(installtarget)s %(args)s')
     keywords = {'installtarget': 'install'}
+
+
+class Ant(BuildCommand):
+    """
+    NAME
+    ====
+
+    B{C{r.Ant()}} - Runs c{ant}
+
+    SYNOPSIS
+    ========
+
+    C{r.Ant(I{antargs}, [I{verbose}], [I{options}], [I{subdir}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.Ant()} class is called from within a Conary recipe to execute the 
+    C{ant} utility.
+
+    EXAMPLES
+    ========
+
+    C{r.Ant('jar javadoc')}
+
+    Demonstrates calling C{r.Ant()}, with the C{jar} and C{javadoc} arguments
+    to C{ant}.
+
+    """
+    keywords = {'subdir': '',
+                'verbose': True,
+                'options': '-lib %(javadir)s'}
+    template = '%%(cdcmd)s CLASSPATH=%%(classpath)s %%(antcmd)s %%(antoptions)s %%(args)s'
+
+    def do(self, macros):
+        macros = macros.copy()
+        if self.subdir: macros.cdcmd = 'cd %s;' % (self.subdir % macros)
+        else: macros.cdcmd = ''
+        if self.options: macros.antoptions = self.options
+        if self.verbose: macros.antoptions += ' -v'
+        macros.antcmd = 'ant'
+        macros.args = ' '.join(self.arglist)
+        build.BuildCommand.do(self, macros)
+
+
+class JavaCompile(BuildCommand):
+    """
+    NAME
+    ====
+
+    B{C{r.JavaCompile()}} - Runs C{javac}
+
+    SYNOPSIS
+    ========
+
+    C{r.JavaCompile(I{directory}, [I{javacmd}], [I{javaArgs}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.JavaCompile()} class is called from within a Conary recipe to 
+    execute the command defined by C{javacmd}, normally C{javac}.
+
+    EXAMPLES
+    ========
+
+    C{r.JavaCompile('/path/to/java/files', javacmd='ecj')}
+
+    Demonstrates calling C{r.JavaCompile()}, to compile all java files in a 
+    directory using C{ecj}.
+
+    """
+
+    keywords = {'javacmd': 'javac',
+                'javaArgs': ''}
+    template = 'CLASSPATH=%%(classpath)s %(javacmd)s %%(dir)s %(javaArgs)s'
+
+    def do(self, macros):
+        macros = macros.copy()
+        assert(len(self.arglist) == 1)
+        macros.dir = self.arglist[0] % macros
+        assert(os.path.exists('%(builddir)s/%(dir)s' % macros))
+        filelist = []
+        util.execute('%s %s' % (self.command % macros, ' '.join(filelist)))
+
 
 
 class CompilePython(BuildCommand):
@@ -1132,6 +1219,42 @@ class Environment(BuildAction):
 	action.RecipeAction.__init__(self, recipe, [], **keywords)
     def do(self, macros):
 	os.environ[self.variable] = self.value % macros
+
+
+class ClassPath(BuildAction):
+    """
+    NAME
+    ====
+
+    B{C{r.ClassPath()}} - Set the CLASSPATH environment variable
+
+    SYNOPSIS
+    ========
+
+    C{r.ClassPath(I{'jars'})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.ClassPath()} class is called from within a Conary recipe to set
+    the CLASSPATH environment variable using C{r.classpath}.
+
+    EXAMPLES
+    ========
+
+    C{r.Environment('junit', 'servlet-api')}
+    """
+    def do(self, macros):
+        macros.classpath = self.recipe.classpath
+        for jar in self.arglist:
+            if macros.classpath:
+                macros.classpath += ':'
+            if '/' not in jar:
+                log.info(('Adding %%(javadir)s/%s.jar to java class path' % jar) % macros)
+                macros.classpath += '%%(javadir)s/%s.jar' % jar
+            else:
+                log.info('Adding %s.jar to java class path' % jar)
+                macros.classpath += '%s.jar' % jar
 
 
 class SetModes(_FileAction):

@@ -53,6 +53,7 @@ cppflags	    = ''
 ldflags		    = '%(dbgflags)s'
 mflags		    = '' # make flags
 parallelmflags      = ''
+classpath           = ''
 sysroot		    = ''
 os		    = 'linux'
 debugedit           = 'debugedit'
