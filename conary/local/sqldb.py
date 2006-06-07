@@ -1680,8 +1680,6 @@ order by
              flags) in cu:
             if parentName:
                 weakRef = flags & schema.TROVE_TROVES_WEAKREF
-                if isPresent and not weakRef:
-                    continue
                 parentVersion = VFS(parentVersion, 
                     timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
                 parentInfo = (parentName, parentVersion, Flavor(parentFlavor))

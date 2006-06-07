@@ -1466,19 +1466,26 @@ conary erase '%s=%s[%s]'
         if troveNames is not None and not troveNames:
             return []
 
+
         allJobs = []        # allJobs is returned from this fn
 
         noParents = []      # troves with no parents that could be part of
                             # unknown local updates.
 
         troves = []         # troveId -> troveInfo map (troveId == index)
-                            # contains (troveTup, isPresent, hasParent, isWeak)
+                            # contains (troveTup, isPresent, hasParent, 
+                            #           isWeak)
 
         maxId = 0           # next index for troves list
         troveIdsByInfo = {} # (name,ver,flavor) -> troveId 
 
         parentIds = {}      # name -> [parents of troves w/ name, troveIds]
         childIds = {}       # troveId -> childIds
+
+        TROVEINFO = 0
+        ISPRESENT = 1
+        HASPARENT = 2
+        ISWEAK = 3
 
         # 1. Create needed data structures
         #    troves, parentIds, childIds
@@ -1490,21 +1497,22 @@ conary erase '%s=%s[%s]'
                 troves.append([troveInfo, isPresent, bool(parentInfo), weakRef])
             else:
                 if isPresent:
-                    troves[troveId][1] = True
+                    troves[troveId][ISPRESENT] = True
                 if parentInfo:
-                    troves[troveId][2] = True
+                    troves[troveId][HASPARENT] = True
                 if not weakRef:
-                    troves[troveId][3] = False
+                    troves[troveId][ISWEAK] = False
 
-            parentId = troveIdsByInfo.setdefault(parentInfo, maxId)
-            if parentId == maxId:
-                maxId += 1
-                troves.append([parentInfo, False, False, False])
+            if parentInfo:
+                parentId = troveIdsByInfo.setdefault(parentInfo, maxId)
+                if parentId == maxId:
+                    maxId += 1
+                    troves.append([parentInfo, False, False, True])
 
-            l = parentIds.setdefault(troveInfo[0], (set(), []))
+            l = parentIds.setdefault(troveInfo[0], [set(), []])
             l[1].append(troveId)
 
-            if parentId:
+            if parentInfo:
                 childIds.setdefault(parentId, []).append(troveId)
                 l[0].add(parentId)
 
@@ -1512,8 +1520,13 @@ conary erase '%s=%s[%s]'
 
         # remove troves that don't are not present and have no parents - they 
         # won't be part of local updates.
-        allTroves = set(x[0] for x in enumerate(troves) if x[1][1] or x[1][2])
-        [ x[0].intersection_update(allTroves) for x in parentIds.itervalues() ]
+        allTroves = set(x[0] for x in enumerate(troves) 
+                        if (x[1][ISPRESENT] or x[1][HASPARENT])
+                           and not (x[1][ISPRESENT] and x[1][HASPARENT] and not x[1][ISWEAK]))
+        for name, (parents, troveIds) in parentIds.items():
+            parents.intersection_update(allTroves)
+            parentIds[name][1] = set(troveIds)
+            parentIds[name][1].intersection_update(allTroves)
         del allTroves
 
         noParents = (x[1][1] for x in parentIds.iteritems() if not x[1][0])
@@ -1537,11 +1550,15 @@ conary erase '%s=%s[%s]'
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
                     continue
-                newIsWeak = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]][3]
-                if newIsWeak:
-                    if not job[1][0]:
-                        continue
-                    elif troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]][3]:
+                newInfo = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]]
+                if not job[1][0] and newInfo[HASPARENT]:
+                    # it's a new install.  If it has a parent,
+                    # then it's already covered by the install of that
+                    # parent.
+                    continue
+                elif newInfo[HASPARENT] and newInfo[ISWEAK]:
+                    oldInfo = troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]]
+                    if oldInfo[ISWEAK]:
                         continue
                 allJobs.append(job)
 

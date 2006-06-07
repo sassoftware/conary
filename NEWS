@@ -5,6 +5,10 @@ Changes in @NEW@:
     * When checking out a source trove from a repository using "cvc checkout"
       the  user is no longer warned about not being able to change the 
       ownership of the files checked out.
+    * Fixed a bug in conary's determination of what troves had been updated 
+      locally.  This bug caused updateall to consider many x86 troves as
+      needing to be updated separately instead of as a part of group-dist.
+      This could cause updateall failures. (CNY-497)
   o Server Changes:
     * Use the term Entitlement Class in all conary repository web interfaces
       replacing Entitlement Group.
