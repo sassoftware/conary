@@ -182,6 +182,18 @@ class _AbstractPackageRecipe(Recipe):
 		    files.append(f)
 	return files
 
+    def fetchLocalSources(self):
+	files = []
+	for src in self._sources:
+	    f = src.fetchLocal()
+	    if f:
+		if type(f) in (tuple, list):
+		    files.extend(f)
+		else:
+		    files.append(f)
+        return files
+
+
     def checkBuildRequirements(self, cfg, sourceVersion, ignoreDeps=False):
         """ Checks to see if the build requirements for the recipe
             are installed

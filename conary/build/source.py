@@ -115,6 +115,9 @@ class _Source(action.RecipeAction):
 	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 			      self.rpm, self.recipe.name,
 			      self.recipe.srcdirs)
+        if not r:
+            return
+
 	# XXX check signature in RPM package?
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
@@ -140,6 +143,18 @@ class _Source(action.RecipeAction):
 			      self.recipe.srcdirs)
 	self._checkSignature(f)
 	return f
+
+    def fetchLocal(self):
+        if self.rpm:
+            toFetch = self.rpm
+        else:
+            toFetch = self.sourcename
+
+        f = lookaside.searchAll(self.recipe.cfg, self.recipe.laReposCache,
+                                toFetch, self.recipe.name,
+                                self.recipe.srcdirs, localOnly=True)
+        return f
+
 
     def do(self):
 	raise NotImplementedError

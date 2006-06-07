@@ -1116,7 +1116,59 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 return versionList[-1].branch().createVersion(
                             versions.Revision('%s-1' % (versionStr)))
     return None
-            
+
+def getRecipeInfoFromPath(repos, cfg, recipeFile):
+
+    if recipeFile[0] != '/':
+        recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+
+    pkgname = recipeFile.split('/')[-1].split('.')[0]
+
+
+    try:
+        use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
+    except AttributeError, msg:
+        log.error('Error setting build flag values: %s' % msg)
+        sys.exit(1)
+    try:
+        # make a guess on the branch to use since it can be important
+        # for loading superclasses.
+        sourceVersion = guessSourceVersion(repos, pkgname,
+                                           None, cfg.buildLabel)
+        if sourceVersion:
+            branch = sourceVersion.branch()
+        else:
+            branch = None
+
+        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
+                                         branch=branch)
+        version = None
+    except builderrors.RecipeFileError, msg:
+        raise CookError(str(msg))
+
+    recipeClass = loader.getRecipe()
+
+    try:
+        sourceVersion = guessSourceVersion(repos, recipeClass.name,
+                                           recipeClass.version,
+                                           cfg.buildLabel)
+    except errors.OpenError:
+        # pass this error here, we'll warn about the unopenable repository
+        # later.
+        sourceVersion = None
+
+    if not sourceVersion:
+        # just make up a sourceCount -- there's no version in 
+        # the repository to compare against
+        if not cfg.buildLabel:
+            cfg.buildLabel = versions.LocalLabel()
+        sourceVersion = versions.VersionFromString('/%s/%s-1' % (
+                                               cfg.buildLabel.asString(),
+                                               recipeClass.version))
+        # the source version must have a time stamp
+        sourceVersion.trailingRevision().resetTimeStamp()
+    return loader, recipeClass, sourceVersion
+
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
@@ -1155,60 +1207,14 @@ def cookItem(repos, cfg, item, prep=0, macros={},
             raise CookError, \
                 ("Must not specify version string when cooking recipe file")
 
-	recipeFile = name
+        loader, recipeClass, sourceVersion = getRecipeInfoFromPath(repos, cfg,
+                                                                   name)
 
-	if recipeFile[0] != '/':
-	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
-
-	pkgname = recipeFile.split('/')[-1].split('.')[0]
-
+        targetLabel = versions.CookLabel()
         if requireCleanSources is None:
             requireCleanSources = False
 
-	try:
-	    use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
-	except AttributeError, msg:
-	    log.error('Error setting build flag values: %s' % msg)
-	    sys.exit(1)
-	try:
-            # make a guess on the branch to use since it can be important
-            # for loading superclasses.
-            sourceVersion = guessSourceVersion(repos, pkgname,
-                                               None, cfg.buildLabel)
-            if sourceVersion:
-                branch = sourceVersion.branch()
-            else:
-                branch = None
-
-	    loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
-                                             branch=branch)
-            version = None
-	except builderrors.RecipeFileError, msg:
-	    raise CookError(str(msg))
-
-	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
-
-        try:
-            sourceVersion = guessSourceVersion(repos, recipeClass.name, 
-                                               recipeClass.version,
-                                               cfg.buildLabel)
-        except errors.OpenError:
-            # pass this error here, we'll warn about the unopenable repository
-            # later.
-            sourceVersion = None
-
-        if not sourceVersion:
-            # just make up a sourceCount -- there's no version in 
-            # the repository to compare against
-            if not cfg.buildLabel:
-                cfg.buildLabel = versions.LocalLabel()
-            sourceVersion = versions.VersionFromString('/%s/%s-1' % (
-                                                   cfg.buildLabel.asString(),
-                                                   recipeClass.version))
-            # the source version must have a time stamp
-            sourceVersion.trailingRevision().resetTimeStamp()
-        targetLabel = versions.CookLabel()
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
