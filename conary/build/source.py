@@ -508,7 +508,7 @@ class Patch(_Source):
         if self.level != None:
             leveltuple = (self.level,)
             log.info('the use of level= in addPatch has been deprecated. '
-                'conary will not figure out the level needed without user input.')
+                'conary will now figure out the level needed without user input.')
         else:
             leveltuple = (1,0,2,3,)
         util.mkdirChain(destDir)
