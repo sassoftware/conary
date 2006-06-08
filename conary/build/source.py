@@ -448,7 +448,7 @@ class Patch(_Source):
     @keyword level: Deprecated! By default, conary attempts to patch the
         source using 1,0,2,3 resolve levels. The C{level} keyword allows manual
         specification of the number of initial subdirectory levels to be
-        removed, but is preserved only so that older recipes can be cooked
+        removed, and is preserved only so that older recipes can be cooked
         without modification.
     @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
