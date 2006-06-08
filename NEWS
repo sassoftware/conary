@@ -7,6 +7,9 @@ Changes in @NEW@:
   o Build Changes:
     * Add the Ant, JavaCompile, and ClassPath build actions to support build 
       java with conary.
+    * addPatch will now determine the patchlevel without users needing to add
+      level= in the r.addPatch() call. The level perameter is still honored,
+      but should not be needed.
 
   o Server Changes:
     * Use the term Entitlement Class in all conary repository web interfaces
