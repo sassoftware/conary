@@ -786,7 +786,7 @@ class Ant(BuildCommand):
         if self.verbose: macros.antoptions += ' -v'
         macros.antcmd = 'ant'
         macros.args = ' '.join(self.arglist)
-        build.BuildCommand.do(self, macros)
+        BuildCommand.do(self, macros)
 
 
 class JavaCompile(BuildCommand):
