@@ -1246,7 +1246,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     if showBuildReqs:
         if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
             raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
-        print '\n'.join(recipeClass.buildRequires)
+        recipeObj = recipeClass(cfg, None, [], lightInstance=True)
+        print '\n'.join(recipeObj.buildRequires)
         return None
 
     if emerge:

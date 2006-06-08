@@ -10,6 +10,8 @@ Changes in @NEW@:
     * "r.addPatch()" will now determine the patchlevel without users
       needing to add level= in the r.addPatch() call. The level
       perameter is still honored, but should not be needed.
+    * "cvc cook --show-buildreqs" now displays build requirements
+      inherited from parent recipe classes. (CNY-520)
 
   o Server Changes:
     * Use the term Entitlement Class in all conary repository web interfaces
