@@ -793,7 +793,15 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 
 	    if f.hasContents and f.flags.isConfig():
 		(contType, contents) = changeSet.getFileContents(pathId)
-		print contents.get().read()
+                lines = contents.get().readlines()
+
+                print '--- /dev/null'
+                print '+++', path
+                print '@@ -0,0 +%s @@' %len(lines)
+                for line in lines:
+                    sys.stdout.write('+')
+                    sys.stdout.write(line)
+                print
 	    continue
 
 	# changed file
