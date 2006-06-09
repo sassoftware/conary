@@ -275,7 +275,7 @@ class ComponentSpec(_filterSpec):
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp).  This line needs to
         # come first because "lib" in these paths should not mean :lib
-	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info|ri)/')),
+	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info|ri|javadoc)/')),
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
