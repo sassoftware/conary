@@ -379,9 +379,11 @@ class Patch(_Source):
     appropriate GPG key. A missing signature results in a warning; a failed
     signature check is fatal.
 
-    B{level} : By default, one level of initial subdirectory names is stripped
-    out prior to applying the patch. The C{level} keyword allows
-    specification of additional initial subdirectory levels to be removed.
+    B{level} : By default, conary attempts to patch the source using
+    levels 1, 0, 2, and 3, in that order. The C{level} keyword can
+    be given an integer value to resolve ambiguity, or if an even
+    higher level is required.  (This is the C{-p} option to the
+    patch program.)
 
     B{macros} : The C{macros} keyword accepts a boolean value, and defaults
     to false. However, if the value of C{macros} is true, recipe macros in the
@@ -445,11 +447,11 @@ class Patch(_Source):
         I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
-    @keyword level: Deprecated! By default, conary attempts to patch the
-        source using 1,0,2,3 resolve levels. The C{level} keyword allows manual
-        specification of the number of initial subdirectory levels to be
-        removed, and is preserved only so that older recipes can be cooked
-        without modification.
+    @keyword level: By default, conary attempts to patch the source using
+        levels 1, 0, 2, and 3, in that order. The C{level} keyword can
+        be given an integer value to resolve ambiguity, or if an even
+        higher level is required.  (This is the C{-p} option to the
+        patch program.)
     @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
         macros in the body  of the patch will be interpolated before applying
@@ -488,11 +490,11 @@ class Patch(_Source):
                 pass
 
             if p2.wait():
-                log.info('patch %s did not apply with level %s!' % (f,patchlevel))
+                log.info('patch %s did not apply with level %s' % (f,patchlevel))
             else:
                 log.info('patch applied successfully')
                 return
-        log.error('could not apply the patch to your build dir')
+        log.error('could not apply patch %s in directory %s', f, destDir)
         raise SourceError, 'could not apply patch %s' % f
 
     def do(self):
@@ -507,8 +509,6 @@ class Patch(_Source):
                                                   defaultDir=defaultDir)
         if self.level != None:
             leveltuple = (self.level,)
-            log.info('the use of level= in addPatch has been deprecated. '
-                'conary will now figure out the level needed without user input.')
         else:
             leveltuple = (1,0,2,3,)
         util.mkdirChain(destDir)
