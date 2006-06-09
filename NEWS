@@ -5,8 +5,8 @@ Changes in @NEW@:
       See the conary man page for more details.
 
   o Build Changes:
-    * Add the Ant, JavaCompile, and ClassPath build actions to support build 
-      java with conary.
+    * "r.Ant()", "r.JavaCompile()", and "r.ClassPath()" build actions
+      have been added to support building java with conary.
     * "r.addPatch()" will now determine the patchlevel without users
       needing to add level= in the r.addPatch() call. The level
       parameter is still honored, but should not be needed.
@@ -29,15 +29,17 @@ Changes in @NEW@:
       replacing Entitlement Group.
 
   o Bugs Fixed:
-    * Server code returns an error to a client when committing
-      duplicate troves with empty flavor strings (CNY-476)
-    * When checking out a source trove from a repository using "cvc checkout"
-      the  user is no longer warned about not being able to change the 
-      ownership of the files checked out.
-    * Fixed a bug in conary's determination of what troves had been updated 
-      locally.  This bug caused updateall to consider many x86 troves as
-      needing to be updated separately instead of as a part of group-dist.
-      This could cause updateall failures. (CNY-497)
+    * The Conary Repositoy now returns an error to a client when
+      committing duplicate troves that have no an empty
+      flavor. (CNY-476)
+    * When checking out a source trove from a repository using
+      "cvc checkout", the user is no longer warned about not being able
+      to change the ownership of the files checked out.
+    * A bug has been fixed in conary's determination of what troves
+      had been updated locally.  This bug caused "conary updateall" to
+      consider many x86 troves as needing to be updated separately
+      instead of as a part of group-dist.  This could cause updateall
+      failures. (CNY-497)
 
 Changes in 1.0.18:
   o Client Changes:
