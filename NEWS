@@ -29,7 +29,7 @@ Changes in @NEW@:
       replacing Entitlement Group.
 
   o Bugs Fixed:
-    * The Conary Repositoy now returns an error to a client when
+    * The Conary Repository now returns an error to a client when
       committing duplicate troves that have no an empty
       flavor. (CNY-476)
     * When checking out a source trove from a repository using
