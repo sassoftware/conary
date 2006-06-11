@@ -20,6 +20,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 
 import gzip
 import os
+import subprocess
 import sys
 
 from conary.lib import log, magic
@@ -115,6 +116,9 @@ class _Source(action.RecipeAction):
 	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 			      self.rpm, self.recipe.name,
 			      self.recipe.srcdirs)
+        if not r:
+            return
+
 	# XXX check signature in RPM package?
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
@@ -140,6 +144,18 @@ class _Source(action.RecipeAction):
 			      self.recipe.srcdirs)
 	self._checkSignature(f)
 	return f
+
+    def fetchLocal(self):
+        if self.rpm:
+            toFetch = self.rpm
+        else:
+            toFetch = self.sourcename
+
+        f = lookaside.searchAll(self.recipe.cfg, self.recipe.laReposCache,
+                                toFetch, self.recipe.name,
+                                self.recipe.srcdirs, localOnly=True)
+        return f
+
 
     def do(self):
 	raise NotImplementedError
@@ -363,9 +379,11 @@ class Patch(_Source):
     appropriate GPG key. A missing signature results in a warning; a failed
     signature check is fatal.
 
-    B{level} : By default, one level of initial subdirectory names is stripped
-    out prior to applying the patch. The C{level} keyword allows
-    specification of additional initial subdirectory levels to be removed.
+    B{level} : By default, conary attempts to patch the source using
+    levels 1, 0, 2, and 3, in that order. The C{level} keyword can
+    be given an integer value to resolve ambiguity, or if an even
+    higher level is required.  (This is the C{-p} option to the
+    patch program.)
 
     B{macros} : The C{macros} keyword accepts a boolean value, and defaults
     to false. However, if the value of C{macros} is true, recipe macros in the
@@ -399,7 +417,7 @@ class Patch(_Source):
     stripped, and a C{dir} keyword, instructing C{r.addPatch} to change to the
     C{lib/Xaw3d} directory prior to applying the patch.
     """
-    keywords = {'level': '1',
+    keywords = {'level': None,
 		'backup': '',
 		'macros': False,
 		'extraArgs': ''}
@@ -429,9 +447,11 @@ class Patch(_Source):
         I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
-    @keyword level: By default, one level of initial subdirectory names is
-        stripped out prior to applying the patch.  The C{level} keyword allows
-        specification of additional initial subdirectory levels to be removed.
+    @keyword level: By default, conary attempts to patch the source using
+        levels 1, 0, 2, and 3, in that order. The C{level} keyword can
+        be given an integer value to resolve ambiguity, or if an even
+        higher level is required.  (This is the C{-p} option to the
+        patch program.)
     @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
         macros in the body  of the patch will be interpolated before applying
@@ -447,36 +467,61 @@ class Patch(_Source):
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
 
-    def do(self):
+    def patchme(self, patch, f, destDir, patchlevels):
+        devnull = open('/dev/null', 'w')
+        for patchlevel in patchlevels:
+            patchArgs = [ 'nohup', 'patch', '-d', destDir, '-p%s'%patchlevel, ]
+            if self.backup:
+                patchArgs.extend(['-b', '-z', self.backup])
+            if self.extraArgs:
+                patchArgs.extend(self.extraArgs)
 
+            log.info('attempting to apply %s with patchlevel %s' % (f,patchlevel))
+            pipe = os.pipe()
+            os.write(pipe[1], patch)
+            os.close(pipe[1])
+            p2 = subprocess.Popen(patchArgs, stdin=pipe[0], stderr=devnull, shell=False)
+
+            try:
+                logmessage = open('nohup.out').read()
+                os.unlink('nohup.out')
+                print logmessage.strip()
+            except IOError:
+                pass
+
+            if p2.wait():
+                log.info('patch %s did not apply with level %s' % (f,patchlevel))
+            else:
+                log.info('patch applied successfully')
+                return
+        log.error('could not apply patch %s in directory %s', f, destDir)
+        raise SourceError, 'could not apply patch %s' % f
+
+    def do(self):
 	f = self._findSource()
 	provides = "cat"
 	if self.sourcename.endswith(".gz"):
 	    provides = "zcat"
 	elif self.sourcename.endswith(".bz2"):
 	    provides = "bzcat"
-	if self.backup:
-	    self.backup = '-b -z %s' % self.backup
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir=defaultDir)
+        if self.level != None:
+            leveltuple = (self.level,)
+        else:
+            leveltuple = (1,0,2,3,)
         util.mkdirChain(destDir)
-	if self.applymacros:
-	    log.info('applying macros to patch %s' %f)
-	    pin = util.popen("%s '%s'" %(provides, f))
-	    log.info('patch -d %s -p%s %s %s'
-		      %(destDir, self.level, self.backup, self.extraArgs))
-	    pout = util.popen('patch -d %s -p%s %s %s'
-		              %(destDir, self.level, self.backup,
-			        self.extraArgs), 'w')
-	    pout.write(pin.read()%self.recipe.macros)
-	    pin.close()
-	    pout.close()
-	else:
-	    util.execute("%s '%s' | patch -d %s -p%s %s %s"
-			 %(provides, f, destDir, self.level, self.backup,
-			   self.extraArgs))
 
+        slurppatch = os.pipe()
+        p1 = subprocess.Popen([provides, f], stdout=slurppatch[1], shell=False)
+        p1.wait()
+        os.close(slurppatch[1])
+	if self.applymacros:
+            patch = os.fdopen(slurppatch[0]).read() % self.recipe.macros
+	else:
+            patch = os.fdopen(slurppatch[0]).read()
+        self.patchme(patch, f, destDir, leveltuple)
 
 class Source(_Source):
     """

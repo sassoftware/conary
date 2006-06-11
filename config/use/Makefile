@@ -18,6 +18,8 @@ use_files =	alternatives	\
 		buildtests	\
 		desktop		\
 		dietlibc	\
+		dom0		\
+		domU		\
 		emacs		\
 		gcj		\
 		gnome		\

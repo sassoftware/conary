@@ -335,7 +335,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         """
         returns url to a conary changeset for updating the local client to
         @param version: a conary client version object, L{versions.Version}
-        @param flavor: a conary client flavor object, L{deps.deps.DependencySet}
+        @param flavor: a conary client flavor object, L{deps.deps.Flavor}
         """        
         return self.repos.getConaryUrl(version, flavor)
 

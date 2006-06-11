@@ -278,7 +278,8 @@ def fetchURL(cfg, name, location):
     rc = _createCacheEntry(cfg, name, location, url)
     return rc
 
-def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
+def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False, 
+              localOnly=False):
     """
     searches all locations, including populating the cache if the
     file can't be found in srcdirs, and returns the name of the file.
@@ -290,6 +291,9 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
         # indirectly fetched via RPMs, so we look in the local directory
         f = util.searchFile(name, srcdirs)
         if f: return f
+
+    if localOnly:
+        return None
 
     # this needs to come as soon as possible to preserve reproducability
     f = _searchRepository(cfg, repCache, name, location)

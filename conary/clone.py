@@ -26,7 +26,7 @@ def displayCloneJob(cs):
     for csTrove in cs.iterNewTroveList():
         newInfo = str(csTrove.getNewVersion())
         flavor = csTrove.getNewFlavor()
-        if flavor:
+        if not flavor.isEmpty():
             newInfo += '[%s]' % flavor
 
         print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)
@@ -59,7 +59,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
             for trove in troves:
                 trovesToClone.append((trove.getSourceName(),
                                       trove.getVersion().getSourceVersion(),
-                                      deps.DependencySet()))
+                                      deps.Flavor()))
                 for troveTup in trove.iterTroveList(strongRefs=True,
                                                     weakRefs=True):
                     if troveTup not in seen:

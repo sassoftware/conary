@@ -34,7 +34,7 @@ def usage():
     print "manageents [--config <value>] create-class <server> <class> <group>"
     print "manageents [--config <value>] delete-entitlement <server> <class> <entitlement>"
     print "manageents [--config <value>] list-entitlements <server> <class>"
-    print "manageents [--config <value>] list-groups <server>"
+    print "manageents [--config <value>] list-classes <server>"
     sys.exit(1)
 
 from conary import conaryclient, conarycfg, versions
@@ -75,7 +75,7 @@ elif otherArgs[1] == 'delete-entitlement':
 elif otherArgs[1] == 'list-entitlements':
     if len(otherArgs) != 4: usage()
     print "\n".join(repos.listEntitlements(otherArgs[2], otherArgs[3]))
-elif otherArgs[1] == 'list-groups':
+elif otherArgs[1] == 'list-classes':
     if len(otherArgs) != 3: usage()
     print "\n".join(repos.listEntitlementGroups(otherArgs[2]))
 else:

@@ -182,6 +182,18 @@ class _AbstractPackageRecipe(Recipe):
 		    files.append(f)
 	return files
 
+    def fetchLocalSources(self):
+	files = []
+	for src in self._sources:
+	    f = src.fetchLocal()
+	    if f:
+		if type(f) in (tuple, list):
+		    files.extend(f)
+		else:
+		    files.append(f)
+        return files
+
+
     def checkBuildRequirements(self, cfg, sourceVersion, ignoreDeps=False):
         """ Checks to see if the build requirements for the recipe
             are installed
@@ -220,7 +232,7 @@ class _AbstractPackageRecipe(Recipe):
 
         def _filterBuildReqsByFlavor(flavor, troves):
             troves.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
-            if not flavor:
+            if flavor is None:
                 return troves[-1]
             for trove in reversed(versionMatches):
                 troveFlavor = trove.getFlavor()
@@ -433,7 +445,7 @@ class _AbstractPackageRecipe(Recipe):
             srcName = rclass._trove.getName()
             srcVersion = rclass._trove.getVersion()
             for f in repos.iterFilesInTrove(srcName, srcVersion,
-                                            deps.DependencySet(),
+                                            deps.Flavor(),
                                             withFiles=True):
                 pathId, path, fileId, version, fileObj = f
                 assert(path[0] != "/")
@@ -537,7 +549,7 @@ class _AbstractPackageRecipe(Recipe):
                  architecture.
         """
         def _parseArch(archSpec):
-            if isinstance(archSpec, deps.DependencySet):
+            if isinstance(archSpec, deps.Flavor):
                 return archSpec, None, None
 
             if '-' in archSpec:
@@ -552,7 +564,7 @@ class _AbstractPackageRecipe(Recipe):
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
 
-            if not flavor:
+            if flavor is None:
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
             return flavor, vendor, hostOs
@@ -811,7 +823,7 @@ class BuildPackageRecipe(PackageRecipe):
     EXAMPLE
     =======
 
-    C{class DocbookDtds(BuidlPackageRecipe):}
+    C{class DocbookDtds(BuildPackageRecipe):}
 
     Uses C{BuildPackageRecipe} to define the class for a Docbook Document Type
     Definition collection recipe.

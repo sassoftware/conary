@@ -220,10 +220,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
 
-        if flavor:
-            flavorTest = "== '%s'" % flavor.freeze()
+        if flavor is None or flavor.isEmpty():
+            flavorTest = "is NULL"
         else:
-            flavorTest = "is NULL";
+            flavorTest = "== '%s'" % flavor.freeze()
 
         cu.execute("""SELECT count(*) FROM Instances
                         JOIN Versions ON
@@ -239,7 +239,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
         result = cu.next()[0] != 0
 
-	return result;
+	return result
 
     def getTroveVersionList(self, name, withFlavors = False):
 	"""
@@ -388,7 +388,7 @@ class Database(SqlDbRepository):
 
         names = {}
         newGroup = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         for name, version, flavor in l:
             names[name] = True
             newGroup.addTrove(name, version, flavor)
@@ -407,7 +407,7 @@ class Database(SqlDbRepository):
         # diff tells us how to match them up. anything which doesn't get
         # a match gets removed. got that? 
         instGroup = trove.Trove("@update", versions.NewVersion(), 
-                                deps.DependencySet(), None)
+                                deps.Flavor(), None)
         for info in instList:
             if info not in ineligible:
                 instGroup.addTrove(*info)

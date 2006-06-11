@@ -22,7 +22,7 @@ all: default-all
 
 install:
 	mkdir -p $(DESTDIR)/etc/conary/recipeTemplates/; \
-	for f in $(default_files); do \
+	for f in $(template_files); do \
 		cp -a $$f $(DESTDIR)/etc/conary/recipeTemplates/$$f; \
 	done
 

@@ -70,7 +70,7 @@ def _createComponent(repos, bldPkg, newVersion, ident):
             flavor = None
         (pathId, fileVersion, oldFileId) = ident(path, newVersion, flavor)
 	f.pathId(pathId)
-        
+
         linkGroupId = linkGroups.get(path, None)
         if linkGroupId:
             f.linkGroup.set(linkGroupId)
@@ -286,8 +286,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if repos:
         try: 
-            trove = repos.getTrove(srcName, sourceVersion, 
-                                   deps.DependencySet(), withFiles = False)
+            trove = repos.getTrove(srcName, sourceVersion, deps.Flavor(),
+                                   withFiles = False)
             sourceVersion = trove.getVersion()
         except errors.TroveMissing:
             if not allowMissingSource and targetLabel != versions.CookLabel():
@@ -477,7 +477,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     _callSetup(cfg, recipeObj)
     use.track(False)
 
-    flavors = [buildpackage._getUseDependencySet(recipeObj)]
+    flavors = [buildpackage._getUseFlavor(recipeObj)]
 
     grouprecipe.buildGroups(recipeObj, cfg, repos, callback)
 
@@ -571,7 +571,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
 
     l = []
-    flavor = deps.DependencySet()
+    flavor = deps.Flavor()
     size = 0
     fileObjList = repos.getFileVersions([ (x[0], x[2], x[3]) for x in 
                                                 recipeObj.iterFileList() ])
@@ -729,7 +729,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             unmanagedPolicyFiles.append(policyPath)
             ver = versions.VersionFromString('/local@local:LOCAL/0-0')
             ver.resetTimeStamps()
-            policyTroves.add((policyPath, ver, deps.DependencySet()))
+            policyTroves.add((policyPath, ver, deps.Flavor()))
     del db
     if unmanagedPolicyFiles and enforceManagedPolicy:
         raise CookError, ('Cannot cook into repository with'
@@ -1116,7 +1116,59 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 return versionList[-1].branch().createVersion(
                             versions.Revision('%s-1' % (versionStr)))
     return None
-            
+
+def getRecipeInfoFromPath(repos, cfg, recipeFile):
+
+    if recipeFile[0] != '/':
+        recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+
+    pkgname = recipeFile.split('/')[-1].split('.')[0]
+
+
+    try:
+        use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
+    except AttributeError, msg:
+        log.error('Error setting build flag values: %s' % msg)
+        sys.exit(1)
+    try:
+        # make a guess on the branch to use since it can be important
+        # for loading superclasses.
+        sourceVersion = guessSourceVersion(repos, pkgname,
+                                           None, cfg.buildLabel)
+        if sourceVersion:
+            branch = sourceVersion.branch()
+        else:
+            branch = None
+
+        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
+                                         branch=branch)
+        version = None
+    except builderrors.RecipeFileError, msg:
+        raise CookError(str(msg))
+
+    recipeClass = loader.getRecipe()
+
+    try:
+        sourceVersion = guessSourceVersion(repos, recipeClass.name,
+                                           recipeClass.version,
+                                           cfg.buildLabel)
+    except errors.OpenError:
+        # pass this error here, we'll warn about the unopenable repository
+        # later.
+        sourceVersion = None
+
+    if not sourceVersion:
+        # just make up a sourceCount -- there's no version in 
+        # the repository to compare against
+        if not cfg.buildLabel:
+            cfg.buildLabel = versions.LocalLabel()
+        sourceVersion = versions.VersionFromString('/%s/%s-1' % (
+                                               cfg.buildLabel.asString(),
+                                               recipeClass.version))
+        # the source version must have a time stamp
+        sourceVersion.trailingRevision().resetTimeStamp()
+    return loader, recipeClass, sourceVersion
+
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
@@ -1148,67 +1200,21 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     use.track(True)
 
     (name, versionStr, flavor) = parseTroveSpec(item)
-    if flavor:
+    if flavor is not None:
         cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
             raise CookError, \
                 ("Must not specify version string when cooking recipe file")
 
-	recipeFile = name
+        loader, recipeClass, sourceVersion = getRecipeInfoFromPath(repos, cfg,
+                                                                   name)
 
-	if recipeFile[0] != '/':
-	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
-
-	pkgname = recipeFile.split('/')[-1].split('.')[0]
-
+        targetLabel = versions.CookLabel()
         if requireCleanSources is None:
             requireCleanSources = False
 
-	try:
-	    use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
-	except AttributeError, msg:
-	    log.error('Error setting build flag values: %s' % msg)
-	    sys.exit(1)
-	try:
-            # make a guess on the branch to use since it can be important
-            # for loading superclasses.
-            sourceVersion = guessSourceVersion(repos, pkgname,
-                                               None, cfg.buildLabel)
-            if sourceVersion:
-                branch = sourceVersion.branch()
-            else:
-                branch = None
-
-	    loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
-                                             branch=branch)
-            version = None
-	except builderrors.RecipeFileError, msg:
-	    raise CookError(str(msg))
-
-	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
-
-        try:
-            sourceVersion = guessSourceVersion(repos, recipeClass.name, 
-                                               recipeClass.version,
-                                               cfg.buildLabel)
-        except errors.OpenError:
-            # pass this error here, we'll warn about the unopenable repository
-            # later.
-            sourceVersion = None
-
-        if not sourceVersion:
-            # just make up a sourceCount -- there's no version in 
-            # the repository to compare against
-            if not cfg.buildLabel:
-                cfg.buildLabel = versions.LocalLabel()
-            sourceVersion = versions.VersionFromString('/%s/%s-1' % (
-                                                   cfg.buildLabel.asString(),
-                                                   recipeClass.version))
-            # the source version must have a time stamp
-            sourceVersion.trailingRevision().resetTimeStamp()
-        targetLabel = versions.CookLabel()
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
@@ -1240,7 +1246,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     if showBuildReqs:
         if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
             raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
-        print '\n'.join(recipeClass.buildRequires)
+        recipeObj = recipeClass(cfg, None, [], lightInstance=True)
+        sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
+        sys.stdout.flush()
         return None
 
     if emerge:
@@ -1345,7 +1353,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             components, csFile = built
             for component, version, flavor in components:
                 print "Created component:", component, version,
-                if flavor:
+                if flavor is not None:
                     print str(flavor).replace("\n", " "),
                 print
             if csFile is None:

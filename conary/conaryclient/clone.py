@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -313,7 +313,7 @@ class ClientClone:
                 # if the latest version of the source trove was cloned from the
                 # version being cloned, we don't need to reclone the source
                 trv = self.repos.getTrove(name, currentVersionList[-1],
-                                     deps.DependencySet(), withFiles = False)
+                                     deps.Flavor(), withFiles = False)
                 if trv.troveInfo.clonedFrom() == version:
                     versionMap[info] = trv.getVersion()
 
@@ -344,7 +344,7 @@ class ClientClone:
         for srcTroveName, (sourceVersion, infoList) in \
                                             trovesBySource.iteritems():
             newSourceVersion = versionMap.get(
-                    (srcTroveName, sourceVersion, deps.DependencySet()), None)
+                    (srcTroveName, sourceVersion, deps.Flavor()), None)
             if newSourceVersion is None:
                 # we're not cloning the source at the same time; try and find
                 # the source version which was used when the source was cloned
@@ -368,7 +368,7 @@ class ClientClone:
 
                     trv = self.repos.getTrove(srcTroveName, 
                                      currentVersionList[-1],
-                                     deps.DependencySet(), withFiles = False)
+                                     deps.Flavor(), withFiles = False)
                     if trv.troveInfo.clonedFrom() == sourceVersion:
                         newSourceVersion = trv.getVersion()
                     else:
