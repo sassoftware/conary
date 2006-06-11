@@ -178,6 +178,9 @@ class ServerProxy(xmlrpclib.ServerProxy):
             return False
 
         password = self.__pwCallback(l[0][:-1], l[1])
+        if not password:
+            return False
+
         l[0] = l[0] + password
         self.__host = '@'.join(l)
 
@@ -251,15 +254,15 @@ class ServerCache:
 
         if url is None:
             if ent or userInfo:
+                # if we have a username/password, use https
                 protocol = 'https'
             else:
+                # if we are using anonymous, use http
                 protocol = 'http'
 
             if userInfo is None:
-                # if we are using anonymous, use http
                 url = "%s://%s/conary/" % (protocol, serverName)
             else:
-                # if we have a username/password, use https
                 url = "%s://%s:%s@%s/conary/" % (protocol,
                                                  quote(userInfo[0]),
                                                  quote(userInfo[1]),
