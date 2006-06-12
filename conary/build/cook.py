@@ -415,13 +415,18 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
                                 flavors, targetLabel, 
                                 alwaysBumpCount=alwaysBumpCount)
 
+    redirList = []
+    childList = []
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
                                  subTroveList) in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
                             None, isRedirect = True)
 
+        redirList.append(redir.getNameVersionFlavor())
+
         for subName in subTroveList:
             redir.addTrove(subName, targetVersion, fromFlavor)
+            childList.append((subName, targetVersion, fromFlavor))
 
         if toName is not None:
             redir.addRedirect(toName, toBranch, toFlavor)
@@ -435,6 +440,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         changeSet.newTrove(trvDiff)
         built.append((redir.getName(), redir.getVersion().asString(), 
                       redir.getFlavor()) )
+
+    changeSet.setPrimaryTroveList(set(redirList) - set(childList))
 
     return (changeSet, built, None)
 
