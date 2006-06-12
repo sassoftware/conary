@@ -64,6 +64,8 @@ Changes in @NEW@:
       line. (CNY-22)
     * Redirect changesets now have primary troves, meaning they will display 
       better when using conary scs. (CNY-450)
+    * Mask user's passwords when using cvc context (unless they use 
+      --show-paswords) (CNY-471)
 
 Changes in 1.0.18:
   o Client Changes:
