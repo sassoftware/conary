@@ -160,6 +160,11 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                 if not flags & TROVE_HASTROVE:
                     # we can't recurse this trove, it doesn't exist.
                     continue
+                if not trove.troveIsCollection(troveTup[0]):
+                    # this could have been one of the troves we specified
+                    # initially, in which case trying to recurse it will
+                    # not work.
+                    continue
 
                 newTroveTups = trv.iterTroveList(strongRefs=True,
                                                  weakRefs=showWeakRefs)

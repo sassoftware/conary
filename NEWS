@@ -54,6 +54,8 @@ Changes in @NEW@:
       consider many x86 troves as needing to be updated separately
       instead of as a part of group-dist.  This could cause updateall
       failures. (CNY-497)
+    * A bug that caused 'conary q tmpwatch:runtime --recurse' to traceback
+      has been fixed (CNY-460)
 
 Changes in 1.0.18:
   o Client Changes:
