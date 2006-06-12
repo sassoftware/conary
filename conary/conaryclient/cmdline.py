@@ -177,10 +177,13 @@ def toTroveSpec(name, versionStr, flavor):
 
 def askYn(prompt, default=None):
     while True:
-        print prompt + ' ',
-        sys.stdout.flush()
-        resp = raw_input()
-        if resp.lower() in ('y', 'yes'):
+        try:
+            resp = raw_input(prompt + ' ')
+        except EOFError:
+            return False
+
+        resp = resp.lower()
+        if resp in ('y', 'yes'):
             return True
         elif resp in ('n', 'no'):
             return False
