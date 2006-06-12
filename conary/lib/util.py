@@ -109,11 +109,17 @@ errorMessage = '''
 *** %(filename)s:%(lineno)s
 *** %(errtype)s: %(errmsg)s
 ***
+*** Receiving this message is always a due to a bug in conary, not
+*** user error.
+***
 *** The related traceback has been output to %(stackfile)s
 ***
 *** To report this error, please run the following script:
 ***
 *** conary-debug "%(command)s"
+***
+*** You can attach the resulting archive to a bug report at
+*** http://issues.rpath.com/.
 ***
 *******************************************************************
 
@@ -121,7 +127,7 @@ For more information, or if you have trouble with the conary-debug
 command, go to http://wiki.conary.com/HowToReportProblems for more
 help.
 
-To get a debug prompt, rerun this command with --config 'debugExceptions True'
+To get a debug prompt, rerun this command with --debug-all
 '''
 _debugAll = False
 
