@@ -1044,13 +1044,16 @@ class _FileAction(BuildAction):
 	    mode=self.mode
 	if mode >= 0:
             # fixup obviously broken permissions
+            destPath = path
+            if isDestFile:
+                destPath = path[len(destdir):]
 	    if _permmap.has_key(mode):
-                log.warning('odd permission %o, correcting to %o: add initial "0"?' \
-                            %(mode, _permmap[mode]))
+                log.warning('odd permission %o for path %s, correcting to 0%o:'
+                            ' add initial "0"?',
+                            mode, destPath, _permmap[mode])
 		mode = _permmap[mode]
 	    isdir = os.path.isdir(path)
             if isDestFile:
-                destPath = path[len(destdir):]
                 if isdir and (mode & 0700) != 0700:
                     # regardless of what permissions go into the package,
                     # we need to be able to traverse this directory as

@@ -37,6 +37,8 @@ Changes in @NEW@:
       hypervisor.  The existing "xen" flag should be used to build
       binaries specific to Xen which apply equally to Xen dom0 and
       domU environments.
+    * Warning message for modes specified without an initial "0" has
+      been improved to include the path that is affected. (CNY-530)
 
   o Server Changes:
     * Use the term Entitlement Class in all conary repository web interfaces
