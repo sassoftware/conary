@@ -267,6 +267,7 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
              cfg.bugsEmailSubject, body)
 
 def handler(req):
+    coveragehook.install()
     try:
         return _handler(req)
     finally:
