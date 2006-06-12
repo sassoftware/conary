@@ -323,20 +323,29 @@ class ContextCommand(CvcCommand):
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["ask"] = NO_PARAM
+        argDef["show-passwords"] = NO_PARAM
 
-    docs = {'ask' : 'If not defined, create CONTEXT by answering questions'}
+    docs = {'ask' : 'If not defined, create CONTEXT by answering questions',
+            'show-passwords' : 'do not mask passwords'}
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) > 2:
             return self.usage()
 
+        showPasswords = argSet.pop('show-passwords', False)
         ask = argSet.pop('ask', False)
         if len(args) > 1:
             name = args[1]
         else:
             name = None
 
+        try:
+            prettyPrint = sys.stdout.isatty()
+        except AttributeError:
+            prettyPrint = False
+        cfg.setDisplayOptions(hidePasswords=not showPasswords,
+                              prettyPrint=prettyPrint)
         checkin.setContext(cfg, name, ask=ask)
 _register(ContextCommand)
 
