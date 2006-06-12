@@ -4,7 +4,7 @@ Changes in @NEW@:
       to update troves that would otherwise cause an update to fail.
       See the conary man page for more details.
     * Multiple bugs have been fixed in interactive prompting for user 
-      passwords:
+      passwords (CNY-466):
         - Password prompts are based on the server name portion of the
           label being accessed, not the actual hostname of the server
           (these are often different when repositoryMaps are used)
