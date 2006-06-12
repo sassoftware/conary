@@ -23,17 +23,18 @@ import sys
 import shlex
 import imp
 
-def usage(exitcode=1):
-    sys.stderr.write("\n".join((
+usageMessage = "\n".join((
      "Usage: commitaction --repmap <repmap> --build-label <buildLabel>",
      "                    [--username <repository username> --password <password>]",
      "                    [--config-file <path>] [--config 'item value']",
      "                    --module '/path/to/module module options'",
      r"Takes triplets of name\nversion\nflavor\n on standard input",
      ""
-    )))
-    sys.exit(exitcode)
+    ))
 
+def usage(exitcode=1):
+    sys.stderr.write(usageMessage)
+    sys.exit(exitcode)
 
 def main(argv):
     if not len(argv) > 1:
@@ -57,7 +58,7 @@ def main(argv):
     cfg = conarycfg.ConaryConfiguration()
     cfg.root = ":memory:"
     cfg.dbPath = ":memory:"
-    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usageMessage,
                                             argv=argv)
 
 
