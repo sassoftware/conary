@@ -66,6 +66,8 @@ Changes in @NEW@:
       better when using conary scs. (CNY-450)
     * Mask user's passwords when using cvc context (unless they use 
       --show-paswords) (CNY-471)
+    * Removed excess output in commitaction, due to change in option parsing
+      code (CNY-405)
 
 Changes in 1.0.18:
   o Client Changes:
