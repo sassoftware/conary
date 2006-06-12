@@ -188,7 +188,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         else:
             host = fullHost
 
-        password = self.__pwCallback(user, host)
+        password = self.__pwCallback(user, self.__serverName)
         if not password:
             return False
 
@@ -215,10 +215,11 @@ class ServerProxy(xmlrpclib.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback)
 
-    def __init__(self, url, transporter, pwCallback):
+    def __init__(self, url, serverName, transporter, pwCallback):
         xmlrpclib.ServerProxy.__init__(self, url, transporter)
         self.__pwCallback = pwCallback
         self.__altHost = None
+        self.__serverName = serverName
 
 class ServerCache:
 
@@ -295,7 +296,7 @@ class ServerCache:
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlement = ent)
 
-        server = ServerProxy(url, transporter, self.__getPassword)
+        server = ServerProxy(url, serverName, transporter, self.__getPassword)
         self.cache[serverName] = server
 
         try:
@@ -330,6 +331,9 @@ class ServerCache:
         transporter.setCompress(True)
 
 	return server
+
+    def getPwPrompt(self):
+        return self.pwPrompt
 
     def getUserMap(self):
         return self.userMap
@@ -373,6 +377,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         again to avoid having to reprompt for passwords.
         """
         return self.c.getUserMap()
+
+    def getPwPrompt(self):
+        return self.c.pwPrompt
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc = "",
                        urls = [], licenses=[], categories = [],

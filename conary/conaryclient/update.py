@@ -2013,7 +2013,8 @@ conary erase '%s=%s[%s]'
                                                 cfg.downloadRateLimit,
                                             uploadRateLimit =
                                                 cfg.uploadRateLimit,
-                                            localRepository = db)
+                                            localRepository = db,
+                                            pwPrompt = self.repos.getPwPrompt())
             callback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):
