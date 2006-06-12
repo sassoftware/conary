@@ -626,19 +626,6 @@ class CvcMain(options.MainHandler):
         repos = client.getRepos()
         callback = CheckinCallback(cfg)
 
-        context = cfg.context
-        if os.path.exists('CONARY'):
-            conaryState = state.ConaryStateFromFile('CONARY')
-            if conaryState.hasContext():
-                context = conaryState.getContext()
-
-        context = os.environ.get('CONARY_CONTEXT', context)
-        context = argSet.pop('context', context)
-
-        if context:
-            cfg.setContext(context)
-
-
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
 
