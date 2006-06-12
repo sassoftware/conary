@@ -173,16 +173,26 @@ class ServerProxy(xmlrpclib.ServerProxy):
             return False
 
         l = self.__host.split('@')
+        if len(l) != 2: return False
 
-        if len(l) != 2 or l[0][-1] != ':':
+        user, fullHost = l
+        if user[-1] != ':':
             return False
 
-        password = self.__pwCallback(l[0][:-1], l[1])
+        user = user[:-1]
+
+        # if there is a port number, strip it off
+        l = fullHost.split(':', 1)
+        if len(l) == 2:
+            host = l[0]
+        else:
+            host = fullHost
+
+        password = self.__pwCallback(user, host)
         if not password:
             return False
 
-        l[0] = l[0] + password
-        self.__host = '@'.join(l)
+        self.__host = '%s:%s@%s' % (user, password, fullHost)
 
         return True
 
@@ -211,6 +221,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__altHost = None
 
 class ServerCache:
+
     def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
 	self.cache = {}
 	self.map = repMap
@@ -218,6 +229,13 @@ class ServerCache:
 	self.pwPrompt = pwPrompt
         self.entitlementDir = entitlementDir
 
+    def __getPassword(self, user, host):
+        pw = self.pwPrompt(user, host)
+        if pw is None:
+            return pw
+
+        self.userMap.append((host, user, pw))
+        return pw
 
     def __getitem__(self, item):
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
@@ -277,7 +295,7 @@ class ServerCache:
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlement = ent)
 
-        server = ServerProxy(url, transporter, self.pwPrompt)
+        server = ServerProxy(url, transporter, self.__getPassword)
         self.cache[serverName] = server
 
         try:
@@ -313,6 +331,9 @@ class ServerCache:
 
 	return server
 
+    def getUserMap(self):
+        return self.userMap
+
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
                               trovesource.SearchableTroveSource):
@@ -344,6 +365,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def open(self, *args):
         pass
+
+    def getUserMap(self):
+        """
+        The user/password map can be updated at runtime since we're prompting
+        the user for passwords. We may need to get those passwords back out
+        again to avoid having to reprompt for passwords.
+        """
+        return self.c.getUserMap()
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc = "",
                        urls = [], licenses=[], categories = [],

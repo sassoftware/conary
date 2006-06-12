@@ -1999,14 +1999,16 @@ conary erase '%s=%s[%s]'
                 raise
 
         def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
-	    # reopen the local database so we don't share a sqlite object
-	    # with the main thread
+            # Reopen the local database so we don't share a sqlite object
+            # with the main thread. This gets the user map from the already
+            # existing repository object to ensure we still have access to
+            # any passwords we need.
             # _createCs accesses the database through the uJob.troveSource,
             # so make sure that references this fresh db as well.
             db = database.Database(cfg.root, cfg.dbPath)
             uJob.troveSource.db = db
             repos = NetworkRepositoryClient(cfg.repositoryMap,
-                                            cfg.user,
+                                            self.repos.getUserMap(),
                                             downloadRateLimit =
                                                 cfg.downloadRateLimit,
                                             uploadRateLimit =
