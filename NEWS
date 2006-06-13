@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fixed a bug in in clone behavior that would cause conary to try to
+      clone too much - if you were cloning uphill from branch /a/b to /a, 
+      and a buildreq was on /a//c, conary would try to clone the buildreq
+      as well (CNY-499)
+
 Changes in 1.0.19:
   o Client Changes:
     * The default resolveLevel setting is now 2, this means that

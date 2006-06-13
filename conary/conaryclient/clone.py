@@ -195,9 +195,9 @@ class ClientClone:
             if sourceBranch == targetBranch:
                 return False
 
-            return branchToCheck == sourceBranch or \
-               (branchToCheck != targetBranch and 
-                        _isUphill(verToCheck, targetBranch))
+            # only rewrite things on the same branch as the source 
+            # we are retargeting.
+            return branchToCheck == sourceBranch
 
         def _iterAllVersions(trv, rewriteTroveInfo=True):
             # return all versions which need rewriting except for file versions
