@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.19:
   o Client Changes:
     * The default resolveLevel setting is now 2, this means that
       conary will try to update troves that would otherwise cause an
