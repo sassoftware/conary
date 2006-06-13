@@ -64,8 +64,8 @@ Changes in 1.0.19:
       failures. (CNY-497)
     * A bug that caused 'conary q tmpwatch:runtime --recurse' to traceback
       has been fixed (CNY-460)
-    * Interactive mode now handles EOF by assuming it means 'no'.  (CNY-391,
-      (Thanks go to David Coulthart for the patch.)
+    * Interactive mode now handles EOF by assuming it means 'no';
+      thanks go to David Coulthart for the patch. (CNY-391)
     * Configuration settings in contexts can now be overridden from
       the command line. (CNY-22)
     * Redirect changesets now have primary troves, meaning they will
