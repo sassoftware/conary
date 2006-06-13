@@ -39,6 +39,14 @@ debugsrcdir         = '/usr/src/debug' # no %(prefix)s!
 userinfodir         = '%(sysconfdir)s/conary/userinfo'
 groupinfodir        = '%(sysconfdir)s/conary/groupinfo'
 buildlogpath        = '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2'
+## Java Macros
+# Root directory where all Java VMs/SDK/JREs are installed.
+jvmdir              = '%(libdir)s/jvm'
+# Directory where arch and version independent jars are installed.
+javadir             = '%(datadir)s/java'
+# Root directory where all javadoc is installed. Also already in RH macros.
+javadocdir          = '%(datadir)s/javadoc'
+thisjavadocdir      = '%(javadocdir)s/%(name)s-%(version)s'
 # special component prefixes that the whole system needs to share
 krbprefix	    = '%(exec_prefix)s/kerberos'
 x11prefix	    = '%(exec_prefix)s/X11R6'

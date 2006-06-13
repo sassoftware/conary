@@ -1966,6 +1966,63 @@ class Doc(_FileAction):
 	else:
 	    self.paths = args
 
+
+class JavaDoc(Doc):
+    """
+    NAME
+    ====
+
+    B{C{r.JavaDoc()}} - Installs documentation files
+
+    SYNOPSIS
+    ========
+
+    C{r.JavaDoc(I{filename}, [I{subdir=/path}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.JavaDoc()} class is called from within a Conary recipe to Install
+    documentation files from the C{%(builddir)s} into
+    C{%(destdir)s/%(thisjavadocdir)s}.
+
+    Specify a single file or directory of files for the C{filename} parameter.
+    The C{subdir=path} keyword argument can be used to create a subdirectory
+    of C{%(destdir)s/%(thisjavadocdir)s} where files may subsequently be located.
+
+    KEYWORDS
+    ========
+
+    The C{r.JavaDoc()} class accepts the following keywords:
+
+    B{subdir} : Specify a subdirectory to create before placing documentation
+    files into it.
+
+    EXAMPLES
+    ========
+
+    C{r.JavaDoc('doc/kbd.FAQ*.html', subdir='html')}
+
+    Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
+    subdirectory after first creating the C{html} subdirectory using
+    C{r.JavaDoc()}.
+
+    C{r.JavaDoc('pam_smb.conf.example')}
+
+    Demonstrates using C{r.JavaDoc} to place the file C{pam_smb.conf.example}
+    into C{%(destdir)s/%(thisjavadocdir)s}.
+
+    C{r.JavaDoc("html/")}
+
+    Demonstrates using C{r.JavaDoc} to place the subdirectory C{html} from
+    C{%(builddir)s} into C{%(destdir)s/%(thisjavadocdir)s}. 
+    """
+    def do(self, macros):
+        macros = macros.copy()
+        macros.thisdocdir = macros.thisjavadocdir
+        Doc.do(self, macros)
+
+
 class Create(_FileAction):
     """
     NAME

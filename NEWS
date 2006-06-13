@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Added the "r.JavaDoc()" build action that works exactly like the 
+      "r.Doc()" build action, except it coppies into "%(thisjavadocdir)s".
+    * Added the "jvmdir", "javadir", "javadocdir", and "thisjavadocdir" 
+      macros.
+
   o Bug Fixes:
     * Fixed a bug in in clone behavior that would cause conary to try to
       clone too much - if you were cloning uphill from branch /a/b to /a, 
