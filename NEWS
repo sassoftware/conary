@@ -1,22 +1,22 @@
 Changes in @NEW@:
   o Client Changes:
-    * The default resolveLevel is now 2, this means that conary will try 
-      to update troves that would otherwise cause an update to fail.
-      See the conary man page for more details.
-    * Multiple bugs have been fixed in interactive prompting for user 
+    * The default resolveLevel setting is now 2, this means that
+      conary will try to update troves that would otherwise cause an
+      update to fail.  See the conary man page for more details.
+    * Multiple bugs have been fixed in interactive prompting for user
       passwords (CNY-466):
-        - Password prompts are based on the server name portion of the
-          label being accessed, not the actual hostname of the server
-          (these are often different when repositoryMaps are used)
-        - When no password callback is available, the operation will
-          fail with an open error (which is identical to what would
-          happen if no user name was present) instead of giving a
-          traceback.
-        - The download thread uses the passwords which the original process
-          prompted for from the user.
-        - The download thread is able to prompt for passwords from the
-          user if distributed changesets require access to additional
-          repositories.
+      o Password prompts are based on the server name portion of the
+        label being accessed, not the actual hostname of the server
+        (these are often different when repositoryMaps are used).
+      o When no password callback is available, the operation will
+        fail with an open error (which is identical to what would
+        happen if no user name was present) instead of giving a
+        traceback.
+      o The download thread uses the passwords which the original
+        thread obtained from the user.
+      o The download thread is able to prompt for passwords from the
+        user if distributed changesets require access to additional
+        repositories.
 
   o Build Changes:
     * "r.Ant()", "r.JavaCompile()", and "r.ClassPath()" build actions
@@ -37,7 +37,7 @@ Changes in @NEW@:
       hypervisor.  The existing "xen" flag should be used to build
       binaries specific to Xen which apply equally to Xen dom0 and
       domU environments.
-    * Warning message for modes specified without an initial "0" has
+    * Warning message for modes specified without an initial "0" have
       been improved to include the path that is affected. (CNY-530)
 
   o Server Changes:
@@ -46,8 +46,7 @@ Changes in @NEW@:
 
   o Bugs Fixed:
     * The Conary Repository now returns an error to a client when
-      committing duplicate troves that have no an empty
-      flavor. (CNY-476)
+      committing duplicate troves that have an empty flavor. (CNY-476)
     * When checking out a source trove from a repository using
       "cvc checkout", the user is no longer warned about not being able
       to change the ownership of the files checked out.
@@ -58,16 +57,16 @@ Changes in @NEW@:
       failures. (CNY-497)
     * A bug that caused 'conary q tmpwatch:runtime --recurse' to traceback
       has been fixed (CNY-460)
-    * interactive mode now handles EOF by assuming it means 'no'.  (CNY-391,
+    * Interactive mode now handles EOF by assuming it means 'no'.  (CNY-391,
       thanks go to David Coulthart for the patch).
-    * config settings in contexts can now be overridden from the command 
-      line. (CNY-22)
-    * Redirect changesets now have primary troves, meaning they will display 
-      better when using conary scs. (CNY-450)
-    * Mask user's passwords when using cvc context (unless they use 
-      --show-paswords) (CNY-471)
-    * Removed excess output in commitaction, due to change in option parsing
-      code (CNY-405)
+    * Configuration settings in contexts can now be overridden from
+      the command line. (CNY-22)
+    * Redirect changesets now have primary troves, meaning they will
+      display better when using "conary showchangeset". (CNY-450)
+    * User's passwords are now masked when using "cvc context" (unless
+      --show-paswords is specified). (CNY-471)
+    * Removed excess output from commitaction which was caused by a
+      change in option parsing code (CNY-405)
 
 Changes in 1.0.18:
   o Client Changes:
