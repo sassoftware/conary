@@ -6,6 +6,15 @@ Changes in @NEW@:
       as well (CNY-499)
 
 Changes in 1.0.19:
+  o API Change:
+    * In order to fully represent empty flavors in Conary, a new Flavor
+      object class has been added.  Previously, DependencySet objects
+      were used to store flavor information.  Unfortunately it was not
+      possible to distinguish "empty flavor" from "flavor not specified".
+      When dealing with thawing frozen flavors, use ThawFlavor() instead
+      of ThawDependencySet().  When testing to see if a flavor is empty,
+      use the isEmpty() method of the flavor object.
+
   o Client Changes:
     * The default resolveLevel setting is now 2, this means that
       conary will try to update troves that would otherwise cause an
