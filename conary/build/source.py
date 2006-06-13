@@ -327,7 +327,17 @@ class Archive(_Source):
                 candidate = difference.pop()
                 if os.path.isdir('%s/%s' %(self.builddir, candidate)):
                     self.recipe.mainDir(candidate)
-                    os.rmdir('/'.join((self.builddir, oldMainDir)))
+                    try:
+                        os.rmdir('/'.join((self.builddir, oldMainDir)))
+                    except OSError:
+                        raise SourceError(
+                            'Sources do not agree on main directory:'
+                            ' files exist in %s but first archive wants %s;'
+                            ' try calling addArchive() before other'
+                            ' source actions such as addSource()',
+                            '/'.join((self.builddir, oldMainDir)),
+                            '/'.join((self.builddir, candidate))
+                        )
                 else:
                     self.recipe.mainDir(oldMainDir)
             else:

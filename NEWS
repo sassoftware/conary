@@ -4,6 +4,10 @@ Changes in @NEW@:
       "r.Doc()" build action, except it coppies into "%(thisjavadocdir)s".
     * Added the "jvmdir", "javadir", "javadocdir", and "thisjavadocdir" 
       macros.
+    * When the r.addArchive() source action attempts to guess the main
+      directory in which to build, it now recognizes when when sources
+      have been added in an order that defeats its algorithm and provides
+      a helpful error message. (CNY-557)
 
   o Bug Fixes:
     * Fixed a bug in in clone behavior that would cause conary to try to
