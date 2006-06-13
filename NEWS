@@ -65,13 +65,13 @@ Changes in 1.0.19:
     * A bug that caused 'conary q tmpwatch:runtime --recurse' to traceback
       has been fixed (CNY-460)
     * Interactive mode now handles EOF by assuming it means 'no'.  (CNY-391,
-      thanks go to David Coulthart for the patch).
+      (Thanks go to David Coulthart for the patch.)
     * Configuration settings in contexts can now be overridden from
       the command line. (CNY-22)
     * Redirect changesets now have primary troves, meaning they will
       display better when using "conary showchangeset". (CNY-450)
     * User's passwords are now masked when using "cvc context" (unless
-      --show-paswords is specified). (CNY-471)
+      --show-passwords is specified). (CNY-471)
     * Removed excess output from commitaction which was caused by a
       change in option parsing code (CNY-405)
 
