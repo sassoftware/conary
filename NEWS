@@ -12,16 +12,16 @@ Changes in 1.0.19:
       update to fail.  See the conary man page for more details.
     * Multiple bugs have been fixed in interactive prompting for user
       passwords (CNY-466):
-      o Password prompts are based on the server name portion of the
+      - Password prompts are based on the server name portion of the
         label being accessed, not the actual hostname of the server
         (these are often different when repositoryMaps are used).
-      o When no password callback is available, the operation will
+      - When no password callback is available, the operation will
         fail with an open error (which is identical to what would
         happen if no user name was present) instead of giving a
         traceback.
-      o The download thread uses the passwords which the original
+      - The download thread uses the passwords which the original
         thread obtained from the user.
-      o The download thread is able to prompt for passwords from the
+      - The download thread is able to prompt for passwords from the
         user if distributed changesets require access to additional
         repositories.
 
