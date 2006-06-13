@@ -776,7 +776,7 @@ class Ant(BuildCommand):
     keywords = {'subdir': '',
                 'verbose': True,
                 'options': '-lib %(javadir)s'}
-    template = '%%(cdcmd)s CLASSPATH=%%(classpath)s %%(antcmd)s %%(antoptions)s %%(args)s'
+    template = '%%(cdcmd)s CLASSPATH="%%(classpath)s" %%(antcmd)s %%(antoptions)s %%(args)s'
 
     def do(self, macros):
         macros = macros.copy()
@@ -819,7 +819,7 @@ class JavaCompile(BuildCommand):
 
     keywords = {'javacmd': 'javac',
                 'javaArgs': ''}
-    template = 'CLASSPATH=%%(classpath)s %(javacmd)s %%(dir)s %(javaArgs)s'
+    template = 'CLASSPATH="%%(classpath)s" %(javacmd)s %%(dir)s %(javaArgs)s'
 
     def do(self, macros):
         macros = macros.copy()
@@ -1224,7 +1224,7 @@ class Environment(BuildAction):
 	os.environ[self.variable] = self.value % macros
 
 
-class ClassPath(BuildAction):
+class ClassPath(BuildCommand):
     """
     NAME
     ====
@@ -1247,6 +1247,8 @@ class ClassPath(BuildAction):
 
     C{r.Environment('junit', 'servlet-api')}
     """
+    template = ''
+
     def do(self, macros):
         macros.classpath = self.recipe.classpath
         for jar in self.arglist:
