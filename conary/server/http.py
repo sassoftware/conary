@@ -119,7 +119,7 @@ class HttpHandler(WebHandler):
         self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
         self.isAdmin = self.repServer.auth.check(self.authToken, admin=True)
         self.hasEntitlements = False
-        self.isAnonymous = self.authToken[0] != 'anonymous'
+        self.isAnonymous = self.authToken[0] == 'anonymous'
         self.hasEntitlements = self.repServer.auth.listEntitlementGroups(
                                                         self.authToken)
 

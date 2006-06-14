@@ -17,6 +17,9 @@ Changes in @NEW@:
     * Fixed bug in 'r.Ant()' and 'r.JavaCompile' which caused the CLASSPATH
       variable to get mangled.
     * Fixed bug in 'r.ClassPath()' which caused a traceback.
+    * A bug that caused the "change password" tab to be displayed when
+      browsing the repository via the web as an anonymous user has
+      been fixed.
 
 Changes in 1.0.19:
   o API Change:
