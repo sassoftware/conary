@@ -559,6 +559,8 @@ class HttpHandler(WebHandler):
     @checkAuth()
     @strFields(username = "")
     def chPassForm(self, auth, username):
+        if self.isAnonymous:
+            raise apache.SERVER_RETURN, 401
         if username:
             askForOld = False
         else:

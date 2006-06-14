@@ -20,6 +20,8 @@ Changes in @NEW@:
     * A bug that caused the "change password" tab to be displayed when
       browsing the repository via the web as an anonymous user has
       been fixed.
+    * The web service code no longer permits the anonymous user to
+      view the "change password" form (/conary/chPassForm).
 
 Changes in 1.0.19:
   o API Change:
