@@ -465,9 +465,6 @@ class Database(SqlDbRepository):
                         autoPinList = RegularExpressionList(), threshold = 0):
 	assert(not cs.isAbsolute())
 
-        import epdb
-        epdb.st('f')
-
         if filePriorityPath is None:
             filePriorityPath = CfgLabelList()
 
