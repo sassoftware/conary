@@ -465,6 +465,9 @@ class Database(SqlDbRepository):
                         autoPinList = RegularExpressionList(), threshold = 0):
 	assert(not cs.isAbsolute())
 
+        import epdb
+        epdb.st('f')
+
         if filePriorityPath is None:
             filePriorityPath = CfgLabelList()
 
@@ -890,7 +893,7 @@ class Database(SqlDbRepository):
         return Rollback(dir, load = True)
 
     def applyRollbackList(self, repos, names, replaceFiles = False,
-                          callback = UpdateCallback()):
+                          callback = UpdateCallback(), tagScript = None):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -962,7 +965,8 @@ class Database(SqlDbRepository):
                                              isRollback = True,
                                              replaceFiles = replaceFiles,
                                              removeHints = removalHints,
-                                             callback = callback)
+                                             callback = callback,
+                                             tagScript = tagScript)
 
                     if not localCs.isEmpty():
                         itemCount += 1
@@ -972,7 +976,8 @@ class Database(SqlDbRepository):
                                              isRollback = True,
                                              updateDatabase = False,
                                              replaceFiles = replaceFiles,
-                                             callback = callback)
+                                             callback = callback,
+                                             tagScript = tagScript)
 
                     rb.removeLast()
                 except CommitError, err:

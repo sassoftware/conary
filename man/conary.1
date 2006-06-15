@@ -129,6 +129,9 @@ Arguments include
 .TP 4
 .B \-\-replace-files
 See \-\-replace-files description from \fBconary update\fP
+.TP
+.B \-\-tag-script \fIpath\fR
+See \-\-tag-script description from \fBconary update\fP
 .RE
 
 .TP
@@ -221,6 +224,10 @@ Only allow updates to versions that are referenced by other troves on the
 system.  This allows you to easily update a trove to a version specified 
 within a group, or ensure you match the :lib component with an out-of-date
 version of a trove you have installed.
+.TP
+.B \-\-tag-script \fIpath\fR
+Instead of executing tag scripts, write out the set of commands which
+would have been executed to \fIpath\fR.
 .TP
 .B \-\-test
 Perform all actions up to the point of writing to the filesystem.

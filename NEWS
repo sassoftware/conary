@@ -25,6 +25,9 @@ Changes in @NEW@:
     * The web service code no longer permits the anonymous user to
       view the "change password" form (/conary/chPassForm).
 
+  o Client Changes:
+    * Added --tag-script parameter to rollback command (CNY-519)
+
 Changes in 1.0.19:
   o API Change:
     * In order to fully represent empty flavors in Conary, a new Flavor

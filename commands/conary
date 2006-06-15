@@ -435,17 +435,23 @@ class RollbackCommand(ConaryCommand):
     paramHelp = "<rollback>"
 
     docs = {'replace-files' : ('replace files on system with files from'
-                               ' rollback if conflict')}
+                               ' rollback if conflict'),
+            'tag-script': ('Output commands to run tag-script to PATH', 'PATH')
+           }
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["replace-files"] = NO_PARAM
+        argDef["tag-script"] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
         if argSet.has_key('replace-files'):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
+
+        kwargs['tagScript'] = argSet.pop('tag-script', None)
+
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
