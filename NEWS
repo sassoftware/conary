@@ -8,6 +8,8 @@ Changes in @NEW@:
       directory in which to build, it now recognizes when when sources
       have been added in an order that defeats its algorithm and provides
       a helpful error message. (CNY-557)
+    * The r.addPatch() source action no longer hangs when presented with
+      large patches, fixing a bug introduced in Conary 1.0.19.
 
   o Bug Fixes:
     * Fixed a bug in in clone behavior that would cause conary to try to

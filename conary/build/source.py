@@ -18,6 +18,7 @@ it, unpack it, and patch it in the correct directory.  Each of the
 public classes in this module is accessed from a recipe as addI{Name}.
 """
 
+import fcntl
 import gzip
 import os
 import subprocess
@@ -488,9 +489,17 @@ class Patch(_Source):
 
             log.info('attempting to apply %s with patchlevel %s' % (f,patchlevel))
             pipe = os.pipe()
-            os.write(pipe[1], patch)
+            # if pipe[1] is open in the subprocess, the pipe won't close
+            # and the subprocess will hang; subprocess does not close
+            # extra fds, so the easiest solution is close on exec
+            fcntl.fcntl(pipe[1], fcntl.F_SETFD, 1)
+            p2 = subprocess.Popen(patchArgs, stdin=pipe[0], stderr=devnull,
+                                  shell=False)
+            os.close(pipe[0])
+            offset=0
+            while len(patch[offset:]):
+                offset += os.write(pipe[1], patch[offset:])
             os.close(pipe[1])
-            p2 = subprocess.Popen(patchArgs, stdin=pipe[0], stderr=devnull, shell=False)
 
             try:
                 logmessage = open('nohup.out').read()
@@ -509,6 +518,8 @@ class Patch(_Source):
 
     def do(self):
 	f = self._findSource()
+        # FIXME: we should probably read in the patch directly now
+        # that we aren't just applying in a pipeline
 	provides = "cat"
 	if self.sourcename.endswith(".gz"):
 	    provides = "zcat"
@@ -523,14 +534,12 @@ class Patch(_Source):
             leveltuple = (1,0,2,3,)
         util.mkdirChain(destDir)
 
-        slurppatch = os.pipe()
-        p1 = subprocess.Popen([provides, f], stdout=slurppatch[1], shell=False)
-        p1.wait()
-        os.close(slurppatch[1])
+        pin = util.popen("%s '%s'" %(provides, f))
 	if self.applymacros:
-            patch = os.fdopen(slurppatch[0]).read() % self.recipe.macros
+            patch = pin.read() % self.recipe.macros
 	else:
-            patch = os.fdopen(slurppatch[0]).read()
+            patch = pin.read()
+        pin.close()
         self.patchme(patch, f, destDir, leveltuple)
 
 class Source(_Source):
