@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.20:
   o Build Changes:
     * "jvmdir", "javadir", "javadocdir", and "thisjavadocdir" have
        been added to the default set of macros.
