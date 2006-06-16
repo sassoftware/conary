@@ -835,8 +835,18 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
         if fileObj or fileStream:
+            sha1 = None
+
             if fileStream is None:
                 fileStream = fileObj.freeze()
+
+            if fileObj is not None:
+                if fileObj.hasContents:
+                    sha1 = fileObj.contents.sha1()
+            elif files.frozenFileHasContents(fileStream):
+                cont = files.frozenFileContentInfo(fileStream)
+                sha1 = cont.sha1()
+
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
 		       (cu.binary(pathId), versionId, cu.binary(fileId), 
                         cu.binary(fileStream), path))
