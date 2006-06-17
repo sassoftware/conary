@@ -134,7 +134,8 @@ class CfgPath(CfgType):
             return val
 
     def format(self, val, displayOptions=None):
-        if hasattr(val, '_getUnexpanded'):
+        if (not displayOptions.get('expandPaths', False)
+            and hasattr(val, '_getUnexpanded')):
             return val._getUnexpanded()
         else:
             return val
