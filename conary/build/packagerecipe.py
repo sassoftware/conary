@@ -716,22 +716,25 @@ class _AbstractPackageRecipe(Recipe):
 	self.macros = macros.Macros()
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
-        if crossCompile:
-            self.setCrossCompile(crossCompile)
-        else:
-            self.macros.update(use.Arch._getMacros())
-            self.macros['hostarch'] = self.macros['targetarch']
-            self.macros['buildarch'] = self.macros['targetarch']
 
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.
  	for key in cfg.macros:
  	    self.macros._override(key, cfg['macros'][key])
+
 	self.macros.name = self.name
 	self.macros.version = self.version
         self.packages = { self.name : True }
 	if extraMacros:
 	    self.macros.update(extraMacros)
+
+        if crossCompile:
+            self.setCrossCompile(crossCompile)
+        else:
+            self.macros.update(use.Arch._getMacros())
+            self.macros.setdefault('hostarch', self.macros['targetarch'])
+            self.macros.setdefault('buildarch', self.macros['targetarch'])
+
 	self.mainDir(self.nameVer(), explicit=False)
         self.sourcePathMap = {}
         self.pathConflicts = {}
