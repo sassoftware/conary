@@ -138,7 +138,7 @@ class CfgPath(CfgType):
             and hasattr(val, '_getUnexpanded')):
             return val._getUnexpanded()
         else:
-            return val
+            return str(val)
 
 class CfgInt(CfgType):
 
