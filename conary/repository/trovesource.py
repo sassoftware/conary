@@ -197,7 +197,7 @@ class SearchableTroveSource(AbstractTroveSource):
         raise NotImplementedError
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
-                        withFileContents = False):
+                        withFileContents = False, callback = None):
         # return changeset, and unhandled jobs
         cs = changeset.ReadOnlyChangeSet()
         return cs, jobList
@@ -685,7 +685,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         return suggMap
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
-                        withFileContents = False, useDatabase = True):
+                        withFileContents = False, useDatabase = True,
+                        callback = None):
         # Returns the changeset plus a remainder list of the bits it
         # couldn't do
         def _findTroveObj(availSet, (name, version, flavor)):
@@ -1035,7 +1036,7 @@ class TroveSourceStack(SearchableTroveSource):
         return allSugg
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
-                        withFileContents = False):
+                        withFileContents = False, callback = None):
 
         cs = changeset.ReadOnlyChangeSet()
 
@@ -1047,7 +1048,8 @@ class TroveSourceStack(SearchableTroveSource):
                 res = source.createChangeSet(jobList, 
                                            withFiles = withFiles,
                                            withFileContents = withFileContents,
-                                           recurse = recurse)
+                                           recurse = recurse, 
+                                           callback = callback)
             except errors.OpenError:
                 res = changeset.ReadOnlyChangeSet(), jobList
             if isinstance(res, (list, tuple)):
