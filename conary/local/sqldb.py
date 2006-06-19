@@ -1041,7 +1041,7 @@ order by
         cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
                                 idx %(PRIMARYKEY)s,
                                 troveName STRING,
-                                troveVersion STRING,
+                                versionId INT,
                                 flavorId INT)
                    """ % self.db.keywords, start_transaction = False)
 
@@ -1049,18 +1049,19 @@ order by
             flavorId = self.flavors.get(flavor, None)
             if flavorId is None:
                 continue
+            versionId = self.versionTable.get(version, None)
+            if versionId is None:
+                continue
 
             cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
-                       i, name, version.asString(), flavorId,
+                       i, name, versionId, flavorId,
                        start_transaction = False)
 
         cu.execute("""SELECT idx, Instances.instanceId FROM getTrovesTbl
-                        INNER JOIN Versions ON
-                            Versions.version == getTrovesTbl.troveVersion
                         INNER JOIN Instances ON
                             getTrovesTbl.troveName == Instances.troveName AND
                             getTrovesTbl.flavorId == Instances.flavorId AND
-                            Instances.versionId == Versions.versionId AND
+                            getTrovesTbl.versionId == Instances.versionId AND
                             Instances.isPresent == 1
                     """)
 
