@@ -281,7 +281,7 @@ class Automake(BuildCommand):
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
         for req in ['autoconf:runtime', 'automake:runtime']:
-            if not [x for x in recipe.buildRequires if 'autoconf:runtime' in x]:
+            if not [ x for x in recipe.buildRequires if x.startswith(req) ]:
                 recipe.buildRequires.append(req)
 
     def do(self, macros):
