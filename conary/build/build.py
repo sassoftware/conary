@@ -277,6 +277,10 @@ class Automake(BuildCommand):
                 'skipMissingSubDir': False,
                }
 
+    def __init__(self, recipe, *args, **keywords):
+        BuildCommand.__init__(self, recipe, *args, **keywords)
+        recipe.buildRequires.extend(['autoconf:runtime', 'automake:runtime'])
+
     def do(self, macros):
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.subDir, macros,
