@@ -18,6 +18,7 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 import difflib
+import errno
 import os
 import stat
 import sys
@@ -275,8 +276,17 @@ def commit(repos, cfg, message, callback=None, test=False):
                 recipeObj.setup()
             except AttributeError:
                 log.error('you need a setup method for your recipe')
-                
-        srcFiles = recipeObj.fetchAllSources()
+
+        try:
+            srcFiles = recipeObj.fetchAllSources()
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                raise errors.CvcError('Source file %s does not exist' % 
+                                      e.filename)
+            else:
+                raise errors.CvcError('Error accessing source file %s: %s' %
+                                      (e.filename, e.strerror))
+
         log.setVerbosity(level)
 
         for fullPath in srcFiles:
@@ -361,10 +371,17 @@ def commit(repos, cfg, message, callback=None, test=False):
 
         del d
 
-    result = update.buildLocalChanges(repos, 
-		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
-                    forceSha1=True,
-                    crossRepositoryDeltas = False)
+    try:
+        result = update.buildLocalChanges(repos, 
+                        [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
+                        forceSha1=True,
+                        crossRepositoryDeltas = False)
+    except OSError, e:
+        if e.errno == errno.ENOENT:
+            raise errors.CvcError('File %s does not exist' % e.filename)
+        else:
+            raise errors.CvcError('Error accessing %s: %s' %
+                                  (e.filename, e.strerror))
 
     # an error occurred.  buildLocalChanges() should have a useful
     # message, so we just return
