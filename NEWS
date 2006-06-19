@@ -1,4 +1,13 @@
 Changes in @VERSION@:
+  o Client Changes:
+    * The migrate command has changed behavior significantly in order to
+      make it more useful for updating appliances.  However, this change
+      makes it much _less_ useful for updating normal systems (do not use 
+      it without reading the man page describing its behavior).  The old
+      migrate behavior is now available under "conary sync --full".  
+      "conary synchildren" has been renamed to "conary sync", and its behavior 
+      has also been tweaked slightly as a result - the old behavior is 
+      available as "conary sync --current". (CNY-477)
 
 Changes in 1.0.20:
   o Build Changes:

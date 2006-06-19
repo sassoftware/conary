@@ -95,13 +95,6 @@ and pin status.
 Displays digital signatures for the specified troves.
 .RE
 .TP
-.B migrate [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
-Update or install \fItrovename\fP, and update the children of \fItrovename\fP 
-so that the versions of the child troves match the version specified by the 
-parent trove.  Also erase any children that are installed that are not by 
-default.
-.RE
-.TP
 .B rblist
 Lists available rollbacks.
 .TP
@@ -135,19 +128,8 @@ See \-\-tag-script description from \fBconary update\fP
 .RE
 
 .TP
-.B sync[children] [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
-Update the children of \fItrovename\fP so that the versions of the child
-troves match the version specified by the parent trove.  
-Arguments include
-.RS 4
-.TP 4
-.B \-\-update-only
-Only change the versions of installed children to match the ones referenced 
-by the specified troves, do not install any missing troves.
-.RE
-.TP
 .B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP][--[\fIversion\fP][\fIflavor\fP]]>* <\fIchangeset-file\fP>*
-Updates each \fItrovename\fR from the appropriate repository to 
+Updates or installs each \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP and \fIflavor\fP given (otherwise the most 
 recent version which matches the \fBinstall-label\fP is used).  Also 
 applies any given changesets. 
@@ -464,7 +446,54 @@ When recursing, use the repository to download information about troves not in
 the changeset but referenced by the changeset.  This allows you to perform a 
 --ls of all the files in a group changeset, for example.
 .RE
+.SS "Advanced update commands"
+Conary also includes some more advanced update commands that should not be used by beginners.
+.TP
+.B migrate [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+\fBWARNING\fP: This command is only useful in situations where a group defines 
+exactly what you wish to update your system to.  It will erase everything
+installed on your system that is not specified to be migrated to.  For this 
+reason, this command must be run with --interactive.  If you're not sure you
+want to use this command, you probably don't.
 
+Migrate system to \fItrovename\fP so that when the migration is done, only
+the troves specified on this command line their children are installed, and 
+pinned troves are left behind.
+
+In general, migrate only installs or updates troves that are defined as 
+byDefault True in their group.  However, there is one exception: if a trove
+is defined as byDefault False, but is installed on the current system, then
+it will be updated.  For example, if the kernel package is by default False (as it currently is with rPath Linux 1), any it is installed, then it will be 
+updated to the new version of the kernel.
+
+Migrate takes its information about the by default settings from the currently 
+installed version of the group being migrated (often group-os or group-dist).
+.RE
+.TP
+.B sync [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Update the children of \fItrovename\fP so that the versions of the child
+troves match the version specified by the parent trove.
+By default, the the specified trove itself is updated first, and
+then children are synced to the new trove.
+
+Arguments include
+.RS 4
+.TP 4
+.TP 4
+.B \-\-current
+Cause only the children of the specified troves to be updated to match the 
+installed troves specified on the command line.  The specified troves 
+themselves are not touched.
+.TP
+.B \-\-full
+Erase packages and components that are children of the specified troves and 
+would not be installed if the the specified troves were being installed for the first time.  For example, :debuginfo components are not installed by default.
+If you used this option when syncing a package and you had its :debuginfo 
+component installed, that component would get erased.
+.TP 4
+.B \-\-update-only
+Only change the versions of installed children to match the ones referenced 
+by the specified troves, do not install any missing troves.
 .RE
 .\"
 .\"

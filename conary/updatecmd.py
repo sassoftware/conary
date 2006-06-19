@@ -233,20 +233,19 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
                                checkPathConflicts = True, syncChildren = False,
-                               updateOnly = False, migrate = False,
-                               keepRequired = False):
+                               syncUpdate = False, updateOnly = False, 
+                               migrate = False, keepRequired = False,
+                               removeNotByDefault = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
-    if migrate or syncChildren:
+    if syncChildren or syncUpdate:
         installMissing = True
     else:
         installMissing = False
 
     if migrate:
-        removeNotByDefault = True
-    else:
-        removeNotByDefault = False
+        replaceFiles = True
 
     fromChangesets = []
     for path in fromFiles:
@@ -287,21 +286,24 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   checkPathConflicts = checkPathConflicts,
                   syncChildren = syncChildren,
                   updateOnly = updateOnly,
-                  removeNotByDefault = removeNotByDefault, 
-                  installMissing = installMissing)
+                  removeNotByDefault = removeNotByDefault,
+                  installMissing = installMissing,
+                  migrate = migrate)
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   test = False, justDatabase = False, 
                                   recurse = True, info = False, 
                                   updateByDefault = True, callback = None, 
-                                  split=True, sync = False, keepRequired = False,
+                                  split=True, sync = False, 
+                                  keepRequired = False,
                                   fromChangesets = [],
                                   checkPathConflicts = True, 
                                   checkPrimaryPins = True, 
-                                  syncChildren = False, updateOnly = False,
+                                  syncChildren = False, 
+                                  updateOnly = False, 
                                   removeNotByDefault = False, 
-                                  installMissing = False):
+                                  installMissing = False, migrate = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -322,7 +324,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                syncChildren = syncChildren,
                                updateOnly = updateOnly,
                                installMissing = installMissing, 
-                               removeNotByDefault = removeNotByDefault)
+                               removeNotByDefault = removeNotByDefault,
+                               migrate = migrate)
     except:
         callback.done()
         raise
@@ -347,14 +350,29 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        for x in itertools.chain(*suggMap.itervalues())))
         print " ".join(items)
         keepExisting = False
-
-    if cfg.interactive:
+    if migrate:
+        print ('As of conary 1.0.21, the migrate command has changed.'
+               '  Migrate must be run with --interactive '
+               ' because it now has the potential to damage your'
+               ' system irreparably if used incorrectly.')
+        if not cfg.interactive:
+            return
+        else:
+            print 'The following updates will be performed:'
+            displayUpdateInfo(updJob, cfg)
+            print ('Migrate erases all troves not referenced in the groups'
+                   ' specified.')
+            okay = cmdline.askYn('continue with migrate? [y/N]', default=False)
+            if not okay:
+                return
+    elif cfg.interactive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
         okay = cmdline.askYn('continue with update? [Y/n]', default=True)
 
         if not okay:
             return
+
 
     log.syslog.command()
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 

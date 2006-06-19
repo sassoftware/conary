@@ -67,7 +67,7 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset> <trove>[=<version>]*"
-    print "       conary syncchildren <pkgname>[=<version>][[flavor]]*"
+    print "       conary sync         <pkgname>[=<version>][[flavor]]*"
     print "       conary unpin        <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary updateall"
@@ -722,10 +722,11 @@ _register(ShowChangesetCommand)
 
 class UpdateCommand(ConaryCommand):
 
-    commands = ["update", "erase", "migrate", "sync", "syncchildren"]
+    commands = ["update", "erase" ]
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
     docs = {
+        'full'          : 'also remove children that are non-default',
         'from-file'     : 'search changeset(s) for given troves',
         'just-db'       : 'Update db only - Do not modify rest of file system',
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
@@ -742,7 +743,7 @@ class UpdateCommand(ConaryCommand):
         'sync-to-parents' : 'Install already referenced versions of troves',
         'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
         'test'      : 'Run through whole update but do not modify system',
-        'update-only' : 'Do not install any new troves', 
+        'update-only' : 'Do not install any new troves',
     }
 
     def addParameters(self, argDef):
@@ -763,10 +764,10 @@ class UpdateCommand(ConaryCommand):
         d["sync-to-parents"] = NO_PARAM
         d["tag-script"] = ONE_PARAM
         d["test"] = NO_PARAM
-        d["update-only"] = NO_PARAM
         argDef['Update Options'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
+        # NOTE: this code path is used by sync and migrate as well.
         cfg.requireInstallLabelPath()
         kwargs = {}
 
@@ -802,8 +803,21 @@ class UpdateCommand(ConaryCommand):
         kwargs['updateOnly'] = argSet.pop('update-only', False)
 
         kwargs['updateByDefault']    = otherArgs[1] != 'erase'
-        kwargs['syncChildren']       = otherArgs[1] in ('sync', 'syncchildren')
         kwargs['migrate']            = otherArgs[1] == 'migrate'
+
+        #
+        kwargs['syncChildren'] = False
+        kwargs['syncUpdate'] = False
+        if otherArgs[1] == 'sync':
+            if argSet.pop('current', False):
+                kwargs['syncChildren'] = True
+            else:
+                kwargs['syncUpdate'] = True
+            kwargs['removeNotByDefault'] = argSet.pop('full', False)
+        elif otherArgs[1] == 'syncchildren':
+            # backwards compatibility.  Don't remove this 
+            kwargs['syncChildren'] = True
+            kwargs['removeNotByDefault'] = argSet.pop('full', False)
 
         if kwargs['sync'] and kwargs['fromFiles']:
             log.error("Only one of --sync and --from-file may be used")
@@ -816,6 +830,41 @@ class UpdateCommand(ConaryCommand):
         else:
             return self.usage()
 _register(UpdateCommand)
+
+class SyncCommand(UpdateCommand):
+
+    commands = ["sync", "syncchildren"]
+    paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
+
+    docs = {
+            'current' : 'syncs child troves to this trove w/o updating <pkgname>'
+           }
+    def addParameters(self, argDef):
+        UpdateCommand.addParameters(self, argDef)
+        sync = argDef.pop('Update Options')
+        sync["full"] = NO_PARAM
+        sync["current"] = NO_PARAM
+        sync["update-only"] = NO_PARAM
+        argDef['Sync Options'] = sync
+
+_register(SyncCommand)
+
+class MigrateCommand(UpdateCommand):
+
+    commands = ["migrate"]
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+
+    def addParameters(self, argDef):
+        UpdateCommand.addParameters(self, argDef)
+        d = argDef.pop('Update Options')
+        del d['from-file']
+        del d['keep-existing']
+        del d['sync-to-parents']
+        del d['no-recurse']
+        del d['replace-files']
+        argDef['Migrate Options'] = d
+_register(MigrateCommand)
+
 
 class UpdateAllCommand(UpdateCommand):
 
