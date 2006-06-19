@@ -461,6 +461,19 @@ class Database:
                     outD[name][version].append(deps.deps.ThawFlavor(flavor))
         return outD
 
+    def iterAllTroves(self):
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT troveName, version, timeStamps, flavor FROM Instances
+                NATURAL JOIN Versions
+                INNER JOIN Flavors
+                    ON Instances.flavorid = Flavors.flavorid
+            WHERE isPresent=1""")
+        for (troveName, version, timeStamps, flavor) in cu:
+            ts = [float(x) for x in timeStamps.split(':')]
+            version = versions.VersionFromString(version, timeStamps=ts)
+            yield troveName, version, deps.deps.ThawFlavor(flavor)
+
     def pinTroves(self, name, version, flavor, pin = True):
         if flavor is None or flavor.isEmpty():
             flavorClause = "IS NULL"
