@@ -1,3 +1,10 @@
+Changes in @VERSION@:
+  o Build Changes:
+    * "r.Automake()" no automatically adds "autoconf:runtime" and 
+      "automake:runtime" the the buildRequires. The version of either 
+      autoconf or automake can be overriden by adding a specific version the 
+      the buildRequires list.
+
 Changes in 1.0.20:
   o Build Changes:
     * "jvmdir", "javadir", "javadocdir", and "thisjavadocdir" have
