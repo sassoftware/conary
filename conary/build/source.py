@@ -23,6 +23,7 @@ import gzip
 import os
 import subprocess
 import sys
+import tempfile
 
 from conary.lib import log, magic
 from conary.build import lookaside
@@ -479,36 +480,39 @@ class Patch(_Source):
 	self.applymacros = self.macros
 
     def patchme(self, patch, f, destDir, patchlevels):
-        devnull = open('/dev/null', 'w')
         for patchlevel in patchlevels:
-            patchArgs = [ 'nohup', 'patch', '-d', destDir, '-p%s'%patchlevel, ]
+            patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
             if self.backup:
                 patchArgs.extend(['-b', '-z', self.backup])
             if self.extraArgs:
                 patchArgs.extend(self.extraArgs)
 
             log.info('attempting to apply %s with patchlevel %s' % (f,patchlevel))
-            pipe = os.pipe()
-            # if pipe[1] is open in the subprocess, the pipe won't close
-            # and the subprocess will hang; subprocess does not close
-            # extra fds, so the easiest solution is close on exec
-            fcntl.fcntl(pipe[1], fcntl.F_SETFD, 1)
-            p2 = subprocess.Popen(patchArgs, stdin=pipe[0], stderr=devnull,
-                                  shell=False)
-            os.close(pipe[0])
+            fd, path = tempfile.mkstemp()
+            os.unlink(path)
+            logFile = os.fdopen(fd, 'w+')
+
+            inFd, outFd = os.pipe()
+            p2 = subprocess.Popen(patchArgs, stdin=inFd, stderr=logFile,
+                                  shell=False, stdout=logFile, close_fds=True)
+
+            os.close(inFd)
             offset=0
             while len(patch[offset:]):
-                offset += os.write(pipe[1], patch[offset:])
-            os.close(pipe[1])
+                offset += os.write(outFd, patch[offset:])
+            os.close(outFd) # since stdin is closed, we can't
+                            # answer y/n questions.
 
+            failed = p2.wait()
             try:
-                logmessage = open('nohup.out').read()
-                os.unlink('nohup.out')
-                print logmessage.strip()
+                logFile.flush()
+                logFile.seek(0,0)
+                print logFile.read().strip()
             except IOError:
                 pass
+            logFile.close()
 
-            if p2.wait():
+            if failed:
                 log.info('patch %s did not apply with level %s' % (f,patchlevel))
             else:
                 log.info('patch applied successfully')

@@ -8,6 +8,9 @@ Changes in @VERSION@:
       "conary synchildren" has been renamed to "conary sync", and its behavior 
       has also been tweaked slightly as a result - the old behavior is 
       available as "conary sync --current". (CNY-477)
+  o Bug Fixes:
+    * The patch functionality no longer depends on nohup creating a file
+      in the current directory (a bug introduced in 1.0.19). (CNY-575)
 
 Changes in 1.0.20:
   o Build Changes:
