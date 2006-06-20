@@ -12,6 +12,8 @@ Changes in @VERSION@:
     * The patch functionality no longer depends on nohup creating a file
       in the current directory (a bug introduced in 1.0.19). (CNY-575)
     * Commits with missing files no longer traceback (CNY-455)
+    * Fixed a bug where #!/usr/bin/env /bin/bash would fail to find 
+      /bin/bash on the user's system.
 
 Changes in 1.0.20:
   o Build Changes:
