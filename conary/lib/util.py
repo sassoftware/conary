@@ -434,6 +434,17 @@ def checkPath(binary, root=None):
     if it exists; otherwise None.
     """
     path = os.environ.get('PATH', '')
+    if binary[0] == '/':
+        # handle case where binary starts with / seperately 
+        # because os.path.join will not do the right
+        # thing with root set.
+        if root:
+            if os.path.exists(root + binary):
+                return root + binary
+        elif os.path.exists(binary):
+            return binary
+        return None
+
     for path in path.split(os.pathsep):
         if root:
             path = joinPaths(root, path)
