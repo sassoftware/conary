@@ -225,13 +225,14 @@ def _searchRepository(cfg, repCache, name, location):
     return None
 
 
-def fetchURL(cfg, name, location):
+def fetchURL(cfg, name, location, httpHeaders={}):
     log.info('Downloading %s...', name)
     retries = 0
     url = None
     while retries < 5:
         try:
-            url = urllib2.urlopen(name)
+            req = urllib2.Request(name, headers=httpHeaders)
+            url = urllib2.urlopen(req)
             break
         except urllib2.HTTPError, msg:
             if msg.code == 404:
@@ -279,7 +280,7 @@ def fetchURL(cfg, name, location):
     return rc
 
 def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False, 
-              localOnly=False):
+              localOnly=False, httpHeaders={}):
     """
     searches all locations, including populating the cache if the
     file can't be found in srcdirs, and returns the name of the file.
@@ -313,14 +314,14 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     # on commit
     for prefix in networkPrefixes:
         if name.startswith(prefix):
-            return fetchURL(cfg, name, location)
+            return fetchURL(cfg, name, location, httpHeaders)
 
     # could not find it anywhere
     return None
 
 
-def findAll(cfg, repcache, name, location, srcdirs, autoSource=False):
-    f = searchAll(cfg, repcache, name, location, srcdirs, autoSource)
+def findAll(cfg, repcache, name, location, srcdirs, autoSource=False, httpHeaders={}):
+    f = searchAll(cfg, repcache, name, location, srcdirs, autoSource, httpHeaders=httpHeaders)
     if not f:
 	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
     return f

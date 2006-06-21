@@ -33,8 +33,9 @@ from conary.build import action, errors
 
 class _Source(action.RecipeAction):
     keywords = {'rpm': '',
-		'dir': '',
-		'keyid': None }
+                'dir': '',
+                'keyid': None,
+                'httpHeaders': {}}
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -127,16 +128,16 @@ class _Source(action.RecipeAction):
 	_extractFilesFromRPM(r, targetfile=c)
 
 
-    def _findSource(self):
+    def _findSource(self, httpHeaders={}):
         if self.rpm:
             # the file was pulled at some point from the RPM, and if it
             # has been committed it is in the repository
             return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
                 self.sourcename, self.recipe.name, self.recipe.srcdirs,
-                autoSource=True)
+                autoSource=True, httpHeaders=httpHeaders)
 
 	return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-	    self.sourcename, self.recipe.name, self.recipe.srcdirs)
+	    self.sourcename, self.recipe.name, self.recipe.srcdirs, httpHeaders=httpHeaders)
 
     def fetch(self):
 	if 'sourcename' not in self.__dict__:
@@ -209,6 +210,12 @@ class Archive(_Source):
     boolean values which determine whether the source code archive is
     actually unpacked, or merely stored in the archive.
 
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
+
     EXAMPLES
     ========
 
@@ -227,6 +234,11 @@ class Archive(_Source):
     C{r.addArchive('ftp://ftp.pbone.net/mirror/ftp.sourceforge.net/pub/sourceforge/g/gc/gcompris/gcompris-7.4-1.i586.rpm')}
 
     Demonstrates use with a binary RPM file accessed via an FTP URL.
+
+    C{r.addArchive('http://ipw2200.sourceforge.net/firmware.php?i_agree_to_the_license=yes&f=%(name)s-%(version)s.tgz', httpHeaders={'Referer': 'http://ipw2200.sourceforge.net/firmware.php?fid=7'})}
+
+    Demonstrates use with a source code archive accessed via an HTTP url, and
+    sending a Referer header through the httpHeader keyword.
     """
 
     def __init__(self, recipe, *args, **keywords):
@@ -251,11 +263,13 @@ class Archive(_Source):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
+    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        when downloading the source code archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 
     def do(self):
-	f = self._findSource()
+	f = self._findSource(self.headers)
 	self._checkSignature(f)
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
@@ -412,6 +426,12 @@ class Patch(_Source):
     boolean values which determine whether the source code archive is
     actually unpacked or merely stored in the archive.
 
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
+
     EXAMPLES
     ========
 
@@ -475,6 +495,8 @@ class Patch(_Source):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
+    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        when downloading the source code archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
@@ -609,6 +631,12 @@ class Source(_Source):
     that determine whether the archive is actually unpacked or merely stored
     in the archive.
 
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
+
     EXAMPLES
     ========
 
@@ -643,8 +671,11 @@ class Source(_Source):
         within a recipe is unnecessary.
     @keyword dest: If set, provides the target name of the file in the build
         directory. A full pathname can be used. Use either B{dir}, or 
-        B{dest} to specify directory information, but not both. Useful mainly        when fetching the file from an source outside your direct control,
-        such as a URL to a third-party web site, or copying a file out of an         RPM package. An absolute C{dest} value will be considered relative to        C{%(destdir)s}, whereas a relative C{dest} value will be considered
+        B{dest} to specify directory information, but not both. Useful mainly
+        when fetching the file from an source outside your direct control, such
+        as a URL to a third-party web site, or copying a file out of an
+        RPM package. An absolute C{dest} value will be considered relative to
+        C{%(destdir)s}, whereas a relative C{dest} value will be considered
         relative to C{%(builddir)s}.
     @keyword dir: The directory in which to store the file, relative to
         the build directory. An absolute C{dir} value will be considered
@@ -672,6 +703,8 @@ class Source(_Source):
     @keyword use: A Use flag or boolean, or a tuple of Use flags and/or
         booleans, that determine whether the archive is actually unpacked or
         merely stored in the archive.
+    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        when downloading the source code archive.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:

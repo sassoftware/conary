@@ -3,6 +3,8 @@ Changes in @VERSION@:
     * Fixed a bug with extracting files containing & or ; in the file names
       e.g. after having been downloaded through a php script with get
       parameters.
+    * Add a parameter to r.addArchive, r.addPatch and r.addSource such that
+      headers can be added to the http request.
   o Client Changes:
     * The migrate command has changed behavior significantly in order to
       make it more useful for updating appliances.  However, this change
