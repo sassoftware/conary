@@ -2028,7 +2028,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < SERVER_VERSIONS[0]:
             raise errors.InvalidClientVersion(
                'Invalid client version %s.  Server accepts client versions %s '
-               '- read http://wiki.conary.com/ConaryConversion' %
+               '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS
 

@@ -124,8 +124,11 @@ errorMessage = '''
 *******************************************************************
 
 For more information, or if you have trouble with the conary-debug
-command, go to http://wiki.conary.com/HowToReportProblems for more
-help.
+command, go to: 
+
+http://wiki.rpath.com/wiki/Conary:How_To_File_An_Effective_Bug_Report
+
+for more help on reporting issues.
 
 To get a debug prompt, rerun this command with --debug-all
 '''

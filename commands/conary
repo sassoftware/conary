@@ -286,7 +286,7 @@ class EmergeCommand(ConaryCommand):
                 return 1
             if info.pw_dir == '/':
                 log.error("The '%s' user's home directory is set to '/'.  "
-                          "See http://wiki.conary.com/ConaryConversion for "
+                          "See http://wiki.rpath.com/wiki/Conary:Conversion for "
                           "assistance."
                           % cookUser)
                 return 1

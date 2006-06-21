@@ -324,7 +324,7 @@ class ServerCache:
                 "While talking to repository " + url + ":\n"
                 "Invalid server version.  Server accepts client "
                 "versions %s, but this client only supports versions %s"
-                " - download a valid client from wiki.conary.com" %
+                " - download a valid client from wiki.rpath.com" %
                 (",".join([str(x) for x in serverVersions]),
                  ",".join([str(x) for x in CLIENT_VERSIONS])))
 
