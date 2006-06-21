@@ -275,7 +275,7 @@ class Archive(_Source):
         util.mkdirChain(destDir)
 
 	if f.endswith(".zip"):
-	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
+	    util.execute("unzip -q -o -d %s '%s'" % (destDir, f))
 
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
@@ -310,7 +310,7 @@ class Archive(_Source):
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            util.execute("%s < %s | %s" % (_uncompress, f, _unpack))
+            util.execute("%s < '%s' | %s" % (_uncompress, f, _unpack))
 
         if guessMainDir:
             bd = self.builddir

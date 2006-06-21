@@ -1,4 +1,8 @@
 Changes in @VERSION@:
+  o Build Changes:
+    * Fixed a bug with extracting files containing & or ; in the file names
+      e.g. after having been downloaded through a php script with get
+      parameters.
   o Client Changes:
     * The migrate command has changed behavior significantly in order to
       make it more useful for updating appliances.  However, this change
