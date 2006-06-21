@@ -269,7 +269,7 @@ class Archive(_Source):
 	_Source.__init__(self, recipe, *args, **keywords)
 
     def do(self):
-	f = self._findSource(self.headers)
+	f = self._findSource(self.httpHeaders)
 	self._checkSignature(f)
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
