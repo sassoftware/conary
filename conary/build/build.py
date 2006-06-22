@@ -100,11 +100,91 @@ class BuildCommand(BuildAction, action.ShellCommand):
     Pure virtual class which implements the do method,
     based on the shell command built from a template.
     """
+    keywords = {'package': None}
     def __init__(self, recipe, *args, **keywords):
 	# enforce pure virtual status
         assert(self.__class__ is not BuildCommand)
 	BuildAction.__init__(self, recipe, *args, **keywords)
 	action.ShellCommand.__init__(self, recipe, *args, **keywords)
+
+        package = None
+        component = None
+
+        if self.package:
+            self.package = self.package % recipe.macros
+            package = self.package
+            if ':' in self.package:
+                (package, component) = self.package.split(':')
+
+            recipe.packages[package] = True
+
+        if component:
+            self.recipe.ComponentSpec(component,
+                                      lambda: self.manifestRegexp(self.package))
+        if package:
+            self.recipe.PackageSpec(package,
+                                      lambda: self.manifestRegexp(self.package))
+
+    def getDestDirItems(self):
+
+        fileList = set()
+
+        destdir = self.recipe.macros.destdir
+
+        skip=len(destdir)
+        for root, dirs, files in os.walk(destdir):
+            topdir = root[skip:]
+            if not topdir:
+                topdir = '/'
+            for name in dirs+files:
+                fileList.add(os.path.join(topdir, name))
+
+        return fileList
+
+    def manifestFile(self, manifest):
+
+        manifestDir = '%s/%s/_MANIFESTS_' \
+            % (util.normpath(self.recipe.cfg.buildPath),
+              self.recipe.name)
+
+        if not os.path.exists(manifestDir):
+            util.mkdirChain(manifestDir)
+
+        manifestFile = '%s/%s.manifest' \
+                       % (manifestDir, manifest)
+
+        return manifestFile
+
+    def manifestRegexp(self, manifest):
+
+        manifestFile = self.manifestFile(manifest)
+
+        log.info("loading specs from '%s.manifest' file" % manifest)
+
+        files = [ re.escape(x[:-1]) for x in open(manifestFile).readlines() ]
+        regexp = '^('+'|'.join(files)+')$'
+
+        return regexp
+
+    def manifestInitialize(self):
+
+        log.info('Manifest: get already installed files')
+
+        self.manifestBefore = self.getDestDirItems()
+
+    def manifestCreate(self):
+
+        log.info('Manifest: get new files')
+
+        files = self.getDestDirItems() - self.manifestBefore
+
+        del self.manifestBefore
+
+        manifestFile = self.manifestFile(self.package)
+        manifest = open(manifestFile, 'a')
+        for file in sorted(list(files)):
+            manifest.write('%s\n' % file)
+        manifest.close()
 
     def do(self, macros):
         """
@@ -116,8 +196,14 @@ class BuildCommand(BuildAction, action.ShellCommand):
         @return: None
         @rtype: None
 	"""
+
+        if self.package:
+            self.manifestInitialize()
+
         util.execute(self.command %macros)
 
+        if self.package:
+            self.manifestCreate()
 
 class Run(BuildCommand):
     """
@@ -209,7 +295,7 @@ class Run(BuildCommand):
 	else:
 	    macros.cdcmd = ''
 
-        util.execute(self.command %macros)
+        BuildCommand.do(self, macros)
 
 class Automake(BuildCommand):
     """
@@ -1027,12 +1113,18 @@ class Ldconfig(BuildCommand):
 
 
 class _FileAction(BuildAction):
-    keywords = {'component': None}
+    keywords = {'component': None, 'package': None}
 
     def __init__(self, recipe, *args, **keywords):
         BuildAction.__init__(self, recipe, *args, **keywords)
         # Add the specified package to the list of packages created by this
         # recipe
+        if self.package:
+            self.package = self.package % recipe.macros
+            if ':' in self.package:
+                self.component = self.package
+            else:
+                self.component = self.package + ':'
         if self.component and self.component.find(':') != -1:
             package = self.component.split(':')[0]
             if package:

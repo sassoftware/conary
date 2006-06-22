@@ -18,6 +18,7 @@ Base classes and data used for all policy
 import imp
 import os
 import sys
+import types
 
 from conary.lib import util, log, graph
 from conary.build import action, errors, filter
@@ -192,7 +193,7 @@ class Policy(action.RecipeAction):
 	(regex, [setmode, [unsetmode]])
 	Create tuple that represents arguments to filter.Filter.__init__
 	"""
-	if type(expression) is str:
+	if type(expression) in (str, types.FunctionType):
 	    return (expression, self.macros)
 	if type(expression) is not list:
 	    expression = list(expression)

@@ -21,6 +21,7 @@ file as it appears in the filesystem.
 import os
 import re
 import stat
+import types
 
 from conary.lib import log
 
@@ -72,6 +73,8 @@ class Filter:
 	self.setmode = setmode
 	self.unsetmode = unsetmode
 	tmplist = []
+        if type(regex) is types.FunctionType:
+            regex = regex()
 	if type(regex) is str:
             try:
                 self.regexp = self._anchor(regex %macros)
