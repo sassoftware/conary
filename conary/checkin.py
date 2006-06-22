@@ -940,7 +940,13 @@ def _determineRootVersion(repos, state):
             # find latest shadowed version
 
             if ver.hasParentVersion():
-                return ver.parentVersion()
+                parentVer = ver.parentVersion()
+                # we need to get the timestamp for this version
+                parentVer = repos.getTroveVersionFlavors(
+                            { name : { parentVer : None } })[name].keys()[0]
+                import epdb
+                epdb.st()
+                return parentVer
         # We must have done a shadow at some point.
         assert(0)
 
