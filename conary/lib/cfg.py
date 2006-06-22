@@ -380,6 +380,9 @@ class SectionedConfigFile(ConfigFile):
     def iterSections(self):
         return self._sections.itervalues()
 
+    def iterSectionNames(self):
+        return self._sections.iterkeys()
+
     def hasSection(self, sectionName):
         return sectionName in self._sections
 
