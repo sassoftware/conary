@@ -311,6 +311,9 @@ class Revision(AbstractRevision):
     def resetTimeStamp(self):
 	self.timeStamp = time.time()
 
+    def clearTimeStamp(self):
+        self.timeStamp = 0
+
     def __init__(self, value, template = None, frozen = False):
 	"""
 	Initialize a Revision object from a string representation
@@ -936,7 +939,8 @@ class Version(VersionSequence):
 
         # if this is a branch, finding the parent is easy
         if isinstance(self.versions[-3], AbstractRevision):
-            return Version(self.versions[:-2])
+            parentVersion = Version(self.versions[:-2])
+            return parentVersion
 
         # this is a shadow. work a bit harder
         items = self.versions[:-2] + [ self.versions[-1].copy() ]
@@ -945,6 +949,8 @@ class Version(VersionSequence):
         items[-1].sourceCount.truncateShadowCount(shadowCount)
         if items[-1].buildCount:
             items[-1].buildCount.truncateShadowCount(shadowCount)
+
+        items[-1].clearTimeStamp()
 
 	return Version(items)
 
