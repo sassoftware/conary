@@ -14,7 +14,9 @@
 
 import getpass
 
-def getPassword(server, userName):
+def getPassword(server, userName=None):
+    if userName is None:
+        return None, None
 
     s = "Enter the password for %s on %s:" % (server, userName)
-    return getpass.getpass(s)
+    return userName, getpass.getpass(s)

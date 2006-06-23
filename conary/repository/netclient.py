@@ -172,25 +172,34 @@ class ServerProxy(xmlrpclib.ServerProxy):
         if self.__pwCallback is None:
             return False
 
-        l = self.__host.split('@')
-        if len(l) != 2: return False
-
-        user, fullHost = l
-        if user[-1] != ':':
-            return False
-
-        user = user[:-1]
-
-        # if there is a port number, strip it off
-        l = fullHost.split(':', 1)
-        if len(l) == 2:
-            host = l[0]
+        l = self.__host.split('@', 1)
+        if len(l) == 1: 
+            fullHost = l[0]
+            user, password = self.__pwCallback(self.__serverName)
+            if not user or not password:
+                return False
+            if not self.__usedMap:
+                # the user didn't specify what protocol to use, therefore
+                # we assume that when we need a user/password we need
+                # to use https
+                self.__transport.https = True
         else:
-            host = fullHost
+            user, fullHost = l
+            if user[-1] != ':':
+                return False
 
-        password = self.__pwCallback(user, self.__serverName)
-        if not password:
-            return False
+            user = user[:-1]
+
+            # if there is a port number, strip it off
+            l = fullHost.split(':', 1)
+            if len(l) == 2:
+                host = l[0]
+            else:
+                host = fullHost
+
+            user, password = self.__pwCallback(self.__serverName, user)
+            if not user or not password:
+                return False
 
         self.__host = '%s:%s@%s' % (user, password, fullHost)
 
@@ -215,11 +224,12 @@ class ServerProxy(xmlrpclib.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback)
 
-    def __init__(self, url, serverName, transporter, pwCallback):
+    def __init__(self, url, serverName, transporter, pwCallback, usedMap):
         xmlrpclib.ServerProxy.__init__(self, url, transporter)
         self.__pwCallback = pwCallback
         self.__altHost = None
         self.__serverName = serverName
+        self.__usedMap = usedMap
 
 class ServerCache:
 
@@ -230,13 +240,12 @@ class ServerCache:
 	self.pwPrompt = pwPrompt
         self.entitlementDir = entitlementDir
 
-    def __getPassword(self, user, host):
-        pw = self.pwPrompt(user, host)
-        if pw is None:
-            return pw
-
+    def __getPassword(self, host, user=None):
+        user, pw = self.pwPrompt(host, user)
+        if user is None or pw is None:
+            return None, None
         self.userMap.append((host, user, pw))
-        return pw
+        return user, pw
 
     def __getitem__(self, item):
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
@@ -271,6 +280,7 @@ class ServerCache:
         # check for an entitlement for this server
         ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
 
+        usedMap = url is not None
         if url is None:
             if ent or userInfo:
                 # if we have a username/password, use https
@@ -291,12 +301,14 @@ class ServerCache:
             assert(not s[1])
             s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
             url = '/'.join(s)
+            usedMap = True
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlement = ent)
 
-        server = ServerProxy(url, serverName, transporter, self.__getPassword)
+        server = ServerProxy(url, serverName, transporter, self.__getPassword,
+                             usedMap = usedMap)
         self.cache[serverName] = server
 
         try:
@@ -350,7 +362,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
-            pwPrompt = lambda x, y: None
+            pwPrompt = lambda x, y: None, None
 
         self.downloadRateLimit = downloadRateLimit
         self.uploadRateLimit = uploadRateLimit
