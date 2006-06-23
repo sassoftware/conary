@@ -9,7 +9,8 @@ Changes in @VERSION@:
       available by using "conary sync --full".  "conary syncchildren"
       has been renamed to "conary sync", and its behavior has also
       been modified slightly as a result.  The old behavior is
-      available by using "conary sync --current". (CNY-477)
+      available by using "conary sync --current". Please read the man
+      page for a full description of the "sync" command as well.  (CNY-477)
 
   o Build Changes:
     * A "package" keyword parameter has been added to build actions,
