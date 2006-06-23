@@ -1,4 +1,4 @@
-Changes in @VERSION@:
+Changes in 1.0.21:
   o Client Changes:
     * The "conary migrate" command has changed behavior significantly
       in order to make it more useful for updating a system to exactly
