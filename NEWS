@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Conary now has hooks for allowing you to be prompted for both name
+      and password when necessary.
+
 Changes in 1.0.21:
   o Client Changes:
     * The "conary migrate" command has changed behavior significantly
