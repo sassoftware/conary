@@ -242,6 +242,14 @@ class Run(BuildCommand):
     except it limits the C{%(destdir)s} substitution to only the tree under
     the given directory.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -340,6 +348,14 @@ class Automake(BuildCommand):
     B{subDir}: (None) Directory in which to re-run C{aclocal}, C{autoconf},
     and C{automake}
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -424,6 +440,14 @@ class Configure(BuildCommand):
     exist.
 
     B{subDir} : (None) Directory in which to run C{configure}
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -615,6 +639,14 @@ class Make(BuildCommand):
     B{subDir} : (The build directory) The directory to enter before running
     C{make}
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -748,6 +780,14 @@ class MakeInstall(Make):
 
     B{installtarget} : (C{install}) The install target to C{make}
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -850,6 +890,20 @@ class Ant(BuildCommand):
     The C{r.Ant()} class is called from within a Conary recipe to execute the 
     C{ant} utility.
 
+    KEYWORDS
+    ========
+
+    The C{r.Ant()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -892,6 +946,20 @@ class JavaCompile(BuildCommand):
 
     The C{r.JavaCompile()} class is called from within a Conary recipe to 
     execute the command defined by C{javacmd}, normally C{javac}.
+
+    KEYWORDS
+    ========
+
+    The C{r.JavaCompile()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -936,6 +1004,20 @@ class CompilePython(BuildCommand):
     optimized and compiled Python bytecode files. The paths specified must be
     absolute paths which are interpreted relative to C{%(destdir)s} in order
     for the paths compiled into the bytecode files to be correct.
+
+    KEYWORDS
+    ========
+
+    The C{r.CompilePython()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -993,6 +1075,9 @@ class PythonSetup(BuildCommand):
 
     KEYWORDS
     ========
+
+    The C{r.PythonSetup()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
 
     The C{r.PythonSetup()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
@@ -1093,6 +1178,20 @@ class Ldconfig(BuildCommand):
     as defined by the C{SharedLibrary} policy, so C{r.Ldconfig} needs
     to be called only for libraries that are not marked as shared
     libraries by the C{SharedLibrary} policy.
+
+    KEYWORDS
+    ========
+
+    The C{r.Ldconfig()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -1235,6 +1334,14 @@ class Desktopfile(BuildCommand, _FileAction):
 
     B{vendor} : (C{net}) A vendor name for the desktop file.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -1334,6 +1441,19 @@ class ClassPath(BuildCommand):
     The C{r.ClassPath()} class is called from within a Conary recipe to set
     the CLASSPATH environment variable using C{r.classpath}.
 
+    KEYWORDS
+    ========
+
+    The C{r.ClassPath()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
     EXAMPLES
     ========
 
@@ -1491,6 +1611,20 @@ class Install(_PutFiles):
     to mode 0755.  If that rule doesn't suffice, use C{mode=0}I{octalmode}
     to set the mode explicitly.
 
+    KEYWORDS
+    ========
+
+    The C{r.Install()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -1530,6 +1664,20 @@ class Copy(_PutFiles):
     of the file created in the destination directory.  The mode of C{srcfile}
     is used for C{destfile} unless you set C{mode=0}I{octalmode}.
 
+    KEYWORDS
+    ========
+
+    The C{r.Copy()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -1565,6 +1713,19 @@ class Move(_PutFiles):
     the file created in the destination directory.  The mode is preserved,
     unless you explicitly set the new mode with C{mode=0}I{octalmode}.
 
+    KEYWORDS
+    ========
+
+    The C{r.Move()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
     EXAMPLES
     ========
 
@@ -1604,6 +1765,14 @@ class Symlink(_FileAction):
 
     The C{r.Symlink()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -1719,6 +1888,20 @@ class Link(_FileAction):
     Hardlinks are limited to the same directory and symbolic links should
     always be chosen in preference to them.  You should not use hard links
     unless the situation deems using them B{absolutely} necessary.
+
+    KEYWORDS
+    ========
+
+    The C{r.Link()} class accepts the following keywords, with default values
+    shown in parentheses when applicable:
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -2014,6 +2197,14 @@ class Doc(_FileAction):
     B{subdir} : Specify a subdirectory to create before placing documentation
     files into it.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -2092,6 +2283,14 @@ class JavaDoc(Doc):
     B{subdir} : Specify a subdirectory to create before placing documentation
     files into it.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -2151,6 +2350,14 @@ class Create(_FileAction):
     B{macros}  : Whether to interpolate macros into the contents
 
     B{mode} : The mode of the file (defaults to 0644)
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -2221,6 +2428,14 @@ class MakeDirs(_FileAction):
 
     B{mode} : (0755) Specify directory access permissions
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -2287,7 +2502,13 @@ class TestSuite(_FileAction):
     The C{r.TestSuite()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
-    None
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
@@ -2698,6 +2919,14 @@ class XInetdService(_FileAction):
 
     B{otherlines} : (None) Specifies additional service definition lines
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
     C{r.XInetdService('swat', 'SWAT is the Samba Web Admin Tool. Use swat to
@@ -2876,6 +3105,14 @@ class XMLCatalogEntry(BuildCommand):
     B{catalogDir} : (C{'%(sysconfdir)s/xml'}) The directory where the catalog
     file is located.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
@@ -2964,6 +3201,14 @@ class SGMLCatalogEntry(BuildCommand):
 
     B{use} : Optional arguments of Use flag(s) telling whether to actually
     perform the action.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
 
     EXAMPLES
     ========
