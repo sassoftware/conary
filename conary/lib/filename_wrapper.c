@@ -366,7 +366,7 @@ int utimes(const char *pathname, const struct timeval tv[2]) {
     return real_utimes(pathname, tv);
 }
 
-int readlink(const char *pathname, char *buf, size_t bufsiz) {
+ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
     static int (*real_readlink)(const char *pathname, char *buf, size_t bufsiz) = NULL;
     const char *p;
     int ret;
