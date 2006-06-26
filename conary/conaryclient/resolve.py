@@ -16,6 +16,7 @@ import itertools
 from conary import errors
 from conary.lib import log
 from conary.repository import trovesource
+from conary.repository import errors as repoerrors
 from conary.deps import deps
 
 class DepResolutionMethod(object):
@@ -184,9 +185,18 @@ class DepResolutionByLabelPath(DepResolutionMethod):
             return False
 
     def resolveDependencies(self):
-        return self.troveSource.resolveDependencies(
-                        self.installLabelPath[self.index],
-                        self.depList)
+        try:
+            return self.troveSource.resolveDependencies(
+                            self.installLabelPath[self.index],
+                            self.depList)
+        except repoerrors.OpenError, err:
+            log.warning('Could not access %s for dependency resolution: %s' % (
+                                self.installLabelPath[self.index], err))
+            # return an empty result.
+            results = {}
+            for depSet in self.depList:
+                results[depSet] = [ [] for x in depSet.iterDeps() ]
+            return results
 
 class DepResolutionByTroveList(DepResolutionMethod):
     def __init__(self, cfg, db, troveList):

@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Client Changes:
     * Conary now has hooks for allowing you to be prompted for both name
       and password when necessary.
+    * Conary will no longer report a traceback when trying to perform 
+      dependency resolution against repositories that are not available.
+      Instead, it will print out a warning. (CNY-578)
 
 Changes in 1.0.21:
   o Client Changes:
