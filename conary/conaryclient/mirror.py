@@ -1,4 +1,3 @@
-#!/usr/bin/python2.4
 # -*- mode: python -*-
 #
 # Copyright (c) 2006 rPath, Inc.

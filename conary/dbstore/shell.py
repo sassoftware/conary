@@ -1,6 +1,4 @@
-#!/usr/bin/python
-#
-# Copyright (c) 2006 rPath, Inc.
+# Copyright (C) 2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
