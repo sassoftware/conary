@@ -340,7 +340,8 @@ class CfgList(CfgType):
             yield '[]'
         else:
             for val in value:
-                yield self.valueType.format(val, displayOptions)
+                for str in self.valueType.toStrings(val, displayOptions):
+                    yield str
 
 
 
