@@ -18,6 +18,7 @@ import fnmatch
 import os
 import sys
 import xml
+import re
 
 from conary.deps import deps, arch
 from conary.lib import util
@@ -153,10 +154,14 @@ class CfgFlavor(CfgType):
 
 
 class CfgFingerPrintMapItem(CfgType):
-    
     def parseString(self, val):
         val = val.split(None, 1)
         label = val[0]
+        try:
+            # compile label to verify that it is valid
+            re.compile(label)
+        except Exception, e:
+            raise ParseError, "Invalid regexp: '%s': " % label + str(e)
 
         if len(val) == 1 or not val[1] or val[1].lower() == 'none':
             fingerprint = None
