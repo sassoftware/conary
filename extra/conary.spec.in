@@ -105,6 +105,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir /var/lib/conarydb
 
 %files repository
+%defattr(-,root,root,-)
 %{pythonlib}/repository/netrepos
 %{pythonlib}/repository/shimclient.py*
 %{pythonlib}/web
