@@ -22,9 +22,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <unistd.h>
 #include <utime.h>
 #include <dirent.h>
+
+/* we can not include <unistd.h> here because we're overriding most of
+   its function prototypes. We still need a getpid() prototype though */
+extern pid_t getpid(void) __THROW;
 
 #define PRINTF(...)
 /* #define PRINTF(...) fprintf(stderr, __VA_ARGS__) */
@@ -366,7 +369,7 @@ int utimes(const char *pathname, const struct timeval tv[2]) {
     return real_utimes(pathname, tv);
 }
 
-int readlink(const char *pathname, char *buf, size_t bufsiz) {
+ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
     static int (*real_readlink)(const char *pathname, char *buf, size_t bufsiz) = NULL;
     const char *p;
     int ret;

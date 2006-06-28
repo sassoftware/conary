@@ -1,5 +1,3 @@
-#!/usr/bin/python
-#
 # Copyright (c) 2005 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,

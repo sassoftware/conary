@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
 # Copyright (c) 2004-2006 rPath, Inc.

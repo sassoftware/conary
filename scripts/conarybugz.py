@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (C) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,7 +18,7 @@
 Keeps bugzilla up to date with repositories.  Needs to be driven with
 a script that contains local information; something like the following:
 
-#!/usr/bin/python
+#!/usr/bin/env python2.4
 
 import os
 import re

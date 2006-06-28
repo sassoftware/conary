@@ -1,7 +1,4 @@
-#!/usr/bin/env python2.4
-# -*- python -*-
-#
-# Copyright (c) 2004 rPath, Inc.
+# Copyright (c) 2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,8 +11,24 @@
 # full details.
 #
 
-from conary import cvcdesc
-import sys
+TOPDIR = ..
 
-if __name__ == "__main__":
-    sys.exit(cvcdesc.main())
+extra_files = Makefile conary.spec.in
+
+dist_files = conary.spec $(extra_files)
+
+all : conary.spec
+
+conary.spec : conary.spec.in $(TOPDIR)/Makefile
+	sed s,@version@,$(VERSION),g $< > $@
+
+install :
+
+dist : $(dist_files) default-dist
+
+clean : default-clean
+	rm -f conary.spec
+
+include $(TOPDIR)/Make.rules
+
+.PHONY: clean dist install

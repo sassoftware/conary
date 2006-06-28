@@ -29,10 +29,10 @@ export conarylibdir = $(libdir)/conary
 export conarylibexecdir = $(libexecdir)/conary
 
 minimal:
-	NO_KID=1 $(MAKE) all 
+	NO_KID=1 $(MAKE) all
 
 
-SUBDIRS=commands conary config man scripts
+SUBDIRS = commands conary config man scripts extra
 
 extra_files = \
 	LICENSE			\
@@ -76,8 +76,6 @@ tag:
 	hg tag conary-$(VERSION)
 
 clean: clean-subdirs default-clean
-	rm -f _sqlite.so _sqlite3.so
-	rm -rf sqlite sqlite3
 
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
