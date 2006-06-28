@@ -344,14 +344,15 @@ class TroveStore:
         # It is possible that NewFiles could have two entries for the same
         # fileId - one NULL and one with stream data.  In that case, we want
         # to insert the one with stream data - and MIN(NULL, data) always
-        # returns data.  
+        # returns data. Same idea for the MINon the sha1.
         # TODO: rework so that fileId in NewFiles is uniquely indexed, and
         # catch an exception when trying to insert a second item with the same
         # fileId.  Then, remove the GROUP BY and MIN bits here.
         cu.execute("""
         INSERT INTO FileStreams
-            (fileId, stream)
-        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream)
+            (fileId, stream, sha1)
+        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream),
+                        MIN(NewFiles.sha1)
         FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
         WHERE FileStreams.streamId is NULL GROUP BY fileId
         """)
@@ -847,11 +848,15 @@ class TroveStore:
                 cont = files.frozenFileContentInfo(fileStream)
                 sha1 = cont.sha1()
 
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
-		       (cu.binary(pathId), versionId, cu.binary(fileId), 
-                        cu.binary(fileStream), path))
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, ?, ?, ?)""",
+                       (cu.binary(pathId), versionId, cu.binary(fileId), 
+                        cu.binary(fileStream), path, cu.binary(sha1)))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)",
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, NULL, ?, NULL)""",
 		       (cu.binary(pathId), versionId, cu.binary(fileId), path))
 
     def getFile(self, pathId, fileId):

@@ -1386,6 +1386,7 @@ def setupTempTables(db):
             versionId   INTEGER,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             path        VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
