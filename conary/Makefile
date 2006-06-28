@@ -71,5 +71,6 @@ dist: default-dist
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
 	rm -rf sqlite sqlite3
+	rm -f constants.py
 
 include ../Make.rules

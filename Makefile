@@ -76,8 +76,6 @@ tag:
 	hg tag conary-$(VERSION)
 
 clean: clean-subdirs default-clean
-	rm -f _sqlite.so _sqlite3.so
-	rm -rf sqlite sqlite3
 
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel

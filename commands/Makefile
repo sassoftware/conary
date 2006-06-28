@@ -41,5 +41,7 @@ install: install-mkdirs
 dist: default-dist
 
 clean: default-clean
+	rm -rf $(TOPDIR)/bin
+
 
 include $(TOPDIR)/Make.rules
