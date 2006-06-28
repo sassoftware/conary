@@ -29,10 +29,10 @@ export conarylibdir = $(libdir)/conary
 export conarylibexecdir = $(libexecdir)/conary
 
 minimal:
-	NO_KID=1 $(MAKE) all 
+	NO_KID=1 $(MAKE) all
 
 
-SUBDIRS=commands conary config man scripts
+SUBDIRS = commands conary config man scripts extra
 
 extra_files = \
 	LICENSE			\
