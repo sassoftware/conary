@@ -142,6 +142,12 @@ class CvcCommand(options.AbstractCommand):
             cfg.installLabelPath = l
             del argSet['install-label']
 
+        for k,v in cfg.environment.items():
+            if v == '':
+                cfg.environment.pop(k)
+                os.environ.pop(k, None)
+                continue
+            os.environ[k] = v
 
 class AddCommand(CvcCommand):
     commands = ['add']

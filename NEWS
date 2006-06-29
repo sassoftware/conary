@@ -6,6 +6,12 @@ Changes in @NEW@:
       dependency resolution against repositories that are not available.
       Instead, it will print out a warning. (CNY-578)
 
+  o Build Changes:
+    * It is now possible to set environment variables to use within
+      Conary builds from within conary configuration files, using the
+      new "environment" configuration item.  Thanks to Pavel
+      Volkovitskiy for implementing this feature. (CNY-592)
+
 Changes in 1.0.21:
   o Client Changes:
     * The "conary migrate" command has changed behavior significantly

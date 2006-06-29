@@ -662,6 +662,12 @@ entries when committing changes to source components.
 The path to the Conary database on the local system.  It is relative
 to \fBroot\fP (see below) and should normally not be changed.
 .TP
+.B environment
+Provides an environment variable and its associated value to which to
+set it (or, if no value is provided, the environment variable to unset)
+while building packages.  These may be set within contexts, and the
+values may include macros.
+.TP
 .B excludeTroves
 The regular expression of a trove name to exclude when doing updates.
 Multiple regular expressions can be specified with mutiple excludeTrove

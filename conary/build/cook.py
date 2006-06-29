@@ -713,6 +713,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
 
+    for k, v in cfg.environment.items():
+        os.environ[k] = v % recipeObj.macros
+
     recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
     recipeObj.sourceVersion = sourceVersion

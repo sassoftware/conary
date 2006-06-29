@@ -231,6 +231,7 @@ class ConaryContext(ConfigSection):
     buildLabel            =  CfgLabel
     buildPath             =  None
     contact               =  None
+    environment           =  CfgDict(CfgString)
     excludeTroves         =  CfgRegExpList
     flavor                =  CfgList(CfgFlavor)
     lookaside             =  CfgPath
@@ -273,6 +274,7 @@ class ConaryConfiguration(SectionedConfigFile):
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
+    environment           =  CfgDict(CfgString)
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
