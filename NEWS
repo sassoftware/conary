@@ -12,6 +12,10 @@ Changes in @NEW@:
       new "environment" configuration item.  Thanks to Pavel
       Volkovitskiy for implementing this feature. (CNY-592)
 
+  o Bug Fixes:
+    * A bug that would allow recursively generated changesets to
+      potentially have missing redirect flags has been fixed.
+
 Changes in 1.0.21:
   o Client Changes:
     * The "conary migrate" command has changed behavior significantly
