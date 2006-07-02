@@ -682,6 +682,8 @@ class TroveStore:
                             TroveRedirects.branchId = Branches.branchId
                         LEFT OUTER JOIN Flavors ON
                             TroveRedirects.flavorId = Flavors.flavorId
+                    ORDER BY
+                        gtlInst.idx
                     """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
 
