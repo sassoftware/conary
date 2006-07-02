@@ -20,7 +20,7 @@ from conary import conarycfg
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import resolve
 from conary.deps import deps
-from conary.errors import ClientError
+from conary.errors import ClientError, InternalConaryError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
@@ -1993,6 +1993,8 @@ conary erase '%s=%s[%s]'
                                        installMissing = installMissing,
                                        removeNotByDefault = removeNotByDefault)
 
+        self._validateJob(jobSet)
+
         updateThreshold = self.cfg.updateThreshold
 
         # When keep existing is provided none of the changesets should
@@ -2111,6 +2113,26 @@ conary erase '%s=%s[%s]'
 
         return (uJob, suggMap)
 
+    def _validateJob(self, jobSet):
+        # sanity check for jobSet - never allow a job that would add 
+        # or remove the same trove twice to be applied to the system.
+        oldTroves = [ (x[0], x[1]) for x in jobSet if x[1][0]]
+        if not len(oldTroves) == len(set(oldTroves)):
+            extraTroves = set(x for x in oldTroves if oldTroves.count(x) > 1)
+            raise InternalConaryError(
+                            "Update tries to remove same trove twice:\n    "
+                              + '\n    '.join('%s=%s[%s]' % ((x[0],) + x[1]) 
+                                              for x in sorted(extraTroves)))
+
+        newTroves = [ (x[0], x[2]) for x in jobSet if x[2][0]]
+        if not len(newTroves) == len(set(newTroves)):
+            extraTroves = [ x for x in newTroves if newTroves.count(x) > 1 ]
+            raise InternalConaryError(
+                             "Update tries to add same trove twice:\n    "
+                              + '\n    '.join('%s=%s[%s]' % ((x[0],) + x[1]) 
+                                              for x in sorted(extraTroves)))
+
+
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback(),
@@ -2211,6 +2233,9 @@ conary erase '%s=%s[%s]'
         # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
+
+        self._validateJob(list(itertools.chain(*allJobs)))
+
         if len(allJobs) == 1:
             # this handles change sets which include change set files
             callback.setChangesetHunk(0, 0)
