@@ -34,6 +34,7 @@ from conary import versions
 from conary.build import cook, use, signtrove
 from conary.lib import cfg
 from conary.lib import log
+from conary.lib import openpgpfile
 from conary.lib import openpgpkey
 from conary.lib import options
 from conary.lib import util
@@ -715,7 +716,8 @@ def main(argv=sys.argv):
                             cfg=ccfg)
     except debuggerException, err:
         raise
-    except (errors.ConaryError, errors.CvcError, cfg.CfgError), e:
+    except (errors.ConaryError, errors.CvcError, cfg.CfgError,
+            openpgpfile.PGPError), e:
         if str(e):
             log.error(str(e))
             sys.exit(1)

@@ -45,7 +45,7 @@ from conary import callbacks, commit, conarycfg, constants
 from conary import cscmd, deps, flavorcfg, query, repository
 from conary import queryrep, conaryclient, rollbacks, showchangeset, state
 from conary import trove, updatecmd, verify, versions
-from conary.lib import cfg,cfgtypes,log, openpgpkey, options, util
+from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
 
@@ -1031,7 +1031,8 @@ def main(argv=sys.argv):
         if log.getVerbosity() == log.DEBUG:
             raise
         log.error(str(e))
-    except conary.repository.errors.ConaryError, e:
+    except (conary.repository.errors.ConaryError, 
+            openpgpfile.PGPError), e:
         if not str(e):
             raise
         else:
