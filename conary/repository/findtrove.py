@@ -397,6 +397,8 @@ class QueryByBranch(Query):
             flavor = troveTup[2]
             for dummy, afVersion, afFlavor in affinityTroves:
                 if afVersion.isOnLocalHost():
+                    # FIXME - if the trove source is a not a repository
+                    # then we could search for local troves.
                     self._addLocalTrove(troveTup)
                     continue
 
