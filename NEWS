@@ -15,6 +15,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug that would allow recursively generated changesets to
       potentially have missing redirect flags has been fixed.
+    * A bug in redirect handling when the branch changed but the trove 
+      name didn't has been fixed - conary will do a better job of
+      determining what jobs to perform in this situation. (CNY-602)
 
 Changes in 1.0.21:
   o Client Changes:
