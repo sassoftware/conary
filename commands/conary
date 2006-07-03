@@ -726,7 +726,6 @@ class UpdateCommand(ConaryCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
     docs = {
-        'full'          : 'also remove children that are non-default',
         'from-file'     : 'search changeset(s) for given troves',
         'just-db'       : 'Update db only - Do not modify rest of file system',
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
@@ -837,7 +836,8 @@ class SyncCommand(UpdateCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
     docs = {
-            'current' : 'syncs child troves to this trove w/o updating <pkgname>'
+            'current' : 'syncs child troves to this trove w/o updating <pkgname>',
+            'full'    : 'also remove children that are non-default',
            }
     def addParameters(self, argDef):
         UpdateCommand.addParameters(self, argDef)
