@@ -1279,7 +1279,12 @@ conary erase '%s=%s[%s]'
             installLabelPath = None
 
         if not useAffinity:
-            results.update(searchSource.findTroves(installLabelPath, toFind))
+            if searchSource.isSearchAsDatabase():
+                flavor = None
+            else:
+                flavor = self.cfg.flavor
+            results.update(searchSource.findTroves(installLabelPath, toFind,
+                                                   flavor))
         else:
             if toFind:
                 log.debug("looking up troves w/ database affinity")
@@ -1355,6 +1360,16 @@ conary erase '%s=%s[%s]'
                                                 recurse = recurse)
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
+        if notFound:
+            nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
+            if nonLocal:
+                troveList = '\n   '.join('%s=%s[%s]' % x for x in nonLocal)
+                raise UpdateError(
+                       'Failed to find required troves for update:\n   %s' 
+                        % troveList)
+            jobSet.difference_update(notFound)
+            if not jobSet:
+                raise NoNewTrovesError
         assert(not notFound)
         uJob.getTroveSource().addChangeSet(cs)
         transitiveClosure = set(cs.getJobSet(primaries = False))
@@ -1873,7 +1888,8 @@ conary erase '%s=%s[%s]'
                         resolveRepos = True, syncChildren = False,
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
-                        keepRequired = False, migrate = False):
+                        keepRequired = False, migrate = False, 
+                        useAffinity = True):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1945,7 +1961,6 @@ conary erase '%s=%s[%s]'
 
         uJob = database.UpdateJob(self.db)
 
-        useAffinity = False
         forceJobClosure = False
         resolveSource = None
 
@@ -1971,14 +1986,16 @@ conary erase '%s=%s[%s]'
                 uJob.getTroveSource().addChangeSet(cs,
                                                    includesFileContents = True)
 
-            uJob.setSearchSource(trovesource.stack(csSource, self.repos))
-        elif sync:
+        if sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
+            useAffinity = False
         elif syncChildren:
             uJob.setSearchSource(self.db)
+            useAffinity = False
+        elif fromChangesets:
+            uJob.setSearchSource(trovesource.stack(csSource, self.repos))
         else:
             uJob.setSearchSource(self.repos)
-            useAffinity = True
 
         if resolveGroupList:
             resolveRepos = False

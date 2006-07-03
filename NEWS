@@ -20,6 +20,10 @@ Changes in @NEW@:
       determining what jobs to perform in this situation. (CNY-599, CNY-602)
     * Errors relating to PGP now just display the error instead of causing 
       conary to traceback. (CNY-591)
+    * Conary sync on a locally cooked trove will no longer traceback (CNY-568)
+    * --from-file and sync now work together.
+    * An AssertionError that was occasionally reached by incorrect repository
+      setups is now a ConaryInternalError
 
 Changes in 1.0.21:
   o Client Changes:
