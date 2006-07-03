@@ -66,8 +66,9 @@ class ClientUpdate:
         troveSet = {}
         redirectHack = {}
 
-        jobsToRemove = set()
-        jobsToAdd = set()
+        jobsToRemove = []
+        jobsToAdd = []
+        transitiveClosureToRemove = []
 
         # We don't have to worry about non-primaries recursively included
         # from the job because groups can't include redirects, so any redirect
@@ -117,7 +118,9 @@ class ClientUpdate:
 
                 if isPrimary:
                     # Don't install a redirect
-                    jobsToRemove.add(job)
+                    jobsToRemove.append(job)
+                else:
+                    transitiveClosureToRemove.append(job)
 
                 if not recurse:
                     raise UpdateError, \
@@ -147,7 +150,7 @@ class ClientUpdate:
                                                      match[1:], True)
                             nextSet.add((isPrimary, redirectJob))
                             if isPrimary:
-                                jobsToAdd.add(redirectJob)
+                                jobsToAdd.append(redirectJob)
 
                     for info in trv.iterTroveList(strongRefs = True):
                         toDoSet.add((False, 
@@ -172,6 +175,10 @@ class ClientUpdate:
         # We may remove some jobs which we add due to redirection chains.
         jobSet.update(jobsToAdd)
         jobSet.difference_update(jobsToRemove)
+
+        # remove redirects from transitive closure
+        transitiveClosure.difference_update(transitiveClosureToRemove)
+        transitiveClosure.difference_update(jobsToRemove)
 
         for l in redirectHack.itervalues():
             outdated = self.db.outdatedTroves(l)
@@ -1019,9 +1026,20 @@ followLocalChanges: %s
         newJob.update(eraseSet)
 
         # items which were updated to redirects should be removed, no matter
-        # what
+        # what - IF there's no job removing them now, we need to add it now.
+        redirects = {}
         for info in set(itertools.chain(*redirectHack.values())):
-            newJob.add((info[0], (info[1], info[2]), (None, None), False))
+            redirects.setdefault(info[0], []).append(info)
+
+        for job in newJob:
+            if job[0] in redirects:
+                redirectList = redirects[job[0]]
+                info = (job[0], job[1][0], job[1][1])
+                if info in redirectList:
+                    redirectList.remove(info)
+        for troveList in redirects.itervalues():
+            for info in set(troveList):
+                newJob.add((info[0], (info[1], info[2]), (None, None), False))
 
         return newJob
 
@@ -1339,7 +1357,7 @@ conary erase '%s=%s[%s]'
                                 self.db, self.repos)
         assert(not notFound)
         uJob.getTroveSource().addChangeSet(cs)
-        transitiveClosure.update(cs.getJobSet(primaries = False))
+        transitiveClosure = set(cs.getJobSet(primaries = False))
         del cs
 
         redirectHack = self._processRedirects(csSource, uJob, jobSet, 
