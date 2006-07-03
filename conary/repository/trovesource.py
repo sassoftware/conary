@@ -218,6 +218,9 @@ class SearchableTroveSource(AbstractTroveSource):
         self._getLeavesOnly = False
         self._flavorCheck = _CHECK_TROVE_STRONG_FLAVOR
 
+    def isSearchAsDatabase(self):
+        return self._allowNoLabel
+
     def getTroveVersionList(self, name, withFlavors=False):
         if withFlavors:
             return [ x[1:] for x in self.trovesByName(name) ]
@@ -939,7 +942,13 @@ class TroveSourceStack(SearchableTroveSource):
                     results[index] = trove
             troveList = newTroveList
         return results
-                    
+
+    def isSearchAsDatabase(self):
+        for source in self.sources:
+            if not source._allowNoLabel:
+                return False
+        return True
+
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False):
@@ -947,13 +956,9 @@ class TroveSourceStack(SearchableTroveSource):
 
         results = {}
 
-        someRequireLabel = False
-        for source in self.sources:
-            if not source._allowNoLabel:
-                assert(labelPath)
-                someRequireLabel = True
-
-                
+        someRequireLabel = not self.isSearchAsDatabase()
+        if someRequireLabel:
+            assert(labelPath)
 
         for source in self.sources[:-1]:
             # FIXME: it should be possible to reuse the trove finder
