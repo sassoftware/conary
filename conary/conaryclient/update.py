@@ -1888,8 +1888,7 @@ conary erase '%s=%s[%s]'
                         resolveRepos = True, syncChildren = False,
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
-                        keepRequired = False, migrate = False, 
-                        useAffinity = True):
+                        keepRequired = False, migrate = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -1964,6 +1963,7 @@ conary erase '%s=%s[%s]'
         forceJobClosure = False
         resolveSource = None
 
+        useAffinity = False
         if fromChangesets:
             # when --from-file is used we need to explicitly compute the
             # transitive closure for our job. we normally trust the 
@@ -1985,17 +1985,15 @@ conary erase '%s=%s[%s]'
                 # a matching comment
                 uJob.getTroveSource().addChangeSet(cs,
                                                    includesFileContents = True)
-
         if sync:
             uJob.setSearchSource(trovesource.ReferencedTrovesSource(self.db))
-            useAffinity = False
         elif syncChildren:
             uJob.setSearchSource(self.db)
-            useAffinity = False
         elif fromChangesets:
             uJob.setSearchSource(trovesource.stack(csSource, self.repos))
         else:
             uJob.setSearchSource(self.repos)
+            useAffinity = True
 
         if resolveGroupList:
             resolveRepos = False

@@ -251,7 +251,6 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
     for path in fromFiles:
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
-    useAffinity = True
 
     # Look for items which look like files in the applyList and convert
     # them into fromChangesets w/ the primary sets
@@ -267,7 +266,6 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
             for trvInfo in cs.getPrimaryTroveList():
                 changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
                       trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
-            useAffinity = False
 
     applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
                                         updateByDefault, allowChangeSets=True)
@@ -290,7 +288,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   updateOnly = updateOnly,
                   removeNotByDefault = removeNotByDefault,
                   installMissing = installMissing,
-                  migrate = migrate, useAffinity = useAffinity)
+                  migrate = migrate)
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -304,9 +302,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   checkPrimaryPins = True, 
                                   syncChildren = False, 
                                   updateOnly = False, 
-                                  removeNotByDefault = False, 
-                                  installMissing = False, migrate = False,
-                                  useAffinity=True):
+                                  removeNotByDefault = False,
+                                  installMissing = False, migrate = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -328,7 +325,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                updateOnly = updateOnly,
                                installMissing = installMissing, 
                                removeNotByDefault = removeNotByDefault,
-                               migrate = migrate, useAffinity = useAffinity)
+                               migrate = migrate)
     except:
         callback.done()
         raise
