@@ -121,7 +121,7 @@ class CvcCommand(options.AbstractCommand):
 
     def setContext(self, cfg, argSet):
         context = cfg.context
-        if os.path.exists('CONARY'):
+        if os.access('CONARY', os.R_OK):
             conaryState = state.ConaryStateFromFile('CONARY')
             if conaryState.hasContext():
                 context = conaryState.getContext()
