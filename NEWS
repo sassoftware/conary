@@ -24,6 +24,8 @@ Changes in @NEW@:
     * --from-file and sync now work together.
     * An AssertionError that was occasionally reached by incorrect repository
       setups is now a ConaryInternalError
+    * A bug when updating to a locally cooked trove when the user had 
+      manually removed files has been fixed. (CNY-604)
 
 Changes in 1.0.21:
   o Client Changes:

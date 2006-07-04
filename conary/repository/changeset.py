@@ -509,8 +509,17 @@ class ChangeSet(streams.StreamSet):
                             origFile.contents.sha1() != newFile.contents.sha1():
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
-		    fsFile = files.FileFromFilesystem(fullPath, pathId,
-				possibleMatch = origFile)
+                    try:
+                        fsFile = files.FileFromFilesystem(fullPath, pathId,
+                                    possibleMatch = origFile)
+                    except OSError, err:
+                        if err.errno == errno.ENOENT:
+                            # the file doesn't exist - the user removed
+                            # it manually.  This will make us store
+                            # just an empty string as contents
+                            fsFile = None
+                        else:
+                            raise
 
                     if (isinstance(fsFile, files.RegularFile) and
                         fsFile.contents.sha1() == origFile.contents.sha1()):

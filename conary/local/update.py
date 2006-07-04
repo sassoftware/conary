@@ -793,7 +793,10 @@ class FilesystemJob:
         # far the most complicated case.
 	for (pathId, headPath, headFileId, headFileVersion), baseFile \
                 in itertools.izip(troveCs.getChangedFileList(), baseFileList):
-            assert(not(pathId in removalList))
+            # NOTE: there used to be an assert(not(pathId in removalList))
+            # here.  But it's possible for this pathId to be set up 
+            # for removal in the local changeset and considered only "changed"
+            # from the repository's point of view.
 
 	    if not fsTrove.hasFile(pathId):
 		# the file was removed from the local system; we're not
