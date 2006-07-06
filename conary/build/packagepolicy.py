@@ -225,7 +225,7 @@ class ComponentSpec(_filterSpec):
     SYNOPSIS
     ========
 
-    C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename:componentname}, I{filterexp}])}
+    C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename}:I{componentname}, I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -236,6 +236,8 @@ class ComponentSpec(_filterSpec):
     first match wins.  After all the recipe-provided expressions are
     evaluated, the default expressions are evaluated.  If no expression
     matches, then the file is assigned to the C{catchall} component.
+    Note that in the C{I{packagename}:I{componentname}} form, the C{:}
+    must be literal, it cannot be part of a macro.
 
     KEYWORDS
     ========
@@ -318,6 +320,15 @@ class ComponentSpec(_filterSpec):
             # until/unless we handle files moving between
             # components
             #self.extraFilters.append(('config', util.literalRegex(config)))
+
+        if args:
+            name = args[0]
+            if ':' in name:
+                package, name = name.split(':')
+                # we've got a package as well as a component, pass it on
+                self.recipe.PackageSpec(package, args[1:])
+                args = (name, ) + args[1:]
+
 	_filterSpec.updateArgs(self, *args, **keywords)
 
     def doProcess(self, recipe):
@@ -331,16 +342,10 @@ class ComponentSpec(_filterSpec):
         for filteritem in itertools.chain(self.invariantFilters,
                                           self.extraFilters,
                                           self.baseFilters):
-            main = ''
 	    name = filteritem[0] % self.macros
-            if ':' in name:
-                main, name = name.split(':')
 	    assert(name != 'source')
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
 	    compFilters.append(filter.Filter(*filterargs))
-            if main:
-                # we've got a package as well as a component, pass it on
-                recipe.PackageSpec(main, filteritem[1:])
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)
 	compFilters.append(filter.Filter('.*', self.macros, name=self.catchall))

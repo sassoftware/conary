@@ -11,6 +11,10 @@ Changes in @NEW@:
       Conary builds from within conary configuration files, using the
       new "environment" configuration item.  Thanks to Pavel
       Volkovitskiy for implementing this feature. (CNY-592)
+    * In previous versions of Conary, calls to r.PackageSpec() would
+      improperly override previous calls to r.ComponentSpec(); now
+      the ordering is preserved.  Thanks to Pavel Volkovitskiy for 
+      this fix. (CNY-613)
 
   o Bug Fixes:
     * A bug that would allow recursively generated changesets to
