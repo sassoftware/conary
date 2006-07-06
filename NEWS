@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.22:
   o Client Changes:
     * Conary now has hooks for allowing you to be prompted for both name
       and password when necessary.
