@@ -1361,7 +1361,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     sys.exit(1)
                 sys.exit(0)
             components, csFile = built
-            for component, version, flavor in components:
+            for component, version, flavor in sorted(components):
                 print "Created component:", component, version,
                 if flavor is not None:
                     print str(flavor).replace("\n", " "),
