@@ -142,7 +142,10 @@ class _AbstractPackageRecipe(Recipe):
 	    util.rmtree(builddir)
 
     def sourceMap(self, path):
-        basepath = os.path.basename(path)
+        if os.path.exists(path):
+            basepath = path
+        else:
+            basepath = os.path.basename(path)
         if basepath in self.sourcePathMap:
             if basepath == path:
                 # we only care about truly different source locations with the
@@ -170,7 +173,10 @@ class _AbstractPackageRecipe(Recipe):
             errlist = []
             for basepath in self.pathConflicts.keys():
                 errlist.extend([x for x in self.pathConflicts[basepath]])
-            raise RecipeFileError, '\n'.join(errlist)
+            raise RecipeFileError("The following file names conflict "
+                                  "(cvc does not currently support multiple"
+                                  " files with the same name from different"
+                                  " locations):\n   " + '\n   '.join(errlist))
 	self.prepSources()
 	files = []
 	for src in self._sources:
