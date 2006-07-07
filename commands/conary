@@ -109,6 +109,7 @@ class ConaryCommand(options.AbstractCommand):
             'full-versions'      : ('Always display complete version strings'),
             'labels'             : 'Always display labels for versions',
             'profile'            : optparse.SUPPRESS_HELP,
+            'lsprof'             : optparse.SUPPRESS_HELP,
             "pubring"            : '',
             'skip-default-config': "Don't read default configs",
             'quiet'              : ('do not display extra information when '
@@ -125,6 +126,7 @@ class ConaryCommand(options.AbstractCommand):
         d["context"] = ONE_PARAM
         d["install-label"] = MULT_PARAM
         d["profile"] = NO_PARAM
+        d["lsprof"] = NO_PARAM
         d["skip-default-config"] = NO_PARAM
         argDef[self.defaultGroup] = d
 
@@ -876,6 +878,7 @@ class UpdateAllCommand(UpdateCommand):
         ConaryCommand.addParameters(self, argDef)
         argDef["items"] = NO_PARAM
         argDef["info"] = NO_PARAM
+        argDef["keep-required"] = NO_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
@@ -902,6 +905,8 @@ class UpdateAllCommand(UpdateCommand):
         if argSet.has_key('replace-files'):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
+
+        kwargs['keepRequired'] = argSet.pop('keep-required', False)
 
         kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)
@@ -987,6 +992,14 @@ class ConaryMain(options.MainHandler):
             profile = True
             del argSet['profile']
 
+        lsprof = False
+        if argSet.has_key('lsprof'):
+            import cProfile
+            prof = cProfile.Profile()
+            prof.enable()
+            lsprof = True
+            del argSet['lsprof']
+
         keyCache = openpgpkey.getKeyCache()
         keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
                                                        cfg.pubRing[-1])
@@ -997,6 +1010,10 @@ class ConaryMain(options.MainHandler):
 
         if profile:
             prof.stop()
+        if lsprof:
+            prof.disable()
+            prof.dump_stats('conary.lsprof')
+            prof.print_stats()
 
         if log.errorOccurred():
             return 1

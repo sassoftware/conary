@@ -450,7 +450,7 @@ def updateConary(cfg, conaryVersion):
     
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
               test = False, showItems = False, checkPathConflicts = True,
-              migrate = False):
+              migrate = False, keepRequired = False):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
 
@@ -483,7 +483,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
                   callback = callback, checkPrimaryPins = False,
                   checkPathConflicts = checkPathConflicts,
                   installMissing = installMissing, 
-                  removeNotByDefault = removeNotByDefault)
+                  removeNotByDefault = removeNotByDefault,
+                  keepRequired = keepRequired)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)

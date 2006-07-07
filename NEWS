@@ -5,6 +5,8 @@ Changes in 1.0.22:
     * Conary will no longer report a traceback when trying to perform 
       dependency resolution against repositories that are not available.
       Instead, it will print out a warning. (CNY-578)
+    * "conary updateall" now accepts the --keep-required command line
+      argument.
 
   o Build Changes:
     * It is now possible to set environment variables to use within

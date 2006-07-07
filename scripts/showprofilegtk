@@ -224,8 +224,8 @@ class StatWindow(gtk.Window):
             caller = Caller()
             caller.func = func
             caller.nc = nc
-            caller.tt = stats.stats[func][2]
-            caller.ct = stats.stats[func][3]
+            caller.tt = stats[func][2]
+            caller.ct = stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Parent function')
@@ -240,8 +240,8 @@ class StatWindow(gtk.Window):
             caller = Caller()
             caller.func = func
             caller.nc = nc
-            caller.tt = stats.stats[func][2]
-            caller.ct = stats.stats[func][3]
+            caller.tt = stats[func][2]
+            caller.ct = stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
             self.callerview.get_column(2).set_title('Child function')
@@ -266,13 +266,13 @@ class StatWindow(gtk.Window):
 
     def populate(self, stats):
         callees = {}
-        for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
+        for func, (cc, nc, tt, ct, callers) in stats.iteritems():
             callees.setdefault(func, {})
             for caller, num in callers.iteritems():
                 d = callees.setdefault(caller, {})
                 d[func] = num
 
-        for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
+        for func, (cc, nc, tt, ct, callers) in stats.iteritems():
             stat = ProfileStat()
             stat.func = func
             stat.cc = cc
@@ -360,9 +360,13 @@ if __name__ == '__main__':
     filename = sys.argv[1]
     if ".pickle" in filename:
         f = open(filename)
-        stats = cPickle.load(f)
+        stats = cPickle.load(f).stats
+    elif filename.endswith('.lsprof'):
+        import marshal
+        f = open(filename)
+        stats = marshal.load(f)
     else:
-        stats = hotshot.stats.load(filename)
+        stats = hotshot.stats.load(filename).stats
 
     app = StatWindow(filename)
     app.populate(stats)
