@@ -736,7 +736,6 @@ class Source(_Source):
 	    self.applymacros = False
 
     def do(self):
-	f = self._findSource()
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -752,6 +751,7 @@ class Source(_Source):
 		pout.write(self.contents)
 	    pout.close()
 	else:
+            f = self._findSource()
 	    if self.applymacros:
 		log.info('applying macros to source %s' %f)
 		pin = file(f)
