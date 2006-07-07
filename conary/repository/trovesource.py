@@ -355,7 +355,7 @@ class SearchableTroveSource(AbstractTroveSource):
                                      _GET_TROVE_ALL_VERSIONS, bestFlavor)
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor=True):
-        """ Takes {n : { Version : [f,...]} dict """
+        """ Takes {n : { Version : [f,...]}} dict """
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH,
                                      _GET_TROVE_VERY_LATEST, bestFlavor)
 
@@ -364,7 +364,7 @@ class SearchableTroveSource(AbstractTroveSource):
                                      _GET_TROVE_ALL_VERSIONS, bestFlavor)
 
     def getTroveVersionFlavors(self, troveSpecs, bestFlavor=True):
-        """ Takes {n : { Version : [f,...]} dict """
+        """ Takes {n : { Version : [f,...]}} dict """
         return self._getTrovesByType(troveSpecs, 
                                      _GTL_VERSION_TYPE_VERSION, 
                                      _GET_TROVE_ALL_VERSIONS, 
