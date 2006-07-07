@@ -216,11 +216,14 @@ def _searchCache(cfg, name, location):
 
 def _searchRepository(cfg, repCache, name, location):
     """searches repository, and retrieves to cache"""
+    if repCache.hasFileName(name):
+	log.info('found %s in repository', name)
+	return repCache.cacheFile(cfg, name, location, name)
     basename = os.path.basename(name)
-
     if repCache.hasFileName(basename):
 	log.info('found %s in repository', name)
-	return repCache.cacheFile(cfg, name, location)
+	return repCache.cacheFile(cfg, basename, location, basename)
+
 
     return None
 
@@ -287,7 +290,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     autoSource should be True when the file has been pulled from an RPM,
     and so has no path associated but is still auto-added
     """
-    if '/' not in name and not autoSource:
+    if name[0] != '/' and not autoSource:
         # these are files that do not have / in the name and are not
         # indirectly fetched via RPMs, so we look in the local directory
         f = util.searchFile(name, srcdirs)
@@ -337,9 +340,8 @@ class RepositoryCache:
     def hasFileName(self, fileName):
 	return fileName in self.nameMap
 
-    def cacheFile(self, cfg, fileName, location):
+    def cacheFile(self, cfg, fileName, location, basename):
 	cachedname = createCacheName(cfg, fileName, location)
-        basename = os.path.basename(fileName)
 
         if basename in self.cacheMap:
             # don't check sha1 twice

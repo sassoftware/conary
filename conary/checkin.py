@@ -272,9 +272,12 @@ def commit(repos, cfg, message, callback=None, test=False):
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
         if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
-            try:
-                recipeObj.setup()
-            except AttributeError:
+            if hasattr(recipeObj, 'setup'):
+                try:
+                    recipeObj.setup()
+                except Exception, err:
+                    raise errors.CvcError('Error calling setup: %s' % err)
+            else:
                 log.error('you need a setup method for your recipe')
 
         try:
