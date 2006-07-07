@@ -44,6 +44,8 @@ Changes in 1.0.22:
       manually removed files has been fixed. (CNY-604)
     * CONARY files that are not accessible will no longer cause conary to
       traceback when trying to read context from them. (CNY-456)
+    * signatureKeyMap configuration entries are now checked to ensure
+      they are valid. (CNY-531)
 
 Changes in 1.0.21:
   o Client Changes:
