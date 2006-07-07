@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Subdirectories within source components are now better supported.
+      Specifically, different subdirectories with the same filename will
+      now work. (CNY-617)
+
 Changes in 1.0.22:
   o Client Changes:
     * Conary now has hooks for allowing you to be prompted for both name
