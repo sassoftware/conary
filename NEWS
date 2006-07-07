@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o API Changes:
+    * Expose the interface to create Groups in ConaryClient.
+
   o Client Changes:
     * "conary updateall" now accepts the --keep-required command line
       argument.

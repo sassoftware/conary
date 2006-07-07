@@ -595,6 +595,7 @@ class NetworkAuthorization:
         cu = self.db.transaction()
         ugid = self._addGroup(cu, userGroupName)
         self.db.commit()
+        return ugid
 
     def renameGroup(self, currentGroupName, userGroupName):
         cu = self.db.cursor()

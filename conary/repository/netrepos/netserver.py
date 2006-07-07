@@ -69,6 +69,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     publicCalls = set([ 'addUser',
                         'addUserByMD5',
                         'deleteUserByName',
+                        'addGroup',
                         'setUserGroupCanMirror',
                         'addAcl',
                         'editAcl',
@@ -357,6 +358,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         #Base64 decode salt
         self.auth.addUserByMD5(user, base64.decodestring(salt), newPassword)
         return True
+
+    def addGroup(self, authToken, clientVersion, groupName):
+        if not self.auth.check(authToken, admin=True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], groupName)
+        return self.auth.addGroup(groupName)
 
     def deleteUserByName(self, authToken, clientVersion, user):
         if not self.auth.check(authToken, admin = True):
