@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 
-from conary.lib import log, magic
+from conary.lib import debugger, log, magic
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
