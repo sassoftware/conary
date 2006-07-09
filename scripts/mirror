@@ -36,7 +36,7 @@ import optparse
 
 #sys.excepthook = util.genExcepthook(debug=True)
 
-def parseArgs():
+def parseArgs(argv):
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
@@ -55,7 +55,7 @@ def parseArgs():
                       action = "store_true", default = False,
                       help = "display information on what is going on")
 
-    (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args(argv)
 
     if options.configFile is None:
         print >> sys.stderr, 'a mirror configuration must be provided'
@@ -67,43 +67,52 @@ def parseArgs():
     return options
 
 
-options = parseArgs()
-cfg = mirror.MirrorConfiguration()
-cfg.read(options.configFile, exception = True)
+def main(argv=sys.argv[1:]):
+    options = parseArgs(argv)
+    cfg = mirror.MirrorConfiguration()
+    cfg.read(options.configFile, exception = True)
 
-if options.verbose:
-    log.setVerbosity(log.DEBUG)
+    if options.verbose:
+        log.setVerbosity(log.DEBUG)
 
-if cfg.lockFile:
-    try:
-        log.debug('checking for lock file')
-        lock = open(cfg.lockFile, 'w')
-        fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
-    except IOError:
-        log.debug('lock held by another process, exiting')
-        sys.exit(0)
+    if cfg.lockFile:
+        try:
+            log.debug('checking for lock file')
+            lock = open(cfg.lockFile, 'w')
+            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError:
+            log.debug('lock held by another process, exiting')
+            sys.exit(0)
 
 
-# We need two repos clients, one for the server and one for the client. Since
-# they have the same name (the repositorymap gets us to the right hosts).
-sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
-                          cfg.source.user,
-                          uploadRateLimit = cfg.uploadRateLimit,
-                          downloadRateLimit = cfg.downloadRateLimit,
-                          entitlementDir = cfg.entitlementDirectory)
+    # We need two repos clients, one for the server and one for the client. Since
+    # they have the same name (the repositorymap gets us to the right hosts).
+    sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
+                              cfg.source.user,
+                              uploadRateLimit = cfg.uploadRateLimit,
+                              downloadRateLimit = cfg.downloadRateLimit,
+                              entitlementDir = cfg.entitlementDirectory)
 
-targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
-                          cfg.target.user,
-                          uploadRateLimit = cfg.uploadRateLimit,
-                          downloadRateLimit = cfg.downloadRateLimit,
-                          entitlementDir = cfg.entitlementDirectory)
+    targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
+                              cfg.target.user,
+                              uploadRateLimit = cfg.uploadRateLimit,
+                              downloadRateLimit = cfg.downloadRateLimit,
+                              entitlementDir = cfg.entitlementDirectory)
 
-# we pass in the sync flag only the first time around, because after
-# that we need the targetRepos mark to advance accordingly after being
-# reset to -1
-count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                test = options.test, sync = options.sync,
-                                syncSigs = options.syncSigs)
-while count:
+    # we pass in the sync flag only the first time around, because after
+    # that we need the targetRepos mark to advance accordingly after being
+    # reset to -1
     count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                    test = options.test)
+                                    test = options.test, sync = options.sync,
+                                    syncSigs = options.syncSigs)
+    while count:
+        count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
+                                        test = options.test)
+
+
+def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
+    sys.exit(main(argv))
+
+
+if __name__ == '__main__':
+    sys.exit(main())
