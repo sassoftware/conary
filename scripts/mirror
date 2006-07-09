@@ -17,6 +17,7 @@
 
 import os
 import sys
+import fcntl
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
@@ -72,6 +73,16 @@ cfg.read(options.configFile, exception = True)
 
 if options.verbose:
     log.setVerbosity(log.DEBUG)
+
+if cfg.lockFile:
+    try:
+        log.debug('checking for lock file')
+        lock = open(cfg.lockFile, 'w')
+        fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except IOError:
+        log.debug('lock held by another process, exiting')
+        sys.exit(0)
+
 
 # We need two repos clients, one for the server and one for the client. Since
 # they have the same name (the repositorymap gets us to the right hosts).

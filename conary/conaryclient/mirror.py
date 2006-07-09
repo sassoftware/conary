@@ -35,6 +35,7 @@ class MirrorConfiguration(cfg.SectionedConfigFile):
     target                =  MirrorConfigurationSection
     uploadRateLimit       =  (conarycfg.CfgInt, 0)
     downloadRateLimit     =  (conarycfg.CfgInt, 0)
+    lockFile              =  cfg.CfgString
 
     def __init__(self):
         cfg.SectionedConfigFile.__init__(self)
