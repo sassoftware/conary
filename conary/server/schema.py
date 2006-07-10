@@ -880,21 +880,8 @@ def loadSchema(db):
     logMe(1, "current =", version, "required =", VERSION)
     # load the current schema object list
     db.loadSchema()
-    # surely there is a more better way of handling this...
-    if version == 1: version = MigrateTo_2(db)()
-    if version == 2: version = MigrateTo_3(db)()
-    if version == 3: version = MigrateTo_4(db)()
-    if version == 4: version = MigrateTo_5(db)()
-    if version == 5: version = MigrateTo_6(db)()
-    if version == 6: version = MigrateTo_7(db)()
-    if version == 7: version = MigrateTo_8(db)()
-    if version == 8: version = MigrateTo_9(db)()
-    if version == 9: version = MigrateTo_10(db)()
-    if version == 10: version = MigrateTo_11(db)()
-    if version == 11: version = MigrateTo_12(db)()
-    if version == 12: version = MigrateTo_13(db)()
 
-    if version < 13:
+    if version != 0 and version < 13:
         raise sqlerrors.SchemaVersionError("""
         Repository schemas from Conary versions older than 1.0 are not
         supported. Contact rPath for help converting your repository to
