@@ -365,9 +365,9 @@ class Automake(BuildCommand):
     and C{--foreign} arguments to the C{automake} program.
     """
     # note: no use of %(args)s -- to which command would it apply?
-    template = ('cd %%(actionDir)s; '
-                'aclocal %%(m4DirArgs)s %(aclocalArgs)s; '
-		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
+    template = ('cd %%(actionDir)s && '
+                'aclocal %%(m4DirArgs)s %(aclocalArgs)s && '
+		'%(preAutoconf)s autoconf %(autoConfArgs)s && '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
     keywords = {'autoConfArgs': '',
                 'autoMakeArgs': '',
