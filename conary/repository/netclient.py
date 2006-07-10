@@ -464,8 +464,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #Base64 encode salt
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
 
-    def addGroup(self, label, groupName):
-        return self.c[label].addGroup(groupName)
+    def addAccessGroup(self, label, groupName):
+        return self.c[label].addAccessGroup(groupName)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         signature = trove.DigitalSignature()
