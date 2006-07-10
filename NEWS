@@ -15,6 +15,8 @@ Changes in @NEW@:
     * Subdirectories within source components are now better supported.
       Specifically, different subdirectories with the same filename will
       now work. (CNY-617)
+    * The util.literalRegex() function now escapes parenthesis characters.
+      (CNY-630)
 
 Changes in 1.0.22:
   o Client Changes:

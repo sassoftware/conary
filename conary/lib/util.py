@@ -243,7 +243,7 @@ def literalRegex(s):
     "escape all regex magic characters in s"
     l = []
     for character in s:
-        if character in '+*[].&^$+{}\\':
+        if character in '+*[].&^$+{}()\\':
             l.append('\\')
         l.append(character)
     return ''.join(l)
