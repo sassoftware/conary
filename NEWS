@@ -20,6 +20,8 @@ Changes in @NEW@:
       now work. (CNY-617)
     * The util.literalRegex() function now escapes parenthesis characters.
       (CNY-630)
+    * Manifest files now handle file names containing "%" characters.
+      Fix from Pavel Volkovitskiy. (CNY-627)
 
 Changes in 1.0.22:
   o Client Changes:
