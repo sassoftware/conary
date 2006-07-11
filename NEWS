@@ -1,9 +1,10 @@
 Changes in @NEW@:
-  o API Changes:
-    * Expose the interface to create, list and delete access groups and
-      modify the users therein through ConaryClient.
-    * Expose the interface to delete entitlement groups through
+  o API Additions:
+    * The interface to create, list and delete access groups and
+      modify the users therein through is now exposed though
       ConaryClient.
+    * The interface to delete entitlement groups is now exposed
+      through ConaryClient.
 
   o Client Changes:
     * "conary updateall" now accepts the --keep-required command line
