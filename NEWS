@@ -9,6 +9,13 @@ Changes in @NEW@:
     * "conary updateall" now accepts the --keep-required command line
       argument.
 
+  o Server Changes:
+    * The repository database migration code now reports an error when
+      trying to migrate old-style redirects.  The code to perform the
+      migration is incomplete and creates invalid new-style
+      redirects.  If you have a repository with old-style redirects,
+      contact rPath for assistance with your migration. (CNY-590)
+
   o Bug Fixes:
     * Subdirectories within source components are now better supported.
       Specifically, different subdirectories with the same filename will
