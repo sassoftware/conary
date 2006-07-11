@@ -1264,7 +1264,6 @@ class MigrateTo_13(SchemaMigration):
                         JOIN Items USING (itemId)
                         JOIN Versions ON Instances.versionId = Versions.versionId
                         WHERE isRedirect = 1""")
-        redirects = [ x for x in self.cu ]
 
         for instanceId, name, version in self.cu:
             l = name.split(":")
