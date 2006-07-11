@@ -409,7 +409,8 @@ def createUsers(db):
             userGroupId     INTEGER NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT EntitlementAccessMap_entGroupId_fk
-                FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
+                FOREIGN KEY (entGroupId) REFERENCES
+                                            EntitlementGroups(entGroupId),
             CONSTRAINT EntitlementAccessMap_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
@@ -1352,39 +1353,48 @@ class MigrateTo_13(SchemaMigration):
 class MigrateTo_14(SchemaMigration):
     Version = 14
     def migrate(self):
-        self.cu.execute("""
-        CREATE TABLE FileStreams2(
-            streamId    %(PRIMARYKEY)s,
-            fileId      %(BINARY20)s,
-            stream      %(MEDIUMBLOB)s,
-            sha1        %(BINARY20)s,
-            changed     NUMERIC(14,0) NOT NULL DEFAULT 0
-        ) %(TABLEOPTS)s""" % self.db.keywords)
+        self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
+                        "sha1        %(BINARY20)s" 
+                        % self.db.keywords)
 
         updateCursor = self.db.cursor()
         for (streamId, fileId, stream) in \
                 self.cu.execute("SELECT streamId, fileId, stream FROM "
                                 "FileStreams"):
-            if files.frozenFileHasContents(stream):
+            if stream and files.frozenFileHasContents(stream):
                 contents = files.frozenFileContentInfo(stream)
                 sha1 = contents.sha1()
-            else:
-                sha1 = None
+                updateCursor.execute("""UPDATE FileStreams SET sha1=?
+                                        WHERE streamId=?""",
+                                     sha1, streamId)
 
-            updateCursor.execute("""INSERT INTO FileStreams2
-                                    (streamId, fileId, stream, sha1)
-                                    VALUES (?, ?, ?, ?)""",
-                                 streamId, fileId, stream, sha1)
-
-        self.cu.execute("DROP TABLE FileStreams")
-        self.cu.execute("ALTER TABLE FileStreams2 RENAME TO FileStreams")
-
-        # we need the entitlement group migration stuff
-        assert(0)
+        self.cu.execute("CREATE TABLE Entitlements2 AS SELECT * FROM "
+                        "Entitlements")
+        self.cu.execute("CREATE TABLE EntitlementGroups2 AS SELECT * FROM "
+                        "EntitlementGroups")
+        self.cu.execute("CREATE TABLE EntitlementOwners2 AS SELECT * FROM "
+                        "EntitlementOwners")
+        self.cu.execute("DROP TABLE Entitlements")
+        self.cu.execute("DROP TABLE EntitlementOwners")
+        self.cu.execute("DROP TABLE EntitlementGroups")
 
         # recreate the indexes and triggers
         self.db.loadSchema()
         createTroves(self.db)
+        createUsers(self.db)
+
+        self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
+                        "SELECT entGroup, entGroupId FROM EntitlementGroups2")
+        self.cu.execute("INSERT INTO EntitlementAccessMap (entGroupId, "
+                        "userGroupId) SELECT entGroupId, userGroupId FROM "
+                        "EntitlementGroups2")
+        self.cu.execute("INSERT INTO Entitlements SELECT * FROM Entitlements2")
+        self.cu.execute("INSERT INTO EntitlementOwners SELECT * FROM "
+                        "EntitlementOwners2")
+        self.cu.execute("DROP TABLE Entitlements2")
+        self.cu.execute("DROP TABLE EntitlementGroups2")
+        self.cu.execute("DROP TABLE EntitlementOwners2")
+
         self.db.commit()
 
 # sets up temporary tables for a brand new connection
