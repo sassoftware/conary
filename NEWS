@@ -22,6 +22,8 @@ Changes in @NEW@:
       (CNY-630)
     * Manifest files now handle file names containing "%" characters.
       Fix from Pavel Volkovitskiy. (CNY-627)
+    * Fixed a bug in migrate that caused its behavior to shift when migrating 
+      to the same version that is currently installed.
 
 Changes in 1.0.22:
   o Client Changes:
