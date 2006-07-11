@@ -9,11 +9,6 @@ Changes in @NEW@:
     * "conary updateall" now accepts the --keep-required command line
       argument.
 
-  o Server Changes:
-    * No longer support repository schema migrations for versions of Conary
-      older than 1.0. If you have a repository that old, please contact
-      us for help.
-
   o Bug Fixes:
     * Subdirectories within source components are now better supported.
       Specifically, different subdirectories with the same filename will
