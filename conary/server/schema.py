@@ -1265,6 +1265,15 @@ class MigrateTo_13(SchemaMigration):
                         JOIN Versions ON Instances.versionId = Versions.versionId
                         WHERE isRedirect = 1""")
 
+        redirects = [ x for x in self.cu ]
+        # the redirect conversion code is broken
+        if len(redirects) > 0:
+            msg = ("ERROR: old-style redirects have been found in this "
+                   "repository, but the code to convert them is incomplete. "
+                   "Please contact rPath for support.")
+            logMe(1, msg)
+            raise sqlerrors.SchemaVersionError(msg)
+
         for instanceId, name, version in self.cu:
             l = name.split(":")
             pkgName = l[0]
