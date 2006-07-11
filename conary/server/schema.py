@@ -12,7 +12,7 @@
 # full details.
 #
 
-from conary import versions, trove
+from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, setupTempDepTables
@@ -20,7 +20,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 13
+VERSION = 14
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -468,12 +468,15 @@ def createTroves(db):
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
     db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx",
+                   "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -1333,6 +1336,40 @@ class MigrateTo_13(SchemaMigration):
         # all done for migration to 13
         return self.Version
 
+class MigrateTo_14(SchemaMigration):
+    Version = 14
+    def migrate(self):
+        self.cu.execute("""
+        CREATE TABLE FileStreams2(
+            streamId    %(PRIMARYKEY)s,
+            fileId      %(BINARY20)s,
+            stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
+            changed     NUMERIC(14,0) NOT NULL DEFAULT 0
+        ) %(TABLEOPTS)s""" % self.db.keywords)
+
+        updateCursor = self.db.cursor()
+        for (streamId, fileId, stream) in \
+                self.cu.execute("SELECT streamId, fileId, stream FROM "
+                                "FileStreams"):
+            if files.frozenFileHasContents(stream):
+                contents = files.frozenFileContentInfo(stream)
+                sha1 = contents.sha1()
+            else:
+                sha1 = None
+
+            updateCursor.execute("""INSERT INTO FileStreams2
+                                    (streamId, fileId, stream, sha1)
+                                    VALUES (?, ?, ?, ?)""",
+                                 streamId, fileId, stream, sha1)
+
+        self.cu.execute("DROP TABLE FileStreams")
+        self.cu.execute("ALTER TABLE FileStreams2 RENAME TO FileStreams")
+        # recreate the indexes and triggers
+        self.db.loadSchema()
+        createTroves(self.db)
+        self.db.commit()
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -1358,6 +1395,7 @@ def setupTempTables(db):
             versionId   INTEGER,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             path        VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
@@ -1506,6 +1544,9 @@ def loadSchema(db):
             "Repository schemas from Conary versions older than 1.0 are not "
             "supported. Contact rPath for help converting your repository to "
             "a supported version.")
+
+    # surely there is a more better way of handling this...
+    if version == 13: version = MigrateTo_14(db)()
 
     if version:
         db.loadSchema()
