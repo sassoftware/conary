@@ -70,6 +70,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'addUserByMD5',
                         'deleteUserByName',
                         'addAccessGroup',
+                        'deleteAccessGroup',
+                        'listAccessGroups',
+                        'updateAccessGroupMembers',
                         'setUserGroupCanMirror',
                         'addAcl',
                         'editAcl',
@@ -77,6 +80,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getUserGroups',
                         'addEntitlement',
                         'addEntitlementGroup',
+                        'deleteEntitlementGroup',
                         'addEntitlementOwnerAcl',
                         'deleteEntitlementOwnerAcl',
                         'deleteEntitlement',
@@ -365,6 +369,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], groupName)
         return self.auth.addGroup(groupName)
 
+    def deleteAccessGroup(self, authToken, clientVersion, groupName):
+        if not self.auth.check(authToken, admin=True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], groupName)
+        self.auth.deleteGroup(groupName)
+        return True
+
+    def listAccessGroups(self, authToken, clientVersion):
+        if not self.auth.check(authToken, admin=True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], 'listAccessGroups')
+        return self.auth.getGroupList()
+
+    def updateAccessGroupMembers(self, authToken, clientVersion, groupName, members):
+        if not self.auth.check(authToken, admin=True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], 'updateAccessGroupMembers')
+        self.auth.updateGroupMembers(groupName, members)
+        return True
+
     def deleteUserByName(self, authToken, clientVersion, user):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
@@ -456,6 +480,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             userGroup):
         # self.auth does its own authentication check
         self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
+        return True
+
+    def deleteEntitlementGroup(self, authToken, clientVersion, entGroup):
+        # self.auth does its own authentication check
+        self.auth.deleteEntitlementGroup(authToken, entGroup)
         return True
 
     def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,

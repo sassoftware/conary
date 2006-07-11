@@ -503,6 +503,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteUserById(self, label, userId):
         self.c[label].deleteUserById(userId)
 
+    def deleteAccessGroup(self, label, groupName):
+        self.c[label].deleteAccessGroup(groupName)
+
+    def updateAccessGroupMembers(self, label, groupName, members):
+        self.c[label].updateAccessGroupMembers(groupName, members)
+
     def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
@@ -559,6 +565,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def addEntitlementGroup(self, serverName, entGroup, userGroup):
         return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
 
+    def deleteEntitlementGroup(self, serverName, entGroup):
+        return self.c[serverName].deleteEntitlementGroup(entGroup)
+
     def addEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
         return self.c[serverName].addEntitlementOwnerAcl(userGroup, entGroup)
 
@@ -571,6 +580,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def listEntitlementGroups(self, serverName):
         return self.c[serverName].listEntitlementGroups()
+
+    def listAccessGroups(self, serverName):
+        return self.c[serverName].listAccessGroups()
 
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
