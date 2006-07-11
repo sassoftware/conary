@@ -201,10 +201,12 @@ class EntitlementAuthorization:
         cu.execute("""
         SELECT userGroupId FROM EntitlementGroups
         JOIN Entitlements USING (entGroupId)
+        JOIN EntitlementAccessMap USING (entGroupId)
         WHERE entGroup=? AND entitlement=?
         """, entitlementGroup, entitlement)
 
         userGroupIds = set(x[0] for x in cu)
+
         if self.cacheTimeout:
             # cacheEntry is still set from the cache check above
             self.cache[cacheEntry] = (userGroupIds,
@@ -735,6 +737,8 @@ class NetworkAuthorization:
                    entGroupId)
         cu.execute("DELETE FROM EntitlementGroups WHERE entGroupId=?",
                    entGroupId)
+        cu.execute("DELETE FROM EntitlementAccessMap WHERE entGroupId=?",
+                   entGroupId)
         self.db.commit()
 
     def addEntitlement(self, authToken, entGroup, entitlement):
@@ -807,9 +811,11 @@ class NetworkAuthorization:
             raise errors.GroupNotFound
         assert(len(l) == 1)
         userGroupId = l[0][0]
-        cu.execute("INSERT INTO EntitlementGroups (entGroupId, entGroup, userGroupId) "
-                   "VALUES (NULL, ?, ?)",
-                   (entGroup, userGroupId))
+        cu.execute("INSERT INTO EntitlementGroups (entGroup) "
+                   "VALUES (?)", entGroup)
+        entGroupId = cu.lastrowid
+        cu.execute("INSERT INTO EntitlementAccessMap (entGroupId, userGroupId) "
+                   "VALUES (?, ?)", entGroupId, userGroupId)
         self.db.commit()
 
     def getEntitlementPermGroup(self, authToken, entGroup):

@@ -357,18 +357,12 @@ def createUsers(db):
         CREATE TABLE EntitlementGroups (
             entGroupId      %(PRIMARYKEY)s,
             entGroup        VARCHAR(254) NOT NULL,
-            userGroupId     INTEGER NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT EntitlementGroups_userGroupId_fk
-                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["EntitlementGroups"] = []
         commit = True
     db.createIndex("EntitlementGroups", "EntitlementGroupsEntGroupIdx",
                    "entGroup", unique = True)
-    db.createIndex("EntitlementGroups", "EntitlementGroupsUGIdx",
-                   "userGroupId")
     if createTrigger(db, "EntitlementGroups"):
         commit = True
 
@@ -406,6 +400,25 @@ def createUsers(db):
     db.createIndex("Entitlements", "EntitlementsEgEIdx",
                    "entGroupId, entitlement", unique = True)
     if createTrigger(db, "Entitlements"):
+        commit = True
+
+    if "EntitlementAccessMap" not in db.tables:
+        cu.execute("""
+        CREATE TABLE EntitlementAccessMap(
+            entGroupId      INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT EntitlementAccessMap_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES EntitlementGroups(entGroupId)
+            CONSTRAINT EntitlementAccessMap_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["EntitlementAccessMap"] = []
+        commit = True
+    db.createIndex("EntitlementAccessMap", "EntitlementAccessMapIndex",
+                   "entGroupId, userGroupId", unique = True)
+    if createTrigger(db, "EntitlementAccessMap"):
         commit = True
 
     if commit:
@@ -1365,6 +1378,10 @@ class MigrateTo_14(SchemaMigration):
 
         self.cu.execute("DROP TABLE FileStreams")
         self.cu.execute("ALTER TABLE FileStreams2 RENAME TO FileStreams")
+
+        # we need the entitlement group migration stuff
+        assert(0)
+
         # recreate the indexes and triggers
         self.db.loadSchema()
         createTroves(self.db)
