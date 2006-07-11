@@ -28,6 +28,10 @@ Changes in @NEW@:
     * Fixed a bug in migrate that caused its behavior to shift when migrating 
       to the same version that is currently installed.
 
+  o Build Changes:
+    * The r.addArchive() source action can now unpack Rock Ridge and
+      Joliet ISO images, with some limitations. (CNY-625)
+
 Changes in 1.0.22:
   o Client Changes:
     * Conary now has hooks for allowing you to be prompted for both name

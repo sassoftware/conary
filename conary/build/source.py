@@ -21,6 +21,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 import fcntl
 import gzip
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -239,6 +240,12 @@ class Archive(_Source):
 
     Demonstrates use with a source code archive accessed via an HTTP url, and
     sending a Referer header through the httpHeader keyword.
+
+    C{r.addArchive('http://example.com/downloads/blah.iso', dir='/')}
+
+    Demonstrates unpacking the contents of an iso image directly into
+    the destdir.  Note that only Rock Ridge or Joliet images are handled,
+    and that permissions and special files are not preserved.
     """
 
     def __init__(self, recipe, *args, **keywords):
@@ -294,6 +301,10 @@ class Archive(_Source):
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
 	    _extractFilesFromRPM(f, directory=destDir)
+
+        elif f.endswith(".iso"):
+            log.info("extracting %s into %s", f, destDir)
+            _extractFilesFromISO(f, directory=destDir)
 
 	else:
             m = magic.magic(f)
@@ -898,6 +909,41 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     if targetfile and not os.path.exists(targetfile):
 	raise IOError, 'failed to extract source %s from RPM %s' \
 		       %(filename, os.path.basename(rpm))
+
+
+def _extractFilesFromISO(iso, directory):
+    isoInfo = util.popen("isoinfo -d -i %s" %iso).read()
+    JolietRE = re.compile('Joliet.*found')
+    RockRidgeRE = re.compile('Rock Ridge.*found')
+    if JolietRE.search(isoInfo):
+        isoType = '-J'
+    elif RockRidgeRE.search(isoInfo):
+        isoType = '-R'
+    else:
+        raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
+                      %iso)
+
+    errorMessage = 'extracting ISO %s' %os.path.basename(iso)
+    filenames = util.popen("isoinfo -i %s %s -f" %(iso, isoType)).readlines()
+    filenames = [ x.strip() for x in filenames ]
+
+    for filename in filenames:
+        r = util.popen("isoinfo %s -i %s -x %s" %(isoType, iso, filename))
+        fullpath = '/'.join((directory, filename))
+        dirName = os.path.dirname(fullpath)
+        if not util.exists(dirName):
+            os.makedirs(dirName)
+        else:
+            if not os.path.isdir(dirName):
+                os.remove(dirName)
+                os.makedirs(dirName)
+        w = file(fullpath, "w")
+        while 1:
+            buf = r.read(16384)
+            if not buf:
+                break
+            w.write(buf)
+        w.close()
 
 
 
