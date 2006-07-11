@@ -760,9 +760,8 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE FileStreams")
         self.cu.execute("ALTER TABLE FileStreams2 RENAME TO FileStreams")
         # recreate the indexes and triggers
-        createTroves(self.db)
         self.db.loadSchema()
-
+        createTroves(self.db)
         self.db.commit()
 
 # sets up temporary tables for a brand new connection
