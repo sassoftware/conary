@@ -5,6 +5,8 @@ Changes in @NEW@:
   o Client Changes:
     * "conary updateall" now accepts the --keep-required command line
       argument.
+    * the mirror script now provides download/commit feedback using
+      display callbacks like other conary commands
 
   o Server Changes:
     * No longer support repository schema migrations for versions of Conary

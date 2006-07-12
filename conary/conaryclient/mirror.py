@@ -17,7 +17,7 @@
 import itertools
 import os
 
-from conary import conarycfg
+from conary import conarycfg, callbacks
 from conary.lib import cfg, util, log
 from conary.repository import errors
 
@@ -156,7 +156,8 @@ def buildJobList(repos, groupList):
     return jobList
 
 recursedGroups = set()
-def recurseTrove(sourceRepos, name, version, flavor):
+def recurseTrove(sourceRepos, name, version, flavor,
+                 callback = callbacks.ChangesetCallback()):
     global recursedGroups
     assert(name.startswith("group-"))
     # there's nothing much we can recurse from the source
@@ -172,7 +173,8 @@ def recurseTrove(sourceRepos, name, version, flavor):
     log.debug("recursing group trove: %s=%s[%s]" % (name, version, flavor))
     groupCs = sourceRepos.createChangeSet(
         [(name, (None, None), (version, flavor), True)],
-        withFiles=False, withFileContents = False, recurse = True)
+        withFiles=False, withFileContents = False, recurse = True,
+        callback = callback)
     recursedGroups.add((name, version, flavor))
     ret = []
     for troveCs in groupCs.iterNewTroveList():
@@ -291,7 +293,8 @@ CurrentTestMark = None
 LastBundleSet = None
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
-                     test = False, sync = False, syncSigs = False):
+                     test = False, sync = False, syncSigs = False,
+                     callback = callbacks.ChangesetCallback):
     global CurrentTestMark
     global LastBundleSet
 
@@ -354,7 +357,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         troveSetList = set([x[1] for x in troveList])
         for (mark, (name, version, flavor)) in troveList:
             if name.startswith("group-"):
-                recTroves = recurseTrove(sourceRepos, name, version, flavor)
+                recTroves = recurseTrove(sourceRepos, name, version, flavor,
+                                         callback = callback)
                 # add the results at the end with the current mark
                 for (n,v,f) in recTroves:
                     if (n,v,f) not in troveSetList:
@@ -411,10 +415,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             (outFd, tmpName) = util.mkstemp()
             os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
-            cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False)
+            cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
+                                                 callback = callback)
             log.debug("committing")
-            targetRepos.commitChangeSetFile(tmpName, mirror = True)
+            targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
             os.unlink(tmpName)
+            callback.done()
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
         # compute the max mark of the bundles we comitted

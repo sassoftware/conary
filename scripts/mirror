@@ -29,7 +29,8 @@ else:
 
 sys.path.insert(0, os.path.dirname(fullPath))
 
-from conary.conaryclient import mirror
+from conary.callbacks import ChangesetCallback as EmptyChangesetCallback
+from conary.conaryclient import mirror, callbacks
 from conary.repository import netclient
 from conary.lib import util, log
 import optparse
@@ -66,14 +67,19 @@ def parseArgs(argv):
 
     return options
 
+class ChangesetCallback(callbacks.ChangesetCallback):
+    def done(self):
+        self._message('\r')
 
 def main(argv=sys.argv[1:]):
     options = parseArgs(argv)
     cfg = mirror.MirrorConfiguration()
     cfg.read(options.configFile, exception = True)
+    callback = EmptyChangesetCallback()
 
     if options.verbose:
         log.setVerbosity(log.DEBUG)
+        callback = ChangesetCallback()
 
     if cfg.lockFile:
         try:
@@ -104,10 +110,11 @@ def main(argv=sys.argv[1:]):
     # reset to -1
     count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
                                     test = options.test, sync = options.sync,
-                                    syncSigs = options.syncSigs)
+                                    syncSigs = options.syncSigs,
+                                    callback = callback)
     while count:
         count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                        test = options.test)
+                                        test = options.test, callback = callback)
 
 
 def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
