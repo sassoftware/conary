@@ -125,8 +125,13 @@ class HttpHandler(WebHandler):
             self.req.write(output)
             return apache.OK
         except InsufficientPermission:
-            # ask for a real login.
-            return self._requestAuth()
+            if auth[0] == "anonymous":
+                # if an anonymous user raises InsufficientPermission,
+                # ask for a real login.
+                return self._requestAuth()
+            else:
+                # if a real user raises InsufficientPermission, forbid access.
+                return apache.HTTP_FORBIDDEN
         except InvalidPassword:
             # if password is invalid, request a new one
             return self._requestAuth()
