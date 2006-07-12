@@ -923,6 +923,12 @@ followLocalChanges: %s
                     if job is None:
                         recurseThis = False
                         break
+                    elif (not isPrimary 
+                          and self.cfg.excludeTroves.match(newInfo[0])):
+                        # New trove matches excludeTroves
+                        log.debug('SKIP: trove matches excludeTroves')
+                        recurseThis = False
+                        break
 
                 log.debug('JOB ADDED: %s' % (job,))
                 newJob.add(job)

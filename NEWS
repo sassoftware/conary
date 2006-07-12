@@ -9,6 +9,8 @@ Changes in @NEW@:
   o Client Changes:
     * "conary updateall" now accepts the --keep-required command line
       argument.
+    * the excludeTroves config option will now keep fresh installs from
+      happening when an update job is split due to a pinned trove.
 
   o Server Changes:
     * The repository database migration code now reports an error when
