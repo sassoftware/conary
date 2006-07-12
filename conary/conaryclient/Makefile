@@ -14,6 +14,7 @@
 
 python_files =	__init__.py	\
 		branch.py       \
+		callbacks.py	\
 		clone.py        \
 		cmdline.py      \
 		mirror.py	\
