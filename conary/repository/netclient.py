@@ -1435,9 +1435,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return [ (x[0], self.toVersion(x[1]), self.toFlavor(x[2]))
                             for x in l ]
                     
-    def commitChangeSetFile(self, fName, mirror = False):
+    def commitChangeSetFile(self, fName, mirror = False, callback = None):
         cs = changeset.ChangeSetFromFile(fName)
-        return self._commit(cs, fName, mirror = mirror)
+        return self._commit(cs, fName, mirror = mirror, callback = callback)
 
     def commitChangeSet(self, chgSet, callback = None, mirror = False):
 	(outFd, path) = util.mkstemp()
