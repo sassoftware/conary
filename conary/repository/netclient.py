@@ -581,6 +581,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def listEntitlementGroups(self, serverName):
         return self.c[serverName].listEntitlementGroups()
 
+    def getEntitlementClassAccessGroup(self, serverName, classList):
+        return self.c[serverName].getEntitlementClassAccessGroup(classList)
+
+    def setEntitlementClassAccessGroup(self, serverName, classInfo):
+        return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+
     def listAccessGroups(self, serverName):
         return self.c[serverName].listAccessGroups()
 

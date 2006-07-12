@@ -86,6 +86,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'deleteEntitlement',
                         'listEntitlements',
                         'listEntitlementGroups',
+                        'getEntitlementClassAccessGroup',
+                        'setEntitlementClassAccessGroup',
                         'updateMetadata',
                         'getMetadata',
                         'troveNames',
@@ -509,6 +511,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # list of entitlements being displayed to those the user has
         # permissions to manage
         return self.auth.listEntitlementGroups(authToken)
+
+    def getEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classList):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        return self.auth.getEntitlementClassAccessGroup(authToken, classList)
+
+    def setEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classInfo):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        self.auth.setEntitlementClassAccessGroup(authToken, classInfo)
+        return ""
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,

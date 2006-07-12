@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
 import md5
 import os
 import re
@@ -213,7 +214,6 @@ class EntitlementAuthorization:
                                       time.time() + self.cacheTimeout)
 
         return userGroupIds
-
 
 class NetworkAuthorization:
     def __init__(self, db, serverNameList, cacheTimeout = None, log = None,
@@ -907,12 +907,79 @@ class NetworkAuthorization:
             if not authGroupIds:
                 return []
 
+            # XXX gafton said he'd clean this up
             cu.execute("""SELECT entGroup FROM EntitlementOwners
                             JOIN EntitlementGroups USING (entGroupId)
                             WHERE ownerGroupId IN (%s)""" % 
                        ",".join([ "%d" % x for x in authGroupIds ]))
 
         return [ x[0] for x in cu ]
+
+    def getEntitlementClassAccessGroup(self, authToken, classList):
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        # XXX gafton said he'd clean this up
+        cu.execute("""SELECT entGroup, userGroup FROM EntitlementGroups
+                        LEFT OUTER JOIN EntitlementAccessMap USING (entGroupId)
+                        LEFT OUTER JOIN UserGroups USING (userGroupId)
+                        WHERE entGroup IN (%s)"""
+                   % ",".join([ "'%s'" % x for x in classList]))
+        d = {}
+        for entGroup, userGroup in cu:
+            l = d.setdefault(entGroup, [])
+            if userGroup is not None:
+                l.append(userGroup)
+
+        if len(d) != len(classList):
+            raise errors.GroupNotFound
+
+        return d
+
+    def setEntitlementClassAccessGroup(self, authToken, classInfo):
+        """
+        @param classInfo: Dictionary indexed by entitlement groups, each
+        entry being a list of exactly the user groups that entitlement group 
+        should have map to.
+        @type classInfo: dict
+        """
+        if not self.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+
+        # this would be faster with temporary tables; I doubt it matters
+        # XXX gafton said he'd clean this up
+        cu.execute("""SELECT entGroup, entGroupId FROM EntitlementGroups
+                      WHERE entGroup IN (%s)""" % 
+                   ",".join([ "'%s'" % x for x in classInfo ]))
+        entGroupMap = dict(x for x in cu)
+        if len(entGroupMap) != len(classInfo):
+            raise errors.GroupNotFound
+
+        # XXX gafton said he'd clean this up
+        userGroupsNeeded = set(itertools.chain(*classInfo.itervalues()))
+        cu.execute("""SELECT userGroup, userGroupId FROM UserGroups
+                      WHERE userGroup IN (%s)""" % 
+                   ",".join([ "'%s'" % x for x in userGroupsNeeded ]))
+        userGroupMap = dict(x for x in cu)
+        if len(userGroupMap) != len(userGroupsNeeded):
+            raise errors.GroupNotFound
+
+        # XXX gafton said he'd clean this up
+        cu.execute("""DELETE FROM EntitlementAccessMap
+                      WHERE entGroupId IN (%s)""" %
+                   ",".join([ "%d" % x for x in entGroupMap.itervalues() ]))
+
+        for entGroup, userGroups in classInfo.iteritems():
+            for userGroup in userGroups:
+                cu.execute("""INSERT INTO EntitlementAccessMap
+                              (entGroupId, userGroupId) VALUES (?, ?)""",
+                           entGroupMap[entGroup], userGroupMap[userGroup])
+
+        self.db.commit()
 
 class PasswordCheckParser(dict):
 
