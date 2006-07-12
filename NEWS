@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * The Conary Repository web interface no longer returns a
+      HTTP_FORBIDDEN (403) when a bad password is given by the user.
+      This allows the user to re-try authentication.
+
 Changes in 1.0.23:
   o API Additions:
     * The interface to create, list and delete access groups and
