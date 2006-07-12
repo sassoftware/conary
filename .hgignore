@@ -5,3 +5,8 @@
 .*\.o$
 .*\.so$
 ^tmp/
+bin/conary-wrapper$
+conary/constants.py$
+extra/conary.spec$
+conary/pysqlite3/build
+conary/sqlite3
