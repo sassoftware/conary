@@ -12,6 +12,8 @@
 # full details.
 #
 
+import sys
+
 from conary import versions, trove
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
@@ -1487,19 +1489,10 @@ def loadSchema(db):
     # load the current schema object list
     db.loadSchema()
 
-    # surely there is a more better way of handling this...
-    if version == 1: version = MigrateTo_2(db)()
-    if version == 2: version = MigrateTo_3(db)()
-    if version == 3: version = MigrateTo_4(db)()
-    if version == 4: version = MigrateTo_5(db)()
-    if version == 5: version = MigrateTo_6(db)()
-    if version == 6: version = MigrateTo_7(db)()
-    if version == 7: version = MigrateTo_8(db)()
-    if version == 8: version = MigrateTo_9(db)()
-    if version == 9: version = MigrateTo_10(db)()
-    if version == 10: version = MigrateTo_11(db)()
-    if version == 11: version = MigrateTo_12(db)()
-    if version == 12: version = MigrateTo_13(db)()
+    # instantiate and call appropriate migration objects in succession.
+    while version and version < VERSION:
+        version = (lambda x : sys.modules[__name__].__dict__[ \
+            'MigrateTo_' + str(x + 1)])(version)(db)()
 
     if version != 0 and version < 13:
         raise sqlerrors.SchemaVersionError(
