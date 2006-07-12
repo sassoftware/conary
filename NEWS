@@ -1,22 +1,40 @@
 Changes in @NEW@:
-  o API Changes:
-    * Expose the interface to create Groups in ConaryClient.
+  o API Additions:
+    * The interface to create, list and delete access groups and
+      modify the users therein through is now exposed though
+      ConaryClient.
+    * The interface to delete entitlement groups is now exposed
+      through ConaryClient.
 
   o Client Changes:
     * "conary updateall" now accepts the --keep-required command line
       argument.
     * the mirror script now provides download/commit feedback using
       display callbacks like other conary commands
+    * the excludeTroves config option will now keep fresh installs from
+      happening when an update job is split due to a pinned trove.
 
   o Server Changes:
-    * No longer support repository schema migrations for versions of Conary
-      older than 1.0. If you have a repository that old, please contact
-      us for help.
+    * The repository database migration code now reports an error when
+      trying to migrate old-style redirects.  The code to perform the
+      migration is incomplete and creates invalid new-style
+      redirects.  If you have a repository with old-style redirects,
+      contact rPath for assistance with your migration. (CNY-590)
 
   o Bug Fixes:
     * Subdirectories within source components are now better supported.
       Specifically, different subdirectories with the same filename will
       now work. (CNY-617)
+    * The util.literalRegex() function now escapes parenthesis characters.
+      (CNY-630)
+    * Manifest files now handle file names containing "%" characters.
+      Fix from Pavel Volkovitskiy. (CNY-627)
+    * Fixed a bug in migrate that caused its behavior to shift when migrating 
+      to the same version that is currently installed.
+
+  o Build Changes:
+    * The r.addArchive() source action can now unpack Rock Ridge and
+      Joliet ISO images, with some limitations. (CNY-625)
 
 Changes in 1.0.22:
   o Client Changes:

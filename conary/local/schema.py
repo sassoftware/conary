@@ -846,24 +846,13 @@ def checkVersion(db):
                 raise OldDatabaseSchema
         version = db.setVersion(VERSION)
 
-    # great candidate for some "smart" python foo...
-    if version in [2,3,4]:
+    if version in (2, 3, 4):
         version = MigrateTo_5(db)()
-    if version == 5: version = MigrateTo_6(db)()
-    if version == 6: version = MigrateTo_7(db)()
-    if version == 7: version = MigrateTo_8(db)()
-    if version == 8: version = MigrateTo_9(db)()
-    if version == 9: version = MigrateTo_10(db)()
-    if version == 10: version = MigrateTo_11(db)()
-    if version == 11: version = MigrateTo_12(db)()
-    if version == 12: version = MigrateTo_13(db)()
-    if version == 13: version = MigrateTo_14(db)()
-    if version == 14: version = MigrateTo_15(db)()
-    if version == 15: version = MigrateTo_16(db)()
-    if version == 16: version = MigrateTo_17(db)()
-    if version == 17: version = MigrateTo_18(db)()
-    if version == 18: version = MigrateTo_19(db)()
-    if version == 19: version = MigrateTo_20(db)()
+
+    # instantiate and call appropriate migration objects in succession.
+    while version and version < VERSION:
+        version = (lambda x : sys.modules[__name__].__dict__[ \
+            'MigrateTo_' + str(x + 1)])(version)(db)()
 
     return version
 

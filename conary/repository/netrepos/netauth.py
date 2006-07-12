@@ -649,7 +649,7 @@ class NetworkAuthorization:
             self.db.commit()
 
     def deleteGroup(self, userGroupName, commit = True):
-        return self.deleteGroupById(self._getGroupIdByName(userGroupName), 
+        self.deleteGroupById(self._getGroupIdByName(userGroupName), 
                                     commit)
 
     def deleteGroupById(self, userGroupId, commit = True):

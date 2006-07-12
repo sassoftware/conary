@@ -923,6 +923,12 @@ followLocalChanges: %s
                     if job is None:
                         recurseThis = False
                         break
+                    elif (not isPrimary 
+                          and self.cfg.excludeTroves.match(newInfo[0])):
+                        # New trove matches excludeTroves
+                        log.debug('SKIP: trove matches excludeTroves')
+                        recurseThis = False
+                        break
 
                 log.debug('JOB ADDED: %s' % (job,))
                 newJob.add(job)
@@ -1448,16 +1454,25 @@ conary erase '%s=%s[%s]'
                                     deps.Flavor(), None)
             availableTrv = trove.Trove("@update", versions.NewVersion(),
                                          deps.Flavor(), None)
+            existsTups = []
+            availTups = []
             for troveNVF in db.findByNames([x.getName() for x in troves]):
+                existsTups.append(troveNVF)
                 existsTrv.addTrove(*troveNVF)
 
             for trv in troves:
+                availTups.append(trv.getNameVersionFlavor())
                 availableTrv.addTrove(*trv.getNameVersionFlavor())
+
+            oldTroves = set(existsTups) & set(availTups) # oldVer == newVer
+                                                         # won't show up in 
+                                                         # the diff, so grab
+                                                         # separately
             jobs = availableTrv.diff(existsTrv)[2]
 
-            return db.getTroves([(x[0], x[1][0], x[1][1])
-                                    for x in jobs if x[1][0] ],
-                                withFiles=False)
+            oldTroves.update((x[0], x[1][0], x[1][1]) for x in jobs if x[1][0])
+
+            return db.getTroves(oldTroves, withFiles=False)
 
         toFind = []
         for item in itemList:

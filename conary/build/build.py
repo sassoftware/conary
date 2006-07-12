@@ -163,6 +163,7 @@ class BuildCommand(BuildAction, action.ShellCommand):
 
         files = [ re.escape(x[:-1]) for x in open(manifestFile).readlines() ]
         regexp = '^('+'|'.join(files)+')$'
+        regexp = re.compile(regexp)
 
         return regexp
 
