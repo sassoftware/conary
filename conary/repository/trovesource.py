@@ -302,25 +302,35 @@ class SearchableTroveSource(AbstractTroveSource):
                     versionResults.setdefault(version, []).append(version)
                 else:
                     assert(False)
+
             for queryKey, versionList in versionResults.iteritems():
                 if latestFilter == _GET_TROVE_VERY_LATEST:
                     versionList.sort()
                     versionList.reverse()
                 flavorQuery = versionQuery[queryKey]
                 if (flavorFilter == _GET_TROVE_ALL_FLAVORS or
-                                                 flavorQuery is None):
-
+                                       flavorQuery is None):
                     if latestFilter == _GET_TROVE_VERY_LATEST:
-                        versionList = versionList[:1]
-                    for version in versionList:
+                        flavorsUsed = set()
                         vDict = allTroves.setdefault(name, {})
-                        fSet = vDict.setdefault(version, set())
-                        fSet.update(troves[name][version])
+                        for version in versionList:
+                            for flavor in troves[name][version]:
+                                if flavor in flavorsUsed:
+                                    continue
+                                flavorsUsed.add(flavor)
+                                vDict.setdefault(version, set()).add(flavor)
+                        del flavorsUsed
+                    else:
+                        vDict = allTroves.setdefault(name, {})
+                        for version in versionList:
+                            fSet = vDict.setdefault(version, set())
+                            fSet.update(troves[name][version])
                 else:
                     for qFlavor in flavorQuery:
+                        usedFlavors = set()
                         for version in versionList:
                             flavorList = troves[name][version]
-                            troveFlavors = set() 
+                            troveFlavors = set()
                             if flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
                                 strongFlavors = [x.toStrongFlavor() for x in flavorList]
                                 flavorList = zip(strongFlavors, flavorList)
@@ -337,12 +347,16 @@ class SearchableTroveSource(AbstractTroveSource):
                                 else:
                                     assert(0)
 
-                        
                             if troveFlavors: 
                                 vDict = allTroves.setdefault(name, {})
                                 fSet = vDict.setdefault(version, set())
+                                if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+                                    troveFlavors.difference_update(usedFlavors)
+                                    usedFlavors.update(troveFlavors)
+
                                 fSet.update(troveFlavors)
-                                if latestFilter == _GET_TROVE_VERY_LATEST:
+                                if (latestFilter == _GET_TROVE_VERY_LATEST 
+                                    and flavorFilter == _GET_TROVE_BEST_FLAVOR):
                                     break
         return allTroves
 
