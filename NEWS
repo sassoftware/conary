@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.23:
   o API Additions:
     * The interface to create, list and delete access groups and
       modify the users therein through is now exposed though
