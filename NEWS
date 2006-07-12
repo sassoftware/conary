@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Server Changes:
+    * The server binary access log can now be downloaded by an
+      administrator by visiting the http://servername/conary/log URL.
+
   o Bug Fixes:
     * The Conary Repository web interface no longer returns a
       HTTP_FORBIDDEN (403) when a bad password is given by the user.
