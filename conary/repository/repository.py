@@ -257,7 +257,7 @@ class ChangeSetJob:
     ChangeSetJob provides a to-do list for applying a change set; file
     remappings should have been applied to the change set before it gets
     this far. Derivative classes can override these methods to change the
-    behavior; for example, if addTrove is overridden no pacakges will
+    behavior; for example, if addTrove is overridden no packages will
     make it to the database. The same holds for oldTrove.
     """
 
