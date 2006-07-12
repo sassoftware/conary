@@ -79,7 +79,7 @@ for entry in iterator:
     if entry.user is not None:
         userInfo.append("user=%s" % entry.user)
     if entry.entitlement is not None:
-        userInfo.append("entitlement=%s" % entry.user)
+        userInfo.append("entitlement=%s" % entry.entitlement)
 
     if userInfo:
         userStr = " ".join(userInfo) + " "

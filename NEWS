@@ -31,6 +31,8 @@ Changes in @NEW@:
       Fix from Pavel Volkovitskiy. (CNY-627)
     * Fixed a bug in migrate that caused its behavior to shift when migrating 
       to the same version that is currently installed.
+    * Fixed a bug in the logcat script that caused the entitlement field to
+      display the user information instead. (CNY-629)
 
   o Build Changes:
     * The r.addArchive() source action can now unpack Rock Ridge and
