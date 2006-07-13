@@ -60,7 +60,7 @@
                 <li py:attrs="{'class': (lastchunk in ('', 'main', 'browse', 'troveInfo', 'files')) and 'highlighted' or None}"><a href="browse">Repository Browser</a></li>
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('metadata', 'getMetadata')) and 'highlighted' or None}"><a href="metadata">Metadata</a></li>
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('pgpAdminForm', 'pgpNewKeyForm')) and 'highlighted' or None}"><a href="pgpAdminForm">PGP Keys</a></li>
-                <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'chPassForm', 'addUserForm', 'addPermForm', 'editPermForm', 'manageGroupForm',)) and 'highlighted' or None}"><a href="userlist">Users and Groups</a></li>
+                <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageGroupForm',)) and 'highlighted' or None}"><a href="userlist">Users and Groups</a></li>
                 <li py:if="not isAnonymous" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>
                 <li py:if="hasEntitlements" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementForm', 'addEntGroupForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
             </ul>
