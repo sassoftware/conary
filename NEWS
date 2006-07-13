@@ -2,6 +2,8 @@ Changes in 1.1:
   o Server Changes:
     * Entitlement classes can now provide access to multiple access
       groups
+  o Client Changes:
+    * Conary now supports a --path kw.
 
 Changes in @NEW@:
   o API Additions:

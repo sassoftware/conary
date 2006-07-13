@@ -20,6 +20,7 @@ from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
+from conary.repository import trovesource
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1
@@ -33,7 +34,8 @@ FLAVOR_FILTER_BEST   = 2
 def displayTroves(cfg, troveSpecs=[], 
                   # query options
                   versionFilter=VERSION_FILTER_LATEST, 
-                  flavorFilter=FLAVOR_FILTER_BEST, useAffinity = False,
+                  flavorFilter=FLAVOR_FILTER_BEST, pathList = [],
+                  useAffinity = False,
                   # trove options
                   info = False, digSigs = False, deps = False,
                   showBuildReqs = False, 
@@ -113,7 +115,7 @@ def displayTroves(cfg, troveSpecs=[],
     else:
         affinityDb = None
 
-    troveTups = getTrovesToDisplay(repos, troveSpecs, versionFilter,
+    troveTups = getTrovesToDisplay(repos, troveSpecs, pathList, versionFilter,
                                    flavorFilter, cfg.installLabelPath,
                                    cfg.flavor, affinityDb)
 
@@ -153,7 +155,7 @@ def displayTroves(cfg, troveSpecs=[],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
+def getTrovesToDisplay(repos, troveSpecs, pathList, versionFilter, flavorFilter,
                        labelPath, defaultFlavor, affinityDb):
     """ Finds troves that match the given trove specifiers, using the
         current configuration, and parameters
@@ -183,10 +185,16 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                 d.setdefault(version, []).extend(flavors)
         return resultD
 
-    if troveSpecs:
+    troveTups = []
+    if troveSpecs or pathList:
         # Search for troves using findTroves.  The options we
         # specify to findTroves are determined by the version and 
         # flavor filter.
+        if pathList:
+            troveTups += getTrovesByPath(repos, pathList, versionFilter,
+                                         flavorFilter, labelPath, defaultFlavor)
+            if not troveSpecs:
+                return sorted(troveSpecs)
         troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
                                                         for x in troveSpecs ]
         searchFlavor = defaultFlavor
@@ -229,7 +237,8 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
             # return all flavors that match.
             bestFlavor = False
             acrossFlavors = True
-            getLeaves = True
+            if versionFilter != VERSION_FILTER_ALL:
+                getLeaves = True
         elif flavorFilter == FLAVOR_FILTER_BEST:
             # match install flavor + affinity, could affect rq branch,
             # return best match.
@@ -373,3 +382,40 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                             continue
                     troveTups.append((name, version, flavor))
     return sorted(troveTups)
+
+
+def getTrovesByPath(repos, pathList, versionFilter, flavorFilter, labelPath,
+                    defaultFlavor):
+    if not pathList:
+        return []
+
+    if versionFilter == VERSION_FILTER_ALL:
+        queryFn = repos.getTroveVersionsByPath
+    elif versionFilter == VERSION_FILTER_LEAVES:
+        queryFn = repos.getTroveLeavesByPath
+    elif versionFilter == VERSION_FILTER_LATEST:
+        queryFn = repos.getTroveLeavesByPath
+    else:
+        assert(0)
+
+    allResults = {}
+    for label in labelPath:
+        results = queryFn(pathList, label)
+        for path, tups in results.iteritems():
+            allResults.setdefault(path, []).extend(tups)
+
+    allResults = [ allResults[x] for x in pathList ]
+
+    finalList = [ ]
+    for tupList in allResults:
+        if not tupList:
+            continue
+        source = trovesource.SimpleTroveSource(tupList)
+        source.searchAsRepository()
+        troveNames = set(x[0] for x in tupList)
+        # no affinity when searching by path.
+        results = getTrovesToDisplay(source, troveNames, [],
+                                     versionFilter, flavorFilter, labelPath,
+                                     defaultFlavor, None)
+        finalList.extend(results)
+    return finalList
