@@ -69,7 +69,6 @@ class XMLOpener(urllib.FancyURLopener):
             #print "proxy via http:", host, selector
         if not host: raise IOError, ('http error', 'no host given')
         if user_passwd:
-            import base64
             auth = base64.b64encode(user_passwd)
         else:
             auth = None
