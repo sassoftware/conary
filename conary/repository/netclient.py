@@ -595,7 +595,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def troveNamesOnServer(self, server):
         return self.c[server].troveNames("")
-    
+
+    def getTroveLeavesByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 
+                                           False)
+        return dict([ (x[0],
+                        [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+
+    def getTroveVersionsByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), True)
+        return dict([ (x[0], 
+                       [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+ 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
         # XXX this code should most likely go away, and anything that

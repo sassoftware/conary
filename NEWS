@@ -5,6 +5,9 @@ Changes in 1.1:
     * addEntitlement and deleteEntitlement repository calls replaced 
       by addEntitlements and deleteEntitlements calls
 
+  o Client Changes:
+    * Conary now supports a --path kw.
+
 Changes in @NEW@:
   o API Additions:
     * The interface to create, list and delete access groups and

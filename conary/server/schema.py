@@ -518,6 +518,8 @@ def createTroves(db):
     # FIXME: rename these indexes
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
+    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path")
+
     if createTrigger(db, "TroveFiles"):
         commit = True
 
@@ -1498,6 +1500,16 @@ def setupTempTables(db):
         db.tempTables["hasTrovesTmp"] = True
         db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
                        check = False)
+ 
+    if "trovesByPathTmp" not in db.tempTables:
+        cu.execute("""
+             CREATE TEMPORARY TABLE
+             trovesByPathTmp(
+                 row                 INTEGER,
+                 path                VARCHAR(767)
+             )""")
+        db.tempTables["trovesByPathTmp"] = True
+
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
