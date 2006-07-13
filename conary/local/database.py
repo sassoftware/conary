@@ -935,7 +935,8 @@ class Database(SqlDbRepository):
                 # changeset from a repository
                 jobList = []
                 for trvCs in reposCs.iterNewTroveList():
-                    if not trvCs.isRedirect(): continue
+                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT: 
+                        continue
                     jobList.append((trvCs.getName(),
                                 (trvCs.getOldVersion(), trvCs.getOldFlavor()),
                                 (trvCs.getNewVersion(), trvCs.getNewFlavor()),

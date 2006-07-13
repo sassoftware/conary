@@ -485,8 +485,8 @@ _STREAM_TRV_SIGS            = 10
 _STREAM_TRV_WEAK_TROVES     = 11
 _STREAM_TRV_REDIRECTS       = 12
 
-_TROVE_TYPE_NORMAL          = 0
-_TROVE_TYPE_REDIRECT        = 1
+TROVE_TYPE_NORMAL          = 0
+TROVE_TYPE_REDIRECT        = 1
 
 class Trove(streams.StreamSet):
     """
@@ -681,13 +681,11 @@ class Trove(streams.StreamSet):
         if not classOverride:
             classOverride = self.__class__
 
-        isRedirect = self.type() == _TROVE_TYPE_REDIRECT
-
         new = classOverride(self.name(),
                             self.version().copy(),
                             self.flavor().copy(),
                             None,
-                            isRedirect = isRedirect,
+                            type = self.type(),
                             setVersion = False)
         new.idMap = self.idMap.copy()
         new.strongTroves = self.strongTroves.copy()
@@ -720,7 +718,10 @@ class Trove(streams.StreamSet):
         return self.troveInfo.sigs
 
     def isRedirect(self):
-        return self.type() == _TROVE_TYPE_REDIRECT
+        return self.type() == TROVE_TYPE_REDIRECT
+
+    def getType(self):
+        return self.type()
 
     def addFile(self, pathId, path, version, fileId):
 	assert(len(pathId) == 16)
@@ -866,7 +867,7 @@ class Trove(streams.StreamSet):
         return rc
 
     def addRedirect(self, toName, toVersion, toFlavor):
-        assert(self.type() == _TROVE_TYPE_REDIRECT)
+        assert(self.type() == TROVE_TYPE_REDIRECT)
         self.redirects.add(toName, toVersion, toFlavor)
 
     def iterRedirects(self):
@@ -1034,7 +1035,7 @@ class Trove(streams.StreamSet):
 	    return False
 	if self.getFlavor() != them.getFlavor():
 	    return False
-	if self.isRedirect() != them.isRedirect():
+	if self.type() != them.type():
 	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
@@ -1563,7 +1564,7 @@ class Trove(streams.StreamSet):
         return self.troveInfo.pathHashes
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
-                 isRedirect = False, skipIntegrityChecks = False,
+                 type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,
                  setVersion = True):
         streams.StreamSet.__init__(self)
 
@@ -1587,10 +1588,7 @@ class Trove(streams.StreamSet):
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())
 
-            if isRedirect:
-                self.type.set(_TROVE_TYPE_REDIRECT)
-            else:
-                self.type.set(_TROVE_TYPE_NORMAL)
+            self.type.set(type)
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
@@ -2035,7 +2033,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, oldSigs, newSigs,
-                 absolute = 0, type = _TROVE_TYPE_NORMAL,
+                 absolute = 0, type = TROVE_TYPE_NORMAL,
                  troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))

@@ -360,7 +360,7 @@ class ChangeSet(streams.StreamSet):
                 oldTrove = trove.Trove(troveCs.getName(), 
                                        troveCs.getOldVersion(),
                                        troveCs.getOldFlavor(), None,
-                                       isRedirect = True)
+                                       type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(newTrove)[0])
                 continue
 
@@ -541,7 +541,7 @@ class ChangeSet(streams.StreamSet):
 	for (name, version, flavor) in self.getOldTroveList():
             if not version.isOnLocalHost() and redirectionRollbacks:
                 oldTrove = trove.Trove(name, version, flavor, None, 
-                                       isRedirect = True)
+                                       type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(None)[0])
                 continue
 

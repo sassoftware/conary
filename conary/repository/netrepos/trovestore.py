@@ -311,7 +311,7 @@ class TroveStore:
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
 					     troveFlavorId, clonedFromId,
-                                             trv.type(),
+                                             trv.getType(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
@@ -423,7 +423,7 @@ class TroveStore:
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             clonedFromId,
-                                            trv.type(),
+                                            trv.getType(),
                                             isPresent = False)
 
             flags = weakFlag
@@ -713,11 +713,9 @@ class TroveStore:
             singleTroveInfo[1].setTimeStamps(
                     [ float(x) for x in timeStamps.split(":") ])
 
-            isRedirect = troveType == trove._TROVE_TYPE_REDIRECT
-
             trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
                               singleTroveInfo[2], changeLog,
-                              isRedirect = isRedirect,
+                              type = troveType,
                               setVersion = False)
 
             try:
