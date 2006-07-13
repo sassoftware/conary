@@ -40,7 +40,7 @@ def createInstances(db):
             versionId       INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             clonedFromId    INTEGER,
-            isRedirect      INTEGER NOT NULL DEFAULT 0,
+            troveType       INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
@@ -1398,6 +1398,8 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE Entitlements2")
         self.cu.execute("DROP TABLE EntitlementGroups2")
         self.cu.execute("DROP TABLE EntitlementOwners2")
+
+        self.db.rename("Instances", "isRedirect", "troveType")
 
         self.db.commit()
 

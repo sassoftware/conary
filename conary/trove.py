@@ -1589,6 +1589,8 @@ class Trove(streams.StreamSet):
 
             if isRedirect:
                 self.type.set(_TROVE_TYPE_REDIRECT)
+            else:
+                self.type.set(_TROVE_TYPE_NORMAL)
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 

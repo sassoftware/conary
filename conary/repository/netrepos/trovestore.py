@@ -85,12 +85,12 @@ class TroveStore:
         return self.items.getOrAddId(item)
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
-                      isRedirect, isPresent = True):
+                      troveType, isPresent = True):
  	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
                                          clonedFromId,
-					 isRedirect, isPresent = isPresent)
+					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent:
 	    self.instances.setPresent(theId, 1)
@@ -311,7 +311,7 @@ class TroveStore:
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
 					     troveFlavorId, clonedFromId,
-                                             trv.isRedirect(),
+                                             trv.type(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
@@ -423,7 +423,7 @@ class TroveStore:
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             clonedFromId,
-                                            trv.isRedirect(),
+                                            trv.type(),
                                             isPresent = False)
 
             flags = weakFlag
@@ -597,7 +597,7 @@ class TroveStore:
                        start_transaction = False)
 
         cu.execute("""SELECT %(STRAIGHTJOIN)s gtl.idx, I.instanceId, 
-                             I.isRedirect, Nodes.timeStamps, Changelogs.name,
+                             I.troveType, Nodes.timeStamps, Changelogs.name,
                              ChangeLogs.contact, ChangeLogs.message
                             FROM
                                 gtl, Items, Versions, Flavors, Instances as I,
@@ -691,7 +691,7 @@ class TroveStore:
 
         neededIdx = 0
         while troveIdList:
-            (idx, troveInstanceId, isRedirect, timeStamps,
+            (idx, troveInstanceId, troveType, timeStamps,
              clName, clVersion, clMessage) =  troveIdList.pop(0)
 
             # make sure we've returned something for everything up to this
@@ -712,6 +712,8 @@ class TroveStore:
 
             singleTroveInfo[1].setTimeStamps(
                     [ float(x) for x in timeStamps.split(":") ])
+
+            isRedirect = troveType == trove._TROVE_TYPE_REDIRECT
 
             trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
                               singleTroveInfo[2], changeLog,
