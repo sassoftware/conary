@@ -362,7 +362,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
-            pwPrompt = lambda x, y: None, None
+            pwPrompt = lambda x, y: (None, None)
 
         self.downloadRateLimit = downloadRateLimit
         self.uploadRateLimit = uploadRateLimit
