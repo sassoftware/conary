@@ -4,9 +4,11 @@ Changes in 1.1:
       groups
     * addEntitlement and deleteEntitlement repository calls replaced 
       by addEntitlements and deleteEntitlements calls
+    * Added getTroveLeavesByPath and getTroveVersionsByPath. (for CNY-74)
 
   o Client Changes:
-    * Conary now supports a --path kw.
+    * conary rq now --path, which allows you to search for troves in the 
+      repository by path. (CNY-74)
 
 Changes in @NEW@:
   o API Additions:
