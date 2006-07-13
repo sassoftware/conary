@@ -18,14 +18,14 @@ class CallLogEntry:
 
     def __init__(self, info):
         revision = info[0]
-        assert(revision == 1)
+        assert(revision == 2)
 
         (self.serverName, self.timeStamp, self.remoteIp,
-         (self.user, self.entitlement),
+         (self.user, self.entClass, self.entKey),
          self.methodName, self.args, self.exceptionStr) = info[1:]
 
 class CallLogger:
-    logFormatRevision = 1
+    logFormatRevision = 2
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
@@ -37,7 +37,7 @@ class CallLogger:
 
     def reopen(self):
         reopen = False
-        # if we've never had an inode, we 
+        # if we've never had an inode, we can simply open
         if not self.inode:
             reopen = True
         else:
@@ -66,9 +66,9 @@ class CallLogger:
         if exception:
             exception = str(exception)
 
-        (user, entitlement) = authToken[0], authToken[2]
+        (user, entClass, entKey) = authToken[0], authToken[2], authToken[3]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
-                                time.time(), remoteIp, (user, entitlement),
+                                time.time(), remoteIp, (user, entClass, entKey),
                                 methodName, args, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 
