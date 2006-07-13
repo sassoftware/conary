@@ -13,7 +13,10 @@ Changes in 1.1:
 Changes in @NEW@:
   o Server Changes:
     * The server binary access log can now be downloaded by an
-      administrator by visiting the http://servername/conary/log URL.
+      administrator by visiting the http://servername/conary/log
+      URL. Once the log is accessed it is rotated automatically by the
+      repository server. Subsequent accesses to the log URL will only
+      yield log entries added since the last access. (CNY-638)
     * The Users and Groups tab in the web management UI is no longer
       highlighted when administrators change their passwords.
 
