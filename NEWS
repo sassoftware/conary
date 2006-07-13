@@ -11,6 +11,7 @@ Changes in @NEW@:
       This allows the user to re-try authentication.
     * The --signatures and --buildreqs flags now work with conary
       showcs.  (CNY-642)
+    * Fixed a bug in the NetworkRepositoryClient default pwPrompt mechanism.
 
 Changes in 1.0.23:
   o API Additions:
