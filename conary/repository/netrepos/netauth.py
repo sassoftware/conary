@@ -656,6 +656,7 @@ class NetworkAuthorization:
 
     def deleteGroupById(self, userGroupId, commit = True):
         cu = self.db.cursor()
+        cu.execute("DELETE FROM EntitlementAccessMap WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
@@ -731,13 +732,13 @@ class NetworkAuthorization:
 
         entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
                                 "WHERE entGroup = ?", entGroup).next()[0]
+        cu.execute("DELETE FROM EntitlementAccessMap WHERE entGroupId=?",
+                   entGroupId)
         cu.execute("DELETE FROM Entitlements WHERE entGroupId=?",
                    entGroupId)
         cu.execute("DELETE FROM EntitlementOwners WHERE entGroupId=?",
                    entGroupId)
         cu.execute("DELETE FROM EntitlementGroups WHERE entGroupId=?",
-                   entGroupId)
-        cu.execute("DELETE FROM EntitlementAccessMap WHERE entGroupId=?",
                    entGroupId)
         self.db.commit()
 
@@ -817,22 +818,6 @@ class NetworkAuthorization:
         cu.execute("INSERT INTO EntitlementAccessMap (entGroupId, userGroupId) "
                    "VALUES (?, ?)", entGroupId, userGroupId)
         self.db.commit()
-
-    def getEntitlementPermGroup(self, authToken, entGroup):
-        """
-        Returns the user group which controls the permissions for a group.
-        """
-        if not self.check(authToken, admin = True):
-            raise errors.InsufficientPermission
-
-        cu = self.db.cursor()
-        cu.execute("""SELECT userGroup FROM EntitlementGroups
-                        JOIN UserGroups USING (userGroupId)
-                        WHERE entGroup = ?""", entGroup)
-        try:
-            return cu.next()[0]
-        except:
-            return None
 
     def getEntitlementOwnerAcl(self, authToken, entGroup):
         """

@@ -605,6 +605,19 @@ class HttpHandler(WebHandler):
 
     @checkAuth()
     @strFields(entClass = None)
+    def configEntClassForm(self, auth, entClass):
+        groups = self.repServer.auth.getGroupList()
+
+        ownerGroup = self.repServer.auth.getEntitlementOwnerAcl(auth, entClass)
+        accessGroups = self.repServer.auth.getEntitlementClassAccessGroup(
+                            auth, [ entClass ] )[entClass]
+
+        return self._write("add_ent_group", groups = groups,
+                           entClass = entClass,
+                           ownerGroup = ownerGroup, accessGroups = accessGroups)
+
+    @checkAuth()
+    @strFields(entClass = None)
     def deleteEntClass(self, auth, entClass):
         self.repServer.auth.deleteEntitlementGroup(auth, entClass)
         self._redirect('manageEntitlements')
@@ -628,7 +641,8 @@ class HttpHandler(WebHandler):
         if self.isAdmin:
             entClassInfo = [
                 (x, self.repServer.auth.getEntitlementOwnerAcl(auth, x),
-                 self.repServer.auth.getEntitlementPermGroup(auth, x)) for
+                 self.repServer.auth.getEntitlementClassAccessGroup(auth,
+                            [ x ])[x]) for
                 x in entClassList ]
         else:
             entClassInfo = [ (x, None, None) for x in entClassList ]
@@ -638,13 +652,21 @@ class HttpHandler(WebHandler):
         return self._write("manage_ents", entClasses = entClassInfo,
                            groups = groups)
 
+    @checkAuth(admin = True)
+    def addEntClassForm(self, auth):
+        groups = self.repServer.auth.getGroupList()
+        return self._write("add_ent_group", groups = groups,
+                           entClass = None, ownerGroup = None,
+                           accessGroups = [])
+
     @checkAuth()
     @strFields(entClass = None, entOwner = None)
-    def entSetOwner(self, auth, entClass, entOwner):
-        oldOwner = self.repServer.auth.getEntitlementOwnerAcl(auth, entClass)
-        if oldOwner:
-            self.repServer.auth.deleteEntitlementOwnerAcl(auth, oldOwner,
-                                                          entClass)
+    @listFields(str, userGroupList = [])
+    def addEntClass(self, auth, entOwner, userGroupList, entClass):
+        self.repServer.auth.addEntitlementGroup(auth, entClass,
+                                                userGroupList[0])
+        self.repServer.auth.setEntitlementClassAccessGroup(auth,
+                                                { entClass : userGroupList } )
         if entOwner != '*none*':
             self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
                                                        entClass)
@@ -652,14 +674,16 @@ class HttpHandler(WebHandler):
         self._redirect('manageEntitlements')
 
     @checkAuth()
-    def addEntClassForm(self, auth):
-        groups = self.repServer.auth.getGroupList()
-        return self._write("add_ent_group", groups = groups)
+    @strFields(entClass = None, entOwner = None)
+    @listFields(str, userGroupList = [])
+    def configEntClass(self, auth, entOwner, userGroupList, entClass):
+        self.repServer.auth.setEntitlementClassAccessGroup(auth,
+                                                { entClass : userGroupList } )
 
-    @checkAuth()
-    @strFields(entClass = None, entOwner = None, userGroup = None)
-    def addEntClass(self, auth, entOwner, userGroup, entClass):
-        self.repServer.auth.addEntitlementGroup(auth, entClass, userGroup)
+        oldOwner = self.repServer.auth.getEntitlementOwnerAcl(auth, entClass)
+        if oldOwner:
+            self.repServer.auth.deleteEntitlementOwnerAcl(auth, oldOwner,
+                                                          entClass)
         if entOwner != '*none*':
             self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
                                                        entClass)
