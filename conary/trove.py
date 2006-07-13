@@ -34,6 +34,9 @@ from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
+# the difference between 10 and 11 is that the REMOVED type appeared; 11 is
+# used *only* for removed troves
+TROVE_VERSION_REMOVED=11
 
 def troveIsCollection(str):
     return not(":" in str or str.startswith("fileset-"))
@@ -487,6 +490,7 @@ _STREAM_TRV_REDIRECTS       = 12
 
 TROVE_TYPE_NORMAL          = 0
 TROVE_TYPE_REDIRECT        = 1
+TROVE_TYPE_REMOVED         = 2
 
 class Trove(streams.StreamSet):
     """
@@ -719,6 +723,9 @@ class Trove(streams.StreamSet):
 
     def isRedirect(self):
         return self.type() == TROVE_TYPE_REDIRECT
+
+    def isRemoved(self):
+        return self.type() == TROVE_TYPE_REMOVED
 
     def getType(self):
         return self.type()
@@ -954,7 +961,8 @@ class Trove(streams.StreamSet):
         if not allowIncomplete and not self.getVersion().isOnLocalHost():
             assert(not self.troveInfo.incomplete())
 
-        if TROVE_VERSION < self.troveInfo.troveVersion():
+        if TROVE_VERSION < self.troveInfo.troveVersion() and \
+           TROVE_VERSION_REMOVED < self.troveInfo.troveVersion():
             self.troveInfo.incomplete.set(1)
         elif self.troveInfo.incomplete() is None:
             # old troves don't have an incomplete flag - we want it to 
@@ -1583,7 +1591,10 @@ class Trove(streams.StreamSet):
             self.version.set(version)
             self.flavor.set(flavor)
             if setVersion:
-                self.troveInfo.troveVersion.set(TROVE_VERSION)
+                if type == TROVE_TYPE_REMOVED:
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_REMOVED)
+                else:
+                    self.troveInfo.troveVersion.set(TROVE_VERSION)
             self.troveInfo.incomplete.set(0)
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())
