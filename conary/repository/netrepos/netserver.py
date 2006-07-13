@@ -78,12 +78,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'editAcl',
                         'changePassword',
                         'getUserGroups',
-                        'addEntitlement',
+                        'addEntitlements',
                         'addEntitlementGroup',
                         'deleteEntitlementGroup',
                         'addEntitlementOwnerAcl',
                         'deleteEntitlementOwnerAcl',
-                        'deleteEntitlement',
+                        'deleteEntitlements',
                         'listEntitlements',
                         'listEntitlementGroups',
                         'getEntitlementClassAccessGroup',
@@ -465,17 +465,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
-    def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+    def addEntitlements(self, authToken, clientVersion, entGroup, 
+                        entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.addEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.addEntitlement(authToken, entGroup, entitlement)
+
         return True
 
-    def deleteEntitlement(self, authToken, clientVersion, entGroup, 
-                          entitlement):
+    def deleteEntitlements(self, authToken, clientVersion, entGroup, 
+                           entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+
         return True
 
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,

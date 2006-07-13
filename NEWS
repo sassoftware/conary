@@ -2,6 +2,8 @@ Changes in 1.1:
   o Server Changes:
     * Entitlement classes can now provide access to multiple access
       groups
+    * addEntitlement and deleteEntitlement repository calls replaced 
+      by addEntitlements and deleteEntitlements calls
 
 Changes in @NEW@:
   o API Additions:

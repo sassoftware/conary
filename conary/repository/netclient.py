@@ -554,13 +554,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
 
-    def addEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].addEntitlement(entGroup, entitlement)
+    def addEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].addEntitlements(entGroup, entitlements)
 
-    def deleteEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].deleteEntitlement(entGroup, entitlement)
+    def deleteEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].deleteEntitlements(entGroup, entitlements)
 
     def addEntitlementGroup(self, serverName, entGroup, userGroup):
         return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
