@@ -78,8 +78,9 @@ for entry in iterator:
     userInfo = []
     if entry.user is not None:
         userInfo.append("user=%s" % entry.user)
-    if entry.entitlement is not None:
-        userInfo.append("entitlement=%s" % entry.entitlement)
+    if entry.entClass is not None:
+        userInfo.append("entclass=%s" % entry.entClass)
+        userInfo.append("entkey=%s" % entry.entKey)
 
     if userInfo:
         userStr = " ".join(userInfo) + " "

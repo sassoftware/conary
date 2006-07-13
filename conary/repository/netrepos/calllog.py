@@ -18,30 +18,57 @@ class CallLogEntry:
 
     def __init__(self, info):
         revision = info[0]
-        assert(revision == 1)
+        assert(revision == 2)
 
         (self.serverName, self.timeStamp, self.remoteIp,
-         (self.user, self.entitlement),
+         (self.user, self.entClass, self.entKey),
          self.methodName, self.args, self.exceptionStr) = info[1:]
 
 class CallLogger:
-    logFormatRevision = 1
+    logFormatRevision = 2
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
         self.path = logPath
-        if readOnly:
-            self.logFd = os.open(logPath, os.O_RDONLY)
+        self.readOnly = readOnly
+        self.logFd = None
+        self.inode = None
+        self.reopen()
+
+    def reopen(self):
+        reopen = False
+        # if we've never had an inode, we can simply open
+        if not self.inode:
+            reopen = True
         else:
-            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND | os.O_RDWR)
+            try:
+                sb = os.stat(self.path)
+                inode = (sb.st_dev, sb.st_ino)
+                if inode != self.inode:
+                    reopen = True
+            except OSError:
+                reopen = True
+        # if we don't need to re-open the log file, return now
+        if not reopen:
+            return
+        # otherwise, re-open the log file
+        if self.readOnly:
+            self.logFd = os.open(self.path, os.O_RDONLY)
+        else:
+            self.logFd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_RDWR)
+        # record the inode of the log file
+        sb = os.stat(self.path)
+        self.inode = (sb.st_dev, sb.st_ino)
 
     def log(self, remoteIp, authToken, methodName, args, exception = None):
+        # lazy re-open the log file in case it was rotated from underneath us
+        self.reopen()
         if exception:
             exception = str(exception)
 
-        (user, entitlement) = authToken[0], authToken[2]
+        (user, entClass, entKey) = authToken[0], authToken[2], authToken[3]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
-                                time.time(), remoteIp, (user, entitlement),
+                                time.time(), remoteIp, (user, entClass, entKey),
                                 methodName, args, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 
