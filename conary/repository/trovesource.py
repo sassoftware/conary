@@ -350,7 +350,8 @@ class SearchableTroveSource(AbstractTroveSource):
                             if troveFlavors: 
                                 vDict = allTroves.setdefault(name, {})
                                 fSet = vDict.setdefault(version, set())
-                                if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+                                if (flavorFilter == _GET_TROVE_ALLOWED_FLAVOR
+                                    and latestFilter == _GET_TROVE_VERY_LATEST):
                                     troveFlavors.difference_update(usedFlavors)
                                     usedFlavors.update(troveFlavors)
 
