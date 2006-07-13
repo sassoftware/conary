@@ -30,12 +30,39 @@ class CallLogger:
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
         self.path = logPath
-        if readOnly:
-            self.logFd = os.open(logPath, os.O_RDONLY)
+        self.readOnly = readOnly
+        self.logFd = None
+        self.inode = None
+        self.reopen()
+
+    def reopen(self):
+        reopen = False
+        # if we've never had an inode, we 
+        if not self.inode:
+            reopen = True
         else:
-            self.logFd = os.open(logPath, os.O_CREAT | os.O_APPEND | os.O_RDWR)
+            try:
+                sb = os.stat(self.path)
+                inode = (sb.st_dev, sb.st_ino)
+                if inode != self.inode:
+                    reopen = True
+            except OSError:
+                reopen = True
+        # if we don't need to re-open the log file, return now
+        if not reopen:
+            return
+        # otherwise, re-open the log file
+        if self.readOnly:
+            self.logFd = os.open(self.path, os.O_RDONLY)
+        else:
+            self.logFd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_RDWR)
+        # record the inode of the log file
+        sb = os.stat(self.path)
+        self.inode = (sb.st_dev, sb.st_ino)
 
     def log(self, remoteIp, authToken, methodName, args, exception = None):
+        # lazy re-open the log file in case it was rotated from underneath us
+        self.reopen()
         if exception:
             exception = str(exception)
 
