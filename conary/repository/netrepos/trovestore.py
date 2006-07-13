@@ -344,14 +344,15 @@ class TroveStore:
         # It is possible that NewFiles could have two entries for the same
         # fileId - one NULL and one with stream data.  In that case, we want
         # to insert the one with stream data - and MIN(NULL, data) always
-        # returns data.  
+        # returns data. Same idea for the MINon the sha1.
         # TODO: rework so that fileId in NewFiles is uniquely indexed, and
         # catch an exception when trying to insert a second item with the same
         # fileId.  Then, remove the GROUP BY and MIN bits here.
         cu.execute("""
         INSERT INTO FileStreams
-            (fileId, stream)
-        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream)
+            (fileId, stream, sha1)
+        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream),
+                        MIN(NewFiles.sha1)
         FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
         WHERE FileStreams.streamId is NULL GROUP BY fileId
         """)
@@ -835,13 +836,27 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
         if fileObj or fileStream:
+            sha1 = None
+
             if fileStream is None:
                 fileStream = fileObj.freeze()
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
-		       (cu.binary(pathId), versionId, cu.binary(fileId), 
-                        cu.binary(fileStream), path))
+
+            if fileObj is not None:
+                if fileObj.hasContents:
+                    sha1 = fileObj.contents.sha1()
+            elif files.frozenFileHasContents(fileStream):
+                cont = files.frozenFileContentInfo(fileStream)
+                sha1 = cont.sha1()
+
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, ?, ?, ?)""",
+                       (cu.binary(pathId), versionId, cu.binary(fileId), 
+                        cu.binary(fileStream), path, cu.binary(sha1)))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)",
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, NULL, ?, NULL)""",
 		       (cu.binary(pathId), versionId, cu.binary(fileId), path))
 
     def getFile(self, pathId, fileId):
@@ -875,6 +890,218 @@ class TroveStore:
 
     def rollback(self):
         return self.db.rollback()
+
+    def removeTrove(self, name, version, flavor):
+        cu = self.db.cursor()
+        cu.execute("""
+                SELECT instanceId, itemId, Instances.versionId,
+                       Instances.flavorId FROM Instances
+                    JOIN Items USING (itemId)
+                    JOIN Versions ON
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                    WHERE
+                        Items.item = ? AND
+                        Versions.version = ? AND
+                        Flavors.flavor = ?
+        """, name, version.asString(), flavor.freeze())
+
+        try:
+            instanceId, itemId, versionId, flavorId = cu.next()
+        except StopIteration:
+            raise errors.TroveMissing(name, version)
+
+        cu.execute("SELECT nodeId, branchId FROM Nodes "
+                   "WHERE itemId = ? AND versionId = ?", itemId, versionId)
+        nodeId, branchId = cu.next()
+
+        # remove all dependencies which are used only by this instanceId
+        cu.execute("""
+        DELETE FROM Dependencies WHERE depId IN (
+            SELECT AllDepsUsed.depId AS depId FROM
+                (SELECT depId FROM Provides WHERE instanceId = :instId
+                 UNION
+                 SELECT depId FROM Requires WHERE instanceId = :instId
+                ) AS AllDepsUsed
+                LEFT OUTER JOIN (
+                    SELECT AllDepsUsed.depId AS depId FROM
+                        (SELECT depId FROM Provides WHERE instanceId = :instId
+                         UNION
+                         SELECT depId FROM Requires WHERE instanceId = :instId
+                        ) AS AllDepsUsed
+                        LEFT OUTER JOIN Provides ON
+                            AllDepsUsed.depId = Provides.depId AND
+                            Provides.instanceId != :instId
+                        LEFT OUTER JOIN Requires ON
+                            AllDepsUsed.depId = Requires.depId AND
+                            Requires.instanceId != :instId
+                        WHERE
+                            Provides.instanceId IS NOT NULL OR
+                            Requires.instanceId IS NOT NULL
+                ) AS DepsStillNeeded ON
+                    AllDepsUsed.depId = DepsStillNeeded.depId
+                WHERE
+                    DepsStillNeeded.depId IS NULL
+            )
+        """, instId = instanceId)
+
+        cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
+        cu.execute("DELETE FROM Requires WHERE instanceId = ?", instanceId)
+
+        # Remove from TroveInfo
+        cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
+
+        # Remove from TroveTroves. XXX If there are troves which are referenced
+        # only here and are not otherwise present on the system, we ought to
+        # erase those as well.
+        cu.execute("DELETE FROM TroveTroves WHERE instanceId = ?", instanceId)
+
+        # Now remove the files. Gather a list of sha1s of files to remove
+        # from the filestore.
+        cu.execute("""
+            SELECT sha1 FROM FileStreams WHERE streamId IN (
+                SELECT TroveFiles.streamId FROM
+                    TroveFiles LEFT OUTER JOIN
+                        (SELECT FilesToKeep.streamId AS streamId
+                            FROM TroveFiles AS FilesUsed
+                            JOIN TroveFiles AS FilesToKeep ON
+                                FilesUsed.streamId = FilesToKeep.streamId AND
+                                FilesToKeep.instanceId != ?
+                            WHERE
+                                FilesUsed.instanceId == ?
+                        ) AS FilesToKeep
+                    ON
+                        TroveFiles.streamId = FilesToKeep.streamId
+                    WHERE
+                        TroveFiles.instanceId = ? AND
+                        FilesToKeep.streamId is NULL
+                )
+        """, instanceId, instanceId, instanceId)
+        filesToRemove = [ x[0] for x in cu ]
+
+        cu.execute("""
+            DELETE FROM FileStreams WHERE streamId IN (
+                SELECT TroveFiles.streamId FROM
+                    TroveFiles LEFT OUTER JOIN
+                        (SELECT FilesToKeep.streamId AS streamId
+                            FROM TroveFiles AS FilesUsed
+                            JOIN TroveFiles AS FilesToKeep ON
+                                FilesUsed.streamId = FilesToKeep.streamId AND
+                                FilesToKeep.instanceId != ?
+                            WHERE
+                                FilesUsed.instanceId == ?
+                        ) AS FilesToKeep
+                    ON
+                        TroveFiles.streamId = FilesToKeep.streamId
+                    WHERE
+                        TroveFiles.instanceId = ? AND
+                        FilesToKeep.streamId is NULL
+                )
+        """, instanceId, instanceId, instanceId)
+        cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
+
+        cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
+
+        # Was this the only Instance for the node?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
+                   "AND versionId = ? AND instanceId != ?", 
+                   itemId, versionId, instanceId)
+        lastInstanceOfNode = (cu.next()[0] == 0)
+
+        if lastInstanceOfNode:
+            # Remove any changelog
+            cu.execute("DELETE FROM ChangeLogs WHERE nodeId = ?", nodeId)
+
+            # Remove the node itself
+            cu.execute("DELETE FROM Nodes WHERE nodeId = ?", nodeId)
+
+        # Now update the latest table
+        cu.execute("""
+                    SELECT versionId, finalTimestamp FROM Nodes
+                        JOIN Instances USING (itemId, versionId)
+                        WHERE
+                            Nodes.itemId = ? AND
+                            Nodes.branchId = ? AND
+                            flavorId = ? AND
+                            isPresent = 1
+                        ORDER BY finalTimestamp DESC
+                        LIMIT 1
+        """, itemId, branchId, flavorId)
+
+        try:
+            prevVersionId = cu.next()[0]
+        except StopIteration:
+            prevVersionId = None
+
+        if prevVersionId is None:
+            # this is the last item on the branch
+            cu.execute("DELETE FROM Latest WHERE "
+                       "itemId = ? AND flavorId = ? AND branchId = ?",
+                       itemId, flavorId, branchId)
+
+            # is this flavor needed anymore?
+            cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
+                       flavorId)
+            count = cu.next()[0]
+            if count == 0:
+                cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
+                cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
+                           flavorId)
+        else:
+            cu.execute("UPDATE Latest SET versionId = ? WHERE "
+                       "itemId = ? AND flavorId = ? AND branchId = ?",
+                       itemId, flavorId, branchId)
+
+        # do we need the labelmap entry anymore?
+        cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
+                   "branchId = ?", itemId, branchId)
+        count = cu.next()[0]
+
+        if not count:
+            cu.execute("SELECT labelId FROM LabelMap WHERE itemid = ? AND "
+                       "branchId = ?", itemId, branchId)
+            labelId = cu.next()[0]
+            cu.execute("DELETE FROM LabelMap WHERE labelId = ?", labelId)
+
+            # do we need this branchId anymore?
+            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
+                       branchId)
+            count = cu.next()[0]
+
+            if not count:
+                cu.execute("DELETE FROM Branches WHERE branchId = ?", branchId)
+
+            # do we need this labelId anymore?
+            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE labelId = ?",
+                       labelId)
+            count = cu.next()[0]
+
+            if not count:
+                cu.execute("DELETE FROM Labels WHERE labelId = ?", labelId)
+
+        # do we need this versionId any longer?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE versionId = ? "
+                   "LIMIT 1", versionId)
+        count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveFiles WHERE versionId = ? "
+                   "LIMIT 1", versionId)
+        count += cu.next()[0]
+
+        if not count:
+            cu.execute("DELETE FROM Versions WHERE versionId = ?", versionId)
+
+        # do we need this itemId any longer?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count = cu.next()[0]
+
+        if not count:
+            cu.execute("DELETE FROM Items WHERE itemId = ?", itemId)
+
+        # XXX what about metadata?
+
+        return filesToRemove
 
     def commit(self):
 	if self.needsCleanup:

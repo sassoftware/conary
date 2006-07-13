@@ -554,13 +554,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
 
-    def addEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].addEntitlement(entGroup, entitlement)
+    def addEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].addEntitlements(entGroup, entitlements)
 
-    def deleteEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].deleteEntitlement(entGroup, entitlement)
+    def deleteEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].deleteEntitlements(entGroup, entitlements)
 
     def addEntitlementGroup(self, serverName, entGroup, userGroup):
         return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
@@ -581,6 +581,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def listEntitlementGroups(self, serverName):
         return self.c[serverName].listEntitlementGroups()
 
+    def getEntitlementClassAccessGroup(self, serverName, classList):
+        return self.c[serverName].getEntitlementClassAccessGroup(classList)
+
+    def setEntitlementClassAccessGroup(self, serverName, classInfo):
+        return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+
     def listAccessGroups(self, serverName):
         return self.c[serverName].listAccessGroups()
 
@@ -589,7 +595,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def troveNamesOnServer(self, server):
         return self.c[server].troveNames("")
-    
+
+    def getTroveLeavesByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 
+                                           False)
+        return dict([ (x[0],
+                        [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+
+    def getTroveVersionsByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), True)
+        return dict([ (x[0], 
+                       [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+ 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
         # XXX this code should most likely go away, and anything that
