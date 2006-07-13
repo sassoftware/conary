@@ -83,9 +83,11 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
             querySource = changeSetSource
 
         dcfg = display.DisplayConfig(querySource, client.db)
-        dcfg.setTroveDisplay(deps=deps, info=info, fullFlavors=cfg.fullFlavors,
+        dcfg.setTroveDisplay(deps=deps, info=info, showBuildReqs=showBuildReqs,
+                             digSigs=digSigs, fullFlavors=cfg.fullFlavors,
                              showLabels=cfg.showLabels, baseFlavors=cfg.flavor,
-                             fullVersions=cfg.fullVersions)
+                             fullVersions=cfg.fullVersions, 
+                             )
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
                             fileDeps=fileDeps, fileVersions=fileVersions)
 

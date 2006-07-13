@@ -9,6 +9,8 @@ Changes in @NEW@:
     * The Conary Repository web interface no longer returns a
       HTTP_FORBIDDEN (403) when a bad password is given by the user.
       This allows the user to re-try authentication.
+    * The --signatures and --buildreqs flags now work with conary
+      showcs.  (CNY-642)
 
 Changes in 1.0.23:
   o API Additions:
