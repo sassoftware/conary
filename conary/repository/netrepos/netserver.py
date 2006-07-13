@@ -1574,7 +1574,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return results
 
-    def getTrovesByPaths(self, authToken, clientVersion, pathList, label, 
+    def getTrovesByPaths(self, authToken, clientVersion, pathList, label,
                          all=False):
         self.log(2, pathList, label, all)
         cu = self.db.cursor()
@@ -1629,6 +1629,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if all:
             results = [[] for x in pathList]
             for idx, name, versionStr, flavor, timeStamps, pattern in cu:
+                if not self.auth.checkTrove(pattern, name):
+                    continue
                 version = versions.VersionFromString(versionStr, 
                         timeStamps=[float(x) for x in timeStamps.split(':')])
                 branch = version.branch()
