@@ -1386,7 +1386,8 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementOwners")
         self.cu.execute("DROP TABLE EntitlementGroups")
 
-        # recreate the indexes and triggers
+        # recreate the indexes and triggers - including new path 
+        # index for TroveFiles
         self.db.loadSchema()
         createTroves(self.db)
         createUsers(self.db)
