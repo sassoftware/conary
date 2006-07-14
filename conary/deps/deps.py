@@ -14,6 +14,7 @@
 
 import re
 from conary.lib import misc, util
+from conary.errors import ParseError
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1
@@ -1430,17 +1431,3 @@ flavorScores = {
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERRED) :   -1,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1 
 }
-
-
-class ParseError(Exception):
-
-    """
-    Indicates that an error occurred turning a string into an object
-    in the dependency module.
-    """
-
-    def __str__(self):
-	return self.str
-
-    def __init__(self, str):
-	self.str = str

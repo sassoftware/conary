@@ -486,6 +486,8 @@ class _AbstractQueryCommand(ConaryCommand):
             'trove-headers' : 'Display current trove name when listing info'
                               ' from multiple troves',
             'weak-refs'     : optparse.SUPPRESS_HELP,
+            'what-provides' : ('Return information about what troves provide a dependency', 'DEP'),
+            'what-requires' : ('Return information about what troves require a dependency', 'DEP')
             }
 
 
@@ -536,6 +538,7 @@ class QueryCommand(_AbstractQueryCommand):
         d = {}
         d["no-pristine"] = NO_PARAM
         d["path"] = MULT_PARAM
+        d["what-provides"] = MULT_PARAM
         argDef['Trove Selection'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
@@ -549,17 +552,19 @@ class QueryCommand(_AbstractQueryCommand):
                 ('troves', 'showTroves'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('trove-flags', 'showTroveFlags'),
-                'deps', 'info'):
+                ('deps', 'showDeps'), 'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
                 kw[opt] = argSet.pop(opt, False)
         kw['pathList'] = argSet.pop('path', [])
+        kw['whatProvidesList'] = argSet.pop('what-provides', [])
         kw['pristine'] = not argSet.pop('no-pristine', False)
         kw['recurse'] = argSet.pop('recurse', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']
+
 
         db = openDatabase(cfg.root, cfg.dbPath)
 
@@ -598,6 +603,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["latest-versions"] = NO_PARAM
         d["leaves"] = NO_PARAM
         d["path"] = MULT_PARAM
+        d["what-provides"] = MULT_PARAM
         argDef['Trove Selection'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
@@ -645,7 +651,7 @@ class RepQueryCommand(_AbstractQueryCommand):
                 ('trove-flags', 'showTroveFlags'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('affinity', 'useAffinity'),
-                'deps', 'info'):
+                ('deps', 'showDeps'), 'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
@@ -655,14 +661,14 @@ class RepQueryCommand(_AbstractQueryCommand):
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']
+        whatProvidesList = argSet.pop('what-provides', [])
 
         pathList = argSet.pop('path', [])
         if argSet: return self.usage()
         troveList = otherArgs[2:]
 
-        queryrep.displayTroves(cfg, troveList, pathList,
-                               versionFilter, flavorFilter,
-                               **kw)
+        queryrep.displayTroves(cfg, troveList, pathList, whatProvidesList,
+                               versionFilter, flavorFilter, **kw)
 _register(RepQueryCommand)
 
 class ShowChangesetCommand(_AbstractQueryCommand):
