@@ -515,8 +515,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
-    def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
-               capped, admin, canRemove = False):
+    def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
+               capped = False, admin = False, canRemove = False):
         if not label:
             label = "ALL"
         else:
@@ -537,7 +537,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                   capped, admin, **kwargs)
 
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write, capped, admin, canRemove = False):
+                trovePattern, label, write = False, capped = False, 
+                admin = False, canRemove = False):
         if not label:
             label = "ALL"
         else:
