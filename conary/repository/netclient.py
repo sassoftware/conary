@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37 ]
+CLIENT_VERSIONS = [ 36, 37, 38 ]
 
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)
@@ -309,7 +309,6 @@ class ServerCache:
 
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
-        self.cache[serverName] = server
 
         try:
             serverVersions = server.checkVersion()
@@ -340,7 +339,11 @@ class ServerCache:
                 (",".join([str(x) for x in serverVersions]),
                  ",".join([str(x) for x in CLIENT_VERSIONS])))
 
+        server._protocolVersion = max(intersection)
+
         transporter.setCompress(True)
+
+        self.cache[serverName] = server
 
 	return server
 
@@ -513,7 +516,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
-               capped, admin):
+               capped, admin, canRemove = False):
         if not label:
             label = "ALL"
         else:
@@ -522,11 +525,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
+        kwargs = {}
+
+        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+            raise InvalidServerVersion, "Setting canRemove for an acl " \
+                    "requires a repository running Conary 1.1 or later."
+        elif canRemove:
+            kwargs['canRemove'] = True
+
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                  capped, admin)
+                                  capped, admin, **kwargs)
 
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write, capped, admin):
+                trovePattern, label, write, capped, admin, canRemove = False):
         if not label:
             label = "ALL"
         else:
@@ -543,8 +554,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
+        kwargs = {}
+
+        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+            raise InvalidServerVersion, "Setting canRemove for an acl " \
+                    "requires a repository running Conary 1.1 or later."
+        elif canRemove:
+            kwargs['canRemove'] = True
+
+
         self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                   trovePattern, label, write, capped, admin)
+                                   trovePattern, label, write, capped, admin,
+                                   **kwargs)
 
         return True
 

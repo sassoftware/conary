@@ -347,8 +347,9 @@ class NetworkAuthorization:
             return True
         return False
 
-    def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
-        self.log(3, userGroup, trovePattern, label, write, admin)
+    def addAcl(self, userGroup, trovePattern, label, write, capped, admin,
+               canRemove = False):
+        self.log(3, userGroup, trovePattern, label, write, admin, canRemove)
         cu = self.db.cursor()
 
         if write:
@@ -365,6 +366,11 @@ class NetworkAuthorization:
             admin = 1
         else:
             admin = 0
+
+        if canRemove:
+            canRemove = 1
+        else:
+            canRemove = 0
 
         # XXX This functionality is available in the TroveStore class
         #     refactor so that the code is not in two places
@@ -396,9 +402,11 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             INSERT INTO Permissions
-                (userGroupId, labelId, itemId, canWrite, capped, admin)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (userGroupId, labelId, itemId, write, capped, admin))
+                (userGroupId, labelId, itemId, canWrite, capped, admin,
+                 canRemove)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (userGroupId, labelId, itemId, write, capped, admin, 
+                  canRemove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -406,7 +414,7 @@ class NetworkAuthorization:
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin):
+            write, capped, admin, canRemove = False):
 
         cu = self.db.cursor()
 
@@ -427,12 +435,18 @@ class NetworkAuthorization:
         else:
             admin = 0
 
+        if canRemove:
+            canRemove = 1
+        else:
+            canRemove = 0
+
         try:
             cu.execute("""
             UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?, capped = ?, admin = ?
+            SET labelId = ?, itemId = ?, canWrite = ?, capped = ?, admin = ?,
+                canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capped, admin,
+                       labelId, troveId, write, capped, admin, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -552,7 +566,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canwrite, capped, admin
+                             canwrite, capped, admin, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON

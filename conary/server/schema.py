@@ -316,6 +316,7 @@ def createUsers(db):
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capped          INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
@@ -1360,6 +1361,9 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
                         "sha1        %(BINARY20)s" 
                         % self.db.keywords)
+        self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
+                        "canRemove   INTEGER NOT NULL DEFAULT 0"
+                        % self.db.keywords)
 
         updateCursor = self.db.cursor()
         for (streamId, fileId, stream) in \
@@ -1399,7 +1403,7 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementGroups2")
         self.cu.execute("DROP TABLE EntitlementOwners2")
 
-        self.db.rename("Instances", "isRedirect", "troveType")
+        #self.db.rename("Instances", "isRedirect", "troveType")
 
         self.db.commit()
 
@@ -1568,12 +1572,9 @@ def loadSchema(db):
     # load the current schema object list
     db.loadSchema()
 
-    # instantiate and call appropriate migration objects in succession.
-    while version and version < VERSION:
-        version = (lambda x : sys.modules[__name__].__dict__[ \
-            'MigrateTo_' + str(x + 1)])(version)(db)()
-
     if version != 0 and version < 13:
+        import epdb
+        epdb.st()
         raise sqlerrors.SchemaVersionError(
             "Repository schemas from Conary versions older than 1.0 are not "
             "supported. Contact rPath for help converting your repository to "

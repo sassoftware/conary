@@ -429,32 +429,35 @@ class HttpHandler(WebHandler):
 
         return self._write("permission", operation='Add', group=userGroupName, trove=None,
             label=None, groups=groups, labels=labels, troves=troves,
-            writeperm=None, capped=None, admin=None)
+            writeperm=None, capped=None, admin=None, remove=None)
 
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "")
     @intFields(writeperm = None, capped = None, admin = None)
-    def editPermForm(self, auth, group, label, trove, writeperm, capped, admin):
+    def editPermForm(self, auth, group, label, trove, writeperm, capped, admin,
+                     remove):
         groups = self.repServer.auth.getGroupList()
         labels = self.repServer.auth.getLabelList()
         troves = self.repServer.auth.getItemList()
 
+        #remove = 0
         return self._write("permission", operation='Edit', group=group, label=label,
             trove=trove, groups=groups, labels=labels, troves=troves,
-            writeperm=writeperm, capped=capped, admin=admin)
+            writeperm=writeperm, capped=capped, admin=admin, remove=remove)
 
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
-               writeperm = "off", capped = "off", admin = "off")
+               writeperm = "off", capped = "off", admin = "off", remove = "off")
     def addPerm(self, auth, group, label, trove,
-                writeperm, capped, admin):
+                writeperm, capped, admin, remove):
         writeperm = (writeperm == "on")
         capped = (capped == "on")
         admin = (admin == "on")
+        remove = (remove== "on")
 
         try:
             self.repServer.addAcl(self.authToken, 0, group, trove, label,
-               writeperm, capped, admin)
+               writeperm, capped, admin, canRemove = remove)
         except PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
@@ -464,16 +467,17 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
                oldlabel = "", oldtrove = "",
-               writeperm = "off", capped = "off", admin = "off")
+               writeperm = "off", capped = "off", admin = "off", remove = "off")
     def editPerm(self, auth, group, label, trove, oldlabel, oldtrove,
-                writeperm, capped, admin):
+                writeperm, capped, admin, remove):
         writeperm = (writeperm == "on")
         capped = (capped == "on")
         admin = (admin == "on")
+        remove = (remove == "on")
 
         try:
             self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove,
-               label, writeperm, capped, admin)
+               label, writeperm, capped, admin, canRemove = remove)
         except PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
@@ -557,9 +561,9 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     @strFields(user = None, password = None)
     @boolFields(write = False, admin = False)
-    def addUser(self, auth, user, password, write, admin):
+    def addUser(self, auth, user, password, write, admin, remove):
         self.repServer.addUser(self.authToken, 0, user, password)
-        self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin)
+        self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin, canRemove = remove)
 
         self._redirect("userlist")
 

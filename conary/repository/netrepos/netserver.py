@@ -37,7 +37,7 @@ from conary.local import schema as depSchema
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37 ]
+SERVER_VERSIONS = [ 36, 37, 38 ]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -408,7 +408,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin):
+               label, write, capped, admin, canRemove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
@@ -420,12 +420,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             label = None
 
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         admin)
+                         admin, canRemove = canRemove)
 
         return True
 
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, admin):
+                oldLabel, trovePattern, label, write, capped, admin,
+                canRemove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -446,7 +447,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin)
+            write, capped, admin, canRemove = canRemove)
 
         return True
 
