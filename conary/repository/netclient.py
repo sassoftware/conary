@@ -340,6 +340,10 @@ class ServerCache:
                 (",".join([str(x) for x in serverVersions]),
                  ",".join([str(x) for x in CLIENT_VERSIONS])))
 
+        # this is the protocol version we should use when talking
+        # to this repository - the maximum we both understand
+        server._protocolVersion = max(intersection)
+
         transporter.setCompress(True)
 
 	return server
