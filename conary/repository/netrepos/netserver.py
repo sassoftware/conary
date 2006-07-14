@@ -1424,6 +1424,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
+
+            oldVersion = troveCs.getOldVersion()
+            if oldVersion is not None and \
+               not self.auth.check(authToken, mirror = mirror,
+                                   label = oldVersion.branch().label(),
+                                   trove = name):
+                raise errors.InsufficientPermission
+
             items.setdefault((version, flavor), []).append(name)
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])

@@ -15,16 +15,19 @@
 Provides the output for the "conary query" command
 """
 
+import itertools
 import os
 
 from conary import display
 from conary.conaryclient import cmdline
+from conary.deps import deps
 from conary.lib import util
 
 def displayTroves(db, cfg, troveSpecs = [], pathList = [],
+                  whatProvidesList = [],
                   # trove options
                   info = False, digSigs = False, showBuildReqs = False, 
-                  deps = False,
+                  showDeps = False,
                   # file options
                   ls = False, lsl = False, ids = False, sha1s = False, 
                   tags = False, fileDeps = False, fileVersions = False,
@@ -42,6 +45,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @type troveSpecs: list of troveSpecs (n[=v][[f]])
        @param pathList: paths to match up to troves
        @type pathList: list of strings
+       @param whatRequiresList: list of dependencies to find reqs for
+       @type whatRequiresList: list of strings
        @param info: If true, display general information about the trove
        @type info: bool
        @param digSigs: If true, display digital signatures for a trove.
@@ -49,9 +54,9 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @param showBuildReqs: If true, display the versions and flavors of the
        build requirements that were used to build the given troves
        @type showBuildReqs: bool
-       @param deps: If true, display provides and requires information 
+       @param showDeps: If true, display provides and requires information 
        for the trove.
-       @type deps: bool
+       @type showDeps: bool
        @param ls: If true, list files in the trove
        @type ls: bool
        @param lsl: If true, list files in the trove + ls -l information
@@ -87,14 +92,18 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @rtype: None
     """
 
-    troveTups, primary = getTrovesToDisplay(db, troveSpecs, pathList)
+    whatProvidesList = [ deps.parseDep(x) for x in whatProvidesList ]
+
+    troveTups, primary = getTrovesToDisplay(db, troveSpecs, pathList,
+                                            whatProvidesList)
 
     dcfg = LocalDisplayConfig(db, affinityDb=db)
     # it might seem weird to use the same source we're querying as
     # a source for affinity info, but it makes sure that all troves with a
     # particular name are looked at for flavor info
 
-    dcfg.setTroveDisplay(deps=deps, info=info, showBuildReqs=showBuildReqs,
+    dcfg.setTroveDisplay(deps=showDeps, info=info, 
+                         showBuildReqs=showBuildReqs,
                          digSigs=digSigs, fullVersions=cfg.fullVersions,
                          showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
                          showComponents = cfg.showComponents,
@@ -110,7 +119,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
         # if we didn't explicitly set recurse and we're not recursing one
         # level explicitly and we specified troves (so everything won't 
         # show up at the top level anyway), guess at whether to recurse
-        recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps, 
+        recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps, 
                            fileVersions)
 
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
@@ -132,7 +141,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(db, troveSpecs, pathList=[]):
+def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
     """ Finds the given trove and path specifiers, and returns matching
         (n,v,f) tuples.
         @param db: database to search
@@ -142,6 +151,9 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[]):
         @param pathList: paths which should be linked to some trove in this 
                          database.
         @type pathList: list of strings
+        @param whatProvidesList: deps to search for providers of
+        @type whatProvidesList: list of strings
+
         @rtype: troveTupleList (list of (name, version, flavor) tuples), 
                 and a boolean that stats whether the troves returned should
                 be considered primary (and therefore not compressed ever).
@@ -164,7 +176,11 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[]):
             troveTups.append((trove.getName(), trove.getVersion(), 
                               trove.getFlavor()))
 
-    if not (troveSpecs or pathList):
+    if whatProvidesList:
+        results = db.getTrovesWithProvides(whatProvidesList)
+        troveTups.extend(itertools.chain(*results.itervalues()))
+
+    if not (troveSpecs or pathList or whatProvidesList):
         names = db.iterAllTroveNames()
         troveTups = sorted(db.findByNames(names))
         primary = False

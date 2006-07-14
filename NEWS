@@ -22,6 +22,9 @@ Changes in @NEW@:
     * The Users and Groups tab in the web management UI is no longer
       highlighted when administrators change their passwords.
 
+  o Client Changes:
+    * Added --what-provides option to query and repquery
+
   o Bug Fixes:
     * The Conary Repository web interface no longer returns a
       HTTP_FORBIDDEN (403) when a bad password is given by the user.
