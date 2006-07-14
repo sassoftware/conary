@@ -84,21 +84,30 @@ class AbstractTroveSource:
 
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
-                   affinityDatabase=None, allowMissing=False):
+                   affinityDatabase=None, allowMissing=False, 
+                   bestFlavor=None, getLeaves=None):
+
+        if bestFlavor is None:
+            bestFlavor = self._bestFlavor
+        if getLeaves is None:
+            getLeaves = self._getLeavesOnly
+
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=self._allowNoLabel,
-                                            bestFlavor=self._bestFlavor,
-                                            getLeaves=self._getLeavesOnly)
+                                            bestFlavor=bestFlavor,
+                                            getLeaves=getLeaves)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossSources = True, 
-                  acrossFlavors = True, affinityDatabase = None):
+                  acrossFlavors = True, affinityDatabase = None,
+                  bestFlavor = None, getLeaves = None):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossSources, acrossFlavors,
-                              affinityDatabase)
+                              affinityDatabase, bestFlavor=bestFlavor,
+                              getLeaves=getLeaves)
         return res[(name, versionStr, flavor)]
 
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
