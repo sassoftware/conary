@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37 ]
+CLIENT_VERSIONS = [ 36, 37, 38 ]
 
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)
@@ -309,7 +309,6 @@ class ServerCache:
 
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
-        self.cache[serverName] = server
 
         try:
             serverVersions = server.checkVersion()
@@ -345,6 +344,8 @@ class ServerCache:
         server._protocolVersion = max(intersection)
 
         transporter.setCompress(True)
+
+        self.cache[serverName] = server
 
 	return server
 
@@ -516,8 +517,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
-    def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
-               capped, admin):
+    def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
+               capped = False, admin = False, canRemove = False):
         if not label:
             label = "ALL"
         else:
@@ -526,11 +527,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
+        kwargs = {}
+
+        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+            raise InvalidServerVersion, "Setting canRemove for an acl " \
+                    "requires a repository running Conary 1.1 or later."
+        elif canRemove:
+            kwargs['canRemove'] = True
+
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                  capped, admin)
+                                  capped, admin, **kwargs)
 
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write, capped, admin):
+                trovePattern, label, write = False, capped = False, 
+                admin = False, canRemove = False):
         if not label:
             label = "ALL"
         else:
@@ -547,8 +557,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
+        kwargs = {}
+
+        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+            raise InvalidServerVersion, "Setting canRemove for an acl " \
+                    "requires a repository running Conary 1.1 or later."
+        elif canRemove:
+            kwargs['canRemove'] = True
+
+
         self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                   trovePattern, label, write, capped, admin)
+                                   trovePattern, label, write, capped, admin,
+                                   **kwargs)
 
         return True
 
@@ -558,13 +578,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
 
-    def addEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].addEntitlement(entGroup, entitlement)
+    def addEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].addEntitlements(entGroup, entitlements)
 
-    def deleteEntitlement(self, serverName, entGroup, entitlement):
-        entitlement = self.fromEntitlement(entitlement)
-        return self.c[serverName].deleteEntitlement(entGroup, entitlement)
+    def deleteEntitlements(self, serverName, entGroup, entitlements):
+        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
+        return self.c[serverName].deleteEntitlements(entGroup, entitlements)
 
     def addEntitlementGroup(self, serverName, entGroup, userGroup):
         return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
@@ -585,6 +605,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def listEntitlementGroups(self, serverName):
         return self.c[serverName].listEntitlementGroups()
 
+    def getEntitlementClassAccessGroup(self, serverName, classList):
+        return self.c[serverName].getEntitlementClassAccessGroup(classList)
+
+    def setEntitlementClassAccessGroup(self, serverName, classInfo):
+        return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+
     def listAccessGroups(self, serverName):
         return self.c[serverName].listAccessGroups()
 
@@ -593,7 +619,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def troveNamesOnServer(self, server):
         return self.c[server].troveNames("")
-    
+
+    def getTroveLeavesByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 
+                                           False)
+        return dict([ (x[0],
+                        [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+
+    def getTroveVersionsByPath(self, pathList, label):
+        l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), True)
+        return dict([ (x[0], 
+                       [(y[0], self.thawVersion(y[1]), self.toFlavor(y[2])) 
+                         for y in x[1]]) for x in itertools.izip(pathList, l) ])
+ 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
         # XXX this code should most likely go away, and anything that

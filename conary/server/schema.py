@@ -14,7 +14,7 @@
 
 import sys
 
-from conary import versions, trove
+from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, setupTempDepTables
@@ -22,7 +22,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 13
+VERSION = 14
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -40,7 +40,7 @@ def createInstances(db):
             versionId       INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             clonedFromId    INTEGER,
-            isRedirect      INTEGER NOT NULL DEFAULT 0,
+            troveType       INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
@@ -316,6 +316,7 @@ def createUsers(db):
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capped          INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
@@ -359,18 +360,12 @@ def createUsers(db):
         CREATE TABLE EntitlementGroups (
             entGroupId      %(PRIMARYKEY)s,
             entGroup        VARCHAR(254) NOT NULL,
-            userGroupId     INTEGER NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT EntitlementGroups_userGroupId_fk
-                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["EntitlementGroups"] = []
         commit = True
     db.createIndex("EntitlementGroups", "EntitlementGroupsEntGroupIdx",
                    "entGroup", unique = True)
-    db.createIndex("EntitlementGroups", "EntitlementGroupsUGIdx",
-                   "userGroupId")
     if createTrigger(db, "EntitlementGroups"):
         commit = True
 
@@ -408,6 +403,26 @@ def createUsers(db):
     db.createIndex("Entitlements", "EntitlementsEgEIdx",
                    "entGroupId, entitlement", unique = True)
     if createTrigger(db, "Entitlements"):
+        commit = True
+
+    if "EntitlementAccessMap" not in db.tables:
+        cu.execute("""
+        CREATE TABLE EntitlementAccessMap(
+            entGroupId      INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT EntitlementAccessMap_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES
+                                            EntitlementGroups(entGroupId),
+            CONSTRAINT EntitlementAccessMap_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["EntitlementAccessMap"] = []
+        commit = True
+    db.createIndex("EntitlementAccessMap", "EntitlementAccessMapIndex",
+                   "entGroupId, userGroupId", unique = True)
+    if createTrigger(db, "EntitlementAccessMap"):
         commit = True
 
     if commit:
@@ -470,12 +485,15 @@ def createTroves(db):
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
     db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx",
+                   "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -503,6 +521,8 @@ def createTroves(db):
     # FIXME: rename these indexes
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
+    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path")
+
     if createTrigger(db, "TroveFiles"):
         commit = True
 
@@ -1335,6 +1355,59 @@ class MigrateTo_13(SchemaMigration):
         # all done for migration to 13
         return self.Version
 
+class MigrateTo_14(SchemaMigration):
+    Version = 14
+    def migrate(self):
+        self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
+                        "sha1        %(BINARY20)s" 
+                        % self.db.keywords)
+        self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
+                        "canRemove   INTEGER NOT NULL DEFAULT 0"
+                        % self.db.keywords)
+
+        updateCursor = self.db.cursor()
+        for (streamId, fileId, stream) in \
+                self.cu.execute("SELECT streamId, fileId, stream FROM "
+                                "FileStreams"):
+            if stream and files.frozenFileHasContents(stream):
+                contents = files.frozenFileContentInfo(stream)
+                sha1 = contents.sha1()
+                updateCursor.execute("""UPDATE FileStreams SET sha1=?
+                                        WHERE streamId=?""",
+                                     sha1, streamId)
+
+        self.cu.execute("CREATE TABLE Entitlements2 AS SELECT * FROM "
+                        "Entitlements")
+        self.cu.execute("CREATE TABLE EntitlementGroups2 AS SELECT * FROM "
+                        "EntitlementGroups")
+        self.cu.execute("CREATE TABLE EntitlementOwners2 AS SELECT * FROM "
+                        "EntitlementOwners")
+        self.cu.execute("DROP TABLE Entitlements")
+        self.cu.execute("DROP TABLE EntitlementOwners")
+        self.cu.execute("DROP TABLE EntitlementGroups")
+
+        # recreate the indexes and triggers - including new path 
+        # index for TroveFiles
+        self.db.loadSchema()
+        createTroves(self.db)
+        createUsers(self.db)
+
+        self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
+                        "SELECT entGroup, entGroupId FROM EntitlementGroups2")
+        self.cu.execute("INSERT INTO EntitlementAccessMap (entGroupId, "
+                        "userGroupId) SELECT entGroupId, userGroupId FROM "
+                        "EntitlementGroups2")
+        self.cu.execute("INSERT INTO Entitlements SELECT * FROM Entitlements2")
+        self.cu.execute("INSERT INTO EntitlementOwners SELECT * FROM "
+                        "EntitlementOwners2")
+        self.cu.execute("DROP TABLE Entitlements2")
+        self.cu.execute("DROP TABLE EntitlementGroups2")
+        self.cu.execute("DROP TABLE EntitlementOwners2")
+
+        #self.db.rename("Instances", "isRedirect", "troveType")
+
+        self.db.commit()
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -1360,6 +1433,7 @@ def setupTempTables(db):
             versionId   INTEGER,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             path        VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
@@ -1435,6 +1509,16 @@ def setupTempTables(db):
         db.tempTables["hasTrovesTmp"] = True
         db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
                        check = False)
+ 
+    if "trovesByPathTmp" not in db.tempTables:
+        cu.execute("""
+             CREATE TEMPORARY TABLE
+             trovesByPathTmp(
+                 row                 INTEGER,
+                 path                VARCHAR(767)
+             )""")
+        db.tempTables["trovesByPathTmp"] = True
+
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
@@ -1489,16 +1573,16 @@ def loadSchema(db):
     # load the current schema object list
     db.loadSchema()
 
-    # instantiate and call appropriate migration objects in succession.
-    while version and version < VERSION:
-        version = (lambda x : sys.modules[__name__].__dict__[ \
-            'MigrateTo_' + str(x + 1)])(version)(db)()
-
     if version != 0 and version < 13:
+        import epdb
+        epdb.st()
         raise sqlerrors.SchemaVersionError(
             "Repository schemas from Conary versions older than 1.0 are not "
             "supported. Contact rPath for help converting your repository to "
             "a supported version.")
+
+    # surely there is a more better way of handling this...
+    if version == 13: version = MigrateTo_14(db)()
 
     if version:
         db.loadSchema()

@@ -37,7 +37,7 @@ from conary.local import schema as depSchema
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37 ]
+SERVER_VERSIONS = [ 36, 37, 38 ]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -78,14 +78,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'editAcl',
                         'changePassword',
                         'getUserGroups',
-                        'addEntitlement',
+                        'addEntitlements',
                         'addEntitlementGroup',
                         'deleteEntitlementGroup',
                         'addEntitlementOwnerAcl',
                         'deleteEntitlementOwnerAcl',
-                        'deleteEntitlement',
+                        'deleteEntitlements',
                         'listEntitlements',
                         'listEntitlementGroups',
+                        'getEntitlementClassAccessGroup',
+                        'setEntitlementClassAccessGroup',
                         'updateMetadata',
                         'getMetadata',
                         'troveNames',
@@ -96,6 +98,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getTroveLeavesByBranch',
                         'getTroveLeavesByLabel',
                         'getTroveVersionsByLabel',
+                        'getTrovesByPaths',
                         'getFileContents',
                         'getTroveLatestVersion',
                         'getChangeSet',
@@ -405,7 +408,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin):
+               label, write, capped, admin, canRemove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
@@ -417,12 +420,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             label = None
 
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         admin)
+                         admin, canRemove = canRemove)
 
         return True
 
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, admin):
+                oldLabel, trovePattern, label, write, capped, admin,
+                canRemove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -443,7 +447,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin)
+            write, capped, admin, canRemove = canRemove)
 
         return True
 
@@ -463,17 +467,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
-    def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+    def addEntitlements(self, authToken, clientVersion, entGroup, 
+                        entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.addEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.addEntitlement(authToken, entGroup, entitlement)
+
         return True
 
-    def deleteEntitlement(self, authToken, clientVersion, entGroup, 
-                          entitlement):
+    def deleteEntitlements(self, authToken, clientVersion, entGroup, 
+                           entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+
         return True
 
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,
@@ -509,6 +518,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # list of entitlements being displayed to those the user has
         # permissions to manage
         return self.auth.listEntitlementGroups(authToken)
+
+    def getEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classList):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        return self.auth.getEntitlementClassAccessGroup(authToken, classList)
+
+    def setEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classInfo):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        self.auth.setEntitlementClassAccessGroup(authToken, classInfo)
+        return ""
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
@@ -1552,6 +1574,82 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             results[row]= self.auth.checkTrove(pattern, name)
 
         return results
+
+    def getTrovesByPaths(self, authToken, clientVersion, pathList, label,
+                         all=False):
+        self.log(2, pathList, label, all)
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'trovesByPathTmp')
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return {}
+
+        for row, path in enumerate(pathList):
+            cu.execute("INSERT INTO trovesByPathTmp (row, path) "
+                       "VALUES (?, ?)", row, path)
+
+
+        query = """SELECT row, item, version, flavor, timeStamps,
+                          UP.permittedTrove 
+                        FROM trovesByPathTmp 
+                        JOIN TroveFiles USING(path)
+                        JOIN Instances USING(instanceId)
+                        JOIN Nodes ON
+                            Nodes.itemId = Instances.itemId AND
+                            Nodes.versionId = Instances.versionId
+                        JOIN LabelMap ON
+                            Nodes.itemId = LabelMap.itemId AND
+                            Nodes.branchId = LabelMap.branchId
+                        JOIN Labels USING(labelId)
+                        JOIN (SELECT
+                               Permissions.labelId as labelId,
+                               PerItems.item as permittedTrove,
+                               Permissions.permissionId as aclId
+                           FROM
+                               Permissions
+                               join Items as PerItems using (itemId)
+                           WHERE
+                               Permissions.userGroupId in (%s)
+                           ) as UP ON
+                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                        JOIN Items ON 
+                            (Instances.itemId = Items.itemId)
+                        JOIN Versions ON 
+                            (Instances.versionId = Versions.versionId)
+                        JOIN Flavors ON
+                            (Instances.flavorId = Flavors.flavorId)
+                        WHERE
+                            Instances.isPresent = 1 
+                            AND Labels.label = ?
+                        ORDER BY
+                            Nodes.finalTimestamp DESC
+                    """ % ",".join("%d" % x for x in userGroupIds)
+        cu.execute(query, label)
+
+        if all:
+            results = [[] for x in pathList]
+            for idx, name, versionStr, flavor, timeStamps, pattern in cu:
+                if not self.auth.checkTrove(pattern, name):
+                    continue
+                version = versions.VersionFromString(versionStr, 
+                        timeStamps=[float(x) for x in timeStamps.split(':')])
+                branch = version.branch()
+                results[idx].append((name, self.freezeVersion(version), flavor))
+            return results
+
+        results = [ {} for x in pathList ]
+        for idx, name, versionStr, flavor, timeStamps, pattern in cu:
+            if not self.auth.checkTrove(pattern, name):
+                continue
+
+            version = versions.VersionFromString(versionStr, 
+                        timeStamps=[float(x) for x in timeStamps.split(':')])
+            branch = version.branch()
+            results[idx].setdefault((name, branch, flavor), 
+                                    self.freezeVersion(version))
+        return [ [ (y[0][0], y[1], y[0][2]) for y in x.iteritems()] 
+                                                            for x in results ]
 
     def getCollectionMembers(self, authToken, clientVersion, troveName,
                              branch):
