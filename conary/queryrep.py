@@ -20,6 +20,7 @@ from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
+from conary.repository import trovesource
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1
@@ -30,12 +31,12 @@ FLAVOR_FILTER_AVAIL  = 1
 FLAVOR_FILTER_BEST   = 2
 
 
-def displayTroves(cfg, troveSpecs=[], 
+def displayTroves(cfg, troveSpecs=[], whatProvidesList=[],
                   # query options
                   versionFilter=VERSION_FILTER_LATEST, 
                   flavorFilter=FLAVOR_FILTER_BEST, useAffinity = False,
                   # trove options
-                  info = False, digSigs = False, deps = False,
+                  info = False, digSigs = False, showDeps = False,
                   showBuildReqs = False, 
                   # file options
                   ls = False, lsl = False, ids = False, sha1s = False, 
@@ -69,9 +70,9 @@ def displayTroves(cfg, troveSpecs=[],
        @param showBuildReqs: If true, display the versions and flavors of the
        build requirements that were used to build the given troves
        @type showBuildReqs: bool
-       @param deps: If true, display provides and requires information 
+       @param showDeps: If true, display provides and requires information 
        for the trove.
-       @type deps: bool
+       @type showDeps: bool
        @param ls: If true, list files in the trove
        @type ls: bool
        @param lsl: If true, list files in the trove + ls -l information
@@ -113,14 +114,17 @@ def displayTroves(cfg, troveSpecs=[],
     else:
         affinityDb = None
 
-    troveTups = getTrovesToDisplay(repos, troveSpecs, versionFilter,
-                                   flavorFilter, cfg.installLabelPath,
-                                   cfg.flavor, affinityDb)
+    whatProvidesList = [ deps.parseDep(x) for x in whatProvidesList ]
+
+    troveTups = getTrovesToDisplay(repos, troveSpecs, whatProvidesList,
+                                   versionFilter, flavorFilter,
+                                   cfg.installLabelPath, cfg.flavor, affinityDb)
 
 
     dcfg = display.DisplayConfig(repos, affinityDb)
 
-    dcfg.setTroveDisplay(deps=deps, info=info, showBuildReqs=showBuildReqs,
+    dcfg.setTroveDisplay(deps=showDeps, info=info, 
+                         showBuildReqs=showBuildReqs,
                          digSigs=digSigs, fullVersions=cfg.fullVersions,
                          showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
                          showComponents = cfg.showComponents,
@@ -134,7 +138,7 @@ def displayTroves(cfg, troveSpecs=[],
         # if we didn't explicitly set recurse and we're not recursing one
         # level explicitly and we specified troves (so everything won't 
         # show up at the top level anyway), guess at whether to recurse
-        recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
+        recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps,
                            fileVersions)
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
 
@@ -148,13 +152,14 @@ def displayTroves(cfg, troveSpecs=[],
     if troveSpecs:
         dcfg.setPrimaryTroves(set(troveTups))
 
+
     formatter = display.TroveFormatter(dcfg)
 
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
-                       labelPath, defaultFlavor, affinityDb):
+def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
+                       flavorFilter, labelPath, defaultFlavor, affinityDb):
     """ Finds troves that match the given trove specifiers, using the
         current configuration, and parameters
 
@@ -183,7 +188,30 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                 d.setdefault(version, []).extend(flavors)
         return resultD
 
-    if troveSpecs:
+    troveTups = []
+
+    if troveSpecs or whatProvidesList:
+        if whatProvidesList:
+            tupList = []
+            for label in labelPath:
+                sols = repos.resolveDependencies(label, whatProvidesList)
+                for solListList in sols.itervalues():
+                    # list of list of solutions to the depSet
+                    tupList.extend(itertools.chain(*solListList))
+
+            source = trovesource.SimpleTroveSource(tupList)
+            source.searchAsRepository()
+
+            troveNames = set(x[0] for x in tupList)
+            results = getTrovesToDisplay(source, troveNames, [],
+                                         versionFilter, flavorFilter, labelPath,
+                                         defaultFlavor, None)
+            troveTups.extend(results)
+
+
+        if not troveSpecs:
+            return sorted(troveTups)
+
         # Search for troves using findTroves.  The options we
         # specify to findTroves are determined by the version and 
         # flavor filter.
@@ -250,7 +278,6 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
 
         # do post processing on the result if necessary
         if (flavorFilter == FLAVOR_FILTER_ALL or versionFilter == VERSION_FILTER_LATEST):
-            troveTups = []
             for (n,vS,fS), tups in results.iteritems():
                 if not tups:
                     continue
@@ -277,7 +304,7 @@ def getTrovesToDisplay(repos, troveSpecs, versionFilter, flavorFilter,
                             continue
                     troveTups.append((n, v, f))
         else:
-            troveTups = list(itertools.chain(*results.itervalues()))
+            troveTups.extend(itertools.chain(*results.itervalues()))
     else:
         # no troves specified, use generic fns with no names given.
         if versionFilter == VERSION_FILTER_ALL:

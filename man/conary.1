@@ -366,8 +366,17 @@ Displays the tags associated with each file.  When a file with a tag is installe
 .B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Lists troves in the repository. Synonyms: \fBrq\fP
 .TP
-Repquery takes several options to modify which troves it returns to you.  The options affect both the verisons of trove returned and the flavors returned.  We call these version and flavor filters.  All flavor filtering occurs after version filtering.  Both types of filtering occur after any version or flavor specified in a trove spec is applied.  The default version filter is --latest, the default flavor filter is--best.
+Repquery takes several options to modify which troves it returns to you.  The options affect both the verisons of trove returned and the flavors returned.  We call these version and flavor filters.  All flavor filtering occurs after version filtering.  Both types of filtering occur after any version or flavor specified in a trove spec is applied.  The default version filter is --latest, the default flavor filter is --best-flavors.
+.TP 4
+.B Trove Selection
 
+By default conary selects troves out of the entire repository, filtering by 
+the troves you list.  You can also select troves by the following methods:
+.RS
+.TP
+.B \-\-what-provides <dep>
+Displays information about the troves that provide dep <dep>, if any.
+.RE
 .TP 4
 .B Version Selection
 .RS
@@ -425,6 +434,9 @@ information is displayed (but they cannot be combined, unfortunately). Synonyms:
 .TP
 .B \-\-path <path>
 Displays information about the trove that owns the path <path>, if any.
+.TP
+.B \-\-what-provides <dep>
+Displays information about the troves that provide dep <dep>, if any.
 .RE
 .RE
 .TP
