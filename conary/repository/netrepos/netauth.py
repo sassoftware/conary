@@ -258,7 +258,7 @@ class NetworkAuthorization:
         return groupSet
 
     def check(self, authToken, write = False, admin = False, label = None,
-              trove = None, mirror = False):
+              trove = None, mirror = False, remove = False):
         self.log(3, authToken[0],
                  "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
@@ -316,6 +316,9 @@ class NetworkAuthorization:
         if admin:
             where.append("Permissions.admin=1")
 
+        if remove:
+            where.append("Permissions.canRemove=1")
+
         if where:
             stmt += "WHERE " + " AND ".join(where)
 
@@ -347,8 +350,8 @@ class NetworkAuthorization:
             return True
         return False
 
-    def addAcl(self, userGroup, trovePattern, label, write, capped, admin,
-               canRemove = False):
+    def addAcl(self, userGroup, trovePattern, label, write = False, 
+               capped = False, admin = False, canRemove = False):
         self.log(3, userGroup, trovePattern, label, write, admin, canRemove)
         cu = self.db.cursor()
 
