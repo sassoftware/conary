@@ -31,10 +31,10 @@ FLAVOR_FILTER_AVAIL  = 1
 FLAVOR_FILTER_BEST   = 2
 
 
-def displayTroves(cfg, troveSpecs=[], whatProvidesList=[],
+def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
                   # query options
                   versionFilter=VERSION_FILTER_LATEST, 
-                  flavorFilter=FLAVOR_FILTER_BEST, pathList = [],
+                  flavorFilter=FLAVOR_FILTER_BEST, 
                   useAffinity = False,
                   # trove options
                   info = False, digSigs = False, showDeps = False,
