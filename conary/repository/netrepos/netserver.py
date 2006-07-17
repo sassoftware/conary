@@ -1359,18 +1359,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return result
 
 
+    def prepareChangeSet(self, authToken, clientVersion, jobList=None,
+                         mirror=False):
+        if jobList:
+            for name, oldInfo, newInfo, absolute in jobList:
+                assert(newInfo[0])
+                newLabel = self.toVersion(newInfo[0]).branch().label()
+                if not self.auth.check(authToken, write = True, mirror = mirror,
+                                       label = newLabel,
+                                       trove = name):
+                    raise errors.InsufficientPermission
+                if oldInfo[0]:
+                    oldLabel = self.toVersion(newInfo[0]).branch().label()
+                    if not self.auth.check(authToken, write = True,
+                                           mirror = mirror, label = oldLabel,
+                                           trove = name):
+                        raise errors.InsufficientPermission
 
-    def prepareChangeSet(self, authToken, clientVersion):
-	# make sure they have a valid account and permission to commit to
-	# *something*
-	if not self.auth.check(authToken, write = True):
-	    raise errors.InsufficientPermission
         self.log(2, authToken[0])
-	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
-	os.close(fd)
+  	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
+  	os.close(fd)
 	fileName = os.path.basename(path)
 
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
+
 
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
 	assert(url.startswith(self.urlBase()))

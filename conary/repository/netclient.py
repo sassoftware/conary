@@ -1658,19 +1658,35 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if chgSet.isEmpty():
             raise errors.CommitError('Attempted to commit an empty changeset')
             
+        jobs = []
 	for trove in chgSet.iterNewTroveList():
 	    v = trove.getOldVersion()
 	    if v:
 		if serverName is None:
 		    serverName = v.getHost()
 		assert(serverName == v.getHost())
+                oldVer = self.fromVersion(v)
+                oldFlavor = self.fromFlavor(trove.getOldFlavor())
+            else:
+                oldVer = ''
+                oldFlavor = ''
 
 	    v = trove.getNewVersion()
 	    if serverName is None:
 		serverName = v.getHost()
 	    assert(serverName == v.getHost())
 
-	url = self.c[serverName].prepareChangeSet()
+            jobs.append((trove.getName(), (oldVer, oldFlavor),
+                         (self.fromVersion(trove.getNewVersion()),
+                          self.fromFlavor(trove.getNewFlavor())),
+                         trove.isAbsolute()))
+
+
+
+        if self.c[serverName]._protocolVersion >= 38:
+            url = self.c[serverName].prepareChangeSet(jobs, mirror)
+        else:
+            self.c[serverName].prepareChangeSet()
 
         self._putFile(url, fName, callback = callback)
 
