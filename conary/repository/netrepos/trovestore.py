@@ -1051,7 +1051,7 @@ class TroveStore:
         else:
             cu.execute("UPDATE Latest SET versionId = ? WHERE "
                        "itemId = ? AND flavorId = ? AND branchId = ?",
-                       itemId, flavorId, branchId)
+                       prevVersionId, itemId, flavorId, branchId)
 
         # do we need the labelmap entry anymore?
         cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
@@ -1102,6 +1102,16 @@ class TroveStore:
         # XXX what about metadata?
 
         return filesToRemove
+
+    def markTroveRemoved(self, name, version, flavor):
+        trv = trove.Trove(name, version, flavor, None,
+                          type = trove.TROVE_TYPE_REMOVED)
+
+        shas = self.removeTrove(name, version, flavor)
+        info = self.addTrove(trv)
+        self.addTroveDone(info)
+
+        return shas
 
     def commit(self):
 	if self.needsCleanup:
