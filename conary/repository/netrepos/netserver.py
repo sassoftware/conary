@@ -1358,23 +1358,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return result
 
+    def _checkCommitPermissions(self, authToken, verList, mirror):
+        for name, oldVer, newVer in verList:
+            assert(newVer)
+            newLabel = newVer.branch().label()
+            if not self.auth.check(authToken, write = True, mirror = mirror,
+                                   label = newLabel,
+                                   trove = name):
+                raise errors.InsufficientPermission
+            if oldVer:
+                oldLabel = oldVer.branch().label()
+                if not self.auth.check(authToken, write = True,
+                                       mirror = mirror, label = oldLabel,
+                                       trove = name):
+                    raise errors.InsufficientPermission
 
     def prepareChangeSet(self, authToken, clientVersion, jobList=None,
                          mirror=False):
-        if jobList:
+        def _convertJobList(jobList):
             for name, oldInfo, newInfo, absolute in jobList:
-                assert(newInfo[0])
-                newLabel = self.toVersion(newInfo[0]).branch().label()
-                if not self.auth.check(authToken, write = True, mirror = mirror,
-                                       label = newLabel,
-                                       trove = name):
-                    raise errors.InsufficientPermission
-                if oldInfo[0]:
-                    oldLabel = self.toVersion(newInfo[0]).branch().label()
-                    if not self.auth.check(authToken, write = True,
-                                           mirror = mirror, label = oldLabel,
-                                           trove = name):
-                        raise errors.InsufficientPermission
+                oldVer = oldInfo[0]
+                newVer = newInfo[0]
+                if oldVer:
+                    oldVer = self.toVersion(oldVer)
+                if newVer:
+                    newVer = self.toVersion(newVer)
+                yield name, oldVer, newVer
+
+        if jobList:
+            self._checkCommitPermissions(authToken, _convertJobList(jobList),
+                                         mirror)
 
         self.log(2, authToken[0])
   	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
@@ -1427,23 +1440,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _commitChangeSet(self, authToken, cs, mirror = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
+
+        verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
+                    for x in cs.iterNewTroveList())
+        self._checkCommitPermissions(authToken, verList, mirror)
+
         items = {}
         for troveCs in cs.iterNewTroveList():
-            name = troveCs.getName()
-            version = troveCs.getNewVersion()
-            flavor = troveCs.getNewFlavor()
-            if not self.auth.check(authToken, write = True, mirror = mirror,
-                                   label = version.branch().label(),
-                                   trove = name):
-                raise errors.InsufficientPermission
-
-            oldVersion = troveCs.getOldVersion()
-            if oldVersion is not None and \
-               not self.auth.check(authToken, mirror = mirror,
-                                   label = oldVersion.branch().label(),
-                                   trove = name):
-                raise errors.InsufficientPermission
-
+            (name, version, flavor) = troveCs.getNewNameVersionFlavor()
             items.setdefault((version, flavor), []).append(name)
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
