@@ -389,6 +389,21 @@ class BaseDatabase:
             self.tables[table].remove(name)
         return True
 
+    # since not all databases handle renaming and dropping columns the
+    # same way, we provide a more generic interface in here
+    def dropColumn(self, table, name):
+        assert(self.dbh)
+        sql = "ALTER TABLE %s DROP COLUMN %s" % (table, name)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
+    def renameColumn(self, table, oldName, newName):
+        assert(self.dbh)
+        sql = "ALTER TABLE %s RENAME COLUMN %s TO %s" % (table, oldName, newName)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
+
     # easy access to the schema state
     def loadSchema(self):
         assert(self.dbh)
