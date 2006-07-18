@@ -2251,6 +2251,8 @@ conary erase '%s=%s[%s]'
                                             uploadRateLimit =
                                                 cfg.uploadRateLimit,
                                             localRepository = db,
+                                            entitlementDir =
+                                                    cfg.entitlementDirectory,
                                             pwPrompt = self.repos.getPwPrompt())
             callback.setAbortEvent(stopSelf)
 
