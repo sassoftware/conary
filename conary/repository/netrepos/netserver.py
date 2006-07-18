@@ -74,8 +74,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'listAccessGroups',
                         'updateAccessGroupMembers',
                         'setUserGroupCanMirror',
+                        'listAcls',
                         'addAcl',
                         'editAcl',
+                        'deleteAcl',
                         'changePassword',
                         'getUserGroups',
                         'addEntitlements',
@@ -407,6 +409,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.setMirror(userGroup, canMirror)
         return True
 
+    def listAcls(self, authToken, clientVersion, userGroup):
+        if not self.auth.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], userGroup)
+
+        returner = list()
+        for acl in self.auth.iterPermsByGroup(userGroup):
+            acl = list(acl)
+            if acl[0] is None:
+                acl[0] = ""
+            if acl[1] is None:
+                acl[1] = ""
+            returner.append(acl)
+        return returner
+
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin, remove = False):
         if not self.auth.check(authToken, admin = True):
@@ -421,6 +438,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
                          admin, remove = remove)
+
+        return True
+
+    def deleteAcl(self, authToken, clientVersion, userGroup, trovePattern,
+               label):
+        if not self.auth.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], userGroup, trovePattern, label)
+        if trovePattern == "":
+            trovePattern = None
+
+        if label == "":
+            label = None
+
+        self.auth.deleteAcl(userGroup, label, trovePattern)
 
         return True
 

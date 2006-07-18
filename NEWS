@@ -1,4 +1,6 @@
 Changes in 1.1:
+  o API Changes:
+    * Exposed deleteAcl and added a listAcls method to conary client.
   o Server Changes:
     * Entitlement classes can now provide access to multiple access
       groups (and updated the web ui to support that) (CNY-600)
