@@ -7,6 +7,8 @@ Changes in 1.1:
     * Added getTroveLeavesByPath and getTroveVersionsByPath. (for CNY-74)
     * Added a separate acl permission for being able to remove troves from
       a repository and updated the web UI to support it
+    * Conary now checks to ensure you have write access to all the things
+      you're trying to commit before you send them across the wire. (CNY-616)
 
   o Client Changes:
     * conary rq now --path, which allows you to search for troves in the 

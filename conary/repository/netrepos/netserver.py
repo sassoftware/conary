@@ -1358,19 +1358,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return result
 
+    def _checkCommitPermissions(self, authToken, verList, mirror):
+        for name, oldVer, newVer in verList:
+            assert(newVer)
+            newLabel = newVer.branch().label()
+            if not self.auth.check(authToken, write = True, mirror = mirror,
+                                   label = newLabel,
+                                   trove = name):
+                raise errors.InsufficientPermission
+            if oldVer:
+                oldLabel = oldVer.branch().label()
+                if not self.auth.check(authToken, write = True,
+                                       mirror = mirror, label = oldLabel,
+                                       trove = name):
+                    raise errors.InsufficientPermission
 
+    def prepareChangeSet(self, authToken, clientVersion, jobList=None,
+                         mirror=False):
+        def _convertJobList(jobList):
+            for name, oldInfo, newInfo, absolute in jobList:
+                oldVer = oldInfo[0]
+                newVer = newInfo[0]
+                if oldVer:
+                    oldVer = self.toVersion(oldVer)
+                if newVer:
+                    newVer = self.toVersion(newVer)
+                yield name, oldVer, newVer
 
-    def prepareChangeSet(self, authToken, clientVersion):
-	# make sure they have a valid account and permission to commit to
-	# *something*
-	if not self.auth.check(authToken, write = True):
-	    raise errors.InsufficientPermission
+        if jobList:
+            self._checkCommitPermissions(authToken, _convertJobList(jobList),
+                                         mirror)
+
         self.log(2, authToken[0])
-	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
-	os.close(fd)
+  	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
+  	os.close(fd)
 	fileName = os.path.basename(path)
 
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
+
 
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
 	assert(url.startswith(self.urlBase()))
@@ -1415,29 +1440,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _commitChangeSet(self, authToken, cs, mirror = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
+
+        verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
+                    for x in cs.iterNewTroveList())
+        self._checkCommitPermissions(authToken, verList, mirror)
+
         items = {}
+        # check removed permissions; _checkCommitPermissions can't do
+        # this for us since it's based on the trove type
         for troveCs in cs.iterNewTroveList():
-            name = troveCs.getName()
-            version = troveCs.getNewVersion()
-            flavor = troveCs.getNewFlavor()
+            if troveCs.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
 
-            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
-                needRemove = True
-                needWrite = False
-            else:
-                needRemove = False
-                needWrite = True
+            (name, version, flavor) = troveCs.getNewNameVersionFlavor()
 
-            if not self.auth.check(authToken, write = needWrite,
-                                   mirror = mirror, remove = needRemove,
+            if not self.auth.check(authToken, mirror = mirror, remove = True,
                                    label = version.branch().label(),
-                                   trove = name):
-                raise errors.InsufficientPermission
-
-            oldVersion = troveCs.getOldVersion()
-            if oldVersion is not None and \
-               not self.auth.check(authToken, mirror = mirror,
-                                   label = oldVersion.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
 
