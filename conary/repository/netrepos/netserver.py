@@ -408,7 +408,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin, canRemove = False):
+               label, write, capped, admin, remove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
@@ -420,7 +420,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             label = None
 
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         admin, canRemove = canRemove)
+                         admin, remove = remove)
 
         return True
 
@@ -1420,7 +1420,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             name = troveCs.getName()
             version = troveCs.getNewVersion()
             flavor = troveCs.getNewFlavor()
-            if not self.auth.check(authToken, write = True, mirror = mirror,
+
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                needRemove = True
+                needWrite = False
+            else:
+                needRemove = False
+                needWrite = True
+
+            if not self.auth.check(authToken, write = needWrite,
+                                   mirror = mirror, remove = needRemove,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
@@ -1433,6 +1442,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 raise errors.InsufficientPermission
 
             items.setdefault((version, flavor), []).append(name)
+
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, mirror = mirror)

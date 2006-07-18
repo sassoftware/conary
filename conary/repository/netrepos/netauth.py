@@ -351,8 +351,8 @@ class NetworkAuthorization:
         return False
 
     def addAcl(self, userGroup, trovePattern, label, write = False, 
-               capped = False, admin = False, canRemove = False):
-        self.log(3, userGroup, trovePattern, label, write, admin, canRemove)
+               capped = False, admin = False, remove = False):
+        self.log(3, userGroup, trovePattern, label, write, admin, remove)
         cu = self.db.cursor()
 
         if write:
@@ -370,10 +370,10 @@ class NetworkAuthorization:
         else:
             admin = 0
 
-        if canRemove:
-            canRemove = 1
+        if remove:
+            remove = 1
         else:
-            canRemove = 0
+            remove = 0
 
         # XXX This functionality is available in the TroveStore class
         #     refactor so that the code is not in two places
@@ -409,7 +409,7 @@ class NetworkAuthorization:
                  canRemove)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (userGroupId, labelId, itemId, write, capped, admin, 
-                  canRemove))
+                  remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)

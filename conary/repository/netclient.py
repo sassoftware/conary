@@ -518,7 +518,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
-               capped = False, admin = False, canRemove = False):
+               capped = False, admin = False, remove = False):
         if not label:
             label = "ALL"
         else:
@@ -529,11 +529,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         kwargs = {}
 
-        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+        if remove and self.c[reposLabel]._protocolVersion < 38:
             raise InvalidServerVersion, "Setting canRemove for an acl " \
                     "requires a repository running Conary 1.1 or later."
-        elif canRemove:
-            kwargs['canRemove'] = True
+        elif remove:
+            kwargs['remove'] = True
 
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
                                   capped, admin, **kwargs)

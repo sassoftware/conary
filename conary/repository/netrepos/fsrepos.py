@@ -14,12 +14,13 @@
 
 # implements a db-based repository
 
+import errno
 import traceback
 import sys
 
 from conary import files, trove
 from conary.deps import deps
-from conary.lib import util, openpgpfile
+from conary.lib import util, openpgpfile, sha1helper
 from conary.repository import changeset, errors, filecontents
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
@@ -32,6 +33,9 @@ class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, *args, **kw):
         self.mirror = kw.pop('mirror', False)
         ChangeSetJob.__init__(self, *args, **kw)
+
+    def markTroveRemoved(self, name, version, flavor):
+        self.repos.markTroveRemoved(name, version, flavor)
 
     def checkTroveCompleteness(self, trv):
         if not self.mirror and not trv.troveInfo.sigs.sha1():
@@ -165,6 +169,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             raise
         else:
             self.troveStore.commit()
+
+    def markTroveRemoved(self, name, version, flavor):
+        sha1s = self.troveStore.markTroveRemoved(name, version, flavor)
+        for sha1 in sha1s:
+            try:
+                self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
 
     def getFileContents(self, itemList):
         contents = []
