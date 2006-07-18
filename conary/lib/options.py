@@ -129,9 +129,12 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
     # message.  We want it to be a string.  For now, we
     # convert here to allow backwards compatibility.
     if hasattr(usage, '__call__'):
-        s = StringIO.StringIO()
+        stdout = StringIO.StringIO()
+        stderr = StringIO.StringIO()
         oldStdOut = sys.stdout
-        sys.stdout = s
+        oldStdErr = sys.stderr
+        sys.stdout = stdout
+        sys.stderr = stderr
         try:
             usage()
         except SystemExit:
@@ -139,7 +142,8 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
             # printing the usage message!
             pass
         sys.stdout = oldStdOut
-        usage = s.getvalue()
+        sys.stderr = oldStdErr
+        usage = stdout.getvalue() + stderr.getvalue()
 
 
     if defaultGroup:
