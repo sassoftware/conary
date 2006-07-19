@@ -21,6 +21,8 @@ Changes in @NEW@:
     * Improved error messages when entitlements fail to load (CNY-662)
     * The repository client no longer caches repo access info when the 
       attempt to access was unsuccessful. (CNY-673, affects CNY-578)
+    * Select better flavors for updateall when updating x86 troves
+      on an x86_64 system (CNY-628)
 
 Changes in 1.0.23:
   o API Additions:

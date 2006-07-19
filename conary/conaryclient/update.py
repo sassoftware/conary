@@ -1642,11 +1642,15 @@ conary erase '%s=%s[%s]'
             score = None
             for instFlavor in self.cfg.flavor:
                 newScore = instFlavor.score(flavor) 
+                if newScore is False:
+                    continue
                 if score is None or newScore > score:
                     score = newScore
                     finalFlavor = instFlavor
 
-            flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+            if score is not None:
+                # otherwise, we'll search all flavors on update using affinity.
+                flavor = deps.overrideFlavor(finalFlavor, flavor)
 
             if len(installedDict[name]) == 1:
                 updateItems.append((name, None, flavor))
