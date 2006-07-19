@@ -19,10 +19,12 @@ import os
 import sys
 import xml
 import re
+import traceback
 
 from conary.deps import deps, arch
 from conary.lib import util
 from conary.lib.cfg import *
+from conary import errors
 from conary import versions
 from conary import flavorcfg
 
@@ -447,6 +449,108 @@ def emitEntitlement(serverName, className, key):
 </entitlement>
 """ % (serverName, className, key)
 
+def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
+    p = EntitlementParser()
+
+    # wrap this in an <entitlement> top level tag (making it optional
+    # [but recommended!] in the entitlement itself)
+    #
+    # XXX This synthetic wrapping should probably be made obsolete; everyone
+    # should use emitEntitlement, which does the right thing.
+    try:
+        if '<entitlement>' not in xmlContent:
+            p.parse("<entitlement>" + xmlContent + "</entitlement>")
+        else:
+            p.parse(xmlContent)
+
+        try:
+            entServer = p['server']
+            entClass = p['class']
+            endKey = p['key']
+        except KeyError:
+            raise errors.ConaryError("Entitlement incomplete.  Entitlements"
+                                     " must include 'server', 'class', and"
+                                     " 'key' values")
+    except Exception, err:
+        raise errors.ConaryError("Malformed entitlement for %s at %s:"
+                                 " %s" % (serverName, source, err))
+
+    if entServer != serverName: 
+        raise errors.ConaryError("Entitlement at %s is for server '%s', "
+                         "should be for '%s'" % (source, entServer, serverName))
+
+    return (entClass, endKey)
+
+def loadEntitlementFromProgram(fullPath, serverName):
+    """ Executes the given file to generate an entitlement.
+        The executable must print to stdout a full valid entitlement xml
+        blob.
+    """
+    readFd, writeFd = os.pipe()
+    stdErrRead, stdErrWrite = os.pipe()
+    childPid = os.fork()
+    if not childPid:
+        try:
+            try:
+                os.close(readFd)
+                os.close(sys.stdin.fileno())
+
+                # both error and stderr are redirected  - the entitlement
+                # should be on stdout, and error info should be 
+                # on stderr.
+                os.dup2(writeFd, sys.stdout.fileno())
+                os.dup2(stdErrWrite, sys.stderr.fileno())
+                os.close(writeFd)
+                os.close(stdErrWrite)
+                os.execl(fullPath, fullPath, serverName)
+            except Exception, err:
+                traceback.print_exc(sys.stderr)
+        finally:
+            os._exit(1)
+    os.close(writeFd)
+    os.close(stdErrWrite)
+
+    # read in from pipes.  When they're closed,
+    # the child process should have exited.
+    output = []
+    errorOutput = []
+    buf = os.read(readFd, 1024)
+    errBuf = os.read(stdErrRead, 1024)
+
+    while buf or errBuf:
+        if buf:
+            output.append(buf)
+            buf = os.read(readFd, 1024)
+        if errBuf:
+            errorOutput.append(errBuf)
+            errBuf = os.read(stdErrRead, 1024)
+
+    pid, status = os.waitpid(childPid, 0)
+
+    errMsg = ''
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status):
+        errMsg = ('Entitlement generator at "%s"'
+                  ' died with exit status %d' % (fullPath,
+                                                 os.WEXITSTATUS(status)))
+    elif os.WIFSIGNALED(status):
+        errMsg = ('Entitlement generator at "%s"'
+                  ' died with signal %d' % (fullPath, os.WTERMSIG(status)))
+    else:
+        errMsg = ''
+
+    if errMsg:
+        if errorOutput:
+            errMsg += ' - stderr output follows:\n%s' % ''.join(errorOutput)
+        else:
+            errMsg += ' - no output on stderr'
+        raise errors.ConaryError(errMsg)
+
+    # looks like we generated an entitlement - they're still the possibility
+    # that the entitlement is broken.
+    xmlContent = ''.join(output)
+    return loadEntitlementFromString(xmlContent, serverName, fullPath)
+
+
 def loadEntitlement(dirName, serverName):
     # XXX this should be replaced with a real xml parser
 
@@ -457,55 +561,18 @@ def loadEntitlement(dirName, serverName):
         return None
 
     fullPath = os.path.join(dirName, serverName)
-    if os.access(fullPath, os.X_OK):
-        pipe = os.pipe()
-        childPid = os.fork()
-        if not childPid:
-            # double fork so we can wait immediately and not worry about
-            # it later on
-            if os.fork(): 
-                # there is probably a better way of exiting without
-                # cleaning things up?
-                os.kill(os.getpid(), 9)
-
-            os.dup2(pipe[1], 1)
-            os.close(0)
-            os.close(2)
-            os.close(pipe[0])
-            os.close(pipe[1])
-            os.execl(fullPath, fullPath, serverName)
-            os.kill(os.getpid(), 9)
-
-        os.close(pipe[1])
-        os.waitpid(childPid, 0)
-
-        f = os.fdopen(pipe[0])
-    elif os.access(fullPath, os.R_OK):
-        f = open(fullPath)
-    else:
-        return None
-
-    xmlContent = f.read()
 
     p = EntitlementParser()
+    if not os.access(fullPath, os.R_OK):
+        return None
 
-    # wrap this in an <entitlement> top level tag (making it optional
-    # [but recommended!] in the entitlement itself)
-    #
-    # XXX This synthetic wrapping should probably be made obsolete; everyone
-    # should use emitEntitlement, which does the right thing.
-    if '<entitlement>' not in xmlContent:
-        p.parse("<entitlement>" + xmlContent + "</entitlement>")
+    if os.access(fullPath, os.X_OK):
+        return loadEntitlementFromProgram(fullPath, serverName)
+    elif os.access(fullPath, os.R_OK):
+        return loadEntitlementFromString(open(fullPath).read(), serverName,
+                                         fullPath)
     else:
-        p.parse(xmlContent)
-
-    entServer = p['server']
-    entClass = p['class']
-    endKey = p['key']
-
-    if entServer != serverName: raise SyntaxError
-
-    return (entClass, endKey)
+        return None
 
 class EntitlementParser(dict):
 
