@@ -309,8 +309,6 @@ class ServerCache:
 
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
-        self.cache[serverName] = server
-
         try:
             serverVersions = server.checkVersion()
         except Exception, e:
@@ -345,6 +343,7 @@ class ServerCache:
         server._protocolVersion = max(intersection)
 
         transporter.setCompress(True)
+        self.cache[serverName] = server
 
 	return server
 

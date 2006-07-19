@@ -19,6 +19,8 @@ Changes in @NEW@:
       showcs.  (CNY-642)
     * Fixed a bug in the NetworkRepositoryClient default pwPrompt mechanism.
     * Improved error messages when entitlements fail to load (CNY-662)
+    * The repository client no longer caches repo access info when the 
+      attempt to access was unsuccessful. (CNY-673, affects CNY-578)
 
 Changes in 1.0.23:
   o API Additions:
