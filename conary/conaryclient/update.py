@@ -25,7 +25,6 @@ from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
 from conary.repository.errors import TroveMissing
-from conary.repository.netclient import NetworkRepositoryClient
 from conary import trove, versions
 
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
@@ -2244,16 +2243,7 @@ conary erase '%s=%s[%s]'
             # so make sure that references this fresh db as well.
             db = database.Database(cfg.root, cfg.dbPath)
             uJob.troveSource.db = db
-            repos = NetworkRepositoryClient(cfg.repositoryMap,
-                                            self.repos.getUserMap(),
-                                            downloadRateLimit =
-                                                cfg.downloadRateLimit,
-                                            uploadRateLimit =
-                                                cfg.uploadRateLimit,
-                                            localRepository = db,
-                                            entitlementDir =
-                                                    cfg.entitlementDirectory,
-                                            pwPrompt = self.repos.getPwPrompt())
+            repos = self.createRepos(db, cfg)
             callback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):
