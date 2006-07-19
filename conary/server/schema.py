@@ -1358,24 +1358,47 @@ class MigrateTo_13(SchemaMigration):
 class MigrateTo_14(SchemaMigration):
     Version = 14
     def migrate(self):
+        self.message('WARNING: do NOT try to interrupt this migration, you will leave your DB in a messy state')
+
+        updateCursor = self.db.cursor()
+        self.cu.execute("""CREATE TEMPORARY TABLE tmpSha1s (streamId INTEGER,
+                                                            sha1  BINARY(20))""",
+                                                        start_transaction=False)
+        self.cu.execute('CREATE INDEX tmpSha1sIdx ON tmpSha1s(streamId)')
+        total = self.cu.execute('SELECT max(streamId) FROM FileStreams').fetchall()[0][0]
+        pct = 0
+        for idx, (streamId, fileId, stream) in \
+                enumerate(updateCursor.execute("SELECT streamId, fileId, stream FROM "
+                                "FileStreams ORDER BY StreamId")):
+            if stream and files.frozenFileHasContents(stream):
+                contents = files.frozenFileContentInfo(stream)
+                sha1 = contents.sha1()
+                self.cu.execute("""UPDATE tmpSha1s SET sha1=?
+                                        WHERE streamId=?""",
+                                     sha1, streamId, start_transaction=False)
+            newPct = (streamId * 100)/total
+            if newPct - 5 >= pct:
+                pct = newPct
+                self.message('Calculating sha1 for fileStream %s/%s (%s%%)...' % (streamId, total, pct))
+
+        self.message('Populating FileStream Table with sha1s...')
+
+        # delay this as long as possible, any CTRL-C after this point
+        # will make future migrations fail.
         self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
-                        "sha1        %(BINARY20)s" 
+                        "sha1        %(BINARY20)s"
                         % self.db.keywords)
         self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
                         "canRemove   INTEGER NOT NULL DEFAULT 0"
                         % self.db.keywords)
 
-        updateCursor = self.db.cursor()
-        for (streamId, fileId, stream) in \
-                self.cu.execute("SELECT streamId, fileId, stream FROM "
-                                "FileStreams"):
-            if stream and files.frozenFileHasContents(stream):
-                contents = files.frozenFileContentInfo(stream)
-                sha1 = contents.sha1()
-                updateCursor.execute("""UPDATE FileStreams SET sha1=?
-                                        WHERE streamId=?""",
-                                     sha1, streamId)
+        self.cu.execute("""UPDATE FileStreams
+                            SET sha1 =
+                                (SELECT sha1 FROM tmpSha1s
+                                 WHERE FileStreams.streamid=tmpSha1s.streamid)""")
+        self.cu.execute('DROP TABLE tmpSha1s')
 
+        self.message('Updating Entitlements...')
         self.cu.execute("CREATE TABLE Entitlements2 AS SELECT * FROM "
                         "Entitlements")
         self.cu.execute("CREATE TABLE EntitlementGroups2 AS SELECT * FROM "
@@ -1389,8 +1412,10 @@ class MigrateTo_14(SchemaMigration):
         # recreate the indexes and triggers - including new path 
         # index for TroveFiles
         self.db.loadSchema()
+        self.message('Recreating indexes... (this could take a while)')
         createTroves(self.db)
         createUsers(self.db)
+        self.message('Indexes created.')
 
         self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
                         "SELECT entGroup, entGroupId FROM EntitlementGroups2")
