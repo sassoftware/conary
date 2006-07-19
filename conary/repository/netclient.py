@@ -524,6 +524,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                capped = False, admin = False, remove = False):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 
@@ -546,11 +548,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 admin = False, canRemove = False):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 
         if not oldLabel:
             oldLabel = "ALL"
+        elif type(oldLabel) == str:
+            pass
         else:
             oldLabel = self.fromLabel(oldLabel)
 
@@ -578,6 +584,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteAcl(self, reposLabel, userGroup, trovePattern, label):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 
