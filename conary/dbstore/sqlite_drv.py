@@ -253,6 +253,92 @@ class Database(BaseDatabase):
         """ % (table, column)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
+    # extract the sql fields from a schema definition
+    def __parseFields(self, fStr):
+        types = """((
+        PRIMARY\ KEY | NOT\ NULL | AUTOINCREMENT | DEFAULT\ \S+ |
+        (VAR)?(CHAR|BINARY) \s* (\(\w+\))? | NUMERIC \s* \(\w+(,\w+)?\) |
+        INT | INTEGER | BLOB | STR | STRING | UNIQUE ) \s*?)+
+        """
+        # extract the fields
+        fields = []
+        fStr = "(%s)" % (fStr,)
+        regex = re.compile(
+            """^\s* \( \s*
+            (?P<name>\w+) \s+ (?P<type>%s) , \s* (?P<rest>.*?)
+            \s* \)  \s* $""" % (types,),
+            re.I | re.M | re.S | re.X)
+        lastField = False
+        while 1:
+            match = regex.match(fStr)
+            if not match:
+                if lastField:
+                    break
+                # try it as the last field
+                regex = re.compile(
+                    """^\s* \( \s*
+                    (?P<name>\w+) \s+ (?P<type>%s)
+                    \s* \)  \s* $""" % (types,),
+                    re.I | re.M | re.S | re.X)
+                match = regex.match(fStr)
+                if not match:
+                    break
+                lastField = True
+            d = match.groupdict()
+            fields.append((d['name'], d["type"]))
+            if lastField:
+                break
+            fStr = "(%s)" % (d["rest"],)
+        assert(fields), "Could not parse table fields:\n%s" %(stmt["fields"],)
+        return fields
+
+    # grab the SQL definition of this table
+    def __getSQLstmt(self, table):
+        cu = self.dbh.cursor()
+        cu.execute("SELECT sql FROM sqlite_master WHERE "
+                   "tbl_name = '%s' AND type = 'table'" % (table,))
+        oldSql = cu.fetchone()[0]
+        stmt = {}
+        regex = re.compile(
+            """^\s*
+            (?P<header>CREATE\s+TABLE\s+\w+) \s* 
+            \( \s*
+            (?P<fields>.*) \s*
+            (?P<constraint>, \s* CONSTRAINT .*?)?
+            \s* \)  \s*
+            (?P<final> .*)$""",
+            re.I | re.M | re.S | re.X)
+        match = regex.match(oldSql)
+        assert(match), "CREATE TABLE statement does not match regex:\n%s" % (oldSql,)
+        stmt.update(match.groupdict())
+        
+    # since sqlite does not provide us with SQL-accessible information
+    # about the column options such as DEFAULT and/or NOT NULL, the
+    # safest way to affect a column change is to grab the old table
+    # definition from the sqlite_master and whish for the best...
+    def renameColumn(self, table, oldName, newName):
+        assert(self.dbh)
+        # parse the table fields
+        fields = self.__parseFields(stmt["fields"])
+        newFields = []
+        for (n, t) in fields:
+            if n.lower() == oldName.lower():
+                newFields.append((newName, t))
+            else:
+                newFields.append((n,t))
+        stmt["fields"] = ",\n".join(["%s %s" % (x[0], x[1]) for x in newFields])
+        newSql = "%(header)s (\n%(fields)s %(constraint)s\n) %(final)s" % stmt
+        cu.execute("ALTER TABLE %s RENAME TO %s_tmp" % (table, table))
+        cu.execute(newSql)
+        cu.execute("INSERT INTO %s (%s) SELECT %s from %s_tmp" % (
+            table, ",".join([x[0] for x in newFields]),
+            ",".join([x[0] for x in fields]), table))
+        cu.execute("DROP TABLE %s_tmp" % (table,))
+        return True
+
+    def dropColumn(self, table, name):
+        assert(self.dbh)
+
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):
         assert(self.dbh)

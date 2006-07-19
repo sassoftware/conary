@@ -198,6 +198,37 @@ class Database(BaseDatabase):
         self.tables[table].remove(name)
         return True
 
+    # MySQL requires us to redefine a column even if all we need is to
+    # rename it...
+    def renameColumn(self, table, oldName, newName):
+        assert(self.dbh)
+        cu = self.dbh.cursor()
+        # first, we need to extract the old column definition
+        cu.execute("SHOW FULL COLUMNS FROM %s LIKE '%s'" % (table, oldName))
+        (oldName, colType, collation, null, key, default, extra, privs, comment) = \
+                  cu.fetchone()
+        # this is a bit tedious, but it has to be done...
+        if collation is not None:
+            collation = "COLLATE %s" % (collation,)
+        else:
+            collation = ''
+        # null or not null?
+        if null == "NO":
+            null = "NOT NULL"
+        else:
+            null = ''
+        if default is None:
+            default = ''
+        else:
+            default = "DEFAULT '%s'" % (self.dbh.escape_string(default),)
+        # now we can roughly rebuild the definition...
+        sql = """ALTER TABLE %s CHANGE COLUMN %s %s
+        %s %s %s %s %s""" %(
+            table, oldName, newName,
+            colType, null, default, extra, collation)
+        cu.execute(sql)
+        return True
+
     def use(self, dbName):
         cu = self.cursor()
         oldDbName = cu.execute("SELECT database()").fetchone()[0]
