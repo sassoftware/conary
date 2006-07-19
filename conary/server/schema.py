@@ -1574,8 +1574,6 @@ def loadSchema(db):
     db.loadSchema()
 
     if version != 0 and version < 13:
-        import epdb
-        epdb.st()
         raise sqlerrors.SchemaVersionError(
             "Repository schemas from Conary versions older than 1.0 are not "
             "supported. Contact rPath for help converting your repository to "
