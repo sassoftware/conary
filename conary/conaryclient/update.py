@@ -1443,8 +1443,10 @@ conary erase '%s=%s[%s]'
             if job[2][0] is None:
                 continue
 
-            troveCs = ts.getChangeSet(job)
-            removedTroves.append(job)
+            cs = ts.getChangeSet(job)
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                removedTroves.append(job)
 
         if removedTroves:
             badTroves = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
