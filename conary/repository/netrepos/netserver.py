@@ -415,12 +415,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], userGroup)
 
         returner = list()
-        for acl in self.auth.iterPermsByGroup(userGroup):
-            acl = list(acl)
-            if acl[0] is None:
-                acl[0] = ""
-            if acl[1] is None:
-                acl[1] = ""
+        for acl in self.auth.getPermsByGroup(userGroup):
+            if acl['label'] is None:
+                acl['label'] = ""
+            if acl['item'] is None:
+                acl['item'] = ""
             returner.append(acl)
         return returner
 

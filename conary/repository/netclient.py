@@ -518,20 +518,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
     def listAcls(self, reposLabel, userGroup):
-        acls = self.c[reposLabel].listAcls(userGroup)
-        returner = list()
-        for acl in acls:
-            if not acl[0]:
-                acl[0] = 'ALL'
-            if not acl[1]:
-                acl[1] = 'ALL'
-            returner.append(acl)
-        return returner
+        return self.c[reposLabel].listAcls(userGroup)
 
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
                capped = False, admin = False, remove = False):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 
@@ -554,11 +548,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 admin = False, canRemove = False):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 
         if not oldLabel:
             oldLabel = "ALL"
+        elif type(oldLabel) == str:
+            pass
         else:
             oldLabel = self.fromLabel(oldLabel)
 
@@ -586,6 +584,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteAcl(self, reposLabel, userGroup, trovePattern, label):
         if not label:
             label = "ALL"
+        elif type(label) == str:
+            pass
         else:
             label = self.fromLabel(label)
 

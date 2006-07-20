@@ -565,11 +565,11 @@ class NetworkAuthorization:
                             WHERE userGroup = ? """, userGroup)
         return [ x[0] for x in cu ]
 
-    def iterPermsByGroup(self, userGroupName):
+    def _queryPermsByGroup(self, userGroupName):
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canwrite, capped, admin, canRemove
+                             canWrite, capped, admin, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
@@ -577,8 +577,19 @@ class NetworkAuthorization:
                       LEFT OUTER JOIN Labels ON
                           Permissions.labelId = Labels.labelId
                       WHERE userGroup=?""", userGroupName)
+        return cu
+
+    def iterPermsByGroup(self, userGroupName):
+        cu = self._queryPermsByGroup(userGroupName)
+
         for row in cu:
             yield row
+
+    def getPermsByGroup(self, userGroupName):
+        cu = self._queryPermsByGroup(userGroupName)
+
+        return cu.fetchall_dict()
+        
 
     def _getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
