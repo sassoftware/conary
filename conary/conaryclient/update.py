@@ -1578,24 +1578,35 @@ conary erase '%s=%s[%s]'
         finalJobs = set(finalJobs)
 
 
-        updateJobs = [ x for x in finalJobs if x[2][0] ]
-        pins = self.db.trovesArePinned([ (x[0], x[1][0], x[1][1]) 
-                                         for x in updateJobs if x[1][0]])
+        updateJobs = set(x for x in finalJobs if x[2][0])
+
+        removalJobs = [ x for x in finalJobs if x[1][0] ]
+
+        pins = self.db.trovesArePinned([(x[0], x[1][0], x[1][1])
+                                        for x in removalJobs])
 
         csSource = trovesource.stack(uJob.getSearchSource(), self.repos)
 
-        for job, isPinned in itertools.izip(updateJobs, pins):
+        for job, isPinned in itertools.izip(removalJobs, pins):
             if isPinned:
+                if not job[2][0]:
+                    # this is an erasure of a pinned trove skip it.
+                    finalJobs.remove(job)
+                    continue
+
                 newJob = self._splitPinnedJob(uJob, csSource, job, force=True)
                 if newJob is not None:
-                    finalJobs.add(newJob)
                     finalJobs.remove(job)
+                    updateJobs.remove(job)
+                    finalJobs.add(newJob)
+                    updateJobs.add(newJob)
                 else:
                     # we can't update this because of the pin.
                     # just leave the old version in place.
                     finalJobs.remove(job)
+                    updateJobs.remove(job)
 
-        cs, notFound = csSource.createChangeSet(updateJobs,
+        cs, notFound = csSource.createChangeSet(list(updateJobs),
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = callback)
