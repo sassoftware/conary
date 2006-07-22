@@ -209,6 +209,7 @@ def createLatest(db):
             branchId        INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
+            latestType      INTEGER NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -226,6 +227,9 @@ def createLatest(db):
         db.tables["Latest"] = []
         commit = True
     db.createIndex("Latest", "LatestIdx", "itemId, branchId, flavorId",
+                   unique = False)
+    db.createIndex("Latest", "LatestCheckIdx",
+                   "itemId, branchId, flavorId, latestType",
                    unique = True)
     if createTrigger(db, "Latest"):
         commit = True
@@ -1428,6 +1432,12 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE Entitlements2")
         self.cu.execute("DROP TABLE EntitlementGroups2")
         self.cu.execute("DROP TABLE EntitlementOwners2")
+
+        self.cu.execute("ALTER TABLE Latest ADD COLUMN "
+                        "latestType      INTEGER NOT NULL")
+        self.cu.execute("DROP INDEX LatestIdx")
+        self.db.loadSchema()
+        createLatest(self.db)
 
         #self.db.rename("Instances", "isRedirect", "troveType")
 

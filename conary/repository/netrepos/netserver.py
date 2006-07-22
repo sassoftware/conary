@@ -743,8 +743,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """JOIN Latest AS Domain USING (itemId)
-            JOIN Nodes USING (itemId, branchId, versionId)"""
+            instanceClause = """JOIN Latest AS Domain ON
+                Items.itemId = Domain.itemId AND
+                Domain.latestType = %d
+            JOIN Nodes USING (itemId, branchId, versionId)""" \
+                    % self.troveStore.LATEST_TYPE_PRESENT
         else:
             instanceClause = """JOIN Instances AS Domain USING (itemId)
             JOIN Nodes USING (itemId, versionid)"""
@@ -1070,14 +1073,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Permissions.userGroupId in (%s)
             ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Latest using (itemId, branchId)
+            join Latest ON
+                Latest.itemId = LabelMap.itemId AND
+                Latest.branchId = LabelMap.branchId AND
+                Latest.latestType = %d
             join Nodes using (itemId, branchId, versionId)
             join Items using (itemId),
             Flavors, Versions
         where
                 Latest.flavorId = Flavors.flavorId
             and Latest.versionId = Versions.versionId
-            """ % ",".join("%d" % x for x in groupIds)
+            """ % (",".join("%d" % x for x in groupIds),
+                   self.troveStore.LATEST_TYPE_PRESENT)
         self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
