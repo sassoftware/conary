@@ -9,7 +9,11 @@ Changes in @NEW@:
       highlighted when administrators change their passwords.
 
   o Client Changes:
-    * Added --what-provides option to query and repquery
+    * A --what-provides option has been added to "conary query" and
+      "conary repquery"
+    * A bug that installed all components of a package that is
+      installed instead of updated due to the existing package being
+      pinned has been fixed. (CNY-682)
 
   o Bug Fixes:
     * The Conary Repository web interface no longer returns a
