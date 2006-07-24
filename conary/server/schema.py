@@ -1413,13 +1413,8 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementOwners")
         self.cu.execute("DROP TABLE EntitlementGroups")
 
-        # recreate the indexes and triggers - including new path 
-        # index for TroveFiles
         self.db.loadSchema()
-        self.message('Recreating indexes... (this could take a while)')
-        createTroves(self.db)
         createUsers(self.db)
-        self.message('Indexes created.')
 
         self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
                         "SELECT entGroup, entGroupId FROM EntitlementGroups2")
@@ -1440,6 +1435,21 @@ class MigrateTo_14(SchemaMigration):
         createLatest(self.db)
 
         #self.db.rename("Instances", "isRedirect", "troveType")
+        self.cu.execute('ALTER TABLE Instances RENAME TO InstancesOld')
+        for idx in self.db.tables['Instances']:
+            self.cu.execute('DROP INDEX %s' % idx)
+
+        self.db.loadSchema()
+        # recreate the indexes and triggers - including new path 
+        # index for TroveFiles.  Also recreates the indexes table.
+        self.message('Recreating indexes... (this could take a while)')
+        createTroves(self.db)
+        self.message('Indexes created.')
+
+        self.message('Updating instances table column name')
+        createInstances(self.db)
+        self.cu.execute('INSERT INTO Instances SELECT * FROM InstancesOld')
+        self.cu.execute('DROP TABLE InstancesOld')
 
         self.db.commit()
 
