@@ -26,6 +26,11 @@ Changes in @NEW@:
     * Fixed a bug that caused migrate behavior to not respect pins when 
       the pinned troves were set to be erased (CNY-680).
 
+  o Build Changes:
+    * When pulling files out of a src.rpm file, Conary now stores the
+      src.rpm file itself in the repository rather than the files
+      pulled from it. (CNY-684)
+
 Changes in 1.0.23:
   o API Additions:
     * The interface to create, list and delete access groups and
