@@ -30,6 +30,8 @@ Changes in @NEW@:
     * When pulling files out of a src.rpm file, Conary now stores the
       src.rpm file itself in the repository rather than the files
       pulled from it. (CNY-684)
+    * Mono dependency version mappings are now discovered in CIL policy
+      .config files. (CNY-686)
 
 Changes in 1.0.23:
   o API Additions:
