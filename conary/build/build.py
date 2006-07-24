@@ -1778,10 +1778,10 @@ class Symlink(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Symlink('enable', '%(bindir)s/cups-enable')}
+    C{r.Symlink('%(bindir)s/enable', '%(bindir)s/cups-enable')}
 
-    Calls C{r.Symlink()} to create a symbolic link named C{enable} from
-    the C{realfile} C{%(bindir)s/cups-enable}.
+    Calls C{r.Symlink()} to create a symbolic link named C{cups-enable} from
+    the C{realfile} C{%(bindir)s/enable}.
     """
     # This keyword is preserved only for compatibility for existing
     # recipes; DanglingSymlinks policy should enforce non-dangling
