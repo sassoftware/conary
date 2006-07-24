@@ -382,6 +382,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         trovesource.SearchableTroveSource.__init__(self)
         self.searchAsRepository()
 
+        self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
+        self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
+        self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
+
     def __del__(self):
         self.c = None
 
