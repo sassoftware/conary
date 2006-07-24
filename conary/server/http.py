@@ -480,7 +480,7 @@ class HttpHandler(WebHandler):
 
         try:
             self.repServer.addAcl(self.authToken, 0, group, trove, label,
-               writeperm, capped, admin, canRemove = remove)
+               writeperm, capped, admin, remove = remove)
         except PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
