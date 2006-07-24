@@ -1020,7 +1020,8 @@ class TroveStore:
             cu.execute("SELECT labelId FROM LabelMap WHERE itemid = ? AND "
                        "branchId = ?", itemId, branchId)
             labelId = cu.next()[0]
-            cu.execute("DELETE FROM LabelMap WHERE labelId = ?", labelId)
+            cu.execute("DELETE FROM LabelMap WHERE itemid = ? AND "
+                       "branchId = ?", itemId, branchId)
 
             # do we need this branchId anymore?
             cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
