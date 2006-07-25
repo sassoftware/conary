@@ -327,9 +327,10 @@ class ComponentSpec(_filterSpec):
             name = args[0]
             if ':' in name:
                 package, name = name.split(':')
-                # we've got a package as well as a component, pass it on
-                self.recipe.PackageSpec(package, args[1:])
                 args = (name, ) + args[1:]
+                if package:
+                    # we've got a package as well as a component, pass it on
+                    self.recipe.PackageSpec(package, args[1:])
 
 	_filterSpec.updateArgs(self, *args, **keywords)
 
