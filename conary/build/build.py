@@ -1056,7 +1056,7 @@ class PythonSetup(BuildCommand):
     NAME
     ====
 
-    B{C{r.PythonSetup()}} - Moves files
+    B{C{r.PythonSetup()}} - Invokes setup.py to package Python code 
 
     SYNOPSIS
     ========
