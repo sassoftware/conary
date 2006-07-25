@@ -874,7 +874,7 @@ class TroveStore:
     def rollback(self):
         return self.db.rollback()
 
-    def removeTrove(self, name, version, flavor):
+    def _removeTrove(self, name, version, flavor, markOnly = False):
         cu = self.db.cursor()
         cu.execute("""
                 SELECT instanceId, itemId, Instances.versionId,
@@ -901,24 +901,23 @@ class TroveStore:
 
         # remove all dependencies which are used only by this instanceId
         cu.execute("""
-        DELETE FROM Dependencies WHERE depId IN (
             SELECT AllDepsUsed.depId AS depId FROM
-                (SELECT depId FROM Provides WHERE instanceId = :instId
+                (SELECT depId FROM Provides WHERE instanceId = ?
                  UNION
-                 SELECT depId FROM Requires WHERE instanceId = :instId
+                 SELECT depId FROM Requires WHERE instanceId = ?
                 ) AS AllDepsUsed
                 LEFT OUTER JOIN (
                     SELECT AllDepsUsed.depId AS depId FROM
-                        (SELECT depId FROM Provides WHERE instanceId = :instId
+                        (SELECT depId FROM Provides WHERE instanceId = ?
                          UNION
-                         SELECT depId FROM Requires WHERE instanceId = :instId
+                         SELECT depId FROM Requires WHERE instanceId = ?
                         ) AS AllDepsUsed
                         LEFT OUTER JOIN Provides ON
                             AllDepsUsed.depId = Provides.depId AND
-                            Provides.instanceId != :instId
+                            Provides.instanceId != ?
                         LEFT OUTER JOIN Requires ON
                             AllDepsUsed.depId = Requires.depId AND
-                            Requires.instanceId != :instId
+                            Requires.instanceId != ?
                         WHERE
                             Provides.instanceId IS NOT NULL OR
                             Requires.instanceId IS NOT NULL
@@ -926,11 +925,16 @@ class TroveStore:
                     AllDepsUsed.depId = DepsStillNeeded.depId
                 WHERE
                     DepsStillNeeded.depId IS NULL
-            )
-        """, instId = instanceId)
+        """, instanceId, instanceId, instanceId, instanceId, instanceId, 
+             instanceId)
+        depsToRemove = [ x[0] for x in cu ]
 
         cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
         cu.execute("DELETE FROM Requires WHERE instanceId = ?", instanceId)
+
+        if depsToRemove:
+            cu.execute("DELETE FROM Dependencies WHERE depId IN (%s)"
+                       % ",".join([ "%d" % x for x in depsToRemove ]))
 
         # Remove from TroveInfo
         cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
@@ -943,7 +947,7 @@ class TroveStore:
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
-            SELECT sha1 FROM FileStreams WHERE streamId IN (
+            SELECT streamId, sha1 FROM FileStreams WHERE streamId IN (
                 SELECT TroveFiles.streamId FROM
                     TroveFiles LEFT OUTER JOIN
                         (SELECT FilesToKeep.streamId AS streamId
@@ -952,7 +956,7 @@ class TroveStore:
                                 FilesUsed.streamId = FilesToKeep.streamId AND
                                 FilesToKeep.instanceId != ?
                             WHERE
-                                FilesUsed.instanceId == ?
+                                FilesUsed.instanceId = ?
                         ) AS FilesToKeep
                     ON
                         TroveFiles.streamId = FilesToKeep.streamId
@@ -961,28 +965,22 @@ class TroveStore:
                         FilesToKeep.streamId is NULL
                 )
         """, instanceId, instanceId, instanceId)
-        filesToRemove = [ x[0] for x in cu ]
+        r = cu.fetchall()
+        filesToRemove = [ x[1] for x in r ]
+        streamIdsToRemove = [ x[0] for x in r ]
 
-        cu.execute("""
-            DELETE FROM FileStreams WHERE streamId IN (
-                SELECT TroveFiles.streamId FROM
-                    TroveFiles LEFT OUTER JOIN
-                        (SELECT FilesToKeep.streamId AS streamId
-                            FROM TroveFiles AS FilesUsed
-                            JOIN TroveFiles AS FilesToKeep ON
-                                FilesUsed.streamId = FilesToKeep.streamId AND
-                                FilesToKeep.instanceId != ?
-                            WHERE
-                                FilesUsed.instanceId == ?
-                        ) AS FilesToKeep
-                    ON
-                        TroveFiles.streamId = FilesToKeep.streamId
-                    WHERE
-                        TroveFiles.instanceId = ? AND
-                        FilesToKeep.streamId is NULL
-                )
-        """, instanceId, instanceId, instanceId)
         cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
+        if streamIdsToRemove:
+            cu.execute("DELETE FROM FileStreams WHERE streamId IN (%s)"
+                       % ",".join([ "%d" % x for x in streamIdsToRemove ]))
+
+        if markOnly:
+            # We don't actually remove anything here; we just mark the trove
+            # as removed instead
+            cu.execute("UPDATE Instances SET troveType=? WHERE instanceId=?",
+                       trove.TROVE_TYPE_REMOVED, instanceId)
+            self.versionOps.updateLatest(itemId, branchId, flavorId)
+            return filesToRemove
 
         cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
@@ -1063,14 +1061,7 @@ class TroveStore:
         return filesToRemove
 
     def markTroveRemoved(self, name, version, flavor):
-        trv = trove.Trove(name, version, flavor, None,
-                          type = trove.TROVE_TYPE_REMOVED)
-
-        shas = self.removeTrove(name, version, flavor)
-        info = self.addTrove(trv)
-        self.addTroveDone(info)
-
-        return shas
+        return self._removeTrove(name, version, flavor, markOnly = True)
 
     def commit(self):
 	if self.needsCleanup:

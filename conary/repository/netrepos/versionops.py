@@ -134,7 +134,7 @@ class LatestTable:
             return
 
         versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId,
-                            "AND troveType == %d" % trove.TROVE_TYPE_NORMAL)
+                            "AND troveType = %d" % trove.TROVE_TYPE_NORMAL)
         if versionId is not None:
             self._add(cu, itemId, branchId, flavorId, versionId,
                       LATEST_TYPE_NORMAL)

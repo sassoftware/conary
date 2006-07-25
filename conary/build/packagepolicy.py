@@ -29,6 +29,8 @@ from conary.deps import deps
 from conary.lib import elf, util, log, pydeps
 from conary.local import database
 
+from elementtree import ElementTree
+
 
 
 class _filterSpec(policy.Policy):
@@ -319,15 +321,16 @@ class ComponentSpec(_filterSpec):
             # disable creating the automatic :config component
             # until/unless we handle files moving between
             # components
-            #self.extraFilters.append(('config', util.literalRegex(config)))
+            #self.extraFilters.append(('config', re.escape(config)))
 
         if args:
             name = args[0]
             if ':' in name:
                 package, name = name.split(':')
-                # we've got a package as well as a component, pass it on
-                self.recipe.PackageSpec(package, args[1:])
                 args = (name, ) + args[1:]
+                if package:
+                    # we've got a package as well as a component, pass it on
+                    self.recipe.PackageSpec(package, args[1:])
 
 	_filterSpec.updateArgs(self, *args, **keywords)
 
@@ -849,7 +852,7 @@ class setModes(policy.Policy):
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
-                exceptions=util.literalRegex(path.replace('%', '%%')))
+                exceptions=re.escape(path.replace('%', '%%')))
             if mode & 06000:
                 self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
@@ -1614,6 +1617,7 @@ class Provides(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('SharedLibrary', policy.REQUIRED),
         # _ELFPathProvide calls Requires to pass in discovered info
+        # _addCILPolicyProvides does likewise
         ('Requires', policy.REQUIRED_SUBSEQUENT),
     )
     filetree = policy.PACKAGE
@@ -1693,6 +1697,7 @@ class Provides(policy.Policy):
 		(filter.Filter(filespec, self.macros), provision % self.macros))
 	del self.provisions
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
+        self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
 
         # interpolate macros, using canonical path form with no trailing /
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
@@ -1769,6 +1774,27 @@ class Provides(policy.Policy):
         pkg.providesMap[path].addDep(deps.PythonDependencies, dep)
 
 
+    def _addOneCILProvide(self, pkg, path, name, ver):
+        if path not in pkg.providesMap:
+            pkg.providesMap[path] = deps.DependencySet()
+        pkg.providesMap[path].addDep(deps.CILDependencies,
+                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+
+    def _addCILPolicyProvides(self, path, pkg, macros):
+        try:
+            keys = {'urn': '{urn:schemas-microsoft-com:asm.v1}'}
+            fullpath = macros.destdir + path
+            tree = ElementTree.parse(fullpath)
+            root = tree.getroot()
+            identity, redirect = root.find('runtime/%(urn)sassemblyBinding/%(urn)sdependentAssembly' % keys).getchildren()
+            assembly = identity.get('name')
+            self._addOneCILProvide(pkg, path, assembly,
+                redirect.get('oldVersion'))
+            self.recipe.Requires(_CILPolicyProvides={
+                path: (assembly, redirect.get('newVersion'))})
+        except:
+            return
+
     def _addCILProvides(self, path, m, pkg, macros):
         if not m or m.name != 'CIL':
             return
@@ -1790,10 +1816,7 @@ class Provides(policy.Policy):
         # monodis did not give us any info
         if not name or not ver:
             return
-        if path not in pkg.providesMap:
-            pkg.providesMap[path] = deps.DependencySet()
-        pkg.providesMap[path].addDep(deps.CILDependencies,
-                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+        self._addOneCILProvide(pkg, path, name, ver)
 
     def _addJavaProvides(self, path, m, pkg):
         if not m.contents['provides']:
@@ -1868,6 +1891,9 @@ class Provides(policy.Policy):
 
             if path.endswith('.so') or path.endswith('.py') or path.endswith('.pyc'):
                 self._addPythonProvides(path, m, pkg, macros)
+
+            elif self.CILPolicyRE.match(path):
+                self._addCILPolicyProvides(path, pkg, macros)
 
             elif m and m.name == 'CIL':
                 self._addCILProvides(path, m, pkg, macros)
@@ -2048,7 +2074,7 @@ class Requires(_addInfo):
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('SharedLibrary', policy.REQUIRED),
-        # Requires depends on _ELFPathProvide having been run
+        # Requires depends on _ELFPathProvide and more having been run
         ('Provides', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
@@ -2067,6 +2093,7 @@ class Requires(_addInfo):
         self.perlReqs = None
         self.perlPath = None
         self.perlIncPath = None
+        self._CILPolicyProvides = {}
         policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2080,6 +2107,9 @@ class Requires(_addInfo):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
+        _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
+        if _CILPolicyProvides:
+            self._CILPolicyProvides.update(_CILPolicyProvides)
         rpath = keywords.pop('rpath', None)
         if rpath:
             if type(rpath) is str:
@@ -2109,6 +2139,7 @@ class Requires(_addInfo):
                            for x, y in self.rpathFixup]
         self.exceptDeps = [(filter.Filter(x, macros), re.compile(y % macros))
                           for x, y in self.exceptDeps]
+        self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
 
     def _ELFPathFixup(self, path, m, pkg):
         """
@@ -2441,6 +2472,10 @@ class Requires(_addInfo):
                     self._addRequirement(path, name, [ver], pkg,
                                          deps.CILDependencies)
             p.close()
+
+        elif self.CILPolicyRE.match(path):
+            name, ver = self._CILPolicyProvides[path]
+            self._addRequirement(path, name, [ver], pkg, deps.CILDependencies)
 
         if (m and (m.name == 'java' or m.name == 'jar')
             and m.contents['requires']):

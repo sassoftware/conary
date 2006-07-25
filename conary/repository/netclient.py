@@ -348,6 +348,7 @@ class ServerCache:
         server._protocolVersion = max(intersection)
 
         transporter.setCompress(True)
+        self.cache[serverName] = server
 
         self.cache[serverName] = server
 
@@ -943,7 +944,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #   5. Download any extra files (and create any extra diffs)
         #   which step 2 couldn't do for us.
 
-        def _separateJobList(jobList):
+        def _separateJobList(jobList, removedList):
             serverJobs = {}
             ourJobList = []
             for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
@@ -975,6 +976,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               (self.fromVersion(new), 
                                self.fromFlavor(newFlavor)),
                               absolute))
+
+            ourJobList += removedList
 
             return (serverJobs, ourJobList)
 
@@ -1045,6 +1048,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         scheduledSet = {}
         internalCs = None
         filesNeeded = []
+        removedList = []
 
         if target:
             outFile = open(target, "w+")
@@ -1058,21 +1062,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             primaryTroveList = [ (x[0], x[2][0], x[2][1]) for x in chgSetList 
                                         if x[2][0] is not None ]
 
-        while chgSetList:
-            (serverJobs, ourJobList) = _separateJobList(chgSetList)
+        while chgSetList or removedList:
+            (serverJobs, ourJobList) = _separateJobList(chgSetList,
+                                                        removedList)
 
             chgSetList = []
+            removedList = []
 
             for serverName, job in serverJobs.iteritems():
                 if callback:
                     callback.requestingChangeSet()
-                (url, sizes, extraTroveList, extraFileList) = \
-                    self.c[serverName].getChangeSet(job, recurse, 
-                                                withFiles, withFileContents,
-                                                excludeAutoSource)
+                (url, sizes, extraTroveList, extraFileList, removedTroveList) \
+                    = self.c[serverName].getChangeSet(job, recurse,
+                                                      withFiles,
+                                                      withFileContents,
+                                                      excludeAutoSource)
 
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
+                removedList += _cvtTroveList(removedTroveList)
 
                 inF = urllib.urlopen(url)
 

@@ -16,6 +16,8 @@
 Module implementing the "macro" dictionary class
 """
 
+import re
+
 from conary.lib import util
 from conary.build.errors import MacroKeyError
 
@@ -107,7 +109,7 @@ class Macros(dict):
         if repmethod is None:
             return name
         if repmethod == 'literalRegex':
-            return util.literalRegex(name)
+            return re.escape(name)
         # should not be reached
         raise MacroError, 'unknown representation method %s for %s' %(repmethod, name)
     

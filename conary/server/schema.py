@@ -1453,7 +1453,7 @@ class MigrateTo_15(SchemaMigration):
     def migrate(self):
         self.cu.execute("ALTER TABLE Latest ADD COLUMN "
                         "latestType      INTEGER NOT NULL")
-        self.cu.execute("DROP INDEX LatestIdx")
+        self.db.dropIndex("Latest", "LatestIdx")
         self.db.loadSchema()
         createLatest(self.db)
 
