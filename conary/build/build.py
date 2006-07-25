@@ -1251,22 +1251,22 @@ class _FileAction(BuildAction):
                     # we need to be able to traverse this directory as
                     # the non-root build user
                     os.chmod(path, (mode & 01777) | 0700)
-                    # not literalRegex because setModes is per-path
+                    # not re.escape because setModes is per-path
                     # internal-only
                     self.recipe.setModes(mode, destPath)
                 else:
                     os.chmod(path, mode & 01777)
                     if mode & 06000:
-                        # not literalRegex, see above
+                        # not re.escape, see above
                         self.recipe.setModes(mode, destPath)
                 if isdir and mode != 0755:
                     self.recipe.ExcludeDirectories(
-                        exceptions=util.literalRegex(destPath).replace(
+                        exceptions=re.escape(destPath).replace(
                         '%', '%%'))
                 # set explicitly, do not warn
                 try:
                     self.recipe.WarnWriteable(
-                        exceptions=util.literalRegex(destPath).replace(
+                        exceptions=re.escape(destPath).replace(
                         '%', '%%'))
                 except AttributeError:
                     pass

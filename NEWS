@@ -34,6 +34,8 @@ Changes in @NEW@:
       pulled from it. (CNY-684)
     * Mono dependency version mappings are now discovered in CIL policy
       .config files. (CNY-686)
+    * The internal util.literalRegex function has been replaced by
+      use of re.escape. (CNY-634)
 
 Changes in 1.0.23:
   o API Additions:

@@ -321,7 +321,7 @@ class ComponentSpec(_filterSpec):
             # disable creating the automatic :config component
             # until/unless we handle files moving between
             # components
-            #self.extraFilters.append(('config', util.literalRegex(config)))
+            #self.extraFilters.append(('config', re.escape(config)))
 
         if args:
             name = args[0]
@@ -852,7 +852,7 @@ class setModes(policy.Policy):
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
-                exceptions=util.literalRegex(path.replace('%', '%%')))
+                exceptions=re.escape(path.replace('%', '%%')))
             if mode & 06000:
                 self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
