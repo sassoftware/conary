@@ -17,6 +17,7 @@ import os
 import sys
 import tempfile
 import time
+import re
 
 from conary import trove, versions
 from conary.conarycfg import CfgRepoMap
@@ -33,6 +34,7 @@ from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
 from conary.local import schema as depSchema
+from conary.errors import ParseError
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
@@ -412,6 +414,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = None
+        try:
+            re.compile(trovePattern)
+        except Exception, e:
+            raise ParseError, "Invalid regexp: '%s'" % str(e)
 
         if label == "":
             label = None
@@ -431,6 +437,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = "ALL"
+        try:
+            re.compile(trovePattern)
+        except Exception, e:
+            raise ParseError, "Invalid regexp: '%s'" % str(e)
 
         if label == "":
             label = "ALL"
