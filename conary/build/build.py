@@ -1056,7 +1056,7 @@ class PythonSetup(BuildCommand):
     NAME
     ====
 
-    B{C{r.PythonSetup()}} - Moves files
+    B{C{r.PythonSetup()}} - Invokes setup.py to package Python code 
 
     SYNOPSIS
     ========
@@ -1251,22 +1251,22 @@ class _FileAction(BuildAction):
                     # we need to be able to traverse this directory as
                     # the non-root build user
                     os.chmod(path, (mode & 01777) | 0700)
-                    # not literalRegex because setModes is per-path
+                    # not re.escape because setModes is per-path
                     # internal-only
                     self.recipe.setModes(mode, destPath)
                 else:
                     os.chmod(path, mode & 01777)
                     if mode & 06000:
-                        # not literalRegex, see above
+                        # not re.escape, see above
                         self.recipe.setModes(mode, destPath)
                 if isdir and mode != 0755:
                     self.recipe.ExcludeDirectories(
-                        exceptions=util.literalRegex(destPath).replace(
+                        exceptions=re.escape(destPath).replace(
                         '%', '%%'))
                 # set explicitly, do not warn
                 try:
                     self.recipe.WarnWriteable(
-                        exceptions=util.literalRegex(destPath).replace(
+                        exceptions=re.escape(destPath).replace(
                         '%', '%%'))
                 except AttributeError:
                     pass
@@ -1578,7 +1578,9 @@ class _PutFiles(_FileAction):
         _FileAction.__init__(self, recipe, *args, **keywords)
 	self.fromFiles = args[:-1]
 	self.toFile = args[-1]
-	# raise error while we can still tell what is wrong...
+	# raise errors while we can still tell what is wrong...
+        if self.move and not self.fromFiles:
+            raise TypeError('too few arguments')
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
@@ -1637,9 +1639,9 @@ class Install(_PutFiles):
     keywords = { 'mode': -2 }
 
     def __init__(self, recipe, *args, **keywords):
+	self.move = 0
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = ''
-	self.move = 0
 
 class Copy(_PutFiles):
     """
@@ -1688,9 +1690,9 @@ class Copy(_PutFiles):
     copied to C{Mailman/mm_cfg.py.dist}.
     """
     def __init__(self, recipe, *args, **keywords):
+	self.move = 0
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
-	self.move = 0
 
 class Move(_PutFiles):
     """
@@ -1736,9 +1738,9 @@ class Move(_PutFiles):
     C{%(sbindir)s/lpc.cups}.
     """
     def __init__(self, recipe, *args, **keywords):
+	self.move = 1
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
-	self.move = 1
 
 class Symlink(_FileAction):
     """
@@ -1778,10 +1780,10 @@ class Symlink(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Symlink('enable', '%(bindir)s/cups-enable')}
+    C{r.Symlink('%(bindir)s/enable', '%(bindir)s/cups-enable')}
 
-    Calls C{r.Symlink()} to create a symbolic link named C{enable} from
-    the C{realfile} C{%(bindir)s/cups-enable}.
+    Calls C{r.Symlink()} to create a symbolic link named C{cups-enable} from
+    the C{realfile} C{%(bindir)s/enable}.
     """
     # This keyword is preserved only for compatibility for existing
     # recipes; DanglingSymlinks policy should enforce non-dangling

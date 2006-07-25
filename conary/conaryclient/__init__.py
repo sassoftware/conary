@@ -66,28 +66,39 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
             cfg.initializeFlavors()
+        self.repos = None
 
-        if passwordPrompter is None:
-            passwordPrompter = password.getPassword
-        
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
-        self.repos = NetworkRepositoryClient(cfg.repositoryMap,
-                                             cfg.user,
-                                             pwPrompt = passwordPrompter,
-                                             localRepository = self.db,
-                                             entitlementDir = 
-                                                    cfg.entitlementDirectory,
-                                             downloadRateLimit =
-                                                    cfg.downloadRateLimit,
-                                             uploadRateLimit =
-                                                    cfg.uploadRateLimit)
+        self.repos = self.createRepos(self.db, cfg, passwordPrompter)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
         if not resolverClass:
             resolverClass = resolve.DependencySolver
 
         self.resolver = resolverClass(self, cfg, self.repos, self.db)
+
+    def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
+        if self.repos:
+            if passwordPrompter is None:
+                passwordPrompter = self.repos.getPwPrompt()
+            if userMap is None:
+                userMap = self.repos.getUserMap()
+        else:
+            if passwordPrompter is None:
+                passwordPrompter = password.getPassword
+            if userMap is None:
+                userMap = cfg.user
+
+        return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
+                                       pwPrompt = passwordPrompter,
+                                       localRepository = self.db,
+                                       entitlementDir =
+                                          cfg.entitlementDirectory,
+                                       downloadRateLimit =
+                                          cfg.downloadRateLimit,
+                                       uploadRateLimit =
+                                          cfg.uploadRateLimit)
 
     def getRepos(self):
         return self.repos
