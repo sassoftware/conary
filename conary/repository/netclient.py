@@ -348,6 +348,7 @@ class ServerCache:
         server._protocolVersion = max(intersection)
 
         transporter.setCompress(True)
+        self.cache[serverName] = server
 
         self.cache[serverName] = server
 

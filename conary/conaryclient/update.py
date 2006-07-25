@@ -25,7 +25,6 @@ from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
 from conary.repository.errors import TroveMissing
-from conary.repository.netclient import NetworkRepositoryClient
 from conary import trove, versions
 
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
@@ -547,7 +546,7 @@ class ClientUpdate:
         respectFlavorAffinity = True
         # thew newTroves parameters are described below.
         newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, False, False, None, 
+                            True, {}, False, False, False, False, None, 
                             respectBranchAffinity, 
                             respectFlavorAffinity, True,
                             True, updateOnly) 
@@ -570,6 +569,8 @@ class ClientUpdate:
             # parentInstalled: True if the parent of this trove was installed.
             #                  Used to determine whether to install troves 
             #                  with weak references.
+            # parentReplacedWasPinned: True if this trove's parent would
+            #                          have replaced a trove that is pinned.
             # parentUpdated: True if the parent of this trove was installed.
             #                or updated.
             # primaryInstalled: True if the primary that led to this update
@@ -596,11 +597,11 @@ class ClientUpdate:
             #              description.
             # updateOnly:  If true, only update troves, don't install them
             #              fresh.
-
-            (newInfo, isPrimary, byDefaultDict, parentInstalled, parentUpdated,
-             primaryInstalled, branchHint, respectBranchAffinity, 
-             respectFlavorAffinity,
-             installRedirects, followLocalChanges, updateOnly) = newTroves.pop(0)
+            (newInfo, isPrimary, byDefaultDict, parentInstalled,
+             parentReplacedWasPinned, parentUpdated, primaryInstalled,
+             branchHint, respectBranchAffinity, respectFlavorAffinity,
+             installRedirects, followLocalChanges,
+             updateOnly) = newTroves.pop(0)
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
@@ -621,7 +622,7 @@ followLocalChanges: %s
             replaced = (None, None)
             recurseThis = True
             childrenFollowLocalChanges = alwaysFollowLocalChanges
-
+            pinned = False
             while True:
                 # this loop should only be called once - it's basically a 
                 # way to create a quick GOTO structure, without needing 
@@ -703,9 +704,10 @@ followLocalChanges: %s
                         # that trove instead.  If not, we just install this 
                         # trove as a fresh update. 
                         log.debug('replaced trove is not installed')
-
-                        if not (parentInstalled
-                                or followLocalChanges or installMissingRefs):
+                        if (not ((parentInstalled
+                                 and not parentReplacedWasPinned)
+                                 or followLocalChanges
+                                 or installMissingRefs)):
                             # followLocalChanges states that, even though
                             # the given trove is not a primary, we still want
                             # replace a localUpdate if available instead of 
@@ -718,7 +720,9 @@ followLocalChanges: %s
                             log.debug('SKIP: not following local changes')
                             break
 
-                        freshInstallOkay = (isPrimary or parentInstalled 
+                        freshInstallOkay = (isPrimary or
+                                            (parentInstalled
+                                             and not parentReplacedWasPinned)
                                             or installMissingRefs)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
@@ -1014,7 +1018,7 @@ followLocalChanges: %s
                     byDefaultDict.setdefault(info, childByDefault)
 
                 newTroves.append((info, False,
-                                  byDefaultDict, jobInstall, jobAdded,
+                                  byDefaultDict, jobInstall, pinned, jobAdded,
                                   primaryInstalled,
                                   branchHint, respectBranchAffinity,
                                   respectFlavorAffinity, installRedirects,
@@ -1595,24 +1599,35 @@ conary erase '%s=%s[%s]'
         finalJobs = set(finalJobs)
 
 
-        updateJobs = [ x for x in finalJobs if x[2][0] ]
-        pins = self.db.trovesArePinned([ (x[0], x[1][0], x[1][1]) 
-                                         for x in updateJobs if x[1][0]])
+        updateJobs = set(x for x in finalJobs if x[2][0])
+
+        removalJobs = [ x for x in finalJobs if x[1][0] ]
+
+        pins = self.db.trovesArePinned([(x[0], x[1][0], x[1][1])
+                                        for x in removalJobs])
 
         csSource = trovesource.stack(uJob.getSearchSource(), self.repos)
 
-        for job, isPinned in itertools.izip(updateJobs, pins):
+        for job, isPinned in itertools.izip(removalJobs, pins):
             if isPinned:
+                if not job[2][0]:
+                    # this is an erasure of a pinned trove skip it.
+                    finalJobs.remove(job)
+                    continue
+
                 newJob = self._splitPinnedJob(uJob, csSource, job, force=True)
                 if newJob is not None:
-                    finalJobs.add(newJob)
                     finalJobs.remove(job)
+                    updateJobs.remove(job)
+                    finalJobs.add(newJob)
+                    updateJobs.add(newJob)
                 else:
                     # we can't update this because of the pin.
                     # just leave the old version in place.
                     finalJobs.remove(job)
+                    updateJobs.remove(job)
 
-        cs, notFound = csSource.createChangeSet(updateJobs,
+        cs, notFound = csSource.createChangeSet(list(updateJobs),
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = callback)
@@ -1659,11 +1674,15 @@ conary erase '%s=%s[%s]'
             score = None
             for instFlavor in self.cfg.flavor:
                 newScore = instFlavor.score(flavor) 
+                if newScore is False:
+                    continue
                 if score is None or newScore > score:
                     score = newScore
                     finalFlavor = instFlavor
 
-            flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+            if score is not None:
+                # otherwise, we'll search all flavors on update using affinity.
+                flavor = deps.overrideFlavor(finalFlavor, flavor)
 
             if len(installedDict[name]) == 1:
                 updateItems.append((name, None, flavor))
@@ -2260,16 +2279,7 @@ conary erase '%s=%s[%s]'
             # so make sure that references this fresh db as well.
             db = database.Database(cfg.root, cfg.dbPath)
             uJob.troveSource.db = db
-            repos = NetworkRepositoryClient(cfg.repositoryMap,
-                                            self.repos.getUserMap(),
-                                            downloadRateLimit =
-                                                cfg.downloadRateLimit,
-                                            uploadRateLimit =
-                                                cfg.uploadRateLimit,
-                                            localRepository = db,
-                                            entitlementDir =
-                                                    cfg.entitlementDirectory,
-                                            pwPrompt = self.repos.getPwPrompt())
+            repos = self.createRepos(db, cfg)
             callback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):
