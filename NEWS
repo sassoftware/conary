@@ -27,6 +27,8 @@ Changes in @NEW@:
       the pinned troves were set to be erased (CNY-680).
     * Calling r.ComponentSpec(':foo') works again; it is exactly
       equivalent to r.ComponentSpec('foo'). (CNY-637)
+    * Calling r.Move() with only one argument now fails explicitly
+      rather than silently doing nothing. (CNY-614)
 
   o Build Changes:
     * When pulling files out of a src.rpm file, Conary now stores the

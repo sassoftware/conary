@@ -1578,7 +1578,9 @@ class _PutFiles(_FileAction):
         _FileAction.__init__(self, recipe, *args, **keywords)
 	self.fromFiles = args[:-1]
 	self.toFile = args[-1]
-	# raise error while we can still tell what is wrong...
+	# raise errors while we can still tell what is wrong...
+        if self.move and not self.fromFiles:
+            raise TypeError('too few arguments')
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
@@ -1637,9 +1639,9 @@ class Install(_PutFiles):
     keywords = { 'mode': -2 }
 
     def __init__(self, recipe, *args, **keywords):
+	self.move = 0
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = ''
-	self.move = 0
 
 class Copy(_PutFiles):
     """
@@ -1688,9 +1690,9 @@ class Copy(_PutFiles):
     copied to C{Mailman/mm_cfg.py.dist}.
     """
     def __init__(self, recipe, *args, **keywords):
+	self.move = 0
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
-	self.move = 0
 
 class Move(_PutFiles):
     """
@@ -1736,9 +1738,9 @@ class Move(_PutFiles):
     C{%(sbindir)s/lpc.cups}.
     """
     def __init__(self, recipe, *args, **keywords):
+	self.move = 1
 	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
-	self.move = 1
 
 class Symlink(_FileAction):
     """
