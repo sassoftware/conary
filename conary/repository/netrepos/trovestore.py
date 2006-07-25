@@ -75,6 +75,10 @@ class TroveStore:
 	self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
 
+        self.LATEST_TYPE_ANY = versionops.LATEST_TYPE_ANY
+        self.LATEST_TYPE_NORMAL = versionops.LATEST_TYPE_NORMAL
+        self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
+
     def __del__(self):
         self.db = self.log = None
 
@@ -303,9 +307,6 @@ class TroveStore:
 
 	    if trv.getChangeLog() and trv.getChangeLog().getName():
 		self.changeLogs.add(nodeId, trv.getChangeLog())
-            updateLatest = False
-        else:
-            updateLatest = True
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
@@ -316,27 +317,9 @@ class TroveStore:
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
-        if updateLatest:
-            # this name/version already exists, so this must be a new
-            # flavor. update the latest table as needed
-            troveBranchId = self.branchTable[troveVersion.branch()]
-            cu.execute("""
-            DELETE FROM Latest WHERE branchId=? AND itemId=? AND flavorId=?
-            """, troveBranchId, troveItemId, troveFlavorId)
-            cu.execute("""
-            INSERT INTO Latest
-                (itemId, branchId, flavorId, versionId)
-            SELECT %d, %d, %d, Instances.versionId
-            FROM
-                Instances JOIN Nodes USING(itemId, versionId)
-            WHERE
-                Instances.itemId=?
-            AND Instances.flavorId=?
-            AND Nodes.branchId=?
-            ORDER BY finalTimestamp DESC
-            LIMIT 1
-            """ %(troveItemId, troveBranchId, troveFlavorId),
-                       (troveItemId, troveFlavorId, troveBranchId))
+        troveBranchId = self.branchTable[troveVersion.branch()]
+        self.versionOps.updateLatest(troveItemId, troveBranchId,
+                                     troveFlavorId)
 
         self.depTables.add(cu, trv, troveInstanceId)
 
@@ -1017,41 +1000,16 @@ class TroveStore:
             cu.execute("DELETE FROM Nodes WHERE nodeId = ?", nodeId)
 
         # Now update the latest table
-        cu.execute("""
-                    SELECT versionId, finalTimestamp FROM Nodes
-                        JOIN Instances USING (itemId, versionId)
-                        WHERE
-                            Nodes.itemId = ? AND
-                            Nodes.branchId = ? AND
-                            flavorId = ? AND
-                            isPresent = 1
-                        ORDER BY finalTimestamp DESC
-                        LIMIT 1
-        """, itemId, branchId, flavorId)
+        self.versionOps.updateLatest(itemId, branchId, flavorId)
 
-        try:
-            prevVersionId = cu.next()[0]
-        except StopIteration:
-            prevVersionId = None
-
-        if prevVersionId is None:
-            # this is the last item on the branch
-            cu.execute("DELETE FROM Latest WHERE "
-                       "itemId = ? AND flavorId = ? AND branchId = ?",
-                       itemId, flavorId, branchId)
-
-            # is this flavor needed anymore?
-            cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
+        # is this flavor needed anymore?
+        cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
+                   flavorId)
+        count = cu.next()[0]
+        if count == 0:
+            cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
+            cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
                        flavorId)
-            count = cu.next()[0]
-            if count == 0:
-                cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
-                cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
-                           flavorId)
-        else:
-            cu.execute("UPDATE Latest SET versionId = ? WHERE "
-                       "itemId = ? AND flavorId = ? AND branchId = ?",
-                       prevVersionId, itemId, flavorId, branchId)
 
         # do we need the labelmap entry anymore?
         cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
@@ -1062,7 +1020,8 @@ class TroveStore:
             cu.execute("SELECT labelId FROM LabelMap WHERE itemid = ? AND "
                        "branchId = ?", itemId, branchId)
             labelId = cu.next()[0]
-            cu.execute("DELETE FROM LabelMap WHERE labelId = ?", labelId)
+            cu.execute("DELETE FROM LabelMap WHERE itemid = ? AND "
+                       "branchId = ?", itemId, branchId)
 
             # do we need this branchId anymore?
             cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",

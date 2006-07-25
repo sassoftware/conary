@@ -480,7 +480,7 @@ class HttpHandler(WebHandler):
 
         try:
             self.repServer.addAcl(self.authToken, 0, group, trove, label,
-               writeperm, capped, admin, canRemove = remove)
+               writeperm, capped, admin, remove = remove)
         except PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
@@ -583,10 +583,10 @@ class HttpHandler(WebHandler):
 
     @checkAuth(admin = True)
     @strFields(user = None, password = None)
-    @boolFields(write = False, admin = False)
+    @boolFields(write = False, admin = False, remove = False)
     def addUser(self, auth, user, password, write, admin, remove):
         self.repServer.addUser(self.authToken, 0, user, password)
-        self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin, canRemove = remove)
+        self.repServer.addAcl(self.authToken, 0, user, "", "", write, True, admin, remove = remove)
 
         self._redirect("userlist")
 

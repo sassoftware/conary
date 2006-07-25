@@ -109,7 +109,7 @@ errorMessage = '''
 *** %(filename)s:%(lineno)s
 *** %(errtype)s: %(errmsg)s
 ***
-*** Receiving this message is always a due to a bug in conary, not
+*** Receiving this message is always due to a bug in conary, not
 *** user error.
 ***
 *** The related traceback has been output to %(stackfile)s

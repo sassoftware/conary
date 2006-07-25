@@ -28,6 +28,8 @@ from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
+from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
+                                        TROVE_QUERY_NORMAL
 from conary.repository.netrepos import cacheset, calllog
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
@@ -640,6 +642,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         entries = cu.next()[0]
         self.log(4, "created temporary table gtvlTbl", entries)
 
+    def _latestType(self, queryType):
+        return queryType
+
     _GTL_VERSION_TYPE_NONE = 0
     _GTL_VERSION_TYPE_LABEL = 1
     _GTL_VERSION_TYPE_VERSION = 2
@@ -649,7 +654,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS,
                       flavorFilter = _GET_TROVE_ALL_FLAVORS,
-                      withFlavors = False):
+                      withFlavors = False,
+                      troveTypes = TROVE_QUERY_PRESENT):
         self.log(3, versionType, latestFilter, flavorFilter)
         cu = self.db.cursor()
         singleVersionSpec = None
@@ -743,11 +749,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """JOIN Latest AS Domain USING (itemId)
-            JOIN Nodes USING (itemId, branchId, versionId)"""
+            latestType = self._latestType(troveTypes)
+
+            instanceClause = """JOIN Latest AS Domain ON
+                Items.itemId = Domain.itemId AND
+                Domain.latestType = %d
+            JOIN Nodes USING (itemId, branchId, versionId)""" \
+                    % latestType
         else:
-            instanceClause = """JOIN Instances AS Domain USING (itemId)
-            JOIN Nodes USING (itemId, versionid)"""
+            if troveTypes == TROVE_QUERY_ALL:
+                instanceClause = """JOIN Instances AS Domain USING (itemId)
+                JOIN Nodes USING (itemId, versionid)"""
+            else:
+                if troveTypes == TROVE_QUERY_PRESENT:
+                    s = "!= %d" % trove.TROVE_TYPE_REMOVED
+                else:
+                    assert(troveTypes == TROVE_QUERY_NORMAL)
+                    s = "= %d" % trove.TROVE_TYPE_NORMAL
+
+                instanceClause = """JOIN Instances AS Domain ON
+                    Items.itemId = Domain.itemId AND
+                    Domain.troveType %s
+                JOIN Nodes USING (itemId, versionid)""" % s
 
         if withFlavors:
             getList.append("Flavors.flavor as flavor")
@@ -1006,7 +1029,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             names.add(trove)
         return list(names)
 
-    def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
+    def getTroveVersionList(self, authToken, clientVersion, troveSpecs,
+                            troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
@@ -1018,17 +1042,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             else:
                 troveFilter[name] = { None : None }
         return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withFlavors = True)
+                                  withFlavors = True,
+                                  troveTypes = troveTypes)
 
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
-                               bestFlavor):
+                               bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs,
                               bestFlavor, self._GTL_VERSION_TYPE_VERSION,
-                              latestFilter = self._GET_TROVE_ALL_VERSIONS)
+                              latestFilter = self._GET_TROVE_ALL_VERSIONS,
+                              troveTypes = troveTypes)
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
-                          flavorFilter = 0):
+                          troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
@@ -1041,8 +1067,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # dispatch the more complex version to the old getTroveList
         if not troveSpecs == { '' : True }:
             return self._getTroveList(authToken, clientVersion, troveFilter,
-                                      latestFilter = self._GET_TROVE_VERY_LATEST,
-                                      withFlavors = True)
+                                  latestFilter = self._GET_TROVE_VERY_LATEST,
+                                  withFlavors = True, troveTypes = troveTypes)
 
         cu = self.db.cursor()
 
@@ -1051,6 +1077,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
+
+        latestType = self._latestType(troveTypes)
 
         query = """
         select
@@ -1070,14 +1098,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Permissions.userGroupId in (%s)
             ) as UP
             join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Latest using (itemId, branchId)
+            join Latest ON
+                Latest.itemId = LabelMap.itemId AND
+                Latest.branchId = LabelMap.branchId AND
+                Latest.latestType = %d
             join Nodes using (itemId, branchId, versionId)
             join Items using (itemId),
             Flavors, Versions
         where
                 Latest.flavorId = Flavors.flavorId
             and Latest.versionId = Versions.versionId
-            """ % ",".join("%d" % x for x in groupIds)
+            """ % (",".join("%d" % x for x in groupIds), latestType)
         self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
@@ -1099,7 +1130,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs,
-                              bestFlavor, versionType, latestFilter):
+                              bestFlavor, versionType, latestFilter,
+                              troveTypes = TROVE_QUERY_PRESENT):
         self.log(3, troveSpecs)
         hasFlavors = False
         d = {}
@@ -1130,43 +1162,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   flavorFilter = flavorFilter,
                                   versionType = versionType,
                                   latestFilter = latestFilter,
-                                  withFlavors = True)
+                                  withFlavors = True, troveTypes = troveTypes)
 
     def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
-                                 bestFlavor):
+                                 bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
-                                          self._GET_TROVE_ALL_VERSIONS)
+                                          self._GET_TROVE_ALL_VERSIONS,
+                                          troveTypes = troveTypes)
 
     def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
-                               bestFlavor):
+                               bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
-                                          self._GET_TROVE_VERY_LATEST)
+                                          self._GET_TROVE_VERY_LATEST,
+                                          troveTypes = troveTypes)
 
-    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList,
-                              labelStr, flavorFilter = None):
-        troveSpecs = troveNameList
+    def getTroveLeavesByLabel(self, authToken, clientVersion, troveSpecs,
+                              bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
-        bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_LABEL,
-                                          self._GET_TROVE_VERY_LATEST)
+                                          self._GET_TROVE_VERY_LATEST,
+                                          troveTypes = troveTypes)
 
     def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList,
-                              labelStr, flavorFilter = None):
+                                bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         troveSpecs = troveNameList
         self.log(2, troveSpecs)
-        bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_LABEL,
-                                          self._GET_TROVE_ALL_VERSIONS)
+                                          self._GET_TROVE_ALL_VERSIONS,
+                                          troveTypes = troveTypes)
 
     def getFileContents(self, authToken, clientVersion, fileList):
         self.log(2, "fileList", fileList)
@@ -1203,11 +1236,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             os.close(fd)
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName,
-                              branchStr):
+                              branchStr, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, pkgName, branchStr)
         r = self.getTroveLeavesByBranch(authToken, clientVersion,
                                 { pkgName : { branchStr : None } },
-                                True)
+                                True, troveTypes = troveTypes)
         if pkgName not in r:
             return 0
         elif len(r[pkgName]) != 1:

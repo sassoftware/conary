@@ -12,10 +12,14 @@
 # full details.
 #
 
-from conary import versions
+from conary import trove, versions
 from conary.dbstore import idtable
 from conary.repository.errors import DuplicateBranch
 from conary.repository.netrepos import items
+
+LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
+LATEST_TYPE_PRESENT = 1         # redirects and normal
+LATEST_TYPE_NORMAL  = 2         # only normal troves
 
 class BranchTable(idtable.IdTable):
     def __init__(self, db):
@@ -82,32 +86,64 @@ class LatestTable:
     def __init__(self, db):
         self.db = db
 
-    def __setitem__(self, key, versionId):
-	(itemId, branchId, flavorId) = key
-
-        cu = self.db.cursor()
-
+    def _findLatest(self, cu, itemId, branchId, flavorId, troveTypeFilter = ""):
         cu.execute("""
-        DELETE FROM Latest
-        WHERE itemId = ?
-        AND   branchId = ?
-        AND   flavorId = ?
-        """, (itemId, branchId, flavorId))
-        cu.execute("INSERT INTO Latest (itemId, branchId, flavorId, versionId) "
-                   "VALUES (?, ?, ?, ?)",
-                   (itemId, branchId, flavorId, versionId))
+            SELECT versionId, troveType FROM Nodes
+                JOIN Instances USING (itemId, versionId)
+                WHERE
+                    Nodes.itemId = ? AND
+                    Nodes.branchId = ? AND
+                    flavorId = ? AND
+                    isPresent = 1
+                    %s
+                ORDER BY finalTimestamp DESC
+                LIMIT 1
+        """ % troveTypeFilter, itemId, branchId, flavorId)
 
-    def get(self, key, defValue):
-	(first, second, third) = key
+        try:
+            latestVersionId, troveType = cu.next()
+        except StopIteration:
+            latestVersionId = None
+            troveType = None
 
+        return latestVersionId, troveType
+
+    def _add(self, cu, itemId, branchId, flavorId, versionId, latestType):
+        cu.execute("""INSERT INTO Latest 
+                        (itemId, branchId, flavorId, versionId, latestType)
+                        VALUES (?, ?, ?, ?, ?)""",
+                    itemId, branchId, flavorId, versionId, latestType)
+
+    def update(self, itemId, branchId, flavorId):
         cu = self.db.cursor()
+        cu.execute("DELETE FROM Latest WHERE itemId=? AND branchId=? AND "
+                   "flavorId=?", itemId, branchId, flavorId)
 
-        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=? "
-                   "AND flavorId=?", (first, second, third))
-	item = cu.fetchone()
-	if not item:
-	    return defValue
-	return item[0]
+        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId)
+
+        if versionId is None:
+            return
+
+        self._add(cu, itemId, branchId, flavorId, versionId, LATEST_TYPE_ANY)
+
+        if troveType == trove.TROVE_TYPE_NORMAL:
+            self._add(cu, itemId, branchId, flavorId, versionId,
+                      LATEST_TYPE_PRESENT)
+            self._add(cu, itemId, branchId, flavorId, versionId,
+                      LATEST_TYPE_NORMAL)
+            return
+
+        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId,
+                            "AND troveType == %d" % trove.TROVE_TYPE_NORMAL)
+        if versionId is not None:
+            self._add(cu, itemId, branchId, flavorId, versionId,
+                      LATEST_TYPE_NORMAL)
+
+        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId,
+                            "AND troveType != %d" % trove.TROVE_TYPE_REMOVED)
+        if versionId is not None:
+            self._add(cu, itemId, branchId, flavorId, versionId,
+                      LATEST_TYPE_PRESENT)
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
@@ -213,16 +249,6 @@ class SqlVersioning:
 	if self.nodes.hasRow(itemId, versionId):
 	    raise DuplicateVersionError(itemId, version)
 
-	if updateLatest:
-	    latestId = self.latest.get((itemId, branchId, flavorId), None)
-	    if latestId == None:
-		# this must be the first thing on the branch
-		self.latest[(itemId, branchId, flavorId)] = versionId
-	    else:
-		currVer = self.versionTable.getId(latestId, itemId)
-		if not currVer.isAfter(version):
-		    self.latest[(itemId, branchId, flavorId)] = versionId
-
         sourceItemId = None
         if sourceName:
             sourceItemId = self.items.getOrAddId(sourceName)
@@ -231,6 +257,9 @@ class SqlVersioning:
 				   version.timeStamps())
 
 	return (nodeId, versionId)
+
+    def updateLatest(self, itemId, branchId, flavorId):
+        self.latest.update(itemId, branchId, flavorId)
 
     def createBranch(self, itemId, branch):
 	"""

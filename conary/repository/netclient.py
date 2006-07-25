@@ -51,6 +51,10 @@ shims = xmlshims.NetworkConvertors()
 
 CLIENT_VERSIONS = [ 36, 37, 38 ]
 
+TROVE_QUERY_ALL = 0                 # normal, removed, redirect
+TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
+TROVE_QUERY_NORMAL = 2              # normal
+
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)
 quote = lambda s: urllib.quote(s, safe='')
@@ -378,6 +382,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         trovesource.SearchableTroveSource.__init__(self)
         self.searchAsRepository()
 
+        self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
+        self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
+        self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
+
     def __del__(self):
         self.c = None
 
@@ -704,7 +712,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return resultD
 
-    def getAllTroveLeaves(self, serverName, troveNameList):
+    def _setTroveTypeArgs(self, serverIdent, *args, **kwargs):
+        if self.c[serverIdent]._protocolVersion >= 38:
+            return args + ( kwargs.get('troveTypes', TROVE_QUERY_PRESENT), )
+        else:
+            return args
+
+    def getAllTroveLeaves(self, serverName, troveNameList,
+                          troveTypes = TROVE_QUERY_PRESENT):
         req = {}
         for name, flavors in troveNameList.iteritems():
             if name is None:
@@ -715,11 +730,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 req[name] = [ self.fromFlavor(x) for x in flavors ]
 
-	d = self.c[serverName].getAllTroveLeaves(req)
+        d = self.c[serverName].getAllTroveLeaves(
+                        *self._setTroveTypeArgs(serverName, req,
+                                                troveTypes = troveTypes))
 
         return self._mergeTroveQuery({}, d)
 
-    def getTroveVersionList(self, serverName, troveNameList):
+    def getTroveVersionList(self, serverName, troveNameList,
+                            troveTypes = TROVE_QUERY_PRESENT):
         req = {}
         for name, flavors in troveNameList.iteritems():
             if name is None:
@@ -730,23 +748,31 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 req[name] = [ self.fromFlavor(x) for x in flavors ]
 
-	d = self.c[serverName].getTroveVersionList(req)
+        d = self.c[serverName].getTroveVersionList(
+                        *self._setTroveTypeArgs(serverName, req,
+                                                troveTypes = troveTypes))
         return self._mergeTroveQuery({}, d)
 
-    def getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False):
+    def getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False,
+                              troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveLeavesByLabel', 
-                                           labels = True)
+                                           labels = True,
+                                           troveTypes = troveTypes)
 
-    def getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False):
+    def getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False,
+                                troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveVersionsByLabel', 
-                                           labels = True)
+                                           labels = True,
+                                           troveTypes = troveTypes)
 
-    def getTroveVersionFlavors(self, troveSpecs, bestFlavor = False):
+    def getTroveVersionFlavors(self, troveSpecs, bestFlavor = False,
+                               troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor,
                                            'getTroveVersionFlavors',
-                                           versions = True)
+                                           versions = True,
+                                           troveTypes = troveTypes)
 
     def getAllTroveFlavors(self, troveDict):
         d = {}
@@ -757,7 +783,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method, 
                                branches = False, labels = False, 
-                               versions = False):
+                               versions = False, 
+                               troveTypes = TROVE_QUERY_PRESENT):
         assert(branches + labels + versions == 1)
 
         d = {}
@@ -787,24 +814,34 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    return result
 
         for host, requestD in d.iteritems():
-            respD = self.c[host].__getattr__(method)(requestD, bestFlavor)
+            respD = self.c[host].__getattr__(method)(
+                            *self._setTroveTypeArgs(host, requestD,
+                                                    bestFlavor,
+                                                    troveTypes = troveTypes))
             self._mergeTroveQuery(result, respD)
 
         return result
 
-    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False):
+    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False,
+                               troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveLeavesByBranch', 
-                                           branches = True)
+                                           branches = True,
+                                           troveTypes = troveTypes)
 
-    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor = False):
+    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor = False,
+                                 troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveVersionsByBranch', 
-                                           branches = True)
+                                           branches = True,
+                                           troveTypes = troveTypes)
 
-    def getTroveLatestVersion(self, troveName, branch):
+    def getTroveLatestVersion(self, troveName, branch,
+                              troveTypes = TROVE_QUERY_PRESENT):
 	b = self.fromBranch(branch)
-	v = self.c[branch].getTroveLatestVersion(troveName, b)
+        v = self.c[branch].getTroveLatestVersion(
+                            *self._setTroveTypeArgs(branch, troveName, b,
+                                                    troveTypes = troveTypes))
         if v == 0:
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
