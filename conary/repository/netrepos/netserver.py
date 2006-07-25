@@ -754,8 +754,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             instanceClause = """JOIN Latest AS Domain ON
                 Items.itemId = Domain.itemId AND
                 Domain.latestType = %d
-            JOIN Nodes USING (itemId, branchId, versionId)""" \
-                    % latestType
+            JOIN Nodes ON
+                Domain.itemId = Nodes.itemId AND
+                Domain.branchId = Nodes.branchId AND
+                Domain.versionId = Nodes.versionId""" % latestType
         else:
             if troveTypes == TROVE_QUERY_ALL:
                 instanceClause = """JOIN Instances AS Domain USING (itemId)
@@ -783,7 +785,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         SELECT %%(distinct)s %%(select)s
         FROM %(troveName)s
         %(instance)s
-        JOIN LabelMap USING (itemid, branchId)
+        JOIN LabelMap ON
+            LabelMap.itemid = Nodes.itemId AND
+            LabelMap.branchId = Nodes.branchId
         JOIN ( SELECT
                    Permissions.labelId as labelId,
                    PerItems.item as permittedTrove,
@@ -854,7 +858,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                            "distinct" : ""}
                 }
         self.log(4, "execute query", fullQuery, argList)
-        cu.execute(fullQuery, argList)
+        try:
+            cu.execute(fullQuery, argList)
+        except:
+            import epdb
+            epdb.st()
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information

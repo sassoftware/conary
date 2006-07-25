@@ -899,26 +899,29 @@ class TroveStore:
                    "WHERE itemId = ? AND versionId = ?", itemId, versionId)
         nodeId, branchId = cu.next()
 
+        cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
+        cu.execute("DELETE FROM Requires WHERE instanceId = ?", instanceId)
+
         # remove all dependencies which are used only by this instanceId
         cu.execute("""
         DELETE FROM Dependencies WHERE depId IN (
             SELECT AllDepsUsed.depId AS depId FROM
-                (SELECT depId FROM Provides WHERE instanceId = :instId
+                (SELECT depId FROM Provides WHERE instanceId = ?
                  UNION
-                 SELECT depId FROM Requires WHERE instanceId = :instId
+                 SELECT depId FROM Requires WHERE instanceId = ?
                 ) AS AllDepsUsed
                 LEFT OUTER JOIN (
                     SELECT AllDepsUsed.depId AS depId FROM
-                        (SELECT depId FROM Provides WHERE instanceId = :instId
+                        (SELECT depId FROM Provides WHERE instanceId = ?
                          UNION
-                         SELECT depId FROM Requires WHERE instanceId = :instId
+                         SELECT depId FROM Requires WHERE instanceId = ?
                         ) AS AllDepsUsed
                         LEFT OUTER JOIN Provides ON
                             AllDepsUsed.depId = Provides.depId AND
-                            Provides.instanceId != :instId
+                            Provides.instanceId != ?
                         LEFT OUTER JOIN Requires ON
                             AllDepsUsed.depId = Requires.depId AND
-                            Requires.instanceId != :instId
+                            Requires.instanceId != ?
                         WHERE
                             Provides.instanceId IS NOT NULL OR
                             Requires.instanceId IS NOT NULL
@@ -927,10 +930,8 @@ class TroveStore:
                 WHERE
                     DepsStillNeeded.depId IS NULL
             )
-        """, instId = instanceId)
-
-        cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
-        cu.execute("DELETE FROM Requires WHERE instanceId = ?", instanceId)
+        """, instanceId, instanceId, instanceId, instanceId, instanceId, 
+             instanceId)
 
         # Remove from TroveInfo
         cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
@@ -952,7 +953,7 @@ class TroveStore:
                                 FilesUsed.streamId = FilesToKeep.streamId AND
                                 FilesToKeep.instanceId != ?
                             WHERE
-                                FilesUsed.instanceId == ?
+                                FilesUsed.instanceId = ?
                         ) AS FilesToKeep
                     ON
                         TroveFiles.streamId = FilesToKeep.streamId
@@ -962,6 +963,8 @@ class TroveStore:
                 )
         """, instanceId, instanceId, instanceId)
         filesToRemove = [ x[0] for x in cu ]
+
+        cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
 
         cu.execute("""
             DELETE FROM FileStreams WHERE streamId IN (
@@ -973,7 +976,7 @@ class TroveStore:
                                 FilesUsed.streamId = FilesToKeep.streamId AND
                                 FilesToKeep.instanceId != ?
                             WHERE
-                                FilesUsed.instanceId == ?
+                                FilesUsed.instanceId = ?
                         ) AS FilesToKeep
                     ON
                         TroveFiles.streamId = FilesToKeep.streamId
@@ -982,7 +985,6 @@ class TroveStore:
                         FilesToKeep.streamId is NULL
                 )
         """, instanceId, instanceId, instanceId)
-        cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
 
         cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
