@@ -252,6 +252,8 @@ class ServerCache:
 	    serverName = item.getHost()
 	elif isinstance(item, str):
 	    serverName = item
+        else:
+            serverName = str(item)
 
         if serverName == 'local':
             raise errors.OpenError(
