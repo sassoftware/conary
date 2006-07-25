@@ -1305,6 +1305,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pathList = []
         newChgSetList = []
         allFilesNeeded = []
+        allRemovedTroves = []
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1338,14 +1339,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                         withFileContents = withFileContents,
                                         excludeAutoSource = excludeAutoSource)
 
-                (cs, trovesNeeded, filesNeeded) = ret
+                (cs, trovesNeeded, filesNeeded, removedTroves) = ret
 
                 # look up the version w/ timestamps
                 primary = (l[0], l[2][0], l[2][1])
-                trvCs = cs.getNewTroveVersion(*primary)
-                primary = (l[0], trvCs.getNewVersion(), l[2][1])
-                cs.addPrimaryTrove(*primary)
-
+                try:
+                    trvCs = cs.getNewTroveVersion(*primary)
+                    primary = (l[0], trvCs.getNewVersion(), l[2][1])
+                    cs.addPrimaryTrove(*primary)
+                except KeyError:
+                    # primary troves could be in the externalTroveList, in
+                    # which case they aren't primries
+                    pass
 
                 (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                                  suffix = '.tmp')
@@ -1357,15 +1362,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 						  withFileContents,
 						  excludeAutoSource,
 						  (trovesNeeded,
-						   filesNeeded),
+						   filesNeeded,
+                                                   removedTroves),
                                                   size = size)
 
                 os.rename(tmpPath, path)
             else:
-                path, (trovesNeeded, filesNeeded), size = cacheEntry
+                path, otherDetails, size = cacheEntry
+                if len(otherDetails) == 2:
+                    # conary 1.0 caches
+                   (trovesNeeded, filesNeeded) = otherDetails
+                   removedTroves = []
+                else:
+                   (trovesNeeded, filesNeeded, removedTroves) = otherDetails
 
             newChgSetList += _cvtTroveList(trovesNeeded)
             allFilesNeeded += _cvtFileList(filesNeeded)
+            allRemovedTroves += removedTroves
 
             pathList.append((path, size))
 
@@ -1379,7 +1392,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             f.write("%s %d\n" % (path, size))
         f.close()
 
-        return url, sizes, newChgSetList, allFilesNeeded
+        if clientVersion < 38:
+            if allRemovedTroves:
+                raise errors.TroveMissing(allRemovedTroves[0][0],
+                                          version = allRemovedTroves[0][1][0])
+            else:
+                return url, sizes, newChgSetList, allFilesNeeded
+
+        return url, sizes, newChgSetList, allFilesNeeded, \
+               _cvtTroveList(allRemovedTroves)
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
 	if not self.auth.check(authToken, write = False,
