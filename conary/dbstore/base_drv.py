@@ -409,6 +409,9 @@ class BaseDatabase:
         cu.execute(sql)
         return True
     def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
         assert(self.dbh)
         sql = "ALTER TABLE %s RENAME COLUMN %s TO %s" % (table, oldName, newName)
         cu = self.dbh.cursor()
