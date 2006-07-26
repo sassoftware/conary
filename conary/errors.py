@@ -91,3 +91,12 @@ class ShadowRedirect(ConaryError):
 
     def __init__(self, n, v, f):
         self.info = (n, v, f)
+
+class InvalidRegex(ParseError):
+    """User attempted to input an invalid regular expression"""
+
+    def __str__(self):
+        return "%s is not a valid regular expression" % self.expr
+
+    def __init__(self, expr):
+        self.expr = expr

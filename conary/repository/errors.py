@@ -12,7 +12,7 @@
 # full details.
 #
 from conary.errors import ConaryError, InternalConaryError
-from conary.errors import RepositoryError, TroveNotFound
+from conary.errors import RepositoryError, TroveNotFound, InvalidRegex
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.trove import TroveError
 from conary.lib import sha1helper
@@ -235,4 +235,5 @@ simpleExceptions = (
     (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
+    (InvalidRegex,               'InvalidRegex'),
     )
