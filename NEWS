@@ -38,6 +38,13 @@ Changes in @NEW@:
       .config files. (CNY-686)
     * The internal util.literalRegex function has been replaced by
       use of re.escape. (CNY-634)
+    * The addArchive() source action will search for reasonably-named
+      archive files based on the name and version if given a URL ending
+      with a "/" character. (CNY-671)
+    * All source actions, when given a URL that starts with "mirror://",
+      will search a set of mirrors based on files in the mirrorDirs
+      configuration entry, with default files provided in the
+      /etc/conary/mirrors/ directory. (CNY-171)
 
 Changes in 1.0.23:
   o API Additions:

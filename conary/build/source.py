@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -43,6 +43,7 @@ class _Source(action.RecipeAction):
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
+        self._guessName()
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
 
@@ -61,8 +62,6 @@ class _Source(action.RecipeAction):
                 sys.excepthook = oldexcepthook
 
     def _doPrep(self):
-        if self.keyid:
-            self._addSignature()
         if self.rpm:
             self._extractFromRPM()
 
@@ -70,19 +69,28 @@ class _Source(action.RecipeAction):
 	self.builddir = self.recipe.macros.builddir
 	action.RecipeAction.doAction(self)
 
-    def _addSignature(self):
-        for suffix in ('sig', 'sign', 'asc'):
-            self.gpg = '%s.%s' %(self.sourcename, suffix)
-            self.localgpgfile = lookaside.searchAll(self.recipe.cfg,
-				    self.recipe.laReposCache, self.gpg,
-                                    self.recipe.name, self.recipe.srcdirs)
-	    if self.localgpgfile:
-		return
+    def _addSignature(self, filename):
+
+        suffixes = ( 'sig', 'sign', 'asc' )
+
+        sourcename = self.sourcename
+        if not self.guessname:
+            sourcename=sourcename[:-len(filename)]
+
+        self.localgpgfile = lookaside.findAll(self.recipe.cfg,
+                                self.recipe.laReposCache, self.sourcename,
+                                self.recipe.name, self.recipe.srcdirs,
+                                guessName=filename, suffixes=suffixes,
+                                allowNone=True)
+
 	if not self.localgpgfile:
-	    log.warning('No GPG signature file found for %s', self.sourcename)
+	    log.warning('No GPG signature file found for %s%s', sourcename, filename)
 	    del self.localgpgfile
 
     def _checkSignature(self, filepath):
+        if self.keyid:
+            filename = os.path.basename(filepath)
+            self._addSignature(filename)
 	if 'localgpgfile' not in self.__dict__:
 	    return
         if not util.checkPath("gpg"):
@@ -120,16 +128,26 @@ class _Source(action.RecipeAction):
 	_extractFilesFromRPM(r, targetfile=c)
 
 
+    def _guessName(self):
+
+        self.guessname = None
+        if self.sourcename.endswith('/'):
+            self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
+
     def _findSource(self, httpHeaders={}):
-	return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-	    self.sourcename, self.recipe.name, self.recipe.srcdirs, httpHeaders=httpHeaders)
+
+        source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+            self.sourcename, self.recipe.name, self.recipe.srcdirs,
+            httpHeaders=httpHeaders, guessName=self.guessname)
+
+        return source
 
     def fetch(self):
 	if 'sourcename' not in self.__dict__:
 	    return None
-	f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-			      self.sourcename, self.recipe.name,
-			      self.recipe.srcdirs)
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+            self.sourcename, self.recipe.name,
+            self.recipe.srcdirs, guessName=self.guessname)
 	self._checkSignature(f)
 	return f
 
@@ -139,7 +157,7 @@ class _Source(action.RecipeAction):
         else:
             toFetch = self.sourcename
 
-        f = lookaside.searchAll(self.recipe.cfg, self.recipe.laReposCache,
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
                                 toFetch, self.recipe.name,
                                 self.recipe.srcdirs, localOnly=True)
         return f
