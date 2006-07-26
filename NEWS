@@ -2,11 +2,13 @@ Changes in @NEW@:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
       archive files based on the name and version if given a URL ending
-      with a "/" character. (CNY-671)
+      with a "/" character. Thanks to Pavel Volkovitskiy for the
+      initial implementation. (CNY-671)
     * All source actions, when given a URL that starts with "mirror://",
       will search a set of mirrors based on files in the mirrorDirs
       configuration entry, with default files provided in the
-      /etc/conary/mirrors/ directory. (CNY-171)
+      /etc/conary/mirrors/ directory. Thanks to Pavel Volkovitskiy for
+      the initial implementation. (CNY-171)
 
 Changes in 1.0.24:
   o Server Changes:
