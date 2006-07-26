@@ -70,16 +70,16 @@ class _Source(action.RecipeAction):
 	action.RecipeAction.doAction(self)
 
     def _addSignature(self, filename):
-        if self.guessname:
-            return
+
+        sourcename=self.sourcename
+        if not self.guessname:
+            sourcename=sourcename[:-len(filename)]
 
         suffixes = ( 'sig', 'sign', 'asc' )
-        guessName = os.path.dirname(self.sourcename)
-
         self.localgpgfile = lookaside.findAll(self.recipe.cfg,
-                                self.recipe.laReposCache, self.sourcename,
+                                self.recipe.laReposCache, sourcename,
                                 self.recipe.name, self.recipe.srcdirs,
-                                guessName=guessName, suffixes=suffixes,
+                                guessName=filename, suffixes=suffixes,
                                 allowNone=True)
 
 	if not self.localgpgfile:
@@ -88,7 +88,8 @@ class _Source(action.RecipeAction):
 
     def _checkSignature(self, filepath):
         if self.keyid:
-            self._addSignature(filepath)
+            filename = os.path.basename(filepath)
+            self._addSignature(filename)
 	if 'localgpgfile' not in self.__dict__:
 	    return
         if not util.checkPath("gpg"):
@@ -100,6 +101,7 @@ class _Source(action.RecipeAction):
 	    if not self._checkKeyID(filepath, self.keyid):
 		log.error(self.failedtest)
 		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
+        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _checkKeyID(self, filepath, keyid):
 	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"

@@ -220,13 +220,6 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         f = util.searchFile(name, srcdirs)
         if f: return f
 
-    if localOnly:
-        if not allowNone:
-            raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
-        else:
-            # we do not guess suffixes for local changes
-            return None
-
     if not guessName:
         if suffixes:
             names = [ "%s.%s" % (name, suffix) for suffix in suffixes ]
@@ -234,8 +227,21 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             names = (name, )
     else:
         suffixes = suffixes or ( 'tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip' )
-        names = [ "%s/%s.%s" % (name.rstrip('/'), guessName, suffix)
+        names = [ "%s%s.%s" % (name, guessName, suffix)
                   for suffix in suffixes ]
+
+    # This for r.addArchive('%(name)s-%(version)s.tar.gz', keyid='9BB19A22') case
+    if not autoSource and guessName and '/' not in name:
+        for sourcename in names:
+            f = util.searchFile(sourcename, srcdirs)
+            if f: return f
+
+    if localOnly:
+        if not allowNone:
+            raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
+        else:
+            # we do not guess suffixes for local changes
+            return None
 
     for sourcename in names:
 
@@ -261,9 +267,11 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
         urls = []
         # mirror://foo/bar -> mirrorType = "foo", trailingName = "bar"
-        mirrorType, trailingName = name.split('//', 1)[1].split('/', 1)
+        mirrorType = name.split('//')[1].split('/', 1)[0]
+        mirrorLen = len('mirror://') + len(mirrorType) + 1
         for mirrorBaseURL in Mirror(cfg, mirrorType):
             for name in names:
+                trailingName = name[mirrorLen:]
                 urls.append(('/'.join((mirrorBaseURL, trailingName)), name))
 
         names = urls
