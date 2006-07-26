@@ -301,6 +301,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return (False, True, ('FileStreamNotFound',
                            self.fromFileId(e.fileId),
                            self.fromVersion(e.fileVer)))
+        elif isinstance(e, errors.FileStreamMissing):
+            return (False, True, ('FileStreamMissing',
+                           self.fromFileId(e.fileId)))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
         elif isinstance(e, errors.TroveIntegrityError):

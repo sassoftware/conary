@@ -850,7 +850,7 @@ class TroveStore:
         try:
             stream = cu.next()[0]
         except StopIteration:
-            raise KeyError, (pathId, fileId)
+            raise errors.FileStreamMissing(fileId)
 
         if stream is not None:
             return files.ThawFile(cu.frombinary(stream), 

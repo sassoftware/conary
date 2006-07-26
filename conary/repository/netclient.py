@@ -158,6 +158,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == 'FileStreamNotFound':
             raise errors.FileStreamNotFound((self.toFileId(exceptionArgs[0]),
                                              self.toVersion(exceptionArgs[1])))
+        elif exceptionName == 'FileStreamMissing':
+            raise errors.FileStreamMissing((self.toFileId(exceptionArgs[0])))
         elif exceptionName == 'RepositoryLocked':
             raise errors.RepositoryLocked
 	else:
