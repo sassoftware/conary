@@ -9,6 +9,10 @@ Changes in @NEW@:
       configuration entry, with default files provided in the
       /etc/conary/mirrors/ directory. Thanks to Pavel Volkovitskiy for
       the initial implementation. (CNY-171)
+    * Symbolic links are now allowed to provide a soname even if they
+      reference an ELF file only indirectly through other symbolic
+      links.  Previously, a symbolic link could only provide a soname
+      if it directly referenced an ELF file. (CNY-696)
 
 Changes in 1.0.24:
   o Server Changes:
