@@ -70,27 +70,25 @@ class _Source(action.RecipeAction):
 	action.RecipeAction.doAction(self)
 
     def _addSignature(self, filename):
+        if self.guessname:
+            return
 
         suffixes = ( 'sig', 'sign', 'asc' )
-
-        sourcename = self.sourcename
-        if not self.guessname:
-            sourcename=sourcename[:-len(filename)]
+        guessName = os.path.dirname(self.sourcename)
 
         self.localgpgfile = lookaside.findAll(self.recipe.cfg,
                                 self.recipe.laReposCache, self.sourcename,
                                 self.recipe.name, self.recipe.srcdirs,
-                                guessName=filename, suffixes=suffixes,
+                                guessName=guessName, suffixes=suffixes,
                                 allowNone=True)
 
 	if not self.localgpgfile:
-	    log.warning('No GPG signature file found for %s%s', sourcename, filename)
+	    log.warning('No GPG signature file found for %s', self.sourcename)
 	    del self.localgpgfile
 
     def _checkSignature(self, filepath):
         if self.keyid:
-            filename = os.path.basename(filepath)
-            self._addSignature(filename)
+            self._addSignature(filepath)
 	if 'localgpgfile' not in self.__dict__:
 	    return
         if not util.checkPath("gpg"):
@@ -121,10 +119,11 @@ class _Source(action.RecipeAction):
         # Always pull from RPM
 	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 			      self.rpm, self.recipe.name,
-			      self.recipe.srcdirs)
+			      self.recipe.srcdirs, allowNone=True)
 
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
+        util.mkdirChain(os.path.dirname(c))
 	_extractFilesFromRPM(r, targetfile=c)
 
 
@@ -159,7 +158,8 @@ class _Source(action.RecipeAction):
 
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
                                 toFetch, self.recipe.name,
-                                self.recipe.srcdirs, localOnly=True)
+                                self.recipe.srcdirs, localOnly=True,
+                                allowNone=True)
         return f
 
 

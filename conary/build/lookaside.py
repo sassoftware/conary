@@ -214,22 +214,30 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     and so has no path associated but is still auto-added
     """
 
-    suffixes = suffixes or ( 'tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip' )
+    if not autoSource and not suffixes and not guessName and '/' not in name:
+        # these are files that do not have / in the name and are not
+        # indirectly fetched via RPMs, so we look in the local directory
+        f = util.searchFile(name, srcdirs)
+        if f: return f
+
+    if localOnly:
+        if not allowNone:
+            raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
+        else:
+            # we do not guess suffixes for local changes
+            return None
+
     if not guessName:
-        names = (name, )
+        if suffixes:
+            names = [ "%s.%s" % (name, suffix) for suffix in suffixes ]
+        else:
+            names = (name, )
     else:
+        suffixes = suffixes or ( 'tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip' )
         names = [ "%s/%s.%s" % (name.rstrip('/'), guessName, suffix)
                   for suffix in suffixes ]
 
     for sourcename in names:
-
-        if sourcename[0] != '/' and not autoSource:
-            # these are files that do not have / in the name and are not
-            # indirectly fetched via RPMs, so we look in the local directory
-            f = util.searchFile(sourcename, srcdirs)
-            if f: return f
-
-        if localOnly: continue
 
         # this needs to come as soon as possible to preserve reproducability
         f = _searchRepository(cfg, repCache, sourcename, location)
@@ -240,6 +248,11 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         # one way or another
         f = _searchCache(cfg, sourcename, location)
         if f: return f
+
+        # finally, look in srcdirs if appropriate
+        if not autoSource and not guessName and '/' not in name:
+            f = util.searchFile(sourcename, srcdirs)
+            if f: return f
 
 
     # Need to fetch a file that will be auto-added to the repository
