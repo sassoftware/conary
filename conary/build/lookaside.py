@@ -153,7 +153,9 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
         try:
             req = urllib2.Request(name, headers=httpHeaders)
             url = urllib2.urlopen(req)
-            content_type = url.info()['content-type']
+            content_tpye = None
+            if not name.startswith('ftp://'):
+                content_type = url.info()['content-type']
             if guessName and content_type == 'text/html':
                 raise urllib2.URLError('"%s" not found' % name)
             log.info('Downloading %s...', name)
@@ -214,8 +216,8 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     and so has no path associated but is still auto-added
     """
 
-    if not autoSource and not suffixes and not guessName and '/' not in name:
-        # these are files that do not have / in the name and are not
+    if not autoSource and not suffixes and not guessName and not name.startswith('/'):
+        # these are files that do not start with / and are not
         # indirectly fetched via RPMs, so we look in the local directory
         f = util.searchFile(name, srcdirs)
         if f: return f
