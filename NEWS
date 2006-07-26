@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.24:
   o Server Changes:
     * The server binary access log can now be downloaded by an
       administrator by visiting the http://servername/conary/log
@@ -10,29 +10,10 @@ Changes in @NEW@:
 
   o Client Changes:
     * A --what-provides option has been added to "conary query" and
-      "conary repquery"
-    * A bug that installed all components of a package that is
+      "conary repquery".
+    * A bug that installed extra components of a package that is being
       installed instead of updated due to the existing package being
       pinned has been fixed. (CNY-682)
-
-  o Bug Fixes:
-    * The Conary Repository web interface no longer returns a
-      HTTP_FORBIDDEN (403) when a bad password is given by the user.
-      This allows the user to re-try authentication.
-    * The --signatures and --buildreqs flags now work with conary
-      showcs.  (CNY-642)
-    * Fixed a bug in the NetworkRepositoryClient default pwPrompt mechanism.
-    * Improved error messages when entitlements fail to load (CNY-662)
-    * The repository client no longer caches repo access info when the 
-      attempt to access was unsuccessful. (CNY-673, affects CNY-578)
-    * Select better flavors for updateall when updating x86 troves
-      on an x86_64 system (CNY-628)
-    * Fixed a bug that caused migrate behavior to not respect pins when 
-      the pinned troves were set to be erased (CNY-680).
-    * Calling r.ComponentSpec(':foo') works again; it is exactly
-      equivalent to r.ComponentSpec('foo'). (CNY-637)
-    * Calling r.Move() with only one argument now fails explicitly
-      rather than silently doing nothing. (CNY-614)
 
   o Build Changes:
     * When pulling files out of a src.rpm file, Conary now stores the
@@ -40,8 +21,31 @@ Changes in @NEW@:
       pulled from it. (CNY-684)
     * Mono dependency version mappings are now discovered in CIL policy
       .config files. (CNY-686)
-    * The internal util.literalRegex function has been replaced by
-      use of re.escape. (CNY-634)
+    * The internal util.literalRegex() function has been replaced by
+      use of re.escape(). (CNY-634)
+
+  o Bug Fixes:
+    * The Conary Repository web interface no longer returns a
+      HTTP_FORBIDDEN (403) when a bad password is given by the user.
+      This allows the user to re-try authentication.
+    * The --signatures and --buildreqs flags now work with "conary
+      showcs".  (CNY-642)
+    * A bug in the NetworkRepositoryClient default pwPrompt mechanism
+      has been fixed.
+    * Error messages when entitlements fail to load have been
+      improved. (CNY-662)
+    * The repository client no longer caches repository access info
+      when the attempt to access was unsuccessful. (CNY-673, affects
+      CNY-578)
+    * A bug that caused x86 flavored troves from being updated
+      properly when using "conary updateall" on an x86_64 system has
+      been fixed. (CNY-628)
+    * A bug that caused migrate behavior to not respect pins when the
+      pinned troves were set to be erased (CNY-680).
+    * Calling r.ComponentSpec(':foo') works again; it is exactly
+      equivalent to r.ComponentSpec('foo'). (CNY-637)
+    * Calling r.Move() with only one argument now fails explicitly
+      rather than silently doing nothing. (CNY-614)
 
 Changes in 1.0.23:
   o API Additions:
