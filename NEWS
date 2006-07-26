@@ -7,6 +7,8 @@ Changes in 1.0.24:
       yield log entries added since the last access. (CNY-638)
     * The Users and Groups tab in the web management UI is no longer
       highlighted when administrators change their passwords.
+    * The server returns a new exception type, FileStreamsMissing, when
+      the client requests file streams w/ getFileVersion(s) (SUP-16)
 
   o Client Changes:
     * A --what-provides option has been added to "conary query" and
