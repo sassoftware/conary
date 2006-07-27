@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.25:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
       archive files based on the name and version if given a URL ending
