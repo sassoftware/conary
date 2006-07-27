@@ -28,6 +28,8 @@ from conary.dbstore import sqlerrors
 UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
+MAX_ENTITLEMENT_LENGTH = 255
+
 class UserAuthorization:
     def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
         self.db = db
@@ -777,7 +779,7 @@ class NetworkAuthorization:
         authGroupIds = self.getAuthGroups(cu, authToken)
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
-        if len(entitlement) > 64:
+        if len(entitlement) > MAX_ENTITLEMENT_LENGTH:
             raise errors.InvalidEntitlement
 
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
@@ -803,7 +805,7 @@ class NetworkAuthorization:
         authGroupIds = self.getAuthGroups(cu, authToken)
         self.log(2, "entGroup=%s entitlement=%s" % (entGroup, entitlement))
 
-        if len(entitlement) > 64:
+        if len(entitlement) > MAX_ENTITLEMENT_LENGTH:
             raise errors.InvalidEntitlement
 
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)

@@ -2,6 +2,9 @@ Changes in 1.1:
   o API Changes:
     * Exposed deleteAcl and added a listAcls method to conary client.
   o Server Changes:
+    * Entitlement keys were artificially limited to 63 characters in length.
+      This restriction has been raised to the max length permitted in the
+      database column (255).
     * Entitlement classes can now provide access to multiple access
       groups (and updated the web ui to support that) (CNY-600)
     * addEntitlement and deleteEntitlement repository calls replaced 
