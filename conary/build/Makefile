@@ -27,6 +27,7 @@ python_files = __init__.py	\
 	loadrecipe.py		\
 	lookaside.py		\
 	macros.py		\
+	mirror.py		\
 	nextversion.py		\
 	packagepolicy.py	\
 	packagerecipe.py	\
