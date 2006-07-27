@@ -17,7 +17,7 @@ Changes in 1.0.25:
   o Bug Fixes:
     * A bug that caused unhandled exceptions when downloading the file
       contents needed for a distributed changeset in threaded mode has
-      been fixed. (CNY-701)
+      been fixed. This bug was introduced in 1.0.24. (CNY-701)
 
 Changes in 1.0.24:
   o Server Changes:
