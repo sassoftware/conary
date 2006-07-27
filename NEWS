@@ -14,6 +14,11 @@ Changes in @NEW@:
       links.  Previously, a symbolic link could only provide a soname
       if it directly referenced an ELF file. (CNY-696)
 
+  o Bug Fixes:
+    * A bug that causes unhandled exceptions when downloading the file
+      contents needed for a distributed changeset in a separate thread
+      has been fixed.
+
 Changes in 1.0.24:
   o Server Changes:
     * The server binary access log can now be downloaded by an

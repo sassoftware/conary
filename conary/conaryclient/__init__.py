@@ -92,7 +92,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
-                                       localRepository = self.db,
+                                       localRepository = db,
                                        entitlementDir =
                                           cfg.entitlementDirectory,
                                        downloadRateLimit =
