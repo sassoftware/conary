@@ -1,3 +1,9 @@
+* Improved acl checks on file contents and file objects
+* getFileVersions() raises FileStreamMissing when it gets in valid
+  request
+* getFileContents() raises FileHasNoContents when contents are
+  requested for a file type which has no contents (such as a symlink)
+
 Changes in 1.0.24:
   o Server Changes:
     * The server binary access log can now be downloaded by an
