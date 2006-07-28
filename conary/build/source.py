@@ -194,6 +194,12 @@ class Archive(_Source):
     archive file extensions, such as (.tar.bz2, .tar.gz, .tbz2, and .tgz) to
     complete I{archivename}.
 
+    If the specified I{archivename} is a URL that begins with C{mirror://},
+    C{r.addArchive} will search a set of mirrors contained in files
+    specified by the C{mirrorDirs} Conary configuration file entry or a set
+    of default mirror files located in the C{/etc/conary/mirrors} directory.
+    The mirror files are comprised of mirror URLs, listed  one entry per line.
+
     KEYWORDS
     ========
 
@@ -248,7 +254,7 @@ class Archive(_Source):
 
     C{r.addArchive('http://ipw2200.sourceforge.net/firmware.php?i_agree_to_the_license=yes&f=%(name)s-%(version)s.tgz', httpHeaders={'Referer': 'http://ipw2200.sourceforge.net/firmware.php?fid=7'})}
 
-    Demonstrates use with a source code archive accessed via an HTTP url, and
+    Demonstrates use with a source code archive accessed via an HTTP URL, and
     sending a Referer header through the httpHeader keyword.
 
     C{r.addArchive('http://example.com/downloads/blah.iso', dir='/')}
@@ -256,6 +262,11 @@ class Archive(_Source):
     Demonstrates unpacking the contents of an iso image directly into
     the destdir.  Note that only Rock Ridge or Joliet images are handled,
     and that permissions and special files are not preserved.
+
+    C{r.addArchive('mirror://sourceforge/%(name)s/%(name)s-%(version)s.tar.gz', keyid='9BB19A22')
+
+    Demonstrates use with mirror URL and C{sourceforge} mirrors list for
+    retrieving package source from SourceForge.
     """
 
     def __init__(self, recipe, *args, **keywords):
