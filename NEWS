@@ -1,6 +1,6 @@
 Changes in 1.0.26:
   o Protocol changes:
-    * Improved acl checks on file contents and file objects
+    * Improved acl checks on file contents and file objects (CNY-700)
     * getFileVersions() raises FileStreamMissing when it gets in valid
       request
     * getFileContents() raises FileHasNoContents when contents are
