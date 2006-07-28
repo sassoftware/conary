@@ -191,6 +191,13 @@ fileId: %s
 fileVersion: %s
 '''
 
+class FileHasNoContents(GetFileContentsError):
+    error = '''File Has No Contents
+The following file is not a regular file and therefore has no contents:
+fileId: %s
+fileVersion: %s
+'''
+
 class FileStreamMissing(RepositoryError):
     # This, instead of FileStreamNotFound, is returned when no version
     # is available for the file stream the server tried to lookup.

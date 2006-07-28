@@ -78,6 +78,20 @@ class NetworkConvertors(object):
         s = base64.encodestring(f.freeze())
         return self.fromPathId(f.pathId()) + s
 
+    def toFileAsStream(self, f, rawPathId = False):
+        pathId, stream = f[:25], f[25:]
+        if not rawPathId:
+            pathId = self.toPathId(pathId)
+
+        return pathId, base64.decodestring(stream)
+
+    def fromFileAsStream(self, pathId, stream, rawPathId = False):
+        s = base64.encodestring(stream)
+        if not rawPathId:
+            pathId = self.fromPathId(pathId)
+
+        return pathId + s
+
     def fromLabel(self, l):
 	return l.asString()
 
