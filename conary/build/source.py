@@ -121,7 +121,7 @@ class _Source(action.RecipeAction):
         # Always pull from RPM
 	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 			      self.rpm, self.recipe.name,
-			      self.recipe.srcdirs, allowNone=True)
+			      self.recipe.srcdirs)
 
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
