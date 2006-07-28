@@ -73,7 +73,7 @@ def _run(coverage):
     signal.signal(signal.SIGUSR2, _saveState)
     atexit.register(coverage.the_coverage.save)
     coverage.the_coverage.get_ready()
-    sys.settrace(coverage.t)
+    coverage.c.enable()
 
 origOsFork = os.fork
 origOsExit = os._exit
@@ -104,7 +104,7 @@ def _installOsWrapper():
         os._exit = exit_wrapper
 
 def _reset(coverage):
-    sys.settrace(None)
+    coverage.c.disable()
     coverage.c.clear()
     coverage.the_coverage = None
     coverage.the_coverage = coverage.coverage()
