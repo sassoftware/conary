@@ -285,6 +285,9 @@ class ConaryConfiguration(SectionedConfigFile):
                                             '~/.conary/log',))
     lookaside             =  (CfgPath, '~/conary/cache')
     macros                =  CfgDict(CfgString)
+    mirrorDirs            =  (CfgPathList, ('~/.conary/mirrors',
+                                            '/etc/conary/distro/mirrors',
+                                            '/etc/conary/mirrors',))
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',

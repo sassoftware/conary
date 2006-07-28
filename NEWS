@@ -1,9 +1,33 @@
-* Improved acl checks on file contents and file objects
-* getFileVersions() raises FileStreamMissing when it gets in valid
-  request
-* getFileContents() raises FileHasNoContents when contents are
-  requested for a file type which has no contents (such as a symlink)
+Changes in 1.0.26:
+  o Protocol changes:
+    * Improved acl checks on file contents and file objects
+    * getFileVersions() raises FileStreamMissing when it gets in valid
+      request
+    * getFileContents() raises FileHasNoContents when contents are
+      requested for a file type which has no contents (such as a symlink)
 
+Changes in 1.0.25:
+  o Build Changes:
+    * The addArchive() source action will search for reasonably-named
+      archive files based on the name and version if given a URL ending
+      with a "/" character. Thanks to Pavel Volkovitskiy for the
+      initial implementation. (CNY-671)
+    * All source actions, when given a URL that starts with "mirror://",
+      will search a set of mirrors based on files in the mirrorDirs
+      configuration entry, with default files provided in the
+      /etc/conary/mirrors/ directory. Thanks to Pavel Volkovitskiy for
+      the initial implementation. (CNY-171)
+    * Symbolic links are now allowed to provide a soname even if they
+      reference an ELF file only indirectly through other symbolic
+      links.  Previously, a symbolic link could only provide a soname
+      if it directly referenced an ELF file. (CNY-696)
+
+  o Bug Fixes:
+    * A bug that caused unhandled exceptions when downloading the file
+      contents needed for a distributed changeset in threaded mode has
+      been fixed. This bug was introduced in 1.0.24. (CNY-701)
+
+>>>>>>> /tmp/NEWS~other.JBkuFI
 Changes in 1.0.24:
   o Server Changes:
     * The server binary access log can now be downloaded by an

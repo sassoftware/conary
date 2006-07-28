@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -43,6 +43,7 @@ class _Source(action.RecipeAction):
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
+        self._guessName()
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
 
@@ -61,8 +62,6 @@ class _Source(action.RecipeAction):
                 sys.excepthook = oldexcepthook
 
     def _doPrep(self):
-        if self.keyid:
-            self._addSignature()
         if self.rpm:
             self._extractFromRPM()
 
@@ -70,19 +69,27 @@ class _Source(action.RecipeAction):
 	self.builddir = self.recipe.macros.builddir
 	action.RecipeAction.doAction(self)
 
-    def _addSignature(self):
-        for suffix in ('sig', 'sign', 'asc'):
-            self.gpg = '%s.%s' %(self.sourcename, suffix)
-            self.localgpgfile = lookaside.searchAll(self.recipe.cfg,
-				    self.recipe.laReposCache, self.gpg,
-                                    self.recipe.name, self.recipe.srcdirs)
-	    if self.localgpgfile:
-		return
+    def _addSignature(self, filename):
+
+        sourcename=self.sourcename
+        if not self.guessname:
+            sourcename=sourcename[:-len(filename)]
+
+        suffixes = ( 'sig', 'sign', 'asc' )
+        self.localgpgfile = lookaside.findAll(self.recipe.cfg,
+                                self.recipe.laReposCache, sourcename,
+                                self.recipe.name, self.recipe.srcdirs,
+                                guessName=filename, suffixes=suffixes,
+                                allowNone=True)
+
 	if not self.localgpgfile:
 	    log.warning('No GPG signature file found for %s', self.sourcename)
 	    del self.localgpgfile
 
     def _checkSignature(self, filepath):
+        if self.keyid:
+            filename = os.path.basename(filepath)
+            self._addSignature(filename)
 	if 'localgpgfile' not in self.__dict__:
 	    return
         if not util.checkPath("gpg"):
@@ -94,6 +101,7 @@ class _Source(action.RecipeAction):
 	    if not self._checkKeyID(filepath, self.keyid):
 		log.error(self.failedtest)
 		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
+        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _checkKeyID(self, filepath, keyid):
 	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
@@ -117,19 +125,30 @@ class _Source(action.RecipeAction):
 
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
+        util.mkdirChain(os.path.dirname(c))
 	_extractFilesFromRPM(r, targetfile=c)
 
 
+    def _guessName(self):
+
+        self.guessname = None
+        if self.sourcename.endswith('/'):
+            self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
+
     def _findSource(self, httpHeaders={}):
-	return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-	    self.sourcename, self.recipe.name, self.recipe.srcdirs, httpHeaders=httpHeaders)
+
+        source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+            self.sourcename, self.recipe.name, self.recipe.srcdirs,
+            httpHeaders=httpHeaders, guessName=self.guessname)
+
+        return source
 
     def fetch(self):
 	if 'sourcename' not in self.__dict__:
 	    return None
-	f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-			      self.sourcename, self.recipe.name,
-			      self.recipe.srcdirs)
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+            self.sourcename, self.recipe.name,
+            self.recipe.srcdirs, guessName=self.guessname)
 	self._checkSignature(f)
 	return f
 
@@ -139,9 +158,10 @@ class _Source(action.RecipeAction):
         else:
             toFetch = self.sourcename
 
-        f = lookaside.searchAll(self.recipe.cfg, self.recipe.laReposCache,
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
                                 toFetch, self.recipe.name,
-                                self.recipe.srcdirs, localOnly=True)
+                                self.recipe.srcdirs, localOnly=True,
+                                allowNone=True)
         return f
 
 
@@ -167,6 +187,18 @@ class Archive(_Source):
     The C{r.addArchive()} class adds a source code archive consisting of an
     optionally compressed tar, cpio, or zip archive, or binary/source RPM,
     and unpacks it to the proper directory.
+
+    If the specified I{archivename} is only a URL in the form of
+    C{http://www.site.org/}, C{r.addArchive} will automatically attempt
+    several combinations of C{%(name)s-%(version)s} combined with common
+    archive file extensions, such as (.tar.bz2, .tar.gz, .tbz2, and .tgz) to
+    complete I{archivename}.
+
+    If the specified I{archivename} is a URL that begins with C{mirror://},
+    C{r.addArchive} will search a set of mirrors contained in files
+    specified by the C{mirrorDirs} Conary configuration file entry or a set
+    of default mirror files located in the C{/etc/conary/mirrors} directory.
+    The mirror files are comprised of mirror URLs, listed  one entry per line.
 
     KEYWORDS
     ========
@@ -222,7 +254,7 @@ class Archive(_Source):
 
     C{r.addArchive('http://ipw2200.sourceforge.net/firmware.php?i_agree_to_the_license=yes&f=%(name)s-%(version)s.tgz', httpHeaders={'Referer': 'http://ipw2200.sourceforge.net/firmware.php?fid=7'})}
 
-    Demonstrates use with a source code archive accessed via an HTTP url, and
+    Demonstrates use with a source code archive accessed via an HTTP URL, and
     sending a Referer header through the httpHeader keyword.
 
     C{r.addArchive('http://example.com/downloads/blah.iso', dir='/')}
@@ -230,6 +262,11 @@ class Archive(_Source):
     Demonstrates unpacking the contents of an iso image directly into
     the destdir.  Note that only Rock Ridge or Joliet images are handled,
     and that permissions and special files are not preserved.
+
+    C{r.addArchive('mirror://sourceforge/%(name)s/%(name)s-%(version)s.tar.gz', keyid='9BB19A22')
+
+    Demonstrates use with mirror URL and C{sourceforge} mirrors list for
+    retrieving package source from SourceForge.
     """
 
     def __init__(self, recipe, *args, **keywords):
