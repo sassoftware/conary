@@ -1,3 +1,13 @@
+Changes in 1.0.26:
+  o Protocol changes:
+    * Improved acl checks on file contents and file objects (CNY-700)
+    * getFileVersions() raises FileStreamMissing when it gets in valid
+      request
+    * getFileContents() raises FileHasNoContents when contents are
+      requested for a file type which has no contents (such as a symlink)
+    * The server returns a new exception type, FileStreamsMissing, when
+      the client requests file streams w/ getFileVersion(s) (SUP-16)
+
 Changes in 1.0.25:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
