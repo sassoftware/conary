@@ -205,6 +205,13 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     rc = _createCacheEntry(cfg, mirror, location, url)
     return rc
 
+# some recipes reach into Conary internals here, and have references
+# to searchAll
+def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
+              httpHeaders={}, localOnly=False):
+    return findAll(cfg, repCache, name, location, srcdirs, autoSource,
+                   httpHeaders, localOnly, allowNone=True)
+
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
             allowNone=False):
