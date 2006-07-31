@@ -29,6 +29,13 @@ Changes in 1.0.26:
     * The "preMake" option had a bad test for the ';' character; this
       test has been fixed and extended to include && and ||.
       thanks to Pavel Volkovitskiy for this fix. (CNY-580)
+    * Many actions had a variety of options (dir=, subdir=, and
+      subDir=) for specifying which directory to affect.  These have
+      been converted to all prefer "dir=", though compatibility
+      with older recipes is retained by continuing to allow the
+      subDir= and subdir= options in cases where they have been
+      allowed in the past. Thanks to Pavel Volkovitskiy for this
+      enhancement. (CNY-668)
 
 Changes in 1.0.25:
   o Build Changes:

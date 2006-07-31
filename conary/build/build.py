@@ -72,6 +72,18 @@ class BuildAction(action.RecipeAction):
         assert(self.__class__ is not BuildAction)
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 
+        # handle outdated, inconsistent keywords
+        # FIXME: change to self.warning some day
+        if hasattr(self, 'subDir') and self.subDir:
+            log.info('"subDir=" is deprecated, use "dir=" instead')
+            self.dir = self.subDir
+        if hasattr(self, 'subdir') and self.subdir:
+            log.info('"subdir=" is deprecated, use "dir=" instead')
+            self.dir = self.subdir
+        if hasattr(self, 'skipMissingSubDir') and self.skipMissingSubDir:
+            log.info('"skipMissingSubDir=" is deprecated, use "skipMissingDir=" instead')
+            self.skipMissingDir = self.skipMissingSubDir
+
     def doAction(self):
 	if self.debug:
 	    from conary.lib import debugger
@@ -267,11 +279,11 @@ class Automake(BuildCommand):
 
     B{preAutoconf} : (None) Commands to be run prior to C{autoconf}
 
-    B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
-    (by default) and if set to C{True} skip the action when C{subDir} does not
+    B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
+    (by default) and if set to C{True} skip the action when C{dir} does not
     exist.
 
-    B{subDir}: (None) Directory in which to re-run C{aclocal}, C{autoconf},
+    B{dir}: (None) Directory in which to re-run C{aclocal}, C{autoconf},
     and C{automake}
 
     B{package} : (None) If set, must be a string that specifies the package
@@ -302,15 +314,17 @@ class Automake(BuildCommand):
                 'm4Dir': '',
 		'automakeVer': '',
                 'subDir': '',
+                'dir': '',
                 'skipMissingSubDir': False,
+                'skipMissingDir': False,
                }
 
     def do(self, macros):
 	macros = macros.copy()
-        macros.actionDir = action._expandOnePath(self.subDir, macros,
-             macros.builddir, error=not self.skipMissingSubDir)
+        macros.actionDir = action._expandOnePath(self.dir, macros,
+             macros.builddir, error=not self.skipMissingDir)
         if not os.path.exists(macros.actionDir):
-            assert(self.skipMissingSubDir)
+            assert(self.skipMissingDir)
             return
 
         if self.m4Dir:
@@ -330,7 +344,7 @@ class Configure(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.Configure(I{extra args}, [I{configureName},] [I{objDir},] [I{preConfigure},] [I{skipMissingSubDir},] [I{subDir}])}
+    C{r.Configure(I{extra args}, [I{configureName},] [I{objDir},] [I{preConfigure},] [I{skipMissingDir},] [I{dir}])}
 
     DESCRIPTION
     ===========
@@ -361,11 +375,11 @@ class Configure(BuildCommand):
     B{preConfigure} : (None) Extra shell script which is inserted in front of
     the C{configure} command.
 
-    B{skipMissingSubDir} : (False) Raise an error if C{subDir} does not exist,
-    (by default) and if set to C{True} skip the action when C{subDir} does not
+    B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
+    (by default) and if set to C{True} skip the action when C{dir} does not
     exist.
 
-    B{subDir} : (None) Directory in which to run C{configure}
+    B{dir} : (None) Directory in which to run C{configure}
 
     B{package} : (None) If set, must be a string that specifies the package
     (C{package='packagename'}), component (C{package=':componentname'}), or
@@ -414,7 +428,9 @@ class Configure(BuildCommand):
                 'objDir': '',
                 'bootstrapFlags': '--target=%(target)s --host=%(host)s --build=%(build)s',
 		'subDir': '',
+                'dir': '',
                 'skipMissingSubDir': False,
+                'skipMissingDir': False,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -427,19 +443,19 @@ class Configure(BuildCommand):
             (srcdir != objdir). It can contain macro references.
         @keyword preConfigure: Extra shell script which is inserted in front
             of the C{configure} command.
-        @keyword skipMissingSubDir: Raise an error if C{subDir} does not
+        @keyword skipMissingDir: Raise an error if C{dir} does not
             exist, (by default) and if set to C{True} skip the action when
-            C{subDir} does not exist.
-        @keyword subDir: Directory in which to run C{configure}
+            C{dir} does not exist.
+        @keyword dir: Directory in which to run C{configure}
         """
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
     def do(self, macros):
 	macros = macros.copy()
-        macros.actionDir = action._expandOnePath(self.subDir, macros,
-             macros.builddir, error=not self.skipMissingSubDir)
+        macros.actionDir = action._expandOnePath(self.dir, macros,
+             macros.builddir, error=not self.skipMissingDir)
         if not os.path.exists(macros.actionDir):
-            assert(self.skipMissingSubDir)
+            assert(self.skipMissingDir)
             return
 
         if self.objDir:
@@ -519,7 +535,7 @@ class Make(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.Make(I{makeargs}, [I{forceFlags},] [I{makeName},] [I{preMake},] [I{skipMissingSubDir},] [I{subDir}])}
+    C{r.Make(I{makeargs}, [I{forceFlags},] [I{makeName},] [I{preMake},] [I{skipMissingDir},] [I{dir}])}
 
     DESCRIPTION
     ===========
@@ -559,10 +575,10 @@ class Make(BuildCommand):
     Use preMake if you need to set an environment variable. The preMake
     keyword cannot contain a ; character.
 
-    B{skipMissingSubDir} : (False) Raises an error if subDir does not exist.
-    If True, skip the action if subDir does not exist.
+    B{skipMissingDir} : (False) Raises an error if dir does not exist.
+    If True, skip the action if dir does not exist.
 
-    B{subDir} : (The build directory) The directory to enter before running
+    B{dir} : (The build directory) The directory to enter before running
     C{make}
 
     B{package} : (None) If set, must be a string that specifies the package
@@ -576,14 +592,14 @@ class Make(BuildCommand):
     EXAMPLES
     ========
 
-    C{r.Make("PARALLELMFLAGS='%(parallelmflags)s'", subDir=objDir)}
+    C{r.Make("PARALLELMFLAGS='%(parallelmflags)s'", dir=objDir)}
 
     Demonstrates calling C{r.Make()}, and setting the environment variable
     C{PARALLELMFLAGS} equal to the current value of C{%(parallelmflags)s},
     and requesting a change into the C{objDir} subdirectory before executing
     make.
 
-    C{r.Make('check', subDir='tests')}
+    C{r.Make('check', dir='tests')}
 
     Demonstrates calling C{r.Make()} with the C{check} argument to the
     C{make} command while also changing to the subdirectory C{tests} prior
@@ -601,7 +617,9 @@ class Make(BuildCommand):
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': '',
+                'dir': '',
                 'skipMissingSubDir': False,
+                'skipMissingDir': False,
 		'forceFlags': False,
                 'makeName': 'make'}
 
@@ -615,9 +633,9 @@ class Make(BuildCommand):
         @keyword preMake: string to be inserted before the C{make} command.
             Use preMake if you need to set an environment variable. The
             preMake keyword cannot contain a C{;} character.
-        @keyword skipMissingSubDir: Raises an error if subDir does not exist.
-            If True, skip the action if subDir does not exist.
-        @keyword subDir: The directory to enter before running C{make}
+        @keyword skipMissingDir: Raises an error if dir does not exist.
+            If True, skip the action if dir does not exist.
+        @keyword dir: The directory to enter before running C{make}
         """
 	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
@@ -635,10 +653,10 @@ class Make(BuildCommand):
 	                           ' LDFLAGS="%(ldflags)s"')
 	else:
 	    macros['overrides'] = ''
-        macros.actionDir = action._expandOnePath(self.subDir, macros,
-             macros.builddir, error=not self.skipMissingSubDir)
+        macros.actionDir = action._expandOnePath(self.dir, macros,
+             macros.builddir, error=not self.skipMissingDir)
         if not os.path.exists(macros.actionDir):
-            assert(self.skipMissingSubDir)
+            assert(self.skipMissingDir)
             return
 
 	BuildCommand.do(self, macros)
@@ -809,7 +827,7 @@ class Ant(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.Ant(I{antargs}, [I{verbose}], [I{options}], [I{subdir}])}
+    C{r.Ant(I{antargs}, [I{verbose}], [I{options}], [I{dir}])}
 
     DESCRIPTION
     ===========
@@ -841,13 +859,14 @@ class Ant(BuildCommand):
 
     """
     keywords = {'subdir': '',
+                'dir': '',
                 'verbose': True,
                 'options': '-lib %(javadir)s'}
     template = '%%(cdcmd)s CLASSPATH="%%(classpath)s" %%(antcmd)s %%(antoptions)s %%(args)s'
 
     def do(self, macros):
         macros = macros.copy()
-        if self.subdir: macros.cdcmd = 'cd %s;' % (self.subdir % macros)
+        if self.dir: macros.cdcmd = 'cd %s;' % (self.dir % macros)
         else: macros.cdcmd = ''
         if self.options: macros.antoptions = self.options
         if self.verbose: macros.antoptions += ' -v'
@@ -2105,7 +2124,7 @@ class Doc(_FileAction):
     SYNOPSIS
     ========
 
-    C{r.Doc(I{filename}, [I{subdir=/path}])}
+    C{r.Doc(I{filename}, [I{dir=/path}])}
 
     DESCRIPTION
     ===========
@@ -2115,7 +2134,7 @@ class Doc(_FileAction):
     C{%(destdir)s/%(thisdocdir)s}.
 
     Specify a single file or directory of files for the C{filename} parameter.
-    The C{subdir=path} keyword argument can be used to create a subdirectory
+    The C{dir=path} keyword argument can be used to create a subdirectory
     of C{%(destdir)s/%(thisdocdir)s} where files may subsequently be located.
 
     KEYWORDS
@@ -2123,7 +2142,7 @@ class Doc(_FileAction):
 
     The C{r.Doc()} class accepts the following keywords:
 
-    B{subdir} : Specify a subdirectory to create before placing documentation
+    B{dir} : Specify a subdirectory to create before placing documentation
     files into it.
 
     B{package} : (None) If set, must be a string that specifies the package
@@ -2137,7 +2156,7 @@ class Doc(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Doc('doc/kbd.FAQ*.html', subdir='html')}
+    C{r.Doc('doc/kbd.FAQ*.html', dir='html')}
 
     Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
     subdirectory after first creating the C{html} subdirectory using
@@ -2154,17 +2173,18 @@ class Doc(_FileAction):
     C{%(builddir)s} into C{%(destdir)s/%(thisdocdir)s}. 
     """
     keywords = {'subdir':  '',
+                'dir': '',
 		'mode': 0644,
 		'dirmode': 0755}
 
     def do(self, macros):
 	macros = macros.copy()
 	destlen = len(macros['destdir'])
-	if self.subdir:
-	    macros['subdir'] = '/%s' % self.subdir
+	if self.dir:
+	    macros['dir'] = '/%s' % self.dir
 	else:
-	    macros['subdir'] = ''
-	base = '%(thisdocdir)s%(subdir)s/' %macros
+	    macros['dir'] = ''
+	base = '%(thisdocdir)s%(dir)s/' %macros
 	dest = macros.destdir + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in action._expandPaths(self.paths, macros, error=True):
@@ -2191,7 +2211,7 @@ class JavaDoc(Doc):
     SYNOPSIS
     ========
 
-    C{r.JavaDoc(I{filename}, [I{subdir=/path}])}
+    C{r.JavaDoc(I{filename}, [I{dir=/path}])}
 
     DESCRIPTION
     ===========
@@ -2201,7 +2221,7 @@ class JavaDoc(Doc):
     C{%(destdir)s/%(thisjavadocdir)s}.
 
     Specify a single file or directory of files for the C{filename} parameter.
-    The C{subdir=path} keyword argument can be used to create a subdirectory
+    The C{dir=path} keyword argument can be used to create a subdirectory
     of C{%(destdir)s/%(thisjavadocdir)s} where files may subsequently be located.
 
     KEYWORDS
@@ -2209,7 +2229,7 @@ class JavaDoc(Doc):
 
     The C{r.JavaDoc()} class accepts the following keywords:
 
-    B{subdir} : Specify a subdirectory to create before placing documentation
+    B{dir} : Specify a subdirectory to create before placing documentation
     files into it.
 
     B{package} : (None) If set, must be a string that specifies the package
@@ -2223,7 +2243,7 @@ class JavaDoc(Doc):
     EXAMPLES
     ========
 
-    C{r.JavaDoc('doc/kbd.FAQ*.html', subdir='html')}
+    C{r.JavaDoc('doc/kbd.FAQ*.html', dir='html')}
 
     Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
     subdirectory after first creating the C{html} subdirectory using
