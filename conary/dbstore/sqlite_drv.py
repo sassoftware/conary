@@ -325,8 +325,6 @@ class Database(BaseDatabase):
         if oldName.lower() == newName.lower():
             return True
         assert(self.dbh)
-        import epdb
-        epdb.st()
         stmt = self.__getSQLstmt(table)
         # parse the table fields
         fields = self.__parseFields(stmt["fields"])
