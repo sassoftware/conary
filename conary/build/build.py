@@ -621,8 +621,9 @@ class Make(BuildCommand):
         """
 	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
-            if ';' in keywords['preMake']:
-                log.error(TypeError, 'preMake argument cannot contain ;')
+            for i in (';', '&&', '||'):
+                if i in keywords['preMake']:
+                    log.error('preMake argument cannot contain "%s"', i)
 
     def do(self, macros):
 	macros = macros.copy()

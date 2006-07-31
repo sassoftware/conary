@@ -26,6 +26,9 @@ Changes in 1.0.26:
     * The source actions (addSource, addArchive, etc.) can now take
       a "package=" argument like the build actions do.  Thanks to
       Pavel Volkovitskiy for contributing this capability.  (CNY-665)
+    * The "preMake" option had a bad test for the ';' character; this
+      test has been fixed and extended to include && and ||.
+      thanks to Pavel Volkovitskiy for this fix. (CNY-580)
 
 Changes in 1.0.25:
   o Build Changes:
