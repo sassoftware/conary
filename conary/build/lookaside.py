@@ -209,7 +209,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 # to searchAll
 def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
               httpHeaders={}, localOnly=False):
-    return findall(cfg, repCache, name, location, srcdirs, autoSource,
+    return findAll(cfg, repCache, name, location, srcdirs, autoSource,
                    httpHeaders, localOnly, allowNone=True)
 
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
