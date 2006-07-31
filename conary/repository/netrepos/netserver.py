@@ -1141,7 +1141,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # so we have to just make one up.
         pathId = self.fromPathId("0" * 16)
         try:
-            streams = self.getFileVersions(authToken, 37,
+            streams = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
                                            [ (pathId, x[0]) for x in fileList ])
         except errors.FileStreamMissing, e:
             # we're supposed to return an exception which includes the
@@ -1554,7 +1554,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert(not withContents)
         self.log(2, pathId, fileId, "withContents=%s" % (withContents,))
         # getFileVersions is responsible for authenticating this call
-        l = self.getFileVersions(authToken, 37, [ (pathId, fileId) ])
+        l = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
+                                 [ (pathId, fileId) ])
         assert(len(l) == 1)
         return l[0]
 
