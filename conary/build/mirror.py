@@ -37,7 +37,7 @@ class Mirror(list):
             return
 
         for line in file(path, 'rU').readlines():
-            line.strip().rstrip('/')
+            line = line.strip().rstrip('/')
             if not line or line.startswith('#'):
                 continue
             self.append(line)

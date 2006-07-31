@@ -153,11 +153,10 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
         try:
             req = urllib2.Request(name, headers=httpHeaders)
             url = urllib2.urlopen(req)
-            content_tpye = None
             if not name.startswith('ftp://'):
                 content_type = url.info()['content-type']
-            if guessName and content_type == 'text/html':
-                raise urllib2.URLError('"%s" not found' % name)
+                if guessName and 'text/html' in content_type:
+                    raise urllib2.URLError('"%s" not found' % name)
             log.info('Downloading %s...', name)
             break
         except urllib2.HTTPError, msg:

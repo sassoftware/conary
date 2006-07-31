@@ -13,6 +13,10 @@ Changes in 1.0.26:
       files rather than their contents, worked for local builds but
       not for commits to repositories.  Committing to repositories
       now incorporates this fix. (CNY-684)
+    * The mirror:// functionality introduced in Conary 1.0.25 had two
+      small bugs, one of which prevented mirror:// pseudo-URLs from
+      working.  These bugs are now fixed, thanks to Pavel
+      Volkovitskiy. (CNY-704)
 
 Changes in 1.0.25:
   o Build Changes:
