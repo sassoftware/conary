@@ -41,6 +41,7 @@ import textwrap
 from conary.build import action
 from conary.lib import fixedglob, log, util
 from conary.build.use import Use
+from conary.build.manifest import Manifest
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -107,85 +108,9 @@ class BuildCommand(BuildAction, action.ShellCommand):
 	BuildAction.__init__(self, recipe, *args, **keywords)
 	action.ShellCommand.__init__(self, recipe, *args, **keywords)
 
-        package = None
-        component = None
-
         if self.package:
             self.package = self.package % recipe.macros
-            package = self.package
-            if ':' in self.package:
-                (package, component) = self.package.split(':')
-
-            recipe.packages[package] = True
-
-        if component:
-            self.recipe.ComponentSpec(component,
-                                      lambda: self.manifestRegexp(self.package))
-        if package:
-            self.recipe.PackageSpec(package,
-                                      lambda: self.manifestRegexp(self.package))
-
-    def getDestDirItems(self):
-
-        fileList = set()
-
-        destdir = self.recipe.macros.destdir
-
-        skip=len(destdir)
-        for root, dirs, files in os.walk(destdir):
-            topdir = root[skip:]
-            if not topdir:
-                topdir = '/'
-            for name in dirs+files:
-                fileList.add(os.path.join(topdir, name))
-
-        return fileList
-
-    def manifestFile(self, manifest):
-
-        manifestDir = '%s/%s/_MANIFESTS_' \
-            % (util.normpath(self.recipe.cfg.buildPath),
-              self.recipe.name)
-
-        if not os.path.exists(manifestDir):
-            util.mkdirChain(manifestDir)
-
-        manifestFile = '%s/%s.manifest' \
-                       % (manifestDir, manifest)
-
-        return manifestFile
-
-    def manifestRegexp(self, manifest):
-
-        manifestFile = self.manifestFile(manifest)
-
-        log.info("loading specs from '%s.manifest' file" % manifest)
-
-        files = [ re.escape(x[:-1]) for x in open(manifestFile).readlines() ]
-        regexp = '^('+'|'.join(files)+')$'
-        regexp = re.compile(regexp)
-
-        return regexp
-
-    def manifestInitialize(self):
-
-        log.info('Manifest: get already installed files')
-
-        self.manifestBefore = self.getDestDirItems()
-
-    def manifestCreate(self):
-
-        log.info('Manifest: get new files')
-
-        files = self.getDestDirItems() - self.manifestBefore
-
-        del self.manifestBefore
-
-        manifestFile = self.manifestFile(self.package)
-        manifest = open(manifestFile, 'a')
-        for file in sorted(list(files)):
-            manifest.write('%s\n' % file)
-        manifest.close()
+            self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def do(self, macros):
         """
@@ -199,12 +124,12 @@ class BuildCommand(BuildAction, action.ShellCommand):
 	"""
 
         if self.package:
-            self.manifestInitialize()
+            self.manifest.walk()
 
         util.execute(self.command %macros)
 
         if self.package:
-            self.manifestCreate()
+            self.manifest.create()
 
 class Run(BuildCommand):
     """

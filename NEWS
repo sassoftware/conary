@@ -23,6 +23,9 @@ Changes in 1.0.26:
     * When cooking a group, adding "--debug" to the "cvc cook" command
       line now displays detailed information about why a component is
       being included to solve a dependency. (CNY-711)
+    * The source actions (addSource, addArchive, etc.) can now take
+      a "package=" argument like the build actions do.  Thanks to
+      Pavel Volkovitskiy for contributing this capability.  (CNY-665)
 
 Changes in 1.0.25:
   o Build Changes:

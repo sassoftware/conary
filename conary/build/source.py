@@ -31,13 +31,14 @@ from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
 from conary.build import action, errors
+from conary.build.manifest import Manifest
 
 class _Source(action.RecipeAction):
     keywords = {'rpm': '',
                 'dir': '',
                 'keyid': None,
-                'httpHeaders': {}}
-
+                'httpHeaders': {},
+                'package': None}
 
     def __init__(self, recipe, *args, **keywords):
 	sourcename = args[0]
@@ -46,6 +47,10 @@ class _Source(action.RecipeAction):
         self._guessName()
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
+
+        if self.package:
+            self.package = self.package % recipe.macros
+            self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def doPrep(self):
         if self.debug:
@@ -67,7 +72,11 @@ class _Source(action.RecipeAction):
 
     def doAction(self):
 	self.builddir = self.recipe.macros.builddir
+        if self.package:
+            self.manifest.walk()
 	action.RecipeAction.doAction(self)
+        if self.package:
+            self.manifest.create()
 
     def _addSignature(self, filename):
 
@@ -173,6 +182,7 @@ class _Source(action.RecipeAction):
 
     def do(self):
 	raise NotImplementedError
+
 
 
 class Archive(_Source):
@@ -858,7 +868,7 @@ class Action(action.RecipeAction):
     executing the script C{prep.sh}.
     """
 
-    keywords = {'dir': '' }
+    keywords = {'dir': '', 'package': None }
 
     def __init__(self, recipe, *args, **keywords):
 	"""
@@ -875,13 +885,21 @@ class Action(action.RecipeAction):
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]
 
+        if self.package:
+            self.package = self.package % recipe.macros
+            self.manifest = Manifest(package=self.package, recipe=recipe)
+
     def do(self):
 	builddir = self.recipe.macros.builddir
         defaultDir = os.sep.join((builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir)
         util.mkdirChain(destDir)
+        if self.package:
+            self.manifest.walk()
 	util.execute(self.action %self.recipe.macros, destDir)
+        if self.package:
+            self.manifest.create()
 
     def fetch(self):
 	return None
