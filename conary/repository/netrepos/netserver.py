@@ -1554,7 +1554,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert(not withContents)
         self.log(2, pathId, fileId, "withContents=%s" % (withContents,))
         # getFileVersions is responsible for authenticating this call
-        l = self.getFileversions(authToken, 37, [ (pathId, fileId) ])
+        l = self.getFileVersions(authToken, 37, [ (pathId, fileId) ])
         assert(len(l) == 1)
         return l[0]
 
