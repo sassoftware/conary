@@ -497,8 +497,10 @@ def createTroves(db):
         commit = True
     db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
-    db.createIndex("FileStreams", "FileStreamsSha1Idx",
-                   "sha1", unique = False)
+    # the creation of this index takes a LOOONG time. As we're not
+    # making any lookups based on sha1, it is disabled for now --gafton
+    #db.createIndex("FileStreams", "FileStreamsSha1Idx",
+    #               "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -1394,15 +1396,12 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
                         "sha1        %(BINARY20)s"
                         % self.db.keywords)
-        self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
-                        "canRemove   INTEGER NOT NULL DEFAULT 0"
-                        % self.db.keywords)
 
         self.cu.execute("""
         UPDATE FileStreams
         SET sha1 = (
             SELECT sha1 FROM tmpSha1s
-            WHERE FileStreams.streamid=tmpSha1s.streamid )
+            WHERE FileStreams.streamid = tmpSha1s.streamid )
         """)
         self.cu.execute('DROP TABLE tmpSha1s')
 
@@ -1434,6 +1433,12 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementGroups2")
         self.cu.execute("DROP TABLE EntitlementOwners2")
 
+        self.message("Updating the Permissions table...")
+        self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
+                        "canRemove   INTEGER NOT NULL DEFAULT 0"
+                        % self.db.keywords)
+
+        self.message("Updating Instances table...")
         self.db.renameColumn("Instances", "isRedirect", "troveType")
         self.db.loadSchema()
 
@@ -1448,6 +1453,7 @@ class MigrateTo_14(SchemaMigration):
 class MigrateTo_15(SchemaMigration):
     Version = 15
     def migrate(self):
+        self.message("Updating the Latest table... 1/3")
         self.cu.execute("ALTER TABLE Latest ADD COLUMN "
                         "latestType      INTEGER NOT NULL")
         self.db.dropIndex("Latest", "LatestIdx")
@@ -1457,6 +1463,7 @@ class MigrateTo_15(SchemaMigration):
         self.cu.execute("UPDATE Latest SET latestType=%d" %
                         versionops.LATEST_TYPE_ANY)
 
+        self.message("Updating the Latest table... 2/3")
         self.cu.execute("""
             insert into Latest (itemId, branchId, flavorId, versionId,
                                 latestType)
@@ -1490,6 +1497,7 @@ class MigrateTo_15(SchemaMigration):
                       instances.flavorid = tmp.flavorid
         """ % (versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_REMOVED))
 
+        self.message("Updating the Latest table... 3/3")
         self.cu.execute("""
             insert into Latest (itemId, branchId, flavorId, versionId,
                                 latestType)
@@ -1522,6 +1530,8 @@ class MigrateTo_15(SchemaMigration):
                       nodes.versionid = instances.versionid and
                       instances.flavorid = tmp.flavorid
         """ % (versionops.LATEST_TYPE_NORMAL, trove.TROVE_TYPE_NORMAL))
+        self.message("Done updating the Latest table")
+
         return self.Version
 
 # sets up temporary tables for a brand new connection
