@@ -1550,8 +1550,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
                        withContents = 0):
-        # withFileContents is legacy; it was never used in conary 1.0.x
-        assert(not withFileContents)
+        # withContents is legacy; it was never used in conary 1.0.x
+        assert(not withContents)
         self.log(2, pathId, fileId, "withContents=%s" % (withContents,))
         # getFileVersions is responsible for authenticating this call
         l = self.getFileversions(authToken, 37, [ (pathId, fileId) ])
