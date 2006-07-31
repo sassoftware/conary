@@ -34,7 +34,7 @@ import time
 
     <table py:def="binaryTroveInfo(trove)" class="vheader">
         <?python
-        sourceVersion = trove.getVersion().getSourceVersion().freeze()
+        sourceVersion = str(trove.getVersion().getSourceVersion())
         sourceLink = "troveInfo?t=%s;v=%s" % (quote(trove.getSourceName()), quote(sourceVersion))
         ?>
         <tr class="even"><td>Trove name:</td><td>${trove.getName()}</td></tr>
