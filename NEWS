@@ -8,6 +8,12 @@ Changes in 1.0.26:
     * The server returns a new exception type, FileStreamsMissing, when
       the client requests file streams w/ getFileVersion(s) (SUP-16)
 
+  o Build Changes:
+    * The fix for CNY-684 introduced in Conary 1.0.24, storing src.rpm
+      files rather than their contents, worked for local builds but
+      not for commits to repositories.  Committing to repositories
+      now incorporates this fix. (CNY-684)
+
 Changes in 1.0.25:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
