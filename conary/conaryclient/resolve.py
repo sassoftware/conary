@@ -79,7 +79,11 @@ class DepResolutionMethod(object):
                             suggList.add(choice)
                             l = suggMap.setdefault(troveTup, set())
                             l.add(choice)
-                            log.debug('%s=%s[%s]\n  REQ: %s=%s[%s]\n  SOLVES: %s' % (troveTup + choice + ('\n\t'.join(str(depSet).split('\n')),)))
+                            log.debug('%s=%s[%s]\n'
+                                      '  Requires:    %s: %s\n'
+                                      '  Provided by: %s=%s[%s]',
+                                      *(troveTup + (depClass.tagName, dep) +
+                                        choice))
                             break
 
                 troves.update([ (x[0], (None, None), x[1:], True)
