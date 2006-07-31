@@ -20,6 +20,9 @@ Changes in 1.0.26:
     * The "cvc cook" command now announces which label it is building
       at the beginning of the cook, making it easier to catch mistakes
       early. Thanks to Pavel Volkovitskiy for this fix. (CNY-615)
+    * When cooking a group, adding "--debug" to the "cvc cook" command
+      line now displays detailed information about why a component is
+      being included to solve a dependency. (CNY-711)
 
 Changes in 1.0.25:
   o Build Changes:
