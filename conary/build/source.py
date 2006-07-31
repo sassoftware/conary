@@ -146,8 +146,14 @@ class _Source(action.RecipeAction):
     def fetch(self):
 	if 'sourcename' not in self.__dict__:
 	    return None
+
+        if self.rpm:
+            toFetch = self.rpm
+        else:
+            toFetch = self.sourcename
+
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-            self.sourcename, self.recipe.name,
+            toFetch, self.recipe.name,
             self.recipe.srcdirs, guessName=self.guessname)
 	self._checkSignature(f)
 	return f
