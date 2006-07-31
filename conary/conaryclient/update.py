@@ -358,10 +358,10 @@ class ClientUpdate:
                       ' installMissingRefs=%s, '
                       ' updateOnly=%s, '
                       ' respectBranchAffinity=%s,'
-                      ' alwaysFollowLocalChanges=%s)' % 
-                      (recurse, checkPrimaryPins, installMissingRefs,
-                       updateOnly, respectBranchAffinity, 
-                       alwaysFollowLocalChanges))
+                      ' alwaysFollowLocalChanges=%s)',
+                      recurse, checkPrimaryPins, installMissingRefs,
+                      updateOnly, respectBranchAffinity,
+                      alwaysFollowLocalChanges)
 
         troveSource = uJob.getTroveSource()
 
@@ -437,8 +437,8 @@ class ClientUpdate:
 
         installedTroves = installedNotReferenced | installedAndReferenced
         referencedNotInstalled = referencedStrong | referencedWeak
-        log.debug('referencedNotInstalled: %s' % (referencedNotInstalled,))
-        log.debug('ineligible: %s' % (ineligible,))
+        log.debug('referencedNotInstalled: %s', referencedNotInstalled)
+        log.debug('ineligible: %s', ineligible)
 
         installedTroves.difference_update(ineligible)
         installedTroves.difference_update(
@@ -495,12 +495,12 @@ class ClientUpdate:
                     del localUpdatesByPresent[(job[0], job[2][0], job[2][1])]
                     del localUpdatesByMissing[(job[0], job[1][0], job[1][1])]
                     referencedNotInstalled.remove((job[0], job[1][0], job[1][1]))
-                    log.debug('reworking same-branch local update: %s' % (job,))
+                    log.debug('reworking same-branch local update: %s', job)
                     # track this update for since it means the user
                     # requested this version explicitly
                     sameBranchLocalUpdates[job[0], job[2][0], job[2][1]] = (job[1][0], job[1][1])
                 else:
-                    log.debug('local update: %s' % (job,))
+                    log.debug('local update: %s', job)
 
         del localUpdates
 
@@ -613,10 +613,12 @@ branchHint: %s
 branchAffinity: %s   flavorAffinity: %s installRedirects: %s
 followLocalChanges: %s
 
-''' % (newInfo[0], newInfo[1], newInfo[2], isPrimary, byDefault, 
-       parentUpdated, parentInstalled, primaryInstalled,
-       updateOnly, branchHint, respectBranchAffinity,
-       respectFlavorAffinity, installRedirects, followLocalChanges))
+''',
+                      newInfo[0], newInfo[1], newInfo[2], isPrimary,
+                      byDefault, parentUpdated, parentInstalled,
+                      primaryInstalled, updateOnly, branchHint,
+                      respectBranchAffinity, respectFlavorAffinity,
+                      installRedirects, followLocalChanges)
             trv = None
             jobAdded = False
             replaced = (None, None)
@@ -664,14 +666,14 @@ followLocalChanges: %s
                                      + localUpdatesByMissing[newInfo])
                             alreadyInstalled.add(info)
                             log.debug('local update - marking present part %s'
-                                      'as already installed' % (info,))
+                                      'as already installed', info)
                         log.debug('SKIP: already referenced')
                         break
 
                 replaced, pinned = jobByNew[newInfo]
                 replacedInfo = (newInfo[0], replaced[0], replaced[1])
 
-                log.debug('replaces: %s' % (replacedInfo,))
+                log.debug('replaces: %s', replacedInfo)
 
                 if replaced[0] is not None:
                     if newInfo in alreadyReferenced:
@@ -688,7 +690,7 @@ followLocalChanges: %s
                                                                  (None, None))
                             replacedInfo = (replacedInfo[0], replaced[0], 
                                             replaced[1])
-                            log.debug('replaced is not installed, using local update %s instead' % (replacedInfo,))
+                            log.debug('replaced is not installed, using local update %s instead', replacedInfo)
                             if replaced[0]:
                                 log.debug('following local changes')
                                 childrenFollowLocalChanges = True
@@ -743,7 +745,7 @@ followLocalChanges: %s
 
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
-                        log.debug('using local update to replace %s, following local changes' % (replacedInfo,))
+                        log.debug('using local update to replace %s, following local changes', replacedInfo)
 
                     elif not installRedirects:
                         if not redirectHack.get(newInfo, True):
@@ -934,12 +936,12 @@ followLocalChanges: %s
                         recurseThis = False
                         break
 
-                log.debug('JOB ADDED: %s' % (job,))
+                log.debug('JOB ADDED: %s', job)
                 newJob.add(job)
                 jobAdded = True
                 break
 
-            log.debug('recurseThis: %s\nrecurse: %s' % (recurseThis, recurse))
+            log.debug('recurseThis: %s\nrecurse: %s', recurseThis, recurse)
 
             if jobAdded and removeNotByDefault and not byDefault:
                 job = (newInfo[0], replaced, (newInfo[1], newInfo[2]), False)
@@ -1126,7 +1128,7 @@ Installing new version of %s side-by-side instead.
 To remove the old %s, run:
 conary unpin '%s=%s[%s]'
 conary erase '%s=%s[%s]'
-""" % ((name, name, name) + replacedInfo + replacedInfo))
+""", *((name, name, name) + replacedInfo + replacedInfo))
         return (job[0], (None, None), job[2], False)
 
 
@@ -2087,7 +2089,8 @@ conary erase '%s=%s[%s]'
         if keepList:
             callback.done()
             for job, depSet, reqInfo in sorted(keepList):
-                log.warning('keeping %s - required by at least %s' % (job[0], reqInfo[0]))
+                log.warning('keeping %s - required by at least %s',
+                            job[0], reqInfo[0])
 
         if depList:
             raise DepResolutionFailure(depList, self.cfg)
