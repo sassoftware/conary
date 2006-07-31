@@ -497,10 +497,8 @@ def createTroves(db):
         commit = True
     db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
-    # the creation of this index takes a LOOONG time. As we're not
-    # making any lookups based on sha1, it is disabled for now --gafton
-    #db.createIndex("FileStreams", "FileStreamsSha1Idx",
-    #               "sha1", unique = False)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx",
+                   "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
