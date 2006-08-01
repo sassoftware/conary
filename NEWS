@@ -43,6 +43,10 @@ Changes in 1.0.26:
   o Script Changes:
     * resha1 script skip troves which aren't present in the repository
 
+  o Bug Fixes:
+    * Fixed a case where an updateall could result in the same trove
+      being erased from the system twice due to a local update (CNY-603)
+
 Changes in 1.0.25:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
