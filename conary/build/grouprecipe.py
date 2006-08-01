@@ -1722,15 +1722,15 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     # information and then having your screen filled up with all 
     # of the update code's debug mess.  Until that logging is moved
     # to it's own private location, turn it off.
-    resetVerbosity = (log.getVerbosity() == log.DEBUG)
+    resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
     if resetVerbosity:
-        log.setVerbosity(log.INFO)
+        log.setVerbosity(log.DEBUG)
     updJob, suggMap = client.updateChangeSet(troves, recurse = False,
                                              resolveDeps = True,
                                              test = True,
                                              checkPathConflicts=False)
     if resetVerbosity:
-        log.setVerbosity(log.DEBUG)
+        log.setVerbosity(log.LOWLEVEL)
 
     for trove, needs in suggMap.iteritems():
         if cfg.fullVersions:

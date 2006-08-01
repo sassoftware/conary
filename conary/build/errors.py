@@ -81,3 +81,7 @@ class GroupAddAllError(CookError):
 class MacroKeyError(KeyError):
     def __str__(self):
         return 'Unknown macro "%s" - check for spelling mistakes' % self.args[0]
+
+class MirrorError(CvcError):
+    pass
+

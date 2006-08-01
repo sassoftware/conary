@@ -1707,6 +1707,15 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpInstances2"] = True
 
+    if "gfvTable" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        gfvTable(
+            idx         INTEGER,
+            fileId      %(BINARY20)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["gfvTable"] = True
+
     db.commit()
 
 def resetTable(cu, name):

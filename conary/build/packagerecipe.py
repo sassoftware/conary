@@ -731,6 +731,7 @@ class _AbstractPackageRecipe(Recipe):
 	self.macros.name = self.name
 	self.macros.version = self.version
         self.packages = { self.name : True }
+        self.manifests = set()
 	if extraMacros:
 	    self.macros.update(extraMacros)
 

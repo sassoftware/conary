@@ -184,7 +184,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
 
     if 'debug' in argSet:
 	del argSet['debug']
-	log.setVerbosity(log.DEBUG)
+	log.setVerbosity(log.LOWLEVEL)
     else:
 	log.setVerbosity(log.WARNING)
 
