@@ -1555,8 +1555,10 @@ class MigrateTo_15(SchemaMigration):
                                 instances.flavorId = flavors.flavorId
                             where troveType=?""", trove.TROVE_TYPE_REDIRECT)
 
-        cu.execute("CREATE TEMPORARY TABLE Fixes "
-                   "(instanceId INTEGER, sigs BLOB)")
+        cu.execute("""
+        CREATE TEMPORARY TABLE Fixes(
+        instanceId INTEGER,
+        sigs %(BLOB)s)""" % self.db.keywords)
 
         from conary.repository.netrepos import trovestore
         repos = trovestore.TroveStore(self.db)
@@ -1570,12 +1572,15 @@ class MigrateTo_15(SchemaMigration):
             cu.execute("INSERT INTO Fixes (instanceId, sigs) VALUES (?, ?)",
                        instanceId, trv.troveInfo.sigs.freeze())
 
-        cu.execute("""DELETE FROM TroveInfo WHERE instanceId IN
-                            (SELECT instanceId FROM Fixes) AND
-                            infoType = %d""" % trove._TROVEINFO_TAG_SIGS)
-        cu.execute("""INSERT INTO TroveInfo (instanceId, infoType, data)
-                        SELECT instanceId, %d, sigs FROM Fixes""" 
-                                    % trove._TROVEINFO_TAG_SIGS)
+        cu.execute("""
+        DELETE FROM TroveInfo WHERE instanceId IN
+        (SELECT instanceId FROM Fixes) AND infoType = %d""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("""
+        INSERT INTO TroveInfo (instanceId, infoType, data)
+        SELECT instanceId, %d, sigs FROM Fixes""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("DROP TABLE Fixes")
 
         return self.Version
 
