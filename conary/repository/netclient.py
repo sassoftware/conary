@@ -53,7 +53,7 @@ CLIENT_VERSIONS = [ 36, 37, 38 ]
 
 TROVE_QUERY_ALL = 0                 # normal, removed, redirect
 TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
-TROVE_QUERY_NORMAL = 2              # normal
+TROVE_QUERY_NORMAL = 2              # hide branches which end in redirects
 
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)

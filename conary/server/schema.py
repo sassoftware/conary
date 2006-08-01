@@ -1381,7 +1381,7 @@ class MigrateTo_14(SchemaMigration):
                 contents = files.frozenFileContentInfo(stream)
                 sha1 = contents.sha1()
                 self.cu.execute("INSERT INTO tmpSha1s (streamId, sha1) VALUES (?,?)",
-                                (sha1, streamId), start_transaction=False)
+                                (streamId, sha1))
             newPct = (streamId * 100)/total
             if newPct >= pct:
                 self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
@@ -1526,33 +1526,17 @@ class MigrateTo_15(SchemaMigration):
                                 latestType)
                 select
                     instances.itemid as itemid,
-                    nodes.branchid as branchid,
+                    latest.branchid as branchid,
                     instances.flavorid as flavorid,
-                    nodes.versionid as versionid,
+                    instances.versionid as versionid,
                     %d
-                from
-                    ( select
-                        i.itemid as itemid,
-                        n.branchid as branchid,
-                        i.flavorid as flavorid,
-                        max(n.finalTimestamp) as finaltimestamp
-                      from
-                        instances as i, nodes as n
-                      where
-                            i.itemid = n.itemid
-                        and i.versionid = n.versionid
-                        and i.troveType = %d
-                      group by i.itemid, n.branchid, i.flavorid
-                    ) as tmp
-                    join nodes on
-                      tmp.itemid = nodes.itemid and
-                      tmp.branchid = nodes.branchid and
-                      tmp.finaltimestamp = nodes.finaltimestamp
-                    join instances on
-                      nodes.itemid = instances.itemid and
-                      nodes.versionid = instances.versionid and
-                      instances.flavorid = tmp.flavorid
-        """ % (versionops.LATEST_TYPE_NORMAL, trove.TROVE_TYPE_NORMAL))
+                from Latest join Instances
+                    using (itemId, versionId, flavorId)
+                where
+                    latest.latestType = %d AND
+                    instances.troveType = %d
+        """ % (versionops.LATEST_TYPE_NORMAL,
+               versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_NORMAL))
 
         # remove dependency provisions from redirects -- the conary 1.0
         # branch would set redirects to provide their own names. this doesn't
