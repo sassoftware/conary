@@ -526,7 +526,8 @@ def createTroves(db):
     # FIXME: rename these indexes
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
-    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path")
+    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path,instanceId",
+                   unique=True)
 
     if createTrigger(db, "TroveFiles"):
         commit = True
