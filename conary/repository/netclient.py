@@ -51,9 +51,7 @@ shims = xmlshims.NetworkConvertors()
 
 CLIENT_VERSIONS = [ 36, 37, 38 ]
 
-TROVE_QUERY_ALL = 0                 # normal, removed, redirect
-TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
-TROVE_QUERY_NORMAL = 2              # normal
+from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)
@@ -380,7 +378,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
         self.localRep = localRepository
 
-        trovesource.SearchableTroveSource.__init__(self)
+        trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
         self.searchAsRepository()
 
         self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
@@ -1633,7 +1631,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
-                  getLeaves = True, bestFlavor = True):
+                  getLeaves = True, bestFlavor = True, troveTypes=TROVE_QUERY_PRESENT):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -1690,16 +1688,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
-                                            getLeaves, bestFlavor)
+                                            getLeaves, bestFlavor, troveTypes=troveTypes)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None,
-                  getLeaves = True, bestFlavor = True):
+                  getLeaves = True, bestFlavor = True, troveTypes = TROVE_QUERY_PRESENT):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossLabels, acrossFlavors,
-                              affinityDatabase, False, getLeaves, bestFlavor)
+                              affinityDatabase, False, getLeaves, bestFlavor, 
+                              troveTypes=troveTypes)
         return res[(name, versionStr, flavor)]
 
     def getConaryUrl(self, version, flavor):

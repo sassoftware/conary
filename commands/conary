@@ -48,6 +48,7 @@ from conary import trove, updatecmd, verify, versions
 from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.repository import trovesource
 
 sys.excepthook = util.genExcepthook(debug=True)
 
@@ -589,8 +590,11 @@ class RepQueryCommand(_AbstractQueryCommand):
                                   ' and the query (and affinity if specified)'),
             'best-flavors' : optparse.SUPPRESS_HELP, # default
             'latest-versions': optparse.SUPPRESS_HELP, # default
-            'leaves'         : 'Return latest version for each unique flavor'}
-
+            'leaves'         : 'Return latest version for each unique flavor',
+            'show-removed'   : 'Display troves that have been removed from the repos',
+            #'show-redirects' : 'Display redirect troves'
+            # turned off for now.
+            }
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
@@ -604,6 +608,8 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["leaves"] = NO_PARAM
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
+        d["show-removed"] = NO_PARAM
+        #d["show-redirects"] = NO_PARAM
         argDef['Trove Selection'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
@@ -664,9 +670,19 @@ class RepQueryCommand(_AbstractQueryCommand):
         whatProvidesList = argSet.pop('what-provides', [])
 
         pathList = argSet.pop('path', [])
-        if argSet: return self.usage()
-        troveList = otherArgs[2:]
 
+        if argSet.pop('show-removed', False):
+            argSet.pop('show-redirects', False)
+            troveTypes = trovesource.TROVE_QUERY_ALL
+        #elif argSet.pop('show-redirects', False):
+        #    troveTypes = trovesource.TROVE_QUERY_PRESENT
+        #else:
+        #    troveTypes = trovesource.TROVE_QUERY_NORMAL
+        else:
+            troveTypes = trovesource.TROVE_QUERY_PRESENT
+        kw['troveTypes'] = troveTypes
+
+        troveList = otherArgs[2:]
         queryrep.displayTroves(cfg, troveList, pathList, whatProvidesList,
                                versionFilter, flavorFilter, **kw)
 _register(RepQueryCommand)
