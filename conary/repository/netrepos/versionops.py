@@ -109,6 +109,9 @@ class LatestTable:
         return latestVersionId, troveType
 
     def _add(self, cu, itemId, branchId, flavorId, versionId, latestType):
+        if versionId is None:
+            import epdb
+            epdb.st()
         cu.execute("""INSERT INTO Latest 
                         (itemId, branchId, flavorId, versionId, latestType)
                         VALUES (?, ?, ?, ?, ?)""",
@@ -133,17 +136,19 @@ class LatestTable:
                       LATEST_TYPE_NORMAL)
             return
 
-        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId,
-                            "AND troveType = %d" % trove.TROVE_TYPE_NORMAL)
-        if versionId is not None:
-            self._add(cu, itemId, branchId, flavorId, versionId,
-                      LATEST_TYPE_NORMAL)
 
-        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId,
+        presentVersionId, troveType = \
+            self._findLatest(cu, itemId, branchId, flavorId,
                             "AND troveType != %d" % trove.TROVE_TYPE_REMOVED)
-        if versionId is not None:
-            self._add(cu, itemId, branchId, flavorId, versionId,
+        if presentVersionId is not None:
+            self._add(cu, itemId, branchId, flavorId, presentVersionId,
                       LATEST_TYPE_PRESENT)
+
+        normalVersionId, troveType = self._findLatest(cu, itemId, branchId,
+                     flavorId, "AND troveType = %d" % trove.TROVE_TYPE_NORMAL)
+        if normalVersionId is not None and normalVersionId == presentVersionId:
+            self._add(cu, itemId, branchId, flavorId, normalVersionId,
+                      LATEST_TYPE_NORMAL)
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
