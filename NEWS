@@ -37,6 +37,12 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
+  o Server Changes:
+    * Flavored redirects could not be loaded properly from a repository
+
+  o Script Changes:
+    * resha1 script skip troves which aren't present in the repository
+
 Changes in 1.0.25:
   o Build Changes:
     * The addArchive() source action will search for reasonably-named
