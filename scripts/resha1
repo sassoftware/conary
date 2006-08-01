@@ -57,6 +57,8 @@ cu.execute("""
                     Instances.versionId = Versions.versionId
                 JOIN Flavors ON
                     Instances.flavorId = Flavors.flavorId
+                WHERE
+                    Instances.isPresent = 1
            """)
 
 allTroves = [ (x[0], (x[1], versions.VersionFromString(x[2]),
@@ -85,7 +87,7 @@ for instanceId, sigs in fixes:
 
 cu.execute("""DELETE FROM TroveInfo WHERE instanceId IN
                     (SELECT instanceId FROM Fixes) AND
-                    infoType == %d""" % trove._TROVEINFO_TAG_SIGS)
+                    infoType = %d""" % trove._TROVEINFO_TAG_SIGS)
 cu.execute("""INSERT INTO TroveInfo (instanceId, infoType, data)
                 SELECT instanceId, %d, sigs FROM Fixes""" 
                             % trove._TROVEINFO_TAG_SIGS)
