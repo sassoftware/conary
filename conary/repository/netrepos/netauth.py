@@ -229,7 +229,6 @@ class NetworkAuthorization:
         """
         self.serverNameList = serverNameList
         self.db = db
-        self.reCache = {}
         self.log = log or tracelog.getLog(None)
         self.userAuth = UserAuthorization(
             self.db, passwordURL, cacheTimeout = cacheTimeout)
@@ -324,10 +323,7 @@ class NetworkAuthorization:
             if troveName=='ALL' or not trove:
                 regExp = None
             else:
-                regExp = self.reCache.get(troveName, None)
-                if regExp is None:
-                    regExp = re.compile(troveName)
-                    self.reCache[troveName] = regExp
+                regExp = re.compile(troveName)
 
             if not regExp or regExp.match(trove):
                 return True
@@ -337,10 +333,7 @@ class NetworkAuthorization:
     def checkTrove(self, pattern, trove):
         if pattern=='ALL':
             return True
-        regExp = self.reCache.get(pattern, None)
-        if regExp is None:
-            regExp = re.compile(pattern)
-            self.reCache[trove] = regExp
+        regExp = re.compile(pattern)
         if regExp.match(trove):
             return True
         return False
