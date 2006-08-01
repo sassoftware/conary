@@ -16,8 +16,11 @@ Changes in 1.1:
       you're trying to commit before you send them across the wire. (CNY-616)
 
   o Client Changes:
-    * conary rq now --path, which allows you to search for troves in the 
-      repository by path. (CNY-74)
+    * conary rq now supports --path, which allows you to search for troves in 
+      the repository by path. (CNY-74)
+    * conary rq now has a --show-removed option that allows you to see removed
+      troves.  A [Removed] flag will be displayed when the --trove-flags option
+      is added.
 
 Changes in @NEW@:
   o Server Changes:

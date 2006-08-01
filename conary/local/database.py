@@ -244,7 +244,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
 	return result
 
-    def getTroveVersionList(self, name, withFlavors = False):
+    def getTroveVersionList(self, name, withFlavors = False, troveTypes=None):
 	"""
 	Returns a list of all of the versions of a trove available
 	in the repository.. If withFlavors is True, (version, flavor)
