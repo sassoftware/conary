@@ -39,6 +39,8 @@ Changes in 1.0.26:
 
   o Server Changes:
     * Flavored redirects could not be loaded properly from a repository
+    * The Conary web interface now provides a method to rely solely on
+      a remote repository server to do authentication checks. (CNY-705)
 
   o Script Changes:
     * resha1 script skip troves which aren't present in the repository

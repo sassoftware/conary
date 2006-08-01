@@ -46,14 +46,21 @@ class InvalidPassword(ServerError):
 def checkAuth(write = False, admin = False):
     def deco(func):
         def wrapper(self, **kwargs):
-            # XXX two xmlrpc calls here could possibly be condensed to one
-            # first check the password only
-            if not self.repServer.auth.check(self.authToken):
-                raise InvalidPassword
-            # now check for proper permissions
-            if not self.repServer.auth.check(self.authToken, write=write,
-                                             admin=admin):
-                raise InsufficientPermission
+            # this is for rBuilder.  It uses this code to provide a web
+            # interface to browse (ONLY) a _remote_ repository.  Since
+            # there isn't any administration stuff going on, we can skip
+            # the authentication checks here.  The remote repository will
+            # prevent us from accessing any information which the authToken
+            # (if any) does not allow us to see.
+            if not self.isRemoteRepository:
+                # XXX two xmlrpc calls here could possibly be condensed to one
+                # first check the password only
+                if not self.repServer.auth.check(self.authToken):
+                    raise InvalidPassword
+                # now check for proper permissions
+                if not self.repServer.auth.check(self.authToken, write=write,
+                                                 admin=admin):
+                    raise InsufficientPermission
 
             return func(self, **kwargs)
         return wrapper
@@ -63,6 +70,8 @@ class HttpHandler(WebHandler):
     def __init__(self, req, cfg, repServer, protocol, port):
         WebHandler.__init__(self, req, cfg)
 
+        # see the comment about remote repositories in the checkAuth decorator
+        self.isRemoteRepository = False
         self.repServer = repServer
         self.troveStore = repServer.troveStore
 
