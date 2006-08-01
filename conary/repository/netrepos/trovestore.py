@@ -739,7 +739,7 @@ class TroveStore:
                             troveRedirectsCursor.next()
                     targetBranch = versions.VersionFromString(targetBranch)
                     if targetFlavor is not None:
-                        targetFlavor = deps.deps.ThawFlavor(targetFlavor)
+                        targetFlavor = deps.ThawFlavor(targetFlavor)
 
                     trv.addRedirect(targetName, targetBranch, targetFlavor)
             except StopIteration:
@@ -848,7 +848,7 @@ class TroveStore:
         try:
             stream = cu.next()[0]
         except StopIteration:
-            raise KeyError, (pathId, fileId)
+            raise errors.FileStreamMissing(fileId)
 
         if stream is not None:
             return files.ThawFile(cu.frombinary(stream), 

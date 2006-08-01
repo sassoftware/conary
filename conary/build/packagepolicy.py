@@ -1883,7 +1883,7 @@ class Provides(policy.Policy):
         # that might need to have paths added
         for (filter, provision) in self.fileFilters:
             if filter.match(path):
-                m = self._markProvides(path, fullpath, provision, pkg, m, f)
+                m = self._markProvides(path, fullpath, provision, pkg, macros, m, f)
 
         if os.path.exists(fullpath):
             if m and m.name == 'ELF':
@@ -1918,7 +1918,7 @@ class Provides(policy.Policy):
         if f.flags.isPathDependencyTarget():
             pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
 
-    def _markProvides(self, path, fullpath, provision, pkg, m, f):
+    def _markProvides(self, path, fullpath, provision, pkg, macros, m, f):
         if path not in pkg.providesMap:
             # BuildPackage only fills in providesMap for ELF files; we may
             # need to create a few more DependencySets.
@@ -1940,16 +1940,20 @@ class Provides(policy.Policy):
             return m
 
         if provision.startswith("soname:"):
-            if os.path.islink(fullpath):
-                # allow symlinks to provide sonames if necessary and if
-                # they point to real files; paths encoded in sonames might
-                # require the symlink path
-                contents = os.readlink(fullpath)
+            # allow symlinks to provide sonames if necessary and if
+            # they point (eventually) to real files; paths encoded
+            # in sonames might require the symlink path
+            contentsPath = fullpath
+            while os.path.islink(contentsPath):
+                contents = os.readlink(contentsPath)
                 if contents.startswith('/'):
-                    m = self.recipe.magic[os.path.normpath(contents)]
+                    contentsPath = os.path.normpath(contents)
                 else:
-                    m = self.recipe.magic[os.path.normpath(
-                                          os.path.dirname(path)+'/'+contents)]
+                    contentsPath = os.path.normpath(
+                        os.path.dirname(path)+'/'+contents)
+                m = self.recipe.magic[contentsPath]
+                contentsPath = macros.destdir + contentsPath
+
             if m and m.name == 'ELF':
                 # Only ELF files can provide sonames.
                 # This is for libraries that don't really include a soname,

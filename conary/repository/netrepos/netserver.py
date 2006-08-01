@@ -13,12 +13,14 @@
 #
 
 import base64
+import itertools
 import os
+import re
 import sys
 import tempfile
 import time
 
-from conary import trove, versions
+from conary import files, trove, versions
 from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
@@ -35,6 +37,7 @@ from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
 from conary.local import schema as depSchema
+from conary.errors import InvalidRegex
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
@@ -306,6 +309,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return (False, True, ('FileStreamNotFound',
                            self.fromFileId(e.fileId),
                            self.fromVersion(e.fileVer)))
+        elif isinstance(e, errors.FileHasNoContents):
+            return (False, True, ('FileHasNoContents',
+                           self.fromFileId(e.fileId),
+                           self.fromVersion(e.fileVer)))
+        elif isinstance(e, errors.FileStreamMissing):
+            return (False, True, ('FileStreamMissing',
+                           self.fromFileId(e.fileId)))
         elif isinstance(e, sqlerrors.DatabaseLocked):
             return (False, True, ('RepositoryLocked'))
         elif isinstance(e, errors.TroveIntegrityError):
@@ -433,6 +443,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = None
+        try:
+            re.compile(trovePattern)
+        except:
+            raise InvalidRegex(trovePattern)
 
         if label == "":
             label = None
@@ -468,6 +482,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = "ALL"
+        try:
+            re.compile(trovePattern)
+        except:
+            raise InvalidRegex(trovePattern)
 
         if label == "":
             label = "ALL"
@@ -1211,32 +1229,55 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileContents(self, authToken, clientVersion, fileList):
         self.log(2, "fileList", fileList)
+
+        # We use getFileStreams here instead of lower-level calls because
+        # it handles permission checks for us. We don't have pathIds here,
+        # so we have to just make one up.
+        pathId = self.fromPathId("0" * 16)
+        try:
+            streams = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
+                                           [ (pathId, x[0]) for x in fileList ])
+        except errors.FileStreamMissing, e:
+            # we're supposed to return an exception which includes the
+            # fileVersion.
+            fileId = self.fromFileId(e.fileId)
+            l = [ x for x in fileList if x[0] == fileId ]
+            raise errors.FileStreamNotFound((self.toFileId(l[0][0]),
+                                             self.toVersion(l[0][1])))
+
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
 
             sizeList = []
+            exception = None
 
-            for fileId, fileVersion in fileList:
-                fileVersion = self.toVersion(fileVersion)
-                fileLabel = fileVersion.branch().label()
-                fileId = self.toFileId(fileId)
+            for encStream, (encFileId, encVersion) in \
+                                itertools.izip(streams, fileList):
+                pathId, stream = self.toFileAsStream(encStream,
+                                                     rawPathId = True)
 
-                if not self.auth.check(authToken, write = False, label = fileLabel):
-                    raise errors.InsufficientPermission
+                if not files.frozenFileHasContents(stream):
+                    exception = errors.FileHasNoContents
+                else:
+                    contents = files.frozenFileContentInfo(stream)
+                    filePath = self.repos.contentsStore.hashToPath(
+                        sha1helper.sha1ToString(contents.sha1()))
 
-                fileObj = self.troveStore.findFileVersion(fileId)
-                if fileObj is None:
-                    raise errors.FileStreamNotFound((fileId, fileVersion))
+                    try:
+                        size = os.stat(filePath).st_size
+                        sizeList.append(size)
+                        os.write(fd, "%s %d\n" % (filePath, size))
+                    except OSError, e:
+                        if e.errno != errno.ENOENT:
+                            raise
+                        exception = errors.FileContentsNotFound
 
-                filePath = self.repos.contentsStore.hashToPath(
-                    sha1helper.sha1ToString(fileObj.contents.sha1()))
-                try:
-                    size = os.stat(filePath).st_size
-                except OSError, e:
-                    raise errors.FileContentsNotFound((fileId, fileVersion))
-                sizeList.append(size)
-                os.write(fd, "%s %d\n" % (filePath, size))
+                if exception:
+                    l = [ x for x in fileList if x[0] == encFileId ]
+                    raise exception((self.toFileId(l[0][0]),
+                                     self.toVersion(l[0][1])))
+
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
             return url, sizeList
@@ -1584,26 +1625,82 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileVersions(self, authToken, clientVersion, fileList):
         self.log(2, fileList)
-	# XXX needs to authentication against the trove the file is part of,
-	# which is unfortunate, though you have to wonder what could be so
-        # special in an inode...
-        r = []
-        for (pathId, fileId) in fileList:
-            f = self.troveStore.getFile(self.toPathId(pathId),
-                                        self.toFileId(fileId))
-            r.append(self.fromFile(f))
 
-        return r
+        cu = self.db.cursor()
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return {}
+
+        schema.resetTable(cu, 'gfvTable')
+        # XXX the only thing we use the pathId for is to set it in the
+        # file object; we should just pass the stream back and let the
+        # client set it to avoid sending it back and forth for no particularly
+        # good reason
+        for i, (pathId, fileId) in enumerate(fileList):
+            cu.execute("INSERT INTO gfvTable (idx, fileId) VALUES (?, ?)",
+                       i, self.toFileId(fileId))
+
+        # None in streams means the stream wasn't found. Insufficient
+        # permission to see a stream looks just like a missing stream
+        # (as missing items do in most of Conary)
+        streams = [ None ] * len(fileList)
+
+        q = """
+            SELECT gfvTable.idx, FileStreams.stream, UP.permittedTrove,
+                   Items.item
+            FROM gfvTable
+                JOIN FileStreams USING (fileId)
+                JOIN TroveFiles USING (streamId)
+                JOIN Instances USING (instanceId)
+                JOIN Nodes USING (itemId, versionId)
+                JOIN LabelMap USING (itemId, branchId)
+                JOIN Items USING (itemId)
+                JOIN ( SELECT
+                           Permissions.labelId as labelId,
+                           PerItems.item as permittedTrove,
+                           Permissions.permissionId as aclId
+                       FROM
+                           Permissions
+                           JOIN Items as PerItems USING (itemId)
+                       WHERE
+                           Permissions.userGroupId IN (%(ugid)s)
+                    ) as UP
+                        ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                WHERE
+                    FileStreams.stream IS NOT NULL
+        """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
+
+        cu.execute(q)
+
+        for (i, stream, troveNamePattern, troveName) in cu:
+            if streams[i]:
+                # we've already found this one
+                continue
+
+            if not self.auth.checkTrove(troveNamePattern, troveName):
+                continue
+
+            streams[i] = self.fromFileAsStream(pathId, stream,
+                                               rawPathId = True)
+
+        # return an exception if we couldn't find one of the streams
+        if None in streams:
+            fileId = self.toFileId(fileList[streams.index(None)][1])
+            raise errors.FileStreamMissing(fileId)
+
+        return streams
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
                        withContents = 0):
+        # withContents is legacy; it was never used in conary 1.0.x
+        assert(not withContents)
         self.log(2, pathId, fileId, "withContents=%s" % (withContents,))
-	# XXX needs to authentication against the trove the file is part of,
-	# which is unfortunate, though you have to wonder what could be so
-        # special in an inode...
-	f = self.troveStore.getFile(self.toPathId(pathId),
-                                    self.toFileId(fileId))
-	return self.fromFile(f)
+        # getFileVersions is responsible for authenticating this call
+        l = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
+                                 [ (pathId, fileId) ])
+        assert(len(l) == 1)
+        return l[0]
 
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName,
                                 branch):

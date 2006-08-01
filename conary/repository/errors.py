@@ -12,7 +12,7 @@
 # full details.
 #
 from conary.errors import ConaryError, InternalConaryError
-from conary.errors import RepositoryError, TroveNotFound
+from conary.errors import RepositoryError, TroveNotFound, InvalidRegex
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.trove import TroveError
 from conary.lib import sha1helper
@@ -191,6 +191,26 @@ fileId: %s
 fileVersion: %s
 '''
 
+class FileHasNoContents(GetFileContentsError):
+    error = '''File Has No Contents
+The following file is not a regular file and therefore has no contents:
+fileId: %s
+fileVersion: %s
+'''
+
+class FileStreamMissing(RepositoryError):
+    # This, instead of FileStreamNotFound, is returned when no version
+    # is available for the file stream the server tried to lookup.
+
+    def __init__(self, fileId):
+        self.fileId = fileId
+        RepositoryError.__init__(self, '''File Stream Missing
+    The following file stream was not found on the server:
+    fileId: %s
+    This could be due to an incomplete mirror, insufficient permissions,
+    or the troves using this filestream having been removed from the server.'''
+    % sha1helper.sha1ToString(fileId))
+
 class InvalidClientVersion(RepositoryError):
     pass
 
@@ -235,4 +255,5 @@ simpleExceptions = (
     (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
+    (InvalidRegex,               'InvalidRegex'),
     )

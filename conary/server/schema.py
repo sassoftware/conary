@@ -526,7 +526,8 @@ def createTroves(db):
     # FIXME: rename these indexes
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
-    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path")
+    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path,instanceId",
+                   unique=True)
 
     if createTrigger(db, "TroveFiles"):
         commit = True
@@ -1381,7 +1382,7 @@ class MigrateTo_14(SchemaMigration):
                 contents = files.frozenFileContentInfo(stream)
                 sha1 = contents.sha1()
                 self.cu.execute("INSERT INTO tmpSha1s (streamId, sha1) VALUES (?,?)",
-                                (sha1, streamId), start_transaction=False)
+                                (streamId, sha1))
             newPct = (streamId * 100)/total
             if newPct >= pct:
                 self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
@@ -1451,17 +1452,43 @@ class MigrateTo_14(SchemaMigration):
 class MigrateTo_15(SchemaMigration):
     Version = 15
     def migrate(self):
-        self.message("Updating the Latest table... 1/3")
-        self.cu.execute("ALTER TABLE Latest ADD COLUMN "
-                        "latestType      INTEGER NOT NULL")
-        self.db.dropIndex("Latest", "LatestIdx")
+        cu = self.db.cursor()
+        cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         createLatest(self.db)
 
-        self.cu.execute("UPDATE Latest SET latestType=%d" %
-                        versionops.LATEST_TYPE_ANY)
+        cu.execute("""
+            insert into Latest (itemId, branchId, flavorId, versionId,
+                                latestType)
+                select
+                    instances.itemid as itemid,
+                    nodes.branchid as branchid,
+                    instances.flavorid as flavorid,
+                    nodes.versionid as versionid,
+                    %d
+                from
+                    ( select
+                        i.itemid as itemid,
+                        n.branchid as branchid,
+                        i.flavorid as flavorid,
+                        max(n.finalTimestamp) as finaltimestamp
+                      from
+                        instances as i, nodes as n
+                      where
+                            i.itemid = n.itemid
+                        and i.versionid = n.versionid
+                      group by i.itemid, n.branchid, i.flavorid
+                    ) as tmp
+                    join nodes on
+                      tmp.itemid = nodes.itemid and
+                      tmp.branchid = nodes.branchid and
+                      tmp.finaltimestamp = nodes.finaltimestamp
+                    join instances on
+                      nodes.itemid = instances.itemid and
+                      nodes.versionid = instances.versionid and
+                      instances.flavorid = tmp.flavorid
+        """ % versionops.LATEST_TYPE_ANY)
 
-        self.message("Updating the Latest table... 2/3")
         self.cu.execute("""
             insert into Latest (itemId, branchId, flavorId, versionId,
                                 latestType)
@@ -1495,42 +1522,68 @@ class MigrateTo_15(SchemaMigration):
                       instances.flavorid = tmp.flavorid
         """ % (versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_REMOVED))
 
-        self.message("Updating the Latest table... 3/3")
         self.cu.execute("""
             insert into Latest (itemId, branchId, flavorId, versionId,
                                 latestType)
                 select
                     instances.itemid as itemid,
-                    nodes.branchid as branchid,
+                    latest.branchid as branchid,
                     instances.flavorid as flavorid,
-                    nodes.versionid as versionid,
+                    instances.versionid as versionid,
                     %d
-                from
-                    ( select
-                        i.itemid as itemid,
-                        n.branchid as branchid,
-                        i.flavorid as flavorid,
-                        max(n.finalTimestamp) as finaltimestamp
-                      from
-                        instances as i, nodes as n
-                      where
-                            i.itemid = n.itemid
-                        and i.versionid = n.versionid
-                        and i.troveType == %d
-                      group by i.itemid, n.branchid, i.flavorid
-                    ) as tmp
-                    join nodes on
-                      tmp.itemid = nodes.itemid and
-                      tmp.branchid = nodes.branchid and
-                      tmp.finaltimestamp = nodes.finaltimestamp
-                    join instances on
-                      nodes.itemid = instances.itemid and
-                      nodes.versionid = instances.versionid and
-                      instances.flavorid = tmp.flavorid
-        """ % (versionops.LATEST_TYPE_NORMAL, trove.TROVE_TYPE_NORMAL))
-        self.message("Done updating the Latest table")
+                from Latest join Instances
+                    using (itemId, versionId, flavorId)
+                where
+                    latest.latestType = %d AND
+                    instances.troveType = %d
+        """ % (versionops.LATEST_TYPE_NORMAL,
+               versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_NORMAL))
+
+        # remove dependency provisions from redirects -- the conary 1.0
+        # branch would set redirects to provide their own names. this doesn't
+        # clean up the dependency table; that would only matter on a trove
+        # which was cooked as only a redirect in the repository; any other
+        # instances would still need the depId anyway
+        cu.execute("delete from provides where instanceId in "
+                   "(select instanceId from instances where troveType=?)",
+                   trove.TROVE_TYPE_REDIRECT)
+        cu.execute("""select instanceId, item, version, flavor from instances
+                            join items using (itemId)
+                            join versions on
+                                instances.versionId = versions.versionId
+                            join flavors on
+                                instances.flavorId = flavors.flavorId
+                            where troveType=?""", trove.TROVE_TYPE_REDIRECT)
+
+        cu.execute("""
+        CREATE TEMPORARY TABLE Fixes(
+        instanceId INTEGER,
+        sigs %(BLOB)s)""" % self.db.keywords)
+
+        from conary.repository.netrepos import trovestore
+        repos = trovestore.TroveStore(self.db)
+        for instanceId, name, version, flavor in cu:
+            trv = repos.getTrove(name, version, flavor)
+
+            if trv.verifySignatures():
+                continue
+
+            trv.computeSignatures()
+            cu.execute("INSERT INTO Fixes (instanceId, sigs) VALUES (?, ?)",
+                       instanceId, trv.troveInfo.sigs.freeze())
+
+        cu.execute("""
+        DELETE FROM TroveInfo WHERE instanceId IN
+        (SELECT instanceId FROM Fixes) AND infoType = %d""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("""
+        INSERT INTO TroveInfo (instanceId, infoType, data)
+        SELECT instanceId, %d, sigs FROM Fixes""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("DROP TABLE Fixes")
 
         return self.Version
+
 
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
@@ -1659,6 +1712,15 @@ def setupTempTables(db):
             instanceId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpInstances2"] = True
+
+    if "gfvTable" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        gfvTable(
+            idx         INTEGER,
+            fileId      %(BINARY20)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["gfvTable"] = True
 
     db.commit()
 

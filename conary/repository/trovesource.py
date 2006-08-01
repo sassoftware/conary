@@ -21,7 +21,7 @@ from conary.repository import changeset, errors, findtrove
 
 TROVE_QUERY_ALL = 0                 # normal, removed, redirect
 TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
-TROVE_QUERY_NORMAL = 2              # normal
+TROVE_QUERY_NORMAL = 2              # hide branches which end in redirects
 
 class AbstractTroveSource:
     """ Provides the interface necessary for performing

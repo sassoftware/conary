@@ -29,6 +29,7 @@ import sys
 import time
 
 from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOWLEVEL=DEBUG - 5
 from conary import constants
 
 syslog = None
@@ -119,6 +120,11 @@ def debug(msg, *args):
     m = "+ %s" % msg
     logger.debug(m, *args)
 
+def lowlevel(msg, *args):
+    "Log a low-level debugging message"
+    m = "+ %s" % msg
+    logger.lowlevel(m, *args)
+
 def errorOccurred():
     return hdlr.error
 
@@ -139,7 +145,17 @@ class ErrorCheckingHandler(logging.StreamHandler):
     def emit(self, record):
         logging.StreamHandler.emit(self, record)
 
+class ConaryLogger(logging.Logger):
+    def lowlevel(self, msg, *args, **kwargs):
+        if self.manager.disable >= LOWLEVEL:
+            return
+        if LOWLEVEL >= self.getEffectiveLevel():
+            apply(self._log, (LOWLEVEL, msg, args), kwargs)
+
 if not globals().has_key("logger"):
+    # override the default logger class with one that has a more low-level
+    # level
+    logging.setLoggerClass(ConaryLogger)
     logger = logging.getLogger(LOGGER_CONARY)
     hdlr = ErrorCheckingHandler(sys.stderr)
     formatter = logging.Formatter('%(message)s')

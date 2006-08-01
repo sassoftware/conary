@@ -19,9 +19,7 @@ from conary.repository.netrepos import items
 
 LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
 LATEST_TYPE_PRESENT = 1         # redirects and normal
-LATEST_TYPE_NORMAL  = 2         # only normal troves that do not have a
-                                # redirect as the latest present on that
-                                # branch/flavor
+LATEST_TYPE_NORMAL  = 2         # hide branches which end in redirects
 
 class BranchTable(idtable.IdTable):
     def __init__(self, db):

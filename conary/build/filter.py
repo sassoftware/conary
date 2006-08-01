@@ -73,7 +73,7 @@ class Filter:
 	self.setmode = setmode
 	self.unsetmode = unsetmode
 	tmplist = []
-        if type(regex) is types.FunctionType:
+        if callable(regex):
             regex = regex()
 	if type(regex) is str:
             try:

@@ -22,7 +22,74 @@ Changes in 1.1:
       troves.  A [Removed] flag will be displayed when the --trove-flags option
       is added.
 
-Changes in @NEW@:
+Changes in 1.0.26:
+  o Protocol changes:
+    * Improved acl checks on file contents and file objects (CNY-700)
+    * getFileVersions() raises FileStreamMissing when it gets in valid
+      request
+    * getFileContents() raises FileHasNoContents when contents are
+      requested for a file type which has no contents (such as a symlink)
+    * The server returns a new exception type, FileStreamsMissing, when
+      the client requests file streams w/ getFileVersion(s) (SUP-16)
+
+  o Build Changes:
+    * The fix for CNY-684 introduced in Conary 1.0.24, storing src.rpm
+      files rather than their contents, worked for local builds but
+      not for commits to repositories.  Committing to repositories
+      now incorporates this fix. (CNY-684)
+    * The mirror:// functionality introduced in Conary 1.0.25 had two
+      small bugs, one of which prevented mirror:// pseudo-URLs from
+      working.  These bugs are now fixed, thanks to Pavel
+      Volkovitskiy. (CNY-704)
+    * The "cvc cook" command now announces which label it is building
+      at the beginning of the cook, making it easier to catch mistakes
+      early. Thanks to Pavel Volkovitskiy for this fix. (CNY-615)
+    * When cooking a group, adding "--debug" to the "cvc cook" command
+      line now displays detailed information about why a component is
+      being included to solve a dependency. (CNY-711)
+    * The source actions (addSource, addArchive, etc.) can now take
+      a "package=" argument like the build actions do.  Thanks to
+      Pavel Volkovitskiy for contributing this capability.  (CNY-665)
+    * The "preMake" option had a bad test for the ';' character; this
+      test has been fixed and extended to include && and ||.
+      thanks to Pavel Volkovitskiy for this fix. (CNY-580)
+    * Many actions had a variety of options (dir=, subdir=, and
+      subDir=) for specifying which directory to affect.  These have
+      been converted to all prefer "dir=", though compatibility
+      with older recipes is retained by continuing to allow the
+      subDir= and subdir= options in cases where they have been
+      allowed in the past. Thanks to Pavel Volkovitskiy for this
+      enhancement. (CNY-668)
+
+  o Server Changes:
+    * Flavored redirects could not be loaded properly from a repository
+
+  o Script Changes:
+    * resha1 script skip troves which aren't present in the repository
+
+Changes in 1.0.25:
+  o Build Changes:
+    * The addArchive() source action will search for reasonably-named
+      archive files based on the name and version if given a URL ending
+      with a "/" character. Thanks to Pavel Volkovitskiy for the
+      initial implementation. (CNY-671)
+    * All source actions, when given a URL that starts with "mirror://",
+      will search a set of mirrors based on files in the mirrorDirs
+      configuration entry, with default files provided in the
+      /etc/conary/mirrors/ directory. Thanks to Pavel Volkovitskiy for
+      the initial implementation. (CNY-171)
+    * Symbolic links are now allowed to provide a soname even if they
+      reference an ELF file only indirectly through other symbolic
+      links.  Previously, a symbolic link could only provide a soname
+      if it directly referenced an ELF file. (CNY-696)
+
+  o Bug Fixes:
+    * A bug that caused unhandled exceptions when downloading the file
+      contents needed for a distributed changeset in threaded mode has
+      been fixed. This bug was introduced in 1.0.24. (CNY-701)
+
+Changes in 1.0.24:
+>>>>>>> /tmp/NEWS~other.8UGRi2
   o Server Changes:
     * The server binary access log can now be downloaded by an
       administrator by visiting the http://servername/conary/log
@@ -34,29 +101,10 @@ Changes in @NEW@:
 
   o Client Changes:
     * A --what-provides option has been added to "conary query" and
-      "conary repquery"
-    * A bug that installed all components of a package that is
+      "conary repquery".
+    * A bug that installed extra components of a package that is being
       installed instead of updated due to the existing package being
       pinned has been fixed. (CNY-682)
-
-  o Bug Fixes:
-    * The Conary Repository web interface no longer returns a
-      HTTP_FORBIDDEN (403) when a bad password is given by the user.
-      This allows the user to re-try authentication.
-    * The --signatures and --buildreqs flags now work with conary
-      showcs.  (CNY-642)
-    * Fixed a bug in the NetworkRepositoryClient default pwPrompt mechanism.
-    * Improved error messages when entitlements fail to load (CNY-662)
-    * The repository client no longer caches repo access info when the 
-      attempt to access was unsuccessful. (CNY-673, affects CNY-578)
-    * Select better flavors for updateall when updating x86 troves
-      on an x86_64 system (CNY-628)
-    * Fixed a bug that caused migrate behavior to not respect pins when 
-      the pinned troves were set to be erased (CNY-680).
-    * Calling r.ComponentSpec(':foo') works again; it is exactly
-      equivalent to r.ComponentSpec('foo'). (CNY-637)
-    * Calling r.Move() with only one argument now fails explicitly
-      rather than silently doing nothing. (CNY-614)
 
   o Build Changes:
     * When pulling files out of a src.rpm file, Conary now stores the
@@ -64,8 +112,31 @@ Changes in @NEW@:
       pulled from it. (CNY-684)
     * Mono dependency version mappings are now discovered in CIL policy
       .config files. (CNY-686)
-    * The internal util.literalRegex function has been replaced by
-      use of re.escape. (CNY-634)
+    * The internal util.literalRegex() function has been replaced by
+      use of re.escape(). (CNY-634)
+
+  o Bug Fixes:
+    * The Conary Repository web interface no longer returns a
+      HTTP_FORBIDDEN (403) when a bad password is given by the user.
+      This allows the user to re-try authentication.
+    * The --signatures and --buildreqs flags now work with "conary
+      showcs".  (CNY-642)
+    * A bug in the NetworkRepositoryClient default pwPrompt mechanism
+      has been fixed.
+    * Error messages when entitlements fail to load have been
+      improved. (CNY-662)
+    * The repository client no longer caches repository access info
+      when the attempt to access was unsuccessful. (CNY-673, affects
+      CNY-578)
+    * A bug that caused x86 flavored troves from being updated
+      properly when using "conary updateall" on an x86_64 system has
+      been fixed. (CNY-628)
+    * A bug that caused migrate behavior to not respect pins when the
+      pinned troves were set to be erased (CNY-680).
+    * Calling r.ComponentSpec(':foo') works again; it is exactly
+      equivalent to r.ComponentSpec('foo'). (CNY-637)
+    * Calling r.Move() with only one argument now fails explicitly
+      rather than silently doing nothing. (CNY-614)
 
 Changes in 1.0.23:
   o API Additions:
