@@ -73,10 +73,16 @@ def _run(coverage):
     signal.signal(signal.SIGUSR2, _saveState)
     atexit.register(coverage.the_coverage.save)
     coverage.the_coverage.get_ready()
-    sys.settrace(coverage.t)
+    coverage.c.enable()
 
 origOsFork = os.fork
 origOsExit = os._exit
+origExecArray = {}
+
+for exectype in 'l', 'le', 'lp', 'lpe', 'v', 've', 'vp', 'vpe':
+    fnName = 'exec' + exectype
+    origExecArray[fnName] = getattr(os, fnName)
+
 def _installOsWrapper():
     """
         wrap fork to automatically start a new coverage
@@ -97,14 +103,25 @@ def _installOsWrapper():
         sys.modules['coverage'].the_coverage.save()
         origOsExit(*args)
 
+    def exec_wrapper(fn):
+        def _exec_wrapper(*args, **kw):
+            sys.modules['coverage'].the_coverage.save()
+            return fn(*args, **kw)
+        return _exec_wrapper
+
     if os.fork is origOsFork:
         os.fork = fork_wrapper
 
     if os._exit is origOsExit:
         os._exit = exit_wrapper
 
+    for fnName, origFn in origExecArray.iteritems():
+        curFn = getattr(os, fnName)
+        if curFn is origFn:
+            setattr(os, fnName, exec_wrapper(origFn))
+
 def _reset(coverage):
-    sys.settrace(None)
+    coverage.c.disable()
     coverage.c.clear()
     coverage.the_coverage = None
     coverage.the_coverage = coverage.coverage()
