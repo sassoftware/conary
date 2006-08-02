@@ -1494,14 +1494,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # file object; we should just pass the stream back and let the
         # client set it to avoid sending it back and forth for no particularly
         # good reason
-        # We'll need to keep a mapping from fileId back to pathId so we
-        # can set it in the file object
-        pathIds = {}
         for i, (pathId, fileId) in enumerate(fileList):
-            fileId = self.toFileId(fileId)
-            pathIds[fileId] = pathId
             cu.execute("INSERT INTO gfvTable (idx, fileId) VALUES (?, ?)",
-                       i, fileId)
+                       i, self.toFileId(fileId))
 
         # None in streams means the stream wasn't found. Insufficient
         # permission to see a stream looks just like a missing stream
@@ -1509,7 +1504,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         streams = [ None ] * len(fileList)
 
         q = """
-            SELECT gfvTable.idx, gfvTable.fileId,
+            SELECT gfvTable.idx,
                    FileStreams.stream, UP.permittedTrove, Items.item
             FROM gfvTable
                 JOIN FileStreams USING (fileId)
@@ -1535,7 +1530,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         cu.execute(q)
 
-        for (i, fileId, stream, troveNamePattern, troveName) in cu:
+        for (i, stream, troveNamePattern, troveName) in cu:
             if streams[i]:
                 # we've already found this one
                 continue
@@ -1543,7 +1538,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
 
-            streams[i] = self.fromFileAsStream(pathIds[fileId], stream,
+            streams[i] = self.fromFileAsStream(fileList[i][0], stream,
                                                rawPathId = True)
 
         # return an exception if we couldn't find one of the streams
