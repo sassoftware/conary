@@ -781,7 +781,6 @@ class Trove(streams.StreamSet):
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
-        assert(not self.isRedirect())
         if weakRef:
             troveGroup = self.weakTroves
         else:
