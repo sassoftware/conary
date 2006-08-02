@@ -1,9 +1,3 @@
-Changes in NEW:
-  o Client Changes:
-    * Added assertions to prevent the wrong Trove.add* methods being called
-      between normal troves and redirects
-    * Trove equality checks did not work for redirects
-
 Changes in 1.0.26:
   o Protocol changes:
     * Improved acl checks on file contents and file objects (CNY-700)
@@ -13,6 +7,11 @@ Changes in 1.0.26:
       requested for a file type which has no contents (such as a symlink)
     * The server returns a new exception type, FileStreamsMissing, when
       the client requests file streams w/ getFileVersion(s) (SUP-16)
+    * Added assertions to prevent the wrong Trove.add* methods being called
+      between normal troves and redirects
+    * Assert that redirects in troves are to branches, not to versions
+    * Trove equality checks did not work for redirects
+    * Redirect flavors were not stored properly in the trovestore
 
   o Build Changes:
     * The fix for CNY-684 introduced in Conary 1.0.24, storing src.rpm
