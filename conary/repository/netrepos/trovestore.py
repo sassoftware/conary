@@ -1008,6 +1008,9 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
                    flavorId)
         count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE flavorId = ?",
+                   flavorId)
+        count += cu.next()[0]
         if count == 0:
             cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
             cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
@@ -1029,6 +1032,9 @@ class TroveStore:
             cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
                        branchId)
             count = cu.next()[0]
+            cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE branchId = ?",
+                       branchId)
+            count += cu.next()[0]
 
             if not count:
                 cu.execute("DELETE FROM Branches WHERE branchId = ?", branchId)
@@ -1056,6 +1062,9 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
                    "LIMIT 1", itemId)
         count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count += cu.next()[0]
 
         if not count:
             cu.execute("DELETE FROM Items WHERE itemId = ?", itemId)
