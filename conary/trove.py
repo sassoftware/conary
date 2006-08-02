@@ -34,9 +34,9 @@ from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
-# the difference between 10 and 11 is that the REMOVED type appeared; 11 is
-# used *only* for removed troves
-TROVE_VERSION_REMOVED=11
+# the difference between 10 and 11 is that the REMOVED type appeared, 
+# and we allow group redirects; 11 is used *only* for those situations
+TROVE_VERSION_1_1=11
 
 def troveIsCollection(str):
     return not(":" in str or str.startswith("fileset-"))
@@ -963,7 +963,7 @@ class Trove(streams.StreamSet):
             assert(not self.troveInfo.incomplete())
 
         if TROVE_VERSION < self.troveInfo.troveVersion() and \
-           TROVE_VERSION_REMOVED < self.troveInfo.troveVersion():
+           TROVE_VERSION_1_1 < self.troveInfo.troveVersion():
             self.troveInfo.incomplete.set(1)
         elif self.troveInfo.incomplete() is None:
             # old troves don't have an incomplete flag - we want it to 
@@ -1594,7 +1594,9 @@ class Trove(streams.StreamSet):
             self.flavor.set(flavor)
             if setVersion:
                 if type == TROVE_TYPE_REMOVED:
-                    self.troveInfo.troveVersion.set(TROVE_VERSION_REMOVED)
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
+                elif type == TROVE_TYPE_REDIRECT and name.startswith('group-'):
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
                 else:
                     self.troveInfo.troveVersion.set(TROVE_VERSION)
             self.troveInfo.incomplete.set(0)
