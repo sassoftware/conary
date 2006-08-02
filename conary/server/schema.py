@@ -14,15 +14,16 @@
 
 import sys
 
-from conary import versions, trove
+from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, setupTempDepTables
+from conary.repository.netrepos import versionops
 
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 13
+VERSION = 15
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -40,7 +41,7 @@ def createInstances(db):
             versionId       INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             clonedFromId    INTEGER,
-            isRedirect      INTEGER NOT NULL DEFAULT 0,
+            troveType       INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
@@ -209,6 +210,7 @@ def createLatest(db):
             branchId        INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
+            latestType      INTEGER NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -226,6 +228,9 @@ def createLatest(db):
         db.tables["Latest"] = []
         commit = True
     db.createIndex("Latest", "LatestIdx", "itemId, branchId, flavorId",
+                   unique = False)
+    db.createIndex("Latest", "LatestCheckIdx",
+                   "itemId, branchId, flavorId, latestType",
                    unique = True)
     if createTrigger(db, "Latest"):
         commit = True
@@ -316,6 +321,7 @@ def createUsers(db):
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capped          INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
@@ -359,18 +365,12 @@ def createUsers(db):
         CREATE TABLE EntitlementGroups (
             entGroupId      %(PRIMARYKEY)s,
             entGroup        VARCHAR(254) NOT NULL,
-            userGroupId     INTEGER NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT EntitlementGroups_userGroupId_fk
-                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["EntitlementGroups"] = []
         commit = True
     db.createIndex("EntitlementGroups", "EntitlementGroupsEntGroupIdx",
                    "entGroup", unique = True)
-    db.createIndex("EntitlementGroups", "EntitlementGroupsUGIdx",
-                   "userGroupId")
     if createTrigger(db, "EntitlementGroups"):
         commit = True
 
@@ -408,6 +408,26 @@ def createUsers(db):
     db.createIndex("Entitlements", "EntitlementsEgEIdx",
                    "entGroupId, entitlement", unique = True)
     if createTrigger(db, "Entitlements"):
+        commit = True
+
+    if "EntitlementAccessMap" not in db.tables:
+        cu.execute("""
+        CREATE TABLE EntitlementAccessMap(
+            entGroupId      INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT EntitlementAccessMap_entGroupId_fk
+                FOREIGN KEY (entGroupId) REFERENCES
+                                            EntitlementGroups(entGroupId),
+            CONSTRAINT EntitlementAccessMap_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES userGroups(userGroupId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["EntitlementAccessMap"] = []
+        commit = True
+    db.createIndex("EntitlementAccessMap", "EntitlementAccessMapIndex",
+                   "entGroupId, userGroupId", unique = True)
+    if createTrigger(db, "EntitlementAccessMap"):
         commit = True
 
     if commit:
@@ -470,12 +490,15 @@ def createTroves(db):
             streamId    %(PRIMARYKEY)s,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             changed     NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
     db.createIndex("FileStreams", "FileStreamsIdx",
                    "fileId", unique = True)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx",
+                   "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -503,6 +526,9 @@ def createTroves(db):
     # FIXME: rename these indexes
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
+    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path,instanceId",
+                   unique=True)
+
     if createTrigger(db, "TroveFiles"):
         commit = True
 
@@ -1335,6 +1361,230 @@ class MigrateTo_13(SchemaMigration):
         # all done for migration to 13
         return self.Version
 
+class MigrateTo_14(SchemaMigration):
+    Version = 14
+    def migrate(self):
+        self.message('WARNING: do NOT interrupt this migration, you will leave your DB in a messy state')
+
+        updateCursor = self.db.cursor()
+        self.cu.execute("""
+        CREATE TEMPORARY TABLE tmpSha1s(
+        streamId INTEGER,
+        sha1  BINARY(20))""",
+                        start_transaction=False)
+        self.cu.execute('CREATE INDEX tmpSha1sIdx ON tmpSha1s(streamId)')
+        total = self.cu.execute('SELECT max(streamId) FROM FileStreams').fetchall()[0][0]
+        pct = 0
+        for idx, (streamId, fileId, stream) in \
+                enumerate(updateCursor.execute("SELECT streamId, fileId, stream FROM "
+                                "FileStreams ORDER BY StreamId")):
+            if stream and files.frozenFileHasContents(stream):
+                contents = files.frozenFileContentInfo(stream)
+                sha1 = contents.sha1()
+                self.cu.execute("INSERT INTO tmpSha1s (streamId, sha1) VALUES (?,?)",
+                                (streamId, sha1))
+            newPct = (streamId * 100)/total
+            if newPct >= pct:
+                self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
+                pct = newPct + 5
+
+        self.message('Populating FileStream Table with sha1s...')
+
+        # delay this as long as possible, any CTRL-C after this point
+        # will make future migrations fail.
+        self.cu.execute("ALTER TABLE FileStreams ADD COLUMN "
+                        "sha1        %(BINARY20)s"
+                        % self.db.keywords)
+
+        self.cu.execute("""
+        UPDATE FileStreams
+        SET sha1 = (
+            SELECT sha1 FROM tmpSha1s
+            WHERE FileStreams.streamid = tmpSha1s.streamid )
+        """)
+        self.cu.execute('DROP TABLE tmpSha1s')
+
+        # because of the foreign key ereferntial mess, we need to
+        # destroy the FKs relationships, recreate the Entitlement
+        # tables, and restore the data
+        self.message('Updating Entitlements...')
+        self.cu.execute("CREATE TABLE Entitlements2 AS SELECT * FROM "
+                        "Entitlements")
+        self.cu.execute("CREATE TABLE EntitlementGroups2 AS SELECT * FROM "
+                        "EntitlementGroups")
+        self.cu.execute("CREATE TABLE EntitlementOwners2 AS SELECT * FROM "
+                        "EntitlementOwners")
+        self.cu.execute("DROP TABLE Entitlements")
+        self.cu.execute("DROP TABLE EntitlementOwners")
+        self.cu.execute("DROP TABLE EntitlementGroups")
+
+        self.db.loadSchema()
+        createUsers(self.db)
+
+        self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
+                        "SELECT entGroup, entGroupId FROM EntitlementGroups2")
+        self.cu.execute("INSERT INTO EntitlementAccessMap (entGroupId, "
+                        "userGroupId) SELECT entGroupId, userGroupId FROM "
+                        "EntitlementGroups2")
+        self.cu.execute("INSERT INTO Entitlements SELECT * FROM Entitlements2")
+        self.cu.execute("INSERT INTO EntitlementOwners SELECT * FROM EntitlementOwners2")
+        self.cu.execute("DROP TABLE Entitlements2")
+        self.cu.execute("DROP TABLE EntitlementGroups2")
+        self.cu.execute("DROP TABLE EntitlementOwners2")
+
+        self.message("Updating the Permissions table...")
+        self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
+                        "canRemove   INTEGER NOT NULL DEFAULT 0"
+                        % self.db.keywords)
+
+        self.message("Updating Instances table...")
+        self.db.renameColumn("Instances", "isRedirect", "troveType")
+        self.db.loadSchema()
+
+        # recreate the indexes and triggers - including new path
+        # index for TroveFiles.  Also recreates the indexes table.
+        self.message('Recreating indexes... (this could take a while)')
+        createTroves(self.db)
+        self.message('Indexes created.')
+
+        return self.Version
+
+class MigrateTo_15(SchemaMigration):
+    Version = 15
+    def migrate(self):
+        cu = self.db.cursor()
+        cu.execute("DROP TABLE Latest")
+        self.db.loadSchema()
+        createLatest(self.db)
+
+        cu.execute("""
+            insert into Latest (itemId, branchId, flavorId, versionId,
+                                latestType)
+                select
+                    instances.itemid as itemid,
+                    nodes.branchid as branchid,
+                    instances.flavorid as flavorid,
+                    nodes.versionid as versionid,
+                    %d
+                from
+                    ( select
+                        i.itemid as itemid,
+                        n.branchid as branchid,
+                        i.flavorid as flavorid,
+                        max(n.finalTimestamp) as finaltimestamp
+                      from
+                        instances as i, nodes as n
+                      where
+                            i.itemid = n.itemid
+                        and i.versionid = n.versionid
+                      group by i.itemid, n.branchid, i.flavorid
+                    ) as tmp
+                    join nodes on
+                      tmp.itemid = nodes.itemid and
+                      tmp.branchid = nodes.branchid and
+                      tmp.finaltimestamp = nodes.finaltimestamp
+                    join instances on
+                      nodes.itemid = instances.itemid and
+                      nodes.versionid = instances.versionid and
+                      instances.flavorid = tmp.flavorid
+        """ % versionops.LATEST_TYPE_ANY)
+
+        self.cu.execute("""
+            insert into Latest (itemId, branchId, flavorId, versionId,
+                                latestType)
+                select
+                    instances.itemid as itemid,
+                    nodes.branchid as branchid,
+                    instances.flavorid as flavorid,
+                    nodes.versionid as versionid,
+                    %d
+                from
+                    ( select
+                        i.itemid as itemid,
+                        n.branchid as branchid,
+                        i.flavorid as flavorid,
+                        max(n.finalTimestamp) as finaltimestamp
+                      from
+                        instances as i, nodes as n
+                      where
+                            i.itemid = n.itemid
+                        and i.versionid = n.versionid
+                        and i.troveType != %d
+                      group by i.itemid, n.branchid, i.flavorid
+                    ) as tmp
+                    join nodes on
+                      tmp.itemid = nodes.itemid and
+                      tmp.branchid = nodes.branchid and
+                      tmp.finaltimestamp = nodes.finaltimestamp
+                    join instances on
+                      nodes.itemid = instances.itemid and
+                      nodes.versionid = instances.versionid and
+                      instances.flavorid = tmp.flavorid
+        """ % (versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_REMOVED))
+
+        self.cu.execute("""
+            insert into Latest (itemId, branchId, flavorId, versionId,
+                                latestType)
+                select
+                    instances.itemid as itemid,
+                    latest.branchid as branchid,
+                    instances.flavorid as flavorid,
+                    instances.versionid as versionid,
+                    %d
+                from Latest join Instances
+                    using (itemId, versionId, flavorId)
+                where
+                    latest.latestType = %d AND
+                    instances.troveType = %d
+        """ % (versionops.LATEST_TYPE_NORMAL,
+               versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_NORMAL))
+
+        # remove dependency provisions from redirects -- the conary 1.0
+        # branch would set redirects to provide their own names. this doesn't
+        # clean up the dependency table; that would only matter on a trove
+        # which was cooked as only a redirect in the repository; any other
+        # instances would still need the depId anyway
+        cu.execute("delete from provides where instanceId in "
+                   "(select instanceId from instances where troveType=?)",
+                   trove.TROVE_TYPE_REDIRECT)
+        cu.execute("""select instanceId, item, version, flavor from instances
+                            join items using (itemId)
+                            join versions on
+                                instances.versionId = versions.versionId
+                            join flavors on
+                                instances.flavorId = flavors.flavorId
+                            where troveType=?""", trove.TROVE_TYPE_REDIRECT)
+
+        cu.execute("""
+        CREATE TEMPORARY TABLE Fixes(
+        instanceId INTEGER,
+        sigs %(BLOB)s)""" % self.db.keywords)
+
+        from conary.repository.netrepos import trovestore
+        repos = trovestore.TroveStore(self.db)
+        for instanceId, name, version, flavor in cu:
+            trv = repos.getTrove(name, version, flavor)
+
+            if trv.verifySignatures():
+                continue
+
+            trv.computeSignatures()
+            cu.execute("INSERT INTO Fixes (instanceId, sigs) VALUES (?, ?)",
+                       instanceId, trv.troveInfo.sigs.freeze())
+
+        cu.execute("""
+        DELETE FROM TroveInfo WHERE instanceId IN
+        (SELECT instanceId FROM Fixes) AND infoType = %d""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("""
+        INSERT INTO TroveInfo (instanceId, infoType, data)
+        SELECT instanceId, %d, sigs FROM Fixes""" %
+                   trove._TROVEINFO_TAG_SIGS)
+        cu.execute("DROP TABLE Fixes")
+
+        return self.Version
+
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -1360,6 +1610,7 @@ def setupTempTables(db):
             versionId   INTEGER,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s,
             path        VARCHAR(767)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
@@ -1435,6 +1686,16 @@ def setupTempTables(db):
         db.tempTables["hasTrovesTmp"] = True
         db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
                        check = False)
+ 
+    if "trovesByPathTmp" not in db.tempTables:
+        cu.execute("""
+             CREATE TEMPORARY TABLE
+             trovesByPathTmp(
+                 row                 INTEGER,
+                 path                VARCHAR(767)
+             )""")
+        db.tempTables["trovesByPathTmp"] = True
+
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
@@ -1498,16 +1759,15 @@ def loadSchema(db):
     # load the current schema object list
     db.loadSchema()
 
-    # instantiate and call appropriate migration objects in succession.
-    while version and version < VERSION:
-        version = (lambda x : sys.modules[__name__].__dict__[ \
-            'MigrateTo_' + str(x + 1)])(version)(db)()
-
     if version != 0 and version < 13:
         raise sqlerrors.SchemaVersionError(
             "Repository schemas from Conary versions older than 1.0 are not "
             "supported. Contact rPath for help converting your repository to "
             "a supported version.")
+
+    # surely there is a more better way of handling this...
+    if version == 13: version = MigrateTo_14(db)()
+    if version == 14: version = MigrateTo_15(db)()
 
     if version:
         db.loadSchema()

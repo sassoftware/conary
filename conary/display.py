@@ -642,7 +642,8 @@ class TroveFormatter(TroveTupFormatter):
                             flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
                                                               rFlavor)
                         fmtFlags.append(flag)
-
+                if trove and trove.isRemoved():
+                    fmtFlags.append('Removed')
                 if fmtFlags:
                     ln += ' [%s]' % ','.join(fmtFlags)
             yield ln
