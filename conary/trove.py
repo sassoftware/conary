@@ -794,6 +794,7 @@ class Trove(streams.StreamSet):
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
+        assert(self.type() == TROVE_TYPE_NORMAL)
         if weakRef:
             troveGroup = self.weakTroves
         else:
@@ -1051,6 +1052,7 @@ class Trove(streams.StreamSet):
             and self.getRequires() == them.getRequires() \
             and self.getProvides() == them.getProvides() \
             and self.getTroveInfo() == them.getTroveInfo() \
+            and set(self.iterRedirects()) == set(them.iterRedirects()) \
             and not([x for x in csg.iterChangedTroves()])
 
 

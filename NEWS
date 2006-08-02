@@ -22,6 +22,12 @@ Changes in 1.1:
       troves.  A [Removed] flag will be displayed when the --trove-flags option
       is added.
 
+Changes in NEW:
+  o Client Changes:
+    * Added assertions to prevent the wrong Trove.add* methods being called
+      between normal troves and redirects
+    * Trove equality checks did not work for redirects
+
 Changes in 1.0.26:
   o Protocol changes:
     * Improved acl checks on file contents and file objects (CNY-700)
