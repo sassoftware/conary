@@ -448,8 +448,12 @@ class TroveStore:
         # now add the redirects
         cu.execute("DELETE FROM NewRedirects")
         for (name, branch, flavor) in trv.iterRedirects():
+            if flavor is None:
+                frz = None
+            else:
+                frz = flavor.freeze()
             cu.execute("INSERT INTO NewRedirects (item, branch, flavor) "
-                       "VALUES (?, ?, ?)", name, str(branch), flavor.freeze())
+                       "VALUES (?, ?, ?)", name, str(branch), frz)
 
         cu.execute("""
                 INSERT INTO Items (item)
