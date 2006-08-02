@@ -973,13 +973,21 @@ class TroveStore:
                 )
         """, instanceId, instanceId, instanceId)
         r = cu.fetchall()
-        filesToRemove = [ x[1] for x in r ]
+        candidateSha1sToRemove = [ x[1] for x in r ]
         streamIdsToRemove = [ x[0] for x in r ]
 
         cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
         if streamIdsToRemove:
             cu.execute("DELETE FROM FileStreams WHERE streamId IN (%s)"
                        % ",".join([ "%d" % x for x in streamIdsToRemove ]))
+
+        # we need to double check filesToRemove against other streams which
+        # may need the same sha1
+        filesToRemove = []
+        for sha1 in candidateSha1sToRemove:
+            cu.execute("SELECT COUNT(*) FROM FileStreams WHERE sha1=?", sha1)
+            if cu.next()[0] == 0:
+                filesToRemove.append(sha1)
 
         if markOnly:
             # We don't actually remove anything here; we just mark the trove
