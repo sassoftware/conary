@@ -861,9 +861,10 @@ class Trove(streams.StreamSet):
 
         return rc
 
-    def addRedirect(self, toName, toVersion, toFlavor):
+    def addRedirect(self, toName, toBranch, toFlavor):
         assert(self.isRedirect())
-        self.redirects.add(toName, toVersion, toFlavor)
+        assert(isinstance(toBranch, versions.Branch))
+        self.redirects.add(toName, toBranch, toFlavor)
 
     def iterRedirects(self):
         for o in self.redirects.iter():
