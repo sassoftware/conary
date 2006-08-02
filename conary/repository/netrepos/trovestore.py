@@ -263,6 +263,10 @@ class TroveStore:
 	    if flavor is not None:
 		flavorsNeeded[flavor] = True
 
+        for (name, branch, flavor) in trv.iterRedirects():
+            if flavor is not None:
+                flavorsNeeded[flavor] = True
+
 	flavorIndex = {}
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
@@ -429,7 +433,7 @@ class TroveStore:
         cu.execute("DELETE FROM NewRedirects")
         for (name, branch, flavor) in trv.iterRedirects():
             cu.execute("INSERT INTO NewRedirects (item, branch, flavor) "
-                       "VALUES (?, ?, ?)", name, str(branch), str(flavor))
+                       "VALUES (?, ?, ?)", name, str(branch), flavor.freeze())
 
         cu.execute("""
                 INSERT INTO Items (item)

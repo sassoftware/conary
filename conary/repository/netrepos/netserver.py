@@ -1647,8 +1647,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         streams = [ None ] * len(fileList)
 
         q = """
-            SELECT gfvTable.idx, FileStreams.stream, UP.permittedTrove,
-                   Items.item
+            SELECT gfvTable.idx,
+                   FileStreams.stream, UP.permittedTrove, Items.item
             FROM gfvTable
                 JOIN FileStreams USING (fileId)
                 JOIN TroveFiles USING (streamId)
@@ -1681,7 +1681,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
 
-            streams[i] = self.fromFileAsStream(pathId, stream,
+            streams[i] = self.fromFileAsStream(fileList[i][0], stream,
                                                rawPathId = True)
 
         # return an exception if we couldn't find one of the streams
