@@ -781,6 +781,7 @@ class Trove(streams.StreamSet):
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
+        assert(not self.isRedirect())
         if weakRef:
             troveGroup = self.weakTroves
         else:
@@ -860,8 +861,10 @@ class Trove(streams.StreamSet):
 
         return rc
 
-    def addRedirect(self, toName, toVersion, toFlavor):
-        self.redirects.add(toName, toVersion, toFlavor)
+    def addRedirect(self, toName, toBranch, toFlavor):
+        assert(self.isRedirect())
+        assert(isinstance(toBranch, versions.Branch))
+        self.redirects.add(toName, toBranch, toFlavor)
 
     def iterRedirects(self):
         for o in self.redirects.iter():
@@ -1036,6 +1039,7 @@ class Trove(streams.StreamSet):
             and self.getRequires() == them.getRequires() \
             and self.getProvides() == them.getProvides() \
             and self.getTroveInfo() == them.getTroveInfo() \
+            and set(self.iterRedirects()) == set(them.iterRedirects()) \
             and not([x for x in csg.iterChangedTroves()])
 
 
