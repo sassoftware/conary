@@ -879,10 +879,11 @@ class TroveStore:
         return self.db.rollback()
 
     def _removeTrove(self, name, version, flavor, markOnly = False):
+        assert(not name.startswith('group-'))
         cu = self.db.cursor()
         cu.execute("""
                 SELECT instanceId, itemId, Instances.versionId,
-                       Instances.flavorId FROM Instances
+                       Instances.flavorId, troveType FROM Instances
                     JOIN Items USING (itemId)
                     JOIN Versions ON
                         Instances.versionId = Versions.versionId
@@ -895,9 +896,11 @@ class TroveStore:
         """, name, version.asString(), flavor.freeze())
 
         try:
-            instanceId, itemId, versionId, flavorId = cu.next()
+            instanceId, itemId, versionId, flavorId, troveType = cu.next()
         except StopIteration:
             raise errors.TroveMissing(name, version)
+
+        assert(troveType == trove.TROVE_TYPE_NORMAL)
 
         cu.execute("SELECT nodeId, branchId FROM Nodes "
                    "WHERE itemId = ? AND versionId = ?", itemId, versionId)
