@@ -22,6 +22,9 @@ Changes in 1.1:
       troves.  A [Removed] flag will be displayed when the --trove-flags option
       is added.
 
+  o Build Changes:
+    * cvc can now build group redirects.
+
 Changes in 1.0.26:
   o Protocol changes:
     * Improved acl checks on file contents and file objects (CNY-700)
@@ -61,6 +64,8 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
+
+Changes in @NEW@:
   o Server Changes:
     * Flavored redirects could not be loaded properly from a repository
     * The Conary web interface now provides a method to rely solely on
@@ -95,7 +100,6 @@ Changes in 1.0.25:
       been fixed. This bug was introduced in 1.0.24. (CNY-701)
 
 Changes in 1.0.24:
->>>>>>> /tmp/NEWS~other.8UGRi2
   o Server Changes:
     * The server binary access log can now be downloaded by an
       administrator by visiting the http://servername/conary/log
