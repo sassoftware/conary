@@ -422,10 +422,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = None
-        try:
-            re.compile(trovePattern)
-        except:
-            raise InvalidRegex(trovePattern)
+        if trovePattern:
+            try:
+                re.compile(trovePattern)
+            except:
+                raise InvalidRegex(trovePattern)
 
         if label == "":
             label = None
@@ -445,10 +446,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "write=%s admin=%s" % (write, admin))
         if trovePattern == "":
             trovePattern = "ALL"
-        try:
-            re.compile(trovePattern)
-        except:
-            raise InvalidRegex(trovePattern)
+        if trovePattern:
+            try:
+                re.compile(trovePattern)
+            except:
+                raise InvalidRegex(trovePattern)
 
         if label == "":
             label = "ALL"
