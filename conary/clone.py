@@ -37,6 +37,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     repos = client.getRepos()
 
     targetBranch = versions.VersionFromString(targetBranch)
+    if not isinstance(targetBranch, versions.Branch):
+        raise errors.ParseError('Cannot specify full version "%s" to clone to - must specify target branch' % targetBranch)
 
     troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecList]
 
