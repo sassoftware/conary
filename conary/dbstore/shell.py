@@ -228,7 +228,10 @@ type ".quit" to exit, ".help" for help"""
         start = time.time()
         # execute the SQL command
         try:
-            self.cu.execute(cmd % self.db.keywords)
+            # a weak attempt to see if we have any %(keyword)s to expand
+            if r'%(' in cmd:
+                cmd = cmd % self.db.keywords
+            self.cu.execute(cmd)
         except sqlerrors.DatabaseError, e:
             if len(e.args) > 1:
                 print 'Error:', str(e.args[0])
