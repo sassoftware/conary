@@ -1077,11 +1077,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for serverName, job in serverJobs.iteritems():
                 if callback:
                     callback.requestingChangeSet()
-                (url, sizes, extraTroveList, extraFileList, removedTroveList) \
-                    = self.c[serverName].getChangeSet(job, recurse,
+                l = self.c[serverName].getChangeSet(job, recurse,
                                                       withFiles,
                                                       withFileContents,
                                                       excludeAutoSource)
+                if self.c[serverName]._protocolVersion < 38:
+                    (url, sizes, extraTroveList, extraFileList) = l
+                    removedTroveList = []
+                else:
+                    (url, sizes, extraTroveList,
+                     extraFileList, removedTroveList) = l
 
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
