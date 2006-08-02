@@ -230,7 +230,13 @@ type ".quit" to exit, ".help" for help"""
         try:
             self.cu.execute(cmd % self.db.keywords)
         except sqlerrors.DatabaseError, e:
-            print 'Error:', str(e.args[0])
+            if len(e.args) > 1:
+                print 'Error:', str(e.args[0])
+            else:
+                print 'Error:', str(e)
+            return False
+        except Exception, e:
+            print 'Error:', str(e)
             return False
 
         # display the results (if any)
