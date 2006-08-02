@@ -31,7 +31,7 @@ def _regexp(pattern, item):
     return regexp.match(item) is not None
 # a timestamp function compatible with other backends
 def _timestamp():
-    return int(time.strftime("%Y%m%d%H%M%S"))
+    return int(time.strftime("%Y%m%d%H%M%S", time.gmtime(time.time())))
 
 class Cursor(BaseCursor):
     driver = "sqlite"
