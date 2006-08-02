@@ -1,23 +1,8 @@
 Changes in 1.0.26:
-  o Protocol changes:
-    * Improved acl checks on file contents and file objects (CNY-700)
-    * getFileVersions() raises FileStreamMissing when it gets in valid
-      request
-    * getFileContents() raises FileHasNoContents when contents are
-      requested for a file type which has no contents (such as a symlink)
-    * The server returns a new exception type, FileStreamsMissing, when
-      the client requests file streams w/ getFileVersion(s) (SUP-16)
-    * Added assertions to prevent redirects from being added to normal
-      troves
-    * Assert that redirects in troves are to branches, not to versions
-    * Trove equality checks did not work for redirects
-    * Redirect flavors were not stored properly in the trovestore
-
   o Build Changes:
-    * The fix for CNY-684 introduced in Conary 1.0.24, storing src.rpm
-      files rather than their contents, worked for local builds but
-      not for commits to repositories.  Committing to repositories
-      now incorporates this fix. (CNY-684)
+    * When cooking a group, adding "--debug" to the "cvc cook" command
+      line now displays detailed information about why a component is
+      being included to solve a dependency. (CNY-711)
     * The mirror:// functionality introduced in Conary 1.0.25 had two
       small bugs, one of which prevented mirror:// pseudo-URLs from
       working.  These bugs are now fixed, thanks to Pavel
@@ -25,9 +10,6 @@ Changes in 1.0.26:
     * The "cvc cook" command now announces which label it is building
       at the beginning of the cook, making it easier to catch mistakes
       early. Thanks to Pavel Volkovitskiy for this fix. (CNY-615)
-    * When cooking a group, adding "--debug" to the "cvc cook" command
-      line now displays detailed information about why a component is
-      being included to solve a dependency. (CNY-711)
     * The source actions (addSource, addArchive, etc.) can now take
       a "package=" argument like the build actions do.  Thanks to
       Pavel Volkovitskiy for contributing this capability.  (CNY-665)
@@ -46,15 +28,38 @@ Changes in 1.0.26:
     * Flavored redirects could not be loaded properly from a repository
     * The Conary web interface now provides a method to rely solely on
       a remote repository server to do authentication checks. (CNY-705)
-
-  o Script Changes:
-    * resha1 script skip troves which aren't present in the repository
+    * The ACL checks on file contents and file object methods have
+      been improved. (CNY-700)
+    * Assertions have been added to prevent redirect entries from
+      being added to normal troves.
+    * An assertion has been added to ensure that redirects specify a
+      branch, not a version.
+    * The server returns a new FileStreamsMissing exception when the
+      client requests file streams with getFileVersion or
+      getFileVersions and the requested file stream is not present in
+      the repository database. (CNY-721)
+    * getFileVersions() now raises FileStreamMissing when it is given
+      invalid request.
+    * getFileContents() now raises a new FileHasNoContents exception
+      when contents are requested for a file type which has no
+      contents (such as a symlink).
 
   o Bug Fixes:
     * Fixed a case where an updateall could result in the same trove
       being erased from the system twice due to a local update (CNY-603)
     * Attempts to clone to a version are now caught (can only clone to 
       branches) (CNY-709)
+    * A bug that caused Trove() equality checks to fail when comparing
+      redirects has been fixed.
+    * A bug that caused the flavor of a redirect to be store
+      improperly in the repository database has been fixed.
+    * The resha1 script now properly skips troves which aren't present
+      in the repository.
+    * Conary 1.0.24 incorporated a fix for CNY-684 to correct behavior
+      when storing src.rpm files rather than their contents.  The fix
+      worked for local builds but not for commits to repositories.
+      Conary 1.0.26 includes a fix that corrects the behavior when
+      committing to a repository as well. (CNY-684)
 
 Changes in 1.0.25:
   o Build Changes:
