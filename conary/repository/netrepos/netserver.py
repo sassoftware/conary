@@ -1510,9 +1510,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 JOIN FileStreams USING (fileId)
                 JOIN TroveFiles USING (streamId)
                 JOIN Instances USING (instanceId)
-                JOIN Nodes USING (itemId, versionId)
-                JOIN LabelMap USING (itemId, branchId)
                 JOIN Items USING (itemId)
+                JOIN Nodes ON
+                    Instances.itemId = Nodes.ItemId AND
+                    Instances.versionId = Nodes.versionId
+                JOIN LabelMap ON
+                    Nodes.itemId = LabelMap.itemId AND
+                    Nodes.branchId = LabelMap.branchId
                 JOIN ( SELECT
                            Permissions.labelId as labelId,
                            PerItems.item as permittedTrove,
