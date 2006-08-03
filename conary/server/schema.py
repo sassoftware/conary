@@ -924,7 +924,7 @@ def loadSchema(db):
             "a supported version.")
 
     if version and version < VERSION:
-        # avoid a recursive import by importing jsut what we need
+        # avoid a recursive import by importing just what we need
         from conary.server import migrate
         version = migrate.migrateSchema(db, version)
 
