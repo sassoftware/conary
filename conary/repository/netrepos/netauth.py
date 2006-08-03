@@ -967,10 +967,13 @@ class NetworkAuthorization:
 
         # XXX gafton said he'd clean this up
         userGroupsNeeded = set(itertools.chain(*classInfo.itervalues()))
-        cu.execute("""SELECT userGroup, userGroupId FROM UserGroups
-                      WHERE userGroup IN (%s)""" % 
-                   ",".join([ "'%s'" % x for x in userGroupsNeeded ]))
-        userGroupMap = dict(x for x in cu)
+        if userGroupsNeeded:
+            cu.execute("""SELECT userGroup, userGroupId FROM UserGroups
+                              WHERE userGroup IN (%s)""" % 
+                       ",".join([ "'%s'" % x for x in userGroupsNeeded ]))
+            userGroupMap = dict(x for x in cu)
+        else:
+            userGroupMap = {}
         if len(userGroupMap) != len(userGroupsNeeded):
             raise errors.GroupNotFound
 
