@@ -656,7 +656,7 @@ class MigrateTo_14(SchemaMigration):
                 contents = files.frozenFileContentInfo(stream)
                 sha1 = contents.sha1()
                 self.cu.execute("INSERT INTO tmpSha1s (streamId, sha1) VALUES (?,?)",
-                                (streamId, cu.binary(sha1)))
+                                (streamId, self.cu.binary(sha1)))
             newPct = (streamId * 100)/total
             if newPct >= pct:
                 self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
@@ -911,16 +911,35 @@ class MigrateTo_15(SchemaMigration):
         schema.createTroves(self.db)
         self.message('Indexes created.')
 
+    # add the CapId reference to Permissions and Latest
+    def fixPermissions(self):
+        # because we need to add a foreign key to the Permissions and Latest
+        # tables, it is easier if we save the tables and recreate them
+        self.message("Updating the Permissions table...")
+        cu = self.db.cursor()
+        cu.execute("""create table tmpPerm as
+        select permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove
+        from Permissions""")
+        cu.execute("drop table Permissions")
+        self.db.loadSchema()
+        schema.createUsers(self.db)
+        cu.execute("""insert into Permissions
+        (permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove)
+        select permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove
+        from tmpPerm
+        """)
+        cu.execute("drop table tmpPerm")
+
     def migrate(self):
         schema.setupTempTables(self.db)
         cu = self.db.cursor()
         # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
 
-        self.updateLatest(cu)
         self.fixRedirects(cu, repos)
         self.fixDuplicatePaths(cu, repos)
-
+        self.fixPermissions()
+        self.updateLatest(cu)
         return self.Version
 
 

@@ -202,6 +202,11 @@ def createLatest(db):
     cu = db.cursor()
     commit = False
     if 'Latest' not in db.tables:
+        assert("Items" in db.tables)
+        assert("Branches" in db.tables)
+        assert("Flavors" in db.tables)
+        assert("Versions" in db.tables)
+        assert("Caps" in db.tables)
         cu.execute("""
         CREATE TABLE Latest(
             itemId          INTEGER NOT NULL,
@@ -209,6 +214,7 @@ def createLatest(db):
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             latestType      INTEGER NOT NULL,
+            capId           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Latest_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -221,6 +227,9 @@ def createLatest(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT Latest_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Latest_capId_fk
+                FOREIGN KEY (capId) REFERENCES Caps(capId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Latest"] = []
@@ -307,9 +316,15 @@ def createUsers(db):
     db.createIndex("UserGroupMembers", "UserGroupMembersUserIdx",
                    "userId")
 
+    if idtable.createIdTable(db, "Caps", "capId", "capName"):
+        cu.execute("INSERT INTO Caps (capId, capName) VALUES (0, 'UNCAPPED')")
+        commit = True
+
     if "Permissions" not in db.tables:
         assert("Items" in db.tables)
         assert("Labels" in db.tables)
+        assert("UserGroups" in db.tables)
+        assert("Caps" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
             permissionId    %(PRIMARYKEY)s,
@@ -317,7 +332,7 @@ def createUsers(db):
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
-            capped          INTEGER NOT NULL DEFAULT 0,
+            capId           INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
             canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
@@ -329,7 +344,10 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Permissions_capId_fk
+                FOREIGN KEY (capId) REFERENCES Caps(capId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Permissions"] = []
         commit = True
