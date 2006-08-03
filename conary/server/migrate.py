@@ -15,7 +15,8 @@ import sys
 from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors
 from conary.lib.tracelog import logMe
-from conary.repository.netrepos import versionops
+from conary.deps import deps
+from conary.repository.netrepos import versionops, trovestore
 from conary.server import schema
 
 # SCHEMA Migration
@@ -655,7 +656,7 @@ class MigrateTo_14(SchemaMigration):
                 contents = files.frozenFileContentInfo(stream)
                 sha1 = contents.sha1()
                 self.cu.execute("INSERT INTO tmpSha1s (streamId, sha1) VALUES (?,?)",
-                                (streamId, sha1))
+                                (streamId, cu.binary(sha1)))
             newPct = (streamId * 100)/total
             if newPct >= pct:
                 self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
@@ -714,18 +715,13 @@ class MigrateTo_14(SchemaMigration):
         self.db.renameColumn("Instances", "isRedirect", "troveType")
         self.db.loadSchema()
 
-        # recreate the indexes and triggers - including new path
-        # index for TroveFiles.  Also recreates the indexes table.
-        self.message('Recreating indexes... (this could take a while)')
-        schema.createTroves(self.db)
-        self.message('Indexes created.')
-
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
     Version = 15
-    def migrate(self):
-        cu = self.db.cursor()
+
+    def updateLatest(self, cu):
+        self.message("Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         schema.createLatest(self.db)
@@ -812,6 +808,35 @@ class MigrateTo_15(SchemaMigration):
         """ % (versionops.LATEST_TYPE_NORMAL,
                versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_NORMAL))
 
+    # update a trove signatures, if required
+    def fixTroveSig(self, repos, instanceId):
+        cu = self.db.cursor()
+        cu.execute("""
+        select Items.item as name, Versions.version, Flavors.flavor
+        from Instances
+        join Items using (itemId)
+        join Versions on
+            Instances.versionId = Versions.versionId
+        join Flavors on
+            Instances.flavorId = Flavors.flavorId
+        where Instances.instanceId = ?""", instanceId)
+        (name, version, flavor) = cu.fetchall()[0]
+        # check the signature
+        trv = repos.getTrove(name, versions.VersionFromString(version),
+                             deps.ThawFlavor(flavor))
+        if trv.verifySignatures():
+            return
+        self.message("updating trove sigs: %s %s %s" % (name, version, flavor))
+        trv.computeSignatures()
+        cu.execute("delete from TroveInfo where instanceId = ? "
+                   "and infoType = ?", (instanceId, trove._TROVEINFO_TAG_SIGS))
+        cu.execute("insert into TroveInfo (instanceId, infoType, data) "
+                   "values (?, ?, ?)", (
+            instanceId, trove._TROVEINFO_TAG_SIGS,
+            cu.binary(trv.troveInfo.sigs.freeze())))
+
+    def fixRedirects(self, cu, repos):
+        self.message("removing dep provisions from redirects...")
         # remove dependency provisions from redirects -- the conary 1.0
         # branch would set redirects to provide their own names. this doesn't
         # clean up the dependency table; that would only matter on a trove
@@ -820,40 +845,81 @@ class MigrateTo_15(SchemaMigration):
         cu.execute("delete from provides where instanceId in "
                    "(select instanceId from instances where troveType=?)",
                    trove.TROVE_TYPE_REDIRECT)
-        cu.execute("""select instanceId, item, version, flavor from instances
-                            join items using (itemId)
-                            join versions on
-                                instances.versionId = versions.versionId
-                            join flavors on
-                                instances.flavorId = flavors.flavorId
-                            where troveType=?""", trove.TROVE_TYPE_REDIRECT)
+        # loop over redirects...
+        cu.execute("select instanceId from instances where troveType = ?",
+                   trove.TROVE_TYPE_REDIRECT)
+        for (instanceId,) in cu:
+            self.fixTroveSig(repos, instanceId)
 
+    # fix the duplicate path problems, if any
+    def fixDuplicatePaths(self, cu, repos):
+        self.db.dropIndex("TroveFiles", "TroveFilesPathIdx")
+        # it is faster to select all the (instanceId, path) pairs into
+        # an indexed table than create a non-unique index, do work,
+        # drop the non-unique index and recreate it as a unique one
         cu.execute("""
-        CREATE TEMPORARY TABLE Fixes(
-        instanceId INTEGER,
-        sigs %(BLOB)s)""" % self.db.keywords)
+        create temporary table tmpDupPath(
+            instanceId integer not null,
+            path varchar(767) not null
+        ) %(TABLEOPTS)s""" % self.db.keywords)
+        self.db.createIndex("tmpDupPath", "tmpDupPathIdx",
+                            "instanceId, path", check = False)
+        cu.execute("""
+        create temporary table tmpDups(
+            counter integer,
+            instanceId integer,
+            path varchar(767)
+        ) %(TABLEOPTS)s""" % self.db.keywords)
+        self.message("searching the trovefiles table...")
+        cu.execute("insert into tmpDupPath (instanceId, path) "
+                   "select instanceId, path from TroveFiles")
+        self.message("looking for troves with duplicate paths...")
+        cu.execute("""insert into tmpDups (counter, instanceId, path)
+        select count(*) as c, instanceId, path
+        from tmpDupPath
+        group by instanceId, path
+        having c > 1""")
+        counter = cu.execute("select count(*) from tmpDups").fetchall()[0][0]
+        self.message("detected %d duplicates" % (counter,))
+        # loop over every duplicate and apply the appropiate fix
+        cu.execute("select instanceId, path from tmpDups")
+        for (instanceId, path) in cu.fetchall():
+            cu.execute("""select distinct
+            instanceId, streamId, versionId, pathId, path
+            from trovefiles where instanceId = ? and path = ?
+            order by streamId, versionId, pathId""", (instanceId, path))
+            ret = cu.fetchall()
+            # delete all the duplicates and put the first one back
+            cu.execute("delete from trovefiles "
+                       "where instanceId = ? and path = ?",
+                       (instanceId, path))
+            # in case they are different, we pick the oldest, chances are it is
+            # more "original"
+            cu.execute("insert into trovefiles "
+                       "(instanceId, streamId, versionId, pathId, path) "
+                       "values (?,?,?,?,?)", ret[0])
+            if len(ret) > 1:
+                # need to recompute the sha1 - we might have changed the trove manifest
+                # if the records were different
+                self.fixTroveSig(repos, instanceId)
 
-        from conary.repository.netrepos import trovestore
+        # recreate the indexes and triggers - including new path
+        # index for TroveFiles.  Also recreates the indexes table.
+        self.message('Recreating indexes... (this could take a while)')
+        cu.execute("drop table tmpDups")
+        cu.execute("drop table tmpDupPath")
+        schema.createTroves(self.db)
+        self.message('Indexes created.')
+
+    def migrate(self):
+        schema.setupTempTables(self.db)
+        cu = self.db.cursor()
+        # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
-        for instanceId, name, version, flavor in cu:
-            trv = repos.getTrove(name, version, flavor)
 
-            if trv.verifySignatures():
-                continue
-
-            trv.computeSignatures()
-            cu.execute("INSERT INTO Fixes (instanceId, sigs) VALUES (?, ?)",
-                       instanceId, trv.troveInfo.sigs.freeze())
-
-        cu.execute("""
-        DELETE FROM TroveInfo WHERE instanceId IN
-        (SELECT instanceId FROM Fixes) AND infoType = %d""" %
-                   trove._TROVEINFO_TAG_SIGS)
-        cu.execute("""
-        INSERT INTO TroveInfo (instanceId, infoType, data)
-        SELECT instanceId, %d, sigs FROM Fixes""" %
-                   trove._TROVEINFO_TAG_SIGS)
-        cu.execute("DROP TABLE Fixes")
+        self.updateLatest(cu)
+        self.fixRedirects(cu, repos)
+        self.fixDuplicatePaths(cu, repos)
 
         return self.Version
 
