@@ -342,6 +342,87 @@ class ClientUpdate:
 
             return fullSet
 
+        def _filterJobListByLocalUpdates(jobList, availableTrv, existsTrv,
+                                         localUpdatesByPresent,
+                                         localUpdatesByMissing):
+            # consider a system where version 1 of a trove foo
+            # has been replaced locally by version 2.
+            #
+            # now there are two updates available for foo, 3 and 4.  One
+            # will match the _missing_ side of the local update, and the other
+            # will match the _present_ side.
+            # 
+            # Due to the local update, conary will try to remove version 2
+            # once for missing update and once for the present one.
+
+            # We fix this by asserting that the present side always wins
+            # in this case.  The update that matches the missing side needs
+            # to be recalculated now, since its initial match was wrong.
+            # This process may need to be repeated, since the recalculation 
+            # for the missing trove may result in this situation reappearing
+
+            # NOTE: we used to not have this problem because we would not
+            # include the present version of local updates in the exists
+            # list.  But that meant that in some cases we made poor matches.
+
+            if not localUpdatesByPresent:
+                return jobList
+
+            finalJobList = []
+            while jobList:
+                # look for cases where one job matches the localUpdateMissing
+                # entry for a job and the other matches the localUpdatePresent
+                # one.  
+
+                localUpdateMissing = []
+                localUpdatePresent = []
+                for job in jobList:
+                    if job[1][0] and job[2][0]:
+                        oldInfo = job[0], job[1][0], job[1][1]
+                        if oldInfo in localUpdatesByPresent:
+                            localUpdatePresent.append(oldInfo)
+                        elif oldInfo in localUpdatesByMissing:
+                            presentInfo = ((job[0],)
+                                            + localUpdatesByMissing[oldInfo])
+                            localUpdateMissing.append(presentInfo)
+
+                localUpdatePresent = set(localUpdatePresent)
+                localUpdatePresent.intersection_update(localUpdateMissing)
+                if not localUpdatePresent:
+                    finalJobList.append(jobList)
+                    break
+                else:
+                    # we've found some jobs that need to be reworked.
+                    # keep the jobs that were the updates for the "present"
+                    # trove, and any jobs that are for trove names that
+                    # don't involve a reworked job.
+
+                    redoNames = set(x[0] for x in localUpdatePresent)
+                    toKeep = [ x for x in jobList
+                            if x[0] not in redoNames
+                            or (x[0], x[1][0], x[1][1]) in localUpdatePresent ]
+                    delExists = existsTrv.delTrove
+                    delAvail = availableTrove.delTrove
+
+                    # don't rediff troves that are in the toKeep list.
+                    [ delExists(x[0], x[1][0], x[1][1], False)
+                      for x in toKeep if x[1][0] ]
+                    [ delAvail(x[0], x[2][0], x[2][1], False)
+                      for x in toKeep if x[2][0] ]
+
+                    # don't rediff the "missing" half of the local updates
+                    # that we've already said is present.
+                    [ delExists(x[0], missingOkay=False,
+                                *localUpdatesByPresent[x])
+                       for x in localUpdatePresent ]
+
+                    finalJobList.append(toKeep)
+                    jobList = availableTrove.diff(existsTrv)[2]
+
+            return list(itertools.chain(*finalJobList))
+
+
+
         # def _mergeGroupChanges -- main body begins here
         erasePrimaries =    set(x for x in primaryJobList 
                                     if x[2][0] is None)
@@ -518,6 +599,10 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
         jobList = availableTrove.diff(existsTrv)[2]
+        jobList = _filterJobListByLocalUpdates(jobList, availableTrove,
+                                               existsTrv,
+                                               localUpdatesByPresent,
+                                               localUpdatesByMissing)
 
         # alreadyReferenced troves are in both the update set 
         # and the installed set.  They are a good match for themselves.
@@ -1032,27 +1117,15 @@ followLocalChanges: %s
                 erasePrimaries.add((job[0], job[1], (None, None), False))
             alreadyInstalled.discard((job[0], job[1][0], job[1][1]))
 
+        # items which were updated to redirects should be removed, no matter
+        # what
+        for info in set(itertools.chain(*redirectHack.values())):
+            erasePrimaries.add((info[0], (info[1], info[2]), (None, None), False))
+
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse)
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
-
-        # items which were updated to redirects should be removed, no matter
-        # what - IF there's no job removing them now, we need to add it now.
-        redirects = {}
-        for info in set(itertools.chain(*redirectHack.values())):
-            redirects.setdefault(info[0], []).append(info)
-
-        for job in newJob:
-            if job[0] in redirects:
-                redirectList = redirects[job[0]]
-                info = (job[0], job[1][0], job[1][1])
-                if info in redirectList:
-                    redirectList.remove(info)
-        for troveList in redirects.itervalues():
-            for info in set(troveList):
-                newJob.add((info[0], (info[1], info[2]), (None, None), False))
-
         return newJob
 
     def _splitPinnedJob(self, uJob, troveSource, job, force=False):

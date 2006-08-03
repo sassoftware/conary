@@ -109,10 +109,7 @@ class LatestTable:
         return latestVersionId, troveType
 
     def _add(self, cu, itemId, branchId, flavorId, versionId, latestType):
-        if versionId is None:
-            import epdb
-            epdb.st()
-        cu.execute("""INSERT INTO Latest 
+        cu.execute("""INSERT INTO Latest
                         (itemId, branchId, flavorId, versionId, latestType)
                         VALUES (?, ?, ?, ?, ?)""",
                     itemId, branchId, flavorId, versionId, latestType)

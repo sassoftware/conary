@@ -16,8 +16,20 @@ Changes in 1.1:
       you're trying to commit before you send them across the wire. (CNY-616)
 
   o Client Changes:
-    * conary rq now --path, which allows you to search for troves in the 
-      repository by path. (CNY-74)
+    * conary rq now supports --path, which allows you to search for troves in 
+      the repository by path. (CNY-74)
+    * conary rq now has a --show-removed option that allows you to see removed
+      troves.  A [Removed] flag will be displayed when the --trove-flags option
+      is added.
+
+  o Build Changes:
+    * cvc can now build group redirects.
+
+Changes in NEW:
+  o Client Changes:
+    * Added assertions to prevent the wrong Trove.add* methods being called
+      between normal troves and redirects
+    * Trove equality checks did not work for redirects
 
 Changes in 1.0.26:
   o Protocol changes:
@@ -58,11 +70,19 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
+
+Changes in @NEW@:
   o Server Changes:
     * Flavored redirects could not be loaded properly from a repository
+    * The Conary web interface now provides a method to rely solely on
+      a remote repository server to do authentication checks. (CNY-705)
 
   o Script Changes:
     * resha1 script skip troves which aren't present in the repository
+
+  o Bug Fixes:
+    * Fixed a case where an updateall could result in the same trove
+      being erased from the system twice due to a local update (CNY-603)
 
 Changes in 1.0.25:
   o Build Changes:
@@ -86,7 +106,6 @@ Changes in 1.0.25:
       been fixed. This bug was introduced in 1.0.24. (CNY-701)
 
 Changes in 1.0.24:
->>>>>>> /tmp/NEWS~other.8UGRi2
   o Server Changes:
     * The server binary access log can now be downloaded by an
       administrator by visiting the http://servername/conary/log

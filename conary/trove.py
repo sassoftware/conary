@@ -34,9 +34,9 @@ from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
-# the difference between 10 and 11 is that the REMOVED type appeared; 11 is
-# used *only* for removed troves
-TROVE_VERSION_REMOVED=11
+# the difference between 10 and 11 is that the REMOVED type appeared, 
+# and we allow group redirects; 11 is used *only* for those situations
+TROVE_VERSION_1_1=11
 
 def troveIsCollection(str):
     return not(":" in str or str.startswith("fileset-"))
@@ -794,6 +794,7 @@ class Trove(streams.StreamSet):
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
+        assert(self.type() == TROVE_TYPE_NORMAL)
         if weakRef:
             troveGroup = self.weakTroves
         else:
@@ -873,9 +874,10 @@ class Trove(streams.StreamSet):
 
         return rc
 
-    def addRedirect(self, toName, toVersion, toFlavor):
+    def addRedirect(self, toName, toBranch, toFlavor):
         assert(self.type() == TROVE_TYPE_REDIRECT)
-        self.redirects.add(toName, toVersion, toFlavor)
+        assert(isinstance(toBranch, versions.Branch))
+        self.redirects.add(toName, toBranch, toFlavor)
 
     def iterRedirects(self):
         for o in self.redirects.iter():
@@ -962,7 +964,7 @@ class Trove(streams.StreamSet):
             assert(not self.troveInfo.incomplete())
 
         if TROVE_VERSION < self.troveInfo.troveVersion() and \
-           TROVE_VERSION_REMOVED < self.troveInfo.troveVersion():
+           TROVE_VERSION_1_1 < self.troveInfo.troveVersion():
             self.troveInfo.incomplete.set(1)
         elif self.troveInfo.incomplete() is None:
             # old troves don't have an incomplete flag - we want it to 
@@ -1051,6 +1053,7 @@ class Trove(streams.StreamSet):
             and self.getRequires() == them.getRequires() \
             and self.getProvides() == them.getProvides() \
             and self.getTroveInfo() == them.getTroveInfo() \
+            and set(self.iterRedirects()) == set(them.iterRedirects()) \
             and not([x for x in csg.iterChangedTroves()])
 
 
@@ -1592,7 +1595,9 @@ class Trove(streams.StreamSet):
             self.flavor.set(flavor)
             if setVersion:
                 if type == TROVE_TYPE_REMOVED:
-                    self.troveInfo.troveVersion.set(TROVE_VERSION_REMOVED)
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
+                elif type == TROVE_TYPE_REDIRECT and name.startswith('group-'):
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
                 else:
                     self.troveInfo.troveVersion.set(TROVE_VERSION)
             self.troveInfo.incomplete.set(0)

@@ -45,8 +45,8 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
                   weakRefs = False, showTroveFlags = False, 
-                  alwaysDisplayHeaders = False
-                  ):
+                  alwaysDisplayHeaders = False,
+                  troveTypes=trovesource.TROVE_QUERY_PRESENT):
     """
        Displays information about troves found in repositories
 
@@ -104,6 +104,11 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @param alwaysDisplayHeaders: If true, display headers even when listing  
        files.
        @type alwaysDisplayHeaders: bool
+       @param showRemovedTroves: If True, display troves that have been removed from
+       the repository (default False).
+       @type showRemovedTroves: bool
+       @param showRedirects: If True, display redirects (default False) 
+       @type showRedirects: bool
        @rtype: None
     """
 
@@ -120,7 +125,9 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
     troveTups = getTrovesToDisplay(repos, troveSpecs, pathList, 
                                    whatProvidesList,
                                    versionFilter, flavorFilter,
-                                   cfg.installLabelPath, cfg.flavor, affinityDb)
+                                   cfg.installLabelPath, cfg.flavor, 
+                                   affinityDb,
+                                   troveTypes=troveTypes)
 
     dcfg = display.DisplayConfig(repos, affinityDb)
 
@@ -161,7 +168,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
 
 def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList, 
                        versionFilter, flavorFilter, labelPath, defaultFlavor, 
-                       affinityDb):
+                       affinityDb, troveTypes=trovesource.TROVE_QUERY_PRESENT):
     """ Finds troves that match the given trove specifiers, using the
         current configuration, and parameters
 
@@ -206,7 +213,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
             troveNames = set(x[0] for x in tupList)
             results = getTrovesToDisplay(source, troveNames, [], [],
                                          versionFilter, flavorFilter, labelPath,
-                                         defaultFlavor, None)
+                                         defaultFlavor, affinityDb=None,
+                                         troveTypes=troveTypes)
             troveTups.extend(results)
 
         # Search for troves using findTroves.  The options we
@@ -214,7 +222,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         # flavor filter.
         if pathList:
             troveTups += getTrovesByPath(repos, pathList, versionFilter,
-                                         flavorFilter, labelPath, defaultFlavor)
+                                         flavorFilter, labelPath, defaultFlavor,
+                                         troveTypes=troveTypes)
 
         if not troveSpecs:
             return sorted(troveTups)
@@ -278,7 +287,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
                                    acrossFlavors = acrossFlavors,
                                    allowMissing = False,
                                    bestFlavor = bestFlavor,
-                                   getLeaves = getLeaves)
+                                   getLeaves = getLeaves,
+                                   troveTypes = troveTypes)
 
         # do post processing on the result if necessary
         if (flavorFilter == FLAVOR_FILTER_ALL or versionFilter == VERSION_FILTER_LATEST):
@@ -339,9 +349,10 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         resultsDict = {}
 
         resultsDict = queryFn({'': {labelPath[0] : flavor}}, 
-                               bestFlavor = bestFlavor)
+                               bestFlavor = bestFlavor, troveTypes=troveTypes)
         for label in labelPath[1:]:
-            d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor)
+            d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor,
+                        troveTypes=troveTypes)
             _merge(resultsDict, d)
 
         # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,

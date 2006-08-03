@@ -263,6 +263,10 @@ class TroveStore:
 	    if flavor is not None:
 		flavorsNeeded[flavor] = True
 
+        for (name, branch, flavor) in trv.iterRedirects():
+            if flavor is not None:
+                flavorsNeeded[flavor] = True
+
 	flavorIndex = {}
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
@@ -429,7 +433,7 @@ class TroveStore:
         cu.execute("DELETE FROM NewRedirects")
         for (name, branch, flavor) in trv.iterRedirects():
             cu.execute("INSERT INTO NewRedirects (item, branch, flavor) "
-                       "VALUES (?, ?, ?)", name, str(branch), str(flavor))
+                       "VALUES (?, ?, ?)", name, str(branch), flavor.freeze())
 
         cu.execute("""
                 INSERT INTO Items (item)
@@ -875,10 +879,11 @@ class TroveStore:
         return self.db.rollback()
 
     def _removeTrove(self, name, version, flavor, markOnly = False):
+        assert(not name.startswith('group-'))
         cu = self.db.cursor()
         cu.execute("""
                 SELECT instanceId, itemId, Instances.versionId,
-                       Instances.flavorId FROM Instances
+                       Instances.flavorId, troveType FROM Instances
                     JOIN Items USING (itemId)
                     JOIN Versions ON
                         Instances.versionId = Versions.versionId
@@ -891,9 +896,11 @@ class TroveStore:
         """, name, version.asString(), flavor.freeze())
 
         try:
-            instanceId, itemId, versionId, flavorId = cu.next()
+            instanceId, itemId, versionId, flavorId, troveType = cu.next()
         except StopIteration:
             raise errors.TroveMissing(name, version)
+
+        assert(troveType == trove.TROVE_TYPE_NORMAL)
 
         cu.execute("SELECT nodeId, branchId FROM Nodes "
                    "WHERE itemId = ? AND versionId = ?", itemId, versionId)
@@ -966,13 +973,21 @@ class TroveStore:
                 )
         """, instanceId, instanceId, instanceId)
         r = cu.fetchall()
-        filesToRemove = [ x[1] for x in r ]
+        candidateSha1sToRemove = [ x[1] for x in r ]
         streamIdsToRemove = [ x[0] for x in r ]
 
         cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
         if streamIdsToRemove:
             cu.execute("DELETE FROM FileStreams WHERE streamId IN (%s)"
                        % ",".join([ "%d" % x for x in streamIdsToRemove ]))
+
+        # we need to double check filesToRemove against other streams which
+        # may need the same sha1
+        filesToRemove = []
+        for sha1 in candidateSha1sToRemove:
+            cu.execute("SELECT COUNT(*) FROM FileStreams WHERE sha1=?", sha1)
+            if cu.next()[0] == 0:
+                filesToRemove.append(sha1)
 
         if markOnly:
             # We don't actually remove anything here; we just mark the trove
@@ -1004,6 +1019,9 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
                    flavorId)
         count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE flavorId = ?",
+                   flavorId)
+        count += cu.next()[0]
         if count == 0:
             cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
             cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
@@ -1025,6 +1043,9 @@ class TroveStore:
             cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
                        branchId)
             count = cu.next()[0]
+            cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE branchId = ?",
+                       branchId)
+            count += cu.next()[0]
 
             if not count:
                 cu.execute("DELETE FROM Branches WHERE branchId = ?", branchId)
@@ -1052,6 +1073,9 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
                    "LIMIT 1", itemId)
         count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count += cu.next()[0]
 
         if not count:
             cu.execute("DELETE FROM Items WHERE itemId = ?", itemId)
