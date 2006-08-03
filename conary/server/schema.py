@@ -366,7 +366,7 @@ def createUsers(db):
             Labels.label as label,
             Permissions.canWrite as W,
             Permissions.admin as A,
-            Permissions.capped as C
+            Permissions.capId as C
         FROM
             Users
         JOIN UserGroupMembers using (userId)

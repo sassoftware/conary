@@ -355,10 +355,9 @@ class NetworkAuthorization:
         else:
             write = 0
 
-        if capped:
-            capped = 1
-        else:
-            capped = 0
+        assert(not capped)
+
+        capId = 0
 
         if admin:
             admin = 1
@@ -400,10 +399,10 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             INSERT INTO Permissions
-                (userGroupId, labelId, itemId, canWrite, capped, admin,
+                (userGroupId, labelId, itemId, canWrite, capId, admin,
                  canRemove)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (userGroupId, labelId, itemId, write, capped, admin, 
+            """, (userGroupId, labelId, itemId, write, capId, admin, 
                   remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -423,10 +422,9 @@ class NetworkAuthorization:
         else:
             write = 0
 
-        if capped:
-            capped = 1
-        else:
-            capped = 0
+        assert(not capped)
+
+        capId = 0
 
         if admin:
             admin = 1
@@ -441,10 +439,10 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?, capped = ?, admin = ?,
+            SET labelId = ?, itemId = ?, canWrite = ?, capId = ?, admin = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capped, admin, canRemove,
+                       labelId, troveId, write, capId, admin, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -564,7 +562,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canWrite, capped, admin, canRemove
+                             canWrite, capId, admin, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
