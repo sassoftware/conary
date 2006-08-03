@@ -1533,7 +1533,66 @@ conary erase '%s=%s[%s]'
         return newJob
 
     def _fullMigrate(self, itemList, uJob, callback):
-        def _getTrovesToBeMigrated(db, troves):
+        def _convertRedirects(searchSource, newTroves):
+            troveNames = set(x.getName() for x in newTroves)
+            redirects = [ x for x in newTroves if x.isRedirect() ]
+            nonRedirects = [ x for x in newTroves if not x.isRedirect() ]
+            if not redirects:
+                return newTroves, troveNames
+
+            redirectMap = {}
+            toFind = {}
+            for trv in redirects:
+                redirTup = trv.getNameVersionFlavor()
+                redirectMap[redirTup] = [redirTup]
+                for troveName, branch, flavor in trv.iterRedirects():
+                    troveSpec = (troveName, str(branch), flavor)
+                    toFind.setdefault(troveSpec, []).append(redirTup)
+
+            if not toFind:
+                if not nonRedirects:
+                    err = ("Cannot migrate to redirect(s), as they are all"
+                           " erases - \n%s" % \
+                           "\n".join("%s=%s[%s]" % x.getNameVersionFlavor()
+                                     for x in redirects))
+                    raise UpdateError(err)
+                else:
+                    return nonRedirects, troveNames
+
+            while toFind:
+                matches = searchSource.findTroves([], toFind,
+                                                  self.cfg.flavor,
+                                                  affinityDatabase = self.db)
+                allTroveTups = list(set(itertools.chain(*matches.itervalues())))
+                allTroves = searchSource.getTroves(allTroveTups)
+                allTroves = dict(itertools.izip(allTroveTups, allTroves))
+
+                newToFind = {}
+                for troveSpec, troveTupList in matches.iteritems():
+                    for troveTup in troveTupList:
+                        redirTups = toFind[troveSpec]
+                        for redirTup in redirTups:
+                            if redirTup == troveTup:
+                                err = "Redirect Loop detected - trove %s=%s[%s] redirects to itself" % redirTup
+                                raise UpdateError(err)
+                            elif redirTup in redirectMap.get(troveTup, []):
+                                err = "Redirect Loop detected - "
+                                err += "includes %s=%s[%s] and %s=%s[%s]" % (redirTup + troveTup)
+                                raise UpdateError(err)
+                            else:
+                                redirectMap.setdefault(troveTup, []).append(redirTup)
+                        trv = allTroves[troveTup]
+                        if trv.isRedirect():
+                            for troveName, branch, flavor in trv.iterRedirects():
+                                newTroveSpec = (troveName, str(branch), flavor)
+                                newToFind.setdefault(newTroveSpec, []).append(troveTup)
+                        else:
+                            nonRedirects.append(trv)
+                            troveNames.add(trv.getName())
+                toFind = newToFind
+            return set(nonRedirects), troveNames
+  
+        def _getTrovesToBeMigrated(db, troves, troveNames):
             """
                 Gets the list of troves on the system 
                 that will be migrated to the new troves in the update
@@ -1547,7 +1606,7 @@ conary erase '%s=%s[%s]'
                                          deps.Flavor(), None)
             existsTups = []
             availTups = []
-            for troveNVF in db.findByNames([x.getName() for x in troves]):
+            for troveNVF in db.findByNames(troveNames):
                 existsTups.append(troveNVF)
                 existsTrv.addTrove(*troveNVF)
 
@@ -1586,6 +1645,8 @@ conary erase '%s=%s[%s]'
         newTroves = list(itertools.chain(*results.itervalues()))
         newTroves = searchSource.getTroves(newTroves, withFiles=False)
 
+        newTroves, troveNames = _convertRedirects(searchSource, newTroves)
+
         updateSet = []
 
         availByDefaultInfo = {}
@@ -1606,7 +1667,7 @@ conary erase '%s=%s[%s]'
         # we will keep when migrating.
         # E.g. if you install foo:debuginfo, when we migrate you,
         # foo:debuginfo will be kept.
-        toBeMigrated = _getTrovesToBeMigrated(self.db, newTroves)
+        toBeMigrated = _getTrovesToBeMigrated(self.db, newTroves, troveNames)
 
         byDefaultFalse = []
         byDefaultTrue = []

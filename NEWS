@@ -62,6 +62,7 @@ Changes in 1.0.26:
       committing to a repository as well. (CNY-684)
     * A bug that prevented flavored redirects from being loaded from
       the repository database has been fixed.
+    * "Conary migrate" now will follow redirects. (CNY-722)
 
 Changes in 1.0.25:
   o Build Changes:
