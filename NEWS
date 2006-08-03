@@ -25,7 +25,6 @@ Changes in 1.0.26:
       enhancement. (CNY-668)
 
   o Server Changes:
-    * Flavored redirects could not be loaded properly from a repository
     * The Conary web interface now provides a method to rely solely on
       a remote repository server to do authentication checks. (CNY-705)
     * The ACL checks on file contents and file object methods have
@@ -45,10 +44,11 @@ Changes in 1.0.26:
       contents (such as a symlink).
 
   o Bug Fixes:
-    * Fixed a case where an updateall could result in the same trove
-      being erased from the system twice due to a local update (CNY-603)
-    * Attempts to clone to a version are now caught (can only clone to 
-      branches) (CNY-709)
+    * A bug that could cause "conary updateall" to attempt to erase
+      the same trove twice due to a local update has been fixed.
+      (CNY-603)
+    * Attempts to target a clone to a version are now caught.  Only
+      branches are valid clone targets. (CNY-709)
     * A bug that caused Trove() equality checks to fail when comparing
       redirects has been fixed.
     * A bug that caused the flavor of a redirect to be store
@@ -60,6 +60,8 @@ Changes in 1.0.26:
       worked for local builds but not for commits to repositories.
       Conary 1.0.26 includes a fix that corrects the behavior when
       committing to a repository as well. (CNY-684)
+    * A bug that prevented flavored redirects from being loaded from
+      the repository database has been fixed.
 
 Changes in 1.0.25:
   o Build Changes:
