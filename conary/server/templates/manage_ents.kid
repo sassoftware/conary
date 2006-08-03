@@ -26,27 +26,25 @@
                         <td style="width: 25%;">Entitlement Class</td>
                         <td py:if="isAdmin" py:content="'Permissions Group'"/>
                         <td py:if="isAdmin" py:content="'Managing Group'"/>
-                        <td py:if="isAdmin" py:content="'Delete'"/>
+                        <td style="text-align: center;" py:content="'Manage'"/>
+                        <td style="text-align: center;" py:if="isAdmin" py:content="'Delete'"/>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr py:for="i, (entClass, owner, permGroup) in enumerate(sorted(entClasses))"
+                    <tr py:for="i, (entClass, owner, accessGroupList) in enumerate(sorted(entClasses))"
                         class="${i % 2 and 'even' or 'odd'}">
                         <td>
-                            <a href="manageEntitlementForm?entClass=${entClass}" py:content="entClass"/>
+                            <a py:if="isAdmin" href="configEntClassForm?entClass=${entClass}" py:content="entClass"/>
+                            <span py:if="not isAdmin" py:content="entClass"/>
                         </td>
-                        <td py:if="isAdmin" py:content="permGroup"/>
-                        <td py:if="isAdmin">
-                            <form action="entSetOwner" method="get">
-                                <input type="hidden" name="entClass" value="${entClass}"/>
-                                <select name="entOwner">
-                                    <option value="*none*" py:attrs="{ 'selected' : owner is None and 'selected' or None }">(none)</option>
-                                    <option py:for="group in groups" py:content="group" py:value="${group}" py:attrs="{ 'selected' : group == owner and 'selected' or None}"/>
-                                </select>
-                                <input type="submit" value="Update"/>
-                            </form>
+                        <td>
+                            <table><tbody><div py:for="accessGroup in sorted(accessGroupList)" py:strip="True">
+                                <tr><td py:content="accessGroup"/></tr>
+                            </div></tbody></table>
                         </td>
-                        <td py:if="isAdmin"><a href="deleteEntClass?entClass=${entClass}">X</a></td>
+                        <td py:if="isAdmin" py:content="owner"/>
+                        <td style="text-align: center;"><a href="manageEntitlementForm?entClass=${entClass}">X</a></td>
+                        <td style="text-align: center;" py:if="isAdmin"><a href="deleteEntClass?entClass=${entClass}">X</a></td>
                     </tr>
                 </tbody>
             </table>
