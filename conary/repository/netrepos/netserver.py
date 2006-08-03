@@ -1130,9 +1130,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Latest.itemId = LabelMap.itemId AND
                 Latest.branchId = LabelMap.branchId AND
                 Latest.latestType = %d
-            join Nodes using (itemId, branchId, versionId)
-            join Items using (itemId),
-            Flavors, Versions
+            join Nodes ON
+                Nodes.itemId = Latest.itemId AND
+                Nodes.branchId = Latest.branchId AND
+                Nodes.versionId = Latest.versionId
+            join Items ON
+                Items.itemId = Nodes.itemId
+            join Flavors ON
+                Flavors.flavorId = Latest.flavorId
+            join Versions ON
+                Versions.versionId = Latest.versionId
         where
                 Latest.flavorId = Flavors.flavorId
             and Latest.versionId = Versions.versionId
