@@ -781,7 +781,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             if troveTypes == TROVE_QUERY_ALL:
                 instanceClause = """JOIN Instances AS Domain USING (itemId)
-                JOIN Nodes USING (itemId, versionid)"""
+                JOIN Nodes ON
+                    Domain.itemId = Nodes.itemId AND
+                    Domain.versionId = Nodes.versionId"""
             else:
                 if troveTypes == TROVE_QUERY_PRESENT:
                     s = "!= %d" % trove.TROVE_TYPE_REMOVED
@@ -792,7 +794,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 instanceClause = """JOIN Instances AS Domain ON
                     Items.itemId = Domain.itemId AND
                     Domain.troveType %s
-                JOIN Nodes USING (itemId, versionid)""" % s
+                JOIN Nodes ON
+                    Domain.itemId = Nodes.itemId AND
+                    Domain.versionId = Nodes.versionId""" % s
 
         if withFlavors:
             getList.append("Flavors.flavor as flavor")
@@ -878,11 +882,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                            "distinct" : ""}
                 }
         self.log(4, "execute query", fullQuery, argList)
-        try:
-            cu.execute(fullQuery, argList)
-        except:
-            import epdb
-            epdb.st()
+        cu.execute(fullQuery, argList)
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
@@ -1130,9 +1130,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 Latest.itemId = LabelMap.itemId AND
                 Latest.branchId = LabelMap.branchId AND
                 Latest.latestType = %d
-            join Nodes using (itemId, branchId, versionId)
-            join Items using (itemId),
-            Flavors, Versions
+            join Nodes ON
+                Nodes.itemId = Latest.itemId AND
+                Nodes.branchId = Latest.branchId AND
+                Nodes.versionId = Latest.versionId
+            join Items ON
+                Items.itemId = Nodes.itemId
+            join Flavors ON
+                Flavors.flavorId = Latest.flavorId
+            join Versions ON
+                Versions.versionId = Latest.versionId
         where
                 Latest.flavorId = Flavors.flavorId
             and Latest.versionId = Versions.versionId
