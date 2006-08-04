@@ -25,11 +25,10 @@ Changes in 1.1:
   o Build Changes:
     * cvc can now build group redirects.
 
-Changes in NEW:
+Changes in @NEW@:
   o Client Changes:
-    * Added assertions to prevent the wrong Trove.add* methods being called
-      between normal troves and redirects
-    * Trove equality checks did not work for redirects
+    * Implemented "files preupdate" tag script method, which gets run
+      before tagged files are installed or changed. (CNY-636)
 
 Changes in 1.0.26:
   o Build Changes:
