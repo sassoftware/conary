@@ -6,6 +6,14 @@ Changes in @NEW@:
       in a trove (CNY-733)
     * Fixed multiple bugs where replace-files could result in the new file
       having no owner (CNY-733)
+    * The logcat script now supports revision 1 log entries.
+
+  o Build Changes:
+    * Improved handling of the "package=" keyword argument for build
+      actions.  In particular, made it available to all build actions,
+      removed double-applying macros to the package specification,
+      and fixed failure in cases like "MakeInstall(dir=doesnotexist,
+      skipMissingDir=True, package=...)". (CNY-737, CNY-738)
 
 Changes in 1.0.26:
   o Build Changes:

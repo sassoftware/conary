@@ -18,11 +18,18 @@ class CallLogEntry:
 
     def __init__(self, info):
         revision = info[0]
-        assert(revision == 2)
 
-        (self.serverName, self.timeStamp, self.remoteIp,
-         (self.user, self.entClass, self.entKey),
-         self.methodName, self.args, self.exceptionStr) = info[1:]
+        if (revision == 1):
+            self.entKey = 'unknown'
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entClass),
+             self.methodName, self.args, self.exceptionStr) = info[1:]
+        elif (revision == 2):
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entClass, self.entKey),
+             self.methodName, self.args, self.exceptionStr) = info[1:]
+        else:
+            assert(0)
 
 class CallLogger:
     logFormatRevision = 2
