@@ -169,8 +169,48 @@ class FilesystemJob:
 
     def pathRemoved(self, info, pathId):
         d = self.userRemovals.get(info, None)
-        if d is None: return False
-        return pathId in d
+        if d:
+            return pathId in d
+
+        # If we don't know anything about this file at all, we may need
+        # to keep the trove as marked removed if it's already been removed
+        # (since we're not changing the state). To find out if this is
+        # the case, we see if we have a TroveChangeSet for the delta to
+        # the trove version in info. If we do, we then check for a delta
+        # for this pathId in that TroveChangeSet. If there isn't one, we
+        # lookup the isPresent state from the database. To make all of
+        # this a little more efficient, we actually cache the list of
+        # missing files for this trove info so we can use it again on the
+        # next call into here.
+        if self.pathRemovedCache[0] == info:
+            if pathId not in self.pathRemovedCache[1]:
+                return False
+
+            return pathId in self.pathRemovedCache[2]
+
+        if not self.changeSet.hasNewTrove(*info):
+            self.pathRemovedCache = ( info, {}, set() )
+            return False
+
+        trvCs = self.changeSet.getNewTroveVersion(*info)
+        if not trvCs.getOldVersion():
+            self.pathRemovedCache = ( info, {}, set() )
+            return False
+
+        # this only matters if the file has changed somehow; if it's
+        # only a version change then we still need to inherit the present
+        # flag from the existing trov
+        changedPathIds = set(x[0] for x in trvCs.getChangedFileList() if
+                                x[2] is not None)
+
+        missingPathIds = set(self.db.db.db.getMissingPathIds(
+                trvCs.getName(), trvCs.getOldVersion(), trvCs.getOldFlavor()))
+        self.pathRemovedCache = (info, changedPathIds, missingPathIds)
+
+        if pathId in changedPathIds:
+            return False
+
+        return pathId in missingPathIds
 
     def iterUserRemovals(self):
 	for ((troveName, troveVersion, troveFlavor), fileDict) \
@@ -1112,6 +1152,17 @@ class FilesystemJob:
                       filePriorityPath,
 		      "merging changes from repository into %s",
                       contentsOverride = None, replaceFiles = replaceFiles)
+            elif not attributesChanged and not beenRestored and headChanges:
+                # Nothing actually changed, but the diff isn't empty
+                # either! This can happen when the version changes but
+                # the fileId doesn't (at least as of Conary 1.1; this needs
+                # to be fixed at some point, which would make headChanges
+                # None). We can't skip the _restore entirely because that
+                # does important file conflict handling.
+                self._restore(fsFile, realPath, newTroveInfo,
+                      filePriorityPath,
+		      "merging changes from repository into %s",
+                      contentsOverride = None, replaceFiles = replaceFiles)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
@@ -1165,6 +1216,7 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
 	self.db = db
+        self.pathRemovedCache = (None, None, None)
 
         for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
             self.oldTroves.append((name, oldVersion, oldFlavor))

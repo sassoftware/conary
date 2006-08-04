@@ -4,6 +4,8 @@ Changes in @NEW@:
       before tagged files are installed or changed. (CNY-636)
     * Fixed bug where replace-files could remove ownership from every file
       in a trove (CNY-733)
+    * Fixed multiple bugs where replace-files could result in the new file
+      having no owner (CNY-733)
 
 Changes in 1.0.26:
   o Build Changes:

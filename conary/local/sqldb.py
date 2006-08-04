@@ -1849,6 +1849,24 @@ order by
                 referencedStrong, 
                 set(referencedWeak) - referencedStrong)
 
+    def getMissingPathIds(self, name, version, flavor):
+        cu = self.db.cursor()
+
+        flavorId = self.flavors.get(flavor, None)
+        if flavorId is None:
+            raise KeyError
+        versionId = self.versionTable.get(version, None)
+        if versionId is None:
+            raise KeyError
+
+        cu.execute("""
+            SELECT pathId FROM Instances JOIN DBTroveFiles USING (instanceId)
+                WHERE Instances.troveName = ? AND Instances.versionId = ?
+                AND Instances.flavorId = ? AND DBTroveFiles.isPresent = 0""",
+                name, versionId, flavorId)
+
+        return [ x[0] for x in cu ]
+
     def close(self):
 	self.db.close()
 
