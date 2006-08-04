@@ -222,8 +222,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         # flavor filter.
         if pathList:
             troveTups += getTrovesByPath(repos, pathList, versionFilter,
-                                         flavorFilter, labelPath, defaultFlavor,
-                                         troveTypes=troveTypes)
+                                         flavorFilter, labelPath, defaultFlavor)
+
 
         if not troveSpecs:
             return sorted(troveTups)
