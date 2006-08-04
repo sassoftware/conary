@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Client Changes:
     * Implemented "files preupdate" tag script method, which gets run
       before tagged files are installed or changed. (CNY-636)
+    * logcat now supports revision 1 log entries
 
   o Build Changes:
     * Improved handling of the "package=" keyword argument for build
