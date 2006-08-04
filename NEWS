@@ -3,6 +3,13 @@ Changes in @NEW@:
     * Implemented "files preupdate" tag script method, which gets run
       before tagged files are installed or changed. (CNY-636)
 
+  o Build Changes:
+    * Improved handling of the "package=" keyword argument for build
+      actions.  In particular, made it available to all build actions,
+      removed double-applying macros to the package specification,
+      and fixed failure in cases like "MakeInstall(dir=doesnotexist,
+      skipMissingDir=True, package=...)". (CNY-737, CNY-738)
+
 Changes in 1.0.26:
   o Build Changes:
     * When cooking a group, adding "--debug" to the "cvc cook" command

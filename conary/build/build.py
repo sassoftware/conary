@@ -62,6 +62,7 @@ class BuildAction(action.RecipeAction):
     Pure virtual class which inherits from action.RecipeAction but
     passes macros to the C{do()} method.
     """
+    keywords = {'package': None}
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
@@ -71,6 +72,7 @@ class BuildAction(action.RecipeAction):
 	# enforce pure virtual status
         assert(self.__class__ is not BuildAction)
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
+        self.manifest = None
 
         # handle outdated, inconsistent keywords
         # FIXME: change to self.warning some day
@@ -84,11 +86,21 @@ class BuildAction(action.RecipeAction):
             log.info('"skipMissingSubDir=" is deprecated, use "skipMissingDir=" instead')
             self.skipMissingDir = self.skipMissingSubDir
 
+        self.initManifest(recipe)
+
+    def initManifest(self, recipe):
+        if self.package:
+            self.manifest = Manifest(package=self.package, recipe=recipe)
+
     def doAction(self):
 	if self.debug:
 	    from conary.lib import debugger
 	    debugger.set_trace()
+
 	if self.use:
+            if self.manifest:
+                self.manifest.walk()
+
 	    if self.linenum is None:
 		self.do(self.recipe.macros)
 	    else:
@@ -97,6 +109,9 @@ class BuildAction(action.RecipeAction):
 		sys.excepthook = action.genExcepthook(self)
 		self.do(self.recipe.macros)
 		sys.excepthook = oldexcepthook
+
+            if self.manifest:
+                self.manifest.create()
 
     def do(self, macros):
         """
@@ -113,16 +128,11 @@ class BuildCommand(BuildAction, action.ShellCommand):
     Pure virtual class which implements the do method,
     based on the shell command built from a template.
     """
-    keywords = {'package': None}
     def __init__(self, recipe, *args, **keywords):
 	# enforce pure virtual status
         assert(self.__class__ is not BuildCommand)
 	BuildAction.__init__(self, recipe, *args, **keywords)
 	action.ShellCommand.__init__(self, recipe, *args, **keywords)
-
-        if self.package:
-            self.package = self.package % recipe.macros
-            self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def do(self, macros):
         """
@@ -135,13 +145,7 @@ class BuildCommand(BuildAction, action.ShellCommand):
         @rtype: None
 	"""
 
-        if self.package:
-            self.manifest.walk()
-
         util.execute(self.command %macros)
-
-        if self.package:
-            self.manifest.create()
 
 class Run(BuildCommand):
     """
@@ -1158,14 +1162,13 @@ class Ldconfig(BuildCommand):
 
 
 class _FileAction(BuildAction):
-    keywords = {'component': None, 'package': None}
+    keywords = {'component': None}
 
     def __init__(self, recipe, *args, **keywords):
         BuildAction.__init__(self, recipe, *args, **keywords)
         # Add the specified package to the list of packages created by this
         # recipe
         if self.package:
-            self.package = self.package % recipe.macros
             if ':' in self.package:
                 self.component = self.package
             else:
@@ -1174,6 +1177,10 @@ class _FileAction(BuildAction):
             package = self.component.split(':')[0]
             if package:
                 recipe.packages[package] = True
+
+    def initManifest(self, recipe):
+        # _FileAction does not need Manifest to do package= kwarg
+        pass
 
     def chmod(self, destdir, path, mode=None):
         isDestFile =  path.startswith(destdir)
