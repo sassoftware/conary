@@ -75,6 +75,10 @@ class TroveStore:
 	self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
 
+        self.LATEST_TYPE_ANY = versionops.LATEST_TYPE_ANY
+        self.LATEST_TYPE_NORMAL = versionops.LATEST_TYPE_NORMAL
+        self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
+
     def __del__(self):
         self.db = self.log = None
 
@@ -85,12 +89,12 @@ class TroveStore:
         return self.items.getOrAddId(item)
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
-                      isRedirect, isPresent = True):
+                      troveType, isPresent = True):
  	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
                                          clonedFromId,
-					 isRedirect, isPresent = isPresent)
+					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent:
 	    self.instances.setPresent(theId, 1)
@@ -307,40 +311,19 @@ class TroveStore:
 
 	    if trv.getChangeLog() and trv.getChangeLog().getName():
 		self.changeLogs.add(nodeId, trv.getChangeLog())
-            updateLatest = False
-        else:
-            updateLatest = True
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
 					     troveFlavorId, clonedFromId,
-                                             trv.isRedirect(),
+                                             trv.getType(),
                                              isPresent = True)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
-        if updateLatest:
-            # this name/version already exists, so this must be a new
-            # flavor. update the latest table as needed
-            troveBranchId = self.branchTable[troveVersion.branch()]
-            cu.execute("""
-            DELETE FROM Latest WHERE branchId=? AND itemId=? AND flavorId=?
-            """, troveBranchId, troveItemId, troveFlavorId)
-            cu.execute("""
-            INSERT INTO Latest
-                (itemId, branchId, flavorId, versionId)
-            SELECT %d, %d, %d, Instances.versionId
-            FROM
-                Instances JOIN Nodes USING(itemId, versionId)
-            WHERE
-                Instances.itemId=?
-            AND Instances.flavorId=?
-            AND Nodes.branchId=?
-            ORDER BY finalTimestamp DESC
-            LIMIT 1
-            """ %(troveItemId, troveBranchId, troveFlavorId),
-                       (troveItemId, troveFlavorId, troveBranchId))
+        troveBranchId = self.branchTable[troveVersion.branch()]
+        self.versionOps.updateLatest(troveItemId, troveBranchId,
+                                     troveFlavorId)
 
         self.depTables.add(cu, trv, troveInstanceId)
 
@@ -348,14 +331,15 @@ class TroveStore:
         # It is possible that NewFiles could have two entries for the same
         # fileId - one NULL and one with stream data.  In that case, we want
         # to insert the one with stream data - and MIN(NULL, data) always
-        # returns data.  
+        # returns data. Same idea for the MINon the sha1.
         # TODO: rework so that fileId in NewFiles is uniquely indexed, and
         # catch an exception when trying to insert a second item with the same
         # fileId.  Then, remove the GROUP BY and MIN bits here.
         cu.execute("""
         INSERT INTO FileStreams
-            (fileId, stream)
-        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream)
+            (fileId, stream, sha1)
+        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream),
+                        MIN(NewFiles.sha1)
         FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
         WHERE FileStreams.streamId is NULL GROUP BY fileId
         """)
@@ -426,7 +410,7 @@ class TroveStore:
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             clonedFromId,
-                                            trv.isRedirect(),
+                                            trv.getType(),
                                             isPresent = False)
 
             flags = weakFlag
@@ -604,7 +588,7 @@ class TroveStore:
                        start_transaction = False)
 
         cu.execute("""SELECT %(STRAIGHTJOIN)s gtl.idx, I.instanceId, 
-                             I.isRedirect, Nodes.timeStamps, Changelogs.name,
+                             I.troveType, Nodes.timeStamps, Changelogs.name,
                              ChangeLogs.contact, ChangeLogs.message
                             FROM
                                 gtl, Items, Versions, Flavors, Instances as I,
@@ -698,7 +682,7 @@ class TroveStore:
 
         neededIdx = 0
         while troveIdList:
-            (idx, troveInstanceId, isRedirect, timeStamps,
+            (idx, troveInstanceId, troveType, timeStamps,
              clName, clVersion, clMessage) =  troveIdList.pop(0)
 
             # make sure we've returned something for everything up to this
@@ -722,7 +706,7 @@ class TroveStore:
 
             trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
                               singleTroveInfo[2], changeLog,
-                              isRedirect = isRedirect,
+                              type = troveType,
                               setVersion = False)
 
             try:
@@ -843,13 +827,27 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
         if fileObj or fileStream:
+            sha1 = None
+
             if fileStream is None:
                 fileStream = fileObj.freeze()
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
-		       (cu.binary(pathId), versionId, cu.binary(fileId), 
-                        cu.binary(fileStream), path))
+
+            if fileObj is not None:
+                if fileObj.hasContents:
+                    sha1 = fileObj.contents.sha1()
+            elif files.frozenFileHasContents(fileStream):
+                cont = files.frozenFileContentInfo(fileStream)
+                sha1 = cont.sha1()
+
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, ?, ?, ?)""",
+                       (cu.binary(pathId), versionId, cu.binary(fileId), 
+                        cu.binary(fileStream), path, cu.binary(sha1)))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)",
+            cu.execute("""INSERT INTO NewFiles
+                          (pathId, versionId, fileId, stream, path, sha1)
+                          VALUES(?, ?, ?, NULL, ?, NULL)""",
 		       (cu.binary(pathId), versionId, cu.binary(fileId), path))
 
     def getFile(self, pathId, fileId):
@@ -883,6 +881,215 @@ class TroveStore:
 
     def rollback(self):
         return self.db.rollback()
+
+    def _removeTrove(self, name, version, flavor, markOnly = False):
+        assert(not name.startswith('group-'))
+        cu = self.db.cursor()
+        cu.execute("""
+                SELECT instanceId, itemId, Instances.versionId,
+                       Instances.flavorId, troveType FROM Instances
+                    JOIN Items USING (itemId)
+                    JOIN Versions ON
+                        Instances.versionId = Versions.versionId
+                    JOIN Flavors ON
+                        Instances.flavorId = Flavors.flavorId
+                    WHERE
+                        Items.item = ? AND
+                        Versions.version = ? AND
+                        Flavors.flavor = ?
+        """, name, version.asString(), flavor.freeze())
+
+        try:
+            instanceId, itemId, versionId, flavorId, troveType = cu.next()
+        except StopIteration:
+            raise errors.TroveMissing(name, version)
+
+        assert(troveType == trove.TROVE_TYPE_NORMAL)
+
+        cu.execute("SELECT nodeId, branchId FROM Nodes "
+                   "WHERE itemId = ? AND versionId = ?", itemId, versionId)
+        nodeId, branchId = cu.next()
+
+        # remove all dependencies which are used only by this instanceId
+        cu.execute("""
+            SELECT AllDepsUsed.depId AS depId FROM
+                (SELECT depId FROM Provides WHERE instanceId = ?
+                 UNION
+                 SELECT depId FROM Requires WHERE instanceId = ?
+                ) AS AllDepsUsed
+                LEFT OUTER JOIN (
+                    SELECT AllDepsUsed.depId AS depId FROM
+                        (SELECT depId FROM Provides WHERE instanceId = ?
+                         UNION
+                         SELECT depId FROM Requires WHERE instanceId = ?
+                        ) AS AllDepsUsed
+                        LEFT OUTER JOIN Provides ON
+                            AllDepsUsed.depId = Provides.depId AND
+                            Provides.instanceId != ?
+                        LEFT OUTER JOIN Requires ON
+                            AllDepsUsed.depId = Requires.depId AND
+                            Requires.instanceId != ?
+                        WHERE
+                            Provides.instanceId IS NOT NULL OR
+                            Requires.instanceId IS NOT NULL
+                ) AS DepsStillNeeded ON
+                    AllDepsUsed.depId = DepsStillNeeded.depId
+                WHERE
+                    DepsStillNeeded.depId IS NULL
+        """, instanceId, instanceId, instanceId, instanceId, instanceId, 
+             instanceId)
+        depsToRemove = [ x[0] for x in cu ]
+
+        cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
+        cu.execute("DELETE FROM Requires WHERE instanceId = ?", instanceId)
+
+        if depsToRemove:
+            cu.execute("DELETE FROM Dependencies WHERE depId IN (%s)"
+                       % ",".join([ "%d" % x for x in depsToRemove ]))
+
+        # Remove from TroveInfo
+        cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
+
+        # Remove from TroveTroves. XXX If there are troves which are referenced
+        # only here and are not otherwise present on the system, we ought to
+        # erase those as well.
+        cu.execute("DELETE FROM TroveTroves WHERE instanceId = ?", instanceId)
+
+        # Now remove the files. Gather a list of sha1s of files to remove
+        # from the filestore.
+        cu.execute("""
+            SELECT streamId, sha1 FROM FileStreams WHERE streamId IN (
+                SELECT TroveFiles.streamId FROM
+                    TroveFiles LEFT OUTER JOIN
+                        (SELECT FilesToKeep.streamId AS streamId
+                            FROM TroveFiles AS FilesUsed
+                            JOIN TroveFiles AS FilesToKeep ON
+                                FilesUsed.streamId = FilesToKeep.streamId AND
+                                FilesToKeep.instanceId != ?
+                            WHERE
+                                FilesUsed.instanceId = ?
+                        ) AS FilesToKeep
+                    ON
+                        TroveFiles.streamId = FilesToKeep.streamId
+                    WHERE
+                        TroveFiles.instanceId = ? AND
+                        FilesToKeep.streamId is NULL
+                )
+        """, instanceId, instanceId, instanceId)
+        r = cu.fetchall()
+        candidateSha1sToRemove = [ x[1] for x in r ]
+        streamIdsToRemove = [ x[0] for x in r ]
+
+        cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
+        if streamIdsToRemove:
+            cu.execute("DELETE FROM FileStreams WHERE streamId IN (%s)"
+                       % ",".join([ "%d" % x for x in streamIdsToRemove ]))
+
+        # we need to double check filesToRemove against other streams which
+        # may need the same sha1
+        filesToRemove = []
+        for sha1 in candidateSha1sToRemove:
+            cu.execute("SELECT COUNT(*) FROM FileStreams WHERE sha1=?", sha1)
+            if cu.next()[0] == 0:
+                filesToRemove.append(sha1)
+
+        if markOnly:
+            # We don't actually remove anything here; we just mark the trove
+            # as removed instead
+            cu.execute("UPDATE Instances SET troveType=? WHERE instanceId=?",
+                       trove.TROVE_TYPE_REMOVED, instanceId)
+            self.versionOps.updateLatest(itemId, branchId, flavorId)
+            return filesToRemove
+
+        cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
+
+        # Was this the only Instance for the node?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
+                   "AND versionId = ? AND instanceId != ?", 
+                   itemId, versionId, instanceId)
+        lastInstanceOfNode = (cu.next()[0] == 0)
+
+        if lastInstanceOfNode:
+            # Remove any changelog
+            cu.execute("DELETE FROM ChangeLogs WHERE nodeId = ?", nodeId)
+
+            # Remove the node itself
+            cu.execute("DELETE FROM Nodes WHERE nodeId = ?", nodeId)
+
+        # Now update the latest table
+        self.versionOps.updateLatest(itemId, branchId, flavorId)
+
+        # is this flavor needed anymore?
+        cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
+                   flavorId)
+        count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE flavorId = ?",
+                   flavorId)
+        count += cu.next()[0]
+        if count == 0:
+            cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
+            cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
+                       flavorId)
+
+        # do we need the labelmap entry anymore?
+        cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
+                   "branchId = ?", itemId, branchId)
+        count = cu.next()[0]
+
+        if not count:
+            cu.execute("SELECT labelId FROM LabelMap WHERE itemid = ? AND "
+                       "branchId = ?", itemId, branchId)
+            labelId = cu.next()[0]
+            cu.execute("DELETE FROM LabelMap WHERE itemid = ? AND "
+                       "branchId = ?", itemId, branchId)
+
+            # do we need this branchId anymore?
+            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
+                       branchId)
+            count = cu.next()[0]
+            cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE branchId = ?",
+                       branchId)
+            count += cu.next()[0]
+
+            if not count:
+                cu.execute("DELETE FROM Branches WHERE branchId = ?", branchId)
+
+            # do we need this labelId anymore?
+            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE labelId = ?",
+                       labelId)
+            count = cu.next()[0]
+
+            if not count:
+                cu.execute("DELETE FROM Labels WHERE labelId = ?", labelId)
+
+        # do we need this versionId any longer?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE versionId = ? "
+                   "LIMIT 1", versionId)
+        count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveFiles WHERE versionId = ? "
+                   "LIMIT 1", versionId)
+        count += cu.next()[0]
+
+        if not count:
+            cu.execute("DELETE FROM Versions WHERE versionId = ?", versionId)
+
+        # do we need this itemId any longer?
+        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count += cu.next()[0]
+
+        if not count:
+            cu.execute("DELETE FROM Items WHERE itemId = ?", itemId)
+
+        # XXX what about metadata?
+
+        return filesToRemove
+
+    def markTroveRemoved(self, name, version, flavor):
+        return self._removeTrove(name, version, flavor, markOnly = True)
 
     def commit(self):
 	if self.needsCleanup:
