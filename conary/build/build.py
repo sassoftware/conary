@@ -1371,7 +1371,7 @@ class Environment(BuildAction):
 	assert(len(args)==2)
 	self.variable = args[0]
 	self.value = args[1]
-	action.RecipeAction.__init__(self, recipe, [], **keywords)
+	BuildAction.__init__(self, recipe, [], **keywords)
     def do(self, macros):
 	os.environ[self.variable] = self.value % macros
 
