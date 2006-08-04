@@ -185,6 +185,19 @@ class FilesystemJob:
 	rootLen = len(self.root)
 	tagCommands = TagCommand()
 
+        # processing these before the tagRemoves taghandler files ensures
+        # we run them even if the taghandler will be removed in the same
+        # job
+        for tag, l in self.tagUpdates.iteritems():
+            if tag == 'tagdescription' or tag == 'taghandler':
+                continue
+            if not tagSet.has_key(tag): continue
+            tagInfo = tagSet[tag]
+
+            if "files preupdate" in tagInfo.implements:
+                tagCommands.addCommand(tagInfo, 'files', 'preupdate',
+                    [x[rootLen:] for x in l ])
+
         for path in self.tagRemoves.get('taghandler', []):
             path = path[rootLen:]
             tagInfo = []
@@ -196,7 +209,6 @@ class FilesystemJob:
                 continue
 
             for ti in tagInfo:
-                # this prevents us from trying to run "files add" for this tag
                 del tagSet[ti.tag]
 
                 # we're running "handler preremove"; we don't need to run
@@ -210,7 +222,7 @@ class FilesystemJob:
                         [x for x in self.db.iterFilesWithTag(ti.tag)])
 
 	for tag, l in self.tagRemoves.iteritems():
-	    if tag == 'tagdescription':
+	    if tag == 'tagdescription' or tag == 'taghandler':
                 continue
 	    if not tagSet.has_key(tag): continue
 	    tagInfo = tagSet[tag]
@@ -218,7 +230,7 @@ class FilesystemJob:
 	    if "files preremove" in tagInfo.implements:
                 tagCommands.addCommand(tagInfo, 'files', 'preremove',
                     [x[rootLen:] for x in l ])
-	    
+
         tagCommands.run(tagScript, self.root, preScript=True)
 
     def _createLink(self, linkGroup, target):
@@ -1785,6 +1797,7 @@ class TagCommand:
     def __init__(self):
         self.commandOrder = (
             ('handler', 'preremove'),
+            ('files',   'preupdate'),
             ('files',   'preremove'),
             ('handler', 'update'),
             ('files',   'update'),
@@ -1796,6 +1809,7 @@ class TagCommand:
                 'preremove': {},
             },
             'files': {
+                'preupdate': {},
                 'update':    {},
                 'preremove': {},
                 'remove':    {},

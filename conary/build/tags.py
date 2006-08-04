@@ -23,7 +23,8 @@ from conary.lib.cfg import *
 EXCLUDE, INCLUDE = range(2)
 
 class CfgImplementsItem(CfgEnum):
-    validValueDict = {'files':   ('update', 'preremove', 'remove'),
+    validValueDict = {'files':   ('update', 'preremove', 'remove',
+                                  'preupdate'),
                       'handler': ('update', 'preremove'),
 		      'description':  ('update', 'preremove')}
 
