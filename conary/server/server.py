@@ -450,8 +450,8 @@ if __name__ == '__main__':
     if 'migrate' in argSet:
         sys.exit(0)
 
-    #netRepos = NetworkRepositoryServer(cfg, baseUrl)
-    netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+    netRepos = NetworkRepositoryServer(cfg, baseUrl)
+    #netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
     if 'add-user' in argSet:
         admin = argSet.pop('admin', False)
