@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Client Changes:
     * Implemented "files preupdate" tag script method, which gets run
       before tagged files are installed or changed. (CNY-636)
+    * Fixed bug where replace-files could remove ownership from every file
+      in a trove (CNY-733)
 
 Changes in 1.0.26:
   o Build Changes:

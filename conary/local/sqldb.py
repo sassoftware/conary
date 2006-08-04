@@ -892,9 +892,9 @@ order by
         if replaceFiles:
             # mark conflicting files as no longer present in the old trove
             cu.execute("""
-                UPDATE DBTroveFiles SET isPresent = 0 WHERE instanceId IN
+                UPDATE DBTroveFiles SET isPresent = 0 WHERE _rowid_ IN
                     (
-                        SELECT ExistingFiles.instanceId FROM NewInstances
+                        SELECT ExistingFiles._rowid_ FROM NewInstances
                             JOIN DBTroveFiles AS NewFiles USING (instanceId)
                             JOIN DBTroveFiles AS ExistingFiles ON
                                 NewFiles.path = ExistingFiles.path AND
