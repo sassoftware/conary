@@ -16,6 +16,11 @@ Changes in @NEW@:
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
     * The lookaside cache now looks in the repository for local sources
       when doing a repository cook. (CNY-744)
+    * The mirror:// pseudo-URL handling now detects bad mirrors that
+      provide an HTML document instead of the real archive when a
+      full archive name is provided; previously, it did so only when
+      guessing an archive name.  Thanks to Pavel Volkovitskiy for this
+      fix. (CNY-745)
 
   o Server Changes:
     * ACL patterns now match to the end of the trove name instead of

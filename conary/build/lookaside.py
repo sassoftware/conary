@@ -136,7 +136,6 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 
     retries = 0
     url = None
-    mirror = mirror or name
 
     # check for negative cache entries to avoid spamming servers
     negativeName = _createNegativeCacheName(cfg, name, location)
@@ -155,7 +154,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
             url = urllib2.urlopen(req)
             if not name.startswith('ftp://'):
                 content_type = url.info()['content-type']
-                if guessName and 'text/html' in content_type:
+                if (guessName or mirror) and 'text/html' in content_type:
                     raise urllib2.URLError('"%s" not found' % name)
             log.info('Downloading %s...', name)
             break
@@ -201,6 +200,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     if url is None:
         return None
 
+    mirror = mirror or name
     rc = _createCacheEntry(cfg, mirror, location, url)
     return rc
 
