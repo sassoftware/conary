@@ -659,10 +659,10 @@ class MigrateTo_14(SchemaMigration):
                                 (streamId, self.cu.binary(sha1)))
             newPct = (streamId * 100)/total
             if newPct >= pct:
-                self.message('Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
+                logMe(3, 'Calculating sha1 for fileStream %s/%s (%02d%%)...' % (streamId, total, pct))
                 pct = newPct + 5
 
-        self.message('Populating FileStream Table with sha1s...')
+        logMe(2, 'Populating FileStream Table with sha1s...')
 
         # delay this as long as possible, any CTRL-C after this point
         # will make future migrations fail.
@@ -681,7 +681,7 @@ class MigrateTo_14(SchemaMigration):
         # because of the foreign key ereferntial mess, we need to
         # destroy the FKs relationships, recreate the Entitlement
         # tables, and restore the data
-        self.message('Updating Entitlements...')
+        logMe(2, 'Updating Entitlements...')
         self.cu.execute("CREATE TABLE Entitlements2 AS SELECT * FROM "
                         "Entitlements")
         self.cu.execute("CREATE TABLE EntitlementGroups2 AS SELECT * FROM "
@@ -706,12 +706,12 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementGroups2")
         self.cu.execute("DROP TABLE EntitlementOwners2")
 
-        self.message("Updating the Permissions table...")
+        logMe(2, "Updating the Permissions table...")
         self.cu.execute("ALTER TABLE Permissions ADD COLUMN "
                         "canRemove   INTEGER NOT NULL DEFAULT 0"
                         % self.db.keywords)
 
-        self.message("Updating Instances table...")
+        logMe(2, "Updating Instances table...")
         self.db.renameColumn("Instances", "isRedirect", "troveType")
         self.db.loadSchema()
 
@@ -721,7 +721,7 @@ class MigrateTo_15(SchemaMigration):
     Version = 15
 
     def updateLatest(self, cu):
-        self.message("Updating the Latest table...")
+        logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         schema.createLatest(self.db)
@@ -826,7 +826,7 @@ class MigrateTo_15(SchemaMigration):
                              deps.ThawFlavor(flavor))
         if trv.verifySignatures():
             return
-        self.message("updating trove sigs: %s %s %s" % (name, version, flavor))
+        logMe(3, "updating trove sigs: %s %s %s" % (name, version, flavor))
         trv.computeSignatures()
         cu.execute("delete from TroveInfo where instanceId = ? "
                    "and infoType = ?", (instanceId, trove._TROVEINFO_TAG_SIGS))
@@ -836,7 +836,7 @@ class MigrateTo_15(SchemaMigration):
             cu.binary(trv.troveInfo.sigs.freeze())))
 
     def fixRedirects(self, cu, repos):
-        self.message("removing dep provisions from redirects...")
+        logMe(2, "removing dep provisions from redirects...")
         # remove dependency provisions from redirects -- the conary 1.0
         # branch would set redirects to provide their own names. this doesn't
         # clean up the dependency table; that would only matter on a trove
@@ -870,17 +870,17 @@ class MigrateTo_15(SchemaMigration):
             instanceId integer,
             path varchar(767)
         ) %(TABLEOPTS)s""" % self.db.keywords)
-        self.message("searching the trovefiles table...")
+        logMe(2, "searching the trovefiles table...")
         cu.execute("insert into tmpDupPath (instanceId, path) "
                    "select instanceId, path from TroveFiles")
-        self.message("looking for troves with duplicate paths...")
+        logMe(2, "looking for troves with duplicate paths...")
         cu.execute("""insert into tmpDups (counter, instanceId, path)
         select count(*) as c, instanceId, path
         from tmpDupPath
         group by instanceId, path
         having c > 1""")
         counter = cu.execute("select count(*) from tmpDups").fetchall()[0][0]
-        self.message("detected %d duplicates" % (counter,))
+        logMe(3, "detected %d duplicates" % (counter,))
         # loop over every duplicate and apply the appropiate fix
         cu.execute("select instanceId, path from tmpDups")
         for (instanceId, path) in cu.fetchall():
@@ -905,17 +905,17 @@ class MigrateTo_15(SchemaMigration):
 
         # recreate the indexes and triggers - including new path
         # index for TroveFiles.  Also recreates the indexes table.
-        self.message('Recreating indexes... (this could take a while)')
+        logMe(2, 'Recreating indexes... (this could take a while)')
         cu.execute("drop table tmpDups")
         cu.execute("drop table tmpDupPath")
         schema.createTroves(self.db)
-        self.message('Indexes created.')
+        logMe(2, 'Indexes created.')
 
     # add the CapId reference to Permissions and Latest
     def fixPermissions(self):
         # because we need to add a foreign key to the Permissions and Latest
         # tables, it is easier if we save the tables and recreate them
-        self.message("Updating the Permissions table...")
+        logMe(2, "Updating the Permissions table...")
         cu = self.db.cursor()
         cu.execute("""create table tmpPerm as
         select permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove
