@@ -51,6 +51,8 @@ Changes in @NEW@:
     * The Conary repository server now invalidates changeset cache
       entries when adding a digital signature to a previously mirrored
       trove.
+    * A bug that caused the mirror code to traceback when no callback
+      function was provided to it has been fixed. (CNY-728)
 
 Changes in 1.0.26:
   o Build Changes:

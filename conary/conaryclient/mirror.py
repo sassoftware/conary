@@ -294,7 +294,7 @@ LastBundleSet = None
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
-                     callback = callbacks.ChangesetCallback):
+                     callback = callbacks.ChangesetCallback()):
     global CurrentTestMark
     global LastBundleSet
 
