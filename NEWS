@@ -14,6 +14,8 @@ Changes in @NEW@:
       removed double-applying macros to the package specification,
       and fixed failure in cases like "MakeInstall(dir=doesnotexist,
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
+    * The lookaside cache now looks in the repository for local sources
+      when doing a repository cook. (CNY-744)
 
   o Server Changes:
     * ACL patterns now match to the end of the trove name instead of
