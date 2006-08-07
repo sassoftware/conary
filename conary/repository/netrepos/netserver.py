@@ -2057,6 +2057,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 WHERE infoType = ? AND instanceId = ?
                 """, (sig, trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
+            self.cache.invalidateEntry(name, self.toVersion(version),
+                                       self.toFlavor(flavor))
 
         return updateCount
 
