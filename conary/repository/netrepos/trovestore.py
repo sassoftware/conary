@@ -958,7 +958,7 @@ class TroveStore:
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
-        SELECT streamId, sha1
+        SELECT FileStreams.streamId, FileStreams.sha1
         FROM FileStreams
         JOIN TroveFiles AS Candidates ON
             FileStreams.streamId = Candidates.streamId
