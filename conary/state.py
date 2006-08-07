@@ -158,9 +158,9 @@ class SourceState(trove.Trove):
         return new
 
     def __init__(self, name, version, branch, changeLog = None,
-                 lastmerged = None, isRedirect = False, **kw):
-        assert(not isRedirect)
+                 lastmerged = None, troveType = 0, **kw):
         assert(not changeLog)
+        assert(troveType == trove.TROVE_TYPE_NORMAL)
 
 	trove.Trove.__init__(self, name, version, deps.Flavor(),
                              None, **kw)
