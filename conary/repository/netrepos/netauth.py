@@ -326,7 +326,7 @@ class NetworkAuthorization:
         return False
 
     def checkTrove(self, pattern, trove):
-        if pattern=='ALL':
+        if pattern == 'ALL' or trove is None:
             return True
         regExp = re.compile(pattern + '$')
         if regExp.match(trove):
