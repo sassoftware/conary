@@ -319,13 +319,8 @@ class NetworkAuthorization:
         self.log(4, stmt, params)
         cu.execute(stmt, params)
 
-        for (troveName,) in cu:
-            if troveName=='ALL' or not trove:
-                regExp = None
-            else:
-                regExp = re.compile(troveName)
-
-            if not regExp or regExp.match(trove):
+        for (pattern,) in cu:
+            if self.checkTrove(pattern, trove):
                 return True
 
         return False
@@ -333,7 +328,7 @@ class NetworkAuthorization:
     def checkTrove(self, pattern, trove):
         if pattern=='ALL':
             return True
-        regExp = re.compile(pattern)
+        regExp = re.compile(pattern + '$')
         if regExp.match(trove):
             return True
         return False

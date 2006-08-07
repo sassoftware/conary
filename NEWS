@@ -15,6 +15,10 @@ Changes in @NEW@:
       and fixed failure in cases like "MakeInstall(dir=doesnotexist,
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
 
+  o Server Changes:
+    * ACL patterns now match to the end of the trove name instead of
+      partial strings (CNY-719)
+
   o Bug Fixes:
     * The Conary repository server now invalidates changeset cache
       entries when adding a digital signature to a previously mirrored
