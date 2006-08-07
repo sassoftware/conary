@@ -1829,8 +1829,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                        "VALUES (?, ?)", row, path)
 
 
-        query = """SELECT row, item, version, flavor, timeStamps,
-                          UP.permittedTrove 
+        # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
+        # explicit
+        query = """SELECT trovesByPathTmp.row, item, version, flavor,
+                          timeStamps, UP.permittedTrove 
                         FROM trovesByPathTmp 
                         JOIN TroveFiles USING(path)
                         JOIN Instances USING(instanceId)
@@ -2283,6 +2285,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 WHERE infoType = ? AND instanceId = ?
                 """, (sig, trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
+            self.cache.invalidateEntry(name, self.toVersion(version),
+                                       self.toFlavor(flavor))
 
         return updateCount
 

@@ -20,7 +20,8 @@ from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
-from conary.repository import trovesource
+from conary.repository import trovesource, errors
+from conary.lib import log
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1
@@ -227,8 +228,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
 
         if not troveSpecs:
             return sorted(troveTups)
-        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
-                                                        for x in troveSpecs ]
+        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False)
+                       for x in troveSpecs ]
         searchFlavor = defaultFlavor
 
         acrossLabels = True
@@ -433,7 +434,12 @@ def getTrovesByPath(repos, pathList, versionFilter, flavorFilter, labelPath,
 
     allResults = {}
     for label in labelPath:
-        results = queryFn(pathList, label)
+        try:
+            results = queryFn(pathList, label)
+        except errors.MethodNotSupported:
+            log.debug('repository server for the %s label does not support '
+                      'queries by path' %label)
+            continue
         for path, tups in results.iteritems():
             allResults.setdefault(path, []).extend(tups)
 

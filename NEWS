@@ -1,6 +1,7 @@
 Changes in 1.1:
   o API Changes:
     * Exposed deleteAcl and added a listAcls method to conary client.
+
   o Server Changes:
     * Entitlement keys were artificially limited to 63 characters in length.
       This restriction has been raised to the max length permitted in the
@@ -41,6 +42,17 @@ Changes in @NEW@:
       removed double-applying macros to the package specification,
       and fixed failure in cases like "MakeInstall(dir=doesnotexist,
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
+
+  o Server Changes:
+    * ACL patterns now match to the end of the trove name instead of
+      partial strings (CNY-719)
+
+  o Bug Fixes:
+    * The Conary repository server now invalidates changeset cache
+      entries when adding a digital signature to a previously mirrored
+      trove.
+    * A bug that caused the mirror code to traceback when no callback
+      function was provided to it has been fixed. (CNY-728)
 
 Changes in 1.0.26:
   o Build Changes:
