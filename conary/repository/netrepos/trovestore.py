@@ -958,24 +958,17 @@ class TroveStore:
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
-            SELECT streamId, sha1 FROM FileStreams WHERE streamId IN (
-                SELECT TroveFiles.streamId FROM
-                    TroveFiles LEFT OUTER JOIN
-                        (SELECT FilesToKeep.streamId AS streamId
-                            FROM TroveFiles AS FilesUsed
-                            JOIN TroveFiles AS FilesToKeep ON
-                                FilesUsed.streamId = FilesToKeep.streamId AND
-                                FilesToKeep.instanceId != ?
-                            WHERE
-                                FilesUsed.instanceId = ?
-                        ) AS FilesToKeep
-                    ON
-                        TroveFiles.streamId = FilesToKeep.streamId
-                    WHERE
-                        TroveFiles.instanceId = ? AND
-                        FilesToKeep.streamId is NULL
-                )
-        """, instanceId, instanceId, instanceId)
+        SELECT streamId, sha1
+        FROM FileStreams
+        JOIN TroveFiles AS Candidates ON
+            FileStreams.streamId = Candidates.streamId
+            AND ( SELECT COUNT(streamId)
+                    FROM TroveFiles as Used
+                   WHERE Used.streamId = Candidates.streamId
+                     AND Used.instanceId != Candidates.instanceId ) = 0
+        WHERE
+            Candidates.instanceId = ?
+        """, instanceId)
         r = cu.fetchall()
         candidateSha1sToRemove = [ x[1] for x in r ]
         streamIdsToRemove = [ x[0] for x in r ]
