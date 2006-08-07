@@ -227,8 +227,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
 
         if not troveSpecs:
             return sorted(troveTups)
-        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
-                                                        for x in troveSpecs ]
+        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False)
+                       for x in troveSpecs ]
         searchFlavor = defaultFlavor
 
         acrossLabels = True
