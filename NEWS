@@ -49,6 +49,7 @@ Changes in 1.0.x:
       full archive name is provided; previously, it did so only when
       guessing an archive name.  Thanks to Pavel Volkovitskiy for this
       fix. (CNY-745)
+    * The Flavor policy has been slightly optimized for speed.
 
   o Server Changes:
     * ACL patterns now match to the end of the trove name instead of
