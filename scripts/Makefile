@@ -38,6 +38,7 @@ install:
 	install -m 755 md5pw $(DESTDIR)$(datadir)/conary
 	install -m 755 ccs2tar $(DESTDIR)$(bindir)
 	install -m 755 showchangeset $(DESTDIR)$(datadir)/conary
+	install -m 755 logcat $(DESTDIR)$(datadir)/conary
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
 	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 

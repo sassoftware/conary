@@ -35,6 +35,7 @@ Changes in 1.0.x:
     * Fixed multiple bugs where replace-files could result in the new file
       having no owner (CNY-733)
     * The logcat script now supports revision 1 log entries.
+    * The logcat script is now installed to /usr/share/conary/logcat
 
   o Build Changes:
     * Improved handling of the "package=" keyword argument for build
