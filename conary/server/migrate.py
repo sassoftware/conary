@@ -911,6 +911,14 @@ class MigrateTo_15(SchemaMigration):
         schema.createTroves(self.db)
         logMe(2, 'Indexes created.')
 
+    # drop the unused views
+    def dropViews(self):
+        logMe(2, "dropping unused views")
+        cu = self.db.cursor()
+        for v in ["UsersView", "NodesView", "InstancesView", "LatestView"]:
+            if v in self.db.views:
+                cu.execute("drop view %s" % (v,))
+
     # add the CapId reference to Permissions and Latest
     def fixPermissions(self):
         # because we need to add a foreign key to the Permissions and Latest
@@ -936,6 +944,7 @@ class MigrateTo_15(SchemaMigration):
         # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
 
+        self.dropViews()
         self.fixRedirects(cu, repos)
         self.fixDuplicatePaths(cu, repos)
         self.fixPermissions()
