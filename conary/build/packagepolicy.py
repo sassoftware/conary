@@ -2621,17 +2621,25 @@ class Flavor(policy.Policy):
     )
     filetree = policy.PACKAGE
 
-    def doProcess(self, recipe):
+    def preProcess(self):
 	self.libRe = re.compile(
             '^(%(libdir)s'
             '|/%(lib)s'
             '|%(x11prefix)s/%(lib)s'
-            '|%(krbprefix)s/%(lib)s)(/|$)' %recipe.macros)
+            '|%(krbprefix)s/%(lib)s)(/|$)' %self.recipe.macros)
 	self.libReException = re.compile('^/usr/(lib|%(lib)s)/python.*$')
-
         self.baseIsnset = use.Arch.getCurrentArch()._name
+        self.baseArchFlavor = use.Arch.getCurrentArch()._toDependency()
+        self.archFlavor = use.createFlavor(None, use.Arch._iterUsed())
+        self.packageFlavor = deps.Flavor()
         self.troveMarked = False
-	policy.Policy.doProcess(self, recipe)
+
+    def postProcess(self):
+	componentMap = self.recipe.autopkg.componentMap
+        # all troves need to share the same flavor so that we can
+        # distinguish them later
+        for pkg in componentMap.values():
+            pkg.flavor.union(self.packageFlavor)
 
     def hasLib(self, path):
         return self.libRe.match(path) and not self.libReException.match(path)
@@ -2651,28 +2659,23 @@ class Flavor(policy.Policy):
                 isnset = self.baseIsnset
             else:
                 # this file can't be marked by arch, but the troves
-                # and package must be
+                # and package must be.
+                # we don't need to union in the base arch flavor more
+                # than once.
                 if self.troveMarked:
                     return
-                set = use.Arch.getCurrentArch()._toDependency()
-                for pkg in componentMap.values():
-                    pkg.flavor.union(set)
+                self.packageFlavor.union(self.baseArchFlavor)
                 self.troveMarked = True
                 return
         else:
             return
 
-	set = deps.Flavor()
-        set.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
+	flv = deps.Flavor()
+        flv.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies
-        set.union(use.createFlavor(None, use.Arch._iterUsed()))
-        f.flavor.set(set)
-        # all troves need to share the same flavor so that we can
-        # distinguish them later
-        for pkg in componentMap.values():
-            pkg.flavor.union(f.flavor())
-
-
+        flv.union(self.archFlavor)
+        f.flavor.set(flv)
+        self.packageFlavor.union(flv)
 
 class reportMissingBuildRequires(policy.Policy):
     """

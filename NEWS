@@ -14,6 +14,7 @@ Changes in @NEW@:
       removed double-applying macros to the package specification,
       and fixed failure in cases like "MakeInstall(dir=doesnotexist,
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
+    * The Flavor policy has been slightly optimized for speed.
 
   o Server Changes:
     * ACL patterns now match to the end of the trove name instead of
