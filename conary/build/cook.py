@@ -681,7 +681,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                                  crossCompile=crossCompile,
                                  enforceManagedPolicy=enforceManagedPolicy,
                                  requireCleanSources = requireCleanSources)
-    if not result:
+    if type(result) is not tuple:
         return
 
     (bldList, recipeObj, builddir, destdir, policyTroves) = result
@@ -816,7 +816,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
         # if we're only extracting, continue to the next recipe class.
         if prep:
-            return
+            return recipeObj
 
         cwd = os.getcwd()
         try:

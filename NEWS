@@ -14,6 +14,13 @@ Changes in @NEW@:
       removed double-applying macros to the package specification,
       and fixed failure in cases like "MakeInstall(dir=doesnotexist,
       skipMissingDir=True, package=...)". (CNY-737, CNY-738)
+    * The lookaside cache now looks in the repository for local sources
+      when doing a repository cook. (CNY-744)
+    * The mirror:// pseudo-URL handling now detects bad mirrors that
+      provide an HTML document instead of the real archive when a
+      full archive name is provided; previously, it did so only when
+      guessing an archive name.  Thanks to Pavel Volkovitskiy for this
+      fix. (CNY-745)
     * The Flavor policy has been slightly optimized for speed.
 
   o Server Changes:
@@ -26,6 +33,9 @@ Changes in @NEW@:
       trove.
     * A bug that caused the mirror code to traceback when no callback
       function was provided to it has been fixed. (CNY-728)
+    * Rolling back changes when the current trove has gone missing from
+      the server now causes the client to generate the changeset to apply
+      based on the trove stored in the local database (CNY-693)
 
 Changes in 1.0.26:
   o Build Changes:
