@@ -1,4 +1,4 @@
-Changes in 1.1:
+Changes in 1.1.0_beta1:
   o API Changes:
     * Exposed deleteAcl and added a listAcls method to conary client.
 
