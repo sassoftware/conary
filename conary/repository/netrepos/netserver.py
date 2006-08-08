@@ -1589,12 +1589,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self._checkCommitPermissions(authToken, verList, mirror)
 
         items = {}
+        removedList = []
         # check removed permissions; _checkCommitPermissions can't do
         # this for us since it's based on the trove type
         for troveCs in cs.iterNewTroveList():
             if troveCs.troveType() != trove.TROVE_TYPE_REMOVED:
                 continue
 
+            removedList.append(troveCs.getNewNameVersionFlavor())
             (name, version, flavor) = troveCs.getNewNameVersionFlavor()
 
             if not self.auth.check(authToken, mirror = mirror, remove = True,
@@ -1607,6 +1609,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, mirror = mirror)
+
+        for info in removedList:
+            self.cache.invalidateEntry(*info)
+
 	if not self.commitAction:
 	    return True
 
