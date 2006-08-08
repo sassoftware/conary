@@ -32,6 +32,9 @@ Changes in @NEW@:
       trove.
     * A bug that caused the mirror code to traceback when no callback
       function was provided to it has been fixed. (CNY-728)
+    * Rolling back changes when the current trove has gone missing from
+      the server now causes the client to generate the changeset to apply
+      based on the trove stored in the local database (CNY-693)
 
 Changes in 1.0.26:
   o Build Changes:
