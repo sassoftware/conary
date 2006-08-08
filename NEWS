@@ -12,9 +12,11 @@
       * Conary can now remove packages and components from a
         repository server.  This is a privileged operation and should
         not normally be used.  Only users with a special "can remove"
-        ACL can remove from the repository.  When you remove something
-        from the repository, a marker is left behind.
-        "conary repquery --show-removed" will display these markers.
+        ACL can remove from the repository.  As removing something
+        from a Conary repository is an act of last resort and modifies
+        repository internals, the command line option will not appear
+        in the reference documentation.  rPath will assist users that
+        need more information.
       * Conary can now query the repository by path.  Use
         "conary repquery --path /path/to/find" to find components that
         include a particular path.
