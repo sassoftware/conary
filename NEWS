@@ -1,3 +1,50 @@
+  o Release Overview
+
+    Conary 1.1.0 is the first version in the 1.1.x series.  New
+    functionality has been added to Conary that required modifications
+    to the repository database schema and XML-RPC protocol.  A Conary
+    1.1.x-compatible client is required to access many of the new
+    features.  The XML-RPC interface includes version information so
+    that old clients continue to work with new servers, and new
+    clients continue to work with old servers.
+
+    New Features:
+      * Conary can now remove packages and components from a
+        repository server.  This is a privileged operation and should
+        not normally be used.  Only users with a special "can remove"
+        ACL can remove from the repository.  When you remove something
+        from the repository, a marker is left behind.
+        "conary repquery --show-removed" will display these markers.
+      * Conary can now query the repository by path.  Use
+        "conary repquery --path /path/to/find" to find components that
+        include a particular path.
+      * Several enhancements were added to the entitlement management
+        facilities in a Conary repository.
+      * Conary can now redirect a group.
+
+  Detailed changes follow:
+
+  o Server Changes:
+    * Entitlement keys were artificially limited to 63 characters in length.
+      This restriction has been raised to the max length permitted in the
+      database column (255).
+    * Entitlement classes can now provide access to multiple access
+      groups (and updated the web ui to support that) (CNY-600)
+    * addEntitlement and deleteEntitlement repository calls replaced
+      by addEntitlements and deleteEntitlements calls.  These calls
+      operate on more than one entitlement simultaneously.
+    * Added getTroveLeavesByPath and getTroveVersionsByPath. (for CNY-74)
+    * Conary now checks to ensure you have write access to all the things
+      you're trying to commit before you send them across the wire. (CNY-616)
+    * deleteAcl and listAcls methods have been added to ConaryClient.
+
+  o Client Changes:
+    * "conary rq" now supports "--path", which allows you to search
+      for troves in the repository by path. (CNY-74)
+    * "conary rq" now has a "--show-removed" option that allows you to
+      see removed troves.  A [Removed] flag will be displayed when the
+      --trove-flags option is added.
+
 Changes in 1.0.27:
   o Client Changes:
     * A "files preupdate" tag script method has been Implemented which
@@ -65,6 +112,8 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
+
+Changes in @NEW@:
   o Server Changes:
     * The Conary web interface now provides a method to rely solely on
       a remote repository server to do authentication checks. (CNY-705)

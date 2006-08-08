@@ -161,46 +161,57 @@ class BaseCursor:
         else:
             return item
 
+
 # A cursor class for the drivers that do not support bind
 # parameters. Instead of :name they use a Python-esque %(name)s
 # syntax. This is quite fragile...
 class BindlessCursor(BaseCursor):
+    # edit the input query to make it python compatible
     def __mungeSQL(self, sql):
-        regex = re.compile(':(\w+)')
-        # edit the input query
         keys = set()
-##         for key in regex.findall(sql):
-##             keys.add(key)
-##             sql = re.sub(":" + key, "%("+key+")s", sql)
-        sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql)
-        return (sql, keys)
+        # take in a match for an :id and return a %(id)s python sub
+        def __match_kw(m):
+            d = m.groupdict()
+            keys.add(d["kw"])
+            return "%(pre)s%(s)s%%(%(kw)s)s" % d
+
+        # handle the :id, :name type syntax
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*):(?P<kw>\w+)",
+                     __match_kw, sql)
+        # force dbi compliance here. args or kw or none, no mixes
+        if len(keys):
+            return (sql, tuple(keys))
+        # handle the ? syntax
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
+        return (sql, ())
 
     # we need to "fix" the sql code before calling out
     def execute(self, sql, *args, **kw):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
         sql, keys = self.__mungeSQL(sql)
-        # force dbi compliance here. we prefer args over the kw
         if len(args) == 1:
-            if isinstance(args[0], (tuple, list)):
+            # unwrap the args if we were called execute(sql, {})
+            if isinstance(args[0], dict) or hasattr(args[0], 'keys'):
+                kw.update(args[0])
+                args = ()
+            # unwrap args if we're called as execute(sql, (a,b))
+            elif isinstance(args[0], (tuple, list)):
                 args = args[0]
-        if len(args) == 0:
-            assert (sorted(kw.keys()) == sorted(keys))
-        elif len(args) == 1:
-            p = args[0]
-            # if it is a dictionary, it must contain bind arguments
-            if hasattr(p, 'keys'):
-                kw.update(p)
-            else: # special case - single positional argument
-                assert(len(keys)==0 and len(kw)==0)
-                return self._cursor.execute(sql, args)
-        else: # many args, we don't mix in bind arguments
-            assert(len(keys)==0 and len(kw)==0)
+        # if we have args, we can not have keywords
+        if len(args):
+            assert(len(keys)==0 and len(kw)==0), \
+                                "Can not mix positional and named parameters"
             return self._cursor.execute(sql, args)
-        # we have a dict of bind arguments
-        return self._cursor.execute(sql, **kw)
-
+        if len(keys):
+            # check that all keys used in the query appear in the kw
+            assert(False not in [x in kw.keys() for x in keys]), \
+                         "Query keys not defined in named argument dict: %s != %s " %(
+                str(sorted(keys)), str(sorted(kw.keys())))
+            # we have keywords in the query
+            return self._cursor.execute(sql, kw)
+        # no args and no keywords
+        return self._cursor.execute(sql)
 
 # A class for working with sequences
 class BaseSequence:
@@ -387,6 +398,24 @@ class BaseDatabase:
         cu.execute(sql)
         if remove:
             self.tables[table].remove(name)
+        return True
+
+    # since not all databases handle renaming and dropping columns the
+    # same way, we provide a more generic interface in here
+    def dropColumn(self, table, name):
+        assert(self.dbh)
+        sql = "ALTER TABLE %s DROP COLUMN %s" % (table, name)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
+    def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
+        assert(self.dbh)
+        sql = "ALTER TABLE %s RENAME COLUMN %s TO %s" % (table, oldName, newName)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
         return True
 
     # easy access to the schema state
