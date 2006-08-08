@@ -1,11 +1,12 @@
-Changes in @NEW@:
+Changes in 1.0.27:
   o Client Changes:
-    * Implemented "files preupdate" tag script method, which gets run
-      before tagged files are installed or changed. (CNY-636)
-    * Fixed bug where replace-files could remove ownership from every file
-      in a trove (CNY-733)
-    * Fixed multiple bugs where replace-files could result in the new file
-      having no owner (CNY-733)
+    * A "files preupdate" tag script method has been Implemented which
+      gets run before tagged files are installed or changed. (CNY-636)
+    * A bug that could cause "--replace-files" to remove ownership
+      from every file in a trove has been fixed. (CNY-733)
+
+    * Multiple bugs where using "--replace-files" could result in the
+      new file having no owner have been fixed. (CNY-733)
     * The logcat script now supports revision 1 log entries.
     * The logcat script is now installed to /usr/share/conary/logcat
 
