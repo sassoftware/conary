@@ -907,26 +907,65 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return l
 
-    def createChangeSet(self, list, withFiles = True, withFileContents = True,
+    def createChangeSet(self, jobList, withFiles = True,
+                        withFileContents = True,
                         excludeAutoSource = False, recurse = True,
                         primaryTroveList = None, callback = None):
-	return self._getChangeSet(list, withFiles = withFiles, 
-                                  withFileContents = withFileContents,
-                                  excludeAutoSource = excludeAutoSource,
-                                  recurse = recurse, 
+        allJobs = [ (jobList, False) ]
+        mergeTarget = None
+
+        while allJobs:
+            fullJob, forceLocal = allJobs.pop(0)
+
+            try:
+                cs = self._getChangeSet(fullJob, withFiles = withFiles, 
+                                        withFileContents = withFileContents,
+                                        excludeAutoSource = excludeAutoSource,
+                                        recurse = recurse,
+                                        primaryTroveList = primaryTroveList,
+                                        callback = callback,
+                                        forceLocalGeneration = forceLocal)
+
+                if mergeTarget is None:
+                    return cs
+
+                mergeTarget.merge(cs)
+            except errors.TroveMissing, e:
+                if forceLocal:
+                    # trying again won't help
+                    raise
+
+                # Split the job into two pieces. This will force local
+                # generation more agressively than is absolutely necessary
+                # (since TroveMissing doesn't convey flavor information)
+                brokenJob = []
+                workingJob = []
+                for job in fullJob:
+                    if job[0] == e.troveName and                    \
+                          (job[1][0] == e.version or job[2][0] == e.version):
+                        brokenJob.append(job)
+                    else:
+                        workingJob.append(job)
+
+                allJobs.append( (brokenJob, True) )
+                allJobs.append( (workingJob, False) )
+
+                if mergeTarget is None:
+                    mergeTarget = changeset.ReadOnlyChangeSet()
+
+        return mergeTarget
+
+    def createChangeSetFile(self, jobList, fName, recurse = True,
+                            primaryTroveList = None, callback = None):
+        return self._getChangeSet(jobList, target = fName,
+                                  recurse = recurse,
                                   primaryTroveList = primaryTroveList,
                                   callback = callback)
-
-    def createChangeSetFile(self, list, fName, recurse = True,
-                            primaryTroveList = None, callback = None):
-	self._getChangeSet(list, target = fName, recurse = recurse,
-                           primaryTroveList = primaryTroveList,
-                           callback = callback)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,
                       excludeAutoSource = False, primaryTroveList = None,
-                      callback = None):
+                      callback = None, forceLocalGeneration = False):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -949,7 +988,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #   5. Download any extra files (and create any extra diffs)
         #   which step 2 couldn't do for us.
 
-        def _separateJobList(jobList, removedList):
+        def _separateJobList(jobList, removedList, forceLocalGeneration):
+            if forceLocalGeneration:
+                return {}, jobList
+
             serverJobs = {}
             ourJobList = []
             for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
@@ -1069,7 +1111,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         while chgSetList or removedList:
             (serverJobs, ourJobList) = _separateJobList(chgSetList,
-                                                        removedList)
+                                                        removedList,
+                                                        forceLocalGeneration)
 
             chgSetList = []
             removedList = []

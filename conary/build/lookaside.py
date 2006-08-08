@@ -136,7 +136,6 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 
     retries = 0
     url = None
-    mirror = mirror or name
 
     # check for negative cache entries to avoid spamming servers
     negativeName = _createNegativeCacheName(cfg, name, location)
@@ -155,7 +154,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
             url = urllib2.urlopen(req)
             if not name.startswith('ftp://'):
                 content_type = url.info()['content-type']
-                if guessName and 'text/html' in content_type:
+                if (guessName or mirror) and 'text/html' in content_type:
                     raise urllib2.URLError('"%s" not found' % name)
             log.info('Downloading %s...', name)
             break
@@ -201,6 +200,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     if url is None:
         return None
 
+    mirror = mirror or name
     rc = _createCacheEntry(cfg, mirror, location, url)
     return rc
 
@@ -218,8 +218,6 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     """
     searches all locations, including populating the cache if the
     file can't be found in srcdirs, and returns the name of the file.
-    autoSource should be True when the file has been pulled from an RPM,
-    and so has no path associated but is still auto-added
     """
 
     if not autoSource and not suffixes and not guessName and not name.startswith('/'):
@@ -244,6 +242,12 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             f = util.searchFile(sourcename, srcdirs)
             if f: return f
 
+    if localOnly and not srcdirs:
+        # This is a "local only cook from the repository", so we need
+        # to ensure that what we have is the same as what is in the
+        # repository, not what is in the cache
+        f = _searchRepository(cfg, repCache, name, location)
+        if f: return f
     if localOnly:
         if not allowNone:
             raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
