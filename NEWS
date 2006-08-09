@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Conary now resets the timeStamps in all cases when getSourceVersion is 
+      called (CNY-708).
+ 
 Changes in 1.0.27:
   o Client Changes:
     * A "files preupdate" tag script method has been Implemented which
