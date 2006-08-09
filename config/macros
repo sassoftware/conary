@@ -62,7 +62,6 @@ ldflags		    = '%(dbgflags)s'
 mflags		    = '' # make flags
 parallelmflags      = ''
 classpath           = ''
-sysroot		    = ''
 os		    = 'linux'
 debugedit           = 'debugedit'
 strip               = 'eu-strip' # eu-strip for debuginfo, "strip -g" else
