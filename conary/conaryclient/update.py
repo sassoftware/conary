@@ -197,7 +197,8 @@ class ClientUpdate:
                            removeNotByDefault = False):
 
 
-	def _findErasures(primaryErases, newJob, referencedTroves, recurse):
+	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
+                          ineligible):
 	    # each node is a ((name, version, flavor), state, edgeList
 	    #		       fromUpdate)
 	    # state is ERASE, KEEP, or UNKNOWN
@@ -275,6 +276,9 @@ class ClientUpdate:
 
                 for inclInfo in trv.iterTroveList(strongRefs=True):
                     # we only use strong references when erasing.
+                    if inclInfo in ineligible:
+                        continue
+
                     jobQueue.add(((inclInfo[0], inclInfo[1:], (None, None), 
                                   False), False))
 
@@ -1118,7 +1122,7 @@ followLocalChanges: %s
             alreadyInstalled.discard((job[0], job[1][0], job[1][1]))
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
-                                 recurse)
+                                 recurse, ineligible)
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
 
@@ -2347,7 +2351,6 @@ conary erase '%s=%s[%s]'
                              "Update tries to add same trove twice:\n    "
                               + '\n    '.join('%s=%s[%s]' % ((x[0],) + x[1]) 
                                               for x in sorted(extraTroves)))
-
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 

@@ -494,6 +494,9 @@ Changes in 1.0.16
     * A bug in the MySQL dbstore driver that caused the wrong
       character encoding to be used when switching databases has been
       fixed.
+    * A bug where running updateall when one of the two groups that
+      reference a trove has no update caused an erase of that trove to
+      be requested has been fixed (CNY-748).
 
 Changes in 1.0.15
   o Client Changes:
