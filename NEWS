@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary now resets the timeStamps in all cases when getSourceVersion is 
       called (CNY-708).
+    * Sqlite ANALYZE locks the database after it is run, causing updates to
+      fail.
 
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in

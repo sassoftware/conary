@@ -239,6 +239,7 @@ class Database(BaseDatabase):
 
         if doAnalyze:
             cu.execute('ANALYZE')
+            self.commit()
             self.loadSchema()
 
     # A trigger that syncs up the changed column
