@@ -290,7 +290,7 @@ class ComponentSpec(_filterSpec):
         # devellib is architecture-specific
         ('devellib',  (r'\.so',), stat.S_IFLNK),
 	('devellib',  (r'\.a',
-                       '%(libdir)s/pkgconfig/')),
+                       '(%(libdir)s|%(datadir)s)/pkgconfig/')),
         # devel is architecture-generic -- no %(lib)s/%(libdir)s
         ('devel',     (r'.*/include/.*\.h',
 		       '%(includedir)s/',

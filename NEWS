@@ -2,6 +2,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary now resets the timeStamps in all cases when getSourceVersion is 
       called (CNY-708).
+
+  o Build Changes:
+    * Conary now recognizes that pkgconfig finds its files in
+      /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
  
 Changes in 1.0.27:
   o Client Changes:
