@@ -4,6 +4,8 @@ Changes in @NEW@:
       called (CNY-708).
     * Sqlite ANALYZE locks the database after it is run, causing updates to
       fail.
+    * Lists in configure files (for example, installLabelPath) now allow there 
+      to be more than one space between items.
 
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
