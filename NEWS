@@ -6,6 +6,8 @@ Changes in @NEW@:
       fail.
     * Lists in configure files (for example, installLabelPath) now allow there 
       to be more than one space between items.
+    * Locally changed files weren't marked properly in rollbacks which were
+      stored locally (incluing rollbacks for locally built troves) (CNY-645)
 
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
