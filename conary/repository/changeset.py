@@ -338,9 +338,6 @@ class ChangeSet(streams.StreamSet):
                      redirectionRollbacks = True):
 	assert(not self.absolute)
 
-        import epdb
-        epdb.st('f')
-
         rollback = ChangeSet()
 
 	for troveCs in self.iterNewTroveList():
