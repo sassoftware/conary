@@ -12,7 +12,9 @@
 # full details.
 #
 
-mirror_files =	debian \
+mirror_files =	\
+                cran \
+                debian \
                 fedora \
                 gentoo \
                 sourceforge

@@ -263,7 +263,7 @@ class CfgCallBack(CfgType):
 # type, and their item type.
 
 class CfgLineList(CfgType):
-    def __init__(self, valueType, separator=' ', listType=list, default=[]):
+    def __init__(self, valueType, separator=None, listType=list, default=[]):
         if inspect.isclass(valueType) and issubclass(valueType, CfgType):
             valueType = valueType()
 
@@ -290,7 +290,10 @@ class CfgLineList(CfgType):
 
     def toStrings(self, value, displayOptions=None):
         if value:
-            yield self.separator.join(
+            separator = self.separator 
+            if separator is None:
+                separator = ' '
+            yield separator.join(
                         self.valueType.format(x, displayOptions) for x in value)
 
 

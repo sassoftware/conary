@@ -341,6 +341,9 @@ class ChangeSet(streams.StreamSet):
                      redirectionRollbacks = True):
 	assert(not self.absolute)
 
+        import epdb
+        epdb.st('f')
+
         rollback = ChangeSet()
 
 	for troveCs in self.iterNewTroveList():
@@ -528,14 +531,15 @@ class ChangeSet(streams.StreamSet):
                         fsFile.contents.sha1() == origFile.contents.sha1()):
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
+                        contType = ChangedFileTypes.file
 		    else:
 			# the contents in the file system are wrong; insert
 			# a placeholder and let the local change set worry
 			# about getting this right
 			cont = filecontents.FromString("")
+                        contType = ChangedFileTypes.hldr
 
-		    rollback.addFileContents(pathId,
-					     ChangedFileTypes.file, cont,
+                    rollback.addFileContents(pathId, contType, cont,
 					     origFile.flags.isConfig() or
 					     newFile.flags.isConfig())
 
@@ -571,14 +575,15 @@ class ChangeSet(streams.StreamSet):
 			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
+                        contType = ChangedFileTypes.file
 		    else:
 			# the contents in the file system are wrong; insert
 			# a placeholder and let the local change set worry
 			# about getting this right
 			cont = filecontents.FromString("")
+                        contType = ChangedFileTypes.hldr
 
-		    rollback.addFileContents(pathId,
-					     ChangedFileTypes.file, cont,
+                    rollback.addFileContents(pathId, contType, cont,
 					     fileObj.flags.isConfig())
 
 	return rollback

@@ -4,6 +4,22 @@ Changes in 1.1.1:
       (501) instead of a HTTP_NOT_FOUND (404) if the logFile
       directive is not configured.
 
+  o Bug Fixes:
+    * Conary now resets the timeStamps in all cases when getSourceVersion is 
+      called (CNY-708).
+    * Commit the repository after an analyze call as sqlite analyze locks
+      the database after it is run
+    * Lists in configure files (for example, installLabelPath) now allow there 
+      to be more than one space between items.
+    * Locally changed files weren't marked properly in rollbacks which were
+      stored locally (incluing rollbacks for locally built troves) (CNY-645)
+
+  o Build Changes:
+    * Conary now recognizes that pkgconfig finds its files in
+      /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
+    * Added the /etc/conary/mirrors/cran file to enable mirror://
+      references to the Comprehensive R Archive Network. (CNY-761)
+
 Changes in 1.1.0:
   o 1.1 Release Overview
 
@@ -546,6 +562,9 @@ Changes in 1.0.16
     * A bug in the MySQL dbstore driver that caused the wrong
       character encoding to be used when switching databases has been
       fixed.
+    * A bug where running updateall when one of the two groups that
+      reference a trove has no update caused an erase of that trove to
+      be requested has been fixed (CNY-748).
 
 Changes in 1.0.15
   o Client Changes:

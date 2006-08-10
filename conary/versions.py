@@ -1179,6 +1179,7 @@ class Version(VersionSequence):
         for item in v.versions:
             if isinstance(item, Revision):
                 item.buildCount = None
+                item.clearTimeStamp()
         return v
 
     def getBinaryVersion(self):
