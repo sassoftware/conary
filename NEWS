@@ -10,6 +10,8 @@ Changes in @NEW@:
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
+    * Added the /etc/conary/mirrors/cran file to enable mirror://
+      references to the Comprehensive R Archive Network. (CNY-761)
  
 Changes in 1.0.27:
   o Client Changes:
