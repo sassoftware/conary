@@ -1,4 +1,4 @@
-Changes in 1.1.1:
+Changes in @NEW@:
   o Server Changes:
     * The log retrieval function now returns a HTTP_NOT_IMPLEMENTED
       (501) instead of a HTTP_NOT_FOUND (404) if the logFile
@@ -13,6 +13,8 @@ Changes in 1.1.1:
       to be more than one space between items.
     * Locally changed files weren't marked properly in rollbacks which were
       stored locally (incluing rollbacks for locally built troves) (CNY-645)
+    * A bug that caused a traceback message when adding a user through
+      the web interface has been fixed.
 
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
