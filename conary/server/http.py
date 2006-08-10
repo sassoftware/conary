@@ -187,7 +187,7 @@ class HttpHandler(WebHandler):
         This method requires admin access.
         """
         if not self.cfg.logFile:
-            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
+            raise apache.SERVER_RETURN, apache.HTTP_NOT_IMPLEMENTED
         if not os.path.exists(self.cfg.logFile):
             raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
         if not os.access(self.cfg.logFile, os.R_OK):

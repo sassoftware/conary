@@ -1,3 +1,9 @@
+Changes in 1.1.1:
+  o Server Changes:
+    * The log retrieval function now returns a HTTP_NOT_IMPLEMENTED
+      (501) instead of a HTTP_NOT_FOUND (404) if the logFile
+      directive is not configured.
+
 Changes in 1.1.0:
   o 1.1 Release Overview
 
