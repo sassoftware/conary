@@ -603,8 +603,8 @@ class FilesystemJob:
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _setupRemoves(self, repos, troveCs, changeSet, baseTrove, fsTrove,
-                      root, flags):
+    def _setupRemoves(self, repos, pathsMoved, troveCs, changeSet, baseTrove,
+                      fsTrove, root, flags):
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
@@ -620,6 +620,10 @@ class FilesystemJob:
 		continue
 
 	    (path, fileId, version) = baseTrove.getFile(pathId)
+
+            if path in pathsMoved:
+                log.debug("%s is being replaced by a new install" % path)
+                continue
 
 	    if not fsTrove.hasFile(pathId):
 		log.debug("%s has already been removed" % path)
@@ -1177,6 +1181,64 @@ class FilesystemJob:
 
 	return fsTrove
 
+    def _findMovedPaths(self, db, changeSet):
+        # Lookup paths which have swithed troves. These look like a
+        # remove and add of the same path; we build an dict which lets
+        # us treat these events as file updates rather than a remove/add
+        # sequence, allowing us to preserve state.
+
+        pathsMoved = {}
+
+        # start off by building a dict of all of the removed paths
+        removedFiles = {}
+        for oldTroveInfo in changeSet.getOldTroveList():
+            oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
+            fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
+            for (pathId, path, fileId, version) in oldTrove.iterFileList():
+                assert(path not in removedFiles)
+                removedFiles[path] = ((pathId, version), oldTroveInfo)
+
+        for troveCs in changeSet.iterNewTroveList():
+            old = troveCs.getOldVersion()
+            if not old:
+                continue
+
+            oldTroveInfo = (troveCs.getName(), old, troveCs.getOldFlavor())
+            oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
+
+            for pathId in troveCs.getOldFileList():
+                (path, fileId, version) = oldTrove.getFile(pathId)
+                assert(path not in removedFiles)
+                removedFiles[path] = ((pathId, version), oldTroveInfo)
+
+        if not removedFiles:
+            return {}
+
+        # using a single db.getFileVersions() call might be better (or it
+        # might just chew RAM; who knows)
+        for troveCs in changeSet.iterNewTroveList():
+            for (pathId, path, fileId, fileVersion) in \
+                                            troveCs.getNewFileList():
+                if path not in removedFiles:
+                    continue
+
+                ((oldPathId, oldVersion), oldTroveInfo) = removedFiles[path]
+                del removedFiles[path]
+                newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
+                                troveCs.getNewFlavor())
+
+                newStream = changeSet.getFileChange(None, fileId)
+                newFile = files.ThawFile(newStream, pathId)
+
+                oldStream = changeSet
+                oldFile = db.getFileVersion(pathId, fileId, version)
+                diff = changeset.fileChangeSet(pathId, oldFile, newFile)
+
+                pathsMoved[path] = (oldTroveInfo, newTroveInfo,
+                                     pathId, diff)
+
+        return pathsMoved
+
     def __init__(self, db, changeSet, fsTroveDict, root, filePriorityPath,
                  callback = None, flags = MERGE, removeHints = {}):
 	"""
@@ -1218,6 +1280,8 @@ class FilesystemJob:
 	self.db = db
         self.pathRemovedCache = (None, None, None)
 
+        pathsMoved = self._findMovedPaths(db, changeSet)
+
         for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
             self.oldTroves.append((name, oldVersion, oldFlavor))
             oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
@@ -1226,7 +1290,8 @@ class FilesystemJob:
             fileObjs = db.getFileVersions(fileList)
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
-                self._remove(fileObj, root + path, "removing %s")
+                if path not in pathsMoved:
+                    self._remove(fileObj, root + path, "removing %s")
 
         troveList = []
 
@@ -1245,7 +1310,7 @@ class FilesystemJob:
             troveList.append((troveCs, baseTrove, newFsTrove))
 
 	for (troveCs, baseTrove, newFsTrove) in troveList:
-            self._setupRemoves(db, troveCs, changeSet, baseTrove,
+            self._setupRemoves(db, pathsMoved, troveCs, changeSet, baseTrove,
                                newFsTrove, root, flags)
 
 	for i, (troveCs, baseTrove, newFsTrove) in enumerate(troveList):
