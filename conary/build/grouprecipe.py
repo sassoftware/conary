@@ -1763,7 +1763,11 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
     byDefault = group.getByDefault()
     for troveTup in neededTups:
-        group.addTrove(troveTup, True, byDefault, [])
+        if group.hasTrove(*troveTup):
+            explicit = False
+        else:
+            explicit = True
+        group.addTrove(troveTup, explicit, byDefault, [])
 
     cache.cacheTroves(neededTups)
     callback.done()
