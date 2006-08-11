@@ -38,7 +38,7 @@ def _save():
     sys.modules['coverage'].the_coverage.save()
 
 def _install():
-    coverageLoc = os.environ.get('COVERAGE_TOOL', None)
+    coverageLoc = os.environ.get('COVERAGE_PATH', None) + '/coverage.py'
     if not coverageLoc:
         raise RuntimeError, 'cannot find coverage.py!'
 
