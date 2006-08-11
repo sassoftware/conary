@@ -14,6 +14,9 @@ Changes in @NEW@:
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
     * Added the /etc/conary/mirrors/cran file to enable mirror://
       references to the Comprehensive R Archive Network. (CNY-761)
+    * Fix a bug that could result in groups having components at the top
+      level through dep resolution if they were included already but
+      byDefault False.
  
 Changes in 1.0.27:
   o Client Changes:
