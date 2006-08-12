@@ -147,8 +147,7 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
-
-Changes in @NEW@:
+Changes in 1.0.26:
   o Server Changes:
     * The Conary web interface now provides a method to rely solely on
       a remote repository server to do authentication checks. (CNY-705)
