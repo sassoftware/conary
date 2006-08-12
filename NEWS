@@ -7,6 +7,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary now resets the timeStamps in all cases when getSourceVersion is 
       called (CNY-708).
+    * Sqlite ANALYZE locks the database after it is run, causing updates to
+      fail.
     * Commit the repository after an analyze call as sqlite analyze locks
       the database after it is run
     * Lists in configure files (for example, installLabelPath) now allow there 
@@ -21,6 +23,9 @@ Changes in @NEW@:
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
     * Added the /etc/conary/mirrors/cran file to enable mirror://
       references to the Comprehensive R Archive Network. (CNY-761)
+    * Fix a bug that could result in groups having components at the top
+      level through dep resolution if they were included already but
+      byDefault False.
 
 Changes in 1.1.0:
   o 1.1 Release Overview

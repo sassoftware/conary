@@ -822,10 +822,12 @@ def setupTempTables(db):
         cu.execute("""
         CREATE TEMPORARY TABLE
         gfvTable(
-            idx         INTEGER,
+            idx         %(PRIMARYKEY)s,
             fileId      %(BINARY20)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gfvTable"] = True
+        db.createIndex("gfvTable", "gfvTableFileIdIdx", "fileId",
+                       check = False)
 
     db.commit()
 
