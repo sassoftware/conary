@@ -17,6 +17,9 @@ Changes in @NEW@:
     * Fix a bug that could result in groups having components at the top
       level through dep resolution if they were included already but
       byDefault False.
+
+  o Client Changes:
+    * Migrate no longer acts as if --replace-files was specified (CNY-769)
  
 Changes in 1.0.27:
   o Client Changes:

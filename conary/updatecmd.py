@@ -244,9 +244,6 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
     else:
         installMissing = False
 
-    if migrate:
-        replaceFiles = True
-
     fromChangesets = []
     for path in fromFiles:
         cs = changeset.ChangeSetFromFile(path)

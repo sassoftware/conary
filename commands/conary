@@ -870,7 +870,6 @@ class MigrateCommand(UpdateCommand):
         del d['keep-existing']
         del d['sync-to-parents']
         del d['no-recurse']
-        del d['replace-files']
         argDef['Migrate Options'] = d
 _register(MigrateCommand)
 
