@@ -1,26 +1,29 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Conary now resets the timeStamps in all cases when getSourceVersion is 
-      called (CNY-708).
-    * Sqlite ANALYZE locks the database after it is run, causing updates to
-      fail.
-    * Lists in configure files (for example, installLabelPath) now allow there 
-      to be more than one space between items.
-    * Locally changed files weren't marked properly in rollbacks which were
-      stored locally (incluing rollbacks for locally built troves) (CNY-645)
+  o Client Changes:
+    * Migrate no longer replaces by default as if --replace-files was
+      specified. (CNY-769)
 
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
-    * Added the /etc/conary/mirrors/cran file to enable mirror://
+    * /etc/conary/mirrors/cran has been added to enable mirror://
       references to the Comprehensive R Archive Network. (CNY-761)
-    * Fix a bug that could result in groups having components at the top
-      level through dep resolution if they were included already but
-      byDefault False.
 
-  o Client Changes:
-    * Migrate no longer acts as if --replace-files was specified (CNY-769)
- 
+  o Bug Fixes:
+    * Conary now resets the timeStamps in all cases when
+      getSourceVersion is called (CNY-708).
+    * SQLite ANALYZE locks the database after it is run, causing
+      updates to fail.
+    * A bug that caused lists such as installLabelPath in
+      configuration files to be parsed incorrectly when more than one
+      space was between list elements has been fixed
+    * A bug that caused Locally changed files to no be marked properly
+      in rollbacks that were stored locally (including rollbacks for
+      locally built troves) has been fixed. (CNY-645)
+    * A bug that could cause "cvc cook" to create groups that include
+      components needed to resolve dependencies that are already
+      included not-by-default has been fixed.
+
 Changes in 1.0.27:
   o Client Changes:
     * A "files preupdate" tag script method has been Implemented which
