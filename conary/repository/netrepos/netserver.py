@@ -1490,15 +1490,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
-
         schema.resetTable(cu, 'gfvTable')
-        # XXX the only thing we use the pathId for is to set it in the
-        # file object; we should just pass the stream back and let the
-        # client set it to avoid sending it back and forth for no particularly
-        # good reason
+
+        # we need to make sure we don't look up the same fileId multiple
+        # times to avoid asking the sql server to do busy work
+        fileIdMap = {}
         for i, (pathId, fileId) in enumerate(fileList):
+            l = fileIdMap.setdefault(fileId, [])
+            # XXX the only thing we use the pathId for is to set it in
+            # the file object; we should just pass the stream back and
+            # let the client set it to avoid sending it back and forth
+            # for no particularly good reason
+            l.append((i, pathId))
+        fileIdList = fileIdMap.keys()
+        for i, fileId in enumerate(fileIdList):
             cu.execute("INSERT INTO gfvTable (idx, fileId) VALUES (?, ?)",
-                       i, self.toFileId(fileId))
+                       (i,self.toFileId(fileId)))
 
         # None in streams means the stream wasn't found. Insufficient
         # permission to see a stream looks just like a missing stream
@@ -1506,46 +1513,48 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         streams = [ None ] * len(fileList)
 
         q = """
-            SELECT gfvTable.idx,
-                   FileStreams.stream, UP.permittedTrove, Items.item
-            FROM gfvTable
-                JOIN FileStreams USING (fileId)
-                JOIN TroveFiles USING (streamId)
-                JOIN Instances USING (instanceId)
-                JOIN Items USING (itemId)
-                JOIN Nodes ON
-                    Instances.itemId = Nodes.ItemId AND
-                    Instances.versionId = Nodes.versionId
-                JOIN LabelMap ON
-                    Nodes.itemId = LabelMap.itemId AND
-                    Nodes.branchId = LabelMap.branchId
-                JOIN ( SELECT
-                           Permissions.labelId as labelId,
-                           PerItems.item as permittedTrove,
-                           Permissions.permissionId as aclId
-                       FROM
-                           Permissions
-                           JOIN Items as PerItems USING (itemId)
-                       WHERE
-                           Permissions.userGroupId IN (%(ugid)s)
-                    ) as UP
-                        ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                WHERE
-                    FileStreams.stream IS NOT NULL
+        SELECT DISTINCT
+            gfvTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
+        FROM gfvTable
+        JOIN FileStreams USING (fileId)
+        JOIN TroveFiles USING (streamId)
+        JOIN Instances USING (instanceId)
+        JOIN Items USING (itemId)
+        JOIN Nodes ON
+            Instances.itemId = Nodes.ItemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+            Nodes.itemId = LabelMap.itemId AND
+            Nodes.branchId = LabelMap.branchId
+        JOIN ( SELECT
+                   Permissions.labelId as labelId,
+                   PerItems.item as permittedTrove,
+                   Permissions.permissionId as aclId
+               FROM Permissions
+               JOIN Items as PerItems USING (itemId)
+               WHERE Permissions.userGroupId IN (%(ugid)s)
+             ) as UP
+                 ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        WHERE FileStreams.stream IS NOT NULL
         """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
 
         cu.execute(q)
+        self.log(4, "executed query", q)
 
         for (i, stream, troveNamePattern, troveName) in cu:
-            if streams[i]:
-                # we've already found this one
-                continue
-
+            fileId = fileIdList[i]
+            if fileId is None:
+                 # we've already found this one
+                 continue
             if not self.auth.checkTrove(troveNamePattern, troveName):
                 continue
-
-            streams[i] = self.fromFileAsStream(fileList[i][0], stream,
-                                               rawPathId = True)
+            for (streamIdx, pathId) in fileIdMap[fileId]:
+                if streams[streamIdx]:
+                    continue
+                streams[streamIdx] = self.fromFileAsStream(
+                    pathId, stream, rawPathId = True)
+            # mark as processed
+            fileIdList[i] = None
 
         # return an exception if we couldn't find one of the streams
         if None in streams:
