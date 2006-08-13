@@ -3,6 +3,11 @@ Changes in @NEW@:
     * Migrate no longer replaces by default as if --replace-files was
       specified. (CNY-769)
 
+  o Server Changes:
+    * The log retrieval function now returns a HTTP_NOT_IMPLEMENTED
+      (501) instead of a HTTP_NOT_FOUND (404) if the logFile
+      directive is not configured.
+
   o Build Changes:
     * Conary now recognizes that pkgconfig finds its files in
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
