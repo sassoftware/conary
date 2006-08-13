@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.1:
   o Client Changes:
     * Migrate no longer replaces by default as if --replace-files was
       specified. (CNY-769)
