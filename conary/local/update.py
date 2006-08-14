@@ -660,6 +660,37 @@ class FilesystemJob:
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsTrove.removeFile(pathId)
 
+    def _pathMerge(self, pathId, headPath, fsTrove, fsPath, fsVersion,
+                   fsFileId, baseTrove, rootFixup, flags):
+        finalPath = fsPath
+        pathOkay = True
+        # if headPath is none, the name hasn't changed in the repository
+        if headPath and headPath != fsPath:
+            # the paths are different; if one of them matches the one
+            # from the old trove, take the other one as it is the one
+            # which changed
+            if baseTrove.hasFile(pathId):
+                basePath = baseTrove.getFile(pathId)[0]
+            else:
+                basePath = None
+
+            if (not flags & MERGE) or fsPath == basePath :
+                # the path changed in the repository, propagate that change
+                self._rename(rootFixup + fsPath, rootFixup + headPath,
+                             "renaming %s to %s" % (fsPath, headPath))
+
+                # XXX is this correct?  all the other addFiles use
+                # the headFileId, not the fsFileId
+                fsTrove.addFile(pathId, headPath, fsVersion, fsFileId)
+                finalPath = headPath
+            else:
+                pathOkay = False
+                finalPath = fsPath	# let updates work still
+                self.errors.append(
+                    PathConflictError(util.normpath(fsPath), headPath))
+
+        return pathOkay, finalPath
+
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
                      removalHints, filePriorityPath, flags):
 	"""
@@ -692,8 +723,12 @@ class FilesystemJob:
         module variable summary for flags definitions.
 	@type flags: int bitfield
 	"""
+
 	if baseTrove:
 	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
+
+        #XXX
+        pathsMoved = set()
 
         # fully updated tracks whether any errors have occurred; if no
         # errors occur, fsTrove gets updated to the new version of the trove
@@ -708,6 +743,12 @@ class FilesystemJob:
 	else:
 	    noIds = False
             twmSkipList = {  "contents" : True }
+
+        if troveCs.getName().endswith(':source'):
+            cwd = os.getcwd()
+            rootFixup = cwd + "/"
+        else:
+            rootFixup = root
 
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())
@@ -725,11 +766,12 @@ class FilesystemJob:
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
                 continue
 
-	    if headPath[0] == '/':
-                headRealPath = root + headPath
-	    else:
-                cwd = os.getcwd()
-		headRealPath = cwd + "/" + headPath
+            if headPath in pathsMoved:
+                # this file looks new, but it's actually moved over from
+                # another trove. treat it as an update later on.
+                continue
+
+            headRealPath = rootFixup + headPath
 
 	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
 
@@ -861,40 +903,13 @@ class FilesystemJob:
 		continue
 
 	    (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
-	    if fsPath[0] == "/":
-		rootFixup = root
-	    else:
-                cwd = os.getcwd()
-		rootFixup = cwd + "/"
 
-	    pathOkay = True             # do we have a valid, merged path?
 	    contentsOkay = True         # do we have valid contents
 
-	    finalPath = fsPath
-	    # if headPath is none, the name hasn't changed in the repository
-	    if headPath and headPath != fsPath:
-		# the paths are different; if one of them matches the one
-		# from the old trove, take the other one as it is the one
-		# which changed
-		if baseTrove.hasFile(pathId):
-		    basePath = baseTrove.getFile(pathId)[0]
-		else:
-		    basePath = None
-
-		if (not flags & MERGE) or fsPath == basePath :
-		    # the path changed in the repository, propagate that change
-		    self._rename(rootFixup + fsPath, rootFixup + headPath,
-		                 "renaming %s to %s" % (fsPath, headPath))
-
-                    # XXX is this correct?  all the other addFiles use
-                    # the headFileId, not the fsFileId
-		    fsTrove.addFile(pathId, headPath, fsVersion, fsFileId)
-		    finalPath = headPath
-		else:
-		    pathOkay = False
-		    finalPath = fsPath	# let updates work still
-                    self.errors.append(
-                        PathConflictError(util.normpath(fsPath), headPath))
+	    # pathOkay is "do we have a valid, merged path?"
+            pathOkay, finalPath = self._pathMerge(pathId, headPath, fsTrove,
+                                                  fsPath, fsVersion, fsFileId,
+                                                  baseTrove, rootFixup, flags)
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -924,7 +939,7 @@ class FilesystemJob:
                           'and then run the update again by using '
                           '"conary update --replace-files"')
                 raise AssertionError
-                
+
             if headChanges[0] == '\x01':
                 # the file was stored as a diff
                 headFile = baseFile.copy()
@@ -935,17 +950,17 @@ class FilesystemJob:
                 # the file was stored frozen. this happens when the file
                 # type changed between versions
                 headFile = files.ThawFile(headChanges, pathId)
-                
+
             if baseFile.flags.isAutoSource():
                 fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
                 continue
-            
+
             # FIXME we should be able to inspect headChanges directly
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
             # trove for every file which has changed
             fsFile = files.FileFromFilesystem(realPath, pathId)
-            
+
             # link groups come from the database; they aren't inferred from
             # the filesystem
             if fsFile.hasContents and baseFile.hasContents:
@@ -1280,7 +1295,12 @@ class FilesystemJob:
 	self.db = db
         self.pathRemovedCache = (None, None, None)
 
-        pathsMoved = self._findMovedPaths(db, changeSet)
+        if hasattr(self.db, 'iterFindPathReferences'):
+            # this only works for local databases, not networked repositories
+            # (like source updates use)
+            pathsMoved = self._findMovedPaths(db, changeSet)
+        else:
+            pathsMoved = {}
 
         for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
             self.oldTroves.append((name, oldVersion, oldFlavor))
