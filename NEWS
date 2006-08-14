@@ -1,3 +1,6 @@
+  o Bug Fixes:
+    * Conary can now update a file from a non-directory to a directory.
+
 Changes in @NEW@:
   o Bug Fixes:
     * Conary now resets the timeStamps in all cases when getSourceVersion is 
