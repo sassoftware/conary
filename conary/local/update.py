@@ -691,6 +691,30 @@ class FilesystemJob:
 
         return pathOkay, finalPath
 
+    def _mergeFile(self, baseFile, headFileId, headChanges, pathId):
+        if headChanges is None:
+            log.error('File objects stored in your database do '
+                      'not match the same version of those file '
+                      'objects in the repository. The best thing '
+                      'to do is erase the version on your system '
+                      'by using "conary erase --just-db --no-deps" '
+                      'and then run the update again by using '
+                      '"conary update --replace-files"')
+            raise AssertionError
+
+        if headChanges[0] == '\x01':
+            # the file was stored as a diff
+            headFile = baseFile.copy()
+            headFile.twm(headChanges, headFile)
+            # verify that the merge yielded the correct fileId
+            assert(headFile.fileId() == headFileId)
+        else:
+            # the file was stored frozen. this happens when the file
+            # type changed between versions
+            headFile = files.ThawFile(headChanges, pathId)
+
+        return headFile
+
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
                      removalHints, filePriorityPath, flags):
 	"""
@@ -755,6 +779,9 @@ class FilesystemJob:
         removalList = removalHints.get(newTroveInfo, [])
         if removalList is None:
             removalList = []
+
+        import epdb
+        epdb.st('f')
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -930,26 +957,8 @@ class FilesystemJob:
 
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(baseFileId, headFileId)
-            if headChanges is None:
-                log.error('File objects stored in your database do '
-                          'not match the same version of those file '
-                          'objects in the repository. The best thing '
-                          'to do is erase the version on your system '
-                          'by using "conary erase --just-db --no-deps" '
-                          'and then run the update again by using '
-                          '"conary update --replace-files"')
-                raise AssertionError
-
-            if headChanges[0] == '\x01':
-                # the file was stored as a diff
-                headFile = baseFile.copy()
-                headFile.twm(headChanges, headFile)
-                # verify that the merge yielded the correct fileId
-                assert(headFile.fileId() == headFileId)
-            else:
-                # the file was stored frozen. this happens when the file
-                # type changed between versions
-                headFile = files.ThawFile(headChanges, pathId)
+            headFile = self._mergeFile(baseFile, headFileId, headChanges,
+                                       pathId)
 
             if baseFile.flags.isAutoSource():
                 fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
@@ -979,7 +988,6 @@ class FilesystemJob:
 
             # handle file types changing. this is dealt with as a bit
             # of an exception
-            fileTypeError = False
             if baseFile.lsTag != headFile.lsTag:
                 if isinstance(baseFile, files.Directory):
                     # a directory changed to some other type of file
@@ -1009,7 +1017,8 @@ class FilesystemJob:
                     fsFile = headFile
                     forceUpdate = True
                 elif baseFile.lsTag != fsFile.lsTag:
-                    fileTypeError = True
+                    self.errors.append(FileTypeChangedError(finalPath))
+                    continue
             elif baseFile.lsTag != fsFile.lsTag:
                 # the user changed the file type. we could try and
                 # merge things a bit more intelligently then we do
@@ -1019,11 +1028,8 @@ class FilesystemJob:
                     fsFile = headFile
                     forceUpdate = True
                 else:
-                    fileTypeError = True
-
-            if fileTypeError:
-                self.errors.append(FileTypeChangedError(finalPath))
-                continue
+                    self.errors.append(FileTypeChangedError(finalPath))
+                    continue
 
             # if we're forcing an update, we don't need to merge this
             # stuff
