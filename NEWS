@@ -1,3 +1,9 @@
+Changes in @VERSION@:
+  o Bug Fix:
+    * Conary now removes sources from the lookaside before unpacking SRPMs to
+      ensure that the source referenced from the SRPM is actually contained in
+      the SRPM. (CNY-771)
+
 Changes in 1.0.28:
   o Client Changes:
     * Migrate no longer replaces by default as if --replace-files was
