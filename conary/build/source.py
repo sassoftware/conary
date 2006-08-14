@@ -910,6 +910,8 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	directory = os.path.dirname(targetfile)
     cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
     if targetfile:
+        if os.path.exists(targetfile):
+            os.remove(targetfile)
 	filename = os.path.basename(targetfile)
 	cpioArgs.append(filename)
 	errorMessage = 'extracting %s from RPM %s' %(
