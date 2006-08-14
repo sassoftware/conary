@@ -4,6 +4,12 @@ Changes in @VERSION@:
       ensure that the source referenced from the SRPM is actually contained in
       the SRPM. (CNY-771)
 
+  o Build Changes:
+    * Conary no longer prints policy error messages three times; it
+      now prints each error immediately when it is found, and then
+      summarizes all policy errors once (instead of twice) at the
+      end of the build process. (CNY-776)
+
 Changes in 1.0.28:
   o Client Changes:
     * Migrate no longer replaces by default as if --replace-files was
