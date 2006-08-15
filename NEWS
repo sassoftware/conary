@@ -5,6 +5,8 @@ Changes in @VERSION@:
       the SRPM. (CNY-771)
     * Errors found in the recipe while checking in will now display file name
       and line number information along with the error found.
+    * The trove browser no longer shows duplicate entries for multihomed
+      repositories
 
   o Build Changes:
     * Conary no longer prints policy error messages three times; it
