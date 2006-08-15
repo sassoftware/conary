@@ -180,6 +180,8 @@ class ChangeSet(streams.StreamSet):
 	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
 
+        self.hasRemoved |= (csTrove.troveType() == trove.TROVE_TYPE_REMOVED)
+
     def newPackage(self, csTrove):
         import warnings
         warnings.warn("newPackage is deprecated, use newTrove",
@@ -319,7 +321,8 @@ class ChangeSet(streams.StreamSet):
     def writeToFile(self, outFileName, withReferences = False):
 	try:
 	    outFile = open(outFileName, "w+")
-	    csf = filecontainer.FileContainer(outFile)
+	    csf = filecontainer.FileContainer(outFile,
+                                              withRemoves = self.hasRemoved)
 
 	    str = self.freeze()
 	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
@@ -360,7 +363,7 @@ class ChangeSet(streams.StreamSet):
                 oldTrove = trove.Trove(troveCs.getName(), 
                                        troveCs.getOldVersion(),
                                        troveCs.getOldFlavor(), None,
-                                       isRedirect = True)
+                                       type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(newTrove)[0])
                 continue
 
@@ -542,7 +545,7 @@ class ChangeSet(streams.StreamSet):
 	for (name, version, flavor) in self.getOldTroveList():
             if not version.isOnLocalHost() and redirectionRollbacks:
                 oldTrove = trove.Trove(name, version, flavor, None, 
-                                       isRedirect = True)
+                                       type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(None)[0])
                 continue
 
@@ -706,6 +709,7 @@ class ChangeSet(streams.StreamSet):
 	self.fileContents = {}
 	self.absolute = False
 	self.local = 0
+        self.hasRemoved = False
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 

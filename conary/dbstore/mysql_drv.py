@@ -198,6 +198,96 @@ class Database(BaseDatabase):
         self.tables[table].remove(name)
         return True
 
+    # MySQL requires us to redefine a column even if all we need is to
+    # rename it...
+    def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
+        assert(self.dbh)
+        cu = self.dbh.cursor()
+        # first, we need to extract the old column definition
+        cu.execute("SHOW FULL COLUMNS FROM %s LIKE '%s'" % (table, oldName))
+        (oldName, colType, collation, null, key, default, extra, privs, comment) = \
+                  cu.fetchone()
+        # this is a bit tedious, but it has to be done...
+        if collation is not None:
+            collation = "COLLATE %s" % (collation,)
+        else:
+            collation = ''
+        # null or not null?
+        if null == "NO":
+            null = "NOT NULL"
+        else:
+            null = ''
+        if default in [None, '']:
+            default = ''
+        else:
+            try:
+                default = "DEFAULT %s" % (int(default),)
+            except ValueError:
+                default = "DEFAULT %s" % (self.dbh.literal(default),)
+        # sanity check: do other tables link to this column via foreign keys?
+        cu.execute("""
+        SELECT table_name, column_name FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE lower(table_schema) = lower(%s)
+          AND lower(referenced_table_schema) = lower(%s)
+          AND lower(referenced_table_name) = lower(%s)
+          AND lower(referenced_column_name) = lower(%s)
+        """, (self.dbName, self.dbName, table, oldName))
+        ret = cu.fetchall()
+        if len(ret):
+            raise sqlerrors.ConstraintViolation(
+                "Column rename will invalidate FOREIGN KEY constraints",
+                *tuple(ret))
+        # MySQL lameness - we need to check if this column is a FK pointing out
+        cu.execute("""
+        SELECT DISTINCT constraint_name as name, referenced_table_name as tName
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE lower(table_schema) = lower(%s)
+          AND lower(referenced_table_schema) = lower(%s)
+          AND lower(table_name) = lower(%s)
+          AND lower(column_name) = lower(%s)
+        """, (self.dbName, self.dbName, table, oldName))
+        ret = cu.fetchall()
+        # a constraint - if exists - can only point to one table
+        assert(len(ret) in [0,1])
+        hasFK = None
+        if len(ret):
+            # if we have a FK constraint, we need to get all members
+            # of the FKs in case we have somthing like this:
+            # FOREIGN KEY (pid, pname) REFERENCES parent(id, name)
+            (hasFK, fkTable) = ret[0]
+            cu.execute("""
+            SELECT ordinal_position as pos,
+            CASE lower(column_name) WHEN lower(%s) THEN %s ELSE column_name END as name,
+            referenced_column_name as fkName
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE lower(table_schema) = lower(%s)
+              AND lower(referenced_table_schema) = lower(%s)
+              AND lower(table_name) = lower(%s)
+              AND constraint_name = %s
+            ORDER BY ordinal_position
+            """, (oldName, newName, self.dbName, self.dbName, table, hasFK))
+            fkDef = cu.fetchall()
+            # need to drop the foreign key constraint first so we can alter the table
+            cu.execute("ALTER TABLE %s DROP FOREIGN KEY %s" % (table, hasFK))
+
+        # now we can roughly rebuild the definition...
+        sql = "ALTER TABLE %s CHANGE COLUMN %s %s %s %s %s %s %s" %(
+            table, oldName, newName,
+            colType, null, default, extra, collation)
+        cu.execute(sql)
+        # do we need to put back the FK constraint?
+        if hasFK:
+            sql = """ALTER TABLE %s ADD CONSTRAINT %s
+                     FOREIGN KEY (%s) REFERENCES %s(%s)
+                     ON UPDATE CASCADE""" % (
+                table, hasFK, ",".join([x[1] for x in fkDef]),
+                fkTable, ",".join([x[2] for x in fkDef]))
+            cu.execute(sql)
+        return True
+
     def use(self, dbName):
         cu = self.cursor()
         oldDbName = cu.execute("SELECT database()").fetchone()[0]
