@@ -222,9 +222,11 @@ class HttpHandler(WebHandler):
         if not char:
             char = 'A'
             defaultPage = True
-        troves = []
-        for serverName in self.serverNameList:
-            troves += self.repos.troveNamesOnServer(serverName)
+        # since the repository is multihomed and we're not doing any
+        # label filtering, a single call will return all the available
+        # troves. We use the first repository name here because we have to
+        # pick one,,,
+        troves = self.repos.troveNamesOnServer(self.serverNameList[0])
 
         # keep a running total of each letter we see so that the display
         # code can skip letters that have no troves

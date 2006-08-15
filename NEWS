@@ -5,6 +5,8 @@ Changes in 1.0.29:
       the SRPM. (CNY-771)
     * Errors found in the recipe while checking in will now display file name
       and line number information along with the error found.
+    * The trove browser no longer shows duplicate entries for multihomed
+      repositories
     * A bug that kept sqlite-based 64-bit mirrors from being used as a source 
       for further mirrors has been fixed
 
