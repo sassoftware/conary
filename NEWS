@@ -1,8 +1,10 @@
 Changes in @VERSION@:
-  o Bug Fix:
+  o Bug Fixes:
     * Conary now removes sources from the lookaside before unpacking SRPMs to
       ensure that the source referenced from the SRPM is actually contained in
       the SRPM. (CNY-771)
+    * Errors found in the recipe while checking in will now display file name
+      and line number information along with the error found.
 
   o Build Changes:
     * Conary no longer prints policy error messages three times; it

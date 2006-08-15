@@ -38,6 +38,7 @@ from conary.build import errors as builderrors
 from conary.build.macros import Macros
 from conary.build.packagerecipe import loadMacros
 from conary.build.cook import signAbsoluteChangeset
+from conary.build import cook
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
 from conary.lib import log
@@ -273,10 +274,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         log.setVerbosity(log.INFO)
         if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
             if hasattr(recipeObj, 'setup'):
-                try:
-                    recipeObj.setup()
-                except Exception, err:
-                    raise errors.CvcError('Error calling setup: %s' % err)
+                cook._callSetup(cfg, recipeObj)
             else:
                 log.error('you need a setup method for your recipe')
 
