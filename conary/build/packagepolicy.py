@@ -2723,6 +2723,4 @@ class reportErrors(policy.Policy):
 
     def do(self):
 	if self.warnings:
-	    for warning in self.warnings:
-		log.error(warning)
 	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)

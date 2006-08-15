@@ -743,7 +743,7 @@ class Source(_Source):
         C{%(cflags)s} to be replaced with the current setting of
         C{recipe.macros.cflags}. Defaults to False.
     @keyword mode: If set, provides the mode to set on the file.
-        use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
+    @keyword use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
         values which determine whether the source code archive is actually
         unpacked, or merely stored in the archive.
     @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
@@ -910,6 +910,8 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	directory = os.path.dirname(targetfile)
     cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
     if targetfile:
+        if os.path.exists(targetfile):
+            os.remove(targetfile)
 	filename = os.path.basename(targetfile)
 	cpioArgs.append(filename)
 	errorMessage = 'extracting %s from RPM %s' %(
