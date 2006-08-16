@@ -755,7 +755,7 @@ class FilesystemJob:
         pathsMoved = set()
 
         # fully updated tracks whether any errors have occurred; if no
-        # errors occur, fsTrove gets updated to the new version of the trove
+        # errors occur, the version for fsTrove gets set to the head version
         # this doesn't matter for binary stuff, just source management
 	fullyUpdated = True
         replaceFiles = (flags & REPLACEFILES) != 0
@@ -1228,6 +1228,7 @@ class FilesystemJob:
             oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
 
             for pathId in troveCs.getOldFileList():
+                if not oldTrove.hasFile(pathId): continue
                 (path, fileId, version) = oldTrove.getFile(pathId)
                 assert(path not in removedFiles)
                 removedFiles[path] = ((pathId, version), oldTroveInfo)
