@@ -341,8 +341,6 @@ def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
             d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor)
             _merge(resultsDict, d)
 
-        import epdb
-        epdb.st('f')
         # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,
         # and FLAVOR_FILTER_AVAIL
         leavesFilter = {}
