@@ -5,6 +5,11 @@ Changes in @NEW@:
     * cvc cook now displays the correct label of the thing its building,
       even when it is not the build label.
 
+  o Client Changes:
+    * --debug should now provide information that is useful to the end-user
+      on update, and --debug --debug will provide output that is useful
+      to conary developers.
+
 Changes in 1.0.29:
   o Bug Fixes:
     * Conary now removes sources from the lookaside before unpacking SRPMs to
