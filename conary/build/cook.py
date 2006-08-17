@@ -254,7 +254,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         raise builderrors.RecipeFileError(
             "Version string %s has illegal '-' character" %recipeClass.version)
 
-    log.info("Building %s=%s", recipeClass.name, cfg.buildLabel)
+    log.info("Building %s=%s", recipeClass.name, sourceVersion.branch().label())
     if not use.Arch.keys():
 	log.error('No architectures have been defined in %s -- '
 		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
