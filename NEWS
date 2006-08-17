@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Conary rq <with no arguments> no longer hides troves if the flavor that
+      matches the system flavor is not built for the latest version (CNY-784).
+    * cvc cook now displays the correct label of the thing its building,
+      even when it is not the build label.
+
 Changes in 1.0.29:
   o Bug Fixes:
     * Conary now removes sources from the lookaside before unpacking SRPMs to

@@ -277,7 +277,8 @@ def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
                                    getLeaves = getLeaves)
 
         # do post processing on the result if necessary
-        if (flavorFilter == FLAVOR_FILTER_ALL or versionFilter == VERSION_FILTER_LATEST):
+        if (flavorFilter == FLAVOR_FILTER_ALL 
+            or versionFilter == VERSION_FILTER_LATEST):
             for (n,vS,fS), tups in results.iteritems():
                 if not tups:
                     continue
@@ -340,6 +341,8 @@ def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
             d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor)
             _merge(resultsDict, d)
 
+        import epdb
+        epdb.st('f')
         # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,
         # and FLAVOR_FILTER_AVAIL
         leavesFilter = {}
@@ -350,53 +353,55 @@ def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
             else:
                 localFlavors = []
 
-            if versionFilter == VERSION_FILTER_LATEST:
-                versionsByBranch = {}
-                for version in versionDict:
-                    versionsByBranch.setdefault(version.branch(),
-                                                []).append(version)
-
-                maxVersions = [ max(x) for x in versionsByBranch.itervalues() ]
-                versionDict = dict((x, versionDict[x]) for x in maxVersions)
-
+            versionsByBranch = {}
             for version, flavorList in versionDict.iteritems():
-                if flavorFilter == FLAVOR_FILTER_BEST:
-                    best = None
-                    for systemFlavor in defaultFlavor:
-                        mathing = []
-                        matchScores = []
-                        if localFlavors:
-                            matchFlavors = [ deps.overrideFlavor(systemFlavor, x) for x in localFlavors]
-                        else:
-                            matchFlavors = [systemFlavor]
+                versionsByBranch.setdefault(version.branch(),
+                                            []).append((version, flavorList))
 
-                        for f in flavorList:
-                            scores = ( (x.score(f), f) for x in matchFlavors)
-                            scores = [ x for x in scores if x[0] is not False]
-                            if scores:
-                                matchScores.append(max(scores))
-                        if matchScores:
-                            best = max(matchScores)[1]
-                            break
-                    if best is not None:
-                        flavorList = [best]
-                    else:
-                        continue
-                elif flavorFilter == FLAVOR_FILTER_AVAIL:
-                    if localFlavors:
-                        matchFlavors = []
+
+            for versionDict in versionsByBranch.itervalues():
+                for version, flavorList in sorted(versionDict, reverse=True):
+                    if flavorFilter == FLAVOR_FILTER_BEST:
+                        best = None
                         for systemFlavor in defaultFlavor:
-                            matchFlavors.extend(deps.overrideFlavor(systemFlavor, x) for x in localFlavors)
-                    else:
-                        matchFlavors = defaultFlavor
-                for flavor in flavorList:
-                    if flavorFilter == FLAVOR_FILTER_AVAIL:
-                        found = False
-                        for matchFlavor in matchFlavors:
-                            if matchFlavor.satisfies(flavor):
-                                found = True
+                            mathing = []
+                            matchScores = []
+                            if localFlavors:
+                                matchFlavors = [ deps.overrideFlavor(systemFlavor, x) for x in localFlavors]
+                            else:
+                                matchFlavors = [systemFlavor]
+
+                            for f in flavorList:
+                                scores = ( (x.score(f), f) for x in matchFlavors)
+                                scores = [ x for x in scores if x[0] is not False]
+                                if scores:
+                                    matchScores.append(max(scores))
+                            if matchScores:
+                                best = max(matchScores)[1]
                                 break
-                        if not found:
+                        if best is not None:
+                            flavorList = [best]
+                        else:
                             continue
-                    troveTups.append((name, version, flavor))
+                    elif flavorFilter == FLAVOR_FILTER_AVAIL:
+                        if localFlavors:
+                            matchFlavors = []
+                            for systemFlavor in defaultFlavor:
+                                matchFlavors.extend(deps.overrideFlavor(systemFlavor, x) for x in localFlavors)
+                        else:
+                            matchFlavors = defaultFlavor
+                    added = False
+                    for flavor in flavorList:
+                        if flavorFilter == FLAVOR_FILTER_AVAIL:
+                            found = False
+                            for matchFlavor in matchFlavors:
+                                if matchFlavor.satisfies(flavor):
+                                    found = True
+                                    break
+                            if not found:
+                                continue
+                        troveTups.append((name, version, flavor))
+                        added = True
+                    if added and versionFilter == VERSION_FILTER_LATEST:
+                        continue
     return sorted(troveTups)
