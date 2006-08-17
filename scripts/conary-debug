@@ -30,10 +30,10 @@ if [ ! -d "$tmpDir" ]; then
 	conary --version >> $tmpDir/submit.script 2>&1
 	echo "Conary command that causes the problem:" >> $tmpDir/submit.script 2>&1
 	echo "$1" >> $tmpDir/submit.script 2>&1
-	echo "(run in this case with --debug)" >> $tmpDir/submit.script 2>&1
+	echo "(run in this case with --debug --debug)" >> $tmpDir/submit.script 2>&1
 
-	$1 --debug >> $tmpDir/submit.script 2>&1
-	conary q --full-versions --flavors --debug --components &> $tmpDir/conary.q
+	$1 --debug --debug >> $tmpDir/submit.script 2>&1
+	conary q --full-versions --flavors --debug  --debug --components &> $tmpDir/conary.q
 	conary config --debug > $tmpDir/conary.config  2>&1
 	tar jcvf $tmpDir/submit.tar.bz2 /var/log/conary $tmpDir/submit.script $tmpDir/conary.config $tmpDir/conary.q > /dev/null 2>&1
 	echo "Please submit $tmpDir/submit.tar.bz2 to the rPath support team"
