@@ -1138,21 +1138,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFileContents(self, authToken, clientVersion, fileList):
         self.log(2, "fileList", fileList)
 
-        # We use getFileStreams here instead of lower-level calls because
-        # it handles permission checks for us. We don't have pathIds here,
-        # so we have to just make one up.
-        pathId = self.fromPathId("0" * 16)
-        try:
-            streams = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
-                                           [ (pathId, x[0]) for x in fileList ])
-        except errors.FileStreamMissing, e:
-            # we're supposed to return an exception which includes the
-            # fileVersion.
-            fileId = self.fromFileId(e.fileId)
-            l = [ x for x in fileList if x[0] == fileId ]
-            raise errors.FileStreamNotFound((self.toFileId(l[0][0]),
-                                             self.toVersion(l[0][1])))
-
+        # We use _getFileStreams here for the permission checks.
+        fileIdGen = (self.toFileId(x[0]) for x in fileList)
+        rawStreams = self._getFileStreams(authToken, fileIdGen)
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
@@ -1160,18 +1148,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sizeList = []
             exception = None
 
-            for encStream, (encFileId, encVersion) in \
-                                itertools.izip(streams, fileList):
-                pathId, stream = self.toFileAsStream(encStream,
-                                                     rawPathId = True)
-
-                if not files.frozenFileHasContents(stream):
+            for stream, (encFileId, encVersion) in \
+                                itertools.izip(rawStreams, fileList):
+                if stream is None:
+                    # return an exception if we couldn't find one of
+                    # the streams
+                    exception = errors.FileStreamNotFound
+                elif not files.frozenFileHasContents(stream):
                     exception = errors.FileHasNoContents
                 else:
                     contents = files.frozenFileContentInfo(stream)
                     filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(contents.sha1()))
-
                     try:
                         size = os.stat(filePath).st_size
                         sizeList.append(size)
@@ -1182,9 +1170,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         exception = errors.FileContentsNotFound
 
                 if exception:
-                    l = [ x for x in fileList if x[0] == encFileId ]
-                    raise exception((self.toFileId(l[0][0]),
-                                     self.toVersion(l[0][1])))
+                    raise exception((self.toFileId(encFileId),
+                                     self.toVersion(encVersion)))
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
@@ -1482,40 +1469,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return True
 
-    def getFileVersions(self, authToken, clientVersion, fileList):
-        self.log(2, fileList)
-
+    # retrieve the raw streams for a fileId list passed in as a generator
+    def _getFileStreams(self, authToken, fileIdGen):
+        self.log(3)
         cu = self.db.cursor()
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
-        schema.resetTable(cu, 'gfvTable')
+        schema.resetTable(cu, 'gfsTable')
 
         # we need to make sure we don't look up the same fileId multiple
         # times to avoid asking the sql server to do busy work
         fileIdMap = {}
-        for i, (pathId, fileId) in enumerate(fileList):
-            l = fileIdMap.setdefault(fileId, [])
-            # XXX the only thing we use the pathId for is to set it in
-            # the file object; we should just pass the stream back and
-            # let the client set it to avoid sending it back and forth
-            # for no particularly good reason
-            l.append((i, pathId))
-        fileIdList = fileIdMap.keys()
-        for i, fileId in enumerate(fileIdList):
-            cu.execute("INSERT INTO gfvTable (idx, fileId) VALUES (?, ?)",
-                       (i,self.toFileId(fileId)))
+        for i, fileId in enumerate(fileIdGen):
+            fileIdMap.setdefault(fileId, []).append(i)
+        uniqIdList = fileIdMap.keys()
 
-        # None in streams means the stream wasn't found. Insufficient
-        # permission to see a stream looks just like a missing stream
-        # (as missing items do in most of Conary)
-        streams = [ None ] * len(fileList)
+        # now i+1 is how many items we shall return
+        # None in streams means the stream wasn't found.
+        streams = [ None ] * (i+1)
+
+        # use the list of uniquified fileIds to look up streams in the repo
+        for i, fileId in enumerate(uniqIdList):
+            cu.execute("INSERT INTO gfsTable (idx, fileId) VALUES (?, ?)",
+                       (i, cu.binary(fileId)))
 
         q = """
         SELECT DISTINCT
-            gfvTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
-        FROM gfvTable
+            gfsTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
+        FROM gfsTable
         JOIN FileStreams USING (fileId)
         JOIN TroveFiles USING (streamId)
         JOIN Instances USING (instanceId)
@@ -1537,30 +1520,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
         WHERE FileStreams.stream IS NOT NULL
         """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
-
         cu.execute(q)
-        self.log(4, "executed query", q)
 
         for (i, stream, troveNamePattern, troveName) in cu:
-            fileId = fileIdList[i]
+            fileId = uniqIdList[i]
             if fileId is None:
                  # we've already found this one
                  continue
             if not self.auth.checkTrove(troveNamePattern, troveName):
+                # Insufficient permission to see a stream looks just
+                # like a missing stream (as missing items do in most
+                # of Conary)
                 continue
-            for (streamIdx, pathId) in fileIdMap[fileId]:
-                if streams[streamIdx]:
-                    continue
-                streams[streamIdx] = self.fromFileAsStream(
-                    pathId, stream, rawPathId = True)
+            if stream is None:
+                continue
+            for streamIdx in fileIdMap[fileId]:
+                streams[streamIdx] = stream
             # mark as processed
-            fileIdList[i] = None
+            uniqIdList[i] = None
+        # FIXME: the fact that we're not extracting the list ordered
+        # makes it very hard to return an iterator out of this
+        # function - for now, returning a list will do...
+        return streams
 
+    def getFileVersions(self, authToken, clientVersion, fileList):
+        self.log(2, "fileList", fileList)
+
+        # build the list of fileIds for query
+        fileIdGen = (self.toFileId(fileId) for (pathId, fileId) in fileList)
+
+        # we rely on _getFileStreams to do the auth for us
+        rawStreams = self._getFileStreams(authToken, fileIdGen)
         # return an exception if we couldn't find one of the streams
-        if None in streams:
+        if None in rawStreams:
             fileId = self.toFileId(fileList[streams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
+        streams = [ None ] * len(fileList)
+        for i,  (stream, (pathId, fileId)) in enumerate(itertools.izip(rawStreams, fileList)):
+            # XXX the only thing we use the pathId for is to set it in
+            # the file object; we should just pass the stream back and
+            # let the client set it to avoid sending it back and forth
+            # for no particularly good reason
+            streams[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
         return streams
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
