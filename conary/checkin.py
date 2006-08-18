@@ -871,7 +871,10 @@ def updateSrc(repos, versionStr = None, callback = None):
     state = conaryState.getSourceState()
     pkgName = state.getName()
     baseVersion = state.getVersion()
-    
+    if baseVersion == versions.NewVersion():
+        log.error("cannot update source directory for package '%s' - it was created with newpkg and has never been checked in." % pkgName)
+        return
+
     if not versionStr:
 	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
 	head = repos.getTrove(pkgName, headVersion, deps.deps.Flavor())

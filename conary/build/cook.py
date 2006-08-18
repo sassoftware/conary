@@ -254,7 +254,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         raise builderrors.RecipeFileError(
             "Version string %s has illegal '-' character" %recipeClass.version)
 
-    log.info("Building %s=%s", recipeClass.name, cfg.buildLabel)
+    log.info("Building %s=%s", recipeClass.name, sourceVersion.branch().label())
     if not use.Arch.keys():
 	log.error('No architectures have been defined in %s -- '
 		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
@@ -1001,7 +1001,7 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
             subsequent_indent='        ',
         )
         for troveTup in sorted(policyTroves):
-            write(wrap.fill('%s = %s [%s]' %troveTup) + '\n')
+            write(wrap.fill("'%s=%s[%s]'" %troveTup) + '\n')
 
     write('*' * 60 + '\n')
     write("Environment:\n")

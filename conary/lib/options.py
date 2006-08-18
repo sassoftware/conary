@@ -27,7 +27,8 @@ import sys
  ONE_PARAM,  # arg may occur once, req'd parameter
  OPT_PARAM,  # arg may occur once, optional parameter
  MULT_PARAM, # arg may occur N times, w/ parameter
- ) = range(0,4)
+ COUNT_PARAM, # arg may occur N times, value is the count
+ ) = range(0,5)
 
 class OptionError(Exception):
     val = 1
@@ -60,15 +61,23 @@ class OptionParser(optparse.OptionParser):
             return optparse.OptionParser._process_short_opts(self, rargs,
                                                              values)
 
+    def _process_long_opt(self, rargs, values):
+        if '=' in rargs[0]:
+            had_explicit_value = True
+        else:
+            had_explicit_value = False
+        opt = self._match_long_opt(rargs[0].split('=')[0])
+        option = self._long_opt[opt]
+        option.had_explicit_value = had_explicit_value
+        return optparse.OptionParser._process_long_opt(self, rargs, values)
+
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
     value = True
-    if parser.rargs:
-        potentialParam = parser.rargs[0]
-        if not potentialParam:
-            del parser.rargs[0]
-        elif potentialParam[0] != '-':
-            value = potentialParam 
-            del parser.rargs[0]
+    if option.had_explicit_value:
+        newValue = parser.rargs[0]
+        del parser.rargs[0]
+        if newValue: # handle --opt= - treat like --opt
+            value = newValue
     setattr(parser.values, option.dest, value)
 
 def addOptions(parser, argDef, skip=None):
@@ -111,6 +120,11 @@ def addOptions(parser, argDef, skip=None):
         elif paramType == MULT_PARAM:
             parser.add_option(action='append', dest=name, help=help, 
                               metavar=meta, *flagNames)
+        elif paramType == COUNT_PARAM:
+            parser.add_option(action='count',
+                              dest=name, help=help, metavar=meta,
+                              *flagNames)
+
 
 def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     """Mostly backwards-compatible (with earlier conary processArgs)
@@ -150,7 +164,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         d = params[defaultGroup]
     else:
         d = params
-    d['debug'] = NO_PARAM, 'Print debugging information'
+    d['debug'] = OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
     d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
     for (arg, name) in cfgMap.items():
@@ -183,8 +197,11 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                                             debugCtrlC=True)
 
     if 'debug' in argSet:
+        if argSet['debug'] is True:
+            log.setVerbosity(log.DEBUG)
+        else:
+            log.setVerbosity(log.LOWLEVEL)
 	del argSet['debug']
-	log.setVerbosity(log.LOWLEVEL)
     else:
 	log.setVerbosity(log.WARNING)
 
