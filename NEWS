@@ -8,7 +8,11 @@ Changes in @NEW@:
   o Client Changes:
     * --debug should now provide information that is useful to the end-user
       on update, and --debug=all will provide output that is useful
-      to conary developers.
+      to conary developers.  This change also results in a slight change 
+      to one of the cvc parameters, --resume.
+      To specify that you wish to resume at a particular location, you
+      must use --resume=<loc>, --resume <loc> will not work anymore.  This
+      removes an ambiguity in how we parse optional parameters with conary.
 
 Changes in 1.0.29:
   o Bug Fixes:

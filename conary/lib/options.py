@@ -74,8 +74,10 @@ class OptionParser(optparse.OptionParser):
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
     value = True
     if option.had_explicit_value:
-        value = parser.rargs[0]
+        newValue = parser.rargs[0]
         del parser.rargs[0]
+        if newValue: # handle --opt= - treat like --opt
+            value = True
     setattr(parser.values, option.dest, value)
 
 def addOptions(parser, argDef, skip=None):
