@@ -61,15 +61,21 @@ class OptionParser(optparse.OptionParser):
             return optparse.OptionParser._process_short_opts(self, rargs,
                                                              values)
 
+    def _process_long_opt(self, rargs, values):
+        if '=' in rargs[0]:
+            had_explicit_value = True
+        else:
+            had_explicit_value = False
+        opt = self._match_long_opt(rargs[0].split('=')[0])
+        option = self._long_opt[opt]
+        option.had_explicit_value = had_explicit_value
+        return optparse.OptionParser._process_long_opt(self, rargs, values)
+
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
     value = True
-    if parser.rargs:
-        potentialParam = parser.rargs[0]
-        if not potentialParam:
-            del parser.rargs[0]
-        elif potentialParam[0] != '-':
-            value = potentialParam 
-            del parser.rargs[0]
+    if option.had_explicit_value:
+        value = parser.rargs[0]
+        del parser.rargs[0]
     setattr(parser.values, option.dest, value)
 
 def addOptions(parser, argDef, skip=None):
@@ -156,7 +162,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         d = params[defaultGroup]
     else:
         d = params
-    d['debug'] = COUNT_PARAM, 'Print helpful debugging output (use multiple times for internal debug info)'
+    d['debug'] = OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
     d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
     for (arg, name) in cfgMap.items():
@@ -189,7 +195,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                                             debugCtrlC=True)
 
     if 'debug' in argSet:
-        if argSet['debug'] == 1:
+        if argSet['debug'] is True:
             log.setVerbosity(log.DEBUG)
         else:
             log.setVerbosity(log.LOWLEVEL)
