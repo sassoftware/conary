@@ -467,7 +467,7 @@ class HttpHandler(WebHandler):
 
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "")
-    @intFields(writeperm = None, capped = None, admin = None)
+    @intFields(writeperm = None, capped = None, admin = None, remove = None)
     def editPermForm(self, auth, group, label, trove, writeperm, capped, admin,
                      remove):
         groups = self.repServer.auth.getGroupList()
