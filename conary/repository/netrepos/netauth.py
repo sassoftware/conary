@@ -283,7 +283,7 @@ class NetworkAuthorization:
                     UserGroups JOIN Permissions USING (userGroupId)
                     WHERE
                         userGroupId IN (%s) AND
-                        (canMirror =1 OR admin = 1)
+                        (canMirror = 1 OR admin = 1)
                 """ % ",".join("%d" % x for x in groupIds))
             if not cu.fetchall():
                 return False
@@ -337,20 +337,10 @@ class NetworkAuthorization:
         self.log(3, userGroup, trovePattern, label, write, admin)
         cu = self.db.cursor()
 
-        if write:
-            write = 1
-        else:
-            write = 0
-
-        if capped:
-            capped = 1
-        else:
-            capped = 0
-
-        if admin:
-            admin = 1
-        else:
-            admin = 0
+        # these need to show up as 0/1 regardless of what we pass in
+        write = int(bool(write))
+        capped = int(bool(capped))
+        admin = int(bool(admin))
 
         # XXX This functionality is available in the TroveStore class
         #     refactor so that the code is not in two places
@@ -398,28 +388,17 @@ class NetworkAuthorization:
 
         userGroupId = self._getGroupIdByName(userGroup)
 
-        if write:
-            write = 1
-        else:
-            write = 0
-
-        if capped:
-            capped = 1
-        else:
-            capped = 0
-
-        if admin:
-            admin = 1
-        else:
-            admin = 0
-
+        # these need to show up as 0/1 regardless of what we pass in
+        write = int(bool(write))
+        capped = int(bool(capped))
+        admin = int(bool(admin))
         try:
             cu.execute("""
             UPDATE Permissions
             SET labelId = ?, itemId = ?, canWrite = ?, capped = ?, admin = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capped, admin,
-                       userGroupId, oldLabelId, oldTroveId)
+                       (labelId, troveId, write, capped, admin,
+                       userGroupId, oldLabelId, oldTroveId))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -474,7 +453,7 @@ class NetworkAuthorization:
         self.log(3, userGroup, canMirror)
         cu = self.db.transaction()
         cu.execute("update userGroups set canMirror=? where userGroup=?",
-                   canMirror, userGroup)
+                   (int(bool(canMirror)), userGroup))
         self.db.commit()
 
     def addUserByMD5(self, user, salt, password):

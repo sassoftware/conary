@@ -12,6 +12,7 @@
 # full details.
 #
 
+import re
 import pgdb
 
 from base_drv import BaseDatabase, BindlessCursor, BaseBinary
@@ -51,6 +52,10 @@ class Cursor(BindlessCursor):
             msg = e.args[0]
             if msg.find("violates foreign key constraint") > 0:
                 raise sqlerrors.ConstraintViolation(msg)
+            if re.search('relation \S+ does not exist', msg, re.I):
+                raise sqlerrors.InvalidTable(msg)
+            if msg.find("duplicate key violates unique constraint") > 0:
+                raise sqlerrors.ColumnNotUnique(msg)
             raise sqlerrors.CursorError(msg, e)
         return self
 
@@ -188,3 +193,11 @@ class Database(BaseDatabase):
         """ % (triggerName, onAction, table, funcName))
         self.triggers[triggerName] = table
         return True
+
+    # avoid leaving around invalid transations when schema is not initialized
+    def getVersion(self):
+        ret = BaseDatabase.getVersion(self)
+        if ret == 0:
+            # need to rollback the last transaction
+            self.dbh.rollback()
+        return ret
