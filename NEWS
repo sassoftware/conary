@@ -4,6 +4,8 @@ Changes in @NEW@:
       matches the system flavor is not built for the latest version (CNY-784).
     * cvc cook now displays the correct label of the thing its building,
       even when it is not the build label.
+    * calling cvc update on a new package will fail with an appropriate 
+      error message instead of tracebacking (CNY-715).
 
   o Client Changes:
     * --debug should now provide information that is useful to the end-user
