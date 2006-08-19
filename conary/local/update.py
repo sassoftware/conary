@@ -660,8 +660,8 @@ class FilesystemJob:
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsTrove.removeFile(pathId)
 
-    def _pathMerge(self, pathId, headPath, fsTrove, fsPath, fsVersion,
-                   fsFileId, baseTrove, rootFixup, flags):
+    def _pathMerge(self, pathId, headPath, fsTrove, fsPath, baseTrove, 
+                   rootFixup, flags):
         finalPath = fsPath
         pathOkay = True
         # if headPath is none, the name hasn't changed in the repository
@@ -679,9 +679,6 @@ class FilesystemJob:
                 self._rename(rootFixup + fsPath, rootFixup + headPath,
                              "renaming %s to %s" % (fsPath, headPath))
 
-                # XXX is this correct?  all the other addFiles use
-                # the headFileId, not the fsFileId
-                fsTrove.addFile(pathId, headPath, fsVersion, fsFileId)
                 finalPath = headPath
             else:
                 pathOkay = False
@@ -716,7 +713,7 @@ class FilesystemJob:
         return headFile
 
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
-                     removalHints, filePriorityPath, flags):
+                     removalHints, filePriorityPath, pathsMoved, flags):
 	"""
 	Build up the todo list for applying a single trove to the
 	filesystem. 
@@ -743,6 +740,9 @@ class FilesystemJob:
         @param filePriorityPath: list of labels; labels earlier in the list
         get automatic priority over those later in the list
         @type filePriorityPath: conarycfg.CfgLabelList
+        @param pathsMoved: dict of paths which moved into this trove from
+        another trove in the same job
+        @type pathsMoved: dict
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
@@ -750,9 +750,6 @@ class FilesystemJob:
 
 	if baseTrove:
 	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
-
-        #XXX
-        pathsMoved = set()
 
         # fully updated tracks whether any errors have occurred; if no
         # errors occur, the version for fsTrove gets set to the head version
@@ -771,6 +768,7 @@ class FilesystemJob:
         if troveCs.getName().endswith(':source'):
             cwd = os.getcwd()
             rootFixup = cwd + "/"
+            assert(not pathsMoved)
         else:
             rootFixup = root
 
@@ -779,9 +777,6 @@ class FilesystemJob:
         removalList = removalHints.get(newTroveInfo, [])
         if removalList is None:
             removalList = []
-
-        import epdb
-        epdb.st('f')
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -914,29 +909,54 @@ class FilesystemJob:
                                         for x in troveCs.getChangedFileList() ]
         baseFileList = repos.getFileVersions(baseFileList)
 
+        # We need to iterate over two types of changed files. The normal
+        # case is files which have changed from the old version of this
+        # trove to the new one. The second type if a file which has moved
+        # from one trove to this new one. The pathsMoved dict contains
+        # the diff for the later type, while we need to get that from
+        # the change set in the normal case.
+        changedHere = itertools.izip(troveCs.getChangedFileList(),
+                                     baseFileList, itertools.repeat(None))
+        changedOther = [ x[1:] for x in pathsMoved.itervalues()
+                                if x[0] == newTroveInfo ]
+
+        if troveCs.getName() == 'foo:config':
+            import epdb
+            epdb.st('f')
+
+
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
-	for (pathId, headPath, headFileId, headFileVersion), baseFile \
-                in itertools.izip(troveCs.getChangedFileList(), baseFileList):
+        for (pathId, headPath, headFileId, headFileVersion),        \
+            baseFile, headChanges in itertools.chain(changedHere, changedOther):
             # NOTE: there used to be an assert(not(pathId in removalList))
             # here.  But it's possible for this pathId to be set up 
             # for removal in the local changeset and considered only "changed"
             # from the repository's point of view.
 
-	    if not fsTrove.hasFile(pathId):
+	    if not headChanges and not fsTrove.hasFile(pathId):
 		# the file was removed from the local system; we're not
 		# putting it back
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
 		continue
 
-	    (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
+            if headChanges:
+                fsPath = headPath
+                fsFileId = headFileId
+                fsVersion = headFileVersion
+            else:
+                (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
 
 	    contentsOkay = True         # do we have valid contents
 
 	    # pathOkay is "do we have a valid, merged path?"
             pathOkay, finalPath = self._pathMerge(pathId, headPath, fsTrove,
-                                                  fsPath, fsVersion, fsFileId,
-                                                  baseTrove, rootFixup, flags)
+                                                  fsPath, baseTrove,
+                                                  rootFixup, flags)
+
+            # XXX is this correct?  all the other addFiles use
+            # the headFileId, not the fsFileId
+            fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -1207,7 +1227,6 @@ class FilesystemJob:
         # remove and add of the same path; we build an dict which lets
         # us treat these events as file updates rather than a remove/add
         # sequence, allowing us to preserve state.
-
         pathsMoved = {}
 
         # start off by building a dict of all of the removed paths
@@ -1252,12 +1271,12 @@ class FilesystemJob:
                 newStream = changeSet.getFileChange(None, fileId)
                 newFile = files.ThawFile(newStream, pathId)
 
-                oldStream = changeSet
                 oldFile = db.getFileVersion(pathId, fileId, version)
-                diff = changeset.fileChangeSet(pathId, oldFile, newFile)
+                diff, hash = changeset.fileChangeSet(pathId, oldFile, newFile)
 
-                pathsMoved[path] = (oldTroveInfo, newTroveInfo,
-                                     pathId, diff)
+                pathsMoved[path] = ( newTroveInfo,
+                                     (pathId, path, fileId, fileVersion),
+                                     oldFile, diff )
 
         return pathsMoved
 
@@ -1350,7 +1369,8 @@ class FilesystemJob:
 					 baseTrove.getFlavor()))
 
             self._singleTrove(db, troveCs, changeSet, baseTrove, newFsTrove, 
-                              root, removeHints, filePriorityPath, flags)
+                              root, removeHints, filePriorityPath,
+                              pathsMoved, flags)
 
             newFsTrove.mergeTroveListChanges(
                 troveCs.iterChangedTroves(strongRefs = True, weakRefs = False),
