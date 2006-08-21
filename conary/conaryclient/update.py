@@ -20,7 +20,7 @@ from conary import conarycfg
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import resolve
 from conary.deps import deps
-from conary.errors import ClientError, InternalConaryError
+from conary.errors import ClientError, InternalConaryError, RemovedTrovesError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
@@ -1121,27 +1121,15 @@ followLocalChanges: %s
                 erasePrimaries.add((job[0], job[1], (None, None), False))
             alreadyInstalled.discard((job[0], job[1][0], job[1][1]))
 
+        # items which were updated to redirects should be removed, no matter
+        # what
+        for info in set(itertools.chain(*redirectHack.values())):
+            erasePrimaries.add((info[0], (info[1], info[2]), (None, None), False))
+
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse, ineligible)
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
-
-        # items which were updated to redirects should be removed, no matter
-        # what - IF there's no job removing them now, we need to add it now.
-        redirects = {}
-        for info in set(itertools.chain(*redirectHack.values())):
-            redirects.setdefault(info[0], []).append(info)
-
-        for job in newJob:
-            if job[0] in redirects:
-                redirectList = redirects[job[0]]
-                info = (job[0], job[1][0], job[1][1])
-                if info in redirectList:
-                    redirectList.remove(info)
-        for troveList in redirects.itervalues():
-            for info in set(troveList):
-                newJob.add((info[0], (info[1], info[2]), (None, None), False))
-
         return newJob
 
     def _splitPinnedJob(self, uJob, troveSource, job, force=False):
@@ -1531,6 +1519,22 @@ conary erase '%s=%s[%s]'
 
         if not newJob:
             raise NoNewTrovesError
+
+        removedTroves = list()
+        ts = uJob.getTroveSource()
+        for job in newJob:
+            if job[2][0] is None:
+                continue
+
+            cs = ts.getChangeSet(job)
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                removedTroves.append(job)
+
+        if removedTroves:
+            badTroves = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
+            badTroves.sort()
+            raise RemovedTrovesError(badTroves)
 
         uJob.setPrimaryJobs(jobSet)
 
