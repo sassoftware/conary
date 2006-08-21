@@ -204,7 +204,8 @@ class Database(BaseDatabase):
             return self.version
         for (type, name, tbl_name) in slist:
             if type == "table":
-                if name in ["sqlite_master", "sqlite_sequence"]:
+                # skip internal sqlite tables
+                if name.startswith('sqlite_'):
                     continue
                 if name.endswith("_sequence"):
                     self.sequences.setdefault(name[:-len("_sequence")], None)
