@@ -649,7 +649,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  troveSpecs.has_key(None) and
                                  len(troveSpecs[None]) == 1 and
                                  troveSpecs[None].has_key(None)):
-            # no trove names, and/or no version spec
+            # None or { None:None} case
             troveNameClause = "Items"
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
         elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
@@ -781,7 +781,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
                     )
             GROUP BY tmpQ.item, tmpQ.version, tmpQ.flavor, tmpQ.aclId %(extraGrouping)s
-            HAVING flavorScore > -500000
+            HAVING SUM(coalesce(FlavorScores.value, 0)) > -500000
             ORDER BY tmpQ.item, tmpQ.finalTimestamp
             """ % {
                 "mainQuery" : mainQuery %{ "select" : ", ".join(getList+["UP.aclId as aclId"]),
@@ -804,7 +804,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # acl's allowing access to the same information
         allowed = set()
 
-        troveNames = []
         troveVersions = {}
 
         # FIXME: Remove the ORDER BY in the sql statement above and watch it
@@ -1026,8 +1025,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Flavors.flavor as flavor,
             Nodes.timeStamps as timeStamps,
             UP.pattern as pattern
-        from
-            ( select
+        from Latest
+        join Nodes using (itemId, branchId, versionId)
+        join LabelMap using (itemId, branchId)
+        join ( select
                 Permissions.labelId as labelId,
                 PerItems.item as pattern
             from
@@ -1035,16 +1036,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 join Items as PerItems using (itemId)
             where
                 Permissions.userGroupId in (%s)
-            ) as UP
-            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Latest using (itemId, branchId)
-            join Nodes using (itemId, branchId, versionId)
-            join Items using (itemId),
-            Flavors, Versions
-        where
-                Latest.flavorId = Flavors.flavorId
-            and Latest.versionId = Versions.versionId
-            """ % ",".join("%d" % x for x in groupIds)
+            ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        join Items on Latest.itemId = Items.itemId
+        join Flavors on Latest.flavorId = Flavors.flavorId
+        join Versions on Latest.versionId = Versions.versionId
+        """ % ",".join("%d" % x for x in groupIds)
         self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
