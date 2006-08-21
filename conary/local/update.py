@@ -971,12 +971,15 @@ class FilesystemJob:
             # (we just checked headFileVersion, and if there isn't an
             # old version then this file would be new, not changed
 
-            # get the baseFile which was originally installed
-            (baseFilePath, baseFileId, baseFileVersion) = baseTrove.getFile(pathId)
-            assert(baseFile.fileId() == baseFileId)
+            if not headChanges:
+                # get the baseFile which was originally installed
+                (baseFilePath, baseFileId, baseFileVersion) = \
+                        baseTrove.getFile(pathId)
+                assert(baseFile.fileId() == baseFileId)
 
-            # now assemble what the file is supposed to look like on head
-            headChanges = changeSet.getFileChange(baseFileId, headFileId)
+                # now assemble what the file is supposed to look like on head
+                headChanges = changeSet.getFileChange(baseFileId, headFileId)
+
             headFile = self._mergeFile(baseFile, headFileId, headChanges,
                                        pathId)
 
@@ -1160,6 +1163,7 @@ class FilesystemJob:
 
                     (headFileContType,
                      headFileContents) = changeSet.getFileContents(pathId)
+                    assert(headFileContType == changeSet.
 
                     cur = open(realPath, "r").readlines()
                     diff = headFileContents.get().readlines()
@@ -1236,7 +1240,7 @@ class FilesystemJob:
             fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
             for (pathId, path, fileId, version) in oldTrove.iterFileList():
                 assert(path not in removedFiles)
-                removedFiles[path] = ((pathId, version), oldTroveInfo)
+                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo)
 
         for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
@@ -1250,7 +1254,7 @@ class FilesystemJob:
                 if not oldTrove.hasFile(pathId): continue
                 (path, fileId, version) = oldTrove.getFile(pathId)
                 assert(path not in removedFiles)
-                removedFiles[path] = ((pathId, version), oldTroveInfo)
+                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo)
 
         if not removedFiles:
             return {}
@@ -1263,7 +1267,8 @@ class FilesystemJob:
                 if path not in removedFiles:
                     continue
 
-                ((oldPathId, oldVersion), oldTroveInfo) = removedFiles[path]
+                ((oldPathId, oldVersion, oldFileId), oldTroveInfo) = \
+                                                        removedFiles[path]
                 del removedFiles[path]
                 newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                                 troveCs.getNewFlavor())
@@ -1271,7 +1276,7 @@ class FilesystemJob:
                 newStream = changeSet.getFileChange(None, fileId)
                 newFile = files.ThawFile(newStream, pathId)
 
-                oldFile = db.getFileVersion(pathId, fileId, version)
+                oldFile = db.getFileVersion(pathId, oldFileId, version)
                 diff, hash = changeset.fileChangeSet(pathId, oldFile, newFile)
 
                 pathsMoved[path] = ( newTroveInfo,
