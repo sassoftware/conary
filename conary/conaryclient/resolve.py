@@ -53,6 +53,8 @@ class DepResolutionMethod(object):
         troves = set()
 
         for (troveTup, depSet) in depList:
+            choicesBySolution = {}
+            seen = set()
             if depSet in sugg:
                 suggList = set()
                 choicesAndDep = itertools.izip(sugg[depSet],
@@ -79,12 +81,28 @@ class DepResolutionMethod(object):
                             suggList.add(choice)
                             l = suggMap.setdefault(troveTup, set())
                             l.add(choice)
-                            log.debug('%s=%s[%s]\n'
-                                      '  Requires:    %s: %s\n'
-                                      '  Provided by: %s=%s[%s]',
-                                      *(troveTup + (depClass.tagName, dep) +
-                                        choice))
+                            
+                            if choice not in seen:
+                                if choice not in choicesBySolution:
+                                    d = deps.DependencySet()
+                                    choicesBySolution[choice] = d
+                                else:
+                                    d = choicesBySolution[choice]
+                                d.addDep(depClass, dep)
                             break
+
+                if choicesBySolution:
+                    for choice, depSet in sorted(choicesBySolution.iteritems()):
+                        seen.add(choice)
+                        depSet = str(depSet).split('\n')
+                        if len(depSet) > 5:
+                            depSet = depSet[0:5] + ['...']
+                        depSet = '\n               '.join(depSet)
+                        log.debug('Resolved:\n' 
+                                  '    %s=%s[%s]\n'
+                                  '    Required:  %s\n'
+                                  '    Adding: %s=%s[%s]',
+                                     troveTup[0], troveTup[1].trailingRevision(),troveTup[2], depSet, choice[0], choice[1].trailingRevision(), choice[2])
 
                 troves.update([ (x[0], (None, None), x[1:], True)
                                 for x in suggList ])
@@ -374,6 +392,18 @@ class DependencySolver(object):
 
             # first: attempt to update packages that dependended on the missing
             # package.
+            log.debug('Update breaks dependencies!')
+            for reqInfo, depSet, provInfo in cannotResolve:
+                depSet = '\n     '.join(str(depSet).split('\n'))
+                msg = (
+                    'Broken dependency: (dep needed by the system but being removed):\n'
+                     '   %s=%s\n'
+                     '   Requires:\n'
+                     '     %s\n'
+                     '   Provided by removed or updated packages: %s')
+                args = (reqInfo[0], reqInfo[1].trailingRevision(), depSet, 
+                        ', '.join(x[0] for x in provInfo))
+                log.debug(msg, *args)
             if self.cfg.resolveLevel > 1:
                 cannotResolve, newJobSet = self.resolveEraseByUpdating(
                                                                 trvSrc,
@@ -449,6 +479,12 @@ class DependencySolver(object):
                 potentialUpdateList.append((reqInfo, depSet, provInfoList))
                 break
 
+        if not potentialUpdateList:
+            return cannotResolve, set()
+
+        log.debug('Attempting to update the following packages in order to '
+                  'remove their dependency on something being erased:\n   %s', ('\n   '.join(x[0][0].split(':')[0] for x in potentialUpdateList)))
+
         # attempt to update the _package_ that has the requirement that
         # is now erased.
         updateJobs = [ (x[0][0].split(':')[0],
@@ -488,6 +524,10 @@ class DependencySolver(object):
         except (errors.ClientError, errors.TroveNotFound):
             newJobSet = set()
 
+        if newJobSet:
+            log.debug('updated %s troves:\n   %s', len(newJobSet), 
+                       '\n   '.join('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in newJobSet))
+
         return cannotResolve, newJobSet
 
     def resolveEraseByKeeping(self, trvSrc, cannotResolve, uJob, jobSet):
@@ -522,6 +562,13 @@ class DependencySolver(object):
                     keepList.append((job, depSet, reqInfo))
                     cannotResolve.remove(resolveInfo)
                     restoreSet.add(job)
+                    depSet = '\n               '.join(str(depSet).split('\n'))
+                    msg = ('Resolved (undoing erasure)\n'
+                           '    %s=%s[%s]'
+                           '    Required: %s'
+                           '    Keeping: %s=%s[%s]')
+                    args = (reqInfo[0], reqInfo[1].trailingRevision(), reqInfo[2], depSet, job[0], job[1][0].trailingRevision(), job[1][1])
+                    log.debug(msg, *args)
                     break
 
                 oldTrv = self.db.getTrove(withFiles = False,
@@ -533,6 +580,16 @@ class DependencySolver(object):
                     restoreSet.add(job)
                     keepList.append((job, depSet, reqInfo))
                     cannotResolve.remove(resolveInfo)
+                    msg = ('Resolved (installing side-by-side)\n'
+                           '    %s=%s[%s]'
+                           '    Required: %s'
+                           '    Keeping: %s=%s[%s]')
+                    args = (reqInfo[0], reqInfo[1].trailingRevision(),
+                            reqInfo[2], depSet, 
+                            job[0], job[1][0].trailingRevision(), job[1][1])
+                    log.debug(msg, *args)
+
+
                     break
 
         if self.cfg.autoResolvePackages:
