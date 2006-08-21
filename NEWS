@@ -16,6 +16,11 @@ Changes in @NEW@:
       must use --resume=<loc>, --resume <loc> will not work anymore.  This
       removes an ambiguity in how we parse optional parameters with conary.
 
+  o Optimizations
+    * The SQL query used to retrieve troves from the local database
+      has been optimized.  The new code is nearly four times faster
+      for operations like "conary q group-dist --info".
+
 Changes in 1.0.29:
   o Bug Fixes:
     * Conary now removes sources from the lookaside before unpacking SRPMs to

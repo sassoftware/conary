@@ -1133,9 +1133,12 @@ order by
             pristineClause = "Instances.isPresent = 1"
 
 	cu.execute("""
-	    SELECT troveName, versionId, flags, timeStamps, 
-                   Flavors.flavorId, flavor FROM 
-		TroveTroves INNER JOIN Instances INNER JOIN Flavors ON 
+	    SELECT troveName, version, flags, timeStamps, 
+                   Flavors.flavorId, flavor FROM TroveTroves
+                JOIN Instances
+                JOIN Versions ON
+                    Versions.versionId = Instances.versionId
+                JOIN Flavors ON
 		    TroveTroves.includedId = Instances.instanceId AND
 		    Flavors.flavorId = Instances.flavorId
 		WHERE TroveTroves.instanceId = ? AND
@@ -1143,9 +1146,14 @@ order by
 	""" % pristineClause, troveInstanceId)
 
 	versionCache = {}
-	for (name, versionId, flags, timeStamps, flavorId, flavorStr) in cu:
-	    version = self.versionTable.getBareId(versionId)
-	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+	for (name, versionStr, flags, timeStamps, flavorId, flavorStr) in cu:
+            key = (versionStr, timeStamps)
+            if versionCache.has_key(key):
+                version = versionCache[key]
+            else:
+                version = versions.VersionFromString(versionStr)
+                version.setTimeStamps([float(x) for x in timeStamps.split(":")])
+                versionCache[key] = version
 
 	    if not flavorId:
 		flavor = deps.deps.Flavor()
@@ -1160,7 +1168,6 @@ order by
 
 	    trv.addTrove(name, version, flavor, byDefault = byDefault,
                          weakRef = weakRef)
-
         if withDeps:
             self.depTables.get(cu, trv, troveInstanceId)
 
@@ -1169,16 +1176,15 @@ order by
         if not withFiles:
             return trv
 
-        cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
-                   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
-	for (pathId, path, versionId, fileId, isPresent) in cu:
+        cu.execute("""SELECT pathId, path, version, fileId, isPresent
+                      FROM DBTroveFiles
+                      JOIN Versions ON
+                          Versions.versionId = DBTroveFiles.versionId
+                      WHERE instanceId = ?""", troveInstanceId)
+	for (pathId, path, version, fileId, isPresent) in cu:
 	    if not pristine and not isPresent:
 		continue
-	    version = versionCache.get(versionId, None)
-	    if not version:
-		version = self.versionTable.getBareId(versionId)
-		versionCache[versionId] = version
-
+	    version = versions.VersionFromString(version)
 	    trv.addFile(pathId, path, version, fileId)
 
 	return trv
