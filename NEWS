@@ -1,28 +1,32 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Conary rq <with no arguments> no longer hides troves if the flavor that
-      matches the system flavor is not built for the latest version (CNY-784).
-    * cvc cook now displays the correct label of the thing its building,
-      even when it is not the build label.
-    * calling cvc update on a new package will fail with an appropriate 
-      error message instead of tracebacking (CNY-715).
-
   o Client Changes:
-    * --debug should now provide information that is useful to the end-user
-      on update, and --debug=all will provide output that is useful
-      to conary developers.  This change also results in a slight change 
-      to one of the cvc parameters, --resume.
-      To specify that you wish to resume at a particular location, you
-      must use --resume=<loc>, --resume <loc> will not work anymore.  This
-      removes an ambiguity in how we parse optional parameters with conary.
-    * Updated the output of --debug when performing dependency resolution -
-      The output should be more helpful to end users.  Also rearranged the 
-      output given when dependencies fail (CNY-779).
+    * The "--debug" command line flag now provides information that is
+      useful to the end-user on update.  The "--debug=all" flag will
+      provide output that is useful to conary developers.  A side
+      effect of this change affects the "cvc" command line.  To use
+      the "--resume" command line argument to specify that you wish to
+      resume at a particular location, you must use "--resume=<loc>".
+      "--resume <loc>" will not work anymore.  This removes an
+      ambiguity in how we parse optional parameters in Conary.
+    * The output of --debug has been modified when performing
+      dependency resolution - The output should be more helpful to end
+      users.  Also rearranged the output given when dependencies
+      fail. (CNY-779)
 
   o Optimizations
     * The SQL query used to retrieve troves from the local database
       has been optimized.  The new code is nearly four times faster
       for operations like "conary q group-dist --info".
+
+  o Bug Fixes:
+    * "conary rq" (with no arguments) no longer hides troves if the
+      flavor that matches the system flavor is not built for the
+      latest version. (CNY-784)
+    * "cvc cook" now displays the correct label of the thing its
+      building, even when it is not the build label.
+    * Calling "cvc update" on a new package will fail with an
+      appropriate error message instead of displaying a
+      traceback. (CNY-715)
 
 Changes in 1.0.29:
   o Bug Fixes:
