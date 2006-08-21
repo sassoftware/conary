@@ -2637,12 +2637,25 @@ class NeededTrovesFailure(DependencyFailure):
 
     def __str__(self):
         res = []
-        res.append("Additional troves are needed:")
+        requiredBy = {}
         for (reqInfo, suggList) in self.suggMap.iteritems():
-            res.append("    %s -> %s" % \
-              (self.formatNVF(reqInfo),
-               " ".join([self.formatNVF(x) for x in suggList])))
+            for sugg in sorted(suggList):
+               if sugg in requiredBy:
+                    requiredBy[sugg].append(reqInfo)
+               else:
+                    requiredBy[sugg] = [reqInfo]
+        numPackages = len(requiredBy)
+        if numPackages == 1:
+            res.append("%s additional trove is needed:" % numPackages)
+        else:
+            res.append("%s additional troves are needed:" % numPackages)
+        for (suggInfo, reqList) in sorted(requiredBy.iteritems()):
+            res.append("    %s is required by:" %  self.formatNVF(suggInfo))
+            for reqInfo in sorted(reqList):
+                res.append('       %s' % self.formatNVF(reqInfo))
         return '\n'.join(res)
+
+
 
 class InstallPathConflicts(UpdateError):
 

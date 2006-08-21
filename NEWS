@@ -15,6 +15,9 @@ Changes in @NEW@:
       To specify that you wish to resume at a particular location, you
       must use --resume=<loc>, --resume <loc> will not work anymore.  This
       removes an ambiguity in how we parse optional parameters with conary.
+    * Updated the output of --debug when performing dependency resolution -
+      The output should be more helpful to end users.  Also rearranged the 
+      output given when dependencies fail (CNY-779).
 
   o Optimizations
     * The SQL query used to retrieve troves from the local database
