@@ -12,7 +12,7 @@ Changes in @NEW@:
       dependency resolution - The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
-    * cvc merge and cvc update are now more verbose when patching (CNY-406).
+    * cvc merge and cvc update are now more verbose when patching. (CNY-406)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
