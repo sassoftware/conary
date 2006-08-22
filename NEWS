@@ -17,6 +17,10 @@ Changes in @NEW@:
     * The SQL query used to retrieve troves from the local database
       has been optimized.  The new code is nearly four times faster
       for operations like "conary q group-dist --info".
+    * The SQL query in getTroveContainers() used to determine the
+      parent package(s) and groups(s) of a set of troves as recorded
+      in the local database has been optimized.  The new code is
+      almost 95 times faster. (0.2 seconds versus 19 seconds)
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
