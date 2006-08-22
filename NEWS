@@ -14,6 +14,9 @@ Changes in @NEW@:
       fail. (CNY-779)
 
   o Optimizations
+    On a test system, "conary updateall --info" is around 24% faster
+    than previous versions of Conary.
+
     * The SQL query used to retrieve troves from the local database
       has been optimized.  The new code is nearly four times faster
       for operations like "conary q group-dist --info".
