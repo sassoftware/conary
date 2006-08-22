@@ -21,6 +21,10 @@ Changes in @NEW@:
       parent package(s) and groups(s) of a set of troves as recorded
       in the local database has been optimized.  The new code is
       almost 95 times faster. (0.2 seconds versus 19 seconds)
+    * The code in getCompleteTroveSet() that creates Version and
+      Flavor objects from entries in the database now caches the
+      created object.  This is approximately a 4.5 times speed
+      up. (2.10 seconds versus 9.4 seconds)
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the

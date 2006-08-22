@@ -1804,7 +1804,6 @@ order by
         for name in names:
             cu.execute("INSERT INTO gcts VALUES (?)", name,
                        start_transaction = False)
-
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
                        timeStamps, TroveTroves.flags, TroveTroves.inPristine 
@@ -1828,15 +1827,26 @@ order by
         referencedStrong = []
         referencedWeak = []
 
-        for (name, version, flavor, isPresent, timeStamps, 
-                                               flags, hasParent) in cu:
+        versionCache = {}
+        flavorCache = {}
+        for (name, version, flavor, isPresent, timeStamps, flags,
+             hasParent) in cu:
             if flavor is None:
                 flavor = ""
+            key = (version, timeStamps)
+            if versionCache.has_key(key):
+                v = versionCache[key]
+            else:
+                v = versions.VersionFromString(version)
+                v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+                versionCache[key] = v
+            if flavorCache.has_key(flavor):
+                f = flavorCache[flavor]
+            else:
+                f = deps.deps.ThawFlavor(flavor)
+                flavorCache[flavor] = f
 
-            v = versions.VersionFromString(version)
-	    v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-
-            info = (name, v, deps.deps.ThawFlavor(flavor))
+            info = (name, v, f)
 
             if isPresent:
                 if hasParent:
