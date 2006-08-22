@@ -281,8 +281,6 @@ class CommitCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         level = log.getVerbosity()
-        if level > log.INFO:
-            log.setVerbosity(log.INFO)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
         sourceCheck = True
@@ -395,8 +393,6 @@ class CookCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         level = log.getVerbosity()
-        if level > log.INFO:
-            log.setVerbosity(log.INFO)
         macros = {}
         prep = 0
         resume = None
@@ -652,6 +648,7 @@ class CvcMain(options.MainHandler):
             cfg.installLabel = cfg.installLabelPath[0]
 
         cfg.initializeFlavors()
+        log.setMinVerbosity(log.INFO)
 
         # set the build flavor here, just to set architecture information 
         # which is used when initializing a recipe class
