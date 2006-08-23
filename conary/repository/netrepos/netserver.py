@@ -645,92 +645,82 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if flavorIndices:
             self._setupFlavorFilter(cu, flavorIndices)
 
+        coreQdict = {}
+        coreQdict["localFlavor"] = "0"
         if not troveSpecs or (len(troveSpecs) == 1 and
                                  troveSpecs.has_key(None) and
                                  len(troveSpecs[None]) == 1 and
                                  troveSpecs[None].has_key(None)):
             # None or { None:None} case
-            troveNameClause = "Items"
+            coreQdict["trove"] = "Items"
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
         elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
             # no trove names, and a single version spec (multiple ones
             # are disallowed)
             assert(len(troveSpecs[None]) == 1)
-            troveNameClause = "Items"
+            coreQdict["trove"] = "Items"
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-            troveNameClause = "gtvlTbl JOIN Items USING (item)"
-
-        getList = [ 'Items.item as item', 'UP.permittedTrove as acl']
-        if dropTroveTable:
-            getList.append('gtvlTbl.flavorId as flavorId')
-        else:
-            getList.append('0 as flavorId')
-        argList = [ ]
-
-        getList += [ 'Versions.version as version',
-                     'Nodes.timeStamps as timeStamps',
-                     'Nodes.branchId as branchId',
-                     'Nodes.finalTimestamp as finalTimestamp' ]
-        versionClause = "JOIN Versions ON Nodes.versionId = Versions.versionId"
+            coreQdict["trove"] = "gtvlTbl JOIN Items USING (item)"
+            coreQdict["localFlavor"] = "gtvlTbl.flavorId"
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
-                labelClause = """JOIN Labels ON
+                coreQdict["spec"] = """JOIN Labels ON
                 Labels.labelId = LabelMap.labelId
                 AND Labels.label = '%s'""" % singleVersionSpec
             else:
-                labelClause = """JOIN Labels ON
+                coreQdict["spec"] = """JOIN Labels ON
                 Labels.labelId = LabelMap.labelId
                 AND Labels.label = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
-                labelClause = """JOIN Branches ON
+                coreQdict["spec"] = """JOIN Branches ON
                 Branches.branchId = LabelMap.branchId
                 AND Branches.branch = '%s'""" % singleVersionSpec
             else:
-                labelClause = """JOIN Branches ON
+                coreQdict["spec"] = """JOIN Branches ON
                 Branches.branchId = LabelMap.branchId
                 AND Branches.branch = gtvlTbl.versionSpec"""
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
-            labelClause = ""
             if singleVersionSpec:
-                vc = "Versions.version = '%s'" % singleVersionSpec
+                coreQdict["spec"] = """JOIN Versions ON
+                Nodes.versionId = Versions.versionId
+                AND Versions.version = '%s'""" % singleVersionSpec
             else:
-                vc = "Versions.version = gtvlTbl.versionSpec"
-            versionClause = """%s AND %s""" % (versionClause, vc)
+                coreQdict["spec"] = """JOIN Versions ON
+                Nodes.versionId = Versions.versionId
+                AND Versions.version = gtvlTbl.versionSpec"""
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
-            labelClause = ""
+            coreQdict["spec"] = ""
 
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """JOIN Latest AS Domain USING (itemId)
+            coreQdict["domain"] = """JOIN Latest AS Domain USING (itemId)
             JOIN Nodes USING (itemId, branchId, versionId)"""
         else:
-            instanceClause = """JOIN Instances AS Domain USING (itemId)
+            coreQdict["domain"] = """JOIN Instances AS Domain USING (itemId)
             JOIN Nodes USING (itemId, versionid)"""
 
-        if withFlavors:
-            getList.append("Flavors.flavor as flavor")
-            flavorClause = "JOIN Flavors ON Flavors.flavorId = Domain.flavorId"
-        else:
-            getList.append("NULL as flavor")
-            flavorClause = ""
-
-        mainQuery = """
-        SELECT %%(distinct)s %%(select)s
-        FROM %(troveName)s
-        %(instance)s
+        coreQdict["ugid"] = ", ".join("%d" % x for x in userGroupIds)
+        coreQuery = """
+        SELECT DISTINCT
+            Nodes.nodeId as nodeId,
+            Domain.flavorId as flavorId,
+            %(localFlavor)s as localFlavorId,
+            UP.acl as acl
+        FROM %(trove)s
+        %(domain)s
         JOIN LabelMap USING (itemid, branchId)
         JOIN ( SELECT
                    Permissions.labelId as labelId,
-                   PerItems.item as permittedTrove,
+                   PerItems.item as acl,
                    Permissions.permissionId as aclId
                FROM
                    Permissions
@@ -738,67 +728,86 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                WHERE
                    Permissions.userGroupId IN (%(ugid)s)
             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        %(version)s
-        %(label)s
-        %(flavor)s
-        """ % {
-            "troveName" : troveNameClause,
-            "instance" : instanceClause,
-            "ugid" : ", ".join("%d" % x for x in userGroupIds),
-            "version" : versionClause,
-            "label" : labelClause,
-            "flavor" : flavorClause,
-            }
+        %(spec)s
+        """ % coreQdict
+
+        # build the outer query around the coreQuery
+        mainQdict = {}
 
         if flavorIndices:
             assert(withFlavors)
-            extraJoin = extraGrouping = ""
+            extraJoin = localGroup = ""
+            localFlavor = "0"
             if len(flavorIndices) > 1:
                 # if there is only one flavor we don't need to join based on
                 # the gtvlTbl.flavorId (which is good, since it may not exist)
-                extraJoin = """ffFlavor.flavorId = tmpQ.flavorId
-                AND """
+                extraJoin = "ffFlavor.flavorId = tmpQ.flavorId AND"
             if dropTroveTable:
-                extraGrouping = ", tmpQ.flavorId"
+                localFlavor = "gtlTmp.localFlavorId"
+                localGroup = ", " + localFlavor
 
-            fullQuery = """
+            # take the core query and compute flavor scoring
+            mainQdict["core"] = """
             SELECT
-                tmpQ.item, tmpQ.acl, tmpQ.flavorId, tmpQ.version,
-                tmpQ.timeStamps, tmpQ.branchId, tmpQ.finalTimestamp,
-                tmpQ.flavor, SUM(coalesce(FlavorScores.value, 0)) as flavorScore
-            FROM ( %(mainQuery)s ) as tmpQ
-            JOIN Flavors ON tmpQ.flavor = Flavors.flavor
+                gtlTmp.nodeId as nodeId,
+                gtlTmp.flavorId as flavorId,
+                %(flavor)s as localFlavorId,
+                gtlTmp.acl as acl,
+                SUM(coalesce(FlavorScores.value, 0)) as flavorScore
+            FROM ( %(core)s ) as gtlTmp
             LEFT OUTER JOIN FlavorMap ON
-                FlavorMap.flavorId = Flavors.flavorId
+                FlavorMap.flavorId = gtlTmp.flavorId
             LEFT OUTER JOIN ffFlavor ON
-                %(extraJoin)s ffFlavor.base = FlavorMap.base
+                %(extra)s ffFlavor.base = FlavorMap.base
                 AND ( ffFlavor.flag = FlavorMap.flag OR
-                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL)
-                    )
+                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL) )
             LEFT OUTER JOIN FlavorScores ON
                 FlavorScores.present = FlavorMap.sense
-                AND ( FlavorScores.request = ffFlavor.sense OR
-                      ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
-                    )
-            GROUP BY tmpQ.item, tmpQ.version, tmpQ.flavor, tmpQ.aclId %(extraGrouping)s
+                AND FlavorScores.request = coalesce(ffFlavor.sense, 0)
+            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId, gtlTmp.acl %(group)s
             HAVING SUM(coalesce(FlavorScores.value, 0)) > -500000
-            ORDER BY tmpQ.item, tmpQ.finalTimestamp
-            """ % {
-                "mainQuery" : mainQuery %{ "select" : ", ".join(getList+["UP.aclId as aclId"]),
-                                           "distinct" : "DISTINCT" },
-                "extraJoin" : extraJoin,
-                "extraGrouping" : extraGrouping,
-                }
+            """ % { "core" : coreQuery,
+                    "extra" : extraJoin,
+                    "flavor" : localFlavor,
+                    "group" : localGroup}
+            mainQdict["score"] = "tmpQ.flavorScore"
         else:
             assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
-            fullQuery = """%(mainQuery)s
-            ORDER BY Items.item, Nodes.finalTimestamp
-            """ % {
-                "mainQuery" : mainQuery % {"select":", ".join(getList+["NULL as flavorScore"]),
-                                           "distinct" : ""}
-                }
-        self.log(4, "execute query", fullQuery, argList)
-        cu.execute(fullQuery, argList)
+            mainQdict["core"] = coreQuery
+            mainQdict["score"] = "NULL"
+
+        mainQdict["select"] = """I.item as trove,
+            tmpQ.acl as acl,
+            tmpQ.localFlavorId as localFlavorId,
+            V.version as version,
+            N.timeStamps as timeStamps,
+            N.branchId as branchId,
+            N.finalTimestamp as finalTimestamp"""
+        mainQdict["flavor"] = ""
+        mainQdict["joinFlavor"] = ""
+        if withFlavors:
+            mainQdict["joinFlavor"] = "JOIN Flavors AS F ON F.flavorId = tmpQ.flavorId"
+            mainQdict["flavor"] = "F.flavor"
+
+        # this is the Query we execute. Executing the core query as a
+        # subquery forces better execution plans and reduces the
+        # overall number of rows traversed.
+        fullQuery = """
+        SELECT
+            %(select)s,
+            %(flavor)s as flavor,
+            %(score)s as flavorScore
+        FROM ( %(core)s ) AS tmpQ
+        JOIN Nodes AS N on tmpQ.nodeId = N.nodeId
+        JOIN Items AS I on N.itemId = I.itemId
+        JOIN Versions AS V on N.versionId = V.versionId
+        %(joinFlavor)s
+        ORDER BY I.item, N.finalTimestamp
+        """ % mainQdict
+
+        self.log(4, "execute query", fullQuery)
+        cu.execute(fullQuery)
+        self.log(3, "executed query")
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
