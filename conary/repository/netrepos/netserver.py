@@ -668,33 +668,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans
+        argDict = {}
+        if singleVersionSpec:
+            spec = ":spec"
+            argDict["spec"] = singleVersionSpec
+        else:
+            spec = "gtvlTbl.versionSpec"
         if versionType == self._GTL_VERSION_TYPE_LABEL:
-            if singleVersionSpec:
-                coreQdict["spec"] = """JOIN Labels ON
-                Labels.labelId = LabelMap.labelId
-                AND Labels.label = '%s'""" % singleVersionSpec
-            else:
-                coreQdict["spec"] = """JOIN Labels ON
-                Labels.labelId = LabelMap.labelId
-                AND Labels.label = gtvlTbl.versionSpec"""
+            coreQdict["spec"] = """JOIN Labels ON
+            Labels.labelId = LabelMap.labelId
+            AND Labels.label = %s""" % spec
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
-            if singleVersionSpec:
-                coreQdict["spec"] = """JOIN Branches ON
-                Branches.branchId = LabelMap.branchId
-                AND Branches.branch = '%s'""" % singleVersionSpec
-            else:
-                coreQdict["spec"] = """JOIN Branches ON
-                Branches.branchId = LabelMap.branchId
-                AND Branches.branch = gtvlTbl.versionSpec"""
+            coreQdict["spec"] = """JOIN Branches ON
+            Branches.branchId = LabelMap.branchId
+            AND Branches.branch = %s""" % spec
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
-            if singleVersionSpec:
-                coreQdict["spec"] = """JOIN Versions ON
-                Nodes.versionId = Versions.versionId
-                AND Versions.version = '%s'""" % singleVersionSpec
-            else:
-                coreQdict["spec"] = """JOIN Versions ON
-                Nodes.versionId = Versions.versionId
-                AND Versions.version = gtvlTbl.versionSpec"""
+            coreQdict["spec"] = """JOIN Versions ON
+            Nodes.versionId = Versions.versionId
+            AND Versions.version = %s""" % spec
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             coreQdict["spec"] = ""
@@ -805,8 +796,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ORDER BY I.item, N.finalTimestamp
         """ % mainQdict
 
-        self.log(4, "execute query", fullQuery)
-        cu.execute(fullQuery)
+        self.log(4, "execute query", fullQuery, argDict)
+        cu.execute(fullQuery, argDict)
         self.log(3, "executed query")
 
         # this prevents dups that could otherwise arise from multiple
