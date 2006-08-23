@@ -77,6 +77,7 @@ def _register(cmd):
 
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
 
 class CvcCommand(options.AbstractCommand):
 
@@ -387,7 +388,7 @@ class CookCommand(CvcCommand):
         argDef['ignore-buildreqs'] = NO_PARAM
         argDef['show-buildreqs' ] = NO_PARAM
         argDef['prep'] = NO_PARAM
-        argDef['resume'] = OPT_PARAM
+        argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
