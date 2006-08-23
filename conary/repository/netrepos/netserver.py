@@ -732,7 +732,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if len(flavorIndices) > 1:
                 # if there is only one flavor we don't need to join based on
                 # the gtvlTbl.flavorId (which is good, since it may not exist)
-                extraJoin = "ffFlavor.flavorId = tmpQ.flavorId AND"
+                extraJoin = "ffFlavor.flavorId = gtlTmp.localFlavorId AND"
             if dropTroveTable:
                 localFlavor = "gtlTmp.localFlavorId"
                 localGroup = ", " + localFlavor
