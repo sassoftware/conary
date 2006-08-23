@@ -1472,7 +1472,7 @@ order by
                       JOIN TroveTroves ON
                           TroveTroves.includedId = IncInst.instanceId
                       JOIN Instances ON
-                          Instances.instanceId = TroveTroves.includedId
+                          Instances.instanceId = TroveTroves.instanceId
                       JOIN Versions ON
                           Versions.versionId = Instances.versionId
                       JOIN Flavors ON
