@@ -1692,27 +1692,46 @@ order by
         WHERE (NotReferenced.instanceId IS NULL
               AND (TroveTroves.inPristine=1 
                     OR TroveTroves.inPristine is NULL)
-                    )
+              )
         """ % fromClause)
 
         VFS = versions.VersionFromString
         Flavor = deps.deps.ThawFlavor
 
+        flavorCache = {}
+        versionCache = {}
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
-             parentName, parentVersion, parentTimeStamps, parentFlavor,
+             parentName, parentVersionStr, parentTimeStamps, parentFlavor,
              flags) in cu:
             if parentName:
                 weakRef = flags & schema.TROVE_TROVES_WEAKREF
-                parentVersion = VFS(parentVersion, 
+                if (parentVersionStr, parentTimeStamps) in versionCache:
+                    parentVersion = versionCache[parentVersionStr, parentTimeStamps]
+                else:
+                    parentVersion = VFS(parentVersionStr,
                     timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
-                parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
+                    versionCache[parentVersionStr, timeStamps] = parentVersion
+                if parentFlavor in flavorCache:
+                    f = flavorCache[parentFlavor]
+                else:
+                    f = Flavor(parentFlavor)
+                    flavorCache[parentFlavor] = f
+                parentInfo = (parentName, parentVersion, f)
             else:
                 weakRef = False
                 parentInfo = None
 
-            version = VFS(versionStr,
-                          timeStamps=[ float(x) for x in timeStamps.split(':')])
-            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent, weakRef)
+            if (versionStr, timeStamps) in versionCache:
+                version = versionCache[versionStr, timeStamps]
+            else:
+                version = VFS(versionStr,
+                              timeStamps=[ float(x) for x in timeStamps.split(':')])
+                versionCache[versionStr, timeStamps] = version
+            if flavorStr in flavorCache:
+                flavor = flavorCache[flavorStr]
+            else:
+                flavorCache[flavorStr] = flavor = Flavor(flavorStr)
+            yield ((name, version, flavor), parentInfo, isPresent, weakRef)
 
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)

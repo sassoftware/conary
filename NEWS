@@ -29,6 +29,9 @@ Changes in @NEW@:
       Flavor objects from entries in the database now caches the
       created object.  This is approximately a 4.5 times speed
       up. (2.10 seconds versus 9.4 seconds)
+    * The code in iterUpdateContainerInfo has had similar version
+      and flavor caching optimizations that make the code about 
+      2.5 times faster (from 10 seconds to 4 seconds).
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
