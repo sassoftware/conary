@@ -279,7 +279,7 @@ class Archive(_Source):
     the destdir.  Note that only Rock Ridge or Joliet images are handled,
     and that permissions and special files are not preserved.
 
-    C{r.addArchive('mirror://sourceforge/%(name)s/%(name)s-%(version)s.tar.gz', keyid='9BB19A22')
+    C{r.addArchive('mirror://sourceforge/%(name)s/%(name)s-%(version)s.tar.gz', keyid='9BB19A22')}
 
     Demonstrates use with mirror URL and C{sourceforge} mirrors list for
     retrieving package source from SourceForge.
