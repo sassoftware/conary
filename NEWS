@@ -27,6 +27,9 @@ Changes in @NEW@:
     * Calling "cvc update" on a new package will fail with an
       appropriate error message instead of displaying a
       traceback. (CNY-715)
+    * A bug that caused a traceback when marking a trove that
+      contained a file with no contents (such as a symlink) as removed
+      has been fixed.
 
 Changes in 1.1.2:
   o Bug Fixes:

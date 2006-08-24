@@ -970,7 +970,8 @@ class TroveStore:
             Candidates.instanceId = ?
         """, instanceId)
         r = cu.fetchall()
-        candidateSha1sToRemove = [ x[1] for x in r ]
+        # if sha1 is None, the file has no contents
+        candidateSha1sToRemove = [ x[1] for x in r if x[1] is not None ]
         streamIdsToRemove = [ x[0] for x in r ]
 
         cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)
