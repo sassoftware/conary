@@ -38,7 +38,7 @@
                             <span py:if="not isAdmin" py:content="entClass"/>
                         </td>
                         <td>
-                            <table><tbody><div py:for="accessGroup in sorted(accessGroupList)" py:strip="True">
+                            <table py:if="isAdmin"><tbody><div py:for="accessGroup in sorted(accessGroupList)" py:strip="True">
                                 <tr><td py:content="accessGroup"/></tr>
                             </div></tbody></table>
                         </td>
