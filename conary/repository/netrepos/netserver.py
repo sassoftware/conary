@@ -161,7 +161,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
             (l, f) = cfg.traceLog
-            self.log = tracelog.getLog(filename=f, level=l)
+            self.log = tracelog.getLog(filename=f, level=l, trace=l>2)
 
         if self.logFile:
             self.callLog = calllog.CallLogger(self.logFile, self.serverNameList)
@@ -1913,10 +1913,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         result = cu.fetchall()
         if not result or result[0][0] == None:
             return -1
-
         return result[0][0]
 
     def setMirrorMark(self, authToken, clientVersion, host, mark):
+        # need to treat the mark as long
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
@@ -1929,7 +1933,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             cu.execute("update LatestMirror set mark=? where host=?",
                        (mark, host))
-
         return ""
 
     def getNewSigList(self, authToken, clientVersion, mark):
@@ -2039,30 +2042,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               AND Versions.version = ?
               AND Flavors.flavor = ?
             """, (name, version, flavor))
-            try:
-                instanceId = cu.next()[0]
-            except StopIteration:
+            ret = cu.fetchall()
+            if not len(ret):
                 raise errors.TroveMissing(name, version = version)
+            instanceId = ret[0][0]
 
             cu.execute("""
             SELECT data FROM TroveInfo WHERE instanceId = ? AND infoType = ?
             """, (instanceId, trove._TROVEINFO_TAG_SIGS))
-            try:
-                currentSig = cu.next()[0]
-            except StopIteration:
+            ret = cu.fetchall()
+            if len(ret):
+                currentSig = cu.frombinary(ret[0][0])
+            else:
                 currentSig = None
 
             if not currentSig:
                 cu.execute("""
                 INSERT INTO TroveInfo (instanceId, infoType, data)
                 VALUES (?, ?, ?)
-                """, instanceId, trove._TROVEINFO_TAG_SIGS, sig)
+                """, (instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig))
                 updateCount += 1
             elif currentSig != sig:
                 cu.execute("""
                 UPDATE TroveInfo SET data = ?
                 WHERE infoType = ? AND instanceId = ?
-                """, (sig, trove._TROVEINFO_TAG_SIGS, instanceId))
+                """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
             self.cache.invalidateEntry(name, self.toVersion(version),
                                        self.toFlavor(flavor))
