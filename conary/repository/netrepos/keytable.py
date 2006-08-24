@@ -27,8 +27,8 @@ class OpenPGPKeyTable:
 
     def getFingerprint(self, keyId):
         cu = self.db.cursor()
-        r = cu.execute('SELECT fingerprint FROM PGPFingerprints '
-                       'WHERE fingerprint LIKE "%' + keyId + '%"')
+        r = cu.execute("SELECT fingerprint FROM PGPFingerprints "
+                       "WHERE fingerprint LIKE '%" + keyId + "%'")
         keyList = r.fetchall()
         if (len(keyList) != 1):
             raise openpgpkey.KeyNotFound(keyId)
@@ -123,7 +123,7 @@ class OpenPGPKeyTable:
                       from
                           PGPKeys, PGPFingerprints
                       where
-                              PGPFingerprints.fingerprint like "%%%s%%"
+                              PGPFingerprints.fingerprint like '%%%s%%'
                           and PGPKeys.keyId=PGPFingerprints.keyId
                        """ %keyId)
         keys = cu.fetchall()
@@ -132,7 +132,7 @@ class OpenPGPKeyTable:
 
         data = keys[0][0]
 
-        return data
+        return cu.frombinary(data)
 
     def getAsciiPGPKeyData(self, keyId):
         # don't trap exceptions--that way we can assume we found a key.
