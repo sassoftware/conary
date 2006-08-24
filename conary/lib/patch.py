@@ -15,6 +15,7 @@
 Applies unified format diffs
 """
 
+from conary.lib import log
 import types
 
 class Hunk:
@@ -167,7 +168,9 @@ def patch(oldLines, unifiedDiff):
     fromLine = 0
     offset = 0
 
-    for hunk in hunks:
+    numHunks = len(hunks)
+    for idx, hunk in enumerate(hunks):
+        log.info('patch: applying hunk %s of %s', idx + 1, numHunks)
 	start = hunk.fromStart + offset
 	conflicts = hunk.countConflicts(oldLines, start)
 	best = (conflicts, 0)

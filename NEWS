@@ -12,11 +12,26 @@ Changes in @NEW@:
       dependency resolution - The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
+    * cvc merge and cvc update are now more verbose when patching. (CNY-406)
 
   o Optimizations
+    On a test system, "conary updateall --info" is around 24% faster
+    than previous versions of Conary.
+
     * The SQL query used to retrieve troves from the local database
       has been optimized.  The new code is nearly four times faster
       for operations like "conary q group-dist --info".
+    * The SQL query in getTroveContainers() used to determine the
+      parent package(s) and groups(s) of a set of troves as recorded
+      in the local database has been optimized.  The new code is
+      almost 95 times faster. (0.2 seconds versus 19 seconds)
+    * The code in getCompleteTroveSet() that creates Version and
+      Flavor objects from entries in the database now caches the
+      created object.  This is approximately a 4.5 times speed
+      up. (2.10 seconds versus 9.4 seconds)
+    * The code in iterUpdateContainerInfo has had similar version
+      and flavor caching optimizations that make the code about 
+      2.5 times faster (from 10 seconds to 4 seconds).
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the

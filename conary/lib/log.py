@@ -137,6 +137,17 @@ def setVerbosity(val):
 def getVerbosity():
     return logger.getEffectiveLevel()
 
+def setMinVerbosity(val):
+    """
+        Ensures that the log level is at least the given log level.
+        Returns the log level before this call if a change was made 
+        otherwise None
+    """
+    oldVal = getVerbosity()
+    if oldVal > val:
+        setVerbosity(val)
+        return oldVal
+
 class ErrorCheckingHandler(logging.StreamHandler):
     def __init__(self, *args, **keywords):
         self.error = False

@@ -1448,7 +1448,8 @@ order by
 
     def getTroveContainers(self, l):
         cu = self.db.cursor()
-        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING, "
+        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER PRIMARY KEY, "
+                                              "name STRING, "
                                               "version STRING, "
                                               "flavor STRING)",
                                               start_transaction = False)
@@ -1459,26 +1460,28 @@ order by
                        start_transaction = False)
             result.append([])
 
-        cu.execute("""SELECT idx, Instances.troveName, Versions.version,
+        cu.execute("""SELECT idx, instances.troveName, Versions.version,
                              Flavors.flavor, flags
-                        FROM ftc JOIN Versions AS IncVersion ON
-                            ftc.version = IncVersion.version
-                        JOIN Flavors AS IncFlavor ON
-                            ftc.flavor = IncFlavor.flavor OR
-                            (ftc.flavor = "" AND IncFlavor.flavor IS NULL)
-                        JOIN Instances AS IncInst ON
-                            ftc.name = IncInst.troveName AND
-                            IncVersion.versionId = IncInst.versionId AND
-                            IncFlavor.flavorId = IncInst.flavorId
-                        JOIN TroveTroves ON
-                            IncInst.instanceId = TroveTroves.includedId
-                        JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN Versions ON
-                            Instances.versionId = Versions.versionId
-                """)
+                      FROM ftc
+                      JOIN Instances AS IncInst ON
+                          IncInst.troveName = ftc.name
+                      JOIN Versions AS IncVersion ON
+                          IncVersion.versionId = IncInst.versionId
+                      JOIN Flavors AS IncFlavor ON
+                          IncFlavor.flavorId = IncInst.flavorId
+                      JOIN TroveTroves ON
+                          TroveTroves.includedId = IncInst.instanceId
+                      JOIN Instances ON
+                          Instances.instanceId = TroveTroves.instanceId
+                      JOIN Versions ON
+                          Versions.versionId = Instances.versionId
+                      JOIN Flavors ON
+                          Flavors.flavorId = Instances.flavorId
+                      WHERE
+                          IncVersion.version = ftc.version AND
+                          (IncFlavor.flavor = ftc.flavor OR
+                           (IncFlavor.flavor IS NULL AND ftc.flavor = ""))
+                   """)
         for (idx, name, version, flavor, flags) in cu:
             if flags & schema.TROVE_TROVES_WEAKREF:
                 # don't include weak references, they are not direct
@@ -1689,27 +1692,46 @@ order by
         WHERE (NotReferenced.instanceId IS NULL
               AND (TroveTroves.inPristine=1 
                     OR TroveTroves.inPristine is NULL)
-                    )
+              )
         """ % fromClause)
 
         VFS = versions.VersionFromString
         Flavor = deps.deps.ThawFlavor
 
+        flavorCache = {}
+        versionCache = {}
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
-             parentName, parentVersion, parentTimeStamps, parentFlavor,
+             parentName, parentVersionStr, parentTimeStamps, parentFlavor,
              flags) in cu:
             if parentName:
                 weakRef = flags & schema.TROVE_TROVES_WEAKREF
-                parentVersion = VFS(parentVersion, 
+                if (parentVersionStr, parentTimeStamps) in versionCache:
+                    parentVersion = versionCache[parentVersionStr, parentTimeStamps]
+                else:
+                    parentVersion = VFS(parentVersionStr,
                     timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
-                parentInfo = (parentName, parentVersion, Flavor(parentFlavor))
+                    versionCache[parentVersionStr, timeStamps] = parentVersion
+                if parentFlavor in flavorCache:
+                    f = flavorCache[parentFlavor]
+                else:
+                    f = Flavor(parentFlavor)
+                    flavorCache[parentFlavor] = f
+                parentInfo = (parentName, parentVersion, f)
             else:
                 weakRef = False
                 parentInfo = None
 
-            version = VFS(versionStr,
-                          timeStamps=[ float(x) for x in timeStamps.split(':')])
-            yield ((name, version, Flavor(flavorStr)), parentInfo, isPresent, weakRef)
+            if (versionStr, timeStamps) in versionCache:
+                version = versionCache[versionStr, timeStamps]
+            else:
+                version = VFS(versionStr,
+                              timeStamps=[ float(x) for x in timeStamps.split(':')])
+                versionCache[versionStr, timeStamps] = version
+            if flavorStr in flavorCache:
+                flavor = flavorCache[flavorStr]
+            else:
+                flavorCache[flavorStr] = flavor = Flavor(flavorStr)
+            yield ((name, version, flavor), parentInfo, isPresent, weakRef)
 
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)
@@ -1801,7 +1823,6 @@ order by
         for name in names:
             cu.execute("INSERT INTO gcts VALUES (?)", name,
                        start_transaction = False)
-
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
                        timeStamps, TroveTroves.flags, TroveTroves.inPristine 
@@ -1825,15 +1846,26 @@ order by
         referencedStrong = []
         referencedWeak = []
 
-        for (name, version, flavor, isPresent, timeStamps, 
-                                               flags, hasParent) in cu:
+        versionCache = {}
+        flavorCache = {}
+        for (name, version, flavor, isPresent, timeStamps, flags,
+             hasParent) in cu:
             if flavor is None:
                 flavor = ""
+            key = (version, timeStamps)
+            if versionCache.has_key(key):
+                v = versionCache[key]
+            else:
+                v = versions.VersionFromString(version)
+                v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+                versionCache[key] = v
+            if flavorCache.has_key(flavor):
+                f = flavorCache[flavor]
+            else:
+                f = deps.deps.ThawFlavor(flavor)
+                flavorCache[flavor] = f
 
-            v = versions.VersionFromString(version)
-	    v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-
-            info = (name, v, deps.deps.ThawFlavor(flavor))
+            info = (name, v, f)
 
             if isPresent:
                 if hasParent:

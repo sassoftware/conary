@@ -1067,6 +1067,7 @@ class FilesystemJob:
 			baseLines = baseLineF.readlines()
 			del baseLineF
 			diff = headFileContents.get().readlines()
+                        log.info('patching %s', realPath)
 			(newLines, failedHunks) = patch.patch(baseLines, diff)
 			assert(not failedHunks)
                         newContents = "".join(newLines)
@@ -1118,6 +1119,7 @@ class FilesystemJob:
 
                     cur = open(realPath, "r").readlines()
                     diff = headFileContents.get().readlines()
+                    log.info('patching %s' % realPath)
                     (newLines, failedHunks) = patch.patch(cur, diff)
 
                     cont = filecontents.FromString("".join(newLines))

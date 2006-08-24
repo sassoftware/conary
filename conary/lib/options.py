@@ -28,7 +28,8 @@ import sys
  OPT_PARAM,  # arg may occur once, optional parameter
  MULT_PARAM, # arg may occur N times, w/ parameter
  COUNT_PARAM, # arg may occur N times, value is the count
- ) = range(0,5)
+ STRICT_OPT_PARAM, # arg may occur once, optional parameter, stricter parsing
+ ) = range(0,6)
 
 class OptionError(Exception):
     val = 1
@@ -72,13 +73,26 @@ class OptionParser(optparse.OptionParser):
         return optparse.OptionParser._process_long_opt(self, rargs, values)
 
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
+    strict = kw.pop('strictOpt', False)
+
     value = True
     if option.had_explicit_value:
         newValue = parser.rargs[0]
         del parser.rargs[0]
         if newValue: # handle --opt= - treat like --opt
             value = newValue
+    elif (not strict and parser.rargs 
+          and parser.rargs[0] and parser.rargs[0][0] != '-'):
+        newValue = parser.rargs[0]
+        del parser.rargs[0]
+        if newValue: # handle --opt= - treat like --opt
+            value = newValue
     setattr(parser.values, option.dest, value)
+
+def strictOptParamCallback(*args, **kw):
+    kw['strictOpt'] = True
+    return optParamCallback(*args, **kw)
+
 
 def addOptions(parser, argDef, skip=None):
     for name, data in sorted(argDef.iteritems()):
@@ -112,11 +126,17 @@ def addOptions(parser, argDef, skip=None):
                               metavar=meta, *flagNames)
         elif paramType == ONE_PARAM:
             parser.add_option(dest=name, help=help, metavar=meta, *flagNames)
+        elif paramType == STRICT_OPT_PARAM:
+            parser.add_option(action='callback',
+                              callback=strictOptParamCallback, dest=name,
+                              type='string', nargs=0, help=help,
+                               metavar=meta, *flagNames)
         elif paramType == OPT_PARAM:
             parser.add_option(action='callback',
                                callback=optParamCallback, dest=name,
                                type='string', nargs=0, help=help, 
                                metavar=meta, *flagNames)
+
         elif paramType == MULT_PARAM:
             parser.add_option(action='append', dest=name, help=help, 
                               metavar=meta, *flagNames)
@@ -164,7 +184,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         d = params[defaultGroup]
     else:
         d = params
-    d['debug'] = OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
+    d['debug'] = STRICT_OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
     d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
     for (arg, name) in cfgMap.items():
