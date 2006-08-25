@@ -633,7 +633,7 @@ class ClientUpdate:
                         job in relativeUpdateJobs))
 
         respectFlavorAffinity = True
-        # thew newTroves parameters are described below.
+        # the newTroves parameters are described below.
         newTroves = sorted(((x[0], x[2][0], x[2][1]), 
                             True, {}, False, False, False, False, None, 
                             respectBranchAffinity, 
