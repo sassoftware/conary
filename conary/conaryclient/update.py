@@ -634,13 +634,16 @@ class ClientUpdate:
 
         respectFlavorAffinity = True
         # the newTroves parameters are described below.
-        newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, False, False, False, None, 
-                            respectBranchAffinity, 
-                            respectFlavorAffinity, True,
-                            True, updateOnly) 
-                                for x in itertools.chain(absolutePrimaries,
-                                                         relativePrimaries))
+        newTroves = sorted((((x[0], x[2][0], x[2][1]), 
+                             True, {}, False, False, False, False, None, 
+                             respectBranchAffinity, 
+                             respectFlavorAffinity, True,
+                             True, updateOnly)
+                            for x in itertools.chain(absolutePrimaries,
+                                                     relativePrimaries)),
+                           # compare on the string of the version, since it might
+                           # not have timestamps
+                           key=lambda y: (y[0][0], str(y[0][1]), y[0][2]) + y[1:])
 
         newJob = set()
         notByDefaultRemovals = set()

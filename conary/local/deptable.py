@@ -646,11 +646,19 @@ class DependencyChecker:
                 if ':' not in comp[0]:
                     BIsPackage = 1
 
+            jobSets = []
+            # the versions might not have timestamps in them (thus
+            # might not be comparable.  Make them strings instead
+            for jobSet in jobSetA, jobSetB:
+                jobSets.append(
+                    [((x[0][0], (str(x[0][1][0]), x[0][1][1]),
+                                (str(x[0][2][0]), x[0][1][1]), x[0][2]),
+                      x[1]) for x in jobSet ])
             # if A has info- components and B doesn't, we want A
             # to be first.  Otherwise, sort by the components in the jobSets
             # (which should already be internally sorted)
-            return cmp((-AHasInfo, -AIsPackage, jobSetA),
-                       (-BHasInfo, -BIsPackage, jobSetB))
+            return cmp((-AHasInfo, -AIsPackage, jobSets[0]),
+                       (-BHasInfo, -BIsPackage, jobSets[1]))
 
         # get sets of strongly connected components - each component has
         # a cycle where something at the beginning requires something at the
