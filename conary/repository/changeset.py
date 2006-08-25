@@ -1001,18 +1001,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
 		newFiles.append((oldFileId, newFileId, filecs))
 
-		if (hash and oldVersion and oldFile.flags.isConfig()
-                    and fileObj.flags.isConfig()):
-		    contType = ChangedFileTypes.file
-		    cont = filecontents.FromChangeSet(self, pathId)
-		    if oldVersion:
-			(contType, cont) = fileContentsDiff(oldFile, oldCont, 
-                                                            fileObj, cont)
-
-                    if contType == ChangedFileTypes.diff:
-                        self.configCache[pathId] = (contType,
-                                                    cont.get().read(), False)
-
         # leave the old files in place; we my need those diffs for a
         # trvCs which hasn't been rooted yet
 	for tup in newFiles:
@@ -1220,11 +1208,14 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             tag = 'cft-' + tag
             isConfig = isConfig == "1"
 
-            # relative change sets only need diffs cached; absolute change
-            # sets get all of their config files cached so we can turn
-            # those into diffs. those cached values are replaced by the
-            # diffs when this happens though, so this isn't a big loss
-            if tag != ChangedFileTypes.diff and not(self.absolute and isConfig):
+            # cache all config files because:
+            #   1. diffs are needed both to precompute a job and to store
+            #      the new config contents in the database
+            #   2. full contents are needed if the config file moves components
+            #      and we need to generate a diff and then store that config
+            #      file in the database
+            # (there are other cases as well)
+            if not isConfig:
                 break
 
             cont = filecontents.FromFile(gzip.GzipFile(None, 'r', fileobj = f))
