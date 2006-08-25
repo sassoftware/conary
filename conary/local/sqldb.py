@@ -23,6 +23,27 @@ class Tags(idtable.CachedIdTable):
     def __init__(self, db):
 	idtable.CachedIdTable.__init__(self, db, "Tags", "tagId", "tag")
 
+class VersionCache(dict):
+    def get(self, vs, ts):
+        key = vs, ts
+        if self.has_key(key):
+            return self[key]
+        ts = [ float(x) for x in ts.split(":") ]
+        v = versions.VersionFromString(vs, timeStamps = ts)
+        self[key] = v
+        return v
+
+class FlavorCache(dict):
+    def get(self, frozen):
+        if self.has_key(frozen):
+            return self[frozen]
+        if frozen is None:
+            f = deps.deps.Flavor()
+        else:
+            f = deps.deps.ThawFlavor(frozen)
+        self[frozen] = f
+        return f
+
 class DBTroveFiles:
     """
     pathId, versionId, path, instanceId, stream
@@ -443,6 +464,8 @@ class Database:
     def getAllTroveFlavors(self, troveDict):
         outD = {}
         cu = self.db.cursor()
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         for name, versionList in troveDict.iteritems():
             d = {}.fromkeys(versionList)
             outD[name] = d
@@ -455,10 +478,9 @@ class Database:
                         ON Instances.flavorid = Flavors.flavorid
                 WHERE troveName=? AND isPresent=1""", name)
             for (match, timeStamps, flavor) in cu:
-                ts = [float(x) for x in timeStamps.split(':')]
-                version = versions.VersionFromString(match, timeStamps=ts)
+                version = versionCache.get(match, timeStamps)
                 if outD[name].has_key(version):
-                    outD[name][version].append(deps.deps.ThawFlavor(flavor))
+                    outD[name][version].append(flavorCache.get(flavor))
         return outD
 
     def iterAllTroves(self):
@@ -469,10 +491,12 @@ class Database:
                 INNER JOIN Flavors
                     ON Instances.flavorid = Flavors.flavorid
             WHERE isPresent=1""")
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         for (troveName, version, timeStamps, flavor) in cu:
-            ts = [float(x) for x in timeStamps.split(':')]
-            version = versions.VersionFromString(version, timeStamps=ts)
-            yield troveName, version, deps.deps.ThawFlavor(flavor)
+            version = versionCache.get(version, timeStamps)
+            flavor = flavorCache.get(flavor)
+            yield troveName, version, flavor
 
     def pinTroves(self, name, version, flavor, pin = True):
         if flavor is None or flavor.isEmpty():
@@ -752,15 +776,12 @@ order by
                                   deps.deps.Flavor(), None)
         instanceDict = {}
         origIncluded = set()
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         for (includedId, name, version, flavor, isPresent,
                                             inPristine, timeStamps) in cu:
-            if flavor is None:
-                flavor = deps.deps.Flavor()
-            else:
-                flavor = deps.deps.ThawFlavor(flavor)
-
-            version = versions.VersionFromString(version)
-	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+            flavor = flavorCache.get(flavor)
+            version = versionCache.get(version, timeStamps)
 
             instanceDict[(name, version, flavor)] = includedId
             origIncluded.add((name, version, flavor))
@@ -1122,8 +1143,6 @@ order by
 	trv = trove.Trove(troveName, troveVersion, troveFlavor, None,
                           setVersion = False)
 
-	flavorCache = {}
-
 	# add all of the troves which are references from this trove; the
 	# flavor cache is already complete
 	cu = self.db.cursor()
@@ -1133,8 +1152,8 @@ order by
             pristineClause = "Instances.isPresent = 1"
 
 	cu.execute("""
-	    SELECT troveName, version, flags, timeStamps, 
-                   Flavors.flavorId, flavor FROM TroveTroves
+	    SELECT troveName, version, flags, timeStamps, flavor
+                FROM TroveTroves
                 JOIN Instances
                 JOIN Versions ON
                     Versions.versionId = Instances.versionId
@@ -1145,23 +1164,11 @@ order by
                       %s
 	""" % pristineClause, troveInstanceId)
 
-	versionCache = {}
-	for (name, versionStr, flags, timeStamps, flavorId, flavorStr) in cu:
-            key = (versionStr, timeStamps)
-            if versionCache.has_key(key):
-                version = versionCache[key]
-            else:
-                version = versions.VersionFromString(versionStr)
-                version.setTimeStamps([float(x) for x in timeStamps.split(":")])
-                versionCache[key] = version
-
-	    if not flavorId:
-		flavor = deps.deps.Flavor()
-	    else:
-		flavor = flavorCache.get(flavorId, None)
-		if flavor is None:
-		    flavor = deps.deps.ThawFlavor(flavorStr)
-		    flavorCache[flavorId] = flavor
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
+	for name, versionStr, flags, timeStamps, flavorStr in cu:
+            version = versionCache.get(versionStr, timeStamps)
+            flavor = flavorCache.get(flavorStr)
 
             byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
             weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
@@ -1695,42 +1702,22 @@ order by
               )
         """ % fromClause)
 
-        VFS = versions.VersionFromString
-        Flavor = deps.deps.ThawFlavor
-
-        flavorCache = {}
-        versionCache = {}
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         for (isPresent, name, versionStr, timeStamps, flavorStr, 
              parentName, parentVersionStr, parentTimeStamps, parentFlavor,
              flags) in cu:
             if parentName:
                 weakRef = flags & schema.TROVE_TROVES_WEAKREF
-                if (parentVersionStr, parentTimeStamps) in versionCache:
-                    parentVersion = versionCache[parentVersionStr, parentTimeStamps]
-                else:
-                    parentVersion = VFS(parentVersionStr,
-                    timeStamps=[ float(x) for x in parentTimeStamps.split(':')])
-                    versionCache[parentVersionStr, timeStamps] = parentVersion
-                if parentFlavor in flavorCache:
-                    f = flavorCache[parentFlavor]
-                else:
-                    f = Flavor(parentFlavor)
-                    flavorCache[parentFlavor] = f
-                parentInfo = (parentName, parentVersion, f)
+                v = versionCache.get(parentVersionStr, parentTimeStamps)
+                f = flavorCache.get(parentFlavor)
+                parentInfo = (parentName, v, f)
             else:
                 weakRef = False
                 parentInfo = None
 
-            if (versionStr, timeStamps) in versionCache:
-                version = versionCache[versionStr, timeStamps]
-            else:
-                version = VFS(versionStr,
-                              timeStamps=[ float(x) for x in timeStamps.split(':')])
-                versionCache[versionStr, timeStamps] = version
-            if flavorStr in flavorCache:
-                flavor = flavorCache[flavorStr]
-            else:
-                flavorCache[flavorStr] = flavor = Flavor(flavorStr)
+            version = versionCache.get(versionStr, timeStamps)
+            flavor = flavorCache.get(flavorStr)
             yield ((name, version, flavor), parentInfo, isPresent, weakRef)
 
         if troveNames:
@@ -1768,11 +1755,12 @@ order by
                                 troveName IN (%s)""" %
                     ",".join(["'%s'" % x for x in nameList]))
 
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         l = []
         for (name, version, flavor, timeStamps) in cu:
-            version = versions.VersionFromString(version)
-	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-            flavor = deps.deps.ThawFlavor(flavor)
+            version = versionCache.get(version, timeStamps)
+            flavor = flavorCache.get(flavor)
             l.append((name, version, flavor))
 
         return l
@@ -1846,25 +1834,12 @@ order by
         referencedStrong = []
         referencedWeak = []
 
-        versionCache = {}
-        flavorCache = {}
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
         for (name, version, flavor, isPresent, timeStamps, flags,
              hasParent) in cu:
-            if flavor is None:
-                flavor = ""
-            key = (version, timeStamps)
-            if versionCache.has_key(key):
-                v = versionCache[key]
-            else:
-                v = versions.VersionFromString(version)
-                v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-                versionCache[key] = v
-            if flavorCache.has_key(flavor):
-                f = flavorCache[flavor]
-            else:
-                f = deps.deps.ThawFlavor(flavor)
-                flavorCache[flavor] = f
-
+            v = versionCache.get(version, timeStamps)
+            f = flavorCache.get(flavor)
             info = (name, v, f)
 
             if isPresent:
