@@ -1001,18 +1001,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
 		newFiles.append((oldFileId, newFileId, filecs))
 
-		if (hash and oldVersion and oldFile.flags.isConfig()
-                    and fileObj.flags.isConfig()):
-		    contType = ChangedFileTypes.file
-		    cont = filecontents.FromChangeSet(self, pathId)
-		    if oldVersion:
-			(contType, cont) = fileContentsDiff(oldFile, oldCont, 
-                                                            fileObj, cont)
-
-                    if contType == ChangedFileTypes.diff:
-                        self.configCache[pathId] = (contType,
-                                                    cont.get().read(), False)
-
         # leave the old files in place; we my need those diffs for a
         # trvCs which hasn't been rooted yet
 	for tup in newFiles:
