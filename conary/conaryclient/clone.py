@@ -33,7 +33,7 @@ class ClientClone:
 
     def createCloneChangeSet(self, targetBranch, troveList = [],
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
-                             infoOnly=False, callback=callbacks.CloneCallback):
+                             infoOnly=False, callback=None):
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
         def _createSourceVersion(targetBranch, targetBranchVersionList, 
@@ -263,6 +263,8 @@ class ClientClone:
 
             raise CloneIncomplete(needs)
                 
+        if callback is None:
+            callback = callbacks.CloneCallback()
         callback.determiningCloneTroves()
         # get the transitive closure
         allTroveInfo = set()
