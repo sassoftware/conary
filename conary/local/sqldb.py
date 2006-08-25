@@ -1736,6 +1736,53 @@ order by
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)
 
+    def getPathHashesForTroveList(self, troveList):
+        """ 
+            Returns the pathHashes for the given trove list.
+        """
+        # returns a list parallel to troveList
+        cu = self.db.cursor()
+
+        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
+                                idx %(PRIMARYKEY)s,
+                                troveName STRING,
+                                versionId INT,
+                                flavorId INT)
+                   """ % self.db.keywords, start_transaction = False)
+
+        i = -1
+        for i, (name, version, flavor) in enumerate(troveList):
+            flavorId = self.flavors.get(flavor, None)
+            if flavorId is None:
+                continue
+            versionId = self.versionTable.get(version, None)
+            if versionId is None:
+                continue
+
+            cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
+                       i, name, versionId, flavorId,
+                       start_transaction = False)
+
+        cu.execute("""SELECT idx, TroveInfo.data FROM getTrovesTbl
+                        INNER JOIN Instances ON
+                            getTrovesTbl.troveName == Instances.troveName AND
+                            getTrovesTbl.flavorId == Instances.flavorId AND
+                            getTrovesTbl.versionId == Instances.versionId AND
+                            Instances.isPresent == 1
+                        INNER JOIN TroveInfo USING (instanceId)
+                        WHERE TroveInfo.infoType = ?
+                    """, trove._TROVEINFO_TAG_PATH_HASHES)
+
+        r = [ None ] * (i + 1)
+        for (idx, data) in cu:
+            r[idx] = trove.PathHashes(data)
+
+        cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
+
+        return r
+
+
+
     def findRemovedByName(self, name):
         """
         Returns information on erased troves with a given name.

@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 20
+VERSION = 21
 
 def resetTable(cu, name):
     try:
@@ -138,6 +138,7 @@ def createTroveInfo(db):
     )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
     cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, data)")
+    cu.execute("CREATE INDEX TroveInfoInstTypeIdx ON TroveInfo(instanceId, infoType)")
     db.commit()
     db.loadSchema()
 
@@ -829,6 +830,13 @@ class MigrateTo_20(SchemaMigration):
         self.db.reopen()
         self.db.loadSchema()
         return self.Version
+
+class MigrateTo_21(SchemaMigration):
+    Version = 21
+
+    def migrate(self):
+        createTroveInfo(self.db) # create index on troveInfo instance + infoType
+        self.db.commit()
 
 def checkVersion(db):
     global VERSION

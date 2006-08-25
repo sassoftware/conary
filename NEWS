@@ -23,6 +23,10 @@ Changes in @NEW@:
       references to the GNU mirror system.
     * /etc/conary/mirrors/cpan has been added to enable mirror:// references to
     * the Comprehensive Perl Archive network mirror system.
+    * Components that modify the same files are now required to be in the 
+      same update job (for example, if a file moves from package a to
+      package b, we make the erase of package a and the install of package
+      b will occur at the same time) (CNY-758).
     * Paths moving between troves as part of a single job are now treated
       as file updates instead of separate add/remove events (CNY-750,
       CNY-786, CNY-359)

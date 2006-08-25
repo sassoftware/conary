@@ -249,13 +249,22 @@ class DependencyChecker:
 
         return nodeId
 
-    def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges):
+    def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges, 
+                    linkedIds):
         for (reqNodeId, provNodeId, depId) in oldOldEdges:
             # remove the provider after removing the requirer
             self.g.addEdge(reqNodeId, provNodeId)
 
         for (reqNodeId, provNodeId, depId) in newNewEdges:
             self.g.addEdge(provNodeId, reqNodeId)
+
+        for nodeIdList in linkedIds:
+            # create a circular link here, to make sure
+            # these troves have to be in the same job:
+            #  a -> b -> c -> a.
+            l = len(nodeIdList)
+            for i in range(l):
+                self.g.addEdge(nodeIdList[i], nodeIdList[(i + 1) % l])
 
         for leafId in self.g.getDisconnected():
             # if nothing depends on a node and the node 
@@ -688,7 +697,7 @@ class DependencyChecker:
                                     nodeSort=lambda a, b: cmp(a[1],  b[1]))
         return [ [y[0] for y in jobSets[x]] for x in orderedComponents ]
 
-    def _findOrdering(self, result, brokenByErase, satisfied):
+    def _findOrdering(self, result, brokenByErase, satisfied, linkedJobSets):
         changeSetList = []
 
         # there are four kinds of edges -- old needs old, old needs new,
@@ -726,6 +735,8 @@ class DependencyChecker:
         # Remove nodes which cancel each other
         self._collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
+        linkedNodes  = self._getLinkedNodes(linkedJobSets)
+
         # the edges left in oldNewEdges represent dependencies which troves
         # slated for removal have on troves being installed. either those
         # dependencies will already be guaranteed by edges in oldOldEdges,
@@ -743,7 +754,7 @@ class DependencyChecker:
         # and the particular depId no longer matter. The direction here is
         # a bit different, and defines the ordering for the operation, not
         # the order of the dependency
-        self._buildEdges(oldOldEdges, newNewEdges, collectionEdges)
+        self._buildEdges(oldOldEdges, newNewEdges, collectionEdges, linkedNodes)
         del oldOldEdges
         del newNewEdges
 
@@ -753,6 +764,22 @@ class DependencyChecker:
             changeSetList.append(list(componentList))
 
         return changeSetList
+
+    def _getLinkedNodes(self, linkedJobSets):
+        # convert from jobSets -> a bunch of nodes that need
+        # to be updated together.
+        linkedNodes = []
+        for jobSet in linkedJobSets:
+            nodeList = []
+            for job in jobSet:
+                if job[1][0]:
+                    nodeId = self.oldInfoToNodeId[job[0], job[1][0], job[1][1]]
+                else:
+                    nodeId = self.newInfoToNodeId[job[0], job[2][0], job[2][1]]
+                nodeList.append(nodeId)
+            linkedNodes.append(nodeList)
+
+        return linkedNodes
 
     def iterNodes(self):
         # skips the None node on the front
@@ -800,7 +827,7 @@ class DependencyChecker:
         self.workTables.merge()
         self.workTables.mergeRemoves()
 
-    def check(self, findOrdering = False):
+    def check(self, findOrdering = False, linkedJobs = None):
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
         # "unresolvable" dependencies. (they could be resolved by something
@@ -822,7 +849,7 @@ class DependencyChecker:
 
         # it's a shame we instantiate this, but merging _gatherResoltion
         # and _findOrdering doesn't seem like any fun
-        result = [ x for x in self.cu ]
+        result = self.cu.fetchall()
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -836,9 +863,11 @@ class DependencyChecker:
         satisfied, brokenByErase, wasIn, unresolveable = \
                                 self._gatherResolution(result)
 
+        if linkedJobs is None:
+            linkedJobs = set()
         if findOrdering:
-            changeSetList = self._findOrdering(result, brokenByErase,
-                                               satisfied)
+            changeSetList = self._findOrdering(result, brokenByErase, satisfied,
+                                               linkedJobSets=linkedJobs)
         else:
             changeSetList = []
 
