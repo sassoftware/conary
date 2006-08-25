@@ -21,8 +21,8 @@ Changes in @NEW@:
       it no longer downloads all of the file contents that would be cloned.
     * /etc/conary/mirrors/gnu has been added to enable mirror://
       references to the GNU mirror system.
-    * /etc/conary/mirrors/cpan has been added to enable mirror:// references to
-    * the Comprehensive Perl Archive network mirror system.
+    * /etc/conary/mirrors/cpan has been added to enable mirror://
+      references to the Comprehensive Perl Archive network mirror system.
     * Components that modify the same files are now required to be in the 
       same update job (for example, if a file moves from package a to
       package b, we make the erase of package a and the install of package
