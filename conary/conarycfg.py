@@ -469,7 +469,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
         try:
             entServer = p['server']
             entClass = p['class']
-            endKey = p['key']
+            entKey = p['key']
         except KeyError:
             raise errors.ConaryError("Entitlement incomplete.  Entitlements"
                                      " must include 'server', 'class', and"
@@ -482,7 +482,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
         raise errors.ConaryError("Entitlement at %s is for server '%s', "
                          "should be for '%s'" % (source, entServer, serverName))
 
-    return (entClass, endKey)
+    return (entClass, entKey)
 
 def loadEntitlementFromProgram(fullPath, serverName):
     """ Executes the given file to generate an entitlement.
