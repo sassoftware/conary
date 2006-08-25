@@ -285,6 +285,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
 	return fileObj
 
+    def getConfigFileContents(self, sha1):
+        return filecontents.FromDataStore(self.contentsStore, sha1)
+
     def findFileVersion(self, fileId):
         return self.db.findFileVersion(fileId)
 

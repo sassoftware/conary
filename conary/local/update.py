@@ -920,11 +920,6 @@ class FilesystemJob:
         changedOther = [ x[1:] for x in pathsMoved.itervalues()
                                 if x[0] == newTroveInfo ]
 
-        if troveCs.getName() == 'foo:config':
-            import epdb
-            epdb.st('f')
-
-
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
         for (pathId, headPath, headFileId, headFileVersion),        \
@@ -1159,11 +1154,20 @@ class FilesystemJob:
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
-                    assert(changeSet.configFileIsDiff(pathId))
 
-                    (headFileContType,
-                     headFileContents) = changeSet.getFileContents(pathId)
-                    assert(headFileContType == changeSet.
+                    if changeSet.configFileIsDiff(pathId):
+                        (headFileContType,
+                         headFileContents) = changeSet.getFileContents(pathId)
+                    else:
+                        assert(baseFile.hasContents)
+                        oldCont = self.db.getConfigFileContents(
+                                            baseFile.contents.sha1())
+
+                        # we're supposed to have a diff
+                        cont = filecontents.FromChangeSet(changeSet, pathId)
+                        (headFileContType, headFileContents) = \
+                                changeset.fileContentsDiff(baseFile, oldCont,
+                                                           headFile, cont)
 
                     cur = open(realPath, "r").readlines()
                     diff = headFileContents.get().readlines()
