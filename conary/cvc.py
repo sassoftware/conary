@@ -241,7 +241,10 @@ class CloneCommand(CvcCommand):
                                   'information about how this trove was built'),
              'info'            : 'Do not perform clone',
              'with-sources'    : ('Ensure that any binaries that are being'
-                                  ' cloned also have a matching source component')
+                                 ' cloned also have a matching source component'),
+             'message': 'Use MESSAGE for the changelog entry for all cloned sources',
+             'test':    ('Runs through all the steps of committing but does not'
+                         'modify the repository')
            }
 
     def addParameters(self, argDef):
@@ -249,6 +252,8 @@ class CloneCommand(CvcCommand):
         argDef["skip-build-info"] = NO_PARAM
         argDef["info"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
+        argDef["message"] = '-m', ONE_PARAM
+        argDef["test"] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -258,10 +263,13 @@ class CloneCommand(CvcCommand):
         from conary import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
         info = argSet.pop('info', False)
+        message = argSet.pop("message", None)
+        test = argSet.pop("test", False)
         cloneSources = argSet.pop('with-sources', False)
         if argSet: return self.usage()
         clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info,
-                         cloneSources=cloneSources)
+                         cloneSources=cloneSources, message = message, 
+                         test = test)
 _register(CloneCommand)
 
 
