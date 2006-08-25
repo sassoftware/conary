@@ -23,6 +23,7 @@ import weakref
 
 #conary
 from conary.errors import ParseError
+from conary.lib import log
 
 staticLabelTable = {}
 
@@ -214,7 +215,8 @@ class Revision(AbstractRevision):
 
 	@rtype: str
 	"""
-	assert(self.timeStamp)
+        if not self.timeStamp:
+            log.warning('freezeTimestamp() called on a Revision that has no timestamp')
 	return "%.3f" % self.timeStamp
 
     def thawTimestamp(self, str):
@@ -971,6 +973,8 @@ class Version(VersionSequence):
         # depth, just increment the build count (without lengthing
         # it). if the source count is too short, make the build count
         # the right length for this shadow
+        self._clearVersionCache()
+
         shadowLength = self.shadowLength()
         self.hash = None
         self.strRep = None
