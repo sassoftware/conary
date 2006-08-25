@@ -19,6 +19,10 @@ Changes in @NEW@:
     * cvc clone now has a --test parameter that runs through all steps of
       cloning without performing the clone.  --info is now more lightweight -
       it no longer downloads all of the file contents that would be cloned.
+    * /etc/conary/mirrors/gnu has been added to enable mirror://
+      references to the GNU mirror system.
+    * /etc/conary/mirrors/cpan has been added to enable mirror:// references to
+    * the Comprehensive Perl Archive network mirror system.
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
