@@ -17,7 +17,8 @@ mirror_files =	\
                 debian \
                 fedora \
                 gentoo \
-                sourceforge
+                sourceforge \
+                gnu
 
 
 dist_files = Makefile $(mirror_files)
