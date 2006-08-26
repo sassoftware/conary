@@ -99,4 +99,4 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     signAbsoluteChangeset(cs, sigKey)
 
     if not test:
-        client.repos.commitChangeSet(cs)
+        client.repos.commitChangeSet(cs, callback=callback)
