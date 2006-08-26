@@ -837,6 +837,7 @@ class MigrateTo_21(SchemaMigration):
     def migrate(self):
         createTroveInfo(self.db) # create index on troveInfo instance + infoType
         self.db.commit()
+        return self.Version
 
 def checkVersion(db):
     global VERSION
