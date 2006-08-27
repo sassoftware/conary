@@ -15,7 +15,7 @@
 import sys
 import itertools
 from conary import trove, deps, errors, files, streams
-from conary.dbstore import idtable, migration
+from conary.dbstore import idtable, migration, sqlerrors
 
 # Stuff related to SQL schema maintenance and migration
 
@@ -836,18 +836,18 @@ class MigrateTo_20(SchemaMigration):
 # conary from working until a schema migration is done
 def optSchemaUpdate(db):
     #do we have the index we need?
-    if "TroveInfoTypeInstanceIdx" in db.tables["TroveInfo"]:
+    if "TroveInfoInstTypeIdx" in db.tables["TroveInfo"]:
         return
     # we need to have write access
     try:
-        cu = self.db.cursor()
+        cu = db.cursor()
         cu.execute("BEGIN IMMEDIATE")
     except sqlerrors.ReadOnlyDatabase:
         return
     else:
-        self.db.rollback()
+        db.rollback()
     # we have write access and we need the index created
-    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx ",
+    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx",
                    "infoType,instanceId")
 
 def checkVersion(db):
