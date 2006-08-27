@@ -22,7 +22,7 @@ from conary.dbstore import idtable, migration
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 21
+VERSION = 20
 
 def resetTable(cu, name):
     try:
@@ -831,18 +831,33 @@ class MigrateTo_20(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
-class MigrateTo_21(SchemaMigration):
-    Version = 21
-
-    def migrate(self):
-        createTroveInfo(self.db) # create index on troveInfo instance + infoType
-        self.db.commit()
-        return self.Version
+# silent update while we're at schema 20. We only need to create a
+# index, so there is no need to do a full blown migration and stop
+# conary from working until a schema migration is done
+def optSchemaUpdate(db):
+    #do we have the index we need?
+    if "TroveInfoTypeInstanceIdx" in db.tables["TroveInfo"]:
+        return
+    # we need to have write access
+    try:
+        cu = self.db.cursor()
+        cu.execute("BEGIN IMMEDIATE")
+    except sqlerrors.ReadOnlyDatabase:
+        return
+    else:
+        self.db.rollback()
+    # we have write access and we need the index created
+    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx ",
+                   "infoType,instanceId")
 
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
     if version == VERSION:
+        # the actions performed by this function should be integrated
+        # in the next schema update, when we have a reason to block
+        # conary functionality...
+        optSchemaUpdate(db)
         return version
     if version > VERSION:
         raise NewDatabaseSchema
