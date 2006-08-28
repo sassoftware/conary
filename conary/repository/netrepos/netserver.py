@@ -85,11 +85,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'deleteAcl',
                         'changePassword',
                         'getUserGroups',
+                        'addEntitlement',
                         'addEntitlements',
                         'addEntitlementGroup',
                         'deleteEntitlementGroup',
                         'addEntitlementOwnerAcl',
                         'deleteEntitlementOwnerAcl',
+                        'deleteEntitlement',
                         'deleteEntitlements',
                         'listEntitlements',
                         'listEntitlementGroups',
@@ -520,6 +522,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
+    def addEntitlement(self, authToken, clientVersion, *args):
+        raise errors.InvalidClientVersion(
+            'conary 1.1.x is required to manipulate entitlements in '
+            'this repository server')
+
     def addEntitlements(self, authToken, clientVersion, entGroup, 
                         entitlements):
         # self.auth does its own authentication check
@@ -528,6 +535,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.auth.addEntitlement(authToken, entGroup, entitlement)
 
         return True
+
+    def deleteEntitlement(self, authToken, clientVersion, *args):
+        raise errors.InvalidClientVersion(
+            'conary 1.1.x is required to manipulate entitlements in '
+            'this repository server')
 
     def deleteEntitlements(self, authToken, clientVersion, entGroup, 
                            entitlements):

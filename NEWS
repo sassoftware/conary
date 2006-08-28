@@ -33,6 +33,11 @@ Changes in @NEW@:
       and flavor caching optimizations that make the code about 
       2.5 times faster (from 10 seconds to 4 seconds).
 
+  o Server Changes:
+    The Conary repository server now sends a InvalidClientVersion
+    exception when a conary 1.0.x client attempts to manipulate an
+    entitlement through addEntitlement() or deleteEntitlement().
+
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
