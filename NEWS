@@ -50,6 +50,13 @@ Changes in @NEW@:
       and flavor caching optimizations that make the code about 
       2.5 times faster (from 10 seconds to 4 seconds).
 
+  o Build Changes:
+    * The PythonSetup build action no longer provides the older
+      --single-version-externally-managed argument, and instead
+      provides the --prefix, --install-purelib, and --install-platlib
+      arguments.  This allows it to work correctly with a greater
+      number of packages. (CNY-809)
+
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
