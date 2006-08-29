@@ -99,6 +99,11 @@ class BaseCursor:
             return self._cursor.execute(sql, args[0])
         return self._cursor.execute(sql, *args)
 
+    # passthrough for the driver's optimized executemany()
+    def executemany(self, sql, argList):
+        assert(self.dbh and self._cursor)
+        return self._cursor.executemany(sql.strip(), argList)
+
     def compile(self, sql):
         return sql
 

@@ -33,6 +33,24 @@ def _regexp(pattern, item):
 def _timestamp():
     return long(time.strftime("%Y%m%d%H%M%S", time.gmtime(time.time())))
 
+# execute with exception translation
+def cursorExecute(func, *params, **kw):
+    try:
+        ret = func(*params, **kw)
+    except sqlite3.ProgrammingError, e:
+        if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+            raise sqlerrors.ColumnNotUnique(e)
+        elif e.args[0] == 'attempt to write a readonly database':
+            raise sqlerrors.ReadOnlyDatabase(str(e))
+        raise sqlerrors.CursorError(e.args[0], e)
+    except sqlite3.DatabaseError, e:
+        if e.args[0].startswith('duplicate column name:'):
+            raise sqlerrors.DuplicateColumnName(str(e))
+        if e.args[0].startswith("no such table"):
+            raise sqlerrors.InvalidTable(str(e))
+        raise sqlerrors.CursorError(e.args[0], e)
+    return ret
+
 class Cursor(BaseCursor):
     driver = "sqlite"
 
@@ -64,26 +82,17 @@ class Cursor(BaseCursor):
         return s
 
     def execute(self, sql, *params, **kw):
-        try:
-            ret = self._execute(sql, *params, **kw)
-        except sqlite3.ProgrammingError, e:
-            #if self.dbh.inTransaction:
-            #    self.dbh.rollback()
-            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
-                raise sqlerrors.ColumnNotUnique(e)
-            elif e.args[0] == 'attempt to write a readonly database':
-                raise sqlerrors.ReadOnlyDatabase(str(e))
-            raise sqlerrors.CursorError(e.args[0], e)
-        except sqlite3.DatabaseError, e:
-            if e.args[0].startswith('duplicate column name:'):
-                raise sqlerrors.DuplicateColumnName(str(e))
-            if e.args[0].startswith("no such table"):
-                raise sqlerrors.InvalidTable(str(e))
-            raise sqlerrors.CursorError(e.args[0], e)
-        else:
-            if ret == self._cursor:
-                return self
-            return ret
+        ret = cursorExecute(self._execute, sql, *params, **kw)
+        if ret == self._cursor:
+            return self
+        return ret
+
+    # we need to wrap this one through the exception translation layer
+    def executemany(self, sql, paramList, **kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
+
+        return cursorExecute(self._cursor.executemany, sql, paramList, **kw)
 
     # deprecated - this breaks programs by commiting stuff before its due time
     def executeWithCommit(self, sql, *params, **kw):
