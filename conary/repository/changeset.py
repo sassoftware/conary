@@ -1107,26 +1107,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         else:
             assert(otherCs.__class__ ==  ChangeSet)
-
-            # make a copy. the configCache should only store diffs
-            configs = {}
-
-            for (pathId, (contType, contents, compressed)) in \
-                                    otherCs.configCache.iteritems():
-                assert(not compressed)
-                if contType == ChangedFileTypes.diff:
-                    self.configCache[pathId] = (contType, contents, compressed)
-                else:
-                    configs[pathId] = (contType, contents, compressed)
-
-            wrapper = DictAsCsf(otherCs.fileContents)
-            wrapper.addConfigs(configs)
-            self.csfWrappers.append(wrapper)
-            entry = wrapper.getNextFile()
-            if entry:
-                util.tupleListBsearchInsert(self.fileQueue,
-                                            entry + (wrapper,), 
-                                            self.fileQueueCmp)
+            self.configCache.update(otherCs.configCache)
 
     def reset(self):
         for csf in self.fileContainers:
