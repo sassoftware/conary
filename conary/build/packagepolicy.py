@@ -1526,7 +1526,7 @@ def _getperl(macros, recipe):
     perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
     # not %(bindir)s so that package modifications do not affect
     # the search for system perl
-    perlPath = '/usr/bin/perl' %macros
+    perlPath = '/usr/bin/perl'
 
     def _perlDestInc(destdir, perlDestInc):
         return ' '.join(['-I' + destdir + x for x in perlDestInc])
@@ -1558,6 +1558,34 @@ def _getperl(macros, recipe):
 
     # must be no perl at all
     return ['', '']
+
+
+def _getpython(macros):
+    """
+    Returns the preferred instance of python to use.
+    """
+    pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
+    # not %(bindir)s so that package modifications do not affect
+    # the search for system python
+    pythonPath = '/usr/bin/python'
+
+    if os.access(pythonDestPath, os.X_OK):
+        return pythonDestPath
+    elif os.access(pythonPath, os.X_OK):
+        return pythonPath
+    # No python?  How is cvc running at all?
+    return None
+
+
+def _stripDestDir(pathList, destdir):
+    destDirLen = len(destdir)
+    pathElementList = []
+    for pathElement in pathList:
+        if pathElement.startswith(destdir):
+            pathElementList.append(pathElement[destDirLen:])
+        else:
+            pathElementList.append(pathElement)
+    return pathElementList
 
 
 class Provides(policy.Policy):
@@ -1657,29 +1685,27 @@ class Provides(policy.Policy):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
+        pythonPath = _getpython(self.macros)
+        # conary is a python program...
+        assert(pythonPath)
 
         try:
-            # 1. determine python dir based on python version and sys.prefix,
-            # just like site.py does
-            pythonDir = os.path.dirname(sys.modules['os'].__file__)
-            systemPaths = set([pythonDir])
+            # get preferred sys.path (not modified by Conary wrapper)
+            # from python just built in destdir, or if that is not
+            # available, from system conary
+            systemPaths = set(x.strip() for x in util.popen(
+                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
+                %pythonPath).read().split('\0')
+                if x)
+            systemPaths = set(_stripDestDir(systemPaths, destdir))
 
-            # 2. determine root system site-packages, and add them to the
-            # list of acceptable provide paths
-            sys.path = []
-            site.addsitepackages(None)
-            systemPaths.update(sys.path)
-
-            # 3. determine created destdir site-packages, and add them to
+            # determine created destdir site-packages, and add them to
             # the list of acceptable provide paths
             sys.path = []
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
             site.addsitepackages(None)
-
-            destDirLen = len(destdir)
-            systemPaths.update(x[destDirLen:] for x in sys.path
-                                                    if x.startswith(destdir))
+            systemPaths.update(_stripDestDir(sys.path, destdir))
 
             # later, we will need to truncate paths using longest path first
             self.sysPath = sorted(systemPaths, key=len, reverse=True)
@@ -2244,41 +2270,36 @@ class Requires(_addInfo):
         oldSysPath = sys.path
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
+        destdir = self.macros.destdir
+        pythonPath = _getpython(self.macros)
+        # conary is a python program...
+        assert(pythonPath)
 
         try:
-            destdir = self.macros.destdir
+            # get preferred sys.path (not modified by Conary wrapper)
+            # from python just built in destdir, or if that is not
+            # available, from system conary
+            systemPaths = [x.strip() for x in util.popen(
+                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
+                %pythonPath).read().split('\0')
+                if x]
 
-            # 1. determine python dir based on python version and sys.prefix,
-            # just like site.py does
-            pythonDir = os.path.dirname(sys.modules['os'].__file__)
-            systemPaths = [pythonDir]
-
-
-            # 2. generate site-packages list for /
-            sys.path = []
-            site.addsitepackages(None)
-
-            systemPaths += sys.path
-
-            # 2. generate site-packages list for destdir
+            # generate site-packages list for destdir
             # (look in python base directory first)
+            pythonDir = os.path.dirname(sys.modules['os'].__file__)
             sys.path = [destdir + pythonDir]
-
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
             site.addsitepackages(None)
-
-            destDirPaths = sys.path
-
-            # when searching for modules, we search destdir first,
-            # then system.
-            self.sysPath = destDirPaths + systemPaths
+            systemPaths = sys.path + systemPaths
 
             # make an unsorted copy for module finder
-            sysPathForModuleFinder = list(self.sysPath)
+            sysPathForModuleFinder = list(systemPaths)
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath.sort(key=len, reverse=True)
+            self.sysPath = sorted(set(_stripDestDir(systemPaths, destdir)),
+                                  key=len, reverse=True)
+
         finally:
             sys.path = oldSysPath
             sys.prefix = oldSysPrefix
@@ -2294,6 +2315,7 @@ class Requires(_addInfo):
         # FIXME: we really should check for python in destdir and shell
         # out to use that python to discover the dependencies if it exists.
         destdir = self.recipe.macros.destdir
+        destDirLen = len(destdir)
 
         if not self.sysPath:
             self._generatePythonRequiresSysPath()
@@ -2309,6 +2331,8 @@ class Requires(_addInfo):
             return
 
         for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
+            if depPath.startswith(destdir):
+                depPath = depPath[destDirLen:]
             for sysPathEntry in self.sysPath:
                 if depPath.startswith(sysPathEntry):
                     newDepPath = depPath[len(sysPathEntry)+1:]
