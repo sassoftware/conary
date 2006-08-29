@@ -56,6 +56,11 @@ Changes in @NEW@:
       provides the --prefix, --install-purelib, and --install-platlib
       arguments.  This allows it to work correctly with a greater
       number of packages. (CNY-809)
+    * Python dependencies were previously incorrectly calculated
+      for certain module path elements added in some Python C
+      code (for example, contents of the lib-dynload directory);
+      these errors are now resolved by using external python
+      to find system path elements. (CNY-813)
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
