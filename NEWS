@@ -63,6 +63,8 @@ Changes in @NEW@:
       code (for example, contents of the lib-dynload directory);
       these errors are now resolved by using external python
       to find system path elements. (CNY-813)
+    * The "cvc cook" command now prints the flavor being built,
+      as well as the version. (CNY-817)
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
