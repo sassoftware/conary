@@ -30,6 +30,8 @@ Changes in @NEW@:
     * Paths moving between troves as part of a single job are now treated
       as file updates instead of separate add/remove events (CNY-750,
       CNY-786, CNY-359)
+    * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
+      objects directly (CNY-640)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
