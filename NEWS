@@ -78,7 +78,8 @@ Changes in @NEW@:
       version object before calling setTimeStamps() or
       resetTimeStamps() on it.  When creating a version object from a
       string and time stamp set, use the timeStamps= keyword argument
-      to versions.VersionFromString to avoid the copy.
+      to versions.VersionFromString to avoid the copy.  In a later
+      version of Conary, version objects will be immutable.
 
 Changes in 1.0.29:
   o Bug Fixes:
