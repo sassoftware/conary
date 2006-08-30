@@ -65,6 +65,8 @@ Changes in @NEW@:
       to find system path elements. (CNY-813)
     * The "cvc cook" command now prints the flavor being built,
       as well as the version. (CNY-817)
+    * The GNU mirror list was significantly expanded and resorted.
+      (CNY-824)
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
