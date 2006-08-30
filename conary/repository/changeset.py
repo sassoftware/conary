@@ -1157,7 +1157,11 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                     raise errors.ConaryError(
                                 "Error opening changeset '%s': %s" % 
                                     (fileName, err.strerror))
-                csf = filecontainer.FileContainer(f)
+                try:
+                    csf = filecontainer.FileContainer(f)
+                except IOError, err:
+                    raise filecontainer.BadContainer(
+                                "File %s is not a valid conary changeset: %s" % fileName)
             else:
                 csf = filecontainer.FileContainer(fileName)
 
