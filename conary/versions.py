@@ -974,9 +974,16 @@ class Version(VersionSequence):
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
+        self._clearVersionCache()
+
         self.hash = None
         self.strRep = None
 	self.versions[-1]._incrementSourceCount(self.shadowLength())
+        if self.cached:
+            log.warning('incrementSourceCount() was called on a version that '
+                        'is cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
 
     def incrementBuildCount(self):
 	"""
@@ -1008,6 +1015,12 @@ class Version(VersionSequence):
                 buildCount = SerialNumber(
                             ".".join([ '0' ] * shadowLength + [ '1' ] ))
                 self.versions[-1]._setBuildCount(buildCount)
+
+        if self.cached:
+            log.warning('incrementBuildCount() was called on a version that '
+                        'is cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
 
         self.versions[-1].resetTimeStamp()
 
@@ -1210,6 +1223,7 @@ class Version(VersionSequence):
         of the branch, even when the two are equal.
         """
         newV = self.copy()
+        newV.cached = False
         v = newV
         trailingRevisions = []
         while v.hasParentVersion():

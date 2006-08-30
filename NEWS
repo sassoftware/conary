@@ -75,11 +75,13 @@ Changes in @NEW@:
       the other inadvertently.  A warning message has been added to
       the version object when setting or resetting timestamps to make
       developers aware of the problem.  Developers should copy the
-      version object before calling setTimeStamps() or
-      resetTimeStamps() on it.  When creating a version object from a
-      string and time stamp set, use the timeStamps= keyword argument
-      to versions.VersionFromString to avoid the copy.  In a later
-      version of Conary, version objects will be immutable.
+      version object before calling setTimeStamps(),
+      resetTimeStamps(), incrementSourceCount(), or
+      incrementBuildCount() on it.  When creating a version object
+      from a string and time stamp set, use the timeStamps= keyword
+      argument to versions.VersionFromString() to avoid the copy.  In
+      a later version of Conary, version objects will be immutable.
+      New methods will be introduced that return new modified objects.
 
 Changes in 1.0.29:
   o Bug Fixes:
