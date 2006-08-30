@@ -19,10 +19,6 @@ Changes in @NEW@:
     * cvc clone now has a --test parameter that runs through all steps of
       cloning without performing the clone.  --info is now more lightweight -
       it no longer downloads all of the file contents that would be cloned.
-    * /etc/conary/mirrors/gnu has been added to enable mirror://
-      references to the GNU mirror system.
-    * /etc/conary/mirrors/cpan has been added to enable mirror://
-      references to the Comprehensive Perl Archive network mirror system.
     * Components that modify the same files are now required to be in the 
       same update job (for example, if a file moves from package a to
       package b, we make the erase of package a and the install of package
@@ -65,8 +61,12 @@ Changes in @NEW@:
       to find system path elements. (CNY-813)
     * The "cvc cook" command now prints the flavor being built,
       as well as the version. (CNY-817)
-    * The GNU mirror list was significantly expanded and resorted.
+    * /etc/conary/mirrors/gnu has been added to enable mirror://
+      references to the GNU mirror system.
+    * The GNU mirror list was then significantly expanded and resorted.
       (CNY-824)
+    * /etc/conary/mirrors/cpan has been added to enable mirror://
+      references to the Comprehensive Perl Archive network mirror system.
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
