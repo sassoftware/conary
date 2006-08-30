@@ -505,7 +505,7 @@ class TroveStore:
         latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
         if language == "C":
             if latestVersion: # a version exists, increment it
-                version = versions.VersionFromString(latestVersion)
+                version = versions.VersionFromString(latestVersion).copy()
                 version.incrementSourceCount()
             else: # otherwise make a new version
                 version = versions._VersionFromString("1-1", defaultBranch=branch)
@@ -717,10 +717,10 @@ class TroveStore:
             else:
                 changeLog = None
 
-            singleTroveInfo[1].setTimeStamps(
-                    [ float(x) for x in timeStamps.split(":") ])
+            v = singleTroveInfo[1].copy()
+            v.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
-            trv = trove.Trove(singleTroveInfo[0], singleTroveInfo[1],
+            trv = trove.Trove(singleTroveInfo[0], v,
                               singleTroveInfo[2], changeLog,
                               isRedirect = isRedirect,
                               setVersion = False)
@@ -729,12 +729,9 @@ class TroveStore:
                 while troveTrovesCursor.peek()[0] == idx:
                     idxA, name, version, flavor, flags, timeStamps = \
                                                 troveTrovesCursor.next()
-                    version = versions.VersionFromString(version)
+                    ts = [ float(x) for x in timeStamps.split(":") ]
+                    version = versions.VersionFromString(version, timeStamps=ts)
                     flavor = deps.ThawFlavor(flavor)
-
-                    version.setTimeStamps(
-                            [ float(x) for x in timeStamps.split(":") ])
-
                     byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
                     weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
                     trv.addTrove(name, version, flavor, byDefault = byDefault,

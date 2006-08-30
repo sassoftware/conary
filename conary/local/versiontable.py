@@ -36,8 +36,8 @@ class VersionTable:
         cu.execute("DELETE FROM Versions WHERE versionId=?", theId)
 
     def _makeVersion(self, str, timeStamps):
-	v = versions.VersionFromString(str)
-	v.setTimeStamps([ float(x) for x in timeStamps.split(":")])
+        ts = [ float(x) for x in timeStamps.split(":") ]
+	v = versions.VersionFromString(str, timeStamps=ts)
 	return v
 
     def getBareId(self, theId):

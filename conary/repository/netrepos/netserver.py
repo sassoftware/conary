@@ -885,9 +885,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                 assert(withFlavors)
 
-                version = versions.VersionFromString(versionStr)
-                version.setTimeStamps([float(x) for x in
-                                            timeStamps.split(":")])
+                ts = [float(x) for x in timeStamps.split(":")]
+                version = versions.VersionFromString(versionStr, timeStamps=ts)
 
                 d = troveVersions.get(troveName, None)
                 if d is None:
@@ -913,9 +912,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 for (finalTimestamp, flavorScore, versionStr, timeStamps,
                      flavor) in versionDict.itervalues():
-                    version = versions.VersionFromString(versionStr)
-                    version.setTimeStamps([float(x) for x in
-                                                timeStamps.split(":")])
+                    ts = [float(x) for x in timeStamps.split(":")]
+                    version = versions.VersionFromString(versionStr, timeStamps=ts)
                     version = self.freezeVersion(version)
 
                     if withFlavors:

@@ -290,6 +290,7 @@ class ClientClone:
 
         # make sure there are no zeroed timeStamps - targetBranch may be
         # a user-supplied string
+        targetBranch = targetBranch.copy()
         targetBranch.resetTimeStamps()
 
         # split out the binary and sources
