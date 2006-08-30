@@ -28,6 +28,9 @@ Changes in @NEW@:
       CNY-786, CNY-359)
     * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
       objects directly (CNY-640)
+    * Errors in callbacks are issues as warnings and the current job is
+      finished before existing. KeyboardInterrupts and SystemExits are handled
+      immediately (CNY-806)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
@@ -93,6 +96,8 @@ Changes in @NEW@:
       argument to versions.VersionFromString() to avoid the copy.  In
       a later version of Conary, version objects will be immutable.
       New methods will be introduced that return new modified objects.
+    * Conary no longer hangs waiting for the download thread when an error
+      occured in the download thread which caused it to terminate.
 
 Changes in 1.0.29:
   o Bug Fixes:

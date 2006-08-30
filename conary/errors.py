@@ -100,3 +100,8 @@ class InvalidRegex(ParseError):
 
     def __init__(self, expr):
         self.expr = expr
+
+UncatchableExceptionClasses = [ SystemExit, KeyboardInterrupt ]
+
+def exceptionIsUncatchable(e):
+    return e.__class__ in UncatchableExceptionClasses

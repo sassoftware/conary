@@ -12,11 +12,42 @@
 #
 
 import sys
+import types
 
-class Callback:
-    pass
+from conary import errors
+from conary.lib import log
 
-class ChangesetCallback:
+def exceptionProtection(method, exceptionCallback):
+    def wrapper(*args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except Exception, e:
+            if errors.exceptionIsUncatchable(e):
+                raise
+
+            exceptionCallback(e)
+
+    return wrapper
+
+class Callback(object):
+
+    def _exceptionOccured(self, e):
+        log.warning("%s: %s" % (e.__class__.__name__, e))
+        self.exceptions.append(e)
+
+    def __getattribute__(self, name):
+        item = object.__getattribute__(self, name)
+        if name[0] == '_':
+            return item
+        elif not isinstance(item, types.MethodType):
+            return item
+
+        return exceptionProtection(item, self._exceptionOccured)
+
+    def __init__(self):
+        self.exceptions = []
+
+class ChangesetCallback(Callback):
 
     def preparingChangeSet(self):
         pass
@@ -49,6 +80,7 @@ class ChangesetCallback:
         pass
 
     def __init__(self):
+        Callback.__init__(self)
         self.rate = 0
 
 class CookCallback(ChangesetCallback):
@@ -81,7 +113,6 @@ class CookCallback(ChangesetCallback):
         pass
 
 class UpdateCallback(ChangesetCallback):
-
 
     def resolvingDependencies(self):
         pass
@@ -123,23 +154,21 @@ class UpdateCallback(ChangesetCallback):
         pass
 
     def checkAbort(self):
-        return (self.abortEvent and self.abortEvent.isSet())
+        return (self.abortEvent and self.abortEvent.isSet()) or self.exceptions
 
     def setAbortEvent(self, event = None):
         self.abortEvent = event
 
     def __init__(self):
+        ChangesetCallback.__init__(self)
         self.abortEvent = None
 
-class SignatureCallback:
+class SignatureCallback(Callback):
 
     def signTrove(self, got, need):
         pass
 
-    def __init__(self):
-        pass
-
-class FetchCallback:
+class FetchCallback(Callback):
 
     def setRate(self, rate):
         self.rate = rate
@@ -148,14 +177,16 @@ class FetchCallback:
         pass
 
     def __init__(self):
+        Callback.__init__(self)
         self.rate = 0
 
-class KeyCacheCallback:
+class KeyCacheCallback(Callback):
 
     def getPublicKey(self, keyId, serverName):
         return False
 
     def __init__(self, repositoryMap = None, pubRing = ''):
+        Callback.__init__(self)
         self.repositoryMap = repositoryMap
         self.pubRing = pubRing
 

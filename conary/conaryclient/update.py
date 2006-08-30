@@ -2517,11 +2517,15 @@ conary erase '%s=%s[%s]'
                     return
 
                 callback.setChangesetHunk(i + 1, len(allJobs))
-                newCs = _createCs(repos, db, job, uJob)
+                try:
+                    newCs = _createCs(repos, db, job, uJob)
+                except:
+                    q.put(None)
+                    raise
 
                 while True:
                     # block for no more than 5 seconds so we can
-                    # check to see if we should sbort
+                    # check to see if we should abort
                     try:
                         q.put(newCs, True, 5)
                         break
@@ -2600,6 +2604,8 @@ conary erase '%s=%s[%s]'
                         callback.setUpdateJob(allJobs[i - 1])
                         _applyCs(newCs, uJob, removeHints = removeHints)
                         callback.updateDone()
+                        if callback.exceptions:
+                            break
                 finally:
                     stopDownloadEvent.set()
                     # the download thread _should_ respond to the
