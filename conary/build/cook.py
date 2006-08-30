@@ -749,7 +749,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                   trove.getFlavor()))
         else:
             unmanagedPolicyFiles.append(policyPath)
-            ver = versions.VersionFromString('/local@local:LOCAL/0-0')
+            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
             ver.resetTimeStamps()
             policyTroves.add((policyPath, ver, deps.Flavor()))
     del db

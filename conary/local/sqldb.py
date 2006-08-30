@@ -287,8 +287,8 @@ class DBInstanceTable:
 		      WHERE instanceId=?""", instanceId)
 	try:
 	    (s, t) = cu.next()
-	    v = versions.VersionFromString(s)
-	    v.setTimeStamps([ float(x) for x in t.split(":") ])
+            ts = [ float(x) for x in t.split(":") ]
+	    v = versions.VersionFromString(s, timeStamps=ts)
 	    return v
 	except StopIteration:
             raise KeyError, instanceId

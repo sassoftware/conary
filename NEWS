@@ -75,7 +75,22 @@ Changes in @NEW@:
     * Calling "cvc update" on a new package will fail with an
       appropriate error message instead of displaying a
       traceback. (CNY-715)
-    * Conary can now update a file from a non-directory to a directory.
+    * Conary can now update a file from a non-directory to a
+      directory.
+    * Currently version objects are cached to optimize Conary.
+      Unfortunately, version objects are mutable objects.  That means
+      that if two different pieces of code are given the same version
+      object, modifications made by one part of the code could affect
+      the other inadvertently.  A warning message has been added to
+      the version object when setting or resetting timestamps to make
+      developers aware of the problem.  Developers should copy the
+      version object before calling setTimeStamps(),
+      resetTimeStamps(), incrementSourceCount(), or
+      incrementBuildCount() on it.  When creating a version object
+      from a string and time stamp set, use the timeStamps= keyword
+      argument to versions.VersionFromString() to avoid the copy.  In
+      a later version of Conary, version objects will be immutable.
+      New methods will be introduced that return new modified objects.
 
 Changes in 1.0.29:
   o Bug Fixes:

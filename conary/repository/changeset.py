@@ -623,7 +623,7 @@ class ChangeSet(streams.StreamSet):
             newVer.incrementBuildCount()
 
             if repos.hasTrove(name, newVer, troveCs.getNewFlavor()):
-                newVer = repos.getTroveLatestVersion(name, newVer.branch())
+                newVer = repos.getTroveLatestVersion(name, newVer.branch()).copy()
                 newVer.incrementBuildCount()
 
             newTrv = oldTrv.copy()
