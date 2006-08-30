@@ -44,18 +44,23 @@ class UserInformation(list):
         # Look for the first item which globs to this, and insert the new
         # item before it. That makes sure find always matches on the
         # most-specific instance
-        for newItem in itemList:
+        for newItem in reversed(itemList):
             self.append(newItem)
 
     def append(self, newItem):
         location = None
+        removeOld = False
         for i, (serverGlob, user, password) in enumerate(self):
             if fnmatch.fnmatch(newItem[0], serverGlob):
+                if serverGlob == newItem[0]:
+                    removeOld = True
                 location = i
                 break
 
         if location is None:
             list.append(self, newItem)
+        elif removeOld:
+            self[location] = newItem
         else:
             self.insert(location, newItem)
 
@@ -469,7 +474,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
         try:
             entServer = p['server']
             entClass = p['class']
-            endKey = p['key']
+            entKey = p['key']
         except KeyError:
             raise errors.ConaryError("Entitlement incomplete.  Entitlements"
                                      " must include 'server', 'class', and"
@@ -482,7 +487,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
         raise errors.ConaryError("Entitlement at %s is for server '%s', "
                          "should be for '%s'" % (source, entServer, serverName))
 
-    return (entClass, endKey)
+    return (entClass, entKey)
 
 def loadEntitlementFromProgram(fullPath, serverName):
     """ Executes the given file to generate an entitlement.

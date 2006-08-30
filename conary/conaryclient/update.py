@@ -633,14 +633,17 @@ class ClientUpdate:
                         job in relativeUpdateJobs))
 
         respectFlavorAffinity = True
-        # thew newTroves parameters are described below.
-        newTroves = sorted(((x[0], x[2][0], x[2][1]), 
-                            True, {}, False, False, False, False, None, 
-                            respectBranchAffinity, 
-                            respectFlavorAffinity, True,
-                            True, updateOnly) 
-                                for x in itertools.chain(absolutePrimaries,
-                                                         relativePrimaries))
+        # the newTroves parameters are described below.
+        newTroves = sorted((((x[0], x[2][0], x[2][1]), 
+                             True, {}, False, False, False, False, None, 
+                             respectBranchAffinity, 
+                             respectFlavorAffinity, True,
+                             True, updateOnly)
+                            for x in itertools.chain(absolutePrimaries,
+                                                     relativePrimaries)),
+                           # compare on the string of the version, since it might
+                           # not have timestamps
+                           key=lambda y: (y[0][0], str(y[0][1]), y[0][2]) + y[1:])
 
         newJob = set()
         notByDefaultRemovals = set()
@@ -1208,6 +1211,97 @@ conary erase '%s=%s[%s]'
 """, *((name, name, name) + replacedInfo + replacedInfo))
         return (job[0], (None, None), job[2], False)
 
+    def _findOverlappingJobs(self, jobSet, troveSource):
+        """
+            Returns a list of sets of jobs, where each set has the 
+            following property:
+                for every job in the set, there is another job in the set
+                    such that:
+                    1) the job removes a path that the other job adds
+                    2) the job adds a path that other job removes
+                    3) both jobs add the same path
+                    or
+                    4) both jobs remove the same path (though this should
+                       be impossible because conary only allows one trove
+                       to own a file)
+             All sets in a job should be connected to each other through
+             some chain of these relationships.
+        """
+        # overlapping is a dict from jobSet id -> overlapping id OR
+        # jobSet id -> list of other ids that overlap.
+        # for example, overlapping[3] -> 2, and overlapping[2] -> [2,3]
+        # would be reasonable, meaning that the set at id 2 contains
+        # all the overlapping troves there.  
+        overlapping = {}
+
+        # d is a dict of pathHash -> id of first job that has that 
+        # pathHash.
+        d = {}
+
+        jobSet = list(enumerate(jobSet))
+
+        pathHashesList = self.db.getPathHashesForTroveList(
+                                           (x[0], x[1][0], x[1][1])
+                                           for idx, x in jobSet if x[1][0])
+        oldJobs = itertools.izip((x for x in jobSet if x[1][1][0]),
+                                 pathHashesList)
+
+        getNewTrove = troveSource.getTrove
+        newJobs = ((x, getNewTrove(x[1][0], x[1][2][0], x[1][2][1],
+                                   withFiles=False).getPathHashes())
+                   for x in jobSet if x[1][2][0])
+
+        for ((idx, job), pathHashes) in itertools.chain(oldJobs, newJobs):
+            if pathHashes is None:
+                continue
+            for pathHash in pathHashes:
+                if pathHash not in d:
+                    d[pathHash] = idx
+                else:
+                    if d[pathHash] == idx:
+                        continue
+                    # someone else already had this issue.  Find out
+                    # what overlapping set they are in and add ourselves to 
+                    # it.
+                    newIdx = d[pathHash]
+
+                    if idx in overlapping:
+                        # if we're already part of a set, find our set.
+                        while isinstance(overlapping[idx], int):
+                            idx = overlapping[idx]
+
+                        if newIdx in overlapping and overlapping[newIdx] == idx:
+                            # in this case newIdx is already a part of our 
+                            # set.
+                            continue
+                        overlapping[idx].append(newIdx)
+                    else:
+                        # create a new set consisting of ourselves and 
+                        # newIdx.
+                        overlapping[idx] = [idx, newIdx]
+
+                    if newIdx in overlapping:
+                        # if newIdx was already part of a set,
+                        # find that set and extend our set with it.
+                        while isinstance(overlapping[newIdx], int):
+                            oldIdx = overlapping[newIdx]
+                            overlapping[newIdx] = idx
+                            newIdx = oldIdx
+                        if newIdx == idx:
+                            continue
+
+                        overlapping[idx].extend(overlapping[newIdx])
+
+                    # we've joined newIdx (and maybe all its friends) into
+                    # our set, so now point newIdx to our set.
+                    overlapping[newIdx] = idx
+
+        sets = []
+        for val in overlapping.itervalues():
+            if isinstance(val, int):
+                continue
+            sets.append([ jobSet[x][1] for x in set(val) ])
+        return sets
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,

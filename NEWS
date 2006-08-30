@@ -13,6 +13,25 @@ Changes in @NEW@:
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
     * cvc merge and cvc update are now more verbose when patching. (CNY-406)
+    * cvc clone now requires that you specify a message when cloning source
+      components unless you specify --message.  It also gives more output
+      about what it is doing (CNY-766, CNY-430).
+    * cvc clone now has a --test parameter that runs through all steps of
+      cloning without performing the clone.  --info is now more lightweight -
+      it no longer downloads all of the file contents that would be cloned.
+    * /etc/conary/mirrors/gnu has been added to enable mirror://
+      references to the GNU mirror system.
+    * /etc/conary/mirrors/cpan has been added to enable mirror://
+      references to the Comprehensive Perl Archive network mirror system.
+    * Components that modify the same files are now required to be in the 
+      same update job (for example, if a file moves from package a to
+      package b, we make the erase of package a and the install of package
+      b will occur at the same time) (CNY-758).
+    * Paths moving between troves as part of a single job are now treated
+      as file updates instead of separate add/remove events (CNY-750,
+      CNY-786, CNY-359)
+    * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
+      objects directly (CNY-640)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
@@ -38,6 +57,20 @@ Changes in @NEW@:
     exception when a conary 1.0.x client attempts to manipulate an
     entitlement through addEntitlement() or deleteEntitlement().
 
+  o Build Changes:
+    * The PythonSetup build action no longer provides the older
+      --single-version-externally-managed argument, and instead
+      provides the --prefix, --install-purelib, and --install-platlib
+      arguments.  This allows it to work correctly with a greater
+      number of packages. (CNY-809)
+    * Python dependencies were previously incorrectly calculated
+      for certain module path elements added in some Python C
+      code (for example, contents of the lib-dynload directory);
+      these errors are now resolved by using external python
+      to find system path elements. (CNY-813)
+    * The "cvc cook" command now prints the flavor being built,
+      as well as the version. (CNY-817)
+
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
@@ -53,6 +86,22 @@ Changes in @NEW@:
     * A bug that caused a traceback in the web interface when a
       non-admin user attempts to manage their entitlement classes has
       been fixed. (CNY-798)
+    * Conary can now update a file from a non-directory to a
+      directory.
+    * Currently version objects are cached to optimize Conary.
+      Unfortunately, version objects are mutable objects.  That means
+      that if two different pieces of code are given the same version
+      object, modifications made by one part of the code could affect
+      the other inadvertently.  A warning message has been added to
+      the version object when setting or resetting timestamps to make
+      developers aware of the problem.  Developers should copy the
+      version object before calling setTimeStamps(),
+      resetTimeStamps(), incrementSourceCount(), or
+      incrementBuildCount() on it.  When creating a version object
+      from a string and time stamp set, use the timeStamps= keyword
+      argument to versions.VersionFromString() to avoid the copy.  In
+      a later version of Conary, version objects will be immutable.
+      New methods will be introduced that return new modified objects.
 
 Changes in 1.1.2:
   o Bug Fixes:

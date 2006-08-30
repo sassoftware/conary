@@ -439,7 +439,15 @@ class Directory(File):
     __slots__ = []
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True):
-	if not os.path.isdir(target):
+        if util.exists(target):
+            # we have something in the way
+            sb = os.lstat(target)
+            if not stat.S_ISDIR(sb.st_mode):
+                # it's not a directory so remove it; if it is a directory,
+                # we just need to change the metadata
+                os.unlink(target)
+                util.mkdirChain(target)
+        else:
 	    util.mkdirChain(target)
 
 	File.restore(self, root, target, journal=journal, nameLookup=nameLookup)

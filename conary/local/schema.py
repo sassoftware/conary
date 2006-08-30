@@ -15,7 +15,7 @@
 import sys
 import itertools
 from conary import trove, deps, errors, files, streams
-from conary.dbstore import idtable, migration
+from conary.dbstore import idtable, migration, sqlerrors
 
 # Stuff related to SQL schema maintenance and migration
 
@@ -138,6 +138,7 @@ def createTroveInfo(db):
     )""" % db.keywords)
     cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
     cu.execute("CREATE INDEX TroveInfoTypeIdx ON TroveInfo(infoType, data)")
+    cu.execute("CREATE INDEX TroveInfoInstTypeIdx ON TroveInfo(instanceId, infoType)")
     db.commit()
     db.loadSchema()
 
@@ -830,10 +831,33 @@ class MigrateTo_20(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
+# silent update while we're at schema 20. We only need to create a
+# index, so there is no need to do a full blown migration and stop
+# conary from working until a schema migration is done
+def optSchemaUpdate(db):
+    #do we have the index we need?
+    if "TroveInfoInstTypeIdx" in db.tables["TroveInfo"]:
+        return
+    # we need to have write access
+    try:
+        cu = db.cursor()
+        cu.execute("BEGIN IMMEDIATE")
+    except sqlerrors.ReadOnlyDatabase:
+        return
+    else:
+        db.rollback()
+    # we have write access and we need the index created
+    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx",
+                   "infoType,instanceId")
+
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
     if version == VERSION:
+        # the actions performed by this function should be integrated
+        # in the next schema update, when we have a reason to block
+        # conary functionality...
+        optSchemaUpdate(db)
         return version
     if version > VERSION:
         raise NewDatabaseSchema

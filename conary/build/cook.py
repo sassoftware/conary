@@ -254,7 +254,6 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         raise builderrors.RecipeFileError(
             "Version string %s has illegal '-' character" %recipeClass.version)
 
-    log.info("Building %s=%s", recipeClass.name, sourceVersion.branch().label())
     if not use.Arch.keys():
 	log.error('No architectures have been defined in %s -- '
 		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
@@ -401,6 +400,10 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     recipeObj.findTroves()
     use.track(False)
 
+    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+                                      sourceVersion.branch().label(),
+                                      use.usedFlagsToFlavor(recipeClass.name)))
+
     redirects = recipeObj.getRedirections()
 
     changeSet = changeset.ChangeSet()
@@ -483,6 +486,10 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     use.track(True)
     _callSetup(cfg, recipeObj)
     use.track(False)
+
+    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+                                      sourceVersion.branch().label(),
+                                      use.usedFlagsToFlavor(recipeClass.name)))
 
     flavors = [buildpackage._getUseFlavor(recipeObj)]
 
@@ -572,6 +579,11 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             cfg.flavor, macros)
     _callSetup(cfg, recipeObj)
+
+    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+                                      sourceVersion.branch().label(),
+                                      use.usedFlagsToFlavor(recipeClass.name)))
+
     recipeObj.findAllFiles()
 
     changeSet = changeset.ChangeSet()
@@ -736,7 +748,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                   trove.getFlavor()))
         else:
             unmanagedPolicyFiles.append(policyPath)
-            ver = versions.VersionFromString('/local@local:LOCAL/0-0')
+            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
             ver.resetTimeStamps()
             policyTroves.add((policyPath, ver, deps.Flavor()))
     del db
@@ -745,6 +757,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
 
     _callSetup(cfg, recipeObj)
+
+    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+                                      sourceVersion.branch().label(),
+                                      use.usedFlagsToFlavor(recipeClass.name)))
+
     recipeObj.checkBuildRequirements(cfg, sourceVersion, 
                                      ignoreDeps=ignoreDeps)
 

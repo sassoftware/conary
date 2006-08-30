@@ -57,10 +57,12 @@ class ChangeLog(streams.StreamSet):
 	assert(not value or value[-1] == '\n')
         self.message.set(value)
 
-    def getMessageFromUser(self):
+    def getMessageFromUser(self, prompt=''):
 	editor = os.environ.get("EDITOR", "/bin/vi")
 	(fd, name) = tempfile.mkstemp()
-	msg = "\n-----\nEnter your change log message.\n"
+        if not prompt:
+            prompt = 'Enter your change log message.'
+	msg = "\n-----\n%s\n" % prompt
 	os.write(fd, msg)
 	os.close(fd)
 

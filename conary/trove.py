@@ -1967,13 +1967,13 @@ class AbstractTroveChangeSet(streams.StreamSet):
             f.write('\t%s: %s\n' %(name,
                                    str(dep).replace('\n', '\n\t%s'
                                                     %(' '* (len(name)+2)))))
-        if self.getRequires():
+        if not self.getRequires().isEmpty():
             depformat('Requires', self.getRequires(), f)
-        if self.getProvides():
+        if not self.getProvides().isEmpty():
             depformat('Provides', self.getProvides(), f)
-        if self.getOldFlavor():
+        if not self.getOldFlavor().isEmpty():
             depformat('Old Flavor', self.getOldFlavor(), f)
-        if self.getNewFlavor():
+        if not self.getNewFlavor().isEmpty():
             depformat('New Flavor', self.getNewFlavor(), f)
 
 	for (pathId, path, fileId, version) in self.newFiles:

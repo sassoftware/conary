@@ -375,9 +375,12 @@ class DependencySolver(object):
         keepList = []
 
         while True:
+            linkedJobs = self.client._findOverlappingJobs(jobSet,
+                                                          uJob.getTroveSource())
             (depList, cannotResolve, changeSetList) = \
                             self.db.depCheck(jobSet, uJob.getTroveSource(),
-                                             findOrdering = findOrdering)
+                                             findOrdering = findOrdering,
+                                             linkedJobs = linkedJobs)
             if not resolveDeps or not cannotResolve:
                 break
             # We have troves that are in the state cannotResolve:

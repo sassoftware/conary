@@ -159,6 +159,26 @@ class KeyCacheCallback:
         self.repositoryMap = repositoryMap
         self.pubRing = pubRing
 
+class CloneCallback(ChangesetCallback):
+    def __init__(self, cfg=None):
+        self.cfg = cfg
+
+    def getCloneChangeLog(self, trv):
+        return trv.getChangeLog()
+
+    def determiningCloneTroves(self):
+        pass
+
+    def determiningTargets(self):
+        pass
+
+    def rewritingFileVersions(self):
+        pass
+
+    def gettingCloneData(self):
+        pass
+
+
 class CallbackRateWrapper:
     def __init__(self, callback, fn, total):
         self._callback = callback

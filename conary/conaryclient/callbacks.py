@@ -17,6 +17,7 @@
 # Generally useful callbacks for client work...
 
 from conary import callbacks
+from conary import changelog
 
 class FetchCallback(callbacks.LineOutput, callbacks.FetchCallback):
     def fetch(self, got, need):
@@ -107,3 +108,34 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
         self.prefix = ''
         callbacks.LineOutput.__init__(self, *args, **kw)
         callbacks.ChangesetCallback.__init__(self, *args, **kw)
+
+class CloneCallback(ChangesetCallback, callbacks.CloneCallback):
+    def __init__(self, cfg, defaultMessage=None):
+        self.cfg = cfg
+        if defaultMessage and defaultMessage[:-1] != '\n':
+            defaultMessage += '\n'
+        self.defaultMessage = defaultMessage
+        callbacks.CloneCallback.__init__(self, cfg)
+        ChangesetCallback.__init__(self)
+
+    def getCloneChangeLog(self, trv):
+        message = self.defaultMessage
+        cl = changelog.ChangeLog(self.cfg.name, self.cfg.contact, message)
+        prompt = ('Please enter the clone message'
+                  ' for\n %s=%s.' % (trv.getName(), trv.getVersion()))
+        if not message and not cl.getMessageFromUser(prompt=prompt):
+            return None
+        return cl
+
+    def determiningCloneTroves(self):
+        self._message('Determining items to clone...')
+
+    def determiningTargets(self):
+        self._message('Determining target versions...')
+
+    def rewritingFileVersions(self):
+        self._message('Rewriting file versions...')
+
+    def gettingCloneData(self):
+        self._message('Getting file contents for clone...')
+

@@ -285,6 +285,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
 	return fileObj
 
+    def getConfigFileContents(self, sha1):
+        return filecontents.FromDataStore(self.contentsStore, sha1)
+
     def findFileVersion(self, fileId):
         return self.db.findFileVersion(fileId)
 
@@ -426,7 +429,8 @@ class Database(SqlDbRepository):
 
         return resultDict
 
-    def depCheck(self, jobSet, troveSource, findOrdering = False):
+    def depCheck(self, jobSet, troveSource, findOrdering = False,
+                 linkedJobs = None):
         """
         Check the database for closure against the operations in
         the passed changeSet.
@@ -448,7 +452,8 @@ class Database(SqlDbRepository):
         checker = self.dependencyChecker(troveSource)
         checker.addJobs(jobSet)
         unsatisfiedList, unresolveableList, changeSetList = \
-                checker.check(findOrdering = findOrdering)
+                checker.check(findOrdering = findOrdering,
+                              linkedJobs = linkedJobs)
         checker.done()
 
         return (unsatisfiedList, unresolveableList, changeSetList)
@@ -987,6 +992,9 @@ class Database(SqlDbRepository):
                 (reposCs, localCs) = rb.getLast()
 
             self.removeRollback(name)
+
+    def getPathHashesForTroveList(self, troveList):
+        return self.db.getPathHashesForTroveList(troveList)
 
     def iterFindPathReferences(self, path, justPresent = False):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)

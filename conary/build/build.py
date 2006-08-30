@@ -1054,7 +1054,9 @@ class PythonSetup(BuildCommand):
         '%%(cdcmd)s'
         '%%(pythonsetup)s'
         ' %%(action)s'
-        ' --single-version-externally-managed'
+        ' --prefix=%%(prefix)s'
+        ' --install-purelib=%%(prefix)s/lib/python2.4/site-packages/'
+        ' --install-platlib=%%(libdir)s/python2.4/site-packages/'
         ' --root=%%(rootdir)s'
     )
     keywords = {

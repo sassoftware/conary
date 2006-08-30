@@ -13,6 +13,8 @@
 
 import itertools
 
+from conary import callbacks
+from conary import changelog
 from conary import errors
 from conary import versions
 from conary.build.nextversion import nextVersion
@@ -24,13 +26,16 @@ V_LOADED = 0
 V_BREQ = 1
 V_REFTRV = 2
 
+# don't change 
+DEFAULT_MESSAGE = 1
+
 class ClientClone:
 
     def createCloneChangeSet(self, targetBranch, troveList = [],
-                             updateBuildInfo=True):
+                             updateBuildInfo=True, message=DEFAULT_MESSAGE,
+                             infoOnly=False, callback=None):
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
-
         def _createSourceVersion(targetBranch, targetBranchVersionList, 
                                  sourceVersion):
             # sort oldest to newest
@@ -70,8 +75,8 @@ class ClientClone:
                 verBranch = verBranch.parentBranch()
                 if uphillBranch == verBranch:
                     return True
-            
-            return False 
+
+            return False
 
         def _isSibling(ver, possibleSibling):
             if isinstance(ver, versions.Version) and \
@@ -128,7 +133,7 @@ class ClientClone:
 
             trvs = repos.getTroves([ (name, version, singleFlavor) for
                                         name, version in dupCheck.iteritems() ],
-                                   withFiles = False)
+                                   withFiles = False, callback = callback)
 
 
 
@@ -258,6 +263,9 @@ class ClientClone:
 
             raise CloneIncomplete(needs)
                 
+        if callback is None:
+            callback = callbacks.CloneCallback()
+        callback.determiningCloneTroves()
         # get the transitive closure
         allTroveInfo = set()
         allTroves = dict()
@@ -273,7 +281,8 @@ class ClientClone:
                     needed.append(info)
                     allTroveInfo.add(info)
 
-            troves = self.repos.getTroves(needed, withFiles = False)
+            troves = self.repos.getTroves(needed, withFiles = False, 
+                                          callback = callback)
             allTroves.update(x for x in itertools.izip(needed, troves))
             cloneSources = [ x for x in itertools.chain(
                         *(t.iterTroveList(weakRefs=True,
@@ -281,6 +290,7 @@ class ClientClone:
 
         # make sure there are no zeroed timeStamps - targetBranch may be
         # a user-supplied string
+        targetBranch = targetBranch.copy()
         targetBranch.resetTimeStamps()
 
         # split out the binary and sources
@@ -296,6 +306,7 @@ class ClientClone:
                                # version of that trove on the target branch
         cloneJob = []          # (info, newVersion) tuples
 
+        callback.determiningTargets()
         # start off by finding new version numbers for the sources
         for info in sourceTroveInfo:
             name, version = info[:2]
@@ -434,7 +445,8 @@ class ClientClone:
         for name, verDict in currentVersions.iteritems():
             for version, flavorList in verDict.iteritems():
                 matches += [ (name, version, flavor) for flavor in flavorList ]
-        trvs = self.repos.getTroves(matches, withFiles = False)
+        trvs = self.repos.getTroves(matches, withFiles = False, 
+                                    callback = callback)
         trvDict = dict(((info[0], info[2]), trv) for (info, trv) in
                             itertools.izip(matches, trvs))
 
@@ -447,11 +459,14 @@ class ClientClone:
 
         _checkNeedsFulfilled(needDict)
 
+
         assert(not needDict)
         del trvs
         del trvDict
         del currentVersions
         del needDict
+
+        callback.rewritingFileVersions()
 
         for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
             assert(newVersion == versionMap[(trv.getName(), trv.getVersion(),
@@ -485,6 +500,7 @@ class ClientClone:
 
             trv.changeVersion(newVersion)
 
+
             # look through files which aren't already on the right host for
             # inclusion in the change set (this could include too many)
             for (pathId, path, fileId, version) in trv.iterFileList():
@@ -514,16 +530,27 @@ class ClientClone:
                     ver = map.get((pathId, fileId), newVersion)
                     trv.updateFile(pathId, path, ver, fileId)
 
+            if trv.getName().endswith(':source') and not infoOnly:
+                cl = callback.getCloneChangeLog(trv)
+                if cl is None:
+                    log.error("no change log message was given"
+                              " for %s." % trv.getName())
+                    return False, None
+                trv.changeChangeLog(cl)
             # reset the signatures, because all the versions have now
             # changed, thus invalidating the old sha1 hash
             trv.troveInfo.sigs.reset()
-            trv.computeSignatures()
+            if not infoOnly: # not computing signatures will make sure this 
+                             # doesn't get committed
+                trv.computeSignatures()
             trvCs = trv.diff(None, absolute = True)[0]
             cs.newTrove(trvCs)
 
             if ":" not in trv.getName():
                 cs.addPrimaryTrove(trv.getName(), trv.getVersion(), 
                                    trv.getFlavor())
+        if infoOnly:
+            return True, cs
 
         # the list(set()) removes duplicates
         newFilesNeeded = []
@@ -536,29 +563,33 @@ class ClientClone:
 
             newFilesNeeded.append((pathId, newFileId, newFileVersion))
 
+        callback.gettingCloneData()
         fileObjs = self.repos.getFileVersions(newFilesNeeded)
         contentsNeeded = []
         pathIdsNeeded = []
         fileObjsNeeded = []
         
-        for (pathId, newFileId, newFileVersion), fileObj in \
+        total = len(newFilesNeeded)
+        for ((pathId, newFileId, newFileVersion), fileObj) in \
                             itertools.izip(newFilesNeeded, fileObjs):
-            (filecs, contentsHash) = changeset.fileChangeSet(pathId, None, 
+            (filecs, contentsHash) = changeset.fileChangeSet(pathId, None,
                                                              fileObj)
             cs.addFile(None, newFileId, filecs)
-            
             if fileObj.hasContents:
                 contentsNeeded.append((newFileId, newFileVersion))
                 pathIdsNeeded.append(pathId)
                 fileObjsNeeded.append(fileObj)
 
-        contents = self.repos.getFileContents(contentsNeeded)
+        contents = self.repos.getFileContents(contentsNeeded, callback=callback)
+        i = 0
         for pathId, (fileId, fileVersion), fileCont, fileObj in \
                 itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
                                fileObjsNeeded):
+
             cs.addFileContents(pathId, changeset.ChangedFileTypes.file, 
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
+        callback.done()
 
         return True, cs
 

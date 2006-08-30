@@ -23,6 +23,7 @@ import weakref
 
 #conary
 from conary.errors import ParseError
+from conary.lib import log
 
 staticLabelTable = {}
 
@@ -214,7 +215,8 @@ class Revision(AbstractRevision):
 
 	@rtype: str
 	"""
-	assert(self.timeStamp)
+        if not self.timeStamp:
+            log.warning('freezeTimestamp() called on a Revision that has no timestamp')
 	return "%.3f" % self.timeStamp
 
     def thawTimestamp(self, str):
@@ -566,7 +568,7 @@ class AbstractVersion(object):
 
 class VersionSequence(AbstractVersion):
 
-    __slots__ = ( "versions", "hash", "strRep" )
+    __slots__ = ( "versions", "hash", "strRep", 'cached' )
 
     """
     Abstract class representing a fully qualified version, branch, or
@@ -720,7 +722,9 @@ class VersionSequence(AbstractVersion):
 	@rtype: VersionSequence
 	"""
 
-        return copy.deepcopy(self)
+        new = copy.deepcopy(self)
+        new.cached = False
+        return new
 
     def timeStamps(self):
         return [ x.timeStamp for x in self.versions
@@ -740,6 +744,11 @@ class VersionSequence(AbstractVersion):
         stringVersionCache.pop(self.asString(), None)
 
     def setTimeStamps(self, timeStamps, clearCache=True):
+        if self.cached:
+            log.warning('setTimeStamps() was called on a version that is '
+                        'cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
         if clearCache and self.timeStamps:
             self._clearVersionCache()
 
@@ -754,6 +763,11 @@ class VersionSequence(AbstractVersion):
         """ set timeStamps to time.time(), can be used to add somewhat 
             arbitrary timestamps to user-supplied strings
         """
+        if self.cached:
+            log.warning('resetTimeStamps() was called on a version that is '
+                        'cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
         if clearCache:
             self._clearVersionCache()
 
@@ -787,6 +801,7 @@ class VersionSequence(AbstractVersion):
 	self.versions = versionList
         self.hash = None
         self.strRep = None
+        self.cached = False
 
 class NewVersion(AbstractVersion):
 
@@ -959,9 +974,16 @@ class Version(VersionSequence):
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
+        self._clearVersionCache()
+
         self.hash = None
         self.strRep = None
 	self.versions[-1]._incrementSourceCount(self.shadowLength())
+        if self.cached:
+            log.warning('incrementSourceCount() was called on a version that '
+                        'is cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
 
     def incrementBuildCount(self):
 	"""
@@ -971,6 +993,8 @@ class Version(VersionSequence):
         # depth, just increment the build count (without lengthing
         # it). if the source count is too short, make the build count
         # the right length for this shadow
+        self._clearVersionCache()
+
         shadowLength = self.shadowLength()
         self.hash = None
         self.strRep = None
@@ -991,6 +1015,12 @@ class Version(VersionSequence):
                 buildCount = SerialNumber(
                             ".".join([ '0' ] * shadowLength + [ '1' ] ))
                 self.versions[-1]._setBuildCount(buildCount)
+
+        if self.cached:
+            log.warning('incrementBuildCount() was called on a version that '
+                        'is cached.  Someone may already have a reference to '
+                        'the cached object.')
+        # assert not self.cached
 
         self.versions[-1].resetTimeStamp()
 
@@ -1193,6 +1223,7 @@ class Version(VersionSequence):
         of the branch, even when the two are equal.
         """
         newV = self.copy()
+        newV.cached = False
         v = newV
         trailingRevisions = []
         while v.hasParentVersion():
@@ -1288,6 +1319,7 @@ def ThawVersion(ver):
 
     v = _VersionFromString(ver, frozen = True)
     thawedVersionCache[ver] = v
+    v.cached = True
     return v
 
 def VersionFromString(ver, defaultBranch = None, timeStamps = []):
@@ -1302,6 +1334,7 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if v is None:
         v = _VersionFromString(ver, defaultBranch)
     stringVersionCache[ver] = v
+    v.cached = True
     return v
 
 def _VersionFromString(ver, defaultBranch = None, frozen = False,

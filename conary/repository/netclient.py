@@ -240,12 +240,13 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
 class ServerCache:
 
-    def __init__(self, repMap, userMap, pwPrompt, entitlementDir):
+    def __init__(self, repMap, userMap, pwPrompt, entitlementDir, entitlements):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
         self.entitlementDir = entitlementDir
+        self.entitlements = entitlements
 
     def __getPassword(self, host, user=None):
         user, pw = self.pwPrompt(host, user)
@@ -287,7 +288,9 @@ class ServerCache:
             userInfo = (userInfo[0], "")
 
         # check for an entitlement for this server
-        ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
+        ent = self.entitlements.get(serverName, None)
+        if ent is None:
+            ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
 
         usedMap = url is not None
         if url is None:
@@ -372,7 +375,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
                  entitlementDir = None, downloadRateLimit = 0,
-                 uploadRateLimit = 0):
+                 uploadRateLimit = 0, entitlements = {}):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -382,7 +385,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.downloadRateLimit = downloadRateLimit
         self.uploadRateLimit = uploadRateLimit
 
-	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir)
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
+                             entitlements)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
