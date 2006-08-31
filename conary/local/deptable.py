@@ -707,7 +707,7 @@ class DependencyChecker:
 
     def _createDepGraph(self, result, brokenByErase, satisfied, 
                             linkedJobSets, createCollectionEdges=False):
-        self.g = graph.DirectedGraph()
+        #self.g = graph.DirectedGraph()
         # there are four kinds of edges -- old needs old, old needs new,
         # new needs new, and new needs old. Each edge carries a depId
         # to aid in cancelling them out. Our initial edge representation
