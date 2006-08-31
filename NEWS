@@ -103,6 +103,8 @@ Changes in @NEW@:
     * Files removed from troves (most often by --replace-files) are now
       properly skipped on updates to that trove when the file didn't change
       between versions (CNY-828)
+    * includeConfigFile now gives a much better error message when it
+      cannot include a config file (CNY-618).
 
 Changes in 1.0.29:
   o Bug Fixes:

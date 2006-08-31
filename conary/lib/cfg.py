@@ -24,6 +24,7 @@ import textwrap
 import urllib2
 
 from conary.lib import cfgtypes,util
+from conary import errors
 
 # NOTE: programs expect to be able to access all of the cfg types from
 # lib.cfg, so we import them here.  At some point, we may wish to make this
@@ -264,11 +265,11 @@ class ConfigFile(_Config):
                 lineno = lineno + lineCount
             f.close()
         except urllib2.HTTPError, err:
-            raise CfgEnvironmentError(err.msg, err.filename)
+            raise CfgEnvironmentError(err.filename, err.filename)
         except urllib2.URLError, err:
-            raise CfgEnvironmentError(err.reason.args[1], path)
+            raise CfgEnvironmentError(path, err.reason.args[1])
         except EnvironmentError, err:
-            raise CfgEnvironmentError(err.strerror, err.filename)
+            raise CfgEnvironmentError(err.filename, err.strerror)
 
     def read(self, path, exception=True):
         if os.path.exists(path):
@@ -303,7 +304,13 @@ class ConfigFile(_Config):
 
         if key.lower() in self._directives:
             fn = getattr(self, self._directives[key.lower()])
-            fn(val)
+            try:
+                fn(val)
+            except Exception, err:
+                if errors.exceptionIsUncatchable(err):
+                    raise
+                raise ParseError, "%s:%s: when processing %s: %s" \
+                                                % (fileName, lineno, key, err)
         else:
             self.configKey(key, val, fileName, lineno)
 
@@ -319,9 +326,16 @@ class ConfigFile(_Config):
                                                             % (fileName,
                                                                lineno, msg, key)
 
-    def includeConfigFile(self, val):
+    def includeConfigFile(self, val, fileName = "override", lineno = '<No line>'):
         if val.startswith("http://") or val.startswith("https://"):
-            f = urllib2.urlopen(val)
+            try:
+                f = urllib2.urlopen(val)
+            except urllib2.HTTPError, err:
+                raise CfgEnvironmentError(err.filename, err.msg)
+            except urllib2.URLError, err:
+                raise CfgEnvironmentError(val, err.reason.args[1])
+            except EnvironmentError, err:
+                raise CfgEnvironmentError(err.filename, err.msg)
             self.readObject(val, f)
         else:
             for cfgfile in util.braceGlob(val):
