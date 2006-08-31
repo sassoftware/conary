@@ -305,6 +305,12 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client = conaryclient.ConaryClient(cfg)
 
     if not info:
+        if migrate and not cfg.interactive:
+            print ('As of conary 1.0.21, the migrate command has changed.'
+                   '  Migrate must be run with --interactive '
+                   ' because it now has the potential to damage your'
+                   ' system irreparably if used incorrectly.')
+            return
 	client.checkWriteableRoot()
 
     try:
@@ -347,25 +353,15 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        for x in itertools.chain(*suggMap.itervalues())))
         print " ".join(items)
         keepExisting = False
-    if migrate:
-        print ('As of conary 1.0.21, the migrate command has changed.'
-               '  Migrate must be run with --interactive '
-               ' because it now has the potential to damage your'
-               ' system irreparably if used incorrectly.')
-        if not cfg.interactive:
-            return
-        else:
-            print 'The following updates will be performed:'
-            displayUpdateInfo(updJob, cfg)
+    if cfg.interactive:
+        print 'The following updates will be performed:'
+        displayUpdateInfo(updJob, cfg)
+        if migrate:
             print ('Migrate erases all troves not referenced in the groups'
                    ' specified.')
             okay = cmdline.askYn('continue with migrate? [y/N]', default=False)
-            if not okay:
-                return
-    elif cfg.interactive:
-        print 'The following updates will be performed:'
-        displayUpdateInfo(updJob, cfg)
-        okay = cmdline.askYn('continue with update? [Y/n]', default=True)
+        else:
+            okay = cmdline.askYn('continue with update? [Y/n]', default=True)
 
         if not okay:
             return
