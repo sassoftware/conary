@@ -34,7 +34,7 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False, cloneSources = False, message = None, 
-               test = False):
+               test = False, recurse = True):
     client = ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -78,7 +78,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
     okay, cs = client.createCloneChangeSet(targetBranch, trovesToClone,
                                            updateBuildInfo=updateBuildInfo,
-                                           infoOnly=info, callback=callback)
+                                           infoOnly=info, callback=callback,
+                                           recurse=recurse)
     if not okay:
         return
 

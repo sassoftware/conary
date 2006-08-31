@@ -33,7 +33,7 @@ class ClientClone:
 
     def createCloneChangeSet(self, targetBranch, troveList = [],
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
-                             infoOnly=False, callback=None):
+                             infoOnly=False, recurse=True, callback=None):
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
         def _createSourceVersion(targetBranch, targetBranchVersionList, 
@@ -225,6 +225,9 @@ class ClientClone:
                            (troveTuple.name(), troveTuple.version(),
                             troveTuple.flavor()))
 
+            if not recurse and trv.getName().startswith('group-'):
+                return
+
             for troveInfo in [ x for x in trv.iterTroveList(strongRefs=True,
                                                             weakRefs=True) ]:
                 yield ((V_REFTRV, troveInfo), troveInfo)
@@ -284,6 +287,10 @@ class ClientClone:
             troves = self.repos.getTroves(needed, withFiles = False, 
                                           callback = callback)
             allTroves.update(x for x in itertools.izip(needed, troves))
+
+            if not recurse:
+                troves = [ x for x in troves 
+                           if not x.getName().startswith('group-')]
             cloneSources = [ x for x in itertools.chain(
                         *(t.iterTroveList(weakRefs=True,
                                           strongRefs=True) for t in troves)) ]
