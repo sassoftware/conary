@@ -35,6 +35,9 @@ class NodeData(object):
     def get(self, index):
         return self.data[index]
 
+    def iterNodes(self):
+        return iter(self.data)
+
     def sort(self, sortAlg=None):
         return sorted(enumerate(self.data), sortAlg)
 
@@ -144,6 +147,16 @@ class DirectedGraph:
     def iterChildren(self, node):
         return (self.data.get(idx) 
                     for idx in self.edges[self.data.getIndex(node)])
+    
+    def iterNodes(self):
+        return self.data.iterNodes()
+
+    def iterEdges(self):
+        get = self.data.get
+        for fromId, toIdList in self.edges.iteritems():
+            fromNode = get(fromId)
+            for toId in toIdList:
+                yield fromNode, get(toId)
 
     def getParents(self, node, withEdges=False):
         idx = self.data.getIndex(node)
