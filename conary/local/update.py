@@ -183,7 +183,7 @@ class FilesystemJob:
         # missing files for this trove info so we can use it again on the
         # next call into here.
         if self.pathRemovedCache[0] == info:
-            if pathId not in self.pathRemovedCache[1]:
+            if pathId in self.pathRemovedCache[1]:
                 return False
 
             return pathId in self.pathRemovedCache[2]
