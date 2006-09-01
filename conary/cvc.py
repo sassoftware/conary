@@ -121,9 +121,11 @@ class CvcCommand(options.AbstractCommand):
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
     def setContext(self, cfg, argSet):
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
         context = cfg.context
         if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY')
+            conaryState = state.ConaryStateFromFile('CONARY', repos)
             if conaryState.hasContext():
                 context = conaryState.getContext()
 
@@ -158,7 +160,9 @@ class AddCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) < 2: return self.usage()
-        checkin.addFiles(args[1:])
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
+        checkin.addFiles(repos, args[1:])
 _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):
@@ -360,7 +364,9 @@ class ContextCommand(CvcCommand):
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               prettyPrint=prettyPrint)
-        checkin.setContext(cfg, name, ask=ask)
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
+        checkin.setContext(repos, cfg, name, ask=ask)
 _register(ContextCommand)
 
 
@@ -495,7 +501,7 @@ class DescribeCommand(CvcCommand):
             log.setVerbosity(log.INFO)
 
         xmlSource = args[1]
-        conaryState = state.ConaryStateFromFile("CONARY").getSourceState()
+        conaryState = state.ConaryStateFromFile("CONARY", repos).getSourceState()
         troveName = conaryState.getName()
         troveBranch = conaryState.getVersion().branch()
 
@@ -548,7 +554,9 @@ class RemoveCommand(CvcCommand):
                    callback = None):
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            checkin.removeFile(f)
+            client = conaryclient.ConaryClient(cfg)
+            repos = client.getRepos()
+            checkin.removeFile(repos, f)
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
@@ -558,7 +566,9 @@ class RenameCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) != 3: return self.usage()
-        checkin.renameFile(args[1], args[2])
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
+        checkin.renameFile(repos, args[1], args[2])
 _register(RenameCommand)
 
 class SignCommand(CvcCommand):
