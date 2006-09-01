@@ -1,41 +1,31 @@
 Changes in @NEW@:
   o Client Changes:
-    * The "--debug" command line flag now provides information that is
-      useful to the end-user on update.  The "--debug=all" flag will
-      provide output that is useful to conary developers.  A side
-      effect of this change affects the "cvc" command line.  To use
-      the "--resume" command line argument to specify that you wish to
-      resume at a particular location, you must use "--resume=<loc>".
-      "--resume <loc>" will not work anymore.  This removes an
-      ambiguity in how we parse optional parameters in Conary.
-    * The output of --debug has been modified when performing
-      dependency resolution - The output should be more helpful to end
+    * The source component is now displayed in "conary rq --info"
+      output.
+    * Entitlements can now be passed into ConaryClient and
+      NetworkRepositoryClient objects directly. (CNY-640)
+    * Exceptions raised in callback functions are now issued as
+      warnings and the current job is finished before
+      existing. KeyboardInterrupts and SystemExits are handled
+      immediately. (CNY-806)
+
+  o System Update Changes:
+    * The output of "--debug" has been modified when performing
+      dependency resolution.  The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
-    * cvc merge and cvc update are now more verbose when patching. (CNY-406)
-    * cvc clone now requires that you specify a message when cloning source
-      components unless you specify --message.  It also gives more output
-      about what it is doing (CNY-766, CNY-430).
-    * cvc clone now has a --test parameter that runs through all steps of
-      cloning without performing the clone.  --info is now more lightweight -
-      it no longer downloads all of the file contents that would be cloned.
-    * Components that modify the same files are now required to be in the 
-      same update job (for example, if a file moves from package a to
-      package b, we make the erase of package a and the install of package
-      b will occur at the same time) (CNY-758).
-    * Paths moving between troves as part of a single job are now treated
-      as file updates instead of separate add/remove events (CNY-750,
-      CNY-786, CNY-359)
-    * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
-      objects directly (CNY-640)
-    * Errors in callbacks are issues as warnings and the current job is
-      finished before existing. KeyboardInterrupts and SystemExits are handled
-      immediately (CNY-806)
-    * Added a --full-recurse option for cloneChangeSet.  Cloning a group no 
-      longer recurses by default, as for that to work successfully all troves in
-      the group also have to come from the same branch, which is almost never
-      the case.
-    * Display source name if it's different than what's expected (CNY-833)
+    * Components that modify the same files are now required to be in
+      the same update job.  For example, if a file moves from
+      component a:runtime to component b:runtime, the erase of
+      component a:runtime and the install of component b:runtime will
+      occur at the same time. (CNY-758).
+    * Files moving between components as part of a single job are now
+      treated as file updates instead of separate add/remove events.
+      (CNY-750, CNY-786, CNY-359)
+    * The "--debug" command line flag now provides information that is
+      useful to the end-user during the update process.  The
+      "--debug=all" flag will provide output that is useful to conary
+      developers.
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
@@ -56,7 +46,29 @@ Changes in @NEW@:
       and flavor caching optimizations that make the code about 
       2.5 times faster (from 10 seconds to 4 seconds).
 
-  o Build Changes:
+  o Build (cvc) Changes:
+    * "cvc merge" and "cvc update" are now more verbose when
+      patching. (CNY-406)
+    * "cvc clone" now requires that you specify a message when cloning
+      source components unless you specify --message.  It also gives
+      more output about what it is doing (CNY-766, CNY-430).
+    * "cvc clone" now has a --test parameter that runs through all
+      steps of cloning without performing the clone.  --info is now
+      more lightweight - it no longer downloads all of the file
+      contents that would be cloned.
+    * "cvc clone" now has a --full-recurse parameter that controls how
+      recursion is performed.  Cloning a group no longer recurses by
+      default.  The only way that a recursive group clone could
+      succeed is if all troves in the group came from the same branch.
+      This is almost never the case.
+    * The "cvc cook" command now prints the flavor being built,
+      as well as the version. (CNY-817)
+    * The command line argument parsing in "cvc" has been modified.
+      To use the "--resume" command line argument to specify that you
+      wish to resume at a particular location, you must use
+      "--resume=<loc>".  "--resume <loc>" will not work anymore.  This
+      removes an ambiguity in how we parse optional parameters in
+      Conary.
     * The PythonSetup build action no longer provides the older
       --single-version-externally-managed argument, and instead
       provides the --prefix, --install-purelib, and --install-platlib
@@ -67,17 +79,16 @@ Changes in @NEW@:
       code (for example, contents of the lib-dynload directory);
       these errors are now resolved by using external python
       to find system path elements. (CNY-813)
-    * The "cvc cook" command now prints the flavor being built,
-      as well as the version. (CNY-817)
     * /etc/conary/mirrors/gnu has been added to enable mirror://
       references to the GNU mirror system.
-    * The GNU mirror list was then significantly expanded and resorted.
-      (CNY-824)
+    * The GNU mirror list was then significantly expanded and
+      re-sorted.  (CNY-824)
     * /etc/conary/mirrors/cpan has been added to enable mirror://
-      references to the Comprehensive Perl Archive network mirror system.
-    * In group recipes, the methods r.add(), r.addAll(), and r.addNewGroup()
-      have been modified to accept the use= parameter, which defaults to True
-      (CNY-830).
+      references to the Comprehensive Perl Archive network mirror
+      system.
+    * In group recipes, the methods r.add(), r.addAll(), and
+      r.addNewGroup() have been modified to accept the use= parameter,
+      which defaults to True (CNY-830).
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
@@ -85,9 +96,10 @@ Changes in @NEW@:
       latest version. (CNY-784)
     * "cvc cook" now displays the correct label of the thing its
       building, even when it is not the build label.
-    * Calling "cvc update" on a new package will fail with an
-      appropriate error message instead of displaying a
-      traceback. (CNY-715)
+    * Running "cvc update" in a directory that has been created with
+      "cvc newpkg" but has not yet been committed to the repository
+      will now fail with an appropriate error message instead of
+      displaying a traceback. (CNY-715)
     * Conary can now update a file from a non-directory to a
       directory.
     * Currently version objects are cached to optimize Conary.
