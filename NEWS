@@ -12,13 +12,15 @@ Changes in @NEW@:
       dependency resolution - The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
-    * cvc merge and cvc update are now more verbose when patching. (CNY-406)
-    * cvc clone now requires that you specify a message when cloning source
-      components unless you specify --message.  It also gives more output
-      about what it is doing (CNY-766, CNY-430).
-    * cvc clone now has a --test parameter that runs through all steps of
-      cloning without performing the clone.  --info is now more lightweight -
-      it no longer downloads all of the file contents that would be cloned.
+    * "cvc merge" and "cvc update" are now more verbose when
+      patching. (CNY-406)
+    * "cvc clone" now requires that you specify a message when cloning
+      source components unless you specify --message.  It also gives
+      more output about what it is doing (CNY-766, CNY-430).
+    * "cvc clone" now has a --test parameter that runs through all
+      steps of cloning without performing the clone.  --info is now
+      more lightweight - it no longer downloads all of the file
+      contents that would be cloned.
     * Components that modify the same files are now required to be in the 
       same update job (for example, if a file moves from package a to
       package b, we make the erase of package a and the install of package
