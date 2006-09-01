@@ -159,6 +159,26 @@ not possible to merge changes (see "merge" later in this document) with clone.
 The commit will appear to originate from the individual who last committed the
 trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
 name. See the \fBExamples\fP section for more information.
+.RS 4
+.TP
+.B \-\-clone-sources
+Automatically clone the source for every package your are cloning.  So, for example, if you are cloning package foo from /localhost@rpl:1 to /localhost@rpl:conary, foo:source would be cloned as well if necessary.
+.TP
+.B \-\-full-recurse
+For any group included in the clone operation, clone every package and subgroup included in that group.  (Note: cvc automatically clones any subgroups that were created from the same source component - there is no way to disable this.  Similarly, cvc automatically clones all components in a package when the package is selected for cloning.  This is why this option is called full-recurse instead of just recurse.
+.TP
+.B \-\-info
+Determine the packages and groups that would be created by the clone and display that information, without actually cloning.
+.TP 4
+.B \-\-message MESSAGE
+Allows you to specify the message to be given on for source components.  If several source components are being cloned at the same time, the same message will be used for all of them if specified here.
+.TP
+.B \-\-skip-build-info
+Normally, cvc tried to rewrite any build information stored with the trove, such as what build requirements were used to build it, from the source branch to the target branch if necessary.  If this is not possible, cvc will exit with an error.  If this flag is given, cvc does not try to rewrite build information.
+.TP
+.B \-\-test
+Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.RE
 .TP
 .B commit [\-\-message|\-m \fI<message>\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP

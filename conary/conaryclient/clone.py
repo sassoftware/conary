@@ -33,7 +33,9 @@ class ClientClone:
 
     def createCloneChangeSet(self, targetBranch, troveList = [],
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
-                             infoOnly=False, callback=None):
+                             infoOnly=False, fullRecurse=False,
+                             cloneSources=False,
+                             callback=None):
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
         def _createSourceVersion(targetBranch, targetBranchVersionList, 
@@ -188,12 +190,21 @@ class ClientClone:
                 
             return infoList, buildVersion
 
-        def _needsRewrite(sourceBranch, targetBranch, verToCheck, kind):
-            # if this version is for a referenced trove, we can be 
-            # sure that trove is being cloned as well, and so we always 
-            # need to rewrite its version.
+        def _needsRewrite(sourceBranch, targetBranch, infoToCheck, kind,
+                          allTroveInfo):
+            name, verToCheck, flavor = infoToCheck
+
             if kind == V_REFTRV:
-                return True
+                # if fullRecurse is False then we don't want
+                # to pull in extra troves to clone automatically.
+                # otherwise, if this version is for a referenced trove, 
+                # we can be sure that trove is being cloned as well, and so we 
+                # always 
+                # need to rewrite its version.
+                if not fullRecurse and infoToCheck not in allTroveInfo:
+                    return False
+                else:
+                    return True
 
             branchToCheck = verToCheck.branch()
 
@@ -254,7 +265,8 @@ class ClientClone:
         def _versionsNeeded(needDict, trv, sourceBranch, targetBranch,
                             rewriteTroveInfo):
             for (mark, src) in _iterAllVersions(trv, rewriteTroveInfo):
-                if _needsRewrite(sourceBranch, targetBranch, src[1], mark[0]):
+                if _needsRewrite(sourceBranch, targetBranch, src, mark[0],
+                                 allTroveInfo):
                     l = needDict.setdefault(src, [])
                     l.append(mark)
 
@@ -267,26 +279,56 @@ class ClientClone:
             callback = callbacks.CloneCallback()
         callback.determiningCloneTroves()
         # get the transitive closure
+
+        seen = set()
         allTroveInfo = set()
         allTroves = dict()
-        cloneSources = troveList
-        while cloneSources:
+        originalSources = set(troveList)
+        toClone = troveList
+        while toClone:
             needed = []
 
-            for info in cloneSources:
+            for info in toClone:
                 if info[0].startswith("fileset"):
                     raise CloneError, "File sets cannot be cloned"
 
-                if info not in allTroveInfo:
+                if info not in seen:
                     needed.append(info)
-                    allTroveInfo.add(info)
+                    seen.add(info)
 
             troves = self.repos.getTroves(needed, withFiles = False, 
                                           callback = callback)
-            allTroves.update(x for x in itertools.izip(needed, troves))
-            cloneSources = [ x for x in itertools.chain(
-                        *(t.iterTroveList(weakRefs=True,
-                                          strongRefs=True) for t in troves)) ]
+            newToClone = []
+            for info, trv in itertools.izip(needed, troves):
+                if not trv.getName().endswith(':source'):
+                    sourceName = trv.getSourceName()
+                    if not sourceName:
+                        sourceName = trv.getName().split(':')[0] + ':source'
+                    if not fullRecurse:
+                        sourcePackage = sourceName.split(':')[0]
+                        parentPackage = (sourcePackage, trv.getVersion(),
+                                         trv.getFlavor())
+                        if parentPackage not in originalSources:
+                            # if we're not recursing, we still want to 
+                            # clone this as long as the parent package is
+                            # the same (this works for groups as well as
+                            # for components)
+                            continue
+
+                    if cloneSources:
+                        sourceTup = (sourceName,
+                                     trv.getVersion().getSourceVersion(),
+                                     deps.Flavor())
+                        newToClone.append(sourceTup)
+
+                allTroves[info] = trv
+                allTroveInfo.add(info)
+
+                newToClone.extend(trv.iterTroveList(weakRefs=True,
+                                                    strongRefs=True))
+
+            toClone = newToClone
+
 
         # make sure there are no zeroed timeStamps - targetBranch may be
         # a user-supplied string
@@ -509,11 +551,14 @@ class ClientClone:
 
             needsNewVersions = []
             for (mark, src) in _iterAllVersions(trv, updateBuildInfo):
-                if _needsRewrite(sourceBranch, targetBranch, src[1], mark[0]):
+                if _needsRewrite(sourceBranch, targetBranch, src, mark[0],
+                                 allTroveInfo):
                     _updateVersion(trv, mark, versionMap[src])
 
             for (pathId, path, fileId, version) in trv.iterFileList():
-                if _needsRewrite(sourceBranch, targetBranch, version, None):
+                if _needsRewrite(sourceBranch, targetBranch, 
+                                 (trv.getName(), version, None), None,
+                                 allTroveInfo):
                     needsNewVersions.append((pathId, path, fileId))
 
             # need to be reversioned

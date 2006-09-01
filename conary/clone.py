@@ -34,7 +34,7 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False, cloneSources = False, message = None, 
-               test = False):
+               test = False, fullRecurse = False):
     client = ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -52,25 +52,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
     trovesToClone = repos.findTroves(cfg.installLabelPath, 
                                     troveSpecs, cfg.flavor)
-    trovesToClone = list(itertools.chain(*trovesToClone.itervalues()))
+    trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
 
-    if cloneSources:
-        binaries = [ x for x in trovesToClone if not x[0].endswith(':source')]
-        seen = set(binaries)
-        while binaries:
-            troves = repos.getTroves(binaries, withFiles=False)
-            binaries = []
-            for trove in troves:
-                trovesToClone.append((trove.getSourceName(),
-                                      trove.getVersion().getSourceVersion(),
-                                      deps.Flavor()))
-                for troveTup in trove.iterTroveList(strongRefs=True,
-                                                    weakRefs=True):
-                    if troveTup not in seen:
-                        binaries.append(troveTup)
-            seen.update(binaries)
-
-        trovesToClone = list(set(trovesToClone))
     if not client.cfg.quiet:
         callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
     else:
@@ -78,7 +61,9 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
     okay, cs = client.createCloneChangeSet(targetBranch, trovesToClone,
                                            updateBuildInfo=updateBuildInfo,
-                                           infoOnly=info, callback=callback)
+                                           infoOnly=info, callback=callback,
+                                           fullRecurse=fullRecurse,
+                                           cloneSources=cloneSources)
     if not okay:
         return
 
