@@ -31,10 +31,12 @@ Changes in @NEW@:
     * Errors in callbacks are issues as warnings and the current job is
       finished before existing. KeyboardInterrupts and SystemExits are handled
       immediately (CNY-806)
-    * Added a --full-recurse option for cloneChangeSet.  Cloning a group no 
-      longer recurses by default, as for that to work successfully all troves in
-      the group also have to come from the same branch, which is almost never
-      the case.
+    * A --full-recurse option has been added to the "cvc clone"
+      command. Cloning a group no longer recurses by default.  The
+      only way that a recursive group clone could succeed is if all
+      troves in the group came from the same branch.  This is almost
+      never the case.
+
     * Display source name if it's different than what's expected (CNY-833)
 
   o Optimizations
