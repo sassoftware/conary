@@ -31,10 +31,6 @@ Changes in @NEW@:
     * Errors in callbacks are issues as warnings and the current job is
       finished before existing. KeyboardInterrupts and SystemExits are handled
       immediately (CNY-806)
-    * Added a --recurse option for cloneChangeSet.  Cloning a group no longer
-      recurses by default, as for that to work successfully all troves in
-      the group also have to come from the same branch, which is almost never
-      the case.
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster

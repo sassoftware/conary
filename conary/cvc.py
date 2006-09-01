@@ -243,7 +243,6 @@ class CloneCommand(CvcCommand):
              'with-sources'    : ('Ensure that any binaries that are being'
                                  ' cloned also have a matching source component'),
              'message': 'Use MESSAGE for the changelog entry for all cloned sources',
-             'recurse': 'Recursively clone groups',
              'test':    ('Runs through all the steps of committing but does not'
                          'modify the repository')
            }
@@ -254,7 +253,6 @@ class CloneCommand(CvcCommand):
         argDef["info"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["message"] = '-m', ONE_PARAM
-        argDef["recurse"] = NO_PARAM
         argDef["test"] = NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
@@ -268,11 +266,10 @@ class CloneCommand(CvcCommand):
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
         cloneSources = argSet.pop('with-sources', False)
-        recurse = argSet.pop('recurse', False)
         if argSet: return self.usage()
         clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info,
                          cloneSources=cloneSources, message = message, 
-                         test = test, recurse = recurse)
+                         test = test)
 _register(CloneCommand)
 
 
