@@ -35,6 +35,7 @@ Changes in @NEW@:
       longer recurses by default, as for that to work successfully all troves in
       the group also have to come from the same branch, which is almost never
       the case.
+    * Display source name if it's different than what's expected (CNY-833)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
