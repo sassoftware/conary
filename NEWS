@@ -10,9 +10,6 @@ Changes in @NEW@:
       immediately. (CNY-806)
 
   o System Update Changes:
-    * The "--debug" command line flag now provides information that is
-      useful to the end-user on update.  The "--debug=all" flag will
-      provide output that is useful to conary developers.
     * The output of "--debug" has been modified when performing
       dependency resolution.  The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
@@ -25,6 +22,10 @@ Changes in @NEW@:
     * Files moving between components as part of a single job are now
       treated as file updates instead of separate add/remove events.
       (CNY-750, CNY-786, CNY-359)
+    * The "--debug" command line flag now provides information that is
+      useful to the end-user during the update process.  The
+      "--debug=all" flag will provide output that is useful to conary
+      developers.
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
