@@ -26,8 +26,8 @@ Changes in @NEW@:
     * Paths moving between troves as part of a single job are now treated
       as file updates instead of separate add/remove events (CNY-750,
       CNY-786, CNY-359)
-    * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
-      objects directly (CNY-640)
+    * Entitlements can now be passed into ConaryClient and
+      NetworkRepositoryClient objects directly. (CNY-640)
     * Errors in callbacks are issued as warnings and the current job is
       finished before existing. KeyboardInterrupts and SystemExits are handled
       immediately (CNY-806)
