@@ -8,8 +8,8 @@ Changes in @NEW@:
       resume at a particular location, you must use "--resume=<loc>".
       "--resume <loc>" will not work anymore.  This removes an
       ambiguity in how we parse optional parameters in Conary.
-    * The output of --debug has been modified when performing
-      dependency resolution - The output should be more helpful to end
+    * The output of "--debug" has been modified when performing
+      dependency resolution.  The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
     * "cvc merge" and "cvc update" are now more verbose when
@@ -21,13 +21,14 @@ Changes in @NEW@:
       steps of cloning without performing the clone.  --info is now
       more lightweight - it no longer downloads all of the file
       contents that would be cloned.
-    * Components that modify the same files are now required to be in the 
-      same update job (for example, if a file moves from package a to
-      package b, we make the erase of package a and the install of package
-      b will occur at the same time) (CNY-758).
-    * Paths moving between troves as part of a single job are now treated
-      as file updates instead of separate add/remove events (CNY-750,
-      CNY-786, CNY-359)
+    * Components that modify the same files are now required to be in
+      the same update job.  For example, if a file moves from
+      component a:runtime to component b:runtime, the erase of
+      component a:runtime and the install of component b:runtime will
+      occur at the same time. (CNY-758).
+    * Files moving between components as part of a single job are now
+      treated as file updates instead of separate add/remove events.
+      (CNY-750, CNY-786, CNY-359)
     * Entitlements can now be passed into ConaryClient and
       NetworkRepositoryClient objects directly. (CNY-640)
     * Exceptions raised in callback functions are now issued as
