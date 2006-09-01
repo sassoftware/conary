@@ -47,12 +47,6 @@ Changes in @NEW@:
       2.5 times faster (from 10 seconds to 4 seconds).
 
   o Build (cvc) Changes:
-    * The command line argument parsing in "cvc" has been modified.
-      To use the "--resume" command line argument to specify that you
-      wish to resume at a particular location, you must use
-      "--resume=<loc>".  "--resume <loc>" will not work anymore.  This
-      removes an ambiguity in how we parse optional parameters in
-      Conary.
     * "cvc merge" and "cvc update" are now more verbose when
       patching. (CNY-406)
     * "cvc clone" now requires that you specify a message when cloning
@@ -69,6 +63,12 @@ Changes in @NEW@:
       This is almost never the case.
     * The "cvc cook" command now prints the flavor being built,
       as well as the version. (CNY-817)
+    * The command line argument parsing in "cvc" has been modified.
+      To use the "--resume" command line argument to specify that you
+      wish to resume at a particular location, you must use
+      "--resume=<loc>".  "--resume <loc>" will not work anymore.  This
+      removes an ambiguity in how we parse optional parameters in
+      Conary.
     * The PythonSetup build action no longer provides the older
       --single-version-externally-managed argument, and instead
       provides the --prefix, --install-purelib, and --install-platlib
@@ -81,8 +81,8 @@ Changes in @NEW@:
       to find system path elements. (CNY-813)
     * /etc/conary/mirrors/gnu has been added to enable mirror://
       references to the GNU mirror system.
-    * The GNU mirror list was then significantly expanded and resorted.
-      (CNY-824)
+    * The GNU mirror list was then significantly expanded and
+      re-sorted.  (CNY-824)
     * /etc/conary/mirrors/cpan has been added to enable mirror://
       references to the Comprehensive Perl Archive network mirror
       system.
