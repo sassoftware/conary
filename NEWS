@@ -21,6 +21,11 @@ Changes in @NEW@:
       steps of cloning without performing the clone.  --info is now
       more lightweight - it no longer downloads all of the file
       contents that would be cloned.
+    * "cvc clone" now has a --full-recurse parameter that controls how
+      recursion is performed.  Cloning a group no longer recurses by
+      default.  The only way that a recursive group clone could
+      succeed is if all troves in the group came from the same branch.
+      This is almost never the case.
     * Components that modify the same files are now required to be in
       the same update job.  For example, if a file moves from
       component a:runtime to component b:runtime, the erase of
@@ -35,11 +40,6 @@ Changes in @NEW@:
       warnings and the current job is finished before
       existing. KeyboardInterrupts and SystemExits are handled
       immediately. (CNY-806)
-    * A --full-recurse option has been added to the "cvc clone"
-      command. Cloning a group no longer recurses by default.  The
-      only way that a recursive group clone could succeed is if all
-      troves in the group came from the same branch.  This is almost
-      never the case.
     * The source component is now displayed in "conary rq --info"
       output if the package name does not match. (CNY-833)
 
