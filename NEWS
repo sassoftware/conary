@@ -36,7 +36,8 @@ Changes in @NEW@:
       only way that a recursive group clone could succeed is if all
       troves in the group came from the same branch.  This is almost
       never the case.
-    * Display source name if it's different than what's expected (CNY-833)
+    * The source component is now displayed in "conary rq --info"
+      output if the package name does not match. (CNY-833)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
