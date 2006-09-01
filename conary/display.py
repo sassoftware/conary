@@ -600,7 +600,7 @@ class TroveFormatter(TroveTupFormatter):
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
 
         if sourceTrove:
-            if sourceTrove.getName() != (trove.getName().split(':')[0] + ':source'):
+            if not n.endswith(':source'):
                 yield 'Source    : %s' % trove.getSourceName()
             if hasattr(troveSource, 'getMetadata'):
                 for ln in metadata.formatDetails(troveSource, None, n, 
