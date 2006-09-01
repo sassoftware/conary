@@ -48,6 +48,10 @@ from conary.local import update
 from conary.repository import changeset
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
+nonCfgExt = ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
+             'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
+             'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
+
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
     def __init__(self):
@@ -182,9 +186,10 @@ use cvc co %s=<branch> for the following branches:
     for (pathId, path, fileId, version) in troveCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
-	sourceState.addFile(pathId, path, version, fileId)
-
 	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
+        sourceState.addFile(pathId, path, version, fileId,
+                            isConfig = fileObj.flags.isConfig())
+
         if fileObj.flags.isAutoSource():
             continue
 
@@ -306,7 +311,8 @@ def commit(repos, cfg, message, callback=None, test=False):
                     return
 
                 pathId = makePathId()
-                state.addFile(pathId, base, versions.NewVersion(), "0" * 20)
+                state.addFile(pathId, base, versions.NewVersion(), "0" * 20,
+                              isConfig = False)
 
             if os.path.dirname(fullPath) != cwd:
                 srcMap[base] = fullPath
@@ -867,6 +873,8 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 def updateSrc(repos, versionStr = None, callback = None):
     if not callback:
         callback = CheckinCallback()
+    import epdb
+    epdb.st('f')
     conaryState = ConaryStateFromFile("CONARY")
     state = conaryState.getSourceState()
     pkgName = state.getName()
@@ -1091,7 +1099,25 @@ def addFiles(fileList, ignoreExisting=False):
 
 	pathId = makePathId()
 
-	state.addFile(pathId, file, versions.NewVersion(), "0" * 20)
+        extension = file.split(".")[-1]
+        if extension not in nonCfgExt:
+            isConfig = True
+            sb = os.stat(file)
+            if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
+                fd = os.open(file, os.O_RDONLY)
+                os.lseek(fd, -1, 2)
+                term = os.read(fd, 1)
+                if term != '\n':
+                    log.error("%s does not end with a trailing new line", 
+                                file)
+
+                    os.close(fd)
+                    return
+        else:
+            isConfig = False
+
+	state.addFile(pathId, file, versions.NewVersion(), "0" * 20,
+                      isConfig = isConfig)
 
     conaryState.write("CONARY")
 
@@ -1187,7 +1213,7 @@ def newTrove(repos, cfg, name, dir = None, template = None):
         try:
             os.chdir(dir)
             pathId = makePathId()
-            sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20)
+            sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20, isConfig = True)
         finally:
             os.chdir(cwd)
 
@@ -1212,7 +1238,8 @@ def renameFile(oldName, newName):
     for (pathId, path, fileId, version) in sourceState.iterFileList():
 	if path == oldName:
 	    os.rename(oldName, newName)
-	    sourceState.addFile(pathId, newName, version, fileId)
+	    sourceState.addFile(pathId, newName, version, fileId,
+                                isConfig = sourceState.fileIsConfig(pathId))
 	    conaryState.write("CONARY")
 	    return
     

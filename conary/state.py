@@ -23,7 +23,19 @@ from conary.deps import deps
 from conary.lib import sha1helper
 from conary import versions
 
+class FileInfo(object):
+
+    __slots__ = ( 'isConfig' )
+
+    # container for the extra information we keep on files for SourceStates
+    # this has no access methods; it is meant to be accessed directly
+
+    def __init__(self, isConfig = 0):
+        self.isConfig = isConfig
+
 class ConaryState:
+
+    stateVersion = 1
 
     def __init__(self, context=None, source=None):
         self.context = context
@@ -36,6 +48,7 @@ class ConaryState:
             self.source._write(f)
             
     def _write(self, f):
+        f.write("stateversion %d\n" % self.stateVersion)
         if self.getContext():
             f.write("context %s\n" % self.getContext())
 
@@ -68,10 +81,18 @@ class ConaryState:
         
 class SourceState(trove.Trove):
 
-    __slots__ = [ "branch", "pathMap", "lastMerged" ]
+    __slots__ = [ "branch", "pathMap", "lastMerged", "fileInfo" ]
 
     def setPathMap(self, map):
         self.pathMap = map
+
+    def removeFile(self, pathId):
+        trove.Trove.removeFile(self, pathId)
+        del self.fileInfo[pathId]
+
+    def addFile(self, pathId, path, version, fileId, isConfig):
+        trove.Trove.addFile(self, pathId, path, version, fileId)
+        self.fileInfo[pathId] = FileInfo(isConfig = isConfig)
 
     def removeFilePath(self, file):
 	for (pathId, path, fileId, version) in self.iterFileList():
@@ -89,13 +110,17 @@ class SourceState(trove.Trove):
 	:source component checkins, so things like trove dependency
 	information is not needed.  The format of the string is:
 
+        name <name>
+        version <version>
+        branch <branch>
+        (lastmerged <version>)?
 	<file count>
-	PATHID1 PATH1 FILEID1 VERSION1
-	PATHID2 PATH2 FILEID2 VERSION2
+	PATHID1 PATH1 FILEID1 ISCONFIG1 VERSION1
+	PATHID2 PATH2 FILEID2 ISCONFIG2 VERSION2
 	.
 	.
 	.
-	PATHIDn PATHn FILEIDn VERSIONn
+	PATHIDn PATHn FILEIDn ISCONFIG3 VERSIONn
 	"""
         assert(len(self.strongTroves) == 0)
         assert(len(self.weakTroves) == 0)
@@ -109,8 +134,9 @@ class SourceState(trove.Trove):
         rc = []
         rc.append("%d\n" % (len(self.idMap)))
 
-        rc += [ "%s %s %s %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
+        rc += [ "%s %s %s %d %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
                                 sha1helper.sha1ToString(x[1][1]),
+                                self.fileInfo[x[0]].isConfig,
                                 x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
@@ -151,11 +177,15 @@ class SourceState(trove.Trove):
         new = trove.Trove.copy(self, classOverride = classOverride)
         new.branch = self.branch.copy()
         new.pathMap = copy.copy(self.pathMap)
+        new.fileInfo = copy.copy(self.fileInfo)
         if self.lastMerged:
             new.lastMerged = self.lastMerged.copy()
         else:
             new.lastMerged = None
         return new
+
+    def fileIsConfig(self, pathId):
+        return self.fileInfo[pathId].isConfig
 
     def __init__(self, name, version, branch, changeLog = None,
                  lastmerged = None, isRedirect = False, **kw):
@@ -167,6 +197,7 @@ class SourceState(trove.Trove):
         self.branch = branch
         self.pathMap = {}
         self.lastMerged = lastmerged
+        self.fileInfo = {}
 
 class ConaryStateFromFile(ConaryState):
 
@@ -174,7 +205,11 @@ class ConaryStateFromFile(ConaryState):
 	f = open(filename)
         lines = f.readlines()
 
-	fields = lines[0][:-1].split()
+        stateVersion = 0
+        if lines[0].startswith('stateversion '):
+            stateVersion = int(lines[0].split(None, 1)[1].strip())
+            lines.pop(0)
+
         contextList = [ x for x in lines if x.startswith('context ') ]
         if contextList:
             contextLine = contextList[-1]
@@ -185,7 +220,8 @@ class ConaryStateFromFile(ConaryState):
 
         if lines:
             try:
-                self.source = SourceStateFromLines(lines)
+                self.source = SourceStateFromLines(lines,
+                                                   stateVersion = stateVersion)
             except ConaryStateError, err:
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
         else:
@@ -206,7 +242,7 @@ class SourceStateFromLines(SourceState):
                'branch'     : (True,  True ),
                'lastmerged' : (True,  False) }
 
-    def readFileList(self, lines):
+    def _readFileList(self, lines, stateVersion):
 	fileCount = int(lines[0][:-1])
 
         for line in lines[1:]:
@@ -215,13 +251,15 @@ class SourceStateFromLines(SourceState):
 	    fields = line.split()
 	    pathId = sha1helper.md5FromString(fields.pop(0))
 	    version = fields.pop(-1)
+	    isConfig = int(fields.pop(-1))
 	    fileId = sha1helper.sha1FromString(fields.pop(-1))
+
 	    path = " ".join(fields)
 
 	    version = versions.VersionFromString(version)
-	    self.addFile(pathId, path, version, fileId)
+	    self.addFile(pathId, path, version, fileId, isConfig = isConfig)
 
-    def parseLines(self, lines):
+    def parseLines(self, lines, stateVersion):
         kwargs = {}
 
         while lines:
@@ -249,10 +287,10 @@ class SourceStateFromLines(SourceState):
 
 	SourceState.__init__(self, **kwargs)
 
-	self.readFileList(lines)
+	self._readFileList(lines, stateVersion = stateVersion)
 
-    def __init__(self, lines):
-        self.parseLines(lines)
+    def __init__(self, lines, stateVersion):
+        self.parseLines(lines, stateVersion = stateVersion)
 
     def copy(self):
         return SourceState.copy(self, classOverride = SourceState)
