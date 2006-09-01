@@ -28,7 +28,7 @@ Changes in @NEW@:
       CNY-786, CNY-359)
     * Entitlements can be passed into ConaryClient and NetworkRepositoryClient
       objects directly (CNY-640)
-    * Errors in callbacks are issues as warnings and the current job is
+    * Errors in callbacks are issued as warnings and the current job is
       finished before existing. KeyboardInterrupts and SystemExits are handled
       immediately (CNY-806)
     * A --full-recurse option has been added to the "cvc clone"
