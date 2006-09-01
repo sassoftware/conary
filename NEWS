@@ -70,6 +70,9 @@ Changes in @NEW@:
       (CNY-824)
     * /etc/conary/mirrors/cpan has been added to enable mirror://
       references to the Comprehensive Perl Archive network mirror system.
+    * In group recipes, the methods r.add(), r.addAll(), and r.addNewGroup()
+      have been modified to accept the use= parameter, which defaults to True
+      (CNY-830).
 
   o Bug Fixes:
     * "conary rq" (with no arguments) no longer hides troves if the
