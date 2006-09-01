@@ -118,13 +118,13 @@ Changes in @NEW@:
       New methods will be introduced that return new modified objects.
     * Conary no longer hangs waiting for the download thread when an error
       occured in the download thread which caused it to terminate.
-    * Conary migrate now returns an error much earlier if you are not using
-      interactive mode (CNY-826).
+    * "conary migrate" now returns an error much earlier if you are
+      not using interactive mode. (CNY-826)
     * Files removed from troves (most often by --replace-files) are now
       properly skipped on updates to that trove when the file didn't change
-      between versions (CNY-828)
+      between versions. (CNY-828)
     * includeConfigFile now gives a much better error message when it
-      cannot include a config file (CNY-618).
+      cannot include a config file. (CNY-618)
 
 Changes in 1.0.29:
   o Bug Fixes:
