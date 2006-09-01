@@ -259,7 +259,8 @@ class GroupRecipe(_BaseGroupRecipe):
             group.addRequires(requirement)
 
     def add(self, name, versionStr = None, flavor = None, source = None,
-            byDefault = None, ref = None, components = None, groupName = None):
+            byDefault = None, ref = None, components = None, groupName = None,
+            use = True):
         """
         NAME
         ====
@@ -306,7 +307,12 @@ class GroupRecipe(_BaseGroupRecipe):
         This parameter's explicit use is generally unnecessary.
 
         B{versionStr} : (None) A version specifier like that passed to
+
         B{repquery} which determines the trove returned.
+        
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are added to the
+        group
 
         EXAMPLES
         ========
@@ -315,6 +321,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
         Adds the C{gzip:runtime} trove to the current group.
         """
+        if not use:
+            return
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
@@ -467,8 +475,7 @@ class GroupRecipe(_BaseGroupRecipe):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
-                                                            recurse=True,
-                                                            groupName = None):
+                           recurse=True, groupName = None, use = True):
         """
         NAME
         ====
@@ -516,6 +523,10 @@ class GroupRecipe(_BaseGroupRecipe):
         B{ref}: (None) Trove reference to search in for this trove. See
         C{r.addReference()} for more information.
 
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are added to the
+        group
+
         EXAMPLES
         ========
 
@@ -524,12 +535,14 @@ class GroupRecipe(_BaseGroupRecipe):
 	Uses C{r.addAll} to add the troves referenced by C{group-core} to
 	the recipe for version string 'conary.rpath.com@rpl:1'.
         """
+        if not use:
+            return
         flavor = self._parseFlavor(flavor)
 
         for group in self._getGroups(groupName):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
 
-    def addNewGroup(self, name, groupName = None, byDefault = True):
+    def addNewGroup(self, name, groupName = None, byDefault = True, use = True):
         """
         NAME
         ====
@@ -561,6 +574,11 @@ class GroupRecipe(_BaseGroupRecipe):
         B{groupName} : (Current group name) The name(s) of group(s) to add
         this trove to.
 
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are added to the
+        group
+
+
         EXAMPLES
         ========
 
@@ -568,6 +586,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
         Adds the group C{group-3d} to the group C{group-graphics}.
         """
+        if not use:
+            return
         #FIXME: this should default to whatever the current byDefault default
         # is!
         if not self._hasGroup(name):
