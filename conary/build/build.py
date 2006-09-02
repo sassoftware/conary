@@ -1744,6 +1744,7 @@ class Move(_PutFiles):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe.
+
     EXAMPLES
     ========
 
