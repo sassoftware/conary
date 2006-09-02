@@ -1034,14 +1034,29 @@ class PythonSetup(BuildCommand):
 
     B{action} : (C{install}) The main argument to pass to C{setup.py}
 
+    B{purePython} : (True) Assume that there are no object files
+    installed in python libraries.  If any instances of
+    C{r.PythonSetup()} in a recipe specify C{purePython=False},
+    then under normal circumstances all of them should.
+
+    B{allowNonPure} : (False) If specifying C{purePython=False} is
+    not enough to fix a problem where setup.py installs files in
+    purelib and platlib directories, specify C{allowNonPure=True}
+    and fix the problem up afterward.  Specifying the
+    C{allowNonPure=True} flag will not override the C{NonMultilibComponent}
+    policy.
+
     B{bootstrap} : (False) Avoids reporting errors that are unavoidable
     when building bootstrap packages.
 
-    B{dir}: (C{%(builddir)s}) Directory in which to find the setup.py file,
+    B{dir} : (C{%(builddir)s}) Directory in which to find the setup.py file,
     defaults to the build directory.
 
-    B{rootDir} (C{%(destdir)s}) The directory to pass to setup.py via the
+    B{rootDir} : (C{%(destdir)s}) The directory to pass to setup.py via the
     C{--root} option
+
+    B{purelib}, B{platlib}, and B{data} : allow overriding the choice
+    of C{--purelib}, C{--platlib}, and C{--data} arguments, respectively.
 
     EXAMPLES
     ========
@@ -1053,15 +1068,21 @@ class PythonSetup(BuildCommand):
     template = (
         '%%(cdcmd)s'
         '%%(pythonsetup)s'
-        ' %%(action)s'
+        ' %(action)s'
         ' --prefix=%%(prefix)s'
-        ' --install-purelib=%%(prefix)s/lib/python2.4/site-packages/'
-        ' --install-platlib=%%(libdir)s/python2.4/site-packages/'
+        ' %%(purelib)s'
+        ' %%(platlib)s'
+        ' %%(data)s'
         ' --root=%%(rootdir)s'
     )
     keywords = {
         'action': 'install',
         'bootstrap': False,
+        'data': None,
+        'purelib': None,
+        'platlib': None,
+        'purePython': True,
+        'allowNonPure': False,
         'dir': '',
         'rootDir': '',
     }
@@ -1089,7 +1110,20 @@ class PythonSetup(BuildCommand):
         else:
             macros.setup = 'setup.py'
 
-        macros.action = self.action
+        # workout arguments and multilib status:
+        if self.purelib is None:
+            self.purelib = ' --install-purelib=%(prefix)s/lib/python2.4/site-packages/'
+        if self.platlib is None:
+            self.platlib = ' --install-platlib=%(libdir)s/python2.4/site-packages/'
+        if self.data is None:
+            if self.purePython:
+                self.data = ' --install-data=%(prefix)s/lib/python2.4/site-packages/'
+            else:
+                self.data = ' --install-data=%(libdir)s/python2.4/site-packages/'
+
+        macros.purelib = self.purelib
+        macros.platlib = self.platlib
+        macros.data = self.data
 
         # now figure out which kind of setup.py this is
         if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, macros.setup)).read()):
@@ -1099,7 +1133,34 @@ class PythonSetup(BuildCommand):
             macros.pythonsetup = (
                 '''python -c "import setuptools;execfile('%(setup)s')"''')
 
+        # prepare to test for multilib problems
+        if macros.lib != 'lib':
+            puresetbefore = set()
+            for tup in os.walk('%(destdir)s%(prefix)s/lib/python2.4' %macros):
+                puresetbefore.update(set('/'.join((tup[0], x)) for x in tup[2]))
+            platsetbefore = set()
+            for tup in os.walk('%(destdir)s%(libdir)s/python2.4' %macros):
+                platsetbefore.update(set('/'.join((tup[0], x)) for x in tup[2]))
+            if puresetbefore and platsetbefore and not self.allowNonPure:
+                errorMsg = 'Python and object files detected in different directories before PythonSetup() instance on line %d' % self.linenum
+                log.error(errorMsg)
+                self.recipe.reportErrors(errorMsg)
+
         util.execute(self.command %macros)
+
+        # test for multilib problems
+        if macros.lib != 'lib' and not self.allowNonPure:
+            puresetafter = set()
+            for tup in os.walk('%(destdir)s%(prefix)s/lib/python2.4' %macros):
+                puresetafter.update(set('/'.join((tup[0], x)) for x in tup[2]))
+            platsetafter = set()
+            for tup in os.walk('%(destdir)s%(libdir)s/python2.4' %macros):
+                platsetafter.update(set('/'.join((tup[0], x)) for x in tup[2]))
+            if puresetafter - puresetbefore and platsetafter - platsetbefore:
+                # we have added both kinds of files in this invocation
+                errorMsg = 'Python and object files detected in different directories on line %d; call all instances of PythonSetup() with the purePython=False argument' % self.linenum
+                log.error(errorMsg)
+                self.recipe.reportErrors(errorMsg)
 
 
 class Ldconfig(BuildCommand):

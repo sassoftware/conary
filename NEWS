@@ -74,9 +74,14 @@ Changes in @NEW@:
       Conary.
     * The PythonSetup build action no longer provides the older
       --single-version-externally-managed argument, and instead
-      provides the --prefix, --install-purelib, and --install-platlib
-      arguments.  This allows it to work correctly with a greater
-      number of packages. (CNY-809)
+      provides the --prefix, --install-purelib, --install-platlib,
+      and --data arguments, each of which can be overridden with
+      the purelib, platlib, and data keyword arguments.  This
+      allows it to work correctly with a greater number of packages.
+      It also provides the option of providing a "purePython=False"
+      argument for python packages that mix architecture-specific
+      and architecture-neutral files, and tries to automatically
+      discover cases when it should be provided. (CNY-809)
     * Python dependencies were previously incorrectly calculated
       for certain module path elements added in some Python C
       code (for example, contents of the lib-dynload directory);
