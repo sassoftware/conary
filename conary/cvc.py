@@ -161,8 +161,6 @@ class AddCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) < 2: return self.usage()
-        client = conaryclient.ConaryClient(cfg)
-        repos = client.getRepos()
         checkin.addFiles(repos, args[1:])
 _register(AddCommand)
 
@@ -365,8 +363,6 @@ class ContextCommand(CvcCommand):
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               prettyPrint=prettyPrint)
-        client = conaryclient.ConaryClient(cfg)
-        repos = client.getRepos()
         checkin.setContext(repos, cfg, name, ask=ask)
 _register(ContextCommand)
 
@@ -555,8 +551,6 @@ class RemoveCommand(CvcCommand):
                    callback = None):
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            client = conaryclient.ConaryClient(cfg)
-            repos = client.getRepos()
             checkin.removeFile(repos, f)
 _register(RemoveCommand)
 
@@ -567,8 +561,6 @@ class RenameCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) != 3: return self.usage()
-        client = conaryclient.ConaryClient(cfg)
-        repos = client.getRepos()
         checkin.renameFile(repos, args[1], args[2])
 _register(RenameCommand)
 
@@ -652,8 +644,6 @@ class SetCommand(CvcCommand):
         if argSet: return self.usage()
         if len(args) < 2: return self.usage()
 
-        client = conaryclient.ConaryClient(cfg)
-        repos = client.getRepos()
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
 
 _register(SetCommand)
