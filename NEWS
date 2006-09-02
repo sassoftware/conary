@@ -1,3 +1,5 @@
+* Added "cvc set" command to change files between binary and text mode.
+
 Changes in @NEW@:
   o Client Changes:
     * The "--debug" command line flag now provides information that is
