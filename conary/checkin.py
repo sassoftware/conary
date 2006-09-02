@@ -1423,3 +1423,26 @@ def setContext(repos, cfg, contextName=None, ask=False):
 
     state.setContext(contextName)
     state.write('CONARY')
+
+def setFileFlags(repos, paths, text = False, binary = False):
+    state = ConaryStateFromFile('CONARY', repos)
+    sourceState = state.getSourceState()
+
+    assert(not text or not binary)
+
+    if text:
+        isConfig = 1
+    elif binary:
+        isConfig = 0
+    else:
+        isConfig = None
+
+    for path in paths:
+        for (pathId, path, fileId, version) in sourceState.iterFileList():
+            if path in paths:
+                if isConfig is not None:
+                    sourceState.fileIsConfig(pathId, set = isConfig)
+
+    state.write('CONARY')
+    
+

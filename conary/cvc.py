@@ -65,6 +65,7 @@ def usage(rc = 1):
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
+    print "       cvc set <path>+"
     print '       cvc sign <trove>[=version][[flavor]]+'
     print "       cvc update [<version>]"
     print ""
@@ -625,6 +626,37 @@ class MergeCommand(CvcCommand):
             kw = {}
         checkin.merge(repos, **kw)
 _register(MergeCommand)
+
+class SetCommand(CvcCommand):
+
+    commands = ['set']
+    paramHelp = "<path>+"
+
+    docs = {'text'       : ('Mark the given files as text files'),
+            'binary'     : ('Mark the given files as binary files') }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["binary"] = NO_PARAM
+        argDef["text"] = NO_PARAM
+
+    def runCommand(self, repos, cfg, argSet, args, profile = False, 
+                   callback = None):
+        binary = argSet.pop('binary', False)
+        text = argSet.pop('text', False)
+
+        if binary and text:
+            log.error("files cannot be both binary and text")
+            return 1
+
+        if argSet: return self.usage()
+        if len(args) < 2: return self.usage()
+
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
+        checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
+
+_register(SetCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
