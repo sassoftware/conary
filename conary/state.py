@@ -26,13 +26,14 @@ from conary import versions
 
 class FileInfo(object):
 
-    __slots__ = ( 'isConfig' )
+    __slots__ = ( 'isConfig', 'refresh' )
 
     # container for the extra information we keep on files for SourceStates
     # this has no access methods; it is meant to be accessed directly
 
-    def __init__(self, isConfig = 0):
+    def __init__(self, isConfig = 0, refresh = 0):
         self.isConfig = isConfig
+        self.refresh = refresh
 
 class ConaryState:
 
@@ -116,12 +117,12 @@ class SourceState(trove.Trove):
         branch <branch>
         (lastmerged <version>)?
 	<file count>
-	PATHID1 PATH1 FILEID1 ISCONFIG1 VERSION1
-	PATHID2 PATH2 FILEID2 ISCONFIG2 VERSION2
+	PATHID1 PATH1 FILEID1 ISCONFIG1 REFRESH1 VERSION1
+	PATHID2 PATH2 FILEID2 ISCONFIG2 REFRESH2 VERSION2
 	.
 	.
 	.
-	PATHIDn PATHn FILEIDn ISCONFIG3 VERSIONn
+	PATHIDn PATHn FILEIDn ISCONFIGn REFRESHn VERSIONn
 	"""
         assert(len(self.strongTroves) == 0)
         assert(len(self.weakTroves) == 0)
@@ -135,9 +136,10 @@ class SourceState(trove.Trove):
         rc = []
         rc.append("%d\n" % (len(self.idMap)))
 
-        rc += [ "%s %s %s %d %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
+        rc += [ "%s %s %s %d %d %s\n" % (sha1helper.md5ToString(x[0]), x[1][0],
                                 sha1helper.sha1ToString(x[1][1]),
                                 self.fileInfo[x[0]].isConfig,
+                                self.fileInfo[x[0]].refresh,
                                 x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
@@ -189,6 +191,11 @@ class SourceState(trove.Trove):
         if set is None:
             return self.fileInfo[pathId].isConfig
         self.fileInfo[pathId].isConfig = set
+
+    def fileNeedsRefresh(self, pathId, set = None):
+        if set is None:
+            return self.fileInfo[pathId].refresh
+        self.fileInfo[pathId].refresh = set
 
     def __init__(self, name, version, branch, changeLog = None,
                  lastmerged = None, isRedirect = False, **kw):
@@ -256,9 +263,11 @@ class SourceStateFromLines(SourceState):
             version = versions.VersionFromString(fields.pop(-1))
 
             if stateVersion >= 1:
+                refresh = int(fields.pop(-1))
                 isConfig = int(fields.pop(-1))
             else:
                 isConfig = 0
+                refresh = 0
 
 	    fileId = sha1helper.sha1FromString(fields.pop(-1))
 
@@ -269,6 +278,7 @@ class SourceStateFromLines(SourceState):
 	    path = " ".join(fields)
 
 	    self.addFile(pathId, path, version, fileId, isConfig = isConfig)
+            self.fileNeedsRefresh(pathId, set = refresh)
 
         if configFlagNeeded:
             assert(stateVersion == 0)
