@@ -774,8 +774,8 @@ class ReadOnlyChangeSet(ChangeSet):
     fileQueueCmp = staticmethod(fileQueueCmp)
 
     def configFileIsDiff(self, pathId):
-        (tag, str, compressed) = self.configCache.get(pathId, 
-                                                      (None, None, None))
+        (tag, cont, compressed) = self.configCache.get(pathId, 
+                                                       (None, None, None))
         return tag == ChangedFileTypes.diff
 
     def _nextFile(self):
@@ -803,10 +803,7 @@ class ReadOnlyChangeSet(ChangeSet):
             name = pathId
 	    (tag, contents, compressed) = self.configCache[pathId]
 
-            if type(contents) == str:
-                cont = filecontents.FromString(contents)
-            else:
-                cont = contents
+            cont = contents
 	else:
             self.filesRead = True
 
@@ -1039,8 +1036,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         allContents = {}
         for pathId in idList:
             (tag, contents, compressed) = self.configCache[pathId]
-            if isinstance(contents, str):
-                contents = filecontents.FromString(contents)
             if tag == ChangedFileTypes.file:
                 allContents[pathId] = (ChangedFileTypes.file, contents, False)
 
@@ -1212,9 +1207,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                 break
 
             cont = filecontents.FromFile(gzip.GzipFile(None, 'r', fileobj = f))
-            s = cont.get().read()
-            self.configCache[name] = (tag, s, False)
-            cont = filecontents.FromString(s)
+            self.configCache[name] = (tag, cont, False)
 
             nextFile = csf.getNextFile()
 

@@ -29,6 +29,9 @@ Changes in @NEW@:
       dependency resolution.  The output should be more helpful to end
       users.  Also rearranged the output given when dependencies
       fail. (CNY-779)
+    * Config files and diffs are no longer cached in ram during installs;
+      they are now reread from the changeset whenever they are needed
+      (CNY-821)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster
