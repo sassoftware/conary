@@ -7,12 +7,14 @@
 # is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
+# without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
 
-kid_files =	add_group.kid		\
+kid_files =     add_ent.kid             \
+                add_ent_group.kid       \
+                add_group.kid		\
 		add_user.kid 		\
 		browse.kid		\
 		change_password.kid	\
@@ -22,15 +24,15 @@ kid_files =	add_group.kid		\
 		files.kid		\
 		group_contents.kid	\
 		library.kid		\
-		main_page.kid		\
+                manage_ents.kid         \
 		metadata.kid		\
 		notice.kid		\
 		permission.kid		\
+                pgp_admin.kid           \
+                pgp_submit_key.kid      \
 		pick_trove.kid		\
 		trove_info.kid		\
 		user_admin.kid		\
-		pgp_admin.kid		\
-		pgp_submit_key.kid      \
 		pgp_get_key.kid
 
 extra_dist = Makefile
