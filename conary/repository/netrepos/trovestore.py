@@ -344,36 +344,55 @@ class TroveStore:
 
         self.depTables.add(cu, trv, troveInstanceId)
 
-        # NOTE: the use of MIN here is a bit of a hack. 
-        # It is possible that NewFiles could have two entries for the same
-        # fileId - one NULL and one with stream data.  In that case, we want
-        # to insert the one with stream data - and MIN(NULL, data) always
-        # returns data.  
-        # TODO: rework so that fileId in NewFiles is uniquely indexed, and
-        # catch an exception when trying to insert a second item with the same
-        # fileId.  Then, remove the GROUP BY and MIN bits here.
-        cu.execute("""
-        INSERT INTO FileStreams
-            (fileId, stream)
-        SELECT DISTINCT NewFiles.fileId, MIN(NewFiles.stream)
-        FROM NewFiles LEFT OUTER JOIN FileStreams USING(fileId)
-        WHERE FileStreams.streamId is NULL GROUP BY fileId
-        """)
+        # Fold NewFiles into FileStreams
+        #
+        # NewFiles can contain duplicate entries for the same fileId,
+        # (with stream being NULL or not), so the FileStreams update
+        # is happening in three steps:
+        # 1. Update existing fileIds (while avoiding  a full table scan)
+        # 2. Insert new fileIds with non-NULL streams
+        # 3. Insert new fileIds that might have NULL streams.
 
-        # this updates the stream for streams where stream is NULL
-        # (because they were originally added from a distributed branch)
-        # for items whose stream is present in NewFiles
+        # Note: writing the next two steps in a single query causes
+        # very slow full table scans on FileStreams. Don't get fancy.
 
-        # XXX: speed this up - the full table scan over filestreams is
-        # too slow
-        cu.execute("""
-        UPDATE FileStreams
-        SET stream = (SELECT DISTINCT NewFiles.stream FROM NewFiles
-                      WHERE FileStreams.fileId = NewFiles.fileId
-                        AND NewFiles.stream IS NOT NULL)
+        # get the common entries we're gonna update
+        cu2 = self.db.cursor()
+        cu2.execute("""
+        SELECT NewFiles.fileId, NewFiles.stream
+        FROM NewFiles
+        JOIN FileStreams USING(fileId)
         WHERE FileStreams.stream IS NULL
+        AND NewFiles.stream IS NOT NULL
+        """)
+        # Note: PostgreSQL and MySQL have support for non-SQL standard
+        # multi-table updates that we could use to do this in one step.
+        # This two step should work on everything though --gafton
+        for (fileId, stream) in cu2:
+            cu.execute("UPDATE FileStreams SET stream = ? "
+                       "WHERE fileId = ?", (stream, fileId))
+        del cu2
+
+        # select the new non-NULL streams out of NewFiles and Insert them in FileStreams
+        cu.execute("""
+        INSERT INTO FileStreams (fileId, stream)
+        SELECT DISTINCT NF.fileId, NF.stream
+        FROM NewFiles AS NF
+        LEFT OUTER JOIN FileStreams AS FS USING(fileId)
+        WHERE FS.fileId IS NULL
+          AND NF.stream IS NOT NULL
+        """)
+        # now insert the other fileIds
+        # select the new non-NULL streams out of NewFiles and Insert them in FileStreams
+        cu.execute("""
+        INSERT INTO FileStreams (fileId, stream)
+        SELECT DISTINCT NF.fileId, NF.stream
+        FROM NewFiles AS NF
+        LEFT OUTER JOIN FileStreams AS FS USING(fileId)
+        WHERE FS.fileId IS NULL
         """)
 
+        # create the TroveFiles links for this trove's files.
         cu.execute("""
         INSERT INTO TroveFiles
             (instanceId, streamId, versionId, pathId, path)
@@ -566,7 +585,7 @@ class TroveStore:
 	assert(troveFlavor is not None)
 
         # if we can not find the ids for the troveName, troveVersion
-        # or troveFlavor in their respective tables, than this troove
+        # or troveFlavor in their respective tables, than this trove
         # can't possibly exist...
 	troveItemId = self.items.get(troveName, None)
 	if troveItemId is None:
@@ -854,15 +873,15 @@ class TroveStore:
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
-        cu.execute("SELECT stream FROM FileStreams WHERE fileId=?", fileId)
+        cu.execute("SELECT stream FROM FileStreams WHERE fileId=?",
+                   cu.binary(fileId))
         try:
             stream = cu.next()[0]
         except StopIteration:
             raise errors.FileStreamMissing(fileId)
 
         if stream is not None:
-            return files.ThawFile(cu.frombinary(stream), 
-                                  cu.frombinary(pathId))
+            return files.ThawFile(cu.frombinary(stream), cu.frombinary(pathId))
         else:
             return None
 
