@@ -80,8 +80,8 @@ Changes in 1.0.30:
     * The PythonSetup build action no longer provides the older
       --single-version-externally-managed argument, and instead
       provides the --prefix, --install-purelib, --install-platlib,
-      and --data arguments, each of which can be overridden with
-      the purelib, platlib, and data keyword arguments.  This
+      and --install-data arguments, which can be overridden with the
+      purelib, platlib, and data keyword arguments, respectively.  This
       allows it to work correctly with a greater number of packages.
       It also provides the option of providing a "purePython=False"
       argument for python packages that mix architecture-specific
