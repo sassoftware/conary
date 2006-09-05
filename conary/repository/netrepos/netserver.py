@@ -1549,7 +1549,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         rawStreams = self._getFileStreams(authToken, fileIdGen)
         # return an exception if we couldn't find one of the streams
         if None in rawStreams:
-            fileId = self.toFileId(fileList[streams.index(None)][1])
+            fileId = self.toFileId(fileList[rawStreams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
         streams = [ None ] * len(fileList)
