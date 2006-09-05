@@ -33,6 +33,24 @@ def _regexp(pattern, item):
 def _timestamp():
     return long(time.strftime("%Y%m%d%H%M%S", time.gmtime(time.time())))
 
+# execute with exception translation
+def cursorExecute(func, *params, **kw):
+    try:
+        ret = func(*params, **kw)
+    except sqlite3.ProgrammingError, e:
+        if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+            raise sqlerrors.ColumnNotUnique(e)
+        elif e.args[0] == 'attempt to write a readonly database':
+            raise sqlerrors.ReadOnlyDatabase(str(e))
+        raise sqlerrors.CursorError(e.args[0], e)
+    except sqlite3.DatabaseError, e:
+        if e.args[0].startswith('duplicate column name:'):
+            raise sqlerrors.DuplicateColumnName(str(e))
+        if e.args[0].startswith("no such table"):
+            raise sqlerrors.InvalidTable(str(e))
+        raise sqlerrors.CursorError(e.args[0], e)
+    return ret
+
 class Cursor(BaseCursor):
     driver = "sqlite"
 
@@ -64,26 +82,17 @@ class Cursor(BaseCursor):
         return s
 
     def execute(self, sql, *params, **kw):
-        try:
-            ret = self._execute(sql, *params, **kw)
-        except sqlite3.ProgrammingError, e:
-            #if self.dbh.inTransaction:
-            #    self.dbh.rollback()
-            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
-                raise sqlerrors.ColumnNotUnique(e)
-            elif e.args[0] == 'attempt to write a readonly database':
-                raise sqlerrors.ReadOnlyDatabase(str(e))
-            raise sqlerrors.CursorError(e.args[0], e)
-        except sqlite3.DatabaseError, e:
-            if e.args[0].startswith('duplicate column name:'):
-                raise sqlerrors.DuplicateColumnName(str(e))
-            if e.args[0].startswith("no such table"):
-                raise sqlerrors.InvalidTable(str(e))
-            raise sqlerrors.CursorError(e.args[0], e)
-        else:
-            if ret == self._cursor:
-                return self
-            return ret
+        ret = cursorExecute(self._execute, sql, *params, **kw)
+        if ret == self._cursor:
+            return self
+        return ret
+
+    # we need to wrap this one through the exception translation layer
+    def executemany(self, sql, paramList, **kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
+
+        return cursorExecute(self._cursor.executemany, sql, paramList, **kw)
 
     # deprecated - this breaks programs by commiting stuff before its due time
     def executeWithCommit(self, sql, *params, **kw):
@@ -254,6 +263,126 @@ class Database(BaseDatabase):
         UPDATE %s SET %s = unix_timestamp() WHERE _ROWID_ = NEW._ROWID_ ;
         """ % (table, column)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
+
+    # extract the sql fields from a schema definition
+    def __parseFields(self, fStr):
+        types = """((
+        PRIMARY\ KEY | NOT\ NULL | AUTOINCREMENT | DEFAULT\ \S+ |
+        (VAR)?(CHAR|BINARY) \s* (\(\w+\))? | NUMERIC \s* \(\w+(,\w+)?\) |
+        INT | INTEGER | BLOB | TEXT | STR | STRING | UNIQUE ) \s*?)+
+        """
+        # extract the fields
+        fields = []
+        fStr = "(%s)" % (fStr,)
+        regex = re.compile(
+            """^\s* \( \s*
+            (?P<name>\w+) \s+ (?P<type>%s) , \s* (?P<rest>.*?)
+            \s* \)  \s* $""" % (types,),
+            re.I | re.S | re.X)
+        lastField = False
+        while 1:
+            match = regex.match(fStr)
+            if not match:
+                if lastField:
+                    break
+                # try it as the last field
+                regex = re.compile(
+                    """^\s* \( \s*
+                    (?P<name>\w+) \s+ (?P<type>%s)
+                    \s* \)  \s* $""" % (types,),
+                    re.I | re.S | re.X)
+                match = regex.match(fStr)
+                if not match:
+                    break
+                lastField = True
+            d = match.groupdict()
+            fields.append((d['name'], d["type"]))
+            if lastField:
+                break
+            fStr = "(%s)" % (d["rest"],)
+        assert(fields), "Could not parse table fields:\n%s" %(stmt["fields"],)
+        return fields
+
+    # grab the SQL definition of this table
+    def __getSQLstmt(self, table):
+        cu = self.dbh.cursor()
+        cu.execute("SELECT sql FROM sqlite_master WHERE "
+                   "lower(tbl_name) = lower('%s') AND type = 'table'" % (table,))
+        oldSql = cu.fetchone()[0]
+        stmt = {}
+        regex = re.compile(
+            """^\s*
+            (?P<header>CREATE\s+TABLE\s+\w+) \s*
+            \( \s*
+            (?P<fields>.*) \s*
+            (?P<constraint>, \s* CONSTRAINT .*?)?
+            \s* \)  \s*
+            (?P<final> .*)$""",
+            re.I | re.S | re.X)
+        match = regex.match(oldSql)
+        assert(match), "CREATE TABLE statement does not match regex:\n%s" % (oldSql,)
+        stmt.update(match.groupdict())
+        if stmt["constraint"] is None:
+            stmt["constraint"] = ""
+        return stmt
+
+    # since sqlite does not provide us with SQL-accessible information
+    # about the column options such as DEFAULT and/or NOT NULL, the
+    # safest way to affect a column change is to grab the old table
+    # definition from the sqlite_master and whish for the best...
+    def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
+        assert(self.dbh)
+        stmt = self.__getSQLstmt(table)
+        # parse the table fields
+        fields = self.__parseFields(stmt["fields"])
+        if oldName.lower() not in [x[0].lower() for x in fields]:
+            raise sqlerrors.DatabaseError(
+                "Table %s does not have a column named %s" % (table, oldName),
+                table, oldName, newName)
+        newFields = []
+        for (n, t) in fields:
+            if n.lower() == oldName.lower():
+                newFields.append((newName, t))
+            else:
+                newFields.append((n, t))
+        stmt["fields"] = ",\n".join(["%s %s" % (x[0], x[1]) for x in newFields])
+        # real databases automatically commit on DDL, os we shouldn't be any different
+        self.dbh.commit()
+        # sqlite can roll back DDL
+        cu = self.dbh.cursor()
+        cu.execute(self.basic_transaction)
+        cu.execute("ALTER TABLE %s RENAME TO %s_tmp" % (table, table))
+        # FIXME: the constraint should also be updated in case we're
+        # changing the fields listed in the constraint. sqlite doesn't care...
+        newSql = "%(header)s (\n%(fields)s %(constraint)s\n) %(final)s" % stmt
+        cu.execute(newSql)
+        # sanity runtime check - the new table should have the same
+        # number of columns as the old one.
+        # select 0 rows to get descriptions back
+        cu.execute("select * from %s_tmp where 1 is NULL" % (table,))
+        set1 = [x[0].lower() for x in cu.description]
+        cu.execute("select * from %s where 1 is NULL" % (table,))
+        set2 = [x[0].lower() for x in cu.description]
+        # make sure that the differences are only the columns we are modifying
+        if len(set1) != len(set2) or \
+           set(set1) - set(set2) != set([oldName.lower()]) or \
+           set(set2) - set(set1) != set([newName.lower()]):
+            # oops, don't mess with it
+            self.dbh.rollback()
+            raise RuntimeError("""Could not parse SQL definition for table %s
+            while attempting column rename %s -> %s""" % (table, oldName, newName),
+                               table, set1, set2)
+        cu.execute("INSERT INTO %s (%s) SELECT %s from %s_tmp" % (
+            table, ",".join([x[0] for x in newFields]),
+            ",".join([x[0] for x in fields]), table))
+        cu.execute("DROP TABLE %s_tmp" % (table,))
+        return True
+
+    def dropColumn(self, table, name):
+        assert(self.dbh)
 
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):

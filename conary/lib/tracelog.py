@@ -66,7 +66,7 @@ class NullLog:
     # log arguments if we're called as a function
     def __call__(self, level, *args):
         if level <= self.level:
-            self.log(*args)
+            self.log(level, *args)
 
 # Base logging class that figures out where it is being called from
 class FileLog(NullLog):
@@ -92,7 +92,7 @@ class FileLog(NullLog):
             return (isFile, fd)
         (self.isFile, self.fd) = __getFD()
         self.reset()
-        self.log("logging level %d for pid %d on '%s'" % (
+        self.log(0, "logging level %d for pid %d on '%s'" % (
             self.level, self.pid, self.filename))
 
     def argStr(self, val):
@@ -108,7 +108,7 @@ class FileLog(NullLog):
         return ret
 
     # python cookbooks are great
-    def log(self, *args):
+    def log(self, level=0, *args):
         global _thisFile
         tbStack = traceback.extract_stack()
         # trim off the calls from this module
@@ -138,17 +138,12 @@ class FileLog(NullLog):
         msg = "%s.%s" % (module, location)
         if len(args):
             msg = "%s %s" % (msg, " ".join([self.argStr(x) for x in args]))
-        # format for logging
-        msg = self.formatLog(msg)
-        self.writeLog(msg)
+        # finally, output the log
+        self.printLog(level, msg)
 
     # this function is mainly here so we can subclass it (ie, tracing)
-    def formatLog(self, msg):
-        return "%s %d %s" % (logTime(), self.pid, msg)
-
-    # simply print a message to the log.
-    def writeLog(self, msg):
-        self.fd.write("%s\n" % msg)
+    def printLog(self, level, msg):
+        self.fd.write("%s %d %s\n" % (logTime(), self.pid, msg))
 
     # close on exit
     def __del__(self):
@@ -159,20 +154,24 @@ class FileLog(NullLog):
 
 # a class that keeps tabs on the time spend between calls to the log function
 class TraceLog(FileLog):
-    lastTime = 0
+    def __init__(self, filename = "stderr", level = 1):
+        self.times = [time.time()] * level
+        FileLog.__init__(self, filename, level)
 
-    def formatLog(self, msg):
+    def printLog(self, level, msg):
         t = time.time()
-        ret = time.strftime("%H:%M:%S", time.localtime(t))
-        return "%d %s %+.3f %s" % (self.pid, ret, t - self.lastTime, msg)
-
-    def writeLog(self, msg):
-        self.lastTime = time.time()
-        FileLog.writeLog(self, msg)
+        timeStr = time.strftime("%H:%M:%S", time.localtime(t))
+        timeIdx = max(level-1, 0)
+        lineStr = "%d %s %+.3f %s" % (
+            self.pid, timeStr, t - self.times[timeIdx], msg)
+        # reset the timers for the next call
+        for i in range(timeIdx, self.level):
+            self.times[i] = t
+        self.fd.write("%s\n" % (lineStr,))
 
     def reset(self, level=None):
-        self.lastTime = time.time()
         FileLog.reset(self, level)
+        self.times = [time.time()] * self.level
 
 # instantiate a log object
 def getLog(filename = "stderr", level = 0, trace = 0):
@@ -218,7 +217,7 @@ def initLog(filename = "stderr", level = 0, trace = 0):
 def logMe(level, *args):
     global _LOG
     if _LOG and _LOG.level >= level:
-        _LOG.log(*args)
+        _LOG.log(0, *args)
 
 # shortcut for error logging
 def logErr(*args):
@@ -226,7 +225,7 @@ def logErr(*args):
     if not args:
         return
     if _LOG:
-        apply(_LOG.log, ["ERROR"] + list(args))
+        _LOG.log(0, *(("ERROR",) + args))
     if _LOG.filename != "stderr":
         # out it on stderr as well
         printErr(" ".join([str(x) for x in args]))

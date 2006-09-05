@@ -12,9 +12,11 @@
 # full details.
 #
 
+import re
+
 import MySQLdb as mysql
 from MySQLdb import converters
-from base_drv import BaseDatabase, BindlessCursor, BaseSequence, BaseBinary
+from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseBinary
 from base_drv import BaseKeywordDict
 import sqlerrors, sqllib
 
@@ -35,30 +37,132 @@ class KeywordDict(BaseKeywordDict):
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 
-class Cursor(BindlessCursor):
+# execute with exception translation
+def cursorExecute(func, *params, **kw):
+    try:
+        ret = func(*params, **kw)
+    except mysql.IntegrityError, e:
+        if e[0] in (1062,):
+            raise sqlerrors.ColumnNotUnique(e)
+        raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
+    except mysql.OperationalError, e:
+        if e[0] in (1216, 1217, 1451, 1452):
+            raise sqlerrors.ConstraintViolation(e.args[1], e.args)
+        if e[0] == 1205:
+            raise sqlerrors.DatabaseLocked(e.args[1], (e,) + tuple(e.args))
+        raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
+    except mysql.ProgrammingError, e:
+        if e[0] == 1146:
+            raise sqlerrors.InvalidTable(e)
+        raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
+    except mysql.MySQLError, e:
+        raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
+    return ret
+
+class Cursor(BaseCursor):
     driver = "mysql"
     binaryClass = BaseBinary
-    def execute(self, sql, *params, **kw):
-        if kw.has_key("start_transaction"):
-            del kw["start_transaction"]
-        try:
-            BindlessCursor.execute(self, sql, *params, **kw)
-        except mysql.IntegrityError, e:
-            if e[0] in (1062,):
-                raise sqlerrors.ColumnNotUnique(e)
-            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
-        except mysql.OperationalError, e:
-            if e[0] in (1216, 1217, 1451, 1452):
-                raise sqlerrors.ConstraintViolation(e.args[1], e.args)
-            if e[0] == 1205:
-                raise sqlerrors.DatabaseLocked(e.args[1], (e,) + tuple(e.args))
-            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
-        except mysql.ProgrammingError, e:
-            if e[0] == 1146:
-                raise sqlerrors.InvalidTable(e)
-            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
-        except mysql.MySQLError, e:
-            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
+    MaxPacket = 1024 * 1024
+
+    # edit the input query to make it python compatible
+    def __mungeSQL(self, sql):
+        keys = set()
+        # take in a match for an :id and return a %(id)s python sub
+        def __match_kw(m):
+            d = m.groupdict()
+            keys.add(d["kw"])
+            return "%(pre)s%(s)s%%(%(kw)s)s" % d
+
+        # handle the :id, :name type syntax
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*):(?P<kw>\w+)",
+                     __match_kw, sql)
+        # force dbi compliance here. args or kw or none, no mixes
+        if len(keys):
+            return (sql, tuple(keys))
+        # handle the ? syntax
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
+        return (sql, ())
+
+    # check proper for a proper execution environment
+    def __checkSQL(self, sql, kw):
+        assert(len(sql) > 0)
+        assert(self.dbh and self._cursor)
+        kw.pop("start_transaction", True)
+        sql, keys = self.__mungeSQL(sql)
+        return sql, keys
+
+    # we need to "fix" the sql code before calling out
+    def execute(self, sql, *args, **kw):
+        sql, keys = self.__checkSQL(sql, kw)
+
+        if len(args) == 1:
+            # unwrap the args if we were called execute(sql, {})
+            if isinstance(args[0], dict) or hasattr(args[0], 'keys'):
+                kw.update(args[0])
+                args = ()
+            # unwrap args if we're called as execute(sql, (a,b))
+            elif isinstance(args[0], (tuple, list)):
+                args = tuple(args[0])
+        # if we have args, we can not have keywords
+        if len(args):
+            assert(len(keys)==0 and len(kw)==0), \
+                                "Can not mix positional and named parameters"
+            cursorExecute(self._cursor.execute, sql, args)
+        elif len(keys):
+            # check that all keys used in the query appear in the kw
+            assert(False not in [kw.has_key(x) for x in keys]), \
+                         "Query keys not defined in named argument dict: %s != %s " %(
+                str(sorted(keys)), str(sorted(kw.keys())))
+            # we have keywords in the query
+            cursorExecute(self._cursor.execute, sql, kw)
+        else:
+            # no args and no keywords
+            cursorExecute(self._cursor.execute, sql)
+        return self
+
+    # coerce a query with parameters to the format MySQL bindings require
+    def __parmsExecute(self, sql, parms):
+        # MySQL bindings only accept tuples or dicts as  parameters
+        if isinstance(parms, (tuple, dict)):
+            ret = cursorExecute(self._cursor.execute, sql, parms)
+        elif isinstance(parms, list):
+            ret = cursorExecute(self._cursor.execute, sql, tuple(parms))
+        else:
+            ret = cursorExecute(self._cursor.execute, sql, (parms,))
+        return ret
+
+    # MySQL-optimized version of executemany when doing INSERT
+    def executemany(self, sql, paramList, **kw):
+        # This improves on the executemany() function defined in the
+        # MySQL bindings by making sure we don't build queries that
+        # are more than MaxPacket in size and that we work correctly
+        # when paramList is an iterator
+        insert_values = re.compile(r'\svalues\s*(\(.+\))', re.IGNORECASE)
+        sql, keys = self.__checkSQL(sql, kw)
+        m = insert_values.search(sql)
+        # if this is not an insert...values() query, loop over the paramList
+        if not m:
+            for parms in paramList:
+                ret = self.__parmsExecute(sql, parms)
+            return self
+        # build the multiple-value query insert
+        crtLen = startLen = m.start(1)
+        valStr = sql[startLen:]
+        vals = []
+        for parms in paramList:
+            try:
+                ps = valStr % self.dbh.literal(parms)
+            except TypeError, e:
+                raise sqlerrors.CursorError(e.args[0], e.args)
+            if crtLen + len(ps) + 1 >= self.MaxPacket:
+                # need to execute with what we have
+                cursorExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
+                crtLen = startLen
+                vals = []
+            crtLen += len(ps) + 1
+            vals.append(ps)
+        if len(vals):
+            cursorExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
         return self
 
 # Sequence implementation for mysql
@@ -98,6 +202,7 @@ class Database(BaseDatabase):
     cursorClass = Cursor
     sequenceClass = Sequence
     driver = "mysql"
+    MaxPacket = 1024 * 1024
 
     keywords = KeywordDict()
     tempTableStorage = {}
@@ -106,8 +211,21 @@ class Database(BaseDatabase):
         cu.execute("SELECT default_character_set_name "
                    "FROM INFORMATION_SCHEMA.SCHEMATA "
                    "where schema_name=?", self.dbName)
-        self.characterSet = cu.fetchone()[0]
+        self.characterSet = cu.fetchall()[0][0]
         cu.execute("set character set %s" % self.characterSet)
+
+    # this is used by the MySQL_specific execute_many to keep the max
+    # packet sizes in check
+    def _getMaxPacketSize(self, cu):
+        cu.execute("show variables like 'max_allowed_packet'")
+        name, size = cu.fetchall()[0]
+        self.MaxPacket = size
+
+    # need to propagate the MAxPacket value to the cursors
+    def cursor(self):
+        ret = BaseDatabase.cursor(self)
+        ret.MaxPacket = self.MaxPacket
+        return ret
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -127,6 +245,7 @@ class Database(BaseDatabase):
         self.dbName = cdb['db']
         cu = self.cursor()
         self._setCharSet(cu)
+        self._getMaxPacketSize(cu)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -196,6 +315,96 @@ class Database(BaseDatabase):
         cu = self.dbh.cursor()
         cu.execute(sql)
         self.tables[table].remove(name)
+        return True
+
+    # MySQL requires us to redefine a column even if all we need is to
+    # rename it...
+    def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
+        assert(self.dbh)
+        cu = self.dbh.cursor()
+        # first, we need to extract the old column definition
+        cu.execute("SHOW FULL COLUMNS FROM %s LIKE '%s'" % (table, oldName))
+        (oldName, colType, collation, null, key, default, extra, privs, comment) = \
+                  cu.fetchone()
+        # this is a bit tedious, but it has to be done...
+        if collation is not None:
+            collation = "COLLATE %s" % (collation,)
+        else:
+            collation = ''
+        # null or not null?
+        if null == "NO":
+            null = "NOT NULL"
+        else:
+            null = ''
+        if default in [None, '']:
+            default = ''
+        else:
+            try:
+                default = "DEFAULT %s" % (int(default),)
+            except ValueError:
+                default = "DEFAULT %s" % (self.dbh.literal(default),)
+        # sanity check: do other tables link to this column via foreign keys?
+        cu.execute("""
+        SELECT table_name, column_name FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE lower(table_schema) = lower(%s)
+          AND lower(referenced_table_schema) = lower(%s)
+          AND lower(referenced_table_name) = lower(%s)
+          AND lower(referenced_column_name) = lower(%s)
+        """, (self.dbName, self.dbName, table, oldName))
+        ret = cu.fetchall()
+        if len(ret):
+            raise sqlerrors.ConstraintViolation(
+                "Column rename will invalidate FOREIGN KEY constraints",
+                *tuple(ret))
+        # MySQL lameness - we need to check if this column is a FK pointing out
+        cu.execute("""
+        SELECT DISTINCT constraint_name as name, referenced_table_name as tName
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE lower(table_schema) = lower(%s)
+          AND lower(referenced_table_schema) = lower(%s)
+          AND lower(table_name) = lower(%s)
+          AND lower(column_name) = lower(%s)
+        """, (self.dbName, self.dbName, table, oldName))
+        ret = cu.fetchall()
+        # a constraint - if exists - can only point to one table
+        assert(len(ret) in [0,1])
+        hasFK = None
+        if len(ret):
+            # if we have a FK constraint, we need to get all members
+            # of the FKs in case we have somthing like this:
+            # FOREIGN KEY (pid, pname) REFERENCES parent(id, name)
+            (hasFK, fkTable) = ret[0]
+            cu.execute("""
+            SELECT ordinal_position as pos,
+            CASE lower(column_name) WHEN lower(%s) THEN %s ELSE column_name END as name,
+            referenced_column_name as fkName
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE lower(table_schema) = lower(%s)
+              AND lower(referenced_table_schema) = lower(%s)
+              AND lower(table_name) = lower(%s)
+              AND constraint_name = %s
+            ORDER BY ordinal_position
+            """, (oldName, newName, self.dbName, self.dbName, table, hasFK))
+            fkDef = cu.fetchall()
+            # need to drop the foreign key constraint first so we can alter the table
+            cu.execute("ALTER TABLE %s DROP FOREIGN KEY %s" % (table, hasFK))
+
+        # now we can roughly rebuild the definition...
+        sql = "ALTER TABLE %s CHANGE COLUMN %s %s %s %s %s %s %s" %(
+            table, oldName, newName,
+            colType, null, default, extra, collation)
+        cu.execute(sql)
+        # do we need to put back the FK constraint?
+        if hasFK:
+            sql = """ALTER TABLE %s ADD CONSTRAINT %s
+                     FOREIGN KEY (%s) REFERENCES %s(%s)
+                     ON UPDATE CASCADE""" % (
+                table, hasFK, ",".join([x[1] for x in fkDef]),
+                fkTable, ",".join([x[2] for x in fkDef]))
+            cu.execute(sql)
         return True
 
     def use(self, dbName):
