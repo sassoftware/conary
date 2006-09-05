@@ -2060,7 +2060,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("""
                 INSERT INTO TroveInfo (instanceId, infoType, data)
                 VALUES (?, ?, ?)
-                """, (instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig))
+                """, (instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig)))
                 updateCount += 1
             elif currentSig != sig:
                 cu.execute("""
@@ -2115,7 +2115,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
            WHERE Instances.isPresent = 1
              AND Instances.changed >= ?
            GROUP BY changed
-           HAVING c>1
+           HAVING COUNT(instanceId) > 1
         ) AS lims""", mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
@@ -2126,8 +2126,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # likely grant access to a trove for this user
         cu.execute("""
         SELECT COUNT(*) AS perms
-        FROM UserGroups
-        JOIN Permissions USING(userGroupId)
+        FROM Permissions
+        JOIN UserGroups USING(userGroupId)
         WHERE UserGroups.canMirror = 1
           AND UserGroups.userGroupId in (%s)
         """ % (",".join("%d" % x for x in userGroupIds),))
@@ -2156,9 +2156,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               WHERE Permissions.userGroupId in (%s)
                 AND UserGroups.canMirror = 1
               ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        JOIN Items ON Instances.itemId = Items.itemId
-        JOIN Versions ON Instances.versionId = Versions.versionId
-        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        JOIN Items ON Items.itemId = Instances.itemId
+        JOIN Versions ON Versions.versionId = Instances.versionId
+        JOIN Flavors ON Flavors.flavorId = Instances.flavorId
         WHERE Instances.changed >= ?
           AND Instances.isPresent = 1
         ORDER BY Instances.changed
