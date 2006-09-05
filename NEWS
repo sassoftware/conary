@@ -1,4 +1,14 @@
 Changes in @NEW@:
+  o Optimizations
+    * The getFileContents and getFileVersions server side calls have
+      been optimized for faster execution
+    * The SQL query in getTroveList has been sped up by a 3-5x factor.
+
+  o Server Changes
+    * Several SQL queries have been updated for PostgreSQL compatibility
+    * dbstore now has support for executemany()
+
+Changes in @NEW@:
   o System Update Changes:
     These changes make Conary much more robust when applying updates
     that move files from one package to another.
