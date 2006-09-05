@@ -48,9 +48,12 @@ from conary.local import update
 from conary.repository import changeset
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
-nonCfgExt = ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
-             'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
-             'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
+nonCfgExt = dict.fromkeys(
+        ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
+         'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
+         'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run') )
+cfgExt = dict.fromkeys(
+        ('recipe', 'patch', 'diff', 'sh', 'txt') )
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
@@ -873,8 +876,6 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 def updateSrc(repos, versionStr = None, callback = None):
     if not callback:
         callback = CheckinCallback()
-    import epdb
-    epdb.st('f')
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
     pkgName = state.getName()
@@ -1061,7 +1062,8 @@ def merge(repos, versionSpec=None, callback=None):
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
 
-def addFiles(repos, fileList, ignoreExisting=False):
+def addFiles(repos, fileList, ignoreExisting=False, text=False, binary=False):
+    assert(not text or not binary)
     try:
         conaryState = ConaryStateFromFile("CONARY", repos)
         state = conaryState.getSourceState()
@@ -1099,8 +1101,12 @@ def addFiles(repos, fileList, ignoreExisting=False):
 
 	pathId = makePathId()
 
+        sb = os.lstat(file)
         extension = file.split(".")[-1]
-        if extension not in nonCfgExt:
+
+        if not(stat.S_ISREG(sb.st_mode)) or binary or extension in nonCfgExt:
+            isConfig = False
+        elif text or extension in cfgExt:
             isConfig = True
             sb = os.stat(file)
             if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
@@ -1114,7 +1120,10 @@ def addFiles(repos, fileList, ignoreExisting=False):
                     os.close(fd)
                     return
         else:
-            isConfig = False
+            log.error("cannot determine if %s is binary or text. please add "
+                      "--binary or --text and rerun cvc add for %s",
+                      file, file)
+            continue
 
 	state.addFile(pathId, file, versions.NewVersion(), "0" * 20,
                       isConfig = isConfig)

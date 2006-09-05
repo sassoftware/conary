@@ -158,10 +158,17 @@ class AddCommand(CvcCommand):
     commands = ['add']
     paramHelp = '<file> [<file2> <file3> ...]'
 
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["binary"] = NO_PARAM
+        argDef["text"] = NO_PARAM
+
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
+        text = argSet.pop('text', False)
+        binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
-        checkin.addFiles(repos, args[1:])
+        checkin.addFiles(repos, args[1:], text = text, binary = binary)
 _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):

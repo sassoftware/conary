@@ -1,4 +1,8 @@
 * Added "cvc set" command to change files between binary and text mode.
+* "cvc add" no longer assumes files it doesn't know to be binary are text
+  files; there are lists for both binary and text types, and files which are
+  added which aren't in either list need to be added with "--text" or
+  "--binary"
 
 Changes in @NEW@:
   o Client Changes:
