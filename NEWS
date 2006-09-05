@@ -32,6 +32,8 @@ Changes in @NEW@:
     * Config files and diffs are no longer cached in ram during installs;
       they are now reread from the changeset whenever they are needed
       (CNY-821)
+    * Binary conflicts no longer cause a traceback in cvc update
+      (CNY-644,CNY-785)
 
   o Optimizations
     On a test system, "conary updateall --info" is around 24% faster

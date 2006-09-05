@@ -919,6 +919,7 @@ def updateSrc(repos, versionStr = None, callback = None):
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
+        return False
     fsJob.apply()
     newPkgs = fsJob.iterNewTroveList()
     newState = newPkgs.next()
