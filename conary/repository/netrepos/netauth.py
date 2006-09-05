@@ -236,7 +236,7 @@ class NetworkAuthorization:
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
 
     def getAuthGroups(self, cu, authToken):
-        self.log(3, authToken[0], authToken[2], authToken[3])
+        self.log(4, authToken[0], authToken[2], authToken[3])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
