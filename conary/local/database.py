@@ -244,7 +244,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
 	return result
 
-    def getTroveVersionList(self, name, withFlavors = False):
+    def getTroveVersionList(self, name, withFlavors = False, troveTypes=None):
 	"""
 	Returns a list of all of the versions of a trove available
 	in the repository.. If withFlavors is True, (version, flavor)
@@ -940,7 +940,8 @@ class Database(SqlDbRepository):
                 # changeset from a repository
                 jobList = []
                 for trvCs in reposCs.iterNewTroveList():
-                    if not trvCs.isRedirect(): continue
+                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT: 
+                        continue
                     jobList.append((trvCs.getName(),
                                 (trvCs.getOldVersion(), trvCs.getOldFlavor()),
                                 (trvCs.getNewVersion(), trvCs.getNewFlavor()),
