@@ -536,9 +536,13 @@ def annotate(repos, filename):
             break
 
     if not found:
-        log.error("%s is not a member of this source trove", pathId)
+        log.error("%s is not a member of this source trove", filename)
         return
-    
+
+    if not state.fileIsConfig(pathId):
+        log.error("%s is not a text file", filename)
+        return
+
     # finalLines contains the current version of the file and the 
     # annotated information about its creation
     finalLines = []
