@@ -171,8 +171,7 @@ class TraceLog(FileLog):
 
     def reset(self, level=None):
         FileLog.reset(self, level)
-        if level:
-            self.times = [time.time()] * level
+        self.times = [time.time()] * self.level
 
 # instantiate a log object
 def getLog(filename = "stderr", level = 0, trace = 0):
