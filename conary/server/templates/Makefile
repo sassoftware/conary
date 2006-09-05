@@ -19,6 +19,7 @@ kid_files =     add_ent.kid             \
 		browse.kid		\
 		change_password.kid	\
 		choose_branch.kid	\
+		entlist.kid		\
 		error.kid		\
 		files.kid		\
 		group_contents.kid	\
