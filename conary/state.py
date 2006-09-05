@@ -16,6 +16,7 @@ CONARY state files - stores directory-specific context and source trove info
 for a particular directory
 """
 import copy
+import itertools
 import os
 
 from conary import errors, trove
@@ -23,7 +24,20 @@ from conary.deps import deps
 from conary.lib import sha1helper
 from conary import versions
 
+class FileInfo(object):
+
+    __slots__ = ( 'isConfig', 'refresh' )
+
+    # container for the extra information we keep on files for SourceStates
+    # this has no access methods; it is meant to be accessed directly
+
+    def __init__(self, isConfig = 0, refresh = 0):
+        self.isConfig = isConfig
+        self.refresh = refresh
+
 class ConaryState:
+
+    stateVersion = 1
 
     def __init__(self, context=None, source=None):
         self.context = context
@@ -36,6 +50,7 @@ class ConaryState:
             self.source._write(f)
             
     def _write(self, f):
+        f.write("stateversion %d\n" % self.stateVersion)
         if self.getContext():
             f.write("context %s\n" % self.getContext())
 
@@ -68,10 +83,18 @@ class ConaryState:
         
 class SourceState(trove.Trove):
 
-    __slots__ = [ "branch", "pathMap", "lastMerged" ]
+    __slots__ = [ "branch", "pathMap", "lastMerged", "fileInfo" ]
 
     def setPathMap(self, map):
         self.pathMap = map
+
+    def removeFile(self, pathId):
+        trove.Trove.removeFile(self, pathId)
+        del self.fileInfo[pathId]
+
+    def addFile(self, pathId, path, version, fileId, isConfig):
+        trove.Trove.addFile(self, pathId, path, version, fileId)
+        self.fileInfo[pathId] = FileInfo(isConfig = isConfig)
 
     def removeFilePath(self, file):
 	for (pathId, path, fileId, version) in self.iterFileList():
@@ -89,13 +112,17 @@ class SourceState(trove.Trove):
 	:source component checkins, so things like trove dependency
 	information is not needed.  The format of the string is:
 
+        name <name>
+        version <version>
+        branch <branch>
+        (lastmerged <version>)?
 	<file count>
-	PATHID1 PATH1 FILEID1 VERSION1
-	PATHID2 PATH2 FILEID2 VERSION2
+	PATHID1 PATH1 FILEID1 ISCONFIG1 REFRESH1 VERSION1
+	PATHID2 PATH2 FILEID2 ISCONFIG2 REFRESH2 VERSION2
 	.
 	.
 	.
-	PATHIDn PATHn FILEIDn VERSIONn
+	PATHIDn PATHn FILEIDn ISCONFIGn REFRESHn VERSIONn
 	"""
         assert(len(self.strongTroves) == 0)
         assert(len(self.weakTroves) == 0)
@@ -109,8 +136,10 @@ class SourceState(trove.Trove):
         rc = []
         rc.append("%d\n" % (len(self.idMap)))
 
-        rc += [ "%s %s %s %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
+        rc += [ "%s %s %s %d %d %s\n" % (sha1helper.md5ToString(x[0]), x[1][0],
                                 sha1helper.sha1ToString(x[1][1]),
+                                self.fileInfo[x[0]].isConfig,
+                                self.fileInfo[x[0]].refresh,
                                 x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
@@ -151,11 +180,22 @@ class SourceState(trove.Trove):
         new = trove.Trove.copy(self, classOverride = classOverride)
         new.branch = self.branch.copy()
         new.pathMap = copy.copy(self.pathMap)
+        new.fileInfo = copy.copy(self.fileInfo)
         if self.lastMerged:
             new.lastMerged = self.lastMerged.copy()
         else:
             new.lastMerged = None
         return new
+
+    def fileIsConfig(self, pathId, set = None):
+        if set is None:
+            return self.fileInfo[pathId].isConfig
+        self.fileInfo[pathId].isConfig = set
+
+    def fileNeedsRefresh(self, pathId, set = None):
+        if set is None:
+            return self.fileInfo[pathId].refresh
+        self.fileInfo[pathId].refresh = set
 
     def __init__(self, name, version, branch, changeLog = None,
                  lastmerged = None, isRedirect = False, **kw):
@@ -167,14 +207,19 @@ class SourceState(trove.Trove):
         self.branch = branch
         self.pathMap = {}
         self.lastMerged = lastmerged
+        self.fileInfo = {}
 
 class ConaryStateFromFile(ConaryState):
 
-    def parseFile(self, filename):
+    def parseFile(self, filename, repos):
 	f = open(filename)
         lines = f.readlines()
 
-	fields = lines[0][:-1].split()
+        stateVersion = 0
+        if lines[0].startswith('stateversion '):
+            stateVersion = int(lines[0].split(None, 1)[1].strip())
+            lines.pop(0)
+
         contextList = [ x for x in lines if x.startswith('context ') ]
         if contextList:
             contextLine = contextList[-1]
@@ -185,17 +230,17 @@ class ConaryStateFromFile(ConaryState):
 
         if lines:
             try:
-                self.source = SourceStateFromLines(lines)
+                self.source = SourceStateFromLines(lines, stateVersion, repos)
             except ConaryStateError, err:
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
         else:
             self.source = None
 
-    def __init__(self, file):
+    def __init__(self, file, repos):
 	if not os.path.isfile(file):
 	    raise CONARYFileMissing
 
-	self.parseFile(file)
+	self.parseFile(file, repos)
         
 
 class SourceStateFromLines(SourceState):
@@ -206,22 +251,43 @@ class SourceStateFromLines(SourceState):
                'branch'     : (True,  True ),
                'lastmerged' : (True,  False) }
 
-    def readFileList(self, lines):
+    def _readFileList(self, lines, stateVersion, repos):
 	fileCount = int(lines[0][:-1])
+        configFlagNeeded = []
 
         for line in lines[1:]:
             # chop
             line = line[:-1]
 	    fields = line.split()
 	    pathId = sha1helper.md5FromString(fields.pop(0))
-	    version = fields.pop(-1)
+            version = versions.VersionFromString(fields.pop(-1))
+
+            if stateVersion >= 1:
+                refresh = int(fields.pop(-1))
+                isConfig = int(fields.pop(-1))
+            else:
+                isConfig = 0
+                refresh = 0
+
 	    fileId = sha1helper.sha1FromString(fields.pop(-1))
+
+            if stateVersion == 0:
+                if not isinstance(version, versions.NewVersion):
+                    configFlagNeeded.append((pathId, fileId, version))
+
 	    path = " ".join(fields)
 
-	    version = versions.VersionFromString(version)
-	    self.addFile(pathId, path, version, fileId)
+	    self.addFile(pathId, path, version, fileId, isConfig = isConfig)
+            self.fileNeedsRefresh(pathId, set = refresh)
 
-    def parseLines(self, lines):
+        if configFlagNeeded:
+            assert(stateVersion == 0)
+            fileObjs = repos.getFileVersions(configFlagNeeded)
+            for (pathId, fileId, version), fileObj in \
+                            itertools.izip(configFlagNeeded, fileObjs):
+                self.fileIsConfig(pathId, set = fileObj.flags.isConfig())
+
+    def parseLines(self, lines, stateVersion, repos):
         kwargs = {}
 
         while lines:
@@ -249,10 +315,10 @@ class SourceStateFromLines(SourceState):
 
 	SourceState.__init__(self, **kwargs)
 
-	self.readFileList(lines)
+	self._readFileList(lines, stateVersion, repos)
 
-    def __init__(self, lines):
-        self.parseLines(lines)
+    def __init__(self, lines, stateVersion, repos):
+        self.parseLines(lines, stateVersion, repos )
 
     def copy(self):
         return SourceState.copy(self, classOverride = SourceState)

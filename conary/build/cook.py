@@ -1087,7 +1087,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     srcName = name + ':source'
     sourceVerison = None
     if os.path.exists('CONARY'):
-        conaryState = ConaryStateFromFile('CONARY')
+        conaryState = ConaryStateFromFile('CONARY', repos)
         if conaryState.hasSourceState():
             state = conaryState.getSourceState()
             if state.getName() == srcName and \
