@@ -1192,7 +1192,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
     conaryState.write("CONARY")
 
-def removeFile(repos, file):
+def removeFile(file, repos=None):
     conaryState = ConaryStateFromFile("CONARY", repos)
     if not conaryState.getSourceState().removeFilePath(file):
 	log.error("file %s is not under management" % file)
