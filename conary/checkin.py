@@ -1122,7 +1122,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
         if not(stat.S_ISREG(sb.st_mode)) or binary or nonCfgRe.match(filename):
             isConfig = False
-        elif text cfgRe.match(filename) or (
+        elif text or cfgRe.match(filename) or (
             fileMagic and isinstance(fileMagic, magic.script)):
             isConfig = True
         elif defaultToText:
