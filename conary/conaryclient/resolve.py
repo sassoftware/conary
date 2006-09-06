@@ -529,7 +529,7 @@ class DependencySolver(object):
 
         if newJobSet:
             log.debug('updated %s troves:\n   %s', len(newJobSet), 
-                       '\n   '.join('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in newJobSet))
+                       '\n   '.join('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in sorted(newJobSet)))
 
         return cannotResolve, newJobSet
 

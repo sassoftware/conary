@@ -350,7 +350,21 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	pass
 
     def writeAccess(self):
+        assert(self.db) # when checking for write access, make sure the
+                        # db has been initialized
         return os.access(self.dbpath, os.W_OK)
+
+    def _initDb(self):
+        self._db = sqldb.Database(self.dbpath)
+        datastore.DataStoreRepository.__init__(self, 
+                           dataStore = localrep.SqlDataStore(self.db.db))
+
+    def _getDb(self):
+        if not self._db:
+            self._initDb()
+        return self._db
+
+    db = property(_getDb)
 
     def __init__(self, path):
         if path == ":memory:":
@@ -358,10 +372,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         else:
             self.dbpath = path + "/conarydb"
 
-	self.db = sqldb.Database(self.dbpath)
-
-        datastore.DataStoreRepository.__init__(self, 
-                           dataStore = localrep.SqlDataStore(self.db.db))
+        self._db = None
         repository.AbstractRepository.__init__(self)
         trovesource.SearchableTroveSource.__init__(self)
 

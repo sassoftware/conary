@@ -238,6 +238,11 @@ Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
 and marks it to be removed from the repository at the next
 \fBcvc commit\fP.
 .TP
+.B set \fI<filename>...>/fP \fI[--text]\fP \fI[--binary]\fP
+Binary and text files in source components are handled slightly differently
+with diff/patch style merging being used for text files. This command lets
+the user switch a file between binary and text modes.
+.TP
 .B shadow \fInewshadow [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Creates a new shadow (identified by the label \fInewshadow\fP) in the
 repository, relative to the shadow specified in \fIversion\fP.

@@ -17,6 +17,8 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import socket
+import time
 import xmlrpclib
 import urllib
 import zlib
@@ -145,7 +147,7 @@ class Transport(xmlrpclib.Transport):
             return 'https'
         return 'http'
 
-    def request(self, host, handler, request_body, verbose=0):
+    def request(self, host, handler, body, verbose=0):
 	self.verbose = verbose
 
 	# turn off proxy for localhost
@@ -168,8 +170,29 @@ class Transport(xmlrpclib.Transport):
             opener.addheader('X-Conary-Entitlement', self.entitlement)
 
 	opener.addheader('User-agent', self.user_agent)
-	usedAnonymous, response = opener.open(''.join([self._protocol(), '://', host, handler]), request_body)
-        
+        tries = 0
+        url = ''.join([self._protocol(), '://', host, handler])
+        while tries < 5:
+            try:
+                usedAnonymous, response = opener.open(url, body)
+                break
+            except IOError, e:
+                tries += 1
+                if tries >= 5:
+                    raise
+                if e.args[0] == 'socket error':
+                    e = e.args[1]
+                if isinstance(e, socket.gaierror):
+                    if e.args[0] == socket.EAI_AGAIN:
+                        from conary.lib import log
+                        log.warning('got "%s" when trying to '
+                                    'resolve %s.  Retrying in '
+                                    '500 ms.' %(e.args[1], host))
+                        time.sleep(.5)
+                    else:
+                        raise
+                else:
+                    raise
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc

@@ -769,8 +769,10 @@ class FilesystemJob:
             cwd = os.getcwd()
             rootFixup = cwd + "/"
             assert(not pathsMoved)
+            isSrcTrove = True
         else:
             rootFixup = root
+            isSrcTrove = False
 
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())
@@ -802,7 +804,8 @@ class FilesystemJob:
             # in the fsTrove, though, since we update the CONARY state
             # from that and want to note these new files.
             if headFile.flags.isAutoSource():
-                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId,
+                                isConfig = headFile.flags.isConfig())
                 continue
 
             restoreFile = True
@@ -902,7 +905,13 @@ class FilesystemJob:
                 self._restore(headFile, headRealPath, newTroveInfo, 
                               filePriorityPath,
                               "creating %s", replaceFiles = replaceFiles)
-                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+                if isSrcTrove:
+                    fsTrove.addFile(pathId, headPath, headFileVersion,
+                                    headFileId,
+                                    isConfig = headFile.flags.isConfig())
+                else:
+                    fsTrove.addFile(pathId, headPath, headFileVersion,
+                                    headFileId)
 
         # get the baseFile which was originally installed
         baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:]) 
@@ -949,10 +958,6 @@ class FilesystemJob:
                                                   fsPath, baseTrove,
                                                   rootFixup, flags)
 
-            # XXX is this correct?  all the other addFiles use
-            # the headFileId, not the fsFileId
-            fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
-
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
 	    realPath = rootFixup + finalPath
@@ -960,6 +965,13 @@ class FilesystemJob:
 	    # headFileVersion is None for renames, but in that case there
             # is nothing left to do for this file
             if not headFileVersion:
+                if isSrcTrove:
+                    fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
+                                    isConfig = fsTrove.fileIsConfig(pathId))
+                else:
+                    # this can't happen right now -- we only support renames
+                    # for source troves
+                    fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
                 continue
 
             # we know we are switching from one version of the file to
@@ -978,9 +990,19 @@ class FilesystemJob:
             headFile = self._mergeFile(baseFile, headFileId, headChanges,
                                        pathId)
 
+            # XXX is this correct?  all the other addFiles use
+            # the headFileId, not the fsFileId
+
+            # autosource files don't get merged
             if baseFile.flags.isAutoSource():
-                fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
+                fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId,
+                                isConfig = headFile.flags.isConfig())
                 continue
+            elif isSrcTrove:
+                fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
+                                isConfig = headFile.flags.isConfig())
+            else:
+                fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
 
             # FIXME we should be able to inspect headChanges directly
             # to see if we need to go into the if statement which follows
@@ -1223,7 +1245,13 @@ class FilesystemJob:
 		# XXX this doesn't even attempt to merge file permissions
 		# and such; the good part of that is differing owners don't
 		# break things
-		fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
+                if isSrcTrove:
+                    fsTrove.addFile(pathId, finalPath, headFileVersion,
+                                    headFileId,
+                                    isConfig = headFile.flags.isConfig())
+                else:
+                    fsTrove.addFile(pathId, finalPath, headFileVersion,
+                                    headFileId)
 	    else:
 		fullyUpdated = False
 
@@ -1453,15 +1481,10 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
 
-    nonCfgExt = ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
-                 'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
-                 'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run')
-
     isSrcTrove = curTrove.getName().endswith(':source')
 
     srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
                                                     fileList ] )
-
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove
@@ -1507,6 +1530,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             newTrove.removeFile(pathId)
             continue
 
+        f.flags.set(srcFile.flags())
+
 	if isSrcTrove:
 	    f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
@@ -1521,28 +1546,20 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             f.requires.set(srcFile.requires())
         if hasattr(f, 'provides') and hasattr(srcFile, 'provides'):
             f.provides.set(srcFile.provides())
-        f.flags.set(srcFile.flags())
         if srcFile.hasContents and f.hasContents:
             f.flavor.set(srcFile.flavor())
         f.tags = srcFile.tags.copy()
 
-	extension = path.split(".")[-1]
-	if isSrcTrove and extension not in nonCfgExt:
-	    f.flags.isConfig(set = True)
-	    sb = os.stat(realPath)
-	    if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
-		fd = os.open(realPath, os.O_RDONLY)
-		os.lseek(fd, -1, 2)
-		term = os.read(fd, 1)
-		if term != '\n':
-		    log.warning("%s does not end with a trailing new line", 
-			        srcPath)
-
-		os.close(fd)
+        if isSrcTrove:
+            f.flags.isConfig(set = curTrove.fileIsConfig(pathId))
 
 	if not f.eq(srcFile, ignoreOwnerGroup = noIds):
             newFileId = f.fileId()
-	    newTrove.addFile(pathId, path, newVersion, newFileId)
+            if isSrcTrove:
+                newTrove.addFile(pathId, path, newVersion, newFileId,
+                                 isConfig = f.flags.isConfig())
+            else:
+                newTrove.addFile(pathId, path, newVersion, newFileId)
 
             needAbsolute = (not crossRepositoryDeltas and
                     (srcFileVersion.trailingLabel().getHost() !=
@@ -1604,16 +1621,19 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 	f = files.FileFromFilesystem(realPath, pathId)
 
-	extension = path.split(".")[-1]
 	if isSrcTrove:
             f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
-            if extension not in nonCfgExt:
-                f.flags.isConfig(set = True)
+            f.flags.isConfig(set= curTrove.fileIsConfig(pathId))
+            newTrove.addFile(pathId, path, newVersion, f.fileId(),
+                             isConfig = f.flags.isConfig())
+        else:
+            # this can't happen since we don't allow files to be added to
+            # troves for installed systems
+            newTrove.addFile(pathId, path, newVersion, f.fileId())
 
 	# new file, so this part is easy
 	changeSet.addFile(None, f.fileId(), f.freeze())
-	newTrove.addFile(pathId, path, newVersion, f.fileId())
 
 	if f.hasContents and withFileContents:
 	    newCont = filecontents.FromFilesystem(realPath)

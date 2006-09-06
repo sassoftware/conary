@@ -1,3 +1,19 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added the "cvc set" command to change files between binary and
+      text mode for files in source components.
+    * "cvc add" no longer assumes files it doesn't know to be binary
+      are text files; there are lists for both binary and text types,
+      and files which are added which aren't in either list need
+      to be added with "--text" or "--binary". (CNY-838)
+    * The conary repository client now retries when a DNS lookup of a
+      server hostname fails with a "temporary failure in name
+      resolution" error.
+
+  o Bug Fixes:
+    * Conary commands do not perform an unnecessary database checks on the 
+      local system. (CNY-571)
+
 Changes in 1.1.3:
   o System Update Changes:
     These changes make Conary much more robust when applying updates
@@ -85,8 +101,8 @@ Changes in 1.1.3:
     * The PythonSetup build action no longer provides the older
       --single-version-externally-managed argument, and instead
       provides the --prefix, --install-purelib, --install-platlib,
-      and --data arguments, each of which can be overridden with
-      the purelib, platlib, and data keyword arguments.  This
+      and --install-data arguments, which can be overridden with the
+      purelib, platlib, and data keyword arguments, respectively.  This
       allows it to work correctly with a greater number of packages.
       It also provides the option of providing a "purePython=False"
       argument for python packages that mix architecture-specific
@@ -115,7 +131,7 @@ Changes in 1.1.3:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
       latest version. (CNY-784)
-    * "cvc cook" now displays the correct label of the thing its
+    * "cvc cook" now displays the correct label of the thing it is
       building, even when it is not the build label.
     * Running "cvc update" in a directory that has been created with
       "cvc newpkg" but has not yet been committed to the repository

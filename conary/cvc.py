@@ -65,6 +65,7 @@ def usage(rc = 1):
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
     print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
+    print "       cvc set <path>+"
     print '       cvc sign <trove>[=version][[flavor]]+'
     print "       cvc update [<version>]"
     print ""
@@ -121,9 +122,11 @@ class CvcCommand(options.AbstractCommand):
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
     def setContext(self, cfg, argSet):
+        client = conaryclient.ConaryClient(cfg)
+        repos = client.getRepos()
         context = cfg.context
         if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY')
+            conaryState = state.ConaryStateFromFile('CONARY', repos)
             if conaryState.hasContext():
                 context = conaryState.getContext()
 
@@ -155,10 +158,17 @@ class AddCommand(CvcCommand):
     commands = ['add']
     paramHelp = '<file> [<file2> <file3> ...]'
 
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["binary"] = NO_PARAM
+        argDef["text"] = NO_PARAM
+
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
+        text = argSet.pop('text', False)
+        binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
-        checkin.addFiles(args[1:])
+        checkin.addFiles(args[1:], text = text, binary = binary, repos = repos)
 _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):
@@ -365,7 +375,7 @@ class ContextCommand(CvcCommand):
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               prettyPrint=prettyPrint)
-        checkin.setContext(cfg, name, ask=ask)
+        checkin.setContext(cfg, name, ask=ask, repos=repos)
 _register(ContextCommand)
 
 
@@ -500,7 +510,7 @@ class DescribeCommand(CvcCommand):
             log.setVerbosity(log.INFO)
 
         xmlSource = args[1]
-        conaryState = state.ConaryStateFromFile("CONARY").getSourceState()
+        conaryState = state.ConaryStateFromFile("CONARY", repos).getSourceState()
         troveName = conaryState.getName()
         troveBranch = conaryState.getVersion().branch()
 
@@ -553,7 +563,7 @@ class RemoveCommand(CvcCommand):
                    callback = None):
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            checkin.removeFile(f)
+            checkin.removeFile(f, repos=repos)
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
@@ -563,7 +573,7 @@ class RenameCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) != 3: return self.usage()
-        checkin.renameFile(args[1], args[2])
+        checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
 
 class SignCommand(CvcCommand):
@@ -629,6 +639,34 @@ class MarkRemovedCommand(CvcCommand):
         if argSet or not args or len(args) != 2: return self.usage()
         checkin.markRemoved(cfg, repos, args[1])
 _register(MarkRemovedCommand)
+
+class SetCommand(CvcCommand):
+
+    commands = ['set']
+    paramHelp = "<path>+"
+
+    docs = {'text'       : ('Mark the given files as text files'),
+            'binary'     : ('Mark the given files as binary files') }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["binary"] = NO_PARAM
+        argDef["text"] = NO_PARAM
+
+    def runCommand(self, repos, cfg, argSet, args, profile = False, 
+                   callback = None):
+        binary = argSet.pop('binary', False)
+        text = argSet.pop('text', False)
+
+        if binary and text:
+            log.error("files cannot be both binary and text")
+            return 1
+
+        if argSet: return self.usage()
+        if len(args) < 2: return self.usage()
+
+        checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
+_register(SetCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
