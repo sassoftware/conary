@@ -780,9 +780,6 @@ class FilesystemJob:
         if removalList is None:
             removalList = []
 
-        import epdb
-        epdb.st('f')
-
         # Create new files. If the files we are about to create already
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
