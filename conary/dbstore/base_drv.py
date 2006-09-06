@@ -73,11 +73,11 @@ class BaseCursor:
         assert(self.dbh)
         return self.dbh.cursor()
 
+    # these should be obsoleted soon...
     def binary(self, s):
         if s is None:
             return None
         return self.binaryClass(s)
-
     def frombinary(self, s):
         return s
 
@@ -191,6 +191,19 @@ class BaseCursor:
         else:
             return item
 
+# a class that holds a prepared cursor
+class BasePreparedCursor:
+    def __init__(self, cursorClass, dbh, sql):
+        self.cursorClass = cursorClass
+        self.dbh = dbh
+        self.sql = sql
+        self._cursor = cursorClass(dbh)
+    # these are just wrapper fro the Cursor.execute() statements
+    def execute(self, *args, **kw):
+        return self._cursor.execute(self.sql, *args, **kw)
+    def executemany(self, *args, **kw):
+        return self._cursor.executemany(self.sql, *args, **kw)
+
 # A class for working with sequences
 class BaseSequence:
     def __init__(self, db, name):
@@ -222,6 +235,7 @@ class BaseDatabase:
     alive_check = "select 1 where 1 = 1"
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
+    preparedClass = BasePreparedCursor
     sequenceClass = BaseSequence
     driver = "base"
     keywords = BaseKeywordDict()
@@ -290,9 +304,16 @@ class BaseDatabase:
     def closed(self):
         return self.dbh is None
 
+    # creating cursors
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
+    def prepare(self, sql):
+        assert(self.dbh)
+        sql = sql.strip()
+        assert(len(sql))
+        return self.preparedClass(self.cursorClass, self.dbh, sql)
+    itercursor = cursor
 
     def sequence(self, name):
         assert(self.dbh)
