@@ -20,6 +20,7 @@ and committing changes back to the repository.
 import difflib
 import errno
 import os
+import re
 import stat
 import sys
 import time
@@ -48,12 +49,26 @@ from conary.local import update
 from conary.repository import changeset
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
 
-nonCfgExt = dict.fromkeys(
-        ('bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img', 'jar',
-         'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps', 'rpm', 'tar', 'tbz',
-         'tbz2', 'tgz', 'tiff', 'ttf', 'zip', 'run') )
-cfgExt = dict.fromkeys(
-        ('recipe', 'patch', 'diff', 'sh', 'txt') )
+nonCfgRe = re.compile(r'^.*\.(%s)$' % '|'.join((
+    'bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img',
+    'jar', 'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps',
+    'rpm', 'run',
+    'tar', 'tbz', 'tbz2', 'tgz', 'tiff', 'ttf',
+    'zip',
+)))
+cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
+    # extensions
+    '(1|2|3|4|5|6|7|8|9)',
+    'c', 'cnf', 'conf', 'CONFIG.*', 'console.*', 'cron.*', '(c|)sh',
+    'desktop', 'diff', 'h', 'init', 'logrotate',
+    'pam(d|)', 'patch', 'pl', 'py',
+    'recipe', 'sysconfig',
+    'tag(handler|description)', 'tmpwatch', 'txt',
+    )),
+    '|'.join((
+    # full filenames
+    r'Makefile(|\..*)',
+    ))))
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
@@ -1071,20 +1086,20 @@ def addFiles(repos, fileList, ignoreExisting=False, text=False, binary=False):
     except OSError:
         return
 
-    for file in fileList:
-        if file == "." or file == "..":
-            log.error("cannot add special directory %s to trove" % file)
+    for filename in fileList:
+        if filename == "." or filename == "..":
+            log.error("cannot add special directory %s to trove" % filename)
             continue
 
 	try:
-	    os.lstat(file)
+	    os.lstat(filename)
 	except OSError:
-	    log.error("file %s does not exist", file)
+	    log.error("file %s does not exist", filename)
 	    continue
 
 	found = False
 	for (pathId, path, fileId, version) in state.iterFileList():
-	    if path == file:
+	    if path == filename:
                 if not ignoreExisting:
                     log.error("file %s is already part of this source component" % path)
 		found = True
@@ -1092,41 +1107,41 @@ def addFiles(repos, fileList, ignoreExisting=False, text=False, binary=False):
 	if found: 
 	    continue
 
-	fileMagic = magic.magic(file)
+	fileMagic = magic.magic(filename)
 	if fileMagic and fileMagic.name == "changeset":
 	    log.error("do not add changesets to source components")
 	    continue
-	elif file == "CONARY":
+	elif filename == "CONARY":
 	    log.error("refusing to add CONARY to the list of managed sources")
 	    continue
 
 	pathId = makePathId()
 
-        sb = os.lstat(file)
-        extension = file.split(".")[-1]
+        sb = os.lstat(filename)
 
-        if not(stat.S_ISREG(sb.st_mode)) or binary or extension in nonCfgExt:
+        if not(stat.S_ISREG(sb.st_mode)) or binary or nonCfgRe.match(filename):
             isConfig = False
-        elif text or extension in cfgExt:
+        elif text or cfgRe.match(filename) or (
+            fileMagic and isinstance(fileMagic, magic.script)):
             isConfig = True
-            sb = os.stat(file)
+            sb = os.stat(filename)
             if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
-                fd = os.open(file, os.O_RDONLY)
+                fd = os.open(filename, os.O_RDONLY)
                 os.lseek(fd, -1, 2)
                 term = os.read(fd, 1)
                 if term != '\n':
                     log.error("%s does not end with a trailing new line", 
-                                file)
+                                filename)
 
                     os.close(fd)
                     return
         else:
             log.error("cannot determine if %s is binary or text. please add "
                       "--binary or --text and rerun cvc add for %s",
-                      file, file)
+                      filename, filename)
             continue
 
-	state.addFile(pathId, file, versions.NewVersion(), "0" * 20,
+	state.addFile(pathId, filename, versions.NewVersion(), "0" * 20,
                       isConfig = isConfig)
 
     conaryState.write("CONARY")
