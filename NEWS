@@ -9,6 +9,10 @@ Changes in @NEW@:
       server hostname fails with a "temporary failure in name
       resolution" error.
 
+  o Bug Fixes:
+    * Conary commands do not perform an unnecessary database checks on the 
+      local system. (CNY-571)
+
 Changes in 1.0.30:
   o System Update Changes:
     These changes make Conary much more robust when applying updates
@@ -118,7 +122,7 @@ Changes in 1.0.30:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
       latest version. (CNY-784)
-    * "cvc cook" now displays the correct label of the thing its
+    * "cvc cook" now displays the correct label of the thing it is
       building, even when it is not the build label.
     * Running "cvc update" in a directory that has been created with
       "cvc newpkg" but has not yet been committed to the repository
