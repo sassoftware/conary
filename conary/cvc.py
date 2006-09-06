@@ -168,7 +168,8 @@ class AddCommand(CvcCommand):
         text = argSet.pop('text', False)
         binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
-        checkin.addFiles(args[1:], text = text, binary = binary, repos = repos)
+        checkin.addFiles(args[1:], text = text, binary = binary, repos = repos,
+                         defaultToText = False)
 _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):

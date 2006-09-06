@@ -1079,7 +1079,7 @@ def merge(repos, versionSpec=None, callback=None):
     conaryState.write("CONARY")
 
 def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
-             repos=None):
+             repos=None, defaultToText=True):
     assert(not text or not binary)
     try:
         conaryState = ConaryStateFromFile("CONARY", repos=repos)
@@ -1122,7 +1122,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
         if not(stat.S_ISREG(sb.st_mode)) or binary or nonCfgRe.match(filename):
             isConfig = False
-        elif text or cfgRe.match(filename) or (
+        elif text or defaultToText or cfgRe.match(filename) or (
             fileMagic and isinstance(fileMagic, magic.script)):
             isConfig = True
             sb = os.stat(filename)
