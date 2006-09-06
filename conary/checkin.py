@@ -1122,9 +1122,22 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
         if not(stat.S_ISREG(sb.st_mode)) or binary or nonCfgRe.match(filename):
             isConfig = False
-        elif text or defaultToText or cfgRe.match(filename) or (
+        elif text cfgRe.match(filename) or (
             fileMagic and isinstance(fileMagic, magic.script)):
             isConfig = True
+        elif defaultToText:
+            # this option should most likely not be used for modern clients
+            # that are adding files, however, for backwards compatibility
+            # purposes we need to allow this setting to be passed in.
+            log.warning('unknown file type for %s - setting to text mode.' % filename)
+            isConfig = True
+        else:
+            log.error("cannot determine if %s is binary or text. please add "
+                      "--binary or --text and rerun cvc add for %s",
+                      filename, filename)
+            continue
+
+        if isConfig:
             sb = os.stat(filename)
             if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
                 fd = os.open(filename, os.O_RDONLY)
@@ -1136,11 +1149,6 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
                     os.close(fd)
                     return
-        else:
-            log.error("cannot determine if %s is binary or text. please add "
-                      "--binary or --text and rerun cvc add for %s",
-                      filename, filename)
-            continue
 
 	state.addFile(pathId, filename, versions.NewVersion(), "0" * 20,
                       isConfig = isConfig)
