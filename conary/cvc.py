@@ -168,7 +168,7 @@ class AddCommand(CvcCommand):
         text = argSet.pop('text', False)
         binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
-        checkin.addFiles(repos, args[1:], text = text, binary = binary)
+        checkin.addFiles(args[1:], text = text, binary = binary, repos = repos)
 _register(AddCommand)
 
 class AnnotateCommand(CvcCommand):
@@ -375,7 +375,7 @@ class ContextCommand(CvcCommand):
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               prettyPrint=prettyPrint)
-        checkin.setContext(repos, cfg, name, ask=ask)
+        checkin.setContext(cfg, name, ask=ask, repos=repos)
 _register(ContextCommand)
 
 
@@ -563,7 +563,7 @@ class RemoveCommand(CvcCommand):
                    callback = None):
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            checkin.removeFile(repos, f)
+            checkin.removeFile(f, repos=repos)
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
@@ -573,7 +573,7 @@ class RenameCommand(CvcCommand):
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if len(args) != 3: return self.usage()
-        checkin.renameFile(repos, args[1], args[2])
+        checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
 
 class SignCommand(CvcCommand):

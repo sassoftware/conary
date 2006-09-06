@@ -211,7 +211,7 @@ class SourceState(trove.Trove):
 
 class ConaryStateFromFile(ConaryState):
 
-    def parseFile(self, filename, repos):
+    def parseFile(self, filename, repos=None):
 	f = open(filename)
         lines = f.readlines()
 
@@ -230,17 +230,18 @@ class ConaryStateFromFile(ConaryState):
 
         if lines:
             try:
-                self.source = SourceStateFromLines(lines, stateVersion, repos)
+                self.source = SourceStateFromLines(lines, stateVersion, 
+                                                   repos=repos)
             except ConaryStateError, err:
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
         else:
             self.source = None
 
-    def __init__(self, file, repos):
+    def __init__(self, file, repos=None):
 	if not os.path.isfile(file):
 	    raise CONARYFileMissing
 
-	self.parseFile(file, repos)
+	self.parseFile(file, repos=repos)
         
 
 class SourceStateFromLines(SourceState):
@@ -281,6 +282,8 @@ class SourceStateFromLines(SourceState):
             self.fileNeedsRefresh(pathId, set = refresh)
 
         if configFlagNeeded:
+            if not repos:
+                raise ConaryStateError('CONARY file has version %s, but this application cannot convert - please run any conary command, e.g. "conary config" in this directory to convert' % stateVersion)
             assert(stateVersion == 0)
             fileObjs = repos.getFileVersions(configFlagNeeded)
             for (pathId, fileId, version), fileObj in \
@@ -317,7 +320,7 @@ class SourceStateFromLines(SourceState):
 
 	self._readFileList(lines, stateVersion, repos)
 
-    def __init__(self, lines, stateVersion, repos):
+    def __init__(self, lines, stateVersion, repos=None):
         self.parseLines(lines, stateVersion, repos )
 
     def copy(self):

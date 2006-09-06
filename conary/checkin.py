@@ -1063,10 +1063,11 @@ def merge(repos, versionSpec=None, callback=None):
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
 
-def addFiles(repos, fileList, ignoreExisting=False, text=False, binary=False):
+def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
+             repos=None):
     assert(not text or not binary)
     try:
-        conaryState = ConaryStateFromFile("CONARY", repos)
+        conaryState = ConaryStateFromFile("CONARY", repos=repos)
         state = conaryState.getSourceState()
     except OSError:
         return
@@ -1229,8 +1230,8 @@ def newTrove(repos, cfg, name, dir = None, template = None):
 
     conaryState.write(os.path.join(dir, "CONARY"))
 
-def renameFile(repos, oldName, newName):
-    conaryState = ConaryStateFromFile("CONARY", repos)
+def renameFile(oldName, newName, repos=None):
+    conaryState = ConaryStateFromFile("CONARY", repos=repos)
     sourceState = conaryState.getSourceState()
 
     if not os.path.exists(oldName):
@@ -1355,7 +1356,7 @@ def fullLabel(defaultLabel, version, versionStr):
     else:
 	return version.branch()
 
-def setContext(repos, cfg, contextName=None, ask=False):
+def setContext(cfg, contextName=None, ask=False, repos=None):
     def _ask(txt, *args):
         if len(args) == 0:
             default = defaultText = None
