@@ -37,32 +37,32 @@ class KeywordDict(BaseKeywordDict):
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 
-# execute with exception translation
-def cursorExecute(func, *params, **kw):
-    try:
-        ret = func(*params, **kw)
-    except mysql.IntegrityError, e:
-        if e[0] in (1062,):
-            raise sqlerrors.ColumnNotUnique(e)
-        raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
-    except mysql.OperationalError, e:
-        if e[0] in (1216, 1217, 1451, 1452):
-            raise sqlerrors.ConstraintViolation(e.args[1], e.args)
-        if e[0] == 1205:
-            raise sqlerrors.DatabaseLocked(e.args[1], (e,) + tuple(e.args))
-        raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
-    except mysql.ProgrammingError, e:
-        if e[0] == 1146:
-            raise sqlerrors.InvalidTable(e)
-        raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
-    except mysql.MySQLError, e:
-        raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
-    return ret
-
 class Cursor(BaseCursor):
     driver = "mysql"
     binaryClass = BaseBinary
     MaxPacket = 1024 * 1024
+
+    # execute with exception translation
+    def _tryExecute(self, func, *params, **kw):
+        try:
+            ret = func(*params, **kw)
+        except mysql.IntegrityError, e:
+            if e[0] in (1062,):
+                raise sqlerrors.ColumnNotUnique(e)
+            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
+        except mysql.OperationalError, e:
+            if e[0] in (1216, 1217, 1451, 1452):
+                raise sqlerrors.ConstraintViolation(e.args[1], e.args)
+            if e[0] == 1205:
+                raise sqlerrors.DatabaseLocked(e.args[1], (e,) + tuple(e.args))
+            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
+        except mysql.ProgrammingError, e:
+            if e[0] == 1146:
+                raise sqlerrors.InvalidTable(e)
+            raise sqlerrors.CursorError(e.args[1], (e,) + tuple(e.args))
+        except mysql.MySQLError, e:
+            raise sqlerrors.DatabaseError(e.args[1], (e,) + tuple(e.args))
+        return ret
 
     # edit the input query to make it python compatible
     def __mungeSQL(self, sql):
@@ -83,69 +83,58 @@ class Cursor(BaseCursor):
         sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
         return (sql, ())
 
-    # check proper for a proper execution environment
-    def __checkSQL(self, sql, kw):
-        assert(len(sql) > 0)
-        assert(self.dbh and self._cursor)
-        kw.pop("start_transaction", True)
-        sql, keys = self.__mungeSQL(sql)
-        return sql, keys
-
     # we need to "fix" the sql code before calling out
     def execute(self, sql, *args, **kw):
-        sql, keys = self.__checkSQL(sql, kw)
+        self._executeCheck(sql)
+        sql, keys = self.__mungeSQL(sql)
 
-        if len(args) == 1:
-            # unwrap the args if we were called execute(sql, {})
-            if isinstance(args[0], dict) or hasattr(args[0], 'keys'):
-                kw.update(args[0])
-                args = ()
-            # unwrap args if we're called as execute(sql, (a,b))
-            elif isinstance(args[0], (tuple, list)):
-                args = tuple(args[0])
+        kw.pop("start_transaction", True)
+        args, kw  = self._executeArgs(args, kw)
+
         # if we have args, we can not have keywords
         if len(args):
-            assert(len(keys)==0 and len(kw)==0), \
-                                "Can not mix positional and named parameters"
-            cursorExecute(self._cursor.execute, sql, args)
-        elif len(keys):
-            # check that all keys used in the query appear in the kw
-            assert(False not in [kw.has_key(x) for x in keys]), \
-                         "Query keys not defined in named argument dict: %s != %s " %(
-                str(sorted(keys)), str(sorted(kw.keys())))
-            # we have keywords in the query
-            cursorExecute(self._cursor.execute, sql, kw)
+            if len(kw):
+                raise sqlerrors.CursorError(
+                    "Do not pass both positional and named bind arguments",
+                    *args, **kw)
+            ret = self._tryExecute(self._cursor.execute, sql, args)
+        elif len(keys): # check that all keys used in the query appear in the kw
+            if False in [kw.has_key(x) for x in keys]:
+                raise CursorError(
+                    "Query keys not defined in named argument dict",
+                    sorted(keys), sorted(kw.keys()))
+            ret = self._tryExecute(self._cursor.execute, sql, kw)
         else:
-            # no args and no keywords
-            cursorExecute(self._cursor.execute, sql)
+            ret = self._tryExecute(self._cursor.execute, sql)
+        # FIXME: the MySQL bindings are not consistent about returning
+        # the number of affected rows on all operations
         return self
 
     # coerce a query with parameters to the format MySQL bindings require
     def __parmsExecute(self, sql, parms):
         # MySQL bindings only accept tuples or dicts as  parameters
         if isinstance(parms, (tuple, dict)):
-            ret = cursorExecute(self._cursor.execute, sql, parms)
-        elif isinstance(parms, list):
-            ret = cursorExecute(self._cursor.execute, sql, tuple(parms))
-        else:
-            ret = cursorExecute(self._cursor.execute, sql, (parms,))
-        return ret
+            return self._tryExecute(self._cursor.execute, sql, parms)
+        if isinstance(parms, list):
+            return self._tryExecute(self._cursor.execute, sql, tuple(parms))
+        return self._tryExecute(self._cursor.execute, sql, (parms,))
 
-    # MySQL-optimized version of executemany when doing INSERT
+    # This improves on the executemany() function defined in the MySQL
+    # bindings by making sure we don't build queries that are more
+    # than MaxPacket in size and that we work correctly when paramList
+    # is an iterator
     def executemany(self, sql, paramList, **kw):
-        # This improves on the executemany() function defined in the
-        # MySQL bindings by making sure we don't build queries that
-        # are more than MaxPacket in size and that we work correctly
-        # when paramList is an iterator
         insert_values = re.compile(r'\svalues\s*(\(.+\))', re.IGNORECASE)
-        sql, keys = self.__checkSQL(sql, kw)
+        sql, keys = self.__mungeSQL(sql)
+        kw.pop("start_transaction", True)
+
         m = insert_values.search(sql)
         # if this is not an insert...values() query, loop over the paramList
         if not m:
             for parms in paramList:
                 ret = self.__parmsExecute(sql, parms)
             return self
-        # build the multiple-value query insert
+        # build MySQL-optimized version of executemany for INSERT
         crtLen = startLen = m.start(1)
         valStr = sql[startLen:]
         vals = []
@@ -156,13 +145,13 @@ class Cursor(BaseCursor):
                 raise sqlerrors.CursorError(e.args[0], e.args)
             if crtLen + len(ps) + 1 >= self.MaxPacket:
                 # need to execute with what we have
-                cursorExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
+                self._tryExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
                 crtLen = startLen
                 vals = []
             crtLen += len(ps) + 1
             vals.append(ps)
         if len(vals):
-            cursorExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
+            self._tryExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
         return self
 
 # Sequence implementation for mysql

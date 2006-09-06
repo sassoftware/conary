@@ -51,7 +51,6 @@ class BaseKeywordDict(dict):
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
-    PASSTHROUGH = set(("description", "lastrowid"))
     binaryClass = BaseBinary
     def __init__(self, dbh=None):
         self.dbh = dbh
@@ -59,7 +58,7 @@ class BaseCursor:
 
     # map some attributes back to self._cursor
     def __getattr__(self, name):
-        if name in self.PASSTHROUGH:
+        if name in  set(["description", "lastrowid"]):
             return getattr(self._cursor, name)
         raise AttributeError("'%s' attribute is invalid" % (name,))
 
@@ -82,26 +81,52 @@ class BaseCursor:
     def frombinary(self, s):
         return s
 
-    def execute(self, sql, *args, **kw):
+    # this needs to be provided by the specific drivers
+    def _tryExecute(self, *args, **kw):
+        raise NotImplementedError("This function should be provided by the SQL drivers")
+
+    # normalize the execute args and kwargs for passing into the driver
+    # on return is a tuple that contains all the positional parameters
+    # and kwargs is a hash of all the named arguments passed in
+    def _executeArgs(self, args, kw):
+        assert(isinstance(args, tuple))
+        assert(isinstance(kw, dict))
+        if len(args) == 0:
+            return (), kw
+        # unwrap unwanted encapsulation
+        if len(args) == 1:
+            if isinstance(args[0], dict):
+                kw.update(args[0])
+                return (), kw
+            if isinstance(args[0], tuple):
+                args = args[0]
+            elif isinstance(args[0], list):
+                args = tuple(args[0])
+        return args, kw
+
+    # basic sanity checks for executes
+    def _executeCheck(self, sql):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
+        return 1
+
+    # basic execute functionality. Usually redefined by the drivers
+    def execute(self, sql, *args, **kw):
+        self._executeCheck(sql)
+        # process the query args
+        args, kw = self._executeArgs(args, kw)
         # force dbi compliance here. we prefer args over the kw
         if len(args) == 0:
-            return self._cursor.execute(sql, **kw)
-        if len(args) == 1 and isinstance(args[0], dict):
-            kw.update(args[0])
-            return self._cursor.execute(sql, **kw)
+            return self._tryExecute(self._cursor.execute, sql, **kw)
         if len(kw):
             raise sqlerrors.CursorError(
                 "Do not pass both positional and named bind arguments",
                 *args, **kw)
-        if len(args) == 1:
-            return self._cursor.execute(sql, args[0])
-        return self._cursor.execute(sql, *args)
+        return self._tryExecute(self._cursor.execute, sql, *args)
 
     # passthrough for the driver's optimized executemany()
     def executemany(self, sql, argList):
-        assert(self.dbh and self._cursor)
+        self._executeCheck(sql)
         return self._cursor.executemany(sql.strip(), argList)
 
     def compile(self, sql):
@@ -114,7 +139,7 @@ class BaseCursor:
     def fields(self):
         if not self._cursor.description:
             return None
-        return [ x[0] for x in self._cursor.description ]
+        return ( x[0] for x in self._cursor.description )
 
     # return the column names of the current select
     def __rowDict(self, row):
@@ -165,58 +190,6 @@ class BaseCursor:
             raise StopIteration
         else:
             return item
-
-
-# A cursor class for the drivers that do not support bind
-# parameters. Instead of :name they use a Python-esque %(name)s
-# syntax. This is quite fragile...
-class BindlessCursor(BaseCursor):
-    # edit the input query to make it python compatible
-    def __mungeSQL(self, sql):
-        keys = set()
-        # take in a match for an :id and return a %(id)s python sub
-        def __match_kw(m):
-            d = m.groupdict()
-            keys.add(d["kw"])
-            return "%(pre)s%(s)s%%(%(kw)s)s" % d
-
-        # handle the :id, :name type syntax
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*):(?P<kw>\w+)",
-                     __match_kw, sql)
-        # force dbi compliance here. args or kw or none, no mixes
-        if len(keys):
-            return (sql, tuple(keys))
-        # handle the ? syntax
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
-        return (sql, ())
-
-    # we need to "fix" the sql code before calling out
-    def execute(self, sql, *args, **kw):
-        assert(len(sql) > 0)
-        assert(self.dbh and self._cursor)
-        sql, keys = self.__mungeSQL(sql)
-        if len(args) == 1:
-            # unwrap the args if we were called execute(sql, {})
-            if isinstance(args[0], dict) or hasattr(args[0], 'keys'):
-                kw.update(args[0])
-                args = ()
-            # unwrap args if we're called as execute(sql, (a,b))
-            elif isinstance(args[0], (tuple, list)):
-                args = args[0]
-        # if we have args, we can not have keywords
-        if len(args):
-            assert(len(keys)==0 and len(kw)==0), \
-                                "Can not mix positional and named parameters"
-            return self._cursor.execute(sql, args)
-        if len(keys):
-            # check that all keys used in the query appear in the kw
-            assert(False not in [x in kw.keys() for x in keys]), \
-                         "Query keys not defined in named argument dict: %s != %s " %(
-                str(sorted(keys)), str(sorted(kw.keys())))
-            # we have keywords in the query
-            return self._cursor.execute(sql, kw)
-        # no args and no keywords
-        return self._cursor.execute(sql)
 
 # A class for working with sequences
 class BaseSequence:
