@@ -5,6 +5,9 @@ Changes in @NEW@:
       files; there are lists for both binary and text types, and files which are
       added which aren't in either list need to be added with "--text" or
       "--binary"
+    * The conary repository client now retries when a DNS lookup of a
+      server hostname fails with a "temporary failure in name
+      resolution" error.
 
 Changes in 1.0.30:
   o System Update Changes:
