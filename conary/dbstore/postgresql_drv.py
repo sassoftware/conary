@@ -13,9 +13,9 @@
 #
 
 import re
-import pgdb
+import pgsql
 
-from base_drv import BaseDatabase, BindlessCursor, BaseBinary
+from base_drv import BaseDatabase, BaseCursor, BaseBinary
 from base_drv import BaseKeywordDict
 import sqlerrors
 import sqllib
@@ -34,21 +34,18 @@ class Binary(BaseBinary):
     def __pg_repr__(self):
         return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
-# FIXME: we should channel exceptions into generic exception classes
-# common to all backends
-class Cursor(BindlessCursor):
+class Cursor(BaseCursor):
     binaryClass = Binary
     driver = "postgresql"
 
     def frombinary(self, s):
         return s.decode("string_escape")
 
-    def execute(self, sql, *params, **kw):
-        if kw.has_key("start_transaction"):
-            del kw["start_transaction"]
+    # execute with exception translation
+    def _tryExecute(self, func, *params, **kw):
         try:
-            ret = BindlessCursor.execute(self, sql, *params, **kw)
-        except pgdb.DatabaseError, e:
+            ret = func(*params, **kw)
+        except pgsql.DatabaseError, e:
             msg = e.args[0]
             if msg.find("violates foreign key constraint") > 0:
                 raise sqlerrors.ConstraintViolation(msg)
@@ -57,13 +54,83 @@ class Cursor(BindlessCursor):
             if msg.find("duplicate key violates unique constraint") > 0:
                 raise sqlerrors.ColumnNotUnique(msg)
             raise sqlerrors.CursorError(msg, e)
-        return self
+        return ret
+
+    # edit the input query to make it postgres compatible
+    def __mungeSQL(self, sql):
+        keys = [] # needs to be a list because we're dealing with positional args
+
+        def __match(m):
+            d = m.groupdict()
+            kw = d["kw"][1:]
+            if len(kw): # a real keyword
+                if kw not in keys:
+                    keys.append(kw)
+                d["kwIdx"] = keys.index(kw)+1
+            else: # if we have just the ? then kw is "" here
+                keys.append(None)
+                d["kwIdx"] = len(keys)
+            return "%(pre)s%(s)s$%(kwIdx)d" % d
+
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)(?P<kw>:\w+|[?])",
+                     __match, sql)
+        # force dbi compliance here. args or kw or none, no mixes
+        if len(keys) and keys[0] is not None:
+            return (sql, keys)
+        return (sql, [])
+
+    # we need to "fix" the sql code before calling out
+    def execute(self, sql, *args, **kw):
+        self._executeCheck(sql)
+        keys = []
+
+        kw.pop("start_transaction", True)
+        args, kw  = self._executeArgs(args, kw)
+
+        # don't do unnecessary work
+        if len(args) or len(kw):
+            sql, keys = self.__mungeSQL(sql)
+
+        # if we have args, we can not have keywords
+        if len(args):
+            if len(kw) or len(keys):
+                raise sqlerrors.CursorError(
+                    "Do not pass both positional and named bind arguments",
+                    *args, **kw)
+            ret = self._tryExecute(self._cursor.execute, sql, args)
+        elif len(keys): # check that all keys used in the query appear in the kw
+            if False in [kw.has_key(x) for x in keys]:
+                raise CursorError(
+                    "Query keys not defined in named argument dict",
+                    sorted(keys), sorted(kw.keys()))
+            # need to transform kw into pozitional args
+            ret = self._tryExecute(self._cursor.execute, sql,
+                                   [kw[x] for x in keys])
+        else:
+            ret = self._tryExecute(self._cursor.execute, sql)
+        if ret == self._cursor:
+            return ret
+
+    # executemany - we have to process the query code
+    def executemany(self, sql, argList, **kw):
+        self._executeCheck(sql)
+        kw.pop("start_transaction", True)
+        sql, keys = self.__mungeSQL(sql)
+        if len(keys):
+            # need to transform the dicts in tuples for the query
+            return self._cursor.executemany(sql, ([row[x] for x in keys]
+                                                     for row in argList))
+        return self._cursor.executemany(sql, argList)
+
+    # override this with the native version
+    def fields(self):
+        return self._cursor.fiels
 
     # we have "our own" lastrowid
     def __getattr__(self, name):
         if name == "lastrowid":
             return self.lastid()
-        return BindlessCursor.__getattr__(self, name)
+        return BaseCursor.__getattr__(self, name)
 
     # postgresql can not report back the last value from a SERIAL
     # PRIMARY KEY column insert, so we have to look it up ourselves
@@ -82,15 +149,9 @@ class Database(BaseDatabase):
     def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
-        for x in cdb.keys():
-            if cdb[x] is None:
-                cdb[x] = ""
-        cstr = "%s:%s:%s:%s" % (cdb["host"], cdb["database"],
-                                cdb["user"], cdb["password"])
-        host = cdb["host"]
-        if cdb["port"]:
-            host ="%s:%s" % (cdb["host"], cdb["port"])
-        self.dbh = pgdb.connect(cstr, host = host)
+        if not cdb.get("port", None):
+            cdb["port"] = -1
+        self.dbh = pgsql.connect(**cdb)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
