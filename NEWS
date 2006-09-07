@@ -29,6 +29,8 @@ Changes in @NEW@:
     * The error message produced by "cvc cook" when a source component
       exists on multiple branches with the same trailing label has
       been improved. (CNY-714)
+    * Error handling when manipulating entitlements via XML-RPC has
+      been improved. (CNY-692)
 
 Changes in 1.0.30:
   o System Update Changes:
