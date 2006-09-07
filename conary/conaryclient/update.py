@@ -583,7 +583,8 @@ class ClientUpdate:
 
         # The job between referencedTroves and installedTroves tells us
         # a lot about what the user has done to his system. 
-        localUpdates = self.getPrimaryLocalUpdates(names)
+        primaryLocalUpdates = self.getPrimaryLocalUpdates(names)
+        localUpdates = list(primaryLocalUpdates)
         if localUpdates:
             localUpdates += self.getChildLocalUpdates(uJob.getSearchSource(),
                                                       localUpdates,
@@ -606,7 +607,8 @@ class ClientUpdate:
                  dict( ((job[0], job[1][0], job[1][1]), job[2]) for
                         job in localUpdates if job[1][0] is not None and
                                                job[2][0] is not None)
-
+        primaryLocalUpdates = set((job[0], job[2][0], job[2][1]) 
+                                  for job in primaryLocalUpdates)
 
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
@@ -742,9 +744,6 @@ class ClientUpdate:
              branchHint, respectBranchAffinity, respectFlavorAffinity,
              installRedirects, followLocalChanges,
              updateOnly) = newTroves.pop(0)
-            if newInfo[0] == 'krb5':
-                from conary.lib import epdb
-                epdb.st()
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
@@ -934,11 +933,11 @@ followLocalChanges: %s
                             # affinity concerns.  If the user has made
                             # a local change that would make this new 
                             # install a downgrade, skip it.
-                            if not isPrimary:
-                                if replacedInfo in sameBranchLocalUpdates:
-                                    notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
-                                if (newInfo[1] < replaced[0]
-                                    and replacedInfo in sameBranchLocalUpdates):
+                            if (not isPrimary
+                                and newInfo[1] < replaced[0]
+                                and replacedInfo in sameBranchLocalUpdates
+                                and (replacedInfo in primaryLocalUpdates 
+                                     or not parentUpdated)):
                                     log.lowlevel('SKIP: avoiding downgrade')
 
                                     # don't let this trove be erased, pretend
