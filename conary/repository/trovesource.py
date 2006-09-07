@@ -700,6 +700,9 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             info = (name, oldVer, oldFla)
             return self.erasuresMap[info]
 
+    def iterChangeSets(self):
+        return iter(self.csList)
+
     def resolveDependencies(self, label, depList):
         assert(self.storeDeps)
         suggMap = self.depDb.resolve(label, depList)
