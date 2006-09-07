@@ -154,6 +154,20 @@ class Cursor(BaseCursor):
             self._tryExecute(self._cursor.execute, sql[:startLen] + ",".join(vals))
         return self
 
+    # "prepared" statements - we munge the SQL statement once and
+    # execute multiple times
+    def compile(self, sql):
+        self._executeCheck(sql)
+        sql, keys = self.__mungeSQL(sql.strip())
+        return (sql, keys)
+    def execstmt(self, (sql, keys), *args):
+        if isinstance(args[0], (tuple, list)):
+            ret = self._tryExecute(self._cursor.execute, sql, *args)
+        else:
+            ret = self._tryExecute(self._cursor.execute, sql, args)
+        return self
+
+
 # Sequence implementation for mysql
 class Sequence(BaseSequence):
     def __init__(self, db, name, cu = None):
