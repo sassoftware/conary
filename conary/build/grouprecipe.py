@@ -270,7 +270,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{byDefault},] [I{components},] [I{flavor},] [I{groupName},] [I{name},] [I{ref},] [I{versionStr}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName}])}
 
         DESCRIPTION
         ===========

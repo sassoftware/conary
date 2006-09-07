@@ -1,13 +1,21 @@
 Changes in @NEW@:
   o Client Changes:
-    * Added "cvc set" command to change files between binary and text mode.
-    * "cvc add" no longer assumes files it doesn't know to be binary are text
-      files; there are lists for both binary and text types, and files which are
-      added which aren't in either list need to be added with "--text" or
-      "--binary"
+    * Added the "cvc set" command to change files between binary and
+      text mode for files in source components.
+    * "cvc add" no longer assumes files it doesn't know to be binary
+      are text files; there are lists for both binary and text types,
+      and files which are added which aren't in either list need
+      to be added with "--text" or "--binary". (CNY-838)
+    * The conary repository client now retries when a DNS lookup of a
+      server hostname fails with a "temporary failure in name
+      resolution" error.
     * "cvc annotate" no longer displays pathIds in the error message for the
       specified path not being included in the source trove
     * "cvc annotate" now gives an error when it is run on a binary file
+
+  o Bug Fixes:
+    * Conary commands do not perform an unnecessary database checks on the 
+      local system. (CNY-571)
 
 Changes in 1.0.30:
   o System Update Changes:
@@ -118,7 +126,7 @@ Changes in 1.0.30:
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
       latest version. (CNY-784)
-    * "cvc cook" now displays the correct label of the thing its
+    * "cvc cook" now displays the correct label of the thing it is
       building, even when it is not the build label.
     * Running "cvc update" in a directory that has been created with
       "cvc newpkg" but has not yet been committed to the repository
