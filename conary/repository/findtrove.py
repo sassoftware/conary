@@ -661,7 +661,7 @@ class TroveFinder:
             hasLabelPath = False
 
             # need a branch or a full label
-            if versionStr and (versionStr[0] == '/' or '@' in versionStr[1:]):
+            if versionStr and (isinstance(versionStr, (versions.Branch, versions.Version)) or versionStr[0] == '/' or '@' in versionStr[1:]):
                 hasLabelPath = True
 
             if not hasLabelPath and not self.allowNoLabel:
