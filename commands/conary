@@ -735,6 +735,7 @@ class UpdateCommand(ConaryCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
 
     docs = {
+        'apply-critical'  : 'apply any critical conary updates and then stop',
         'from-file'     : 'search changeset(s) for given troves',
         'just-db'       : 'Update db only - Do not modify rest of file system',
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
@@ -748,6 +749,7 @@ class UpdateCommand(ConaryCommand):
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found',
         'resolve'       : 'Add troves to update to solve dependency problems',
+        'restart-info'  : optparse.SUPPRESS_HELP,
         'sync-to-parents' : 'Install already referenced versions of troves',
         'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
         'test'      : 'Run through whole update but do not modify system',
@@ -757,6 +759,7 @@ class UpdateCommand(ConaryCommand):
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         d = {}
+        d["apply-critical"] = NO_PARAM
         d["from-file"] = MULT_PARAM
         d["just-db"] = NO_PARAM
         d["keep-existing"] = NO_PARAM
@@ -772,6 +775,9 @@ class UpdateCommand(ConaryCommand):
         d["sync-to-parents"] = NO_PARAM
         d["tag-script"] = ONE_PARAM
         d["test"] = NO_PARAM
+
+        d["restart-info"] = ONE_PARAM
+
         argDef['Update Options'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
@@ -795,6 +801,7 @@ class UpdateCommand(ConaryCommand):
             cfg.autoResolve = False
             del argSet['no-resolve']
 
+        kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['replaceFiles'] = argSet.pop('replace-files', False)
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
@@ -809,6 +816,7 @@ class UpdateCommand(ConaryCommand):
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
+        kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
         kwargs['updateByDefault']    = otherArgs[1] != 'erase'
         kwargs['migrate']            = otherArgs[1] == 'migrate'
@@ -891,6 +899,8 @@ class UpdateAllCommand(UpdateCommand):
         argDef["replace-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
+        argDef["restart-info"] = ONE_PARAM
+        argDef["apply-critical"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         cfg.requireInstallLabelPath()
@@ -912,6 +922,8 @@ class UpdateAllCommand(UpdateCommand):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
 
+        kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
+        kwargs['restartInfo'] = argSet.pop('restart-info', None)
         kwargs['keepRequired'] = argSet.pop('keep-required', False)
 
         kwargs['checkPathConflicts'] = \
@@ -1048,6 +1060,15 @@ def main(argv=sys.argv):
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:
             raise
+    except conary.errors.ReexecRequired, e:
+        print e
+        # a restart of this command has been requested for some 
+        # reason.  Exit code will now be the exit code of the redirect.
+        if e.execParams is not None:
+            args = e.execParams
+        else:
+            args = sys.argv
+        os.execve(sys.argv[0], args, os.environ)
     except debuggerException:
         raise
     except cfgtypes.CfgError, e:

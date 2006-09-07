@@ -144,10 +144,13 @@ class DirectedGraph:
                 newEdges.setdefault(toId, []).append((fromId, value))
         return dict((x[0], dict(x[1])) for x in newEdges.iteritems())
 
-    def iterChildren(self, node):
-        return (self.data.get(idx) 
+    def iterChildren(self, node, withEdges=False):
+        if withEdges:
+            return ((self.data.get(x[0]), x[1])
+                    for x in self.edges[self.data.getIndex(node)].iteritems())
+        return (self.data.get(idx)
                     for idx in self.edges[self.data.getIndex(node)])
-    
+
     def iterNodes(self):
         return self.data.iterNodes()
 
@@ -236,6 +239,9 @@ class DirectedGraph:
         return starts, finishes, trees
 
     def getTotalOrdering(self, nodeSort=None):
+        """
+            Note: children are ordered after their parents. 
+        """
         # to sort correctly, we need the nodes the user wants first to 
         # be picked _last_ by the selection algorithm.  That way they'll
         # have the latest possible finish times, and score better in the

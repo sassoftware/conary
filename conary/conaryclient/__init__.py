@@ -37,6 +37,8 @@ EraseDepFailure = update.EraseDepFailure
 NeededTrovesFailure = update.NeededTrovesFailure
 InstallPathConflicts = update.InstallPathConflicts
 
+CriticalUpdateInfo = update.CriticalUpdateInfo
+
 class TroveNotFound(Exception):
     def __init__(self, troveName):
         self.troveName = troveName

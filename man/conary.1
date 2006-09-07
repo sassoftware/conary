@@ -216,6 +216,10 @@ would have been executed to \fIpath\fR.
 Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
+.B \-\-apply-critical
+If the given update involves critical updates, apply only those critical 
+updates and then stop.
+.TP
 .B updateall
 Iterates through all the top-level troves installed on the system
 and updates to the most recent version in the repository.
@@ -228,6 +232,9 @@ not referenced by any other trove installed on the system,
 emerges, thanks to branch affinity.
 .RS 4
 .TP 4
+.B \-\-apply-critical
+See \fBupdate \-\-apply-critical\fP
+.TP
 .B \-\-exclude-troves <patterns>
 See \fBupdate \-\-exclude-troves\fP
 .TP

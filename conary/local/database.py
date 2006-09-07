@@ -119,6 +119,9 @@ class UpdateJob:
     def getJobs(self):
         return self.jobs
 
+    def setJobs(self, jobs):
+        self.jobs = jobs
+
     def setPrimaryJobs(self, jobs):
         assert(type(jobs) == set)
         self.primaries = jobs
@@ -126,12 +129,19 @@ class UpdateJob:
     def getPrimaryJobs(self):
         return self.primaries
 
+    def setCriticalJobs(self, criticalJobs):
+        self.criticalJobs = criticalJobs
+
+    def getCriticalJobs(self):
+        return self.criticalJobs
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
         self.rollback = None
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
+        self.criticalJobs = []
 
         self.searchSource = searchSource
 
@@ -441,7 +451,8 @@ class Database(SqlDbRepository):
         return resultDict
 
     def depCheck(self, jobSet, troveSource, findOrdering = False,
-                 linkedJobs = None):
+                 linkedJobs = None, criticalJobs = None,
+                 finalJobs = None, criticalOnly = False):
         """
         Check the database for closure against the operations in
         the passed changeSet.
@@ -454,7 +465,13 @@ class Database(SqlDbRepository):
         @param findOrdering: If true, a reordering of the job is
                              returned which preserves dependency
                              closure at each step.
-        @param findOrdering: boolean
+        @type findOrdering: boolean
+        @param criticalJobs: list of jobs that should be applied as early
+        as possible.
+        @type criticalJobs: list of job tuples
+        @param finalJobs: list of jobs that should be applied as a part of the
+        last job.
+        @type finalJobs: list of job tuples
         @rtype: tuple of dependency failures for new packages and
                 dependency failures caused by removal of existing
                 packages
@@ -462,12 +479,31 @@ class Database(SqlDbRepository):
 
         checker = self.dependencyChecker(troveSource)
         checker.addJobs(jobSet)
-        unsatisfiedList, unresolveableList, changeSetList = \
+        unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
                 checker.check(findOrdering = findOrdering,
-                              linkedJobs = linkedJobs)
-        checker.done()
+                              linkedJobs = linkedJobs,
+                              criticalJobs = criticalJobs,
+                              finalJobs = finalJobs)
 
-        return (unsatisfiedList, unresolveableList, changeSetList)
+        if criticalOnly and criticalUpdates:
+            changeSetList = changeSetList[:criticalUpdates[0] + 1]
+            jobSet.clear()
+            jobSet.update(itertools.chain(*changeSetList))
+            if criticalUpdates and (unresolveableList or unsatisfiedList):
+                # we're trying to apply only critical updates, but
+                # there's a dep failure somewhere in the entire job.
+                # Try again to resolve dependencies, using only
+                # the critical changes
+                checker.done()
+                checker = self.dependencyChecker(troveSource)
+                checker.addJobs(jobSet)
+                (unsatisfiedList, unresolveableList, changeSetList,
+                 criticalUpdates) = checker.check(findOrdering = findOrdering,
+                                                  linkedJobs = linkedJobs)
+                criticalUpdates = []
+        checker.done()
+        return (unsatisfiedList, unresolveableList, changeSetList,
+                criticalUpdates)
 
     def dependencyChecker(self, troveSource):
         return self.db.dependencyChecker(troveSource)

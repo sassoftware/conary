@@ -12,6 +12,11 @@ Changes in @NEW@:
     * "cvc annotate" no longer displays pathIds in the error message for the
       specified path not being included in the source trove
     * "cvc annotate" now gives an error when it is run on a binary file
+    * Conary now restarts itself after updating critical conary components
+      (currently, that consists of conary).  Hooks have been added for
+      other components using the conary api to specify other troves as
+      critical.  Also, hooks have been added for other components to specify
+      a trove to update last (CNY-805, CNY-808).
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the 
