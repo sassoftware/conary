@@ -339,11 +339,13 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     if filterVersions:
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:
+        pkgs = sorted(pkgs)
         raise builderrors.LoadRecipeError(
                               "source component %s has multiple versions "
-                              "on labelPath %s: %s" %(component,
-                            ', '.join(x.asString() for x in labelPath),
-                            pkgs))
+                              "on labelPath %s: %s"
+                              %(component,
+                                ', '.join(x.asString() for x in labelPath),
+                                ', '.join('%s=%s' % x[:2] for x in pkgs)))
     sourceComponent = repos.getTrove(*pkgs[0])
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 

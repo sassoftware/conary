@@ -26,6 +26,11 @@ Changes in @NEW@:
     * If you've made a local modification to a package and then try to
       downgrade it later, conary will downgrade included components as well.
       (CNY-805)
+    * The error message produced by "cvc cook" when a source component
+      exists on multiple branches with the same trailing label has
+      been improved. (CNY-714)
+    * Error handling when manipulating entitlements via XML-RPC has
+      been improved. (CNY-692)
 
 Changes in 1.0.30:
   o System Update Changes:
