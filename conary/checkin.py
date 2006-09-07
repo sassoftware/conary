@@ -243,6 +243,7 @@ def commit(repos, cfg, message, callback=None, test=False):
     state = conaryState.getSourceState()
 
     troveName = state.getName()
+    conflicts = []
 
     if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
         log.error("recipe not in CONARY state file, please run cvc add")
@@ -250,12 +251,17 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
-        if repos.getTroveLeavesByBranch(
-        { troveName : { state.getBranch() : None } }).get(troveName, None):
-	    log.error("%s is marked as a new package but it " 
-		      "already exists" % troveName)
-	    return
-	srcPkg = None
+        matches = repos.getTroveLeavesByLabel(
+        { troveName : { state.getBranch().label() : None } }).get(troveName, {})
+        if matches:
+            for version in matches:
+                if version.branch() == state.getBranch():
+                    log.error("%s is marked as a new package but it " 
+                              "already exists" % troveName)
+                    return
+                else:
+                    conflicts.append(version)
+        srcPkg = None
     else:
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
         if not _verifyAtHead(repos, srcPkg, state):
@@ -427,12 +433,26 @@ def commit(repos, cfg, message, callback=None, test=False):
     if message is None and not cl.getMessageFromUser():
 	log.error("no change log message was given")
 	return
+    
+
 
     if cfg.interactive:
         print 'The following commits will be performed:'
         print
         print '\t%s=%s' % (troveName, newVersion.asString())
         print
+    if conflicts:
+        print 'WARNING: performing this commit will create label conflicts:'
+        print
+        print 'New version %s=%s' % (troveName, newVersion)
+        for otherVersion in conflicts:
+            print '   conflicts with existing %s=%s' % (troveName, otherVersion)
+
+        if not cfg.interactive:
+            print 'error: interactive mode is required when creating label conflicts'
+            return
+
+    if cfg.interactive:
         okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
 
         if not okay:

@@ -1,5 +1,4 @@
 Changes in @NEW@:
-=======
   o Client Changes:
     * Added the "cvc set" command to change files between binary and
       text mode for files in source components.
@@ -18,6 +17,13 @@ Changes in @NEW@:
       other components using the conary api to specify other troves as
       critical.  Also, hooks have been added for other components to specify
       a trove to update last. (CNY-805, CNY-808)
+    * Conary now warns the user when they will be causing label conflicts -
+      that is when an operation would cause two different branches of 
+      development for a single trove to end up with the same trailing label.
+      Since most conary operations are label based, such label
+      conflicts can be confusing to work with and are almost never
+      desireable - except in those few cases where they are necessary.
+      (CNY-796)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the

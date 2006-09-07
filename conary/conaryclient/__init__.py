@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import itertools
 import os
 import pickle
 
@@ -20,6 +21,7 @@ from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
+from conary.repository import trovesource
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
@@ -359,4 +361,36 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
     def getRepos(self):
         return self.repos
-    
+
+
+    def _checkChangeSetForLabelConflicts(self, cs):
+        source = trovesource.ChangesetFilesTroveSource(None)
+        source.addChangeSet(cs)
+        # there should be a better way to iterate over all NVF in a source.
+        toCreate = [source.trovesByName(x) for x in source.iterAllTroveNames()]
+
+        branchesByLabel = {}
+        for (n,v,f) in itertools.chain(*toCreate):
+            branchesByLabel[(n, str(v.trailingLabel()), None)] \
+                                                = (v.branch(), (n, v,f))
+
+        results = self.repos.findTroves(None, branchesByLabel, None,
+                                       bestFlavor = False, getLeaves = True,
+                                       allowMissing = True)
+        conflicts = []
+        for troveSpec, troveTups in results.iteritems():
+            if not troveTups:
+                continue
+            # finding one conflict per trove to create is enough
+            troveConflict = None
+            foundPrevious = False
+            branchToCreate, tupToCreate = branchesByLabel[troveSpec]
+            for troveTup in troveTups:
+                if branchToCreate != troveTup[1].branch():
+                    troveConflict = (troveTup, tupToCreate)
+                else:
+                    foundPrevious = True
+                    break 
+            if not foundPrevious and troveConflict:
+                conflicts.append(troveConflict)
+        return conflicts
