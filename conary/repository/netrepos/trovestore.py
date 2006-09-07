@@ -356,9 +356,11 @@ class TroveStore:
         # Note: writing the next two steps in a single query causes
         # very slow full table scans on FileStreams. Don't get fancy.
 
-        # get the common entries we're gonna update
-        cu2 = self.db.cursor()
-        cu2.execute("""
+        # get the common entries we're gonna update. In the extreme
+        # case of binary shadowing this might require a bit of of
+        # memory for large troves, but it is preferable to constant
+        # full table scans in the much more common cases
+        cu.execute("""
         SELECT NewFiles.fileId, NewFiles.stream
         FROM NewFiles
         JOIN FileStreams USING(fileId)
@@ -368,12 +370,12 @@ class TroveStore:
         # Note: PostgreSQL and MySQL have support for non-SQL standard
         # multi-table updates that we could use to do this in one step.
         # This two step should work on everything though --gafton
-        for (fileId, stream) in cu2:
+        for (fileId, stream) in cu.fetchall():
             cu.execute("UPDATE FileStreams SET stream = ? "
                        "WHERE fileId = ?", (stream, fileId))
-        del cu2
 
-        # select the new non-NULL streams out of NewFiles and Insert them in FileStreams
+        # select the new non-NULL streams out of NewFiles and Insert
+        # them in FileStreams
         cu.execute("""
         INSERT INTO FileStreams (fileId, stream)
         SELECT DISTINCT NF.fileId, NF.stream
