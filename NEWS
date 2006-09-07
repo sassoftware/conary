@@ -1,4 +1,5 @@
 Changes in @NEW@:
+=======
   o Client Changes:
     * Added the "cvc set" command to change files between binary and
       text mode for files in source components.
@@ -31,6 +32,15 @@ Changes in @NEW@:
       been improved. (CNY-714)
     * Error handling when manipulating entitlements via XML-RPC has
       been improved. (CNY-692)
+
+  o Optimizations
+    * The getFileContents and getFileVersions server side calls have
+      been optimized for faster execution
+    * The SQL query in getTroveList has been sped up by a 3-5x factor.
+
+  o Server Changes
+    * Several SQL queries have been updated for PostgreSQL compatibility
+    * dbstore now has support for executemany()
 
 Changes in 1.0.30:
   o System Update Changes:

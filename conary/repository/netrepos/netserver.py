@@ -161,7 +161,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
             (l, f) = cfg.traceLog
-            self.log = tracelog.getLog(filename=f, level=l)
+            self.log = tracelog.getLog(filename=f, level=l, trace=l>2)
 
         if self.logFile:
             self.callLog = calllog.CallLogger(self.logFile, self.serverNameList)
@@ -645,92 +645,73 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if flavorIndices:
             self._setupFlavorFilter(cu, flavorIndices)
 
+        coreQdict = {}
+        coreQdict["localFlavor"] = "0"
         if not troveSpecs or (len(troveSpecs) == 1 and
                                  troveSpecs.has_key(None) and
                                  len(troveSpecs[None]) == 1 and
                                  troveSpecs[None].has_key(None)):
-            # no trove names, and/or no version spec
-            troveNameClause = "Items"
+            # None or { None:None} case
+            coreQdict["trove"] = "Items"
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
         elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
             # no trove names, and a single version spec (multiple ones
             # are disallowed)
             assert(len(troveSpecs[None]) == 1)
-            troveNameClause = "Items"
+            coreQdict["trove"] = "Items"
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-            troveNameClause = "gtvlTbl JOIN Items USING (item)"
-
-        getList = [ 'Items.item as item', 'UP.permittedTrove as acl']
-        if dropTroveTable:
-            getList.append('gtvlTbl.flavorId as flavorId')
-        else:
-            getList.append('0 as flavorId')
-        argList = [ ]
-
-        getList += [ 'Versions.version as version',
-                     'Nodes.timeStamps as timeStamps',
-                     'Nodes.branchId as branchId',
-                     'Nodes.finalTimestamp as finalTimestamp' ]
-        versionClause = "JOIN Versions ON Nodes.versionId = Versions.versionId"
+            coreQdict["trove"] = "gtvlTbl JOIN Items USING (item)"
+            coreQdict["localFlavor"] = "gtvlTbl.flavorId"
 
         # FIXME: the '%s' in the next lines are wreaking havoc through
         # cached execution plans
+        argDict = {}
+        if singleVersionSpec:
+            spec = ":spec"
+            argDict["spec"] = singleVersionSpec
+        else:
+            spec = "gtvlTbl.versionSpec"
         if versionType == self._GTL_VERSION_TYPE_LABEL:
-            if singleVersionSpec:
-                labelClause = """JOIN Labels ON
-                Labels.labelId = LabelMap.labelId
-                AND Labels.label = '%s'""" % singleVersionSpec
-            else:
-                labelClause = """JOIN Labels ON
-                Labels.labelId = LabelMap.labelId
-                AND Labels.label = gtvlTbl.versionSpec"""
+            coreQdict["spec"] = """JOIN Labels ON
+            Labels.labelId = LabelMap.labelId
+            AND Labels.label = %s""" % spec
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
-            if singleVersionSpec:
-                labelClause = """JOIN Branches ON
-                Branches.branchId = LabelMap.branchId
-                AND Branches.branch = '%s'""" % singleVersionSpec
-            else:
-                labelClause = """JOIN Branches ON
-                Branches.branchId = LabelMap.branchId
-                AND Branches.branch = gtvlTbl.versionSpec"""
+            coreQdict["spec"] = """JOIN Branches ON
+            Branches.branchId = LabelMap.branchId
+            AND Branches.branch = %s""" % spec
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
-            labelClause = ""
-            if singleVersionSpec:
-                vc = "Versions.version = '%s'" % singleVersionSpec
-            else:
-                vc = "Versions.version = gtvlTbl.versionSpec"
-            versionClause = """%s AND %s""" % (versionClause, vc)
+            coreQdict["spec"] = """JOIN Versions ON
+            Nodes.versionId = Versions.versionId
+            AND Versions.version = %s""" % spec
         else:
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
-            labelClause = ""
+            coreQdict["spec"] = ""
 
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            instanceClause = """JOIN Latest AS Domain USING (itemId)
+            coreQdict["domain"] = """JOIN Latest AS Domain USING (itemId)
             JOIN Nodes USING (itemId, branchId, versionId)"""
         else:
-            instanceClause = """JOIN Instances AS Domain USING (itemId)
+            coreQdict["domain"] = """JOIN Instances AS Domain USING (itemId)
             JOIN Nodes USING (itemId, versionid)"""
 
-        if withFlavors:
-            getList.append("Flavors.flavor as flavor")
-            flavorClause = "JOIN Flavors ON Flavors.flavorId = Domain.flavorId"
-        else:
-            getList.append("NULL as flavor")
-            flavorClause = ""
-
-        mainQuery = """
-        SELECT %%(distinct)s %%(select)s
-        FROM %(troveName)s
-        %(instance)s
+        coreQdict["ugid"] = ", ".join("%d" % x for x in userGroupIds)
+        coreQuery = """
+        SELECT DISTINCT
+            Nodes.nodeId as nodeId,
+            Domain.flavorId as flavorId,
+            %(localFlavor)s as localFlavorId,
+            UP.acl as acl
+        FROM %(trove)s
+        %(domain)s
         JOIN LabelMap USING (itemid, branchId)
         JOIN ( SELECT
                    Permissions.labelId as labelId,
-                   PerItems.item as permittedTrove,
+                   PerItems.item as acl,
                    Permissions.permissionId as aclId
                FROM
                    Permissions
@@ -738,73 +719,91 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                WHERE
                    Permissions.userGroupId IN (%(ugid)s)
             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        %(version)s
-        %(label)s
-        %(flavor)s
-        """ % {
-            "troveName" : troveNameClause,
-            "instance" : instanceClause,
-            "ugid" : ", ".join("%d" % x for x in userGroupIds),
-            "version" : versionClause,
-            "label" : labelClause,
-            "flavor" : flavorClause,
-            }
+        %(spec)s
+        """ % coreQdict
+
+        # build the outer query around the coreQuery
+        mainQdict = {}
 
         if flavorIndices:
             assert(withFlavors)
-            extraJoin = extraGrouping = ""
+            extraJoin = localGroup = ""
+            localFlavor = "0"
             if len(flavorIndices) > 1:
                 # if there is only one flavor we don't need to join based on
                 # the gtvlTbl.flavorId (which is good, since it may not exist)
-                extraJoin = """ffFlavor.flavorId = tmpQ.flavorId
-                AND """
+                extraJoin = "ffFlavor.flavorId = gtlTmp.localFlavorId AND"
             if dropTroveTable:
-                extraGrouping = ", tmpQ.flavorId"
+                localFlavor = "gtlTmp.localFlavorId"
+                localGroup = ", " + localFlavor
 
-            fullQuery = """
+            # take the core query and compute flavor scoring
+            mainQdict["core"] = """
             SELECT
-                tmpQ.item, tmpQ.acl, tmpQ.flavorId, tmpQ.version,
-                tmpQ.timeStamps, tmpQ.branchId, tmpQ.finalTimestamp,
-                tmpQ.flavor, SUM(coalesce(FlavorScores.value, 0)) as flavorScore
-            FROM ( %(mainQuery)s ) as tmpQ
-            JOIN Flavors ON tmpQ.flavor = Flavors.flavor
+                gtlTmp.nodeId as nodeId,
+                gtlTmp.flavorId as flavorId,
+                %(flavor)s as localFlavorId,
+                gtlTmp.acl as acl,
+                SUM(coalesce(FlavorScores.value, 0)) as flavorScore
+            FROM ( %(core)s ) as gtlTmp
             LEFT OUTER JOIN FlavorMap ON
-                FlavorMap.flavorId = Flavors.flavorId
+                FlavorMap.flavorId = gtlTmp.flavorId
             LEFT OUTER JOIN ffFlavor ON
-                %(extraJoin)s ffFlavor.base = FlavorMap.base
+                %(extra)s ffFlavor.base = FlavorMap.base
                 AND ( ffFlavor.flag = FlavorMap.flag OR
-                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL)
-                    )
+                      (ffFlavor.flag is NULL AND FlavorMap.flag is NULL) )
             LEFT OUTER JOIN FlavorScores ON
                 FlavorScores.present = FlavorMap.sense
-                AND ( FlavorScores.request = ffFlavor.sense OR
-                      ( ffFlavor.sense is NULL AND FlavorScores.request = 0 )
-                    )
-            GROUP BY tmpQ.item, tmpQ.version, tmpQ.flavor, tmpQ.aclId %(extraGrouping)s
-            HAVING flavorScore > -500000
-            ORDER BY tmpQ.item, tmpQ.finalTimestamp
-            """ % {
-                "mainQuery" : mainQuery %{ "select" : ", ".join(getList+["UP.aclId as aclId"]),
-                                           "distinct" : "DISTINCT" },
-                "extraJoin" : extraJoin,
-                "extraGrouping" : extraGrouping,
-                }
+                AND FlavorScores.request = coalesce(ffFlavor.sense, 0)
+            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId, gtlTmp.acl %(group)s
+            HAVING SUM(coalesce(FlavorScores.value, 0)) > -500000
+            """ % { "core" : coreQuery,
+                    "extra" : extraJoin,
+                    "flavor" : localFlavor,
+                    "group" : localGroup}
+            mainQdict["score"] = "tmpQ.flavorScore"
         else:
             assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
-            fullQuery = """%(mainQuery)s
-            ORDER BY Items.item, Nodes.finalTimestamp
-            """ % {
-                "mainQuery" : mainQuery % {"select":", ".join(getList+["NULL as flavorScore"]),
-                                           "distinct" : ""}
-                }
-        self.log(4, "execute query", fullQuery, argList)
-        cu.execute(fullQuery, argList)
+            mainQdict["core"] = coreQuery
+            mainQdict["score"] = "NULL"
+
+        mainQdict["select"] = """I.item as trove,
+            tmpQ.acl as acl,
+            tmpQ.localFlavorId as localFlavorId,
+            V.version as version,
+            N.timeStamps as timeStamps,
+            N.branchId as branchId,
+            N.finalTimestamp as finalTimestamp"""
+        mainQdict["flavor"] = ""
+        mainQdict["joinFlavor"] = ""
+        if withFlavors:
+            mainQdict["joinFlavor"] = "JOIN Flavors AS F ON F.flavorId = tmpQ.flavorId"
+            mainQdict["flavor"] = "F.flavor"
+
+        # this is the Query we execute. Executing the core query as a
+        # subquery forces better execution plans and reduces the
+        # overall number of rows traversed.
+        fullQuery = """
+        SELECT
+            %(select)s,
+            %(flavor)s as flavor,
+            %(score)s as flavorScore
+        FROM ( %(core)s ) AS tmpQ
+        JOIN Nodes AS N on tmpQ.nodeId = N.nodeId
+        JOIN Items AS I on N.itemId = I.itemId
+        JOIN Versions AS V on N.versionId = V.versionId
+        %(joinFlavor)s
+        ORDER BY I.item, N.finalTimestamp
+        """ % mainQdict
+
+        self.log(4, "execute query", fullQuery, argDict)
+        cu.execute(fullQuery, argDict)
+        self.log(3, "executed query")
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
         allowed = set()
 
-        troveNames = []
         troveVersions = {}
 
         # FIXME: Remove the ORDER BY in the sql statement above and watch it
@@ -1024,8 +1023,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Flavors.flavor as flavor,
             Nodes.timeStamps as timeStamps,
             UP.pattern as pattern
-        from
-            ( select
+        from Latest
+        join Nodes using (itemId, branchId, versionId)
+        join LabelMap using (itemId, branchId)
+        join ( select
                 Permissions.labelId as labelId,
                 PerItems.item as pattern
             from
@@ -1033,16 +1034,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 join Items as PerItems using (itemId)
             where
                 Permissions.userGroupId in (%s)
-            ) as UP
-            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Latest using (itemId, branchId)
-            join Nodes using (itemId, branchId, versionId)
-            join Items using (itemId),
-            Flavors, Versions
-        where
-                Latest.flavorId = Flavors.flavorId
-            and Latest.versionId = Versions.versionId
-            """ % ",".join("%d" % x for x in groupIds)
+            ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        join Items on Latest.itemId = Items.itemId
+        join Flavors on Latest.flavorId = Flavors.flavorId
+        join Versions on Latest.versionId = Versions.versionId
+        """ % ",".join("%d" % x for x in groupIds)
         self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
@@ -1136,21 +1132,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFileContents(self, authToken, clientVersion, fileList):
         self.log(2, "fileList", fileList)
 
-        # We use getFileStreams here instead of lower-level calls because
-        # it handles permission checks for us. We don't have pathIds here,
-        # so we have to just make one up.
-        pathId = self.fromPathId("0" * 16)
-        try:
-            streams = self.getFileVersions(authToken, SERVER_VERSIONS[-1],
-                                           [ (pathId, x[0]) for x in fileList ])
-        except errors.FileStreamMissing, e:
-            # we're supposed to return an exception which includes the
-            # fileVersion.
-            fileId = self.fromFileId(e.fileId)
-            l = [ x for x in fileList if x[0] == fileId ]
-            raise errors.FileStreamNotFound((self.toFileId(l[0][0]),
-                                             self.toVersion(l[0][1])))
-
+        # We use _getFileStreams here for the permission checks.
+        fileIdGen = (self.toFileId(x[0]) for x in fileList)
+        rawStreams = self._getFileStreams(authToken, fileIdGen)
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
@@ -1158,18 +1142,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sizeList = []
             exception = None
 
-            for encStream, (encFileId, encVersion) in \
-                                itertools.izip(streams, fileList):
-                pathId, stream = self.toFileAsStream(encStream,
-                                                     rawPathId = True)
-
-                if not files.frozenFileHasContents(stream):
+            for stream, (encFileId, encVersion) in \
+                                itertools.izip(rawStreams, fileList):
+                if stream is None:
+                    # return an exception if we couldn't find one of
+                    # the streams
+                    exception = errors.FileStreamNotFound
+                elif not files.frozenFileHasContents(stream):
                     exception = errors.FileHasNoContents
                 else:
                     contents = files.frozenFileContentInfo(stream)
                     filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(contents.sha1()))
-
                     try:
                         size = os.stat(filePath).st_size
                         sizeList.append(size)
@@ -1180,9 +1164,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         exception = errors.FileContentsNotFound
 
                 if exception:
-                    l = [ x for x in fileList if x[0] == encFileId ]
-                    raise exception((self.toFileId(l[0][0]),
-                                     self.toVersion(l[0][1])))
+                    raise exception((self.toFileId(encFileId),
+                                     self.toVersion(encVersion)))
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
@@ -1480,40 +1463,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return True
 
-    def getFileVersions(self, authToken, clientVersion, fileList):
-        self.log(2, fileList)
-
+    # retrieve the raw streams for a fileId list passed in as a generator
+    def _getFileStreams(self, authToken, fileIdGen):
+        self.log(3)
         cu = self.db.cursor()
 
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
-        schema.resetTable(cu, 'gfvTable')
+        schema.resetTable(cu, 'gfsTable')
 
         # we need to make sure we don't look up the same fileId multiple
         # times to avoid asking the sql server to do busy work
         fileIdMap = {}
-        for i, (pathId, fileId) in enumerate(fileList):
-            l = fileIdMap.setdefault(fileId, [])
-            # XXX the only thing we use the pathId for is to set it in
-            # the file object; we should just pass the stream back and
-            # let the client set it to avoid sending it back and forth
-            # for no particularly good reason
-            l.append((i, pathId))
-        fileIdList = fileIdMap.keys()
-        for i, fileId in enumerate(fileIdList):
-            cu.execute("INSERT INTO gfvTable (idx, fileId) VALUES (?, ?)",
-                       (i,self.toFileId(fileId)))
+        for i, fileId in enumerate(fileIdGen):
+            fileIdMap.setdefault(fileId, []).append(i)
+        uniqIdList = fileIdMap.keys()
 
-        # None in streams means the stream wasn't found. Insufficient
-        # permission to see a stream looks just like a missing stream
-        # (as missing items do in most of Conary)
-        streams = [ None ] * len(fileList)
+        # now i+1 is how many items we shall return
+        # None in streams means the stream wasn't found.
+        streams = [ None ] * (i+1)
+
+        # use the list of uniquified fileIds to look up streams in the repo
+        for i, fileId in enumerate(uniqIdList):
+            cu.execute("INSERT INTO gfsTable (idx, fileId) VALUES (?, ?)",
+                       (i, cu.binary(fileId)))
 
         q = """
         SELECT DISTINCT
-            gfvTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
-        FROM gfvTable
+            gfsTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
+        FROM gfsTable
         JOIN FileStreams USING (fileId)
         JOIN TroveFiles USING (streamId)
         JOIN Instances USING (instanceId)
@@ -1535,30 +1514,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
         WHERE FileStreams.stream IS NOT NULL
         """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
-
         cu.execute(q)
-        self.log(4, "executed query", q)
 
         for (i, stream, troveNamePattern, troveName) in cu:
-            fileId = fileIdList[i]
+            fileId = uniqIdList[i]
             if fileId is None:
                  # we've already found this one
                  continue
             if not self.auth.checkTrove(troveNamePattern, troveName):
+                # Insufficient permission to see a stream looks just
+                # like a missing stream (as missing items do in most
+                # of Conary)
                 continue
-            for (streamIdx, pathId) in fileIdMap[fileId]:
-                if streams[streamIdx]:
-                    continue
-                streams[streamIdx] = self.fromFileAsStream(
-                    pathId, stream, rawPathId = True)
+            if stream is None:
+                continue
+            for streamIdx in fileIdMap[fileId]:
+                streams[streamIdx] = stream
             # mark as processed
-            fileIdList[i] = None
+            uniqIdList[i] = None
+        # FIXME: the fact that we're not extracting the list ordered
+        # makes it very hard to return an iterator out of this
+        # function - for now, returning a list will do...
+        return streams
 
+    def getFileVersions(self, authToken, clientVersion, fileList):
+        self.log(2, "fileList", fileList)
+
+        # build the list of fileIds for query
+        fileIdGen = (self.toFileId(fileId) for (pathId, fileId) in fileList)
+
+        # we rely on _getFileStreams to do the auth for us
+        rawStreams = self._getFileStreams(authToken, fileIdGen)
         # return an exception if we couldn't find one of the streams
-        if None in streams:
-            fileId = self.toFileId(fileList[streams.index(None)][1])
+        if None in rawStreams:
+            fileId = self.toFileId(fileList[rawStreams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
+        streams = [ None ] * len(fileList)
+        for i,  (stream, (pathId, fileId)) in enumerate(itertools.izip(rawStreams, fileList)):
+            # XXX the only thing we use the pathId for is to set it in
+            # the file object; we should just pass the stream back and
+            # let the client set it to avoid sending it back and forth
+            # for no particularly good reason
+            streams[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
         return streams
 
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
@@ -1913,10 +1911,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         result = cu.fetchall()
         if not result or result[0][0] == None:
             return -1
-
         return result[0][0]
 
     def setMirrorMark(self, authToken, clientVersion, host, mark):
+        # need to treat the mark as long
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
@@ -1929,7 +1931,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             cu.execute("update LatestMirror set mark=? where host=?",
                        (mark, host))
-
         return ""
 
     def getNewSigList(self, authToken, clientVersion, mark):
@@ -2039,30 +2040,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               AND Versions.version = ?
               AND Flavors.flavor = ?
             """, (name, version, flavor))
-            try:
-                instanceId = cu.next()[0]
-            except StopIteration:
+            ret = cu.fetchall()
+            if not len(ret):
                 raise errors.TroveMissing(name, version = version)
+            instanceId = ret[0][0]
 
             cu.execute("""
             SELECT data FROM TroveInfo WHERE instanceId = ? AND infoType = ?
             """, (instanceId, trove._TROVEINFO_TAG_SIGS))
-            try:
-                currentSig = cu.next()[0]
-            except StopIteration:
+            ret = cu.fetchall()
+            if len(ret):
+                currentSig = cu.frombinary(ret[0][0])
+            else:
                 currentSig = None
 
             if not currentSig:
                 cu.execute("""
                 INSERT INTO TroveInfo (instanceId, infoType, data)
                 VALUES (?, ?, ?)
-                """, instanceId, trove._TROVEINFO_TAG_SIGS, sig)
+                """, (instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig)))
                 updateCount += 1
             elif currentSig != sig:
                 cu.execute("""
                 UPDATE TroveInfo SET data = ?
                 WHERE infoType = ? AND instanceId = ?
-                """, (sig, trove._TROVEINFO_TAG_SIGS, instanceId))
+                """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
             self.cache.invalidateEntry(name, self.toVersion(version),
                                        self.toFlavor(flavor))
@@ -2111,7 +2113,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
            WHERE Instances.isPresent = 1
              AND Instances.changed >= ?
            GROUP BY changed
-           HAVING c>1
+           HAVING COUNT(instanceId) > 1
         ) AS lims""", mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
@@ -2122,8 +2124,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # likely grant access to a trove for this user
         cu.execute("""
         SELECT COUNT(*) AS perms
-        FROM UserGroups
-        JOIN Permissions USING(userGroupId)
+        FROM Permissions
+        JOIN UserGroups USING(userGroupId)
         WHERE UserGroups.canMirror = 1
           AND UserGroups.userGroupId in (%s)
         """ % (",".join("%d" % x for x in userGroupIds),))
@@ -2152,9 +2154,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               WHERE Permissions.userGroupId in (%s)
                 AND UserGroups.canMirror = 1
               ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        JOIN Items ON Instances.itemId = Items.itemId
-        JOIN Versions ON Instances.versionId = Versions.versionId
-        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        JOIN Items ON Items.itemId = Instances.itemId
+        JOIN Versions ON Versions.versionId = Instances.versionId
+        JOIN Flavors ON Flavors.flavorId = Instances.flavorId
         WHERE Instances.changed >= ?
           AND Instances.isPresent = 1
         ORDER BY Instances.changed
