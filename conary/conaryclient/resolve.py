@@ -540,7 +540,8 @@ class DependencySolver(object):
             (depList, newCannotResolve, changeSetList, criticalUpdates) = \
                     self.db.depCheck(jobSet | newJobSet,
                                      uJob.getTroveSource(),
-                                     findOrdering = False)
+                                     findOrdering = False,
+                                     criticalJobs=[])
             if cannotResolve != newCannotResolve:
                 cannotResolve = newCannotResolve
                 ineligible.update((x[0], x[1][0], x[1][1])
