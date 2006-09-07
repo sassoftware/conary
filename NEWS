@@ -9,6 +9,11 @@ Changes in @NEW@:
     * The conary repository client now retries when a DNS lookup of a
       server hostname fails with a "temporary failure in name
       resolution" error.
+    * Conary now restarts itself after updating critical conary components
+      (currently, that consists of conary).  Hooks have been added for
+      other components using the conary api to specify other troves as
+      critical.  Also, hooks have been added for other components to specify
+      a trove to update last (CNY-805, CNY-808).
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the 

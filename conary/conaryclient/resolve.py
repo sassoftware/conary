@@ -12,6 +12,7 @@
 # full details.
 
 import itertools
+import re
 
 from conary import errors
 from conary.lib import log
@@ -248,9 +249,17 @@ class DependencySolver(object):
         self.repos = repos
         self.db = db
 
+    def _findCriticalJobInfo(self, jobSet, updateSettings):
+        if updateSettings is None:
+            return [], [], False
+        criticalJobs = updateSettings.findCriticalJobs(jobSet)
+        finalJobs = updateSettings.findFinalJobs(jobSet)
+        return criticalJobs, finalJobs, updateSettings.isCriticalOnlyUpdate()
+
     def resolveDependencies(self, uJob, jobSet, split = False,
                             resolveDeps = True, useRepos = True,
-                            resolveSource = None, keepRequired = True):
+                            resolveSource = None, keepRequired = True,
+                            criticalUpdateInfo = None):
         """
             Determine and possibly resolve dependency problems.
             @param uJob: update job we are resolving dependencies for
@@ -277,12 +286,13 @@ class DependencySolver(object):
 
         ineligible = set()
 
-        (depList, cannotResolve, changeSetList, keepList, ineligible) \
-                             = self.checkDeps(uJob, jobSet, troveSource,
-                                              findOrdering = split,
-                                              resolveDeps = resolveDeps,
-                                              ineligible=ineligible,
-                                              keepRequired = keepRequired)
+        (depList, cannotResolve, changeSetList, keepList, ineligible,
+         criticalUpdates) = self.checkDeps(uJob, jobSet, troveSource,
+                                       findOrdering = split,
+                                       resolveDeps = resolveDeps,
+                                       ineligible=ineligible,
+                                       keepRequired = keepRequired,
+                                       criticalUpdateInfo = criticalUpdateInfo)
 
 
         if not resolveDeps:
@@ -313,17 +323,20 @@ class DependencySolver(object):
                 continue
 
             (depList, cannotResolve, changeSetList, newKeepList,
-             ineligible) =  self.checkDeps(uJob, jobSet,
-                                           uJob.getTroveSource(),
-                                           findOrdering = True,
-                                           resolveDeps = True,
-                                           ineligible = ineligible,
-                                           keepRequired = keepRequired)
+             ineligible, criticalUpdates) =  self.checkDeps(uJob, jobSet,
+                                       uJob.getTroveSource(),
+                                       findOrdering = True,
+                                       resolveDeps = True,
+                                       ineligible = ineligible,
+                                       keepRequired = keepRequired,
+                                       criticalUpdateInfo = criticalUpdateInfo)
             keepList.extend(newKeepList)
 
-        return (depList, suggMap, cannotResolve, changeSetList, keepList)
-
-
+        if criticalUpdateInfo is None:
+            # backwards compatibility with conary v. 1.0.30/1.1.3 and earlier
+            return (depList, suggMap, cannotResolve, changeSetList, keepList)
+        return (depList, suggMap, cannotResolve, changeSetList, keepList,
+                criticalUpdates)
 
     def addUpdates(self, troves, uJob, jobSet, ineligible, keepList, 
                     troveSource):
@@ -364,7 +377,8 @@ class DependencySolver(object):
         return True
 
     def checkDeps(self, uJob, jobSet, trvSrc, findOrdering,
-                  resolveDeps, ineligible, keepRequired = True):
+                  resolveDeps, ineligible, keepRequired = True,
+                  criticalUpdateInfo = None):
         """
             Given a jobSet, use its dependencies to determine an
             ordering, resolve problems with jobs that have difficult
@@ -377,10 +391,17 @@ class DependencySolver(object):
         while True:
             linkedJobs = self.client._findOverlappingJobs(jobSet,
                                                           uJob.getTroveSource())
-            (depList, cannotResolve, changeSetList) = \
+            criticalJobs, finalJobs, criticalOnly = self._findCriticalJobInfo(
+                                                         jobSet,
+                                                         criticalUpdateInfo)
+            (depList, cannotResolve, changeSetList, criticalUpdates) = \
                             self.db.depCheck(jobSet, uJob.getTroveSource(),
                                              findOrdering = findOrdering,
-                                             linkedJobs = linkedJobs)
+                                             linkedJobs = linkedJobs,
+                                             criticalJobs = criticalJobs,
+                                             finalJobs = finalJobs,
+                                             criticalOnly = criticalOnly)
+
             if not resolveDeps or not cannotResolve:
                 break
             # We have troves that are in the state cannotResolve:
@@ -430,7 +451,8 @@ class DependencySolver(object):
             if not changeMade:
                 break
 
-        return (depList, cannotResolve, changeSetList, keepList, ineligible)
+        return (depList, cannotResolve, changeSetList, keepList, ineligible,
+                criticalUpdates)
 
     def resolveEraseByUpdating(self, trvSrc, cannotResolve, uJob, jobSet, 
                                ineligible):
@@ -514,7 +536,8 @@ class DependencySolver(object):
             # there is actually a change
 
             uJob.getTroveSource().merge(newJob.getTroveSource())
-            (depList, newCannotResolve, changeSetList) = \
+
+            (depList, newCannotResolve, changeSetList, criticalUpdates) = \
                     self.db.depCheck(jobSet | newJobSet,
                                      uJob.getTroveSource(),
                                      findOrdering = False)

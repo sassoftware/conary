@@ -14,6 +14,7 @@
 import os
 import itertools
 import sys
+import tempfile
 import thread
 import urllib2
 
@@ -21,6 +22,7 @@ from conary import callbacks
 from conary import conaryclient
 from conary import display
 from conary import errors
+from conary import versions
 from conary.deps import deps
 from conary.lib import log
 from conary.lib import util
@@ -31,6 +33,9 @@ from conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line 
 # conary client
+
+class CriticalUpdateInfo(conaryclient.CriticalUpdateInfo):
+    criticalTroveRegexps = ['conary:.*']
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
@@ -205,6 +210,26 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                                             showComponents=showComponents)
         self.formatter.dcfg.setJobDisplay(compressJobs=not showComponents)
 
+def displayChangedJobs(addedJobs, removedJobs, cfg):
+    db = conaryclient.ConaryClient(cfg).db
+    formatter = display.JobTupFormatter(affinityDb=db)
+    formatter.dcfg.setTroveDisplay(fullVersions=cfg.fullVersions,
+                                   fullFlavors=cfg.fullFlavors,
+                                   showLabels=cfg.showLabels,
+                                   baseFlavors=cfg.flavor,
+                                   showComponents=cfg.showComponents)
+    formatter.dcfg.setJobDisplay(compressJobs=not cfg.showComponents)
+    formatter.prepareJobLists([removedJobs | addedJobs])
+
+    if removedJobs:
+        print 'No longer part of job:'
+        for line in formatter.formatJobTups(removedJobs, indent='    '):
+            print line
+    if addedJobs:
+        print 'Added to job:'
+        for line in formatter.formatJobTups(addedJobs, indent='    '):
+            print line
+
 def displayUpdateInfo(updJob, cfg):
     jobLists = updJob.getJobs()
     db = conaryclient.ConaryClient(cfg).db
@@ -221,9 +246,20 @@ def displayUpdateInfo(updJob, cfg):
     totalJobs = len(jobLists)
     for num, job in enumerate(jobLists):
         if totalJobs > 1:
+            if num in updJob.getCriticalJobs():
+                print '** ',
             print 'Job %d of %d:' % (num + 1, totalJobs)
         for line in formatter.formatJobTups(job, indent='    '):
             print line
+    if updJob.getCriticalJobs():
+        criticalJobs = updJob.getCriticalJobs()
+        if len(criticalJobs) > 1:
+            jobPlural = 's'
+        else:
+            jobPlural = ''
+        jobList = ', '.join([str(x + 1) for x in criticalJobs])
+        print
+        print '** The update will restart itself after job%s %s and continue updating' % (jobPlural, jobList)
     return
 
 def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None, 
@@ -233,9 +269,10 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                updateByDefault = True, callback = None, 
                                split = True, sync = False, fromFiles = [],
                                checkPathConflicts = True, syncChildren = False,
-                               syncUpdate = False, updateOnly = False, 
+                               syncUpdate = False, updateOnly = False,
                                migrate = False, keepRequired = False,
-                               removeNotByDefault = False):
+                               removeNotByDefault = False, restartInfo = None,
+                               applyCriticalOnly = False):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -264,19 +301,29 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                 changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
                       trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
 
-    applyList = cmdline.parseChangeList(changeSpecs, keepExisting, 
-                                        updateByDefault, allowChangeSets=True)
+    if restartInfo:
+        applyList, restartChangeSets = _loadRestartInfo(restartInfo)
+        recurse = False
+        syncChildren = False # we don't recalculate update info anyway
+                             # so we'll just revert to regular update.
+    else:
+        restartChangeSets = []
+        applyList = cmdline.parseChangeList(changeSpecs, keepExisting,
+                                            updateByDefault,
+                                            allowChangeSets=True)
+
     if syncChildren:
         for name, oldInf, newInfo, isAbs in applyList:
             if not isAbs:
-                raise errors.ConaryError('cannot specify erases/relative updates with sync')
+                raise errors.ConaryError(
+                        'cannot specify erases/relative updates with sync')
                 return
 
-    _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
+    _updateTroves(cfg, applyList, replaceFiles = replaceFiles,
                   tagScript = tagScript, keepRequired = keepRequired,
                   keepExisting = keepExisting, depCheck = depCheck,
-                  test = test, justDatabase = justDatabase, 
-                  recurse = recurse, info = info, 
+                  test = test, justDatabase = justDatabase,
+                  recurse = recurse, info = info,
                   updateByDefault = updateByDefault, callback = callback, 
                   split = split, sync = sync,
                   fromChangesets = fromChangesets,
@@ -285,7 +332,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   updateOnly = updateOnly,
                   removeNotByDefault = removeNotByDefault,
                   installMissing = installMissing,
-                  migrate = migrate)
+                  migrate = migrate, restartChangeSets = restartChangeSets, 
+                  applyCriticalOnly = applyCriticalOnly)
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -300,18 +348,28 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   syncChildren = False, 
                                   updateOnly = False, 
                                   removeNotByDefault = False,
-                                  installMissing = False, migrate = False):
+                                  installMissing = False, migrate = False,
+                                  restartChangeSets = None,
+                                  applyCriticalOnly = False):
 
     client = conaryclient.ConaryClient(cfg)
 
+
     if not info:
-        if migrate and not cfg.interactive:
-            print ('As of conary 1.0.21, the migrate command has changed.'
-                   '  Migrate must be run with --interactive '
-                   ' because it now has the potential to damage your'
-                   ' system irreparably if used incorrectly.')
+        client.checkWriteableRoot()
+
+    if migrate:
+        print ('As of conary 1.0.21, the migrate command has changed.'
+               '  Migrate must be run with --interactive '
+               ' because it now has the potential to damage your'
+               ' system irreparably if used incorrectly.')
+        if not cfg.interactive:
             return
-	client.checkWriteableRoot()
+
+    criticalUpdateInfo = CriticalUpdateInfo(applyCriticalOnly)
+    if restartChangeSets:
+        for cs in restartChangeSets:
+            criticalUpdateInfo.addChangeSet(cs)
 
     try:
         (updJob, suggMap) = \
@@ -326,16 +384,35 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                checkPrimaryPins = checkPrimaryPins,
                                syncChildren = syncChildren,
                                updateOnly = updateOnly,
-                               installMissing = installMissing, 
+                               installMissing = installMissing,
                                removeNotByDefault = removeNotByDefault,
-                               migrate = migrate)
+                               migrate = migrate,
+                               criticalUpdateInfo=criticalUpdateInfo)
+    except conaryclient.update.DependencyFailure, e:
+        callback.done()
+        if e.hasCriticalUpdates() and not applyCriticalOnly:
+            e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
+        raise
     except:
         callback.done()
+        if restartChangeSets:
+            log.error('** NOTE: A critical update was applied - rerunning this command may resolve this error')
         raise
 
     if info:
         callback.done()
         displayUpdateInfo(updJob, cfg)
+        if restartChangeSets:
+            callback.done()
+            newJobs = set(itertools.chain(*updJob.getJobs()))
+            oldJobs = set(applyList)
+            addedJobs = newJobs - oldJobs
+            removedJobs = oldJobs - newJobs
+            if addedJobs or removedJobs:
+                print
+                print 'NOTE: after critical updates were applied, the contents of the update were recalculated:'
+                print
+                displayChangedJobs(addedJobs, removedJobs, cfg)
         return
 
     if suggMap:
@@ -353,19 +430,43 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        for x in itertools.chain(*suggMap.itervalues())))
         print " ".join(items)
         keepExisting = False
-    if cfg.interactive:
+
+    askInteractive = cfg.interactive
+    if restartChangeSets:
+        callback.done()
+        newJobs = set(itertools.chain(*updJob.getJobs()))
+        oldJobs = set(applyList)
+        addedJobs = newJobs - oldJobs
+        removedJobs = oldJobs - newJobs
+
+        if addedJobs or removedJobs:
+            print 'NOTE: after critical updates were applied, the contents of the update were recalculated:'
+            displayChangedJobs(addedJobs, removedJobs, cfg)
+        else:
+            askInteractive = False
+    elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
-        if migrate:
-            print ('Migrate erases all troves not referenced in the groups'
-                   ' specified.')
-            okay = cmdline.askYn('continue with migrate? [y/N]', default=False)
-        else:
-            okay = cmdline.askYn('continue with update? [Y/n]', default=True)
+    if migrate:
+        print ('Migrate erases all troves not referenced in the groups'
+               ' specified.')
 
+    if askInteractive:
+        if migrate:
+            values = 'migrate', '[y/N]'
+            default = False
+        else:
+            values = 'update', '[Y/n]'
+            default = True
+        okay = cmdline.askYn('continue with %s? %s' % values, default=default)
         if not okay:
             return
 
+    if updJob.getCriticalJobs():
+        print "Performing critical system updates, will then restart update."
+        firstCritical = updJob.getCriticalJobs()[0]
+        remainingJobs = updJob.getJobs()[firstCritical + 1:]
+        updJob.setJobs(updJob.getJobs()[0:firstCritical + 1])
 
     log.syslog.command()
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
@@ -375,6 +476,67 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        threshold = cfg.trustThreshold)
 
     log.syslog.commandComplete()
+
+    if updJob.getCriticalJobs():
+        restartDir = _storeJobInfo(remainingJobs, updJob.getTroveSource())
+        # FIXME: write the updJob.getTroveSource() changeset(s) to disk
+        # write the job set to disk
+        # Restart conary telling it to use those changesets and jobset
+        # (ignore ordering).
+        # do depresolution on that job set to compare contents and warn
+        # if contents have changed.
+        params = sys.argv
+        params.extend(['--restart-info=%s' % restartDir])
+        raise errors.ReexecRequired(
+                'Critical update completed, rerunning command...', params,
+                restartDir)
+
+def _storeJobInfo(remainingJobs, changeSetSource):
+    restartDir = tempfile.mkdtemp(prefix='conary-restart-')
+    for idx, cs in enumerate(changeSetSource.iterChangeSets()):
+        if isinstance(cs, changeset.ChangeSetFromFile):
+            # these will be picked up on restart by parsing the command line
+            # arguments
+            continue
+        cs.reset()
+        cs.writeToFile(restartDir + '/%d.ccs' % idx)
+
+    jobSetPath = os.path.join(restartDir, 'joblist')
+    jobFile = open(jobSetPath, 'w')
+    jobStrs = []
+    for job in itertools.chain(*remainingJobs): # flatten list
+        jobStr = []
+        if job[1][0]:
+            jobStr.append('%s=%s[%s]--' % (job[0], job[1][0], job[1][1]))
+        else:
+            jobStr.append('%s=--' % (job[0],))
+        if job[2][0]:
+            jobStr.append('%s[%s]' % (job[2][0], job[2][1]))
+        jobStrs.append(''.join(jobStr))
+    jobFile.write('\n'.join(jobStrs))
+    jobFile.close()
+    return restartDir
+
+def _loadRestartInfo(restartDir):
+    changeSetList = []
+    for path in [ x for x in os.listdir(restartDir) if x != 'joblist']:
+        cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
+        changeSetList.append(cs)
+    jobSetPath = os.path.join(restartDir, 'joblist')
+    jobSet = cmdline.parseChangeList(x.strip() for x in open(jobSetPath))
+    finalJobSet = []
+    for job in jobSet:
+        if job[1][0]:
+            oldVersion = versions.VersionFromString(job[1][0])
+        else:
+            oldVersion = None
+        if job[2][0]:
+            newVersion = versions.VersionFromString(job[2][0])
+        else:
+            newVersion = None
+        finalJobSet.append((job[0], (oldVersion, job[1][1]), 
+                            (newVersion, job[2][1]), job[3]))
+    return finalJobSet, changeSetList
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -443,12 +605,17 @@ def updateConary(cfg, conaryVersion):
     
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
               test = False, showItems = False, checkPathConflicts = True,
-              migrate = False, keepRequired = False):
-    client = conaryclient.ConaryClient(cfg)
-    updateItems = client.fullUpdateItemList()
-
-
-    applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
+              migrate = False, keepRequired = False, applyCriticalOnly=False, 
+              restartInfo=None):
+    if restartInfo:
+        applyList, restartChangeSets = _loadRestartInfo(restartInfo)
+        recurse = False
+    else:
+        client = conaryclient.ConaryClient(cfg)
+        updateItems = client.fullUpdateItemList()
+        applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
+        restartChangeSets = []
+        recurse = True
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
@@ -477,7 +644,9 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
                   checkPathConflicts = checkPathConflicts,
                   installMissing = installMissing, 
                   removeNotByDefault = removeNotByDefault,
-                  keepRequired = keepRequired)
+                  keepRequired = keepRequired, 
+                  applyCriticalOnly=applyCriticalOnly,
+                  restartChangeSets=restartChangeSets, recurse=recurse)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)

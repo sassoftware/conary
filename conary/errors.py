@@ -101,6 +101,16 @@ class InvalidRegex(ParseError):
     def __init__(self, expr):
         self.expr = expr
 
+class ReexecRequired(ConaryError):
+    """
+       Conary needs to reexec itself with the same command again.
+       Can occur due to critical component updates.
+    """
+    def __init__(self, msg, params=None, data=None):
+        self.execParams = params
+        self.data = data
+        ConaryError.__init__(self, msg)
+
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
 def exceptionIsUncatchable(e):
