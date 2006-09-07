@@ -129,7 +129,7 @@ class Cursor:
             except _sqlite.DatabaseError:
                 pass
             self.stmt = None
-        
+
     def _checkNotClosed(self, methodname=None):
         if self.closed:
             raise _sqlite.ProgrammingError, \
@@ -144,13 +144,14 @@ class Cursor:
             stmt.bind(i + 1, parm)
 	self.current_row = stmt.step()
 
-    def execute(self, SQL, *parms, **kwargs):
-        # kwargs we won't attempt to bind to the query
-        _nobind = ['start_transaction']
-        start_transaction = kwargs.get('start_transaction', True)
-        SQL = SQL.strip()
-        self._checkNotClosed("execute")
+    def _preExecute(self, funcName, SQL, kwargs):
+        start_transaction = kwargs.pop('start_transaction', True)
+        self._checkNotClosed(funcName)
         startingTransaction = False
+        SQL = SQL.strip()
+
+        if self.con is None:
+            raise _sqlite.ProgrammingError, "connection is closed."
 
         if self.con.autocommit:
             pass
@@ -161,6 +162,10 @@ class Cursor:
                 elif (len(SQL) >= 6 and SQL[:6].upper()
                       not in ("SELECT", "VACUUM", "DETACH")):
                     self.con._begin()
+        return startingTransaction, SQL
+
+    def execute(self, SQL, *parms, **kwargs):
+        startingTransaction, SQL = self._preExecute("execute", SQL, kwargs)
 
         # prepare the statement
         self.stmt = self.con.db.prepare(SQL)
@@ -177,7 +182,6 @@ class Cursor:
         # hashes are named parameters
         elif isinstance(parms, dict):
             for pkey, pval in parms.iteritems():
-                if pkey in _nobind: continue
                 if pkey[0] is not ":": pkey = ":" + pkey
                 self.stmt.bind(pkey, pval)
         else:
@@ -185,9 +189,7 @@ class Cursor:
                   "Don't know how to bind these parameters"
         # the sqlite C bindings require us to reference these bind parameters as :name
         for pkey, pval in kwargs.items():
-            # some arguments are not meant for the query
-            if pkey in _nobind: continue
-            self.stmt.bind(":" + pkey, pval)        
+            self.stmt.bind(":" + pkey, pval)
         self.current_row = self.stmt.step()
         if startingTransaction:
             self.con.inTransaction = True
@@ -197,17 +199,29 @@ class Cursor:
         # you to do "for row in cu.execute(...)"
         return self
 
-    def executemany(self, query, parm_sequence):
-        self._checkNotClosed("executemany")
-
-        if self.con is None:
-            raise _sqlite.ProgrammingError, "connection is closed."
-
-        for _i in parm_sequence:
-            if hasattr(_i, '__getitem__'): 
-                self.execute(query, *_i)
+    def executemany(self, query, parm_sequence, **kw):
+        startingTransaction, SQL = self._preExecute("executemany", query, kw)
+        # prepare the statement
+        self.stmt = self.con.db.prepare(SQL)
+        for parms in parm_sequence:
+            self.stmt.reset()
+            if isinstance(parms,tuple) or isinstance(parms, list):
+                # bind as positional arguments
+                for i, parm in enumerate(parms):
+                    self.stmt.bind(i+1, parm)
+            elif isinstance(parms, dict):
+                # bind as named arguments
+                for pkey, pval in parms.iteritems():
+                    if pkey[0] != ":": pkey = ":" + pkey
+                    self.stmt.bind(pkey, pval)
             else:
-                self.execute(query, _i)
+                # this better be an int or string or we'll fail here
+                self.stmt.bind(1, parms)
+            self.current_row = self.stmt.step()
+            if startingTransaction:
+                self.con.inTransaction = True
+            self.closed = 0
+        return self
 
     def close(self):
         if self.con and self.con.closed:

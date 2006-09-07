@@ -1452,15 +1452,16 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpInstances2"] = True
 
-    if "gfvTable" not in db.tempTables:
+    # temporary table for _getFileStreams
+    if "gfsTable" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
-        gfvTable(
+        gfsTable(
             idx         %(PRIMARYKEY)s,
-            fileId      %(BINARY20)s
+            fileId      %(BINARY20)s NOT NULL
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["gfvTable"] = True
-        db.createIndex("gfvTable", "gfvTableFileIdIdx", "fileId",
+        db.tempTables["gfsTable"] = True
+        db.createIndex("gfsTable", "gfsTableFileIdIdx", "fileId",
                        check = False)
 
     db.commit()

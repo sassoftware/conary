@@ -18,7 +18,6 @@ import base64
 from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey
 from textwrap import wrap
-from conary.dbstore import sqlerrors
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -28,8 +27,8 @@ class OpenPGPKeyTable:
 
     def getFingerprint(self, keyId):
         cu = self.db.cursor()
-        r = cu.execute('SELECT fingerprint FROM PGPFingerprints '
-                       'WHERE fingerprint LIKE "%' + keyId + '%"')
+        r = cu.execute("SELECT fingerprint FROM PGPFingerprints "
+                       "WHERE fingerprint LIKE '%" + keyId + "%'")
         keyList = r.fetchall()
         if (len(keyList) != 1):
             raise openpgpkey.KeyNotFound(keyId)
@@ -70,33 +69,32 @@ class OpenPGPKeyTable:
         # the old one, and then just do it.
         r = cu.execute('SELECT KeyId, pgpKey FROM PGPKeys WHERE fingerprint=?',
                        mainFingerprint)
-        keyInfo = cu.fetchone()
-        if keyInfo:
-            keyId, origKey = keyInfo
+        for (keyId, keyBlob) in cu.fetchall():
+            origKey = cu.frombinary(keyBlob)
             # ensure new key is a superset of old key. we can't allow the
             # repo to let go of subkeys or revocations.
             openpgpfile.assertReplaceKeyAllowed(origKey, pgpKeyData)
             #reset the key cache so the changed key shows up
             keyCache = openpgpkey.getKeyCache()
             keyCache.reset()
-
             cu.execute('UPDATE PGPKeys set pgpKey=? where keyId=?',
                        cu.binary(pgpKeyData), keyId)
+            break
         else:
-            cu.execute('INSERT INTO PGPKeys (userId, fingerprint, '
-                       'pgpKey) VALUES (?, ?, ?)',
+            cu.execute('INSERT INTO PGPKeys (userId, fingerprint, pgpKey) '
+                       'VALUES (?, ?, ?)',
                        (userId, mainFingerprint, cu.binary(pgpKeyData)))
             keyId = cu.lastrowid
 
         keyFingerprints = openpgpfile.getFingerprints(keyRing)
         for fingerprint in keyFingerprints:
-            try:
-                cu.execute('INSERT INTO PGPFingerprints (keyId, fingerprint) '
-                           'VALUES(?, ?)', (keyId, fingerprint))
-            except sqlerrors.ColumnNotUnique:
-                # ignore duplicate fingerprint errors.
-                pass
-
+            cu.execute("SELECT COUNT(*) FROM PGPFingerprints "
+                       "WHERE keyId = ? and fingerprint = ?",
+                       (keyId, fingerprint))
+            if cu.fetchall()[0][0] > 0:
+                continue
+            cu.execute('INSERT INTO PGPFingerprints (keyId, fingerprint) '
+                       'VALUES(?, ?)', (keyId, fingerprint))
         self.db.commit()
 
     def updateOwner(self, uid, fpr):
@@ -125,7 +123,7 @@ class OpenPGPKeyTable:
                       from
                           PGPKeys, PGPFingerprints
                       where
-                              PGPFingerprints.fingerprint like "%%%s%%"
+                              PGPFingerprints.fingerprint like '%%%s%%'
                           and PGPKeys.keyId=PGPFingerprints.keyId
                        """ %keyId)
         keys = cu.fetchall()
@@ -134,7 +132,7 @@ class OpenPGPKeyTable:
 
         data = keys[0][0]
 
-        return data
+        return cu.frombinary(data)
 
     def getAsciiPGPKeyData(self, keyId):
         # don't trap exceptions--that way we can assume we found a key.
