@@ -1609,7 +1609,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     # probably by a merge (if it was added on the command
                     # line, it's version would be NewVersion)
                     changeSet.addFile(None, srcFile.fileId(), srcFile.freeze())
-                    newTrove.addFile(pathId, path, version, srcFile.fileId())
+                    newTrove.addFile(pathId, path, version, srcFile.fileId(),
+                                     isConfig=srcFile.flags.isConfig())
                     continue
         else:
 	    realPath = root + path
