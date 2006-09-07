@@ -148,7 +148,12 @@ class ConaryCommand(options.AbstractCommand):
     def setContext(self, cfg, argSet):
         context = cfg.context
         if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY')
+            # FIXME: this repository will not have the right settings if to 
+            # have the correct settings for your repository you need to set 
+            # a particular context...
+            client = conaryclient.ConaryClient(cfg)
+            repos = client.getRepos()
+            conaryState = state.ConaryStateFromFile('CONARY', repos)
             if conaryState.hasContext():
                 context = conaryState.getContext()
 
@@ -157,7 +162,6 @@ class ConaryCommand(options.AbstractCommand):
 
         if context:
             cfg.setContext(context)
-
 
     def processConfigOptions(self, cfg, cfgMap, argSet):
         self.setContext(cfg, argSet)
