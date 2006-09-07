@@ -59,8 +59,8 @@ def usage(rc = 1):
     print '       cvc describe <xml file>'
     print "       cvc diff"
     print "       cvc log"
-    print "       cvc newpkg <name>"
     print "       cvc merge [<revision>]"
+    print "       cvc newpkg <name>"
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
@@ -632,6 +632,15 @@ class MergeCommand(CvcCommand):
         checkin.merge(repos, **kw)
 _register(MergeCommand)
 
+class MarkRemovedCommand(CvcCommand):
+    commands = [ 'markremoved' ]
+
+    def runCommand(self, repos, cfg, argSet, args, profile = False, 
+                   callback = None):
+        if argSet or not args or len(args) != 2: return self.usage()
+        checkin.markRemoved(cfg, repos, args[1])
+_register(MarkRemovedCommand)
+
 class SetCommand(CvcCommand):
 
     commands = ['set']
@@ -658,7 +667,6 @@ class SetCommand(CvcCommand):
         if len(args) < 2: return self.usage()
 
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
-
 _register(SetCommand)
 
 class UpdateCommand(CvcCommand):
