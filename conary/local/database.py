@@ -507,9 +507,9 @@ class Database(SqlDbRepository):
             # criticalJobs = [] to make sure you get a consistant
             # return value.  FIXME when we can break bw compatibility,
             # we should remove this inconsistent
-            return (unsatisfiedList, unresolveableList, changeSetList,
-                    criticalUpdates)
-        return (unsatisfiedList, unresolveableList, changeSetList)
+            return (unsatisfiedList, unresolveableList, changeSetList)
+        return (unsatisfiedList, unresolveableList, changeSetList, 
+                criticalUpdates)
 
     def dependencyChecker(self, troveSource):
         return self.db.dependencyChecker(troveSource)
