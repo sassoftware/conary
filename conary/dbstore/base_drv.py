@@ -51,7 +51,6 @@ class BaseKeywordDict(dict):
 # base Cursor class. All backend drivers are expected to provide this
 # interface
 class BaseCursor:
-    PASSTHROUGH = set(("description", "lastrowid"))
     binaryClass = BaseBinary
     def __init__(self, dbh=None):
         self.dbh = dbh
@@ -59,7 +58,7 @@ class BaseCursor:
 
     # map some attributes back to self._cursor
     def __getattr__(self, name):
-        if name in self.PASSTHROUGH:
+        if name in  set(["description", "lastrowid"]):
             return getattr(self._cursor, name)
         raise AttributeError("'%s' attribute is invalid" % (name,))
 
@@ -74,30 +73,61 @@ class BaseCursor:
         assert(self.dbh)
         return self.dbh.cursor()
 
+    # these should be obsoleted soon...
     def binary(self, s):
         if s is None:
             return None
         return self.binaryClass(s)
-
     def frombinary(self, s):
         return s
 
-    def execute(self, sql, *args, **kw):
+    # this needs to be provided by the specific drivers
+    def _tryExecute(self, *args, **kw):
+        raise NotImplementedError("This function should be provided by the SQL drivers")
+
+    # normalize the execute args and kwargs for passing into the driver
+    # on return is a tuple that contains all the positional parameters
+    # and kwargs is a hash of all the named arguments passed in
+    def _executeArgs(self, args, kw):
+        assert(isinstance(args, tuple))
+        assert(isinstance(kw, dict))
+        if len(args) == 0:
+            return (), kw
+        # unwrap unwanted encapsulation
+        if len(args) == 1:
+            if isinstance(args[0], dict):
+                kw.update(args[0])
+                return (), kw
+            if isinstance(args[0], tuple):
+                args = args[0]
+            elif isinstance(args[0], list):
+                args = tuple(args[0])
+        return args, kw
+
+    # basic sanity checks for executes
+    def _executeCheck(self, sql):
         assert(len(sql) > 0)
         assert(self.dbh and self._cursor)
+        return 1
+
+    # basic execute functionality. Usually redefined by the drivers
+    def execute(self, sql, *args, **kw):
+        self._executeCheck(sql)
+        # process the query args
+        args, kw = self._executeArgs(args, kw)
         # force dbi compliance here. we prefer args over the kw
         if len(args) == 0:
-            return self._cursor.execute(sql, **kw)
-        if len(args) == 1 and isinstance(args[0], dict):
-            kw.update(args[0])
-            return self._cursor.execute(sql, **kw)
+            return self._tryExecute(self._cursor.execute, sql, **kw)
         if len(kw):
             raise sqlerrors.CursorError(
                 "Do not pass both positional and named bind arguments",
                 *args, **kw)
-        if len(args) == 1:
-            return self._cursor.execute(sql, args[0])
-        return self._cursor.execute(sql, *args)
+        return self._tryExecute(self._cursor.execute, sql, *args)
+
+    # passthrough for the driver's optimized executemany()
+    def executemany(self, sql, argList):
+        self._executeCheck(sql)
+        return self._cursor.executemany(sql.strip(), argList)
 
     def compile(self, sql):
         return sql
@@ -109,7 +139,7 @@ class BaseCursor:
     def fields(self):
         if not self._cursor.description:
             return None
-        return [ x[0] for x in self._cursor.description ]
+        return ( x[0] for x in self._cursor.description )
 
     # return the column names of the current select
     def __rowDict(self, row):
@@ -160,47 +190,6 @@ class BaseCursor:
             raise StopIteration
         else:
             return item
-
-# A cursor class for the drivers that do not support bind
-# parameters. Instead of :name they use a Python-esque %(name)s
-# syntax. This is quite fragile...
-class BindlessCursor(BaseCursor):
-    def __mungeSQL(self, sql):
-        regex = re.compile(':(\w+)')
-        # edit the input query
-        keys = set()
-##         for key in regex.findall(sql):
-##             keys.add(key)
-##             sql = re.sub(":" + key, "%("+key+")s", sql)
-        sql = re.sub("(?P<c>[(,<>=])(\s+)?[?]", "\g<c> %s", sql)
-        sql = re.sub("(?i)(?P<kw>LIKE|AND|BETWEEN|LIMIT|OFFSET)(\s+)?[?]", "\g<kw> %s", sql)
-        return (sql, keys)
-
-    # we need to "fix" the sql code before calling out
-    def execute(self, sql, *args, **kw):
-        assert(len(sql) > 0)
-        assert(self.dbh and self._cursor)
-        sql, keys = self.__mungeSQL(sql)
-        # force dbi compliance here. we prefer args over the kw
-        if len(args) == 1:
-            if isinstance(args[0], (tuple, list)):
-                args = args[0]
-        if len(args) == 0:
-            assert (sorted(kw.keys()) == sorted(keys))
-        elif len(args) == 1:
-            p = args[0]
-            # if it is a dictionary, it must contain bind arguments
-            if hasattr(p, 'keys'):
-                kw.update(p)
-            else: # special case - single positional argument
-                assert(len(keys)==0 and len(kw)==0)
-                return self._cursor.execute(sql, args)
-        else: # many args, we don't mix in bind arguments
-            assert(len(keys)==0 and len(kw)==0)
-            return self._cursor.execute(sql, args)
-        # we have a dict of bind arguments
-        return self._cursor.execute(sql, **kw)
-
 
 # A class for working with sequences
 class BaseSequence:
@@ -301,9 +290,11 @@ class BaseDatabase:
     def closed(self):
         return self.dbh is None
 
+    # creating cursors
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
+    itercursor = cursor
 
     def sequence(self, name):
         assert(self.dbh)
@@ -387,6 +378,24 @@ class BaseDatabase:
         cu.execute(sql)
         if remove:
             self.tables[table].remove(name)
+        return True
+
+    # since not all databases handle renaming and dropping columns the
+    # same way, we provide a more generic interface in here
+    def dropColumn(self, table, name):
+        assert(self.dbh)
+        sql = "ALTER TABLE %s DROP COLUMN %s" % (table, name)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
+        return True
+    def renameColumn(self, table, oldName, newName):
+        # avoid busywork
+        if oldName.lower() == newName.lower():
+            return True
+        assert(self.dbh)
+        sql = "ALTER TABLE %s RENAME COLUMN %s TO %s" % (table, oldName, newName)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
         return True
 
     # easy access to the schema state
