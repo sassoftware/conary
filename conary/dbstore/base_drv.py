@@ -191,42 +191,6 @@ class BaseCursor:
         else:
             return item
 
-# a class that holds a prepared cursor
-class BasePreparedCursor(object):
-    def __init__(self, cursorClass, dbh, sql):
-        self.cursorClass = cursorClass
-        self.dbh = dbh
-        self.sql = sql
-        self._cursor = cursorClass(dbh)
-        self._stmt = self._cursor.compile(sql)
-    # these are just wrapper fro the Cursor.execute() statements
-    def execute(self, *args):
-        args, kw = self._cursor._executeArgs(args, {})
-        return self._cursor.execstmt(self._stmt, *args)
-    def executemany(self, argList):
-        if not len(argList):
-            return self._cursor.execstmt(self._stmt)
-        if isinstance(argList[0], (tuple, dict)):
-            gen = (x for x in argList )
-        elif isinstance(argList[0], list):
-            gen = ( tuple(x) for x in argList )
-        else:
-            gen = ( (x,) for x in argList )
-        for arg in gen:
-            self._cursor.execstmt(self._stmt, *arg)
-        return self
-    def __getattr__(self, name):
-        if self.__dict__.has_key(name):
-            return self.__dict__[name]
-        if name in set(["fetchone", "fetchmany", "fetchall",
-                        "description", "lastrowid"]):
-            return getattr(self._cursor, name)
-        if name in set(["compile", "execstmt"]):
-            raise sqlerrors.CursorError("Prepared statements can only "
-                                        "exeute their own stmt!",
-                                        (self.sql, self._cursor))
-        return object.__getattr__(name)
-
 # A class for working with sequences
 class BaseSequence:
     def __init__(self, db, name):
@@ -258,7 +222,6 @@ class BaseDatabase:
     alive_check = "select 1 where 1 = 1"
     basic_transaction = "begin transaction"
     cursorClass = BaseCursor
-    preparedClass = BasePreparedCursor
     sequenceClass = BaseSequence
     driver = "base"
     keywords = BaseKeywordDict()
@@ -331,11 +294,6 @@ class BaseDatabase:
     def cursor(self):
         assert (self.dbh)
         return self.cursorClass(self.dbh)
-    def prepare(self, sql):
-        assert(self.dbh)
-        sql = sql.strip()
-        assert(len(sql))
-        return self.preparedClass(self.cursorClass, self.dbh, sql)
     itercursor = cursor
 
     def sequence(self, name):
