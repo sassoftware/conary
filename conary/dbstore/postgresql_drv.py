@@ -34,6 +34,28 @@ class Binary(BaseBinary):
     def __pg_repr__(self):
         return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
+# edit the input query to make it postgres compatible
+def _mungeSQL(sql):
+    keys = [] # needs to be a list because we're dealing with positional args
+    def __match(m):
+        d = m.groupdict()
+        kw = d["kw"][1:]
+        if len(kw): # a real keyword
+            if kw not in keys:
+                keys.append(kw)
+            d["kwIdx"] = keys.index(kw)+1
+        else: # if we have just the ? then kw is "" here
+            keys.append(None)
+            d["kwIdx"] = len(keys)
+        return "%(pre)s%(s)s$%(kwIdx)d" % d
+
+    sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)(?P<kw>:\w+|[?])",
+                 __match, sql)
+    # force dbi compliance here. args or kw or none, no mixes
+    if len(keys) and keys[0] is not None:
+        return (sql, keys)
+    return (sql, [])
+
 class Cursor(BaseCursor):
     binaryClass = Binary
     driver = "postgresql"
@@ -56,29 +78,6 @@ class Cursor(BaseCursor):
             raise sqlerrors.CursorError(msg, e)
         return ret
 
-    # edit the input query to make it postgres compatible
-    def __mungeSQL(self, sql):
-        keys = [] # needs to be a list because we're dealing with positional args
-
-        def __match(m):
-            d = m.groupdict()
-            kw = d["kw"][1:]
-            if len(kw): # a real keyword
-                if kw not in keys:
-                    keys.append(kw)
-                d["kwIdx"] = keys.index(kw)+1
-            else: # if we have just the ? then kw is "" here
-                keys.append(None)
-                d["kwIdx"] = len(keys)
-            return "%(pre)s%(s)s$%(kwIdx)d" % d
-
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)(?P<kw>:\w+|[?])",
-                     __match, sql)
-        # force dbi compliance here. args or kw or none, no mixes
-        if len(keys) and keys[0] is not None:
-            return (sql, keys)
-        return (sql, [])
-
     # we need to "fix" the sql code before calling out
     def execute(self, sql, *args, **kw):
         self._executeCheck(sql)
@@ -89,7 +88,7 @@ class Cursor(BaseCursor):
 
         # don't do unnecessary work
         if len(args) or len(kw):
-            sql, keys = self.__mungeSQL(sql)
+            sql, keys = _mungeSQL(sql)
 
         # if we have args, we can not have keywords
         if len(args):
@@ -109,18 +108,30 @@ class Cursor(BaseCursor):
         else:
             ret = self._tryExecute(self._cursor.execute, sql)
         if ret == self._cursor:
-            return ret
+            return self
+        return ret
 
     # executemany - we have to process the query code
     def executemany(self, sql, argList, **kw):
         self._executeCheck(sql)
         kw.pop("start_transaction", True)
-        sql, keys = self.__mungeSQL(sql)
+        sql, keys = _mungeSQL(sql)
         if len(keys):
             # need to transform the dicts in tuples for the query
-            return self._cursor.executemany(sql, ([row[x] for x in keys]
-                                                     for row in argList))
-        return self._cursor.executemany(sql, argList)
+            return self._tryExecute(self._cursor.executemany, sql,
+                                    (tuple([row[x] for x in keys]) for row in argList))
+        return self._tryExecute(self._cursor.executemany, sql, argList)
+
+    # support for prepared statements
+    def compile(self, sql):
+        self._executeCheck(sql)
+        sql, keys = _mungeSQL(sql.strip())
+        stmt = self.dbh.prepare(sql)
+        stmt.keys = keys
+        return stmt
+    def execstmt(self, stmt, *args):
+        assert(isinstance(stmt, pgsql.PreparedCursor))
+        return stmt.execute(*args)
 
     # override this with the native version
     def fields(self):
