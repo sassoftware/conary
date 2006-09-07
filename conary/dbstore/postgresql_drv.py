@@ -131,7 +131,10 @@ class Cursor(BaseCursor):
         return stmt
     def execstmt(self, stmt, *args):
         assert(isinstance(stmt, pgsql.PreparedCursor))
-        return stmt.execute(*args)
+        ret = self._tryExecute(stmt._source.execute, *args)
+        if isinstance(ret, int):
+            return ret
+        return stmt
 
     # override this with the native version
     def fields(self):

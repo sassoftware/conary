@@ -84,7 +84,7 @@ class Cursor(BaseCursor):
         return self._cursor.compile(sql)
 
     def execstmt(self, stmt, *args):
-        return self._cursor.execstmt(stmt, *args)
+        return self._tryExecute(self._cursor.execstmt, stmt, *args)
 
 # Sequence implementation for sqlite
 class Sequence(BaseSequence):
