@@ -502,8 +502,14 @@ class Database(SqlDbRepository):
                                                   linkedJobs = linkedJobs)
                 criticalUpdates = []
         checker.done()
-        return (unsatisfiedList, unresolveableList, changeSetList,
-                criticalUpdates)
+        if criticalJobs is None and finalJobs is None:
+            # backwards compatibility.  For future code, pass in 
+            # criticalJobs = [] to make sure you get a consistant
+            # return value.  FIXME when we can break bw compatibility,
+            # we should remove this inconsistent
+            return (unsatisfiedList, unresolveableList, changeSetList,
+                    criticalUpdates)
+        return (unsatisfiedList, unresolveableList, changeSetList)
 
     def dependencyChecker(self, troveSource):
         return self.db.dependencyChecker(troveSource)
