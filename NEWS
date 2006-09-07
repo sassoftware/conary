@@ -16,11 +16,13 @@ Changes in @NEW@:
       (currently, that consists of conary).  Hooks have been added for
       other components using the conary api to specify other troves as
       critical.  Also, hooks have been added for other components to specify
-      a trove to update last (CNY-805, CNY-808).
+      a trove to update last. (CNY-805, CNY-808)
 
   o Bug Fixes:
-    * Conary commands do not perform an unnecessary database checks on the 
+    * Conary commands do not perform an unnecessary database checks on the
       local system. (CNY-571)
+    * Fixed a bug that could allow conary to consider a noop update as an
+      install (and could result in tracebacks in some situations). (CNY-845)
 
 Changes in 1.0.30:
   o System Update Changes:

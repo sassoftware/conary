@@ -742,6 +742,9 @@ class ClientUpdate:
              branchHint, respectBranchAffinity, respectFlavorAffinity,
              installRedirects, followLocalChanges,
              updateOnly) = newTroves.pop(0)
+            if newInfo[0] == 'krb5':
+                from conary.lib import epdb
+                epdb.st()
 
             byDefault = isPrimary or byDefaultDict[newInfo]
 
@@ -775,6 +778,8 @@ followLocalChanges: %s
                     # but count it as 'added' for the purposes of
                     # whether or not to recurse
                     jobAdded = True
+                    job = (newInfo[0], (newInfo[1], newInfo[2]),
+                                       (newInfo[1], newInfo[2]), False)
                     log.lowlevel('SKIP: already installed')
                     break
                 elif newInfo in ineligible:
