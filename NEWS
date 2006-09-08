@@ -38,6 +38,8 @@ Changes in @NEW@:
       been improved. (CNY-714)
     * Error handling when manipulating entitlements via XML-RPC has
       been improved. (CNY-692)
+    * The usage message displayed when running "conary changeset" has
+      been corrected. (CNY-864)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have

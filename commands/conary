@@ -178,7 +178,7 @@ class ConaryCommand(options.AbstractCommand):
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]
     paramHelp = '''\
-conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>
+<pkg>[=[<oldver>--]<newver>]+ <outfile>
 
 Creates a changeset with the specified troves and stores it in <outfile>'''
 
