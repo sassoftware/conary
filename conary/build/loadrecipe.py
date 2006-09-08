@@ -134,7 +134,7 @@ class RecipeLoader:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory)
         except Exception, err:
-            raise builderrors.LoadRecipeError('unable to load recipe file %s: %s'\
+            raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
     def _load(self, filename, cfg=None, repos=None, component=None,
@@ -183,6 +183,20 @@ class RecipeLoader:
         use.resetUsed()
         try:
             exec code in self.module.__dict__
+        except (errors.ConaryError, builderrors.CvcError), err:
+            # don't show the exception for conary and cvc errors -
+            # we assume their exception message already contains the 
+            # required information
+
+            tb = sys.exc_info()[2]
+            while tb and tb.tb_frame.f_code.co_filename != filename:
+                tb = tb.tb_next
+            linenum = tb.tb_frame.f_lineno
+
+            msg = ('Error in recipe file "%s", line %s:\n %s' % (basename, linenum, err))
+
+
+            raise builderrors.RecipeFileError(msg)
         except Exception, err:
             tb = sys.exc_info()[2]
             while tb and tb.tb_frame.f_code.co_filename != filename:
@@ -330,12 +344,16 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
             'no build label set -  cannot find source component %s' % component)
             
 	labelPath = [cfg.buildLabel]
+    if repos is None:
+        raise builderrors.LoadRecipeError(
+                                'cannot find source component %s: No repository access' % (component, ))
     try:
 	pkgs = repos.findTrove(labelPath,
                                (component, versionStr, deps.Flavor()))
-    except errors.TroveNotFound:
+    except (errors.TroveNotFound, errors.OpenError), err:
         raise builderrors.LoadRecipeError(
-                                'cannot find source component %s' % component)
+                                'cannot find source component %s: %s' %
+                                (component, err))
     if filterVersions:
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:

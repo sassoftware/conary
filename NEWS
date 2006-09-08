@@ -40,6 +40,10 @@ Changes in @NEW@:
       been improved. (CNY-692)
     * The usage message displayed when running "conary changeset" has
       been corrected. (CNY-864)
+    * Conary no longer tracebacks when a disconnected cook tries to load
+      a superclass.  Conary also gives better messages when the loaded recipe
+      has a traceback.  Thanks to David Coulthart for the core of this patch.
+      (CNY-518).
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
