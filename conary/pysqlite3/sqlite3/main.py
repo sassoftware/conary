@@ -183,7 +183,13 @@ class Cursor:
         elif isinstance(parms, dict):
             for pkey, pval in parms.iteritems():
                 if pkey[0] is not ":": pkey = ":" + pkey
-                self.stmt.bind(pkey, pval)
+                # the sqlite bindings don't like 'binding' unkown named arguments
+                try:
+                    self.stmt.bind(pkey, pval)
+                except _sqlite.ProgrammingError, e:
+                    if e.args[0] == "Bind parameter name unknown to the query":
+                        continue
+                    raise
         else:
             raise _sqlite.ProgrammingError, \
                   "Don't know how to bind these parameters"
