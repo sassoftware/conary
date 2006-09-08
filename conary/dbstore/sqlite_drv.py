@@ -234,13 +234,14 @@ class Database(BaseDatabase):
         (VAR)?(CHAR|BINARY) \s* (\(\w+\))? | NUMERIC \s* \(\w+(,\w+)?\) |
         INT | INTEGER | BLOB | TEXT | STR | STRING | UNIQUE ) \s*?)+
         """
+        constraint = "\s* ( ( REFERENCES \s* \w+\(\w+\) | ON \s* (DELETE|UPDATE) \s* (CASCADE|RESTRICT) ) \s* )*"
         # extract the fields
         fields = []
         fStr = "(%s)" % (fStr,)
         regex = re.compile(
             """^\s* \( \s*
-            (?P<name>\w+) \s+ (?P<type>%s) , \s* (?P<rest>.*?)
-            \s* \)  \s* $""" % (types,),
+            (?P<name>\w+) \s+ (?P<type>%s) (?P<constraint>%s)?, \s* (?P<rest>.*?)
+            \s* \)  \s* $""" % (types, constraint),
             re.I | re.S | re.X)
         lastField = False
         while 1:
@@ -251,15 +252,15 @@ class Database(BaseDatabase):
                 # try it as the last field
                 regex = re.compile(
                     """^\s* \( \s*
-                    (?P<name>\w+) \s+ (?P<type>%s)
-                    \s* \)  \s* $""" % (types,),
+                    (?P<name>\w+) \s+ (?P<type>%s) (?P<constraint>%s)?
+                    \s* \)  \s* $""" % (types, constraint),
                     re.I | re.S | re.X)
                 match = regex.match(fStr)
                 if not match:
                     break
                 lastField = True
             d = match.groupdict()
-            fields.append((d['name'], d["type"]))
+            fields.append((d['name'], d["type"], d["constraint"]))
             if lastField:
                 break
             fStr = "(%s)" % (d["rest"],)
@@ -306,12 +307,12 @@ class Database(BaseDatabase):
                 "Table %s does not have a column named %s" % (table, oldName),
                 table, oldName, newName)
         newFields = []
-        for (n, t) in fields:
+        for (n, t, c) in fields:
             if n.lower() == oldName.lower():
-                newFields.append((newName, t))
+                newFields.append((newName, t, c))
             else:
-                newFields.append((n, t))
-        stmt["fields"] = ",\n".join(["%s %s" % (x[0], x[1]) for x in newFields])
+                newFields.append((n, t, c))
+        stmt["fields"] = ",\n".join(["%s %s %s" % x for x in newFields])
         # real databases automatically commit on DDL, os we shouldn't be any different
         self.dbh.commit()
         # sqlite can roll back DDL
