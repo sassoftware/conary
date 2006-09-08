@@ -48,7 +48,7 @@ Changes in @NEW@:
     * Several SQL queries have been updated for PostgreSQL compatibility
     * dbstore now has support for executemany()
 
-Changes in 1.0.30:
+Changes in 1.1.3:
   o System Update Changes:
     These changes make Conary much more robust when applying updates
     that move files from one package to another.
@@ -104,6 +104,11 @@ Changes in 1.0.30:
       and flavor caching optimizations that make the code about 
       2.5 times faster (from 10 seconds to 4 seconds).
 
+  o Server Changes:
+    The Conary repository server now sends a InvalidClientVersion
+    exception when a conary 1.0.x client attempts to manipulate an
+    entitlement through addEntitlement() or deleteEntitlement().
+
   o Build (cvc) Changes:
     * "cvc merge" and "cvc update" are now more verbose when
       patching. (CNY-406)
@@ -154,6 +159,9 @@ Changes in 1.0.30:
       which defaults to True (CNY-830).
 
   o Bug Fixes:
+    * A bug that caused a traceback in the web interface when a
+      non-admin user attempts to manage their entitlement classes has
+      been fixed. (CNY-798)
     * "conary rq" (with no arguments) no longer hides troves if the
       flavor that matches the system flavor is not built for the
       latest version. (CNY-784)
@@ -189,7 +197,7 @@ Changes in 1.0.30:
     * includeConfigFile now gives a much better error message when it
       cannot include a config file. (CNY-618)
 
-Changes in 1.0.29:
+Changes in 1.1.2:
   o Bug Fixes:
     * Conary now removes sources from the lookaside before unpacking SRPMs to
       ensure that the source referenced from the SRPM is actually contained in
@@ -207,7 +215,7 @@ Changes in 1.0.29:
       summarizes all policy errors once (instead of twice) at the
       end of the build process. (CNY-776)
 
-Changes in 1.0.28:
+Changes in 1.1.1:
   o Client Changes:
     * Migrate no longer replaces by default as if --replace-files was
       specified. (CNY-769)
@@ -222,6 +230,76 @@ Changes in 1.0.28:
       /usr/share/pkgconfig as well as /usr/lib*/pkgconfig. (CNY-754)
     * /etc/conary/mirrors/cran has been added to enable mirror://
       references to the Comprehensive R Archive Network. (CNY-761)
+
+  o Bug Fixes:
+    * Conary now resets the timeStamps in all cases when
+      getSourceVersion is called (CNY-708).
+    * SQLite ANALYZE locks the database after it is run, causing
+      updates to fail.
+    * A bug that caused lists such as installLabelPath in
+      configuration files to be parsed incorrectly when more than one
+      space was between list elements has been fixed
+    * A bug that caused Locally changed files to no be marked properly
+      in rollbacks that were stored locally (including rollbacks for
+      locally built troves) has been fixed. (CNY-645)
+    * A bug that could cause "cvc cook" to create groups that include
+      components needed to resolve dependencies that are already
+      included not-by-default has been fixed.
+    * A bug that caused a traceback message when adding a user through
+      the web interface has been fixed.
+
+Changes in 1.1.0:
+  o 1.1 Release Overview
+
+    Conary 1.1.0 is the first version in the 1.1 series.  New
+    functionality has been added to Conary that required modifications
+    to the repository database schema and XML-RPC protocol.  A Conary
+    1.1.x-compatible client is required to access many of the new
+    features.  The XML-RPC interface includes version information so
+    that old clients continue to work with new servers, and new
+    clients continue to work with old servers.
+
+    New Features:
+      * Conary can now remove packages and components from a
+        repository server.  This is a privileged operation and should
+        not normally be used.  Only users with a special "can remove"
+        ACL can remove from the repository.  As removing something
+        from a Conary repository is an act of last resort and modifies
+        repository internals, the command line option will not appear
+        in the reference documentation.  rPath will assist users that
+        need more information.
+      * Conary can now query the repository by path.  Use
+        "conary repquery --path /path/to/find" to find components that
+        include a particular path.
+      * Several enhancements were added to the entitlement management
+        facilities in a Conary repository.
+      * Conary can now redirect a group.
+
+  Detailed changes follow:
+
+  o Server Changes:
+    * Entitlement keys were artificially limited to 63 characters in
+      length.  This restriction has been raised to the max length
+      permitted in the database column (255).
+    * Entitlement classes can now provide access to multiple access
+      groups (and updated the web UI to support that) (CNY-600)
+    * addEntitlement() and deleteEntitlement() repository calls replaced
+      by addEntitlements and deleteEntitlements calls.  These calls
+      operate on more than one entitlement simultaneously.
+    * Added getTroveLeavesByPath() and getTroveVersionsByPath(). (for
+      CNY-74)
+    * Conary now checks to ensure you have write access to all the
+      things the client is trying to commit before you send them
+      across the wire. (CNY-616)
+    * deleteAcl() and listAcls() methods have been added to
+      ConaryClient.
+
+  o Client Changes:
+    * "conary rq" now supports "--path", which allows you to search
+      for troves in the repository by path. (CNY-74)
+    * "conary rq" now has a "--show-removed" option that allows you to
+      see removed trove markers.  A [Removed] flag will be displayed
+      when the --trove-flags option is added.
 
   o Bug Fixes:
     * Conary now resets the timeStamps in all cases when
@@ -305,6 +383,7 @@ Changes in 1.0.26:
       allowed in the past. Thanks to Pavel Volkovitskiy for this
       enhancement. (CNY-668)
 
+Changes in 1.0.26:
   o Server Changes:
     * The Conary web interface now provides a method to rely solely on
       a remote repository server to do authentication checks. (CNY-705)
