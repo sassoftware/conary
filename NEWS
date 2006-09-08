@@ -24,6 +24,8 @@ Changes in @NEW@:
       conflicts can be confusing to work with and are almost never
       desireable - except in those few cases where they are necessary.
       (CNY-796)
+    * Conary no longer tries to display the contents of autosource files
+      in "cvc diff" (CNY-866)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
