@@ -236,13 +236,17 @@ class ConaryStateFromFile(ConaryState):
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
         else:
             self.source = None
+        if stateVersion != self.stateVersion:
+            return True
+        return False
 
     def __init__(self, file, repos=None):
 	if not os.path.isfile(file):
 	    raise CONARYFileMissing
 
-	self.parseFile(file, repos=repos)
-        
+	versionUpdated = self.parseFile(file, repos=repos)
+        if versionUpdated and os.access(file, os.W_OK):
+            self.write(file)
 
 class SourceStateFromLines(SourceState):
 
