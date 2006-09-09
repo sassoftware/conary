@@ -34,7 +34,7 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False, cloneSources = False, message = None, 
-               test = False, fullRecurse = False, forceConflicts = False):
+               test = False, fullRecurse = False, ignoreConflicts = False):
     client = ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -72,7 +72,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
         displayCloneJob(cs)
 
     labelConflicts = client._checkChangeSetForLabelConflicts(cs)
-    if labelConflicts and not forceConflicts:
+    if labelConflicts and not ignoreConflicts:
         print
         print 'WARNING: performing this clone will create label conflicts:'
         for troveTups in labelConflicts:
