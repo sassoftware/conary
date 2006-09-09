@@ -122,11 +122,9 @@ class CvcCommand(options.AbstractCommand):
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
     def setContext(self, cfg, argSet):
-        client = conaryclient.ConaryClient(cfg)
-        repos = client.getRepos()
         context = cfg.context
         if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY', repos)
+            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
             if conaryState.hasContext():
                 context = conaryState.getContext()
 

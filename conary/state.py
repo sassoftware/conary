@@ -211,7 +211,7 @@ class SourceState(trove.Trove):
 
 class ConaryStateFromFile(ConaryState):
 
-    def parseFile(self, filename, repos=None):
+    def parseFile(self, filename, repos=None, parseSource=True):
 	f = open(filename)
         lines = f.readlines()
 
@@ -228,23 +228,25 @@ class ConaryStateFromFile(ConaryState):
         else:
             self.context = None
 
-        if lines:
+        if lines and parseSource:
             try:
                 self.source = SourceStateFromLines(lines, stateVersion, 
                                                    repos=repos)
             except ConaryStateError, err:
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
+            if stateVersion != self.stateVersion:
+                # update this state w/ the new information
+                return True
         else:
             self.source = None
-        if stateVersion != self.stateVersion:
-            return True
         return False
 
-    def __init__(self, file, repos=None):
+    def __init__(self, file, repos=None, parseSource=True):
 	if not os.path.isfile(file):
 	    raise CONARYFileMissing
 
-	versionUpdated = self.parseFile(file, repos=repos)
+	versionUpdated = self.parseFile(file, repos=repos,
+                                        parseSource=parseSource)
         if versionUpdated and os.access(file, os.W_OK):
             self.write(file)
 
@@ -287,7 +289,7 @@ class SourceStateFromLines(SourceState):
 
         if configFlagNeeded:
             if not repos:
-                raise ConaryStateError('CONARY file has version %s, but this application cannot convert - please run any conary command, e.g. "conary config" in this directory to convert' % stateVersion)
+                raise ConaryStateError('CONARY file has version %s, but this application cannot convert - please run a cvc command, e.g. cvc diff, to convert.' % stateVersion)
             assert(stateVersion == 0)
             fileObjs = repos.getFileVersions(configFlagNeeded)
             for (pathId, fileId, version), fileObj in \
