@@ -651,9 +651,12 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             if info not in self.troveCsMap:
                 retList.append(None)
                 continue
-            if info in self._troveCache:
-                retList.append(self._troveCache[info])
-                continue
+            # NOTE: Turned off troveCache - turning it on took up an
+            # extra 75M when grabbing all troves out of a changeset for
+            # group-dist.
+            #if info, withFiles in self._troveCache:
+            #    retList.append(self._troveCache[info, withFiles])
+            #    continue
 
             trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
             if trvCs.getOldVersion() is None:
@@ -671,7 +674,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 newTrove.applyChangeSet(trvCs,
                                         skipFiles = not withFiles,
                                         skipIntegrityChecks = not withFiles)
-            self._troveCache[info] = newTrove
+            #self._troveCache[info, withFiles] = newTrove
             retList.append(newTrove)
 
         return retList
