@@ -456,7 +456,7 @@ class DependencyClass(object):
 
             score += thisScore
 
-        return thisScore
+        return score
 
     def emptyDepsScore(self):
         score = 0
