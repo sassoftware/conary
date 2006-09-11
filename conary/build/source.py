@@ -152,7 +152,7 @@ class _Source(action.RecipeAction):
 
         return source
 
-    def fetch(self):
+    def fetch(self, refreshFilter=None):
 	if 'sourcename' not in self.__dict__:
 	    return None
 
@@ -162,8 +162,8 @@ class _Source(action.RecipeAction):
             toFetch = self.sourcename
 
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-            toFetch, self.recipe.name,
-            self.recipe.srcdirs, guessName=self.guessname)
+            toFetch, self.recipe.name, self.recipe.srcdirs,
+            guessName=self.guessname, refreshFilter=refreshFilter)
 	self._checkSignature(f)
 	return f
 

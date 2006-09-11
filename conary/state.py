@@ -197,6 +197,13 @@ class SourceState(trove.Trove):
             return self.fileInfo[pathId].refresh
         self.fileInfo[pathId].refresh = set
 
+    def getFileRefreshList(self):
+        refreshPatterns = []
+        for pathId, path, fileId, version in self.iterFileList():
+            if self.fileNeedsRefresh(pathId):
+                refreshPatterns.append(path)
+        return refreshPatterns
+
     def __init__(self, name, version, branch, changeLog = None,
                  lastmerged = None, isRedirect = False, **kw):
         assert(not isRedirect)

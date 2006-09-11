@@ -27,6 +27,12 @@ Changes in @NEW@:
     * Conary no longer tries to display the contents of autosource files
       in "cvc diff" (CNY-866)
 
+  o Build (cvc) Changes:
+    * The new "cvc refresh" command allows you to request that cvc
+      fetch new upstream versions of files referenced by URL.  Thanks
+      to Pavel Volkovitskiy for the initial implementation of this
+      feature. (CNY-743)
+
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
       local system. (CNY-571)

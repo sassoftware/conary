@@ -19,11 +19,13 @@ and committing changes back to the repository.
 """
 import difflib
 import errno
+import fnmatch
 import os
 import re
 import stat
 import sys
 import time
+import re
 
 from conary import callbacks
 from conary import changelog
@@ -103,6 +105,24 @@ def _verifyAtHead(repos, headPkg, state):
 		return False
 
     return True
+
+def _makeFilter(patterns):
+
+    # convert globs to regexps, but chop off the final '$'
+    patterns = [ fnmatch.translate(x)[:-1] for x in patterns ]
+
+    if len(patterns) > 1:
+        filter = '(' + '|'.join(patterns) + ')'
+    elif len(patterns):
+        filter = patterns[0]
+    else:
+        patterns = ''
+
+    filter = re.compile('^' + filter + '$')
+
+    patternsFilter = lambda x: bool(filter.match(x))
+
+    return patternsFilter
 
 def verifyAbsoluteChangeset(cs, trustThreshold = 0):
     # go through all the trove change sets we have in this changeset.
@@ -242,6 +262,11 @@ def commit(repos, cfg, message, callback=None, test=False):
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
 
+    refreshFilter = None
+    refreshPatterns = state.getFileRefreshList()
+    if len(refreshPatterns):
+        refreshFilter = _makeFilter(refreshPatterns)
+
     troveName = state.getName()
     conflicts = []
 
@@ -286,7 +311,7 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     # don't download sources for groups or filesets
     if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-        lcache = lookaside.RepositoryCache(repos)
+        lcache = lookaside.RepositoryCache(repos, refreshFilter)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
@@ -1506,4 +1531,84 @@ def setFileFlags(repos, paths, text = False, binary = False):
 
     state.write('CONARY')
     
+def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
+    if not callback:
+        callback = CheckinCallback()
+
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
+
+    if len(refreshPatterns) == 1 and refreshPatterns[0] is None:
+        refreshPatterns = [ '*' ]
+    if len(refreshPatterns) == 0:
+        refreshPatterns = [ '*' ]
+    else:
+        refreshPatterns.extend(state.getFileRefreshList())
+
+    refreshFilter = _makeFilter(refreshPatterns)
+
+    troveName = state.getName()
+
+    srcPkg = None
+    if not isinstance(state.getVersion(), versions.NewVersion):
+        srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
+
+    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                     cfg=cfg, repos=repos,
+                                     branch=state.getBranch())
+
+    # fetch all the sources
+    recipeClass = loader.getRecipe()
+    # setting the _trove to the last version of the source component
+    # allows us to search that source component for files that are
+    # not in the current directory or lookaside cache.
+    recipeClass._trove = srcPkg
+    srcFiles = {}
+
+    # don't download sources for groups or filesets
+    if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+        raise errors.CvcError('Only package recipes can be refreshed')
+
+    lcache = lookaside.RepositoryCache(repos, refreshFilter)
+    srcdirs = [ os.path.dirname(recipeClass.filename),
+                cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
+
+    try:
+        recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
+    except builderrors.RecipeFileError, msg:
+        log.error(str(msg))
+        sys.exit(1)
+
+    recipeObj.populateLcache()
+    recipeObj.sourceVersion = state.getVersion()
+    recipeObj.loadPolicy()
+    level = log.getVerbosity()
+    log.setVerbosity(log.INFO)
+    if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
+        if hasattr(recipeObj, 'setup'):
+            cook._callSetup(cfg, recipeObj)
+        else:
+            raise errors.CvcError('Recipe requires setup() method')
+
+    try:
+        srcFiles = recipeObj.fetchAllSources(refreshFilter)
+    except OSError, e:
+        if e.errno == errno.ENOENT:
+            raise errors.CvcError('Source file %s does not exist' % 
+                                  e.filename)
+        else:
+            raise errors.CvcError('Error accessing source file %s: %s' %
+                                  (e.filename, e.strerror))
+
+    log.setVerbosity(level)
+
+    recipeFileName = state.getRecipeFileName()
+    for (pathId, path, fileId, version) in state.iterFileList():
+        if recipeFileName.endswith(path):
+            continue
+        if refreshFilter(path):
+            state.fileNeedsRefresh(pathId, 1)
+
+    conaryState.setSourceState(state)
+    conaryState.write('CONARY')
