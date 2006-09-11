@@ -34,7 +34,7 @@ Changes in @NEW@:
       install (and could result in tracebacks in some situations). (CNY-845)
     * If you've made a local modification to a package and then try to
       downgrade it later, conary will downgrade included components as well.
-      (CNY-805)
+      (CNY-836)
     * The error message produced by "cvc cook" when a source component
       exists on multiple branches with the same trailing label has
       been improved. (CNY-714)
