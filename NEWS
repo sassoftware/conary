@@ -46,6 +46,12 @@ Changes in @NEW@:
       a superclass.  Conary also gives better messages when the loaded recipe
       has a traceback.  Thanks to David Coulthart for the core of this patch.
       (CNY-518).
+    * Fixed a bug in dep scoring: dependency scoring when multiple sonames
+      were being scored would simply use the value of the last soname,
+      instead of the cumulative score (note that the deps that did not
+      match at all would still return as not matching, so this bug only
+      affected conary's ability to select the best match)
+
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
