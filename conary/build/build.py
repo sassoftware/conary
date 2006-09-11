@@ -2149,7 +2149,9 @@ class Replace(BuildAction):
         unchanged = []
         for path in paths:
             if not util.isregular(path):
-                log.warning("%s is not a regular file, not applying Replace")
+                path = path[len(macros.destdir):]
+                log.warning("%s is not a regular file, not applying Replace",
+                            path)
                 continue
 
             fd, tmppath = tempfile.mkstemp(suffix='rep',

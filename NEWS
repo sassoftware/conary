@@ -58,6 +58,8 @@ Changes in @NEW@:
     * The PythonSetup command ignored any C compiler macros that had been
       set.  The template has been changed to use them in the same way that
       Configure() uses them; as environment variables.
+    * The warning message produced when r.Replace() refuses to modify
+      a non-regular file now includes the path, as intended.  (CNY-844)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
