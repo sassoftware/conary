@@ -45,7 +45,7 @@ Changes in @NEW@:
     * Conary no longer tracebacks when a disconnected cook tries to load
       a superclass.  Conary also gives better messages when the loaded recipe
       has a traceback.  Thanks to David Coulthart for the core of this patch.
-      (CNY-518).
+      (CNY-518, CNY-713).
     * Fixed a bug in dep scoring: dependency scoring when multiple sonames
       were being scored would simply use the value of the last soname,
       instead of the cumulative score (note that the deps that did not
