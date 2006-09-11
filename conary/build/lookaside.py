@@ -97,8 +97,14 @@ def _createNegativeCacheEntry(cfg, name, location):
     util.mkdirChain(os.path.dirname(negativeEntry))
     open(negativeEntry, "w+").close()
 
-def _searchCache(cfg, name, location):
+def _searchCache(cfg, name, location, refreshFilter=None):
+
     basename = os.path.basename(name)
+
+    # check if we trying to refresh sources
+    if refreshFilter:
+        if refreshFilter(basename):
+            return None
 
     networkSource = False
     for prefix in networkPrefixes:
@@ -213,7 +219,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
-            allowNone=False):
+            allowNone=False, refreshFilter=None):
 
     """
     searches all locations, including populating the cache if the
@@ -264,7 +270,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         # OK, now look in the lookaside cache
         # this is for sources that will later be auto-added
         # one way or another
-        f = _searchCache(cfg, sourcename, location)
+        f = _searchCache(cfg, sourcename, location, refreshFilter)
         if f: return f
 
         # finally, look in srcdirs if appropriate
@@ -313,6 +319,9 @@ class RepositoryCache:
                               fileVersion, sha1)
 
     def hasFileName(self, fileName):
+        if self.refreshFilter:
+            if self.refreshFilter(fileName):
+                return False
 	return fileName in self.nameMap
 
     def cacheFile(self, cfg, fileName, location, basename):
@@ -349,7 +358,8 @@ class RepositoryCache:
         self.cacheMap[basename] = cachedname
 	return cachedname
 
-    def __init__(self, repos):
+    def __init__(self, repos, refreshFilter=None):
 	self.repos = repos
+        self.refreshFilter = refreshFilter
 	self.nameMap = {}
         self.cacheMap = {}

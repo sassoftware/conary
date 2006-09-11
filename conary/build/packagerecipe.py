@@ -163,7 +163,7 @@ class _AbstractPackageRecipe(Recipe):
         else:
             self.sourcePathMap[basepath] = path
 
-    def fetchAllSources(self):
+    def fetchAllSources(self, refreshFilter=None):
 	"""
 	returns a list of file locations for all the sources in
 	the package recipe
@@ -180,7 +180,7 @@ class _AbstractPackageRecipe(Recipe):
 	self.prepSources()
 	files = []
 	for src in self._sources:
-	    f = src.fetch()
+	    f = src.fetch(refreshFilter)
 	    if f:
 		if type(f) in (tuple, list):
 		    files.extend(f)

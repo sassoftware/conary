@@ -228,6 +228,13 @@ This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of
 a source trove from the repository.
 .TP
+.B refresh [\fI<fileglob>...\fP]
+This source command causes the autosource (URL-referenced) files
+specified by the globs (matched only against the basename of the
+file, not the entire URL), or all autosource files if no globs
+are specified, to be re-loaded from the upstream source at the
+next cook.
+.TP
 .B remove \fI<filename>...\fP
 Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
 the file from the filesystem and marks it to be removed from the next

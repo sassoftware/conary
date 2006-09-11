@@ -554,6 +554,16 @@ class RdiffCommand(CvcCommand):
         checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
 _register(RdiffCommand)
 
+class RefreshCommand(CvcCommand):
+    commands = ['refresh']
+    paramHelp = '<fileGlob> [<fileGlob2> <fileGlob3> ...]'
+
+    def runCommand(self, repos, cfg, argSet, args, profile = False,
+                   callback = None):
+        #if len(args) < 2: return self.usage()
+        checkin.refresh(repos, cfg, args[1:])
+_register(RefreshCommand)
+
 class RemoveCommand(CvcCommand):
     commands = ['remove', 'rm']
     paramHelp = "<file> [<file2> <file3> ...]"
