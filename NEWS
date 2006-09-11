@@ -51,7 +51,10 @@ Changes in @NEW@:
       instead of the cumulative score (note that the deps that did not
       match at all would still return as not matching, so this bug only
       affected conary's ability to select the best match)
-
+    * Fixed a bug in dep scoring: matching architectures are now counted as
+      having a positive value, so that when performing dep resolution on 
+      an x86_64 machine, troves that have flavor is:x86_64 x86 will be 
+      preferred to those with flavor is:x86.
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have

@@ -461,6 +461,8 @@ class DependencyClass(object):
                 return False
 
             score += thisScore
+            if self.depNameSignificant:
+                score += 1
 
         return score
 
