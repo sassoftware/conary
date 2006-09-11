@@ -901,7 +901,7 @@ class Action(action.RecipeAction):
         if self.package:
             self.manifest.create()
 
-    def fetch(self):
+    def fetch(self, refreshFilter=None):
 	return None
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
