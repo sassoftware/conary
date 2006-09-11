@@ -836,9 +836,11 @@ def diff(repos, versionStr = None):
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return
-    _showChangeSet(repos, changeSet, oldTrove, state)
+    _showChangeSet(repos, changeSet, oldTrove, state,
+                   displayAutoSourceFiles = False)
 
-def _showChangeSet(repos, changeSet, oldTrove, newTrove):
+def _showChangeSet(repos, changeSet, oldTrove, newTrove,
+                   displayAutoSourceFiles = True):
     troveChanges = changeSet.iterNewTroveList()
     troveCs = troveChanges.next()
     assert(util.assertIteratorAtEnd(troveChanges))
@@ -857,7 +859,8 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 	    chg = changeSet.getFileChange(None, fileId)
 	    f = files.ThawFile(chg, pathId)
 
-	    if f.hasContents and f.flags.isConfig():
+            if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
+                    and f.hasContents and f.flags.isConfig():
 		(contType, contents) = changeSet.getFileContents(pathId)
                 lines = contents.get().readlines()
 

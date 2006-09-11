@@ -146,6 +146,12 @@ class Dependency(BaseDependency):
 	else:
 	    return self.name
 
+    def __repr__(self):
+        if self.flags:
+            return "Dependency('%s', flags=%s)" % (self.name, self.flags)
+        else:
+            return "Dependency('%s')" % (self.name)
+
     def freeze(self):
 	if self.flags:
 	    flags = [ (x.replace(':', '::'), y) for x, y in self.flags.items() ]
@@ -455,8 +461,10 @@ class DependencyClass(object):
                 return False
 
             score += thisScore
+            if self.depNameSignificant:
+                score += 1
 
-        return thisScore
+        return score
 
     def emptyDepsScore(self):
         score = 0

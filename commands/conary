@@ -149,12 +149,7 @@ class ConaryCommand(options.AbstractCommand):
     def setContext(self, cfg, argSet):
         context = cfg.context
         if os.access('CONARY', os.R_OK):
-            # FIXME: this repository will not have the right settings if to 
-            # have the correct settings for your repository you need to set 
-            # a particular context...
-            client = conaryclient.ConaryClient(cfg)
-            repos = client.getRepos()
-            conaryState = state.ConaryStateFromFile('CONARY', repos)
+            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
             if conaryState.hasContext():
                 context = conaryState.getContext()
 
@@ -179,7 +174,7 @@ class ConaryCommand(options.AbstractCommand):
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]
     paramHelp = '''\
-conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>
+<pkg>[=[<oldver>--]<newver>]+ <outfile>
 
 Creates a changeset with the specified troves and stores it in <outfile>'''
 

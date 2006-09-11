@@ -24,6 +24,8 @@ Changes in @NEW@:
       conflicts can be confusing to work with and are almost never
       desireable - except in those few cases where they are necessary.
       (CNY-796)
+    * Conary no longer tries to display the contents of autosource files
+      in "cvc diff" (CNY-866)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
@@ -38,6 +40,21 @@ Changes in @NEW@:
       been improved. (CNY-714)
     * Error handling when manipulating entitlements via XML-RPC has
       been improved. (CNY-692)
+    * The usage message displayed when running "conary changeset" has
+      been corrected. (CNY-864)
+    * Conary no longer tracebacks when a disconnected cook tries to load
+      a superclass.  Conary also gives better messages when the loaded recipe
+      has a traceback.  Thanks to David Coulthart for the core of this patch.
+      (CNY-518).
+    * Fixed a bug in dep scoring: dependency scoring when multiple sonames
+      were being scored would simply use the value of the last soname,
+      instead of the cumulative score (note that the deps that did not
+      match at all would still return as not matching, so this bug only
+      affected conary's ability to select the best match)
+    * Fixed a bug in dep scoring: matching architectures are now counted as
+      having a positive value, so that when performing dep resolution on 
+      an x86_64 machine, troves that have flavor is:x86_64 x86 will be 
+      preferred to those with flavor is:x86.
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
