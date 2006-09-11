@@ -1010,7 +1010,7 @@ class PythonSetup(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.PythonSetup(I{srcname}, I{destname})}
+    C{r.PythonSetup([I{setupfile}])}
 
     DESCRIPTION
     ===========
@@ -1067,7 +1067,10 @@ class PythonSetup(BuildCommand):
     """
     template = (
         '%%(cdcmd)s'
-        '%%(pythonsetup)s'
+        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
+        ' CPPFLAGS="%%(cppflags)s"'
+        ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
+        ' %%(pythonsetup)s'
         ' %(action)s'
         ' --prefix=%%(prefix)s'
         ' %%(purelib)s'

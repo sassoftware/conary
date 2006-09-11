@@ -55,6 +55,9 @@ Changes in @NEW@:
       having a positive value, so that when performing dep resolution on 
       an x86_64 machine, troves that have flavor is:x86_64 x86 will be 
       preferred to those with flavor is:x86.
+    * The PythonSetup command ignored any C compiler macros that had been
+      set.  The template has been changed to use them in the same way that
+      Configure() uses them; as environment variables.
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
