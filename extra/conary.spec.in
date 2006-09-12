@@ -10,7 +10,7 @@
 Summary: Conary is a distributed software management system for Linux distributions.
 Name: conary
 Version: @version@
-Release: 2%{?dist}
+Release: 1%{?dist}
 License: CPL
 Group: System Environment/Base
 URL: http://wiki.conary.com/
@@ -76,6 +76,7 @@ rm -rf $RPM_BUILD_ROOT
 %config %{_sysconfdir}/conary/arch/*
 %config %{_sysconfdir}/conary/site/*
 %config %{_sysconfdir}/conary/use/*
+%config %{_sysconfdir}/conary/mirrors/*
 %config %{_sysconfdir}/conary/recipeTemplates/*
 %config(noreplace) %{_sysconfdir}/conary/macros
 %config(noreplace) %{_sysconfdir}/conary/pubring.gpg
@@ -112,6 +113,9 @@ rm -rf $RPM_BUILD_ROOT
 %{pythonlib}//server
 
 %changelog
+* Tue Sep 12 2006 Cristian Gafton <gafton@gmail.com> - 1.0.31-1
+- add the /etc/conary/mirrors files
+
 * Tue Jun 27 2006 Cristian Gafton <gafton@rpath.com> - 1.0.21-2
 - update to handle python24 for RHELs and plain python for others
 
