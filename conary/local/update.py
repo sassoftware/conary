@@ -924,21 +924,26 @@ class FilesystemJob:
         # from one trove to this new one. The pathsMoved dict contains
         # the diff for the later type, while we need to get that from
         # the change set in the normal case.
+        repeat = itertools.repeat
         changedHere = itertools.izip(troveCs.getChangedFileList(),
-                                     baseFileList, itertools.repeat(None))
+                                     baseFileList, repeat(None), repeat(None))
         changedOther = [ x[1:] for x in pathsMoved.itervalues()
                                 if x[0] == newTroveInfo ]
 
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
-        for (pathId, headPath, headFileId, headFileVersion),        \
-            baseFile, headChanges in itertools.chain(changedHere, changedOther):
+        for ((pathId, headPath, headFileId, headFileVersion),
+             baseFile, headChanges, fileOnSystem) \
+                in itertools.chain(changedHere, changedOther):
             # NOTE: there used to be an assert(not(pathId in removalList))
             # here.  But it's possible for this pathId to be set up 
             # for removal in the local changeset and considered only "changed"
             # from the repository's point of view.
 
-	    if not headChanges and not fsTrove.hasFile(pathId):
+            if not headChanges:
+                fileOnSystem = fsTrove.hasFile(pathId)
+
+	    if not fileOnSystem:
 		# the file was removed from the local system; we're not
 		# putting it back
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
@@ -1260,7 +1265,7 @@ class FilesystemJob:
 
 	return fsTrove
 
-    def _findMovedPaths(self, db, changeSet):
+    def _findMovedPaths(self, db, changeSet, fsTroveDict):
         # Lookup paths which have swithed troves. These look like a
         # remove and add of the same path; we build an dict which lets
         # us treat these events as file updates rather than a remove/add
@@ -1274,7 +1279,8 @@ class FilesystemJob:
             fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
             for (pathId, path, fileId, version) in oldTrove.iterFileList():
                 assert(path not in removedFiles)
-                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo)
+                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo, 
+                                      True)
 
         for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
@@ -1288,7 +1294,8 @@ class FilesystemJob:
                 if not oldTrove.hasFile(pathId): continue
                 (path, fileId, version) = oldTrove.getFile(pathId)
                 assert(path not in removedFiles)
-                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo)
+                removedFiles[path] = ((pathId, version, fileId), oldTroveInfo, 
+                                      False)
 
         if not removedFiles:
             return {}
@@ -1301,21 +1308,34 @@ class FilesystemJob:
                 if path not in removedFiles:
                     continue
 
-                ((oldPathId, oldVersion, oldFileId), oldTroveInfo) = \
+                ((oldPathId, oldVersion, oldFileId), oldTroveInfo, isErase) = \
                                                         removedFiles[path]
                 del removedFiles[path]
                 newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                                 troveCs.getNewFlavor())
 
+
+                # store information needed for the file update that's contained
+                # in the old trove and bring it to the new trove.  Information
+                # needed: the file object, the diff between old and
+                # new versions, and whether the file's been removed locally.
+                oldName, oldVer, oldFlavor = oldTroveInfo
+                if isErase:
+                    localVer = oldVer.createShadow(versions.RollbackLabel())
+                else:
+                    localVer = oldVer.createShadow(versions.LocalLabel())
+                fileExists = fsTroveDict[oldName, localVer].hasFile(oldPathId)
+
+                # NOTE: if the file doesn't exist we could 
+                # avoid this thawing and diffing.  But that is the odd case.
                 newStream = changeSet.getFileChange(None, fileId)
                 newFile = files.ThawFile(newStream, pathId)
-
                 oldFile = db.getFileVersion(pathId, oldFileId, version)
                 diff, hash = changeset.fileChangeSet(pathId, oldFile, newFile)
 
                 pathsMoved[path] = ( newTroveInfo,
                                      (pathId, path, fileId, fileVersion),
-                                     oldFile, diff )
+                                     oldFile, diff, fileExists )
 
         return pathsMoved
 
@@ -1363,7 +1383,7 @@ class FilesystemJob:
         if hasattr(self.db, 'iterFindPathReferences'):
             # this only works for local databases, not networked repositories
             # (like source updates use)
-            pathsMoved = self._findMovedPaths(db, changeSet)
+            pathsMoved = self._findMovedPaths(db, changeSet, fsTroveDict)
         else:
             pathsMoved = {}
 
