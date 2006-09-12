@@ -229,11 +229,11 @@ source directory.  It creates a diff between two versions of
 a source trove from the repository.
 .TP
 .B refresh [\fI<fileglob>...\fP]
-This source command causes the autosource (URL-referenced) files
-specified by the globs (matched only against the basename of the
-file, not the entire URL), or all autosource files if no globs
-are specified, to be re-loaded from the upstream source at the
-next cook.
+This source command reloads URL-referenced autosource files specified by 
+\fI<fileglob>\fP arguments from the upstream source at the next \fBcook\fP 
+command usage. The \fI<fileglob>\fP arguments are globs matched only against 
+the basename of the file, and not the entire URL. If refresh is invoked 
+without \fI<fileglob>\fP arguments, all autosource files will be reloaded.
 .TP
 .B remove \fI<filename>...\fP
 Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
