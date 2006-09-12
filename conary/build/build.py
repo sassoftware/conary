@@ -2149,7 +2149,11 @@ class Replace(BuildAction):
         unchanged = []
         for path in paths:
             if not util.isregular(path):
-                path = path[len(macros.destdir):]
+                if path.startswith(macros.destdir):
+                    path = path[len(macros.destdir):]
+                elif path.startswith(macros.builddir):
+                    # +1 takes off the leading '/', since builddir is relative
+                    path = path[len(macros.builddir)+1:]
                 log.warning("%s is not a regular file, not applying Replace",
                             path)
                 continue
