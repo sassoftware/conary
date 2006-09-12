@@ -1113,7 +1113,7 @@ class FilesystemJob:
                    not forceUpdate and \
                    headFile.flags.isInitialContents():
 		    log.debug("skipping new contents of InitialContents file"
-                              "%s" % finalPath)
+                              " %s" % finalPath)
 		elif forceUpdate or replaceFiles or \
                         (not flags & MERGE) or \
 			headFile.flags.isTransient() or \
