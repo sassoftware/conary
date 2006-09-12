@@ -73,6 +73,11 @@ Changes in @NEW@:
       a non-regular file now includes the path, as intended.  (CNY-844)
     * A traceback that occurred when a resolveLevel 2 update resulted in a 
       component being erased has been fixed. (CNY-879)
+    * Conary now works around a possible threading deadlock when
+      exceptions are raised in Threading.join().  The bug is in the
+      standard Python threading library, and is fixed in 2.4.3.
+      Conary will use a workaround when running under older versions
+      of Python. (CNY-795)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have

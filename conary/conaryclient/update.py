@@ -2657,7 +2657,8 @@ conary erase '%s=%s[%s]'
                     callback.updateDone()
             else:
                 import Queue
-                from threading import Event, Thread
+                from conary.lib.fixedthreading import Thread
+                from threading import Event
 
                 csQueue = Queue.Queue(5)
                 stopDownloadEvent = Event()
