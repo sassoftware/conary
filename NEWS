@@ -71,6 +71,8 @@ Changes in @NEW@:
       Configure() uses them; as environment variables.
     * The warning message produced when r.Replace() refuses to modify
       a non-regular file now includes the path, as intended.  (CNY-844)
+    * A traceback that occurred when a resolveLevel 2 update resulted in a 
+      component being erased has been fixed. (CNY-879)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
