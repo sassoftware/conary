@@ -21,6 +21,7 @@ python_files=	    __init__.py		\
 		    erlcompleter.py	\
 		    epdb.py     	\
 		    fixedglob.py	\
+		    fixedthreading.py	\
 		    graph.py		\
 		    importer.py		\
 		    javadeps.py     	\
