@@ -1026,9 +1026,6 @@ class PythonSetup(BuildCommand):
     KEYWORDS
     ========
 
-    The C{r.PythonSetup()} class accepts the following keywords, with default values
-    shown in parentheses when applicable:
-
     The C{r.PythonSetup()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
