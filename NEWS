@@ -73,6 +73,9 @@ Changes in @NEW@:
       a non-regular file now includes the path, as intended.  (CNY-844)
     * A traceback that occurred when a resolveLevel 2 update resulted in a 
       component being erased has been fixed. (CNY-879)
+    * Fixed an as-of-yet untriggered bug for an unusual case when multiple
+      files being installed share the same content and one of the files
+      is erased locally.
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have

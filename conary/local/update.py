@@ -392,7 +392,7 @@ class FilesystemJob:
                 if fileObj.hasContents and fileObj.linkGroup():
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
-
+                ptrTargets[pathId] = target
                 continue
 
 	    # None means "don't restore contents"; "" means "take the
