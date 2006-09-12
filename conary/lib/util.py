@@ -339,7 +339,6 @@ def copyfileobj(source, dest, callback = None, digest = None,
     starttime = time.time()
 
     total = 0
-    buf = source.read(bufSize)
 
     if abortCheck:
         sourceFd = source.fileno()
@@ -347,6 +346,15 @@ def copyfileobj(source, dest, callback = None, digest = None,
         sourceFd = None
 
     while True:
+        if abortCheck:
+            # if we need to abortCheck, make sure we check it every time
+            # read returns, and every five seconds
+            l1 = []
+            while not l1:
+                if abortCheck and abortCheck():
+                    return None
+                l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
+        buf = source.read(bufSize)
         if not buf:
             break
 
@@ -365,16 +373,6 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if digest: digest.update(buf)
         if callback:
             callback(total, rate)
-
-        if abortCheck:
-            # if we need to abortCheck, make sure we check it every time
-            # read returns, and every five seconds
-            l1 = []
-            while not l1:
-                if abortCheck and abortCheck():
-                    return None
-                l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
-        buf = source.read(bufSize)
 
     return total
 
