@@ -182,20 +182,21 @@ class Cursor:
         # hashes are named parameters
         elif isinstance(parms, dict):
             for pkey, pval in parms.iteritems():
-                if pkey[0] is not ":": pkey = ":" + pkey
-                # the sqlite bindings don't like 'binding' unkown named arguments
-                try:
-                    self.stmt.bind(pkey, pval)
-                except _sqlite.ProgrammingError, e:
-                    if e.args[0] == "Bind parameter name unknown to the query":
-                        continue
-                    raise
+                if pkey[0] == ":":
+                    pkey = pkey[1:]
+                kwargs[pkey] = pval
         else:
             raise _sqlite.ProgrammingError, \
                   "Don't know how to bind these parameters"
         # the sqlite C bindings require us to reference these bind parameters as :name
         for pkey, pval in kwargs.items():
-            self.stmt.bind(":" + pkey, pval)
+            # the sqlite bindings don't like 'binding' unkown named arguments
+            try:
+                self.stmt.bind(":" + pkey, pval)
+            except _sqlite.ProgrammingError, e:
+                if e.args[0] == "Bind parameter name unknown to the query":
+                    continue
+                raise
         self.current_row = self.stmt.step()
         if startingTransaction:
             self.con.inTransaction = True
