@@ -32,7 +32,7 @@ Changes in @NEW@:
       fetch new upstream versions of files referenced by URL.  Thanks
       to Pavel Volkovitskiy for the initial implementation of this
       feature. (CNY-743)
-    * The PythonSetup() build action has been modified to be more consistant
+    * The PythonSetup() build action has been modified to be more consistent
       with other build actions. The "setupName" paramater has been added, which
       can specify a command to run (defaults to "setup.py"). The first
       argument, similar to Configure(), passes arguments to the command being
