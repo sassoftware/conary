@@ -78,6 +78,11 @@ Changes in @NEW@:
       standard Python threading library, and is fixed in 2.4.3.
       Conary will use a workaround when running under older versions
       of Python. (CNY-795)
+    * Fixed an as-of-yet untriggered bug for an unusual case when multiple
+      files being installed share the same content and one of the files
+      is erased locally.
+    * Fixed a traceback that occurred when a manually removed file switched
+      packages. (CNY-869)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
