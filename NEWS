@@ -88,6 +88,10 @@ Changes in @NEW@:
     * Conary's OpenPGP implementation now dynamically uses RIPEMD if
       it is available from PyCrpyto.  Some PyCrypto builds don't
       include RIPEMD hash support.  (CNY-868)
+    * A bug that allowed merging changesets with conflicting file
+      contents for configuration files with the same pathId has been
+      fixed.  Applying the resulting merged changeset caused
+      IntegrityErrors.  (CNY-888).
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
