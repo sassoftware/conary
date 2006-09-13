@@ -37,6 +37,8 @@ Changes in @NEW@:
       can specify a command to run (defaults to "setup.py"). The first
       argument, similar to Configure(), passes arguments to the command being
       specified by setupName. (CNY-355)
+    * The "cvc newpkg" command and the PackageSpec policy now disallow
+      certain potentially confusing characters in trove names. (CNY-842)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the

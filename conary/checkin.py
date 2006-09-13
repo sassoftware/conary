@@ -1238,6 +1238,8 @@ def newTrove(repos, cfg, name, dir = None, template = None):
         except versions.ParseError:
             log.error("%s is not a valid label" % versionStr)
             return
+    if not trove.troveNameIsValid(name):
+        raise errors.CvcError('%s is not a valid package name', name)
     component = "%s:source" % name
 
     # XXX this should really allow a --build-branch or something; we can't
