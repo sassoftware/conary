@@ -17,6 +17,8 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import httplib
+import select
 import socket
 import time
 import xmlrpclib
@@ -98,14 +100,18 @@ class DecompressFileObj:
 class XMLOpener(urllib.FancyURLopener):
     def __init__(self, *args, **kw):
         self.compress = False
+        self.abortCheck = None
         urllib.FancyURLopener.__init__(self, *args, **kw)
 
     def setCompress(self, compress):
         self.compress = compress
 
+    def setAbortCheck(self, check):
+        self.abortCheck = check
+
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
-    
+
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
 	   one magic string -- the content type --
@@ -114,7 +120,6 @@ class XMLOpener(urllib.FancyURLopener):
             protocol='https'
         else:
             protocol='http'
-        import httplib
         user_passwd = None
         if isinstance(url, str):
             host, selector = urllib.splithost(url)
@@ -173,6 +178,8 @@ class XMLOpener(urllib.FancyURLopener):
         h.endheaders()
         if data is not None:
             h.send(data)
+        # wait for a response
+        self._wait(h)
         errcode, errmsg, headers = h.getreply()
         if errcode == 200:
             fp = h.getfile()
@@ -185,6 +192,18 @@ class XMLOpener(urllib.FancyURLopener):
             return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
+
+    def _wait(self, h):
+        # wait for data if abortCheck is set
+        if not self.abortCheck:
+            return
+        # FIXME: this is poking at httplib internals.  Should subclass.
+        sourceFd = h._conn.sock.fileno()
+        l1 = []
+        while not l1:
+            if self.abortCheck():
+                raise AbortError
+            l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
 
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
@@ -204,6 +223,7 @@ class Transport(xmlrpclib.Transport):
     def __init__(self, https = False, entitlement = None):
         self.https = https
         self.compress = False
+        self.abortCheck = None
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
@@ -212,6 +232,9 @@ class Transport(xmlrpclib.Transport):
 
     def setCompress(self, compress):
         self.compress = compress
+
+    def setAbortCheck(self, abortCheck):
+        self.abortCheck = abortCheck
 
     def _protocol(self):
         if self.https:
@@ -228,6 +251,7 @@ class Transport(xmlrpclib.Transport):
 	else:
 	    opener = XMLOpener()
         opener.setCompress(self.compress)
+        opener.setAbortCheck(self.abortCheck)
 
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
@@ -267,3 +291,5 @@ class Transport(xmlrpclib.Transport):
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
+
+class AbortError(Exception): pass
