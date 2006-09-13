@@ -90,6 +90,7 @@ Changes in @NEW@:
     * The getFileContents and getFileVersions server side calls have
       been optimized for faster execution
     * The SQL query in getTroveList has been sped up by a 3-5x factor.
+    * Inserts into local database now use executemany().
 
   o Server Changes
     * Several SQL queries have been updated for PostgreSQL compatibility

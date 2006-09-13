@@ -12,6 +12,8 @@
 # full details.
 #
 
+import itertools
+
 from conary import dbstore
 from conary import deps, errors, files, streams, trove, versions
 from conary.dbstore import idtable, sqlerrors
@@ -526,13 +528,13 @@ class Database:
             version     STRING,
             flavor      STRING
         )""", start_transaction = False)
-        # count the number of items we're inserting
-        count = 0
-        for name, version, flavor in troveList:
-            cu.execute("INSERT INTO tlList VALUES(?, ?, ?)", name,
-                       version.asString(), flavor.freeze(),
+        def _iter(tl):
+            for name, version, flavor in troveList:
+                yield (name, version.asString(), flavor.freeze())
+        cu.executemany("INSERT INTO tlList VALUES(?, ?, ?)", _iter(troveList),
                        start_transaction = False)
-            count += 1
+        # count the number of items we're inserting
+        count = cu.execute('SELECT count(*) FROM tlList').next()[0]
         cu.execute("""
 select
     pinned
@@ -664,25 +666,26 @@ order by
                                 timeStamps STRING,
                                 flags INT)
                    """)
-
-	for (name, version, flavor), byDefault, isStrong \
+        def _iter(trove):
+            for (name, version, flavor), byDefault, isStrong \
                                                 in trove.iterTroveListInfo():
-	    versionId = self.getVersionId(version, self.addVersionCache)
-	    if flavor.isEmpty():
-		flavorId = 0
-	    else:
-		flavorId = flavorMap[flavor.freeze()]
+                versionId = self.getVersionId(version, self.addVersionCache)
+                if flavor.isEmpty():
+                    flavorId = 0
+                else:
+                    flavorId = flavorMap[flavor.freeze()]
 
-            flags = 0
-            if not isStrong:
-                flags |= schema.TROVE_TROVES_WEAKREF
-            if byDefault:
-                flags |= schema.TROVE_TROVES_BYDEFAULT;
-
-            cu.execute("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
-                       name, versionId, flavorId, 
-                        ":".join([ "%.3f" % x for x in version.timeStamps()]), 
+                flags = 0
+                if not isStrong:
+                    flags |= schema.TROVE_TROVES_WEAKREF
+                if byDefault:
+                    flags |= schema.TROVE_TROVES_BYDEFAULT;
+                yield (name, versionId, flavorId, 
+                       ":".join([ "%.3f" % x for x in version.timeStamps()]), 
                        flags)
+
+        cu.executemany("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
+                       _iter(trove))
 
         # make sure every trove we include has an instanceid
         cu.execute("""
@@ -864,9 +867,8 @@ order by
                 tags = files.frozenFileTags(fileStream)
 
             if tags:
-                for tag in tags:
-                    cu.execute("INSERT INTO NewFileTags VALUES (?, ?)",
-                               pathId, tag)
+                cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
+                               itertools.izip(itertools.repeat(pathId), tags))
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=?, isPresent=? WHERE
@@ -1022,11 +1024,9 @@ order by
 	    CREATE TEMPORARY TABLE getFilesTbl(row %(PRIMARYKEY)s,
                                                fileId BINARY)
 	""" % self.db.keywords, start_transaction = False)
-
-        stmt = cu.compile("INSERT INTO getFilesTbl VALUES (?, ?)")
-	for (i, (pathId, fileId, version)) in enumerate(l):
-            cu.execstmt(stmt, i, fileId)
-
+        cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
+                       ((x[0], x[1][1]) for x in enumerate(l)),
+                       start_transaction = False)
 	cu.execute("""
 	    SELECT DISTINCT row, stream FROM getFilesTbl
                 JOIN DBTroveFiles ON
@@ -1079,17 +1079,18 @@ order by
                                 flavorId INT)
                    """ % self.db.keywords, start_transaction = False)
 
-        for i, (name, version, flavor) in enumerate(troveList):
-            flavorId = self.flavors.get(flavor, None)
-            if flavorId is None:
-                continue
-            versionId = self.versionTable.get(version, None)
-            if versionId is None:
-                continue
+        def _iter(tl):
+            for i, (name, version, flavor) in enumerate(tl):
+                flavorId = self.flavors.get(flavor, None)
+                if flavorId is None:
+                    continue
+                versionId = self.versionTable.get(version, None)
+                if versionId is None:
+                    continue
+                yield (i, name, versionId, flavorId)
 
-            cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
-                       i, name, versionId, flavorId,
-                       start_transaction = False)
+        cu.executemany("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
+                       _iter(troveList), start_transaction = False)
 
         cu.execute("""SELECT idx, Instances.instanceId FROM getTrovesTbl
                         INNER JOIN Instances ON
@@ -1403,23 +1404,25 @@ order by
                             mappedTimestamps STRING,
                             mappedFlavor STRING)""")
 
-        for (name, pinnedInfo, mapInfo) in mapList:
-            assert(sum(mapInfo[0].timeStamps()) > 0)
-            if pinnedInfo[1] is None or pinnedInfo[1].isEmpty():
-                pinnedFlavor = None
-            else:
-                pinnedFlavor = pinnedInfo[1].freeze()
+        def _iter(ml):
+            for (name, pinnedInfo, mapInfo) in ml:
+                assert(sum(mapInfo[0].timeStamps()) > 0)
+                if pinnedInfo[1] is None or pinnedInfo[1].isEmpty():
+                    pinnedFlavor = None
+                else:
+                    pinnedFlavor = pinnedInfo[1].freeze()
 
-            if mapInfo[1] is None or mapInfo[1].isEmpty():
-                mapFlavor = None
-            else:
-                mapFlavor = mapInfo[1].freeze()
-
-            cu.execute("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)",
-                       name, pinnedInfo[0].asString(), pinnedFlavor,
+                if mapInfo[1] is None or mapInfo[1].isEmpty():
+                    mapFlavor = None
+                else:
+                    mapFlavor = mapInfo[1].freeze()
+                yield (name, pinnedInfo[0].asString(), pinnedFlavor,
                        mapInfo[0].asString(),
-                        ":".join([ "%.3f" % x for x in mapInfo[0].timeStamps()]),
+                       ":".join([ "%.3f" % x for x in mapInfo[0].timeStamps()]),
                        mapFlavor)
+
+            cu.executemany("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)",
+                           _iter(mapList))
 
         # now add link collections to these troves
         cu.execute("""INSERT INTO TroveTroves
@@ -1461,11 +1464,12 @@ order by
                                               "flavor STRING)",
                                               start_transaction = False)
         result = []
-        for idx, info in enumerate(l):
-            cu.execute("INSERT INTO ftc VALUES(?, ?, ?, ?)", idx, info[0],
-                       info[1].asString(), info[2].freeze(),
-                       start_transaction = False)
-            result.append([])
+        def _iter(infoList, resultList):
+            for idx, info in enumerate(infoList):
+                resultList.append([])
+                yield (idx, info[0], info[1].asString(), info[2].freeze())
+        cu.executemany("INSERT INTO ftc VALUES(?, ?, ?, ?)", 
+                       _iter(l, result), start_transaction = False)
 
         cu.execute("""SELECT idx, instances.troveName, Versions.version,
                              Flavors.flavor, flags
@@ -1507,8 +1511,7 @@ order by
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
                                               start_transaction = False)
-        for idx, name in enumerate(names):
-            cu.execute("INSERT INTO ftc VALUES(?, ?)", idx, name,
+        cu.executemany("INSERT INTO ftc VALUES(?, ?)", enumerate(names),
                        start_transaction = False)
 
         cu.execute("""SELECT idx, Instances.troveName, Versions.version,
@@ -1544,9 +1547,8 @@ order by
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
                                               start_transaction = False)
-        for idx, name in enumerate(names):
-            cu.execute("INSERT INTO ftc VALUES(?, ?)", idx, name,
-                       start_transaction = False)
+        cu.executemany("INSERT INTO ftc VALUES(?, ?)",
+                       enumerate(names), start_transaction = False)
 
         # the JOIN TroveTroves on includedId ensures that this trove
         # is pointed to somewhere!
@@ -1624,11 +1626,9 @@ order by
             cu.execute("CREATE TEMPORARY TABLE tmpInst(instanceId INT)",
                        start_transaction = False)
 
-            for name in troveNames:
-                cu.execute("""INSERT INTO tmpInst 
-                   SELECT instanceId FROM Instances WHERE troveName = ?""",
-                           name, start_transaction = False)
-
+            cu.executemany(
+                """INSERT INTO tmpInst SELECT instanceId FROM Instances
+                WHERE troveName = ?""", troveNames, start_transaction = False)
             # Summary, Insert into this tmpInst all troves that are parents
             # of the troves already in tmpIst + all troves with the same 
             # name.
@@ -1737,18 +1737,20 @@ order by
                                 flavorId INT)
                    """ % self.db.keywords, start_transaction = False)
 
-        i = -1
-        for i, (name, version, flavor) in enumerate(troveList):
-            flavorId = self.flavors.get(flavor, None)
-            if flavorId is None:
-                continue
-            versionId = self.versionTable.get(version, None)
-            if versionId is None:
-                continue
+        r = []
+        def _iter(tl, r):
+            for i, (name, version, flavor) in enumerate(tl):
+                flavorId = self.flavors.get(flavor, None)
+                if flavorId is None:
+                    continue
+                versionId = self.versionTable.get(version, None)
+                if versionId is None:
+                    continue
+                r.append([])
+                yield (i, name, versionId, flavorId)
 
-            cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
-                       i, name, versionId, flavorId,
-                       start_transaction = False)
+        cu.executemany("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
+                       _iter(troveList, r), start_transaction = False)
 
         cu.execute("""SELECT idx, TroveInfo.data FROM getTrovesTbl
                         INNER JOIN Instances ON
@@ -1760,7 +1762,6 @@ order by
                         WHERE TroveInfo.infoType = ?
                     """, trove._TROVEINFO_TAG_PATH_HASHES)
 
-        r = [ None ] * (i + 1)
         for (idx, data) in cu:
             r[idx] = trove.PathHashes(data)
 
@@ -1855,8 +1856,7 @@ order by
 
         cu.execute("CREATE TEMPORARY TABLE gcts(troveName STRING)",
                    start_transaction = False)
-        for name in names:
-            cu.execute("INSERT INTO gcts VALUES (?)", name,
+        cu.executemany("INSERT INTO gcts VALUES (?)", names,
                        start_transaction = False)
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
