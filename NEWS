@@ -85,6 +85,9 @@ Changes in @NEW@:
       packages. (CNY-869)
     * When you remove a file and replace it with a directory, conary
       treats it as a removal (CNY-872).
+    * Conary's OpenPGP implementation now dynamically uses RIPEMD if
+      it is available from PyCrpyto.  Some PyCrypto builds don't
+      include RIPEMD hash support.  (CNY-868)
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
