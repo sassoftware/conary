@@ -351,7 +351,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
             # read returns, and every five seconds
             l1 = []
             while not l1:
-                if abortCheck and abortCheck():
+                if abortCheck():
                     return None
                 l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
         buf = source.read(bufSize)

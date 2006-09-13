@@ -17,24 +17,101 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import httplib
+import select
 import socket
 import time
 import xmlrpclib
 import urllib
 import zlib
 from StringIO import StringIO
-        
+
+class DecompressFileObj:
+    "implements a wrapper file object that decompress()s data on the fly"
+    def __init__(self, fp):
+        self.fp = fp
+        self.dco = zlib.decompressobj()
+        self.readsize = 1024
+        self.available = ''
+
+    def _read(self, size=-1):
+        # get at least @size uncompressed data ready in the available
+        # buffer.  Returns False is there is no more to read at the moment
+        bufs = [self.available]
+        more = True
+        while size == -1 or len(self.available) < size:
+            # read some compressed data
+            buf = self.fp.read(self.readsize)
+            if not buf:
+                more = False
+                break
+            decomp = self.dco.decompress(buf)
+            bufs.append(decomp)
+        self.available = ''.join(bufs)
+        return more
+
+    def read(self, size=-1):
+        self._read(size)
+        if size == -1:
+            # return it all
+            ret = self.available
+            self.available = ''
+        else:
+            # return what's asked for
+            ret = self.available[:size]
+            self.available = self.available[size:]
+        return ret
+
+    def readline(self, size=-1):
+        bufs = []
+        haveline = False
+        while True:
+            havemore = self._read(1024)
+
+            bufs.append(self.available)
+            haveline = '\n' in self.available
+            self.available = ''
+
+            haveenough = size != -1 and sum(len(x) for x in bufs) > size
+            if (not havemore) or haveenough or haveline:
+                line = ''.join(bufs)
+                if haveline:
+                    i = line.index('\n') + 1
+                    if size != -1:
+                        i = min(i, size)
+                    ret = line[:i]
+                    self.available = line[i:]
+                    return ret
+                if size != -1 and len(line) > size:
+                    # return just what was asked
+                    ret = line[size:]
+                    self.available = line[:size]
+                    return ret
+                # otherwise return it all
+                return line
+
+    def close(self):
+        self.fp.close()
+        self.available = ''
+
+    def fileno(self):
+        return self.fp.fileno()
+
 class XMLOpener(urllib.FancyURLopener):
     def __init__(self, *args, **kw):
         self.compress = False
+        self.abortCheck = None
         urllib.FancyURLopener.__init__(self, *args, **kw)
 
     def setCompress(self, compress):
         self.compress = compress
 
+    def setAbortCheck(self, check):
+        self.abortCheck = check
+
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
-    
+
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
 	   one magic string -- the content type --
@@ -43,7 +120,6 @@ class XMLOpener(urllib.FancyURLopener):
             protocol='https'
         else:
             protocol='http'
-        import httplib
         user_passwd = None
         if isinstance(url, str):
             host, selector = urllib.splithost(url)
@@ -102,6 +178,8 @@ class XMLOpener(urllib.FancyURLopener):
         h.endheaders()
         if data is not None:
             h.send(data)
+        # wait for a response
+        self._wait(h)
         errcode, errmsg, headers = h.getreply()
         if errcode == 200:
             fp = h.getfile()
@@ -109,11 +187,23 @@ class XMLOpener(urllib.FancyURLopener):
 
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
-                fp = StringIO(zlib.decompress(fp.read()))
+                fp = DecompressFileObj(fp)
 
             return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
+
+    def _wait(self, h):
+        # wait for data if abortCheck is set
+        if not self.abortCheck:
+            return
+        # FIXME: this is poking at httplib internals.  Should subclass.
+        sourceFd = h._conn.sock.fileno()
+        l1 = []
+        while not l1:
+            if self.abortCheck():
+                raise AbortError
+            l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
 
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
@@ -133,6 +223,7 @@ class Transport(xmlrpclib.Transport):
     def __init__(self, https = False, entitlement = None):
         self.https = https
         self.compress = False
+        self.abortCheck = None
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
@@ -141,6 +232,9 @@ class Transport(xmlrpclib.Transport):
 
     def setCompress(self, compress):
         self.compress = compress
+
+    def setAbortCheck(self, abortCheck):
+        self.abortCheck = abortCheck
 
     def _protocol(self):
         if self.https:
@@ -157,6 +251,7 @@ class Transport(xmlrpclib.Transport):
 	else:
 	    opener = XMLOpener()
         opener.setCompress(self.compress)
+        opener.setAbortCheck(self.abortCheck)
 
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
@@ -197,4 +292,4 @@ class Transport(xmlrpclib.Transport):
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
 
-    
+class AbortError(Exception): pass
