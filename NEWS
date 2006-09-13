@@ -90,16 +90,20 @@ Changes in @NEW@:
     * Conary's OpenPGP implementation now dynamically uses RIPEMD if
       it is available from PyCrpyto.  Some PyCrypto builds don't
       include RIPEMD hash support.  (CNY-868)
+    * A bug that allowed merging changesets with conflicting file
+      contents for configuration files with the same pathId has been
+      fixed.  Applying the resulting merged changeset caused
+      IntegrityErrors.  (CNY-888).
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
       been optimized for faster execution
     * The SQL query in getTroveList has been sped up by a 3-5x factor.
+    * dbstore now has support for executemany()
     * Inserts into local database now use executemany().
 
   o Server Changes
     * Several SQL queries have been updated for PostgreSQL compatibility
-    * dbstore now has support for executemany()
 
 Changes in 1.0.30:
   o System Update Changes:
