@@ -23,7 +23,78 @@ import xmlrpclib
 import urllib
 import zlib
 from StringIO import StringIO
-        
+
+class DecompressFileObj:
+    "implements a wrapper file object that decompress()s data on the fly"
+    def __init__(self, fp):
+        self.fp = fp
+        self.dco = zlib.decompressobj()
+        self.readsize = 1024
+        self.available = ''
+
+    def _read(self, size=-1):
+        # get at least @size uncompressed data ready in the available
+        # buffer.  Returns False is there is no more to read at the moment
+        bufs = [self.available]
+        more = True
+        while size == -1 or len(self.available) < size:
+            # read some compressed data
+            buf = self.fp.read(self.readsize)
+            if not buf:
+                more = False
+                break
+            decomp = self.dco.decompress(buf)
+            bufs.append(decomp)
+        self.available = ''.join(bufs)
+        return more
+
+    def read(self, size=-1):
+        self._read(size)
+        if size == -1:
+            # return it all
+            ret = self.available
+            self.available = ''
+        else:
+            # return what's asked for
+            ret = self.available[:size]
+            self.available = self.available[size:]
+        return ret
+
+    def readline(self, size=-1):
+        bufs = []
+        haveline = False
+        while True:
+            havemore = self._read(1024)
+
+            bufs.append(self.available)
+            haveline = '\n' in self.available
+            self.available = ''
+
+            haveenough = size != -1 and sum(len(x) for x in bufs) > size
+            if (not havemore) or haveenough or haveline:
+                line = ''.join(bufs)
+                if haveline:
+                    i = line.index('\n') + 1
+                    if size != -1:
+                        i = min(i, size)
+                    ret = line[:i]
+                    self.available = line[i:]
+                    return ret
+                if size != -1 and len(line) > size:
+                    # return just what was asked
+                    ret = line[size:]
+                    self.available = line[:size]
+                    return ret
+                # otherwise return it all
+                return line
+
+    def close(self):
+        self.fp.close()
+        self.available = ''
+
+    def fileno(self):
+        return self.fp.fileno()
+
 class XMLOpener(urllib.FancyURLopener):
     def __init__(self, *args, **kw):
         self.compress = False
@@ -109,7 +180,7 @@ class XMLOpener(urllib.FancyURLopener):
 
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
-                fp = StringIO(zlib.decompress(fp.read()))
+                fp = DecompressFileObj(fp)
 
             return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
         else:
@@ -196,5 +267,3 @@ class Transport(xmlrpclib.Transport):
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
-
-    
