@@ -341,26 +341,36 @@ class FilesystemJob:
 
         extraContents = []
 
-	paths = self.removes.keys()
-	paths.sort()
-	paths.reverse()
-	for fileNum, target in enumerate(paths):
-	    (fileObj, msg) = self.removes[target]
+        paths = self.removes.keys()
+        paths.sort()
+        paths.reverse()
+        for fileNum, target in enumerate(paths):
+            (fileObj, msg) = self.removes[target]
             callback.removeFiles(fileNum + 1, len(paths))
 
-	    # don't worry about files which don't exist
-	    try:
-		os.lstat(target)
-	    except OSError, e:
-		if e.errno == errno.ENOENT:
-		    log.warning("%s has already been removed" % 
-				    target[len(self.root):])
-		else:
-		    log.error("%s could not be removed: %s" % 
-				    (target, e.strerror))
-		    raise
-	    else:
-		fileObj.remove(target)
+            # don't worry about files which don't exist
+            try:
+                info = os.lstat(target)
+            except OSError, e:
+                if e.errno == errno.ENOENT:
+                    log.warning("%s has already been removed",
+                                target[len(self.root):])
+                else:
+                    log.error("%s could not be removed: %s",
+                              target, e.strerror)
+                    raise
+            else:
+                if (stat.S_ISDIR(info.st_mode)
+                    and not isinstance(fileObj, files.Directory)):
+                    log.warning('%s was changed into a directory'
+                                ' - not removing', target[len(self.root):])
+                    continue
+                try:
+                    fileObj.remove(target)
+                except OSError, e:
+                    log.error("%s could not be removed: %s",
+                              target[len(self.root):], e.strerror)
+                    raise
 
 	    log.debug(msg, target)
 
@@ -656,7 +666,12 @@ class FilesystemJob:
                         not oldFile.flags.isTransient():
 		log.warning("%s has changed but has been removed "
 				   "on head", path)
-
+            if (localFile and isinstance(localFile, files.Directory)
+                and not isinstance(oldFile, files.Directory)):
+                # the user removed this file, and then remade it as a
+                # directory.  That is as good as a removal in my book.
+                log.warning("%s was changed to a directory - ignoring")
+                continue
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsTrove.removeFile(pathId)
 
