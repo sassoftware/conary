@@ -369,15 +369,18 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         # there should be a better way to iterate over all NVF in a source.
         toCreate = [source.trovesByName(x) for x in source.iterAllTroveNames()]
 
+        conflicts = []
         branchesByLabel = {}
         for (n,v,f) in itertools.chain(*toCreate):
-            branchesByLabel[(n, str(v.trailingLabel()), None)] \
-                                                = (v.branch(), (n, v,f))
+            troveSpec =  (n, str(v.trailingLabel()), None)
+            if troveSpec in branchesByLabel:
+                conflicts.append(((n,v,f), branchesByLabel[troveSpec][1]))
+            branchesByLabel[troveSpec] = (v.branch(), (n, v,f))
 
         results = self.repos.findTroves(None, branchesByLabel, None,
                                        bestFlavor = False, getLeaves = True,
                                        allowMissing = True)
-        conflicts = []
+
         for troveSpec, troveTups in results.iteritems():
             if not troveTups:
                 continue
