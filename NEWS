@@ -83,6 +83,8 @@ Changes in @NEW@:
       is erased locally.
     * Fixed a traceback that occurred when a manually removed file switched
       packages. (CNY-869)
+    * When you remove a file and replace it with a directory, conary
+      treats it as a removal (CNY-872).
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
