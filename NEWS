@@ -80,6 +80,11 @@ Changes in @NEW@:
       standard Python threading library, and is fixed in 2.4.3.
       Conary will use a workaround when running under older versions
       of Python. (CNY-795)
+    * Checks have been added to the XML-RPC transport system to see if
+      an abort has been requested while waiting for a response from
+      the server.  This allows the main thread to terminate the
+      changeset download thread if it is waiting for an XML-RPC
+      response from the server.  (CNY-795)
     * Fixed an as-of-yet untriggered bug for an unusual case when multiple
       files being installed share the same content and one of the files
       is erased locally.
