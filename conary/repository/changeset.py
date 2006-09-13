@@ -1111,7 +1111,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             troves = set(itertools.chain(self.iterNewTroveList(),
                                          otherCs.iterNewTroveList()))
             conflicts = []
-            for myTrove in troves:
+            for myTrove in sorted(troves):
                 files = (myTrove.getNewFileList()
                          + myTrove.getChangedFileList())
                 conflicts.extend((myTrove, x) for x in files if x[0] == pathId)
