@@ -47,16 +47,13 @@ class UserAuthorization:
         # make sure we don't conflict with another entry based on case; this
         # avoids races from other processes adding case differentiated
         # duplicates
-        cu.execute("""
-            SELECT COUNT(userId)
-            FROM Users WHERE LOWER(userName)=LOWER(?)
-        """, user)
-        if cu.next()[0] > 1:
+        cu.execute("SELECT userId FROM Users WHERE LOWER(userName)=LOWER(?)",
+                   user)
+        if len(cu.fetchall()) > 1:
             raise errors.UserAlreadyExists, 'user: %s' % user
 
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
-                   "VALUES (?, ?)",
-                   (ugid, uid))
+                   "VALUES (?, ?)", (ugid, uid))
 
         return uid
 
@@ -148,10 +145,10 @@ class UserAuthorization:
         cu = self.db.cursor()
 
         cu.execute("SELECT userId FROM Users WHERE userName=?", userName)
-        try:
-            return cu.next()[0]
-        except:
-            raise errors.UserNotFound(userName)
+        ret = cu.fetchall()
+        if len(ret):
+            return ret[0][0]
+        raise errors.UserNotFound(userName)
 
     def getUserList(self):
         cu = self.db.cursor()
@@ -406,26 +403,19 @@ class NetworkAuthorization:
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
-        cu = self.db.cursor()
-
+        # check the validity of the userGroupId
         userGroupId = self._getGroupIdByName(userGroup)
 
-        if label is None:
-            labelId = 0
-        else:
-            labelId = cu.execute("SELECT labelId FROM Labels WHERE label=?", 
-                                 label).next()[0]
+        if item is None: item = 'ALL'
+        if label is None: label = 'ALL'
 
-        if item is None:
-            itemId = 0
-        else:
-            itemId = cu.execute("SELECT itemId FROM Items WHERE item=?", 
-                                item).next()[0]
-
-        stmt = """DELETE FROM Permissions
-                  WHERE userGroupId=? AND labelId=? AND itemId=?"""
-
-        cu.execute(stmt, userGroupId, labelId, itemId)
+        cu = self.db.cursor()
+        cu.execute("""
+        DELETE FROM Permissions
+        WHERE userGroupId = ?
+          AND labelId = (SELECT labelId FROM Labels WHERE label=?)
+          AND itemId = (SELECT itemId FROM Items WHERE item=?)
+        """, (userGroupId, label, item))
         self.db.commit()
 
     def addUser(self, user, password):
@@ -440,19 +430,18 @@ class NetworkAuthorization:
 
     def groupCanMirror(self, userGroup):
         cu = self.db.cursor()
-        cu.execute("SELECT canMirror FROM UserGroups WHERE userGroup=?",
+        cu.execute("SELECT canMirror FROM UserGroups "
+                   "WHERE userGroup=? AND canMirror != 0",
                    userGroup)
-        try:
-            canMirror = cu.next()[0]
-        except:
-            raise errors.GroupNotFound
-
-        return canMirror != 0
+        ret = cu.fetchall()
+        if len(ret):
+            return True
+        raise errors.GroupNotFound
 
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
         cu = self.db.transaction()
-        cu.execute("update userGroups set canMirror=? where userGroup=?",
+        cu.execute("UPDATE userGroups SET canMirror=? WHERE userGroup=?",
                    (int(bool(canMirror)), userGroup))
         self.db.commit()
 
@@ -531,32 +520,30 @@ class NetworkAuthorization:
     def _getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
-            userGroupName)
+                   userGroupName)
+        ret = cu.fetchall()
+        if len(ret):
+            return ret[0][0]
+        raise errors.GroupNotFound
 
-        try:
-            return cu.next()[0]
-        except:
-            raise errors.GroupNotFound
 
     def _addGroup(self, cu, userGroupName):
-        cu = self.db.transaction()
         try:
-            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", 
+            cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)",
                        userGroupName)
+            ugid = cu.lastrowid
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-
         # check for case insensitive user conflicts -- avoids race with
         # other adders on case-differentiated names
-        cu.execute("""
-            SELECT COUNT(userGroupId)
-            FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
-        """, userGroupName)
-        if cu.next()[0] > 1:
+        cu.execute("SELECT userGroupId FROM UserGroups "
+                   "WHERE LOWER(UserGroup)=LOWER(?)", userGroupName)
+        if len(cu.fetchall()) > 1:
+            # undo our insert
+            self.db.rollback()
             raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
-
-        return cu.lastrowid
+        return ugid
 
     def addGroup(self, userGroupName):
         cu = self.db.transaction()
@@ -566,29 +553,19 @@ class NetworkAuthorization:
 
     def renameGroup(self, currentGroupName, userGroupName):
         cu = self.db.cursor()
-        #See if we're actually going to do any work:
-
+        if currentGroupName == userGroupName:
+            return True
+        # this will raise constraint violations if we have a case clash
         try:
-            userGroupId = self._getGroupIdByName(currentGroupName)
-        except errors.GroupNotFound:
-            return
-
-        if currentGroupName != userGroupName:
-            try:
-                cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
-            except sqlerrors.ColumnNotUnique:
-                self.db.rollback()
-                raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-
-            # check for case-differentiated duplicates
-            cu.execute("""
-                SELECT COUNT(userGroupId)
-                FROM UserGroups WHERE LOWER(UserGroup)=LOWER(?)
-            """, userGroupName)
-            if cu.next()[0] > 1:
-                raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
-
+            cu.execute("UPDATE UserGroups SET userGroup=? "
+                       "WHERE LOWER(userGroup) = LOWER(?)",
+                       (userGroupName, currentGroupName))
+        except sqlerrors.ColumnNotUnique:
+            self.db.rollback()
+            raise errors.GroupAlreadyExists, "usergroup: %s" % userGroupName
+        else:
             self.db.commit()
+        return True
 
     def updateGroupMembers(self, userGroup, members):
         #Do this in a transaction
@@ -665,16 +642,11 @@ class NetworkAuthorization:
             return entGroupIdList[0]
 
         # admins can do everything
-        cu.execute("""
-                SELECT COUNT(*)
-                    FROM Permissions
-                    WHERE
-                        Permissions.userGroupId IN (%s)
-                      AND
-                       Permissions.admin = 1
-        """ % ",".join(str(x) for x in authGroupIds))
-
-        if cu.next()[0] == 0:
+        cu.execute("SELECT permissionId FROM Permissions "
+                   "WHERE Permissions.userGroupId IN (%s) "
+                   "AND Permissions.admin = 1" %
+                   ",".join(str(x) for x in authGroupIds))
+        if not len(cu.fetchall()):
             raise errors.InsufficientPermission
 
         cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE "
@@ -694,12 +666,13 @@ class NetworkAuthorization:
         if not self.check(authToken, admin = True):
             raise errors.InsufficientPermission
 
-        try:
-            entGroupId = cu.execute("SELECT entGroupId FROM entitlementGroups "
-                                    "WHERE entGroup = ?", entGroup).next()[0]
-        except StopIteration:
+        cu.execute("SELECT entGroupId FROM entitlementGroups "
+                                "WHERE entGroup = ?", entGroup)
+        ret = cu.fetchall()
+        # XXX: should we raise an error here or just go about it silently?
+        if not len(ret):
             raise errors.UnknownEntitlementGroup
-
+        entGroupId = ret[0][0]
         cu.execute("DELETE FROM Entitlements WHERE entGroupId=?",
                    entGroupId)
         cu.execute("DELETE FROM EntitlementOwners WHERE entGroupId=?",
@@ -721,13 +694,10 @@ class NetworkAuthorization:
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # check for duplicates
-        cu.execute("""
-                SELECT COUNT(*) FROM Entitlements WHERE
-                    entGroupId = ? AND entitlement = ?
-                """, entGroupId, entitlement)
-        count = cu.next()[0]
-        if count:
-            raise UserAlreadyExists
+        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?"
+                   (entGroupId, entitlement))
+        if len(cu.fetchall()):
+            raise errors.UserAlreadyExists
 
         cu.execute("INSERT INTO Entitlements (entGroupId, entitlement) VALUES (?, ?)",
                    (entGroupId, entitlement))
@@ -747,12 +717,9 @@ class NetworkAuthorization:
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # if the entitlement doesn't exist, return an error
-        cu.execute("""
-                SELECT COUNT(*) FROM Entitlements WHERE
-                    entGroupId = ? AND entitlement = ?
-                """, entGroupId, entitlement)
-        count = cu.next()[0]
-        if not count:
+        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?"
+                   (entGroupId, entitlement))
+        if not len(cu.fetchall()):
             raise errors.InvalidEntitlement
 
         cu.execute("DELETE FROM Entitlements WHERE entGroupId=? AND "
@@ -767,9 +734,9 @@ class NetworkAuthorization:
         self.log(2, "entGroup=%s userGroup=%s" % (entGroup, userGroup))
 
         # check for duplicate
-        cu.execute("SELECT COUNT(*) FROM EntitlementGroups WHERE "
-                   "entGroup = ?", entGroup)
-        if cu.next()[0]:
+        cu.execute("SELECT entGroupId FROM EntitlementGroups WHERE entGroup = ?",
+                   entGroup)
+        if len(cu.fetchall()):
             raise errors.GroupAlreadyExists
         cu.execute("SELECT userGroupId FROM userGroups WHERE userGroup=?",
                    userGroup)
@@ -791,13 +758,14 @@ class NetworkAuthorization:
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
-        cu.execute("""SELECT userGroup FROM EntitlementGroups
-                        JOIN UserGroups USING (userGroupId)
-                        WHERE entGroup = ?""", entGroup)
-        try:
-            return cu.next()[0]
-        except:
-            return None
+        cu.execute("""
+        SELECT userGroup FROM EntitlementGroups
+        JOIN UserGroups USING (userGroupId)
+        WHERE entGroup = ?""", entGroup)
+        ret = cu.fetchall()
+        if len(ret):
+            return ret[0][0]
+        return None
 
     def getEntitlementOwnerAcl(self, authToken, entGroup):
         """
@@ -807,31 +775,29 @@ class NetworkAuthorization:
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
-        cu.execute("""SELECT userGroup FROM EntitlementGroups
-                        JOIN EntitlementOwners USING (entGroupId)
-                        JOIN UserGroups ON
-                            UserGroups.userGroupId =
-                                EntitlementOwners.ownerGroupId
-                        WHERE entGroup = ?""", entGroup)
-        try:
-            return cu.next()[0]
-        except:
-            return None
+        cu.execute("""
+        SELECT userGroup FROM EntitlementGroups
+        JOIN EntitlementOwners USING (entGroupId)
+        JOIN UserGroups ON UserGroups.userGroupId = EntitlementOwners.ownerGroupId
+        WHERE entGroup = ?""", entGroup)
+        ret = cu.fetchall()
+        if len(ret):
+            return ret[0][0]
+        return None
 
     def _getIds(self, cu, entGroup, userGroup):
         cu.execute("SELECT entGroupId FROM entitlementGroups "
                    "WHERE entGroup = ?", entGroup)
-        try:
-            entGroupId = cu.next()[0]
-        except StopIteration:
+        ent = cu.fetchall()
+        if not len(ret):
             raise errors.UnknownEntitlementGroup
+
         cu.execute("SELECT userGroupId FROM userGroups "
                    "WHERE userGroup = ?", userGroup)
-        try:
-            userGroupId = cu.next()[0]
-        except StopIteration:
+        user = cu.fetchall()
+        if not len(user):
             raise errors.GroupNotFound
-        return entGroupId, userGroupId
+        return ent[0][0],, user[0][0]
 
     def addEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
         """
