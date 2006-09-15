@@ -802,14 +802,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             %(localFlavor)s as localFlavorId,
             UP.acl as acl
         FROM %(trove)s %(domain)s
-        JOIN LabelMap USING (itemid, branchId)
+        JOIN LabelMap ON
+            LabelMap.itemid=Nodes.itemId AND
+            LabelMap.branchId = Nodes.branchId
         JOIN ( SELECT
                    Permissions.labelId as labelId,
                    PerItems.item as acl,
                    Permissions.permissionId as aclId
                FROM
-                   Permissions
-                   JOIN Items as PerItems USING (itemId)
+                   Permissions JOIN Items as PerItems ON
+                       Permissions.itemId = PerItems.itemId
                WHERE
                    Permissions.userGroupId IN (%(ugid)s)
             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
