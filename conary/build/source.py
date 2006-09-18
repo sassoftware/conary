@@ -935,10 +935,14 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     pid = os.fork()
     if not pid:
         try:
-            os.close(wpipe)
-            os.dup2(rpipe, 0)
-            os.chdir(directory)
-            os.execl(*cpioArgs)
+            try:
+                os.close(wpipe)
+                #os.dup2(rpipe, 0)
+                #os.chdir(directory)
+                os.execl(*cpioArgs)
+            except Exception, e:
+                print 'Could not execute %s: %s' % (cpioArgs[0], e)
+                os.close(rpipe)
         finally:
             os._exit(1)
     os.close(rpipe)
@@ -946,7 +950,10 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
         buf = uncompressed.read(16384)
 	if not buf:
 	    break
-	os.write(wpipe, buf)
+        try:
+            os.write(wpipe, buf)
+        except OSError, msg:
+            break
     os.close(wpipe)
     (pid, status) = os.waitpid(pid, 0)
     if not os.WIFEXITED(status):
