@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.31:
   o Client Changes:
     * Conary now restarts itself after updating critical conary
       components (currently, that consists of conary).  Hooks have
