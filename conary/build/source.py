@@ -934,11 +934,13 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     (rpipe, wpipe) = os.pipe()
     pid = os.fork()
     if not pid:
-        os.close(wpipe)
-	os.dup2(rpipe, 0)
-	os.chdir(directory)
-	os.execl(*cpioArgs)
-	os._exit(1)
+        try:
+            os.close(wpipe)
+            os.dup2(rpipe, 0)
+            os.chdir(directory)
+            os.execl(*cpioArgs)
+        finally:
+            os._exit(1)
     os.close(rpipe)
     while 1:
         buf = uncompressed.read(16384)
