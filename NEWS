@@ -41,6 +41,8 @@ Changes in @NEW@:
       certain potentially confusing characters in trove names. (CNY-842)
     * The "cvc commit" command now recognizes .html, .css, .kid, and .cfg
       as extensions that identify text files. (CNY-891)
+    * The PythonSetup build action has been modified to make it
+      clearer what its "dir" and "rootDir" options specify. (CNY-328)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
