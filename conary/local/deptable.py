@@ -996,7 +996,9 @@ class DependencyChecker:
             criticalUpdates = []
         if createGraph:
             depGraph = self._createDepGraph(result, brokenByErase, satisfied,
-                                            linkedJobSets=linkedJobs)
+                                            linkedJobSets=linkedJobs,
+                                            criticalJobs=criticalJobs,
+                                            finalJobs=finalJobs)
         else:
             depGraph = None
 
@@ -1021,7 +1023,7 @@ class DependencyChecker:
         return unsatisfiedList, unresolveableList, changeSetList, criticalUpdates
 
     def createDepGraph(self, linkedJobs=None):
-        unsatisfiedList, unresolveableList, changeSetList, depGraph = \
+        unsatisfiedList, unresolveableList, changeSetList, depGraph, criticalUpdates = \
                 self._check(findOrdering=False, linkedJobs=linkedJobs,
                             createGraph=True)
 
