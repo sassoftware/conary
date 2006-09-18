@@ -37,6 +37,8 @@ Changes in @NEW@:
       can specify a command to run (defaults to "setup.py"). The first
       argument, similar to Configure(), passes arguments to the command being
       specified by setupName. (CNY-355)
+    * The "cvc newpkg" command and the PackageSpec policy now disallow
+      certain potentially confusing characters in trove names. (CNY-842)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
@@ -78,6 +80,11 @@ Changes in @NEW@:
       standard Python threading library, and is fixed in 2.4.3.
       Conary will use a workaround when running under older versions
       of Python. (CNY-795)
+    * Checks have been added to the XML-RPC transport system to see if
+      an abort has been requested while waiting for a response from
+      the server.  This allows the main thread to terminate the
+      changeset download thread if it is waiting for an XML-RPC
+      response from the server.  (CNY-795)
     * Fixed an as-of-yet untriggered bug for an unusual case when multiple
       files being installed share the same content and one of the files
       is erased locally.
@@ -85,16 +92,23 @@ Changes in @NEW@:
       packages. (CNY-869)
     * When you remove a file and replace it with a directory, conary
       treats it as a removal (CNY-872).
+    * Conary's OpenPGP implementation now dynamically uses RIPEMD if
+      it is available from PyCrpyto.  Some PyCrypto builds don't
+      include RIPEMD hash support.  (CNY-868)
+    * A bug that allowed merging changesets with conflicting file
+      contents for configuration files with the same pathId has been
+      fixed.  Applying the resulting merged changeset caused
+      IntegrityErrors.  (CNY-888).
 
   o Optimizations
     * The getFileContents and getFileVersions server side calls have
       been optimized for faster execution
     * The SQL query in getTroveList has been sped up by a 3-5x factor.
+    * dbstore now has support for executemany()
     * Inserts into local database now use executemany().
 
   o Server Changes
     * Several SQL queries have been updated for PostgreSQL compatibility
-    * dbstore now has support for executemany()
 
 Changes in 1.0.30:
   o System Update Changes:

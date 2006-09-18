@@ -1057,6 +1057,34 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         return 0
 
+    def _mergeConfigs(self, otherCs):
+        for pathId, f in otherCs.configCache.iteritems():
+            if not self.configCache.has_key(pathId):
+                self.configCache[pathId] = f
+            if self.configCache[pathId] != f:
+                raise PathIdsConflictError(pathId)
+
+    def _mergeReadOnly(self, otherCs):
+        assert(not self.lastCsf)
+        assert(not otherCs.lastCsf)
+
+        self._mergeConfigs(otherCs)
+        self.fileContainers += otherCs.fileContainers
+        for entry in otherCs.fileQueue:
+            util.tupleListBsearchInsert(self.fileQueue, entry, 
+                                        self.fileQueueCmp)
+
+    def _mergeCs(self, otherCs):
+        assert(otherCs.__class__ ==  ChangeSet)
+
+        self._mergeConfigs(otherCs)
+        wrapper = DictAsCsf(otherCs.fileContents)
+        self.csfWrappers.append(wrapper)
+        entry = wrapper.getNextFile()
+        if entry:
+            util.tupleListBsearchInsert(self.fileQueue,
+                                        entry + (wrapper,), 
+                                        self.fileQueueCmp)
     def merge(self, otherCs):
         self.files.update(otherCs.files)
 
@@ -1071,46 +1099,28 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             del self.oldTroves[:]
             self.oldTroves.extend(l)
 
-        if isinstance(otherCs, ReadOnlyChangeSet):
-            assert(not self.lastCsf)
-            assert(not otherCs.lastCsf)
-
-            self.configCache.update(otherCs.configCache)
-            self.fileContainers += otherCs.fileContainers
-
-            try:
-                for entry in otherCs.fileQueue:
-                    util.tupleListBsearchInsert(self.fileQueue, entry, 
-                                                self.fileQueueCmp)
-            except PathIdsConflictError, err:
-                pathId = err.pathId
-                # look up the trove and file that caused the pathId 
-                # conflict.  
-                troves = set(itertools.chain(self.iterNewTroveList(),
-                                             otherCs.iterNewTroveList()))
-                conflicts = []
-                for myTrove in troves:
-                    files = (myTrove.getNewFileList() 
-                             + myTrove.getChangedFileList())
-                    conflicts.extend((myTrove, x) for x in files if x[0] == pathId)
-                if len(conflicts) >= 2:
-                    raise PathIdsConflictError(pathId,
-                                               conflicts[0][0], conflicts[0][1],
-                                               conflicts[1][0], conflicts[1][1])
-                else:
-                    raise
-
-        else:
-            assert(otherCs.__class__ ==  ChangeSet)
-            self.configCache.update(otherCs.configCache)
-
-            wrapper = DictAsCsf(otherCs.fileContents)
-            self.csfWrappers.append(wrapper)
-            entry = wrapper.getNextFile()
-            if entry:
-                util.tupleListBsearchInsert(self.fileQueue,
-                                            entry + (wrapper,), 
-                                            self.fileQueueCmp)
+        try:
+            if isinstance(otherCs, ReadOnlyChangeSet):
+                self._mergeReadOnly(otherCs)
+            else:
+                self._mergeCs(otherCs)
+        except PathIdsConflictError, err:
+            pathId = err.pathId
+            # look up the trove and file that caused the pathId
+            # conflict.
+            troves = set(itertools.chain(self.iterNewTroveList(),
+                                         otherCs.iterNewTroveList()))
+            conflicts = []
+            for myTrove in sorted(troves):
+                files = (myTrove.getNewFileList()
+                         + myTrove.getChangedFileList())
+                conflicts.extend((myTrove, x) for x in files if x[0] == pathId)
+            if len(conflicts) >= 2:
+                raise PathIdsConflictError(pathId,
+                                           conflicts[0][0], conflicts[0][1],
+                                           conflicts[1][0], conflicts[1][1])
+            else:
+                raise
 
     def reset(self):
         for csf in self.fileContainers:

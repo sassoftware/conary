@@ -22,7 +22,7 @@ import site
 import stat
 import sys
 
-from conary import files
+from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
@@ -414,6 +414,9 @@ class PackageSpec(_filterSpec):
 
 	for (filteritem) in self.extraFilters:
 	    name = filteritem[0] % self.macros
+            if not trove.troveNameIsValid(name):
+                self.error('%s is not a valid package name', name)
+
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
 	    pkgFilters.append(filter.Filter(*filterargs))
 	# by default, everything that hasn't matched a pattern in the

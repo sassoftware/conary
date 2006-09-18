@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,7 +16,10 @@ import base64
 import os
 import sha
 import md5
-from Crypto.Hash import RIPEMD
+try:
+    from Crypto.Hash import RIPEMD
+except ImportError:
+    RIPEMD = 'RIPEMD'
 import StringIO
 from Crypto.Cipher import AES
 from Crypto.Cipher import DES3
@@ -1163,11 +1166,10 @@ def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
         cipherAlg = ciphers[algType]
         s2kType = readBlockType(keyRing)
         hashType = readBlockType(keyRing)
-        if hashType in (1, 2, 3):
-            hashAlg = hashes[hashType]
-        else:
-            if hashType > len(hashes) - 1:
-                hashType = 0
+        if hashType > len(hashes) - 1:
+            hashType = 0
+        hashAlg = hashes[hashType]
+        if isinstance(hashAlg, str):
             raise IncompatibleKey('Hash algortihm %s is not implemented. '
                                   'Key not readable' %hashes[hashType])
         # RFC 2440 3.6.1.1
