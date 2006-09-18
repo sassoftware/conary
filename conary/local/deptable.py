@@ -996,7 +996,7 @@ class DependencyChecker:
             criticalUpdates = []
         if createGraph:
             depGraph = self._createDepGraph(result, brokenByErase, satisfied,
-                                            finalJobs, linkedJobSets=linkedJobs)
+                                            linkedJobSets=linkedJobs)
         else:
             depGraph = None
 
