@@ -937,8 +937,8 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
         try:
             try:
                 os.close(wpipe)
-                #os.dup2(rpipe, 0)
-                #os.chdir(directory)
+                os.dup2(rpipe, 0)
+                os.chdir(directory)
                 os.execl(*cpioArgs)
             except Exception, e:
                 print 'Could not execute %s: %s' % (cpioArgs[0], e)
