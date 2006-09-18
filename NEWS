@@ -39,6 +39,8 @@ Changes in @NEW@:
       specified by setupName. (CNY-355)
     * The "cvc newpkg" command and the PackageSpec policy now disallow
       certain potentially confusing characters in trove names. (CNY-842)
+    * The "cvc commit" command now recognizes .html, .css, .kid, and .cfg
+      as extensions that identify text files. (CNY-891)
 
   o Bug Fixes:
     * Conary commands do not perform an unnecessary database checks on the
