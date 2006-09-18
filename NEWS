@@ -52,6 +52,10 @@ Changes in @NEW@:
       has been added, which can specify a command to run (defaults to
       "setup.py"). The first argument, similar to Configure(), passes
       arguments to the command being specified by setupName. (CNY-355)
+    * The "cvc commit" command now recognizes .html, .css, .kid, and .cfg
+      as extensions that identify text files. (CNY-891)
+    * The PythonSetup build action has been modified to make it
+      clearer what its "dir" and "rootDir" options specify. (CNY-328)
 
   o Bug Fixes:
     * Conary commands no longer perform an unnecessary database check

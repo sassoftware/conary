@@ -100,10 +100,10 @@ class DepResolutionMethod(object):
                             depSet = depSet[0:5] + ['...']
                         depSet = '\n               '.join(depSet)
                         log.debug('Resolved:\n' 
-                                  '    %s=%s[%s]\n'
+                                  '    %s=%s/%s[%s]\n'
                                   '    Required:  %s\n'
-                                  '    Adding: %s=%s[%s]',
-                                     troveTup[0], troveTup[1].trailingRevision(),troveTup[2], depSet, choice[0], choice[1].trailingRevision(), choice[2])
+                                  '    Adding: %s=%s/%s[%s]',
+                                     troveTup[0], troveTup[1].trailingLabel(), troveTup[1].trailingRevision(),troveTup[2], depSet, choice[0], choice[1].trailingLabel(), choice[1].trailingRevision(), choice[2])
 
                 troves.update([ (x[0], (None, None), x[1:], True)
                                 for x in suggList ])

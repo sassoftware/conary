@@ -61,8 +61,9 @@ nonCfgRe = re.compile(r'^.*\.(%s)$' % '|'.join((
 cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
     # extensions
     '(1|2|3|4|5|6|7|8|9)',
-    'c', 'cnf', 'conf', 'CONFIG.*', 'console.*', 'cron.*', '(c|)sh',
-    'desktop', 'diff', 'h', 'init', 'logrotate',
+    'c', 'cfg', 'cnf', 'conf', 'CONFIG.*',
+    'console.*', 'cron.*', '(c|)sh', 'css',
+    'desktop', 'diff', 'h', 'html', 'init', 'kid', 'logrotate',
     'pam(d|)', 'patch', 'pl', 'py',
     'recipe', 'sysconfig',
     'tag(handler|description)', 'tmpwatch', 'txt',
