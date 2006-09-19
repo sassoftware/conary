@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary now runs tagscripts correctly when passed a relative root 
       parameter (CNY-416).
+    * cvc log now works when there are multiple branches matching for the
+      same trove on the same label.
 
 Changes in 1.0.31:
   o Client Changes:
