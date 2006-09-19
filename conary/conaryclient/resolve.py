@@ -477,6 +477,11 @@ class DependencySolver(object):
         for resolveInfo in cannotResolve:
             (reqInfo, depSet, provInfoList) = resolveInfo
 
+            if reqInfo in newIdx:
+                # The thing with the requirement is something we asked 
+                # to be installed - don't try to update it again!
+                continue
+
             found = False
             for provInfo in provInfoList:
                 if provInfo in ineligible:
@@ -490,6 +495,7 @@ class DependencySolver(object):
             if found:
                 continue
 
+            ineligible.update(provInfoList)
             for provInfo in provInfoList:
                 if provInfo not in oldIdx:
                     continue

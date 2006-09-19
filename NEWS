@@ -112,14 +112,18 @@ Changes in 1.0.31:
     * A traceback that occurred when a manually removed file switches
       packages during an update has been fixed. (CNY-869)
     * When you remove a file and replace it with a directory, Conary
-      now treats it as a removal (CNY-872).
+      now treats it as a removal. (CNY-872)
     * Conary's OpenPGP implementation now dynamically uses RIPEMD if
       it is available from PyCrpyto.  Some PyCrypto builds don't
-      include RIPEMD hash support.  (CNY-868)
+      include RIPEMD hash support. (CNY-868)
     * A bug that allowed merging changesets with conflicting file
       contents for configuration files with the same pathId has been
       fixed.  Applying the resulting merged changeset caused
-      IntegrityErrors.  (CNY-888).
+      IntegrityErrors.  (CNY-888)
+    * Fixed resolveLevel 2 so that it does not try to update packages that
+      are already a part of the update. (CNY-886, CNY-780)
+    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
+      the same update. (CNY-887)
 
 Changes in 1.0.30:
   o System Update Changes:
