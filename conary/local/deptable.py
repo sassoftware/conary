@@ -916,16 +916,15 @@ class DependencyChecker:
                 self.workTables.removeTrove((job[0], job[1][0], job[1][1]), 
                                             nodeId)
             else:
-                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                                withFiles = False)
+                (provides, requires) = self.troveSource.getDepsForTroveList(
+                                        [ (job[0], job[2][0], job[2][1]) ])[0]
 
                 newNodeId = self._addJob(job)
 
-                provides = trv.getProvides()
                 # this reduces the size of our tables by removing things
                 # which this trove both provides and requires conary 1.0.11
                 # and later remove these from troves at build time
-                requires = trv.getRequires() - provides
+                requires = requires - provides
 
                 self.workTables._populateTmpTable(depList = self.depList,
                                                   troveNum = -newNodeId,

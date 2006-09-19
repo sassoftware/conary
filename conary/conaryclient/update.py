@@ -1310,9 +1310,8 @@ conary erase '%s=%s[%s]'
         oldJobs = itertools.izip((x for x in jobSet if x[1][1][0]),
                                  pathHashesList)
 
-        getNewTrove = troveSource.getTrove
-        newJobs = ((x, getNewTrove(x[1][0], x[1][2][0], x[1][2][1],
-                                   withFiles=False).getPathHashes())
+        getHashes = troveSource.getPathHashesForTroveList
+        newJobs = ((x, getHashes([(x[1][0], x[1][2][0], x[1][2][1])])[0])
                    for x in jobSet if x[1][2][0])
 
         for ((idx, job), pathHashes) in itertools.chain(oldJobs, newJobs):
@@ -2426,7 +2425,7 @@ conary erase '%s=%s[%s]'
                         [ (x[0], x[2][0], x[2][1]) for x in jobList ],
                         withFiles = False)
                 paths = [ x.getPathHashes() for x in trvs ]
-                
+
                 for i, job in enumerate(jobList):
                     for j in range(i):
                         if not paths[i].compatibleWith(paths[j]):

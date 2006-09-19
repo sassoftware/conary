@@ -170,6 +170,11 @@ class AbstractTroveSource:
             for i, troveList in enumerate(trovesByDepList):
                 lst[i].extend(troveList)
 
+    def getPathHashesForTroveList(self, troveList):
+        raise NotImplementedError
+
+    def getDepsForTroveList(self, troveList):
+        raise NotImplementedError
 
 # constants mostly stolen from netrepos/netserver
 _GET_TROVE_ALL_VERSIONS = 1
@@ -643,6 +648,39 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
     def getFileVersion(self, pathId, fildId, version):
         # TODO: implement getFileVersion for changeset source
         raise KeyError
+
+    def getDepsForTroveList(self, troveList):
+        # returns a list of (prov, req) pairs
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                return SearchableTroveSource.getDepsForTroveList(self,
+                                                                 troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            retList.append((trvCs.getProvides(), trvCs.getRequires()))
+
+        return retList
+
+    def getPathHashesForTroveList(self, troveList):
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                return SearchableTroveSource.getPathHashesForTroveList(self,
+                                                                   troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            if trvCs.getOldVersion() is not None:
+                trv = self.getTrove(*info)
+                retList.append(trv.getPathHashes())
+            else:
+                retList.append(trvCs.getNewPathHashes())
+
+        return retList
 
     def getTroves(self, troveList, withFiles = True):
         retList = []
