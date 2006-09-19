@@ -1354,8 +1354,10 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
 
             try:
                 # the child should control stdin -- if stdin is a tty
-                # that can be controlled
-                if sys.stdin.isatty():
+                # that can be controlled, and we're not piping output
+                # to some other process that should be controlling it
+                # (like less).
+                if sys.stdin.isatty() and sys.stdout.isatty():
                     os.tcsetpgrp(0, os.getpgrp())
             except AttributeError:
                 # stdin might not even have an isatty method
