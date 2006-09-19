@@ -4,6 +4,11 @@ Changes in @NEW@:
       parameter (CNY-416).
     * cvc log now works when there are multiple branches matching for the
       same trove on the same label.
+    * Fixed resolveLevel 2 so that it does not try to update packages that
+      are already a part of the update. (CNY-886, CNY-780)
+    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
+      the same update. (CNY-887)
+    * cvc cook | less now leaves less in control of the terminal. (CNY-802)
 
 Changes in 1.0.31:
   o Client Changes:
@@ -127,10 +132,6 @@ Changes in 1.0.31:
       contents for configuration files with the same pathId has been
       fixed.  Applying the resulting merged changeset caused
       IntegrityErrors.  (CNY-888)
-    * Fixed resolveLevel 2 so that it does not try to update packages that
-      are already a part of the update. (CNY-886, CNY-780)
-    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
-      the same update. (CNY-887)
 
 Changes in 1.0.30:
   o System Update Changes:
