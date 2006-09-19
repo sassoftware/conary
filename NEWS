@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Conary now runs tagscripts correctly when passed a relative root 
+      parameter (CNY-416).
+
 Changes in 1.0.31:
   o Client Changes:
     * Conary now restarts itself after updating critical conary
