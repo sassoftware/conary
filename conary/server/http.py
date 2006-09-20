@@ -714,6 +714,8 @@ class HttpHandler(WebHandler):
     @strFields(entClass = None, entOwner = None)
     @listFields(str, userGroupList = [])
     def addEntClass(self, auth, entOwner, userGroupList, entClass):
+        if len(userGroupList) < 1:
+            return self._write("error", error="No access groups specified")
         self.repServer.auth.addEntitlementGroup(auth, entClass,
                                                 userGroupList[0])
         self.repServer.auth.setEntitlementClassAccessGroup(auth,
