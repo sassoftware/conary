@@ -23,7 +23,11 @@ Changes in @NEW@:
     * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
       the same update. (CNY-887)
     * cvc cook | less now leaves less in control of the terminal. (CNY-802)
-    * The download thread terminating during an update is now a fatal error.
+    * The download thread terminating during an update is now a fatal
+      error.
+    * The web interface to a conary repository will now print an error
+      message instead of a traceback when adding an entitlement class
+      with access to a group that does not exist.
 
 Changes in 1.0.31:
   o Client Changes:
