@@ -1,14 +1,4 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Conary now runs tagscripts correctly when passed a relative root 
-      parameter (CNY-416).
-    * cvc log now works when there are multiple branches matching for the
-      same trove on the same label.
-    * Fixed resolveLevel 2 so that it does not try to update packages that
-      are already a part of the update. (CNY-886, CNY-780)
-    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
-      the same update. (CNY-887)
-    * cvc cook | less now leaves less in control of the terminal. (CNY-802)
   o Optimizations
     * Duplicate trove instantiations have been removed. Build requires are
       no longer thawed out of abstract change sets, and methods were added
@@ -22,7 +12,22 @@ Changes in @NEW@:
       and then update foo and its containing group at the same time would
       cause conary to try to reinstall the original foo (resulting in path
       conflicts). (CNY-915)
-    * The download thread terminating during an update is now a fatal error.
+
+  o Bug Fixes:
+    * Conary now runs tagscripts correctly when passed a relative root 
+      parameter (CNY-416).
+    * cvc log now works when there are multiple branches matching for the
+      same trove on the same label.
+    * Fixed resolveLevel 2 so that it does not try to update packages that
+      are already a part of the update. (CNY-886, CNY-780)
+    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
+      the same update. (CNY-887)
+    * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+    * The download thread terminating during an update is now a fatal
+      error.
+    * The web interface to a conary repository will now print an error
+      message instead of a traceback when adding an entitlement class
+      with access to a group that does not exist.
 
 Changes in 1.0.31:
   o Client Changes:
