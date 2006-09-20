@@ -9,6 +9,13 @@ Changes in @NEW@:
     * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
       the same update. (CNY-887)
     * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+  o Optimizations
+    * Duplicate trove instantiations have been removed. Build requires are
+      no longer thawed out of abstract change sets, and methods were added
+      to get dependency and path hash information directly from trove
+      change set objects. These changes combined for a 50% speedup an
+      update --info of a large group into an empty root and saved a few
+      megs of memory as well (CNY-892)
 
 Changes in 1.0.31:
   o Client Changes:
