@@ -394,84 +394,32 @@ class ClientUpdate:
 
             return fullSet
 
-        def _filterJobListByLocalUpdates(jobList, availableTrv, existsTrv,
-                                         localUpdatesByPresent,
-                                         localUpdatesByMissing):
-            # consider a system where version 1 of a trove foo
-            # has been replaced locally by version 2.
-            #
-            # now there are two updates available for foo, 3 and 4.  One
-            # will match the _missing_ side of the local update, and the other
-            # will match the _present_ side.
-            # 
-            # Due to the local update, conary will try to remove version 2
-            # once for missing update and once for the present one.
+        def _filterDoubleRemovesDueToLocalUpdates(newJob, replacedJobs):
+            # it's possible that a locally removed half of a local update
+            # trove will match up to something that is due to be installed
+            # despite the fact that its match has been removed by the user.
+            # We don't want to disallow that type of match - it is useful
+            # information and may be corrrect.  However, we don't want to
+            # have a double removal, which is what will happen in some cases
+            # - conary will switch the erased version mentioned in the local 
+            # update to the installed version, which could be a part of 
+            # another update.  In such cases, we remove the "erase" part
+            # of the local update.
+            eraseCount = {}
+            for job in newJob:
+                oldInfo = job[0], job[1][0], job[1][1]
+                if oldInfo in replacedJobs:
+                    if oldInfo in eraseCount:
+                        eraseCount[oldInfo] += 1
+                    else:
+                        eraseCount[oldInfo] = 1
 
-            # We fix this by asserting that the present side always wins
-            # in this case.  The update that matches the missing side needs
-            # to be recalculated now, since its initial match was wrong.
-            # This process may need to be repeated, since the recalculation 
-            # for the missing trove may result in this situation reappearing
-
-            # NOTE: we used to not have this problem because we would not
-            # include the present version of local updates in the exists
-            # list.  But that meant that in some cases we made poor matches.
-
-            if not localUpdatesByPresent:
-                return jobList
-
-            finalJobList = []
-            while jobList:
-                # look for cases where one job matches the localUpdateMissing
-                # entry for a job and the other matches the localUpdatePresent
-                # one.  
-
-                localUpdateMissing = []
-                localUpdatePresent = []
-                for job in jobList:
-                    if job[1][0] and job[2][0]:
-                        oldInfo = job[0], job[1][0], job[1][1]
-                        if oldInfo in localUpdatesByPresent:
-                            localUpdatePresent.append(oldInfo)
-                        elif oldInfo in localUpdatesByMissing:
-                            presentInfo = ((job[0],)
-                                            + localUpdatesByMissing[oldInfo])
-                            localUpdateMissing.append(presentInfo)
-
-                localUpdatePresent = set(localUpdatePresent)
-                localUpdatePresent.intersection_update(localUpdateMissing)
-                if not localUpdatePresent:
-                    finalJobList.append(jobList)
-                    break
-                else:
-                    # we've found some jobs that need to be reworked.
-                    # keep the jobs that were the updates for the "present"
-                    # trove, and any jobs that are for trove names that
-                    # don't involve a reworked job.
-
-                    redoNames = set(x[0] for x in localUpdatePresent)
-                    toKeep = [ x for x in jobList
-                            if x[0] not in redoNames
-                            or (x[0], x[1][0], x[1][1]) in localUpdatePresent ]
-                    delExists = existsTrv.delTrove
-                    delAvail = availableTrove.delTrove
-
-                    # don't rediff troves that are in the toKeep list.
-                    [ delExists(x[0], x[1][0], x[1][1], False)
-                      for x in toKeep if x[1][0] ]
-                    [ delAvail(x[0], x[2][0], x[2][1], False)
-                      for x in toKeep if x[2][0] ]
-
-                    # don't rediff the "missing" half of the local updates
-                    # that we've already said is present.
-                    [ delExists(x[0], missingOkay=False,
-                                *localUpdatesByPresent[x])
-                       for x in localUpdatePresent ]
-
-                    finalJobList.append(toKeep)
-                    jobList = availableTrove.diff(existsTrv)[2]
-
-            return list(itertools.chain(*finalJobList))
+            doubleErased = [ x[0] for x in eraseCount.iteritems() if x[1] > 1 ]
+            for oldInfo in doubleErased:
+                newJob.remove((oldInfo[0], (oldInfo[1], oldInfo[2]),
+                               replacedJobs[oldInfo], False))
+                newJob.add((oldInfo[0], (None, None), 
+                            replacedJobs[oldInfo], False))
 
 
 
@@ -653,10 +601,6 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
         jobList = availableTrove.diff(existsTrv)[2]
-        jobList = _filterJobListByLocalUpdates(jobList, availableTrove,
-                                               existsTrv,
-                                               localUpdatesByPresent,
-                                               localUpdatesByMissing)
 
         # alreadyReferenced troves are in both the update set 
         # and the installed set.  They are a good match for themselves.
@@ -701,6 +645,7 @@ class ClientUpdate:
         # ensure the user-specified respect branch affinity setting is not 
         # lost.
         neverRespectBranchAffinity = not respectBranchAffinity
+        replacedJobs = {}
 
         while newTroves:
             # newTroves tuple values
@@ -838,6 +783,7 @@ followLocalChanges: %s
                             if replaced[0]:
                                 log.lowlevel('following local changes')
                                 childrenFollowLocalChanges = True
+                                replacedJobs[replacedInfo] = (newInfo[1], newInfo[2])
                     elif replacedInfo in referencedNotInstalled:
                         # the trove on the local system is one that's referenced
                         # but not installed, so, normally we would not install
@@ -889,6 +835,7 @@ followLocalChanges: %s
 
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
+                        replacedJobs[replacedInfo] = (newInfo[1], newInfo[2])
                         log.lowlevel('using local update to replace %s, following local changes', replacedInfo)
 
                     elif not installRedirects:
@@ -1171,6 +1118,7 @@ followLocalChanges: %s
                                   childrenFollowLocalChanges,
                                   updateOnly))
 
+        _filterDoubleRemovesDueToLocalUpdates(newJob, replacedJobs)
         for job in notByDefaultRemovals:
             if job not in newJob:
                 erasePrimaries.add((job[0], job[1], (None, None), False))
