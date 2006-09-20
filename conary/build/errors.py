@@ -39,7 +39,9 @@ class GroupPathConflicts(CookError):
                 errStrings.append('\n    Troves:')
                 errStrings.extend('      %s=%s[%s]' % x for x in conflictSet)
                 errStrings.append('\n    Conflicting Files:')
-                errStrings.extend('      %s' % x for x in paths)
+                errStrings.extend('      %s' % x for x in sorted(paths)[0:11])
+                if len(paths) > 10:
+                    errStrings.append('      ... (%s more)' % (len(paths) - 10))
                 errStrings.append('')
             
         self.args = """

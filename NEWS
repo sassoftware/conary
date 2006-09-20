@@ -9,6 +9,9 @@ Changes in @NEW@:
     * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
       the same update. (CNY-887)
     * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+    * cvc cook group now limits the number of path conflicts displayed for 
+      one trove to 10. (CNY-910)
+
   o Optimizations
     * Duplicate trove instantiations have been removed. Build requires are
       no longer thawed out of abstract change sets, and methods were added
