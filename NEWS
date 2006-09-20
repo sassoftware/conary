@@ -12,7 +12,6 @@ Changes in @NEW@:
       and then update foo and its containing group at the same time would
       cause conary to try to reinstall the original foo (resulting in path
       conflicts). (CNY-915)
-    * The download thread terminating during an update is now a fatal error.
 
   o Bug Fixes:
     * Conary now runs tagscripts correctly when passed a relative root 
@@ -24,6 +23,7 @@ Changes in @NEW@:
     * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
       the same update. (CNY-887)
     * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+    * The download thread terminating during an update is now a fatal error.
 
 Changes in 1.0.31:
   o Client Changes:
