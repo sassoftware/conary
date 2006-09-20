@@ -170,6 +170,11 @@ class AbstractTroveSource:
             for i, troveList in enumerate(trovesByDepList):
                 lst[i].extend(troveList)
 
+    def getPathHashesForTroveList(self, troveList):
+        raise NotImplementedError
+
+    def getDepsForTroveList(self, troveList):
+        raise NotImplementedError
 
 # constants mostly stolen from netrepos/netserver
 _GET_TROVE_ALL_VERSIONS = 1
@@ -527,7 +532,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.rooted = {}
         self.idMap = {}
         self.storeDeps = storeDeps
-        self._troveCache = {}
 
         if storeDeps:
             self.depDb = deptable.DependencyDatabase()
@@ -644,6 +648,39 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         # TODO: implement getFileVersion for changeset source
         raise KeyError
 
+    def getDepsForTroveList(self, troveList):
+        # returns a list of (prov, req) pairs
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                return SearchableTroveSource.getDepsForTroveList(self,
+                                                                 troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            retList.append((trvCs.getProvides(), trvCs.getRequires()))
+
+        return retList
+
+    def getPathHashesForTroveList(self, troveList):
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                return SearchableTroveSource.getPathHashesForTroveList(self,
+                                                                   troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            if trvCs.getOldVersion() is not None:
+                trv = self.getTrove(*info)
+                retList.append(trv.getPathHashes())
+            else:
+                retList.append(trvCs.getNewPathHashes())
+
+        return retList
+
     def getTroves(self, troveList, withFiles = True):
         retList = []
 
@@ -651,12 +688,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             if info not in self.troveCsMap:
                 retList.append(None)
                 continue
-            # NOTE: Turned off troveCache - turning it on took up an
-            # extra 75M when grabbing all troves out of a changeset for
-            # group-dist.
-            #if info, withFiles in self._troveCache:
-            #    retList.append(self._troveCache[info, withFiles])
-            #    continue
 
             trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
             if trvCs.getOldVersion() is None:
@@ -674,7 +705,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 newTrove.applyChangeSet(trvCs,
                                         skipFiles = not withFiles,
                                         skipIntegrityChecks = not withFiles)
-            #self._troveCache[info, withFiles] = newTrove
             retList.append(newTrove)
 
         return retList
