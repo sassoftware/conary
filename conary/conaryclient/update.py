@@ -2630,9 +2630,9 @@ conary erase '%s=%s[%s]'
                         except Queue.Empty:
                             if downloadThread.isAlive():
                                 continue
-                            log.warning('download thread terminated '
-                                        'unexpectedly')
-                            break
+
+                            raise UpdateError('error: download thread terminated'
+                                              ' unexpectedly, cannot continue update')
                         if newCs is None:
                             break
                         i += 1
