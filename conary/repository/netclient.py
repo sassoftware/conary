@@ -311,7 +311,11 @@ class ServerCache:
                                                  serverName)
         elif userInfo:
             s = url.split('/')
-            assert(not s[1])
+            if s[1]:
+                # catch "http/server/"
+                raise errors.OpenError(
+                    'Invalid URL "%s" when trying access the %s repository. '
+                    'Check your repositoryMap entries' % (url, serverName))
             s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
             url = '/'.join(s)
             usedMap = True
