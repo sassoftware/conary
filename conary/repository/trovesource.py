@@ -675,7 +675,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             trvCs = cs.getNewTroveVersion(*info)
             if trvCs.getOldVersion() is not None:
-                trv = self.getTrove(*info)
+                trv = self.getTrove(withFiles=False, *info)
                 retList.append(trv.getPathHashes())
             else:
                 retList.append(trvCs.getNewPathHashes())
