@@ -14,12 +14,13 @@
 
 # implements a db-based repository
 
+import errno
 import traceback
 import sys
 
 from conary import files, trove
 from conary.deps import deps
-from conary.lib import util, openpgpfile
+from conary.lib import util, openpgpfile, sha1helper
 from conary.repository import changeset, errors, filecontents
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
@@ -32,6 +33,9 @@ class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, *args, **kw):
         self.mirror = kw.pop('mirror', False)
         ChangeSetJob.__init__(self, *args, **kw)
+
+    def markTroveRemoved(self, name, version, flavor):
+        self.repos.markTroveRemoved(name, version, flavor)
 
     def checkTroveCompleteness(self, trv):
         if not self.mirror and not trv.troveInfo.sigs.sha1():
@@ -166,6 +170,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         else:
             self.troveStore.commit()
 
+    def markTroveRemoved(self, name, version, flavor):
+        sha1s = self.troveStore.markTroveRemoved(name, version, flavor)
+        for sha1 in sha1s:
+            try:
+                self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
+
     def getFileContents(self, itemList):
         contents = []
 
@@ -210,6 +223,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         externalTroveList = []
         externalFileList = []
+        removedTroveList = []
 
 	dupFilter = {}
 
@@ -296,6 +310,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 self.troveStore = troveStore
                 self.withFiles = withFiles
 
+        # def createChangeSet begins here
+
         troveWrapper = troveListWrapper(troveList, self.troveStore, withFiles)
 
         for job in troveWrapper:
@@ -346,11 +362,19 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		continue
 
             if (newVersion.getHost() not in self.serverNameList
-                or (oldVersion and oldVersion.getHost() not in self.serverNameList)):
+                or (oldVersion and
+                    oldVersion.getHost() not in self.serverNameList)):
                 # don't try to make changesets between repositories; the
                 # client can do that itself
+
+                # we don't generate chagnesets between removed and
+                # present troves; that's up to the client
                 externalTroveList.append((troveName, (oldVersion, oldFlavor),
                                      (newVersion, newFlavor), absolute))
+                continue
+            elif (oldVersion and old.type() == trove.TROVE_TYPE_REMOVED):
+                removedTroveList.append((troveName, (oldVersion, oldFlavor),
+                                        (newVersion, newFlavor), absolute))
                 continue
 
 	    (troveChgSet, filesNeeded, pkgsNeeded) = \
@@ -468,4 +492,4 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
 
-	return (cs, externalTroveList, externalFileList)
+	return (cs, externalTroveList, externalFileList, removedTroveList)
