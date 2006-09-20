@@ -1,3 +1,34 @@
+Changes in @NEW@:
+  o Optimizations
+    * Duplicate trove instantiations have been removed. Build requires are
+      no longer thawed out of abstract change sets, and methods were added
+      to get dependency and path hash information directly from trove
+      change set objects. These changes combined for a 50% speedup an
+      update --info of a large group into an empty root and saved a few
+      megs of memory as well (CNY-892)
+    * Conary update now respects local changes when a group update occurs
+      along with the update of the switched trove.  For example, switch
+      foo to be installed from another branch instead of the default, 
+      and then update foo and its containing group at the same time would
+      cause conary to try to reinstall the original foo (resulting in path
+      conflicts). (CNY-915)
+
+  o Bug Fixes:
+    * Conary now runs tagscripts correctly when passed a relative root 
+      parameter (CNY-416).
+    * cvc log now works when there are multiple branches matching for the
+      same trove on the same label.
+    * Fixed resolveLevel 2 so that it does not try to update packages that
+      are already a part of the update. (CNY-886, CNY-780)
+    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
+      the same update. (CNY-887)
+    * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+    * The download thread terminating during an update is now a fatal
+      error.
+    * The web interface to a conary repository will now print an error
+      message instead of a traceback when adding an entitlement class
+      with access to a group that does not exist.
+
 Changes in 1.0.31:
   o Client Changes:
     * Conary now restarts itself after updating critical conary
@@ -112,14 +143,14 @@ Changes in 1.0.31:
     * A traceback that occurred when a manually removed file switches
       packages during an update has been fixed. (CNY-869)
     * When you remove a file and replace it with a directory, Conary
-      now treats it as a removal (CNY-872).
+      now treats it as a removal. (CNY-872)
     * Conary's OpenPGP implementation now dynamically uses RIPEMD if
       it is available from PyCrpyto.  Some PyCrypto builds don't
-      include RIPEMD hash support.  (CNY-868)
+      include RIPEMD hash support. (CNY-868)
     * A bug that allowed merging changesets with conflicting file
       contents for configuration files with the same pathId has been
       fixed.  Applying the resulting merged changeset caused
-      IntegrityErrors.  (CNY-888).
+      IntegrityErrors.  (CNY-888)
 
 Changes in 1.0.30:
   o System Update Changes:

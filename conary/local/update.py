@@ -2061,6 +2061,7 @@ class TagCommand:
         return False
 
     def run(self, tagScript, root, preScript=False):
+        root = os.path.realpath(root)
         if tagScript:
             if preScript:
                 pre = "# "
@@ -2157,6 +2158,7 @@ class TagCommand:
                         os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
                         os.chdir(root)
                         if root != '/':
+                            assert(root[0] == '/')
                             os.chroot(root)
                         os.execv(command[0], command)
                     except Exception, e:

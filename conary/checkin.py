@@ -1346,8 +1346,8 @@ def showLog(repos, branch = None):
 
     troveName = state.getName()
 
-    verList = repos.getTroveVersionsByLabel(
-                            { troveName : { branch.label() : None } } )
+    verList = repos.getTroveVersionsByBranch(
+                            { troveName : { branch : None } } )
     if not verList:
         log.error('nothing has been committed')
         return
@@ -1356,7 +1356,6 @@ def showLog(repos, branch = None):
     verList.reverse()
     l = []
     for version in verList:
-	if version.branch() != branch: return
 	l.append((troveName, version, deps.deps.Flavor()))
 
     print "Name  :", troveName
