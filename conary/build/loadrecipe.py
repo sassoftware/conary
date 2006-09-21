@@ -27,7 +27,7 @@ from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary.lib import util
+from conary.lib import log, util
 from conary.local import database
 from conary import versions
 
@@ -313,17 +313,19 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
     """
     scores = [ (_scoreLoadRecipeChoice(labelPath, x[1]), x) for x in troveTups ]
     maxScore = max(scores)[0]
-    troveTups = [x[1] for x in scores if x[0] == maxScore ]
+    troveTups = [x for x in scores if x[0] == maxScore ]
 
     if len(troveTups) <= 1:
-        return troveTups
+        return [x[1] for x in troveTups]
     else:
         byBranch = {}
-        for troveTup in troveTups:
+        for score, troveTup in troveTups:
             branch = troveTup[1].branch()
             if branch in byBranch:
-                byBranch[branch] = max(byBranch[branch], troveTup)
-        return byBranch.values()
+                byBranch[branch] = max(byBranch[branch], (score, troveTup))
+            else:
+                byBranch[branch] = (score, troveTup)
+        return [x[1] for x in byBranch.itervalues()]
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
@@ -342,7 +344,6 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
         if not cfg.buildLabel:
              raise builderrors.LoadRecipeError(
             'no build label set -  cannot find source component %s' % component)
-            
 	labelPath = [cfg.buildLabel]
     if repos is None:
         raise builderrors.LoadRecipeError(
@@ -357,13 +358,13 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     if filterVersions:
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:
-        pkgs = sorted(pkgs)
-        raise builderrors.LoadRecipeError(
-                              "source component %s has multiple versions "
-                              "on labelPath %s: %s"
-                              %(component,
-                                ', '.join(x.asString() for x in labelPath),
-                                ', '.join('%s=%s' % x[:2] for x in pkgs)))
+        pkgs = sorted(pkgs, reverse=True)
+        log.warning("source component %s has multiple versions "
+                     "on labelPath %s\n\nPicking latest: \n       %s\n\nNot using:\n      %s"
+                      %(component,
+                        ', '.join(x.asString() for x in labelPath),
+                        '%s=%s' % pkgs[0][:2],
+                        '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
     sourceComponent = repos.getTrove(*pkgs[0])
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 

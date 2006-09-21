@@ -30,6 +30,8 @@ Changes in @NEW@:
       with access to a group that does not exist.
     * cvc cook group now limits the number of path conflicts displayed for 
       one trove to 10. (CNY-910)
+    * loadRecipe now selects the most recent of two recipes available in the
+      case where there are multiple choices due to label multiplicity. (CNY-918)
 
 Changes in 1.0.31:
   o Client Changes:
