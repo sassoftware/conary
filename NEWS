@@ -17,6 +17,8 @@ Changes in @NEW@:
     * The Requires() policy now reads pkg-config files and converts the
       "Requires:" lines in them into trove dependencies, removing the
       need to specify those dependencies manually. (CNY-896)
+    * Files in /etc/conary/macros.d/ are now loaded in sorted order
+      after initial macros are read from /etc/conary/macros. (CNY-878)
 
   o Bug Fixes:
     * Conary now runs tagscripts correctly when passed a relative root 
