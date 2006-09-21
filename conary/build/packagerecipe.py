@@ -13,6 +13,7 @@
 #
 
 import copy
+import glob
 import os
 import imp
 import inspect
@@ -45,12 +46,20 @@ crossMacros = {
 
 def loadMacros(paths):
     baseMacros = {}
+    loadPaths = []
     for path in paths:
-        if not os.path.exists(path):
-            continue
+        globPaths = sorted(list(glob.glob(path)))
+        loadPaths.extend(globPaths)
+
+    for path in loadPaths:
+        compiledPath = path+'c'
+        deleteCompiled = not util.exists(compiledPath)
         macroModule = imp.load_source('tmpmodule', path)
+        if deleteCompiled:
+            os.unlink(compiledPath)
         baseMacros.update(x for x in macroModule.__dict__.iteritems()
                           if not x[0].startswith('__'))
+
     return baseMacros
 
 class _recipeHelper:

@@ -277,6 +277,7 @@ class ConaryConfiguration(SectionedConfigFile):
     debugExceptions       =  (CfgBool, False)
     debugRecipeExceptions =  (CfgBool, False)
     defaultMacros         =  (CfgPathList, ('/etc/conary/macros',
+                                            '/etc/conary/macros.d/*',
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)
