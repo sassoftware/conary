@@ -331,7 +331,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
                                     ignoreInstalled=False, 
                                     filterVersions=False, 
-                                    parentDir=None):
+                                    parentDir=None, 
+                                    defaultToLatest = False):
     # FIXME parentDir specifies the directory to look for 
     # local copies of recipes called with loadRecipe.  If 
     # empty, we'll look in the tmp directory where we create the recipe
@@ -359,12 +360,23 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
         pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
     if len(pkgs) > 1:
         pkgs = sorted(pkgs, reverse=True)
-        log.warning("source component %s has multiple versions "
-                     "on labelPath %s\n\nPicking latest: \n       %s\n\nNot using:\n      %s"
-                      %(component,
-                        ', '.join(x.asString() for x in labelPath),
-                        '%s=%s' % pkgs[0][:2],
-                        '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
+        if defaultToLatest:
+            log.warning("source component %s has multiple versions "
+                         "on labelPath %s\n\n"
+                         "Picking latest: \n       %s\n\n"
+                         "Not using:\n      %s"
+                          %(component,
+                            ', '.join(x.asString() for x in labelPath),
+                            '%s=%s' % pkgs[0][:2],
+                            '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
+        else:
+            raise builderrors.LoadRecipeError(
+                "source component %s has multiple versions "
+                "on labelPath %s: %s"
+                 %(component,
+                   ', '.join(x.asString() for x in labelPath),
+                   ', '.join('%s=%s' % x[:2] for x in pkgs)))
+
     sourceComponent = repos.getTrove(*pkgs[0])
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
@@ -569,7 +581,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                                  versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled,
                                      filterVersions=True,
-                                     parentDir=parentDir)[0]
+                                     parentDir=parentDir,
+                                     defaultToLatest=True)[0]
 
     if label and not versionSpec:
         # If they used the old-style specification of label, we should 
