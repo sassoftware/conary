@@ -1102,6 +1102,29 @@ class TroveStore:
     def markTroveRemoved(self, name, version, flavor):
         return self._removeTrove(name, version, flavor, markOnly = True)
 
+    def getParentTroves(self, name, version, flavor):
+        import epdb
+        epdb.st()
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT item, version, flavor FROM TroveTroves
+                JOIN Instances USING (instanceId)
+                JOIN Items ON Instances.itemId = Items.itemId
+                JOIN Versions ON Instances.versionId = Versions.versionId
+                JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+            WHERE includedId =
+                (SELECT instanceId FROM Instances WHERE
+                    itemId = (SELECT itemId FROM Items WHERE item=?) AND
+                    versionId = (SELECT versionId FROM Versions
+                                 WHERE version=?) AND
+                    flavorId = (SELECT flavorId FROM Flavors
+                                WHERE flavor=?)
+                )
+        """, name, version.asString(), flavor.freeze())
+
+        return [ (x[0], versions.VersionFromString(x[1]),
+                  deps.ThawFlavor(x[2])) for x in cu ]
+
     def commit(self):
 	if self.needsCleanup:
 	    assert(0)

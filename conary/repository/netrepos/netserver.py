@@ -1596,7 +1596,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.repos.commitChangeSet(cs, mirror = mirror)
 
         for info in removedList:
-            self.cache.invalidateEntry(*info)
+            self.cache.invalidateEntry(self.repos, *info)
 
 	if not self.commitAction:
 	    return True
@@ -2048,7 +2048,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             VALUES (?, ?, ?)
             """, (instanceId, trove._TROVEINFO_TAG_SIGS,
                   cu.binary(trv.troveInfo.sigs.freeze())))
-        self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
+        self.cache.invalidateEntry(self.repos, trv.getName(), trv.getVersion(),
                                    trv.getFlavor())
         return True
 
@@ -2304,7 +2304,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
-            self.cache.invalidateEntry(name, self.toVersion(version),
+            self.cache.invalidateEntry(self.repos, name,
+                                       self.toVersion(version),
                                        self.toFlavor(flavor))
 
         return updateCount
