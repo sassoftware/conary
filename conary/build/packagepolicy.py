@@ -2453,6 +2453,8 @@ class Requires(_addInfo):
         preface = True
         pcContents = [x.strip() for x in file(fullpath).readlines()]
         for pcLine in pcContents:
+            for var in variables:
+                pcLine = pcLine.replace(var, variables[var])
             if ':' in pcLine:
                 preface = False
             if preface:
@@ -2461,8 +2463,6 @@ class Requires(_addInfo):
                     variables['${%s}' %key] = val
             else:
                 if pcLine.startswith('Requires:'):
-                    for var in variables:
-                        pcLine = pcLine.replace(var, variables[var])
                     reqList = pcLine.split(':', 1)[1].split()
                     versionNext = False
                     for req in reqList:
