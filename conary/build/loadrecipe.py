@@ -366,7 +366,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                          "Picking latest: \n       %s\n\n"
                          "Not using:\n      %s"
                           %(component,
-                            ', '.join(x.asString() for x in labelPath),
+                            ', '.join(x.asString() for x in sorted(labelPath)),
                             '%s=%s' % pkgs[0][:2],
                             '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
         else:
