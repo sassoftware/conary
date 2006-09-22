@@ -1103,8 +1103,6 @@ class TroveStore:
         return self._removeTrove(name, version, flavor, markOnly = True)
 
     def getParentTroves(self, name, version, flavor):
-        import epdb
-        epdb.st()
         cu = self.db.cursor()
         cu.execute("""
             SELECT item, version, flavor FROM TroveTroves
