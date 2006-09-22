@@ -55,7 +55,7 @@ def loadMacros(paths):
         compiledPath = path+'c'
         deleteCompiled = not util.exists(compiledPath)
         macroModule = imp.load_source('tmpmodule', path)
-        if deleteCompiled:
+        if deleteCompiled and util.exists(compiledPath):
             os.unlink(compiledPath)
         baseMacros.update(x for x in macroModule.__dict__.iteritems()
                           if not x[0].startswith('__'))
