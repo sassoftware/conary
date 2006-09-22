@@ -64,15 +64,24 @@ def main(argv):
     infoList = itertools.chain(*(
                     trove.iterTroveList(strongRefs=True, weakRefs=True)
                     for trove in troveList))
-    # we want the length for progress reporting...
-    infoList = list(infoList)
+    # we want the length for progress reporting, but first cut out
+    # the components that we do not want to consider
+    infoList = [info for info in infoList
+                if ':' in info[0] and
+                not info[0].startswith('group-') and
+                not info[0].startswith('info-') and
+                not info[0].endswith(':source') and
+                not info[0].endswith(':doc') and
+                not info[0].endswith(':data') and
+                not info[0].endswith(':locale') and
+                not info[0].endswith(':debuginfo')]
+    infoListLen = len(infoList)
 
     missingReqs = {}
     sourceMap = {}
 
     kw = {'withFiles': False}
     index = 0
-    infoListLen = len(infoList)
     progressLen = 40 # enough to wipe out initialization message
     for index in range(infoListLen):
         info = infoList[index]
@@ -82,17 +91,6 @@ def main(argv):
         sys.stdout.write(progress)
         progressLen = len(progress)
         sys.stdout.flush()
-
-        # avoid repository round-trips for components that do not
-        # or should not contain dependencies that we need to
-        # query
-        if (':' not in info[0] or
-            info[0].endswith(':source') or
-            info[0].endswith(':doc') or
-            info[0].endswith(':data') or
-            info[0].endswith(':locale') or
-            info[0].endswith(':debuginfo')):
-            continue
 
         troveName = info[0].split(':', 1)[0] + ':'
 
