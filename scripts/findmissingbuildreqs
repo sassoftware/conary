@@ -51,6 +51,8 @@ def main(argv):
 
     # turn list of command-line incomplete troveSpecs into a list
     # of trove objects
+    sys.stdout.write('initializing...\r')
+    sys.stdout.flush()
     troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False)
                    for x in troveSpecs ]
     troveTups = repos.findTroves(cfg.installLabelPath, troveSpecs,
@@ -59,88 +61,100 @@ def main(argv):
     troveList = itertools.chain(*(repos.getTroves(troveTups[x],
                                                   withFiles=False)
                                  for x in troveSpecs))
+    infoList = itertools.chain(*(
+                    trove.iterTroveList(strongRefs=True, weakRefs=True)
+                    for trove in troveList))
+    # we want the length for progress reporting...
+    infoList = list(infoList)
 
     missingReqs = {}
     sourceMap = {}
 
     kw = {'withFiles': False}
-    for trove in troveList:
-        for info in trove.iterTroveList(strongRefs=True, weakRefs=True):
-            sys.stdout.write('%s                         \r' %info[0])
-            sys.stdout.flush()
+    index = 0
+    infoListLen = len(infoList)
+    progressLen = 40 # enough to wipe out initialization message
+    for index in range(infoListLen):
+        info = infoList[index]
+        sys.stdout.write((' '*progressLen)+'\r')
+        progress = '%d of %d (%1.2f%%): %s\r' %(
+            index+1, infoListLen, (float(index)/infoListLen)*100, info[0])
+        sys.stdout.write(progress)
+        progressLen = len(progress)
+        sys.stdout.flush()
 
-            # avoid repository round-trips for components that do not
-            # or should not contain dependencies that we need to
-            # query
-            if (':' not in info[0] or
-                info[0].endswith(':source') or
-                info[0].endswith(':doc') or
-                info[0].endswith(':data') or
-                info[0].endswith(':locale') or
-                info[0].endswith(':debuginfo')):
-                continue
+        # avoid repository round-trips for components that do not
+        # or should not contain dependencies that we need to
+        # query
+        if (':' not in info[0] or
+            info[0].endswith(':source') or
+            info[0].endswith(':doc') or
+            info[0].endswith(':data') or
+            info[0].endswith(':locale') or
+            info[0].endswith(':debuginfo')):
+            continue
 
-            troveName = info[0].split(':', 1)[0] + ':'
+        troveName = info[0].split(':', 1)[0] + ':'
 
-            trv = repos.getTrove(*info, **kw)
-            depSet = trv.getRequires()
-            reqDepSet = deps.DependencySet()
-            # add the critical dependency types only
-            reqDepSet.addDeps(deps.SonameDependencies,
-                              depSet.iterDepsByClass(deps.SonameDependencies))
-            reqDepSet.addDeps(deps.SonameDependencies,
-                              depSet.iterDepsByClass(deps.PythonDependencies))
-            reqDepSet.addDeps(deps.SonameDependencies,
-                              depSet.iterDepsByClass(deps.PerlDependencies))
+        trv = repos.getTrove(*info, **kw)
+        depSet = trv.getRequires()
+        reqDepSet = deps.DependencySet()
+        # add the critical dependency types only
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.SonameDependencies))
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.PythonDependencies))
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.PerlDependencies))
 
-            if not reqDepSet.isEmpty():
-                # fetch the recorded build requirements
-                pkgInfo = (info[0].split(':')[0], info[1], info[2])
-                pkg = repos.getTrove(*pkgInfo, **kw)
-                buildReqs = set(x[0] for x in pkg.getBuildRequirements())
+        if not reqDepSet.isEmpty():
+            # fetch the recorded build requirements
+            pkgInfo = (info[0].split(':')[0], info[1], info[2])
+            pkg = repos.getTrove(*pkgInfo, **kw)
+            buildReqs = set(x[0] for x in pkg.getBuildRequirements())
 
-                # find the items in the database that satisfy the
-                # dependency types we are looking for
-                # FIXME: when getTrovesWithProvides can handle a list
-                # with one large depSet in it, we can shorten this
-                depSetList = []
-                for depClass, dep in reqDepSet.iterDeps():
-                    depSet = deps.DependencySet()
-                    depSet.addDep(depClass, dep)
-                    depSetList.append(depSet)
-                newDBProv = db.getTrovesWithProvides(depSetList)
-                newBuildReqs = set(x[0] for x in
-                                   itertools.chain(*newDBProv.itervalues()))
+            # find the items in the database that satisfy the
+            # dependency types we are looking for
+            # FIXME: when getTrovesWithProvides can handle a list
+            # with one large depSet in it, we can shorten this
+            depSetList = []
+            for depClass, dep in reqDepSet.iterDeps():
+                depSet = deps.DependencySet()
+                depSet.addDep(depClass, dep)
+                depSetList.append(depSet)
+            newDBProv = db.getTrovesWithProvides(depSetList)
+            newBuildReqs = set(x[0] for x in
+                               itertools.chain(*newDBProv.itervalues()))
 
-                # convert :lib to :devel or :devellib if possible, and
-                # ignore internal dependencies
-                fixedBuildReqs = set()
-                for req in newBuildReqs:
-                    if req.startswith(troveName):
+            # convert :lib to :devel or :devellib if possible, and
+            # ignore internal dependencies
+            fixedBuildReqs = set()
+            for req in newBuildReqs:
+                if req.startswith(troveName):
+                    continue
+                if req.endswith(':lib'):
+                    candidate = req.replace(':lib', ':devel')
+                    if db.hasTroveByName(candidate):
+                        fixedBuildReqs.add(candidate)
                         continue
-                    if req.endswith(':lib'):
-                        candidate = req.replace(':lib', ':devel')
-                        if db.hasTroveByName(candidate):
-                            fixedBuildReqs.add(candidate)
-                            continue
-                        candidate = req.replace(':lib', ':devellib')
-                        if db.hasTroveByName(candidate):
-                            fixedBuildReqs.add(candidate)
-                            continue
-                    fixedBuildReqs.add(req)
-                newBuildReqs = fixedBuildReqs
-                addedReqs = newBuildReqs - buildReqs
-                
-                srcName = trv.getSourceName()
-                if srcName in sourceMap:
-                    sourceMap[srcName].add(info[0])
+                    candidate = req.replace(':lib', ':devellib')
+                    if db.hasTroveByName(candidate):
+                        fixedBuildReqs.add(candidate)
+                        continue
+                fixedBuildReqs.add(req)
+            newBuildReqs = fixedBuildReqs
+            addedReqs = newBuildReqs - buildReqs
+            
+            srcName = trv.getSourceName()
+            if srcName in sourceMap:
+                sourceMap[srcName].add(info[0])
+            else:
+                sourceMap[srcName] = set([info[0]])
+            if addedReqs:
+                if srcName in missingReqs:
+                    missingReqs[srcName].update(addedReqs)
                 else:
-                    sourceMap[srcName] = set([info[0]])
-                if addedReqs:
-                    if srcName in missingReqs:
-                        missingReqs[srcName].update(addedReqs)
-                    else:
-                        missingReqs[srcName] = addedReqs
+                    missingReqs[srcName] = addedReqs
 
 
     # finally, report
