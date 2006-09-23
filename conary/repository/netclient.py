@@ -767,7 +767,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def hasTroves(self, troveInfoList):
         if not troveInfoList:
-            return []
+            return {}
         byServer = {}
         for name, version, flavor in troveInfoList:
             l = byServer.setdefault(version.branch().label().getHost(), [])
