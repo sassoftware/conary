@@ -423,12 +423,8 @@ class Database:
 	return self.instances.iterNames()
 
     def iterFindByName(self, name, pristine = False):
-	for (instanceId, versionId, troveName, flavorId) in self.instances.iterByName(name):
-	    yield self._getTrove(troveName = troveName,
-				 troveInstanceId = instanceId,
-				 troveVersionId = versionId,
-				 troveFlavorId = flavorId,
-				 pristine = pristine)
+        instanceIds = [x[0] for x in self.instances.iterByName(name)]
+        return self._iterTroves(instanceIds=instanceIds, pristine = pristine)
 
     def iterVersionByName(self, name, withFlavors):
 	cu = self.db.cursor()
@@ -1058,14 +1054,23 @@ order by
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
+        toFind = {}
+
+        # go through some hoops to give the same order
+        # when troves are missing - _iterTroves doesn't 
+        # handle missing troves.
         for i, instanceId in enumerate(instances):
             if instanceId is not None:
-                instances[i] = self._getTrove(pristine,
-                                              troveInstanceId = instanceId,
-                                              withFiles = withFiles,
-                                              withDeps = withDeps)
+                toFind[instanceId] = i
 
-        return instances
+        results = [ None for x in instances ]
+        instances = list(self._iterTroves(pristine,
+                                          instanceIds = toFind,
+                                          withFiles = withFiles,
+                                          withDeps = withDeps))
+        for instanceId, instance in itertools.izip(toFind, instances):
+            results[toFind[instanceId]] = instance
+        return results
 
     def _lookupTroves(self, troveList):
         # returns a list parallel to troveList, with nonexistant troves
@@ -1075,127 +1080,132 @@ order by
         cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
                                 idx %(PRIMARYKEY)s,
                                 troveName STRING,
-                                versionId INT,
-                                flavorId INT)
+                                version STRING,
+                                flavor STRING)
                    """ % self.db.keywords, start_transaction = False)
 
         def _iter(tl):
             for i, (name, version, flavor) in enumerate(tl):
-                flavorId = self.flavors.get(flavor, None)
-                if flavorId is None:
-                    continue
-                versionId = self.versionTable.get(version, None)
-                if versionId is None:
-                    continue
-                yield (i, name, versionId, flavorId)
+                yield (i, name, str(version), flavor.freeze())
 
         cu.executemany("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
-                       _iter(troveList), start_transaction = False)
+                       _iter(troveList),
+                       start_transaction = False)
 
         cu.execute("""SELECT idx, Instances.instanceId FROM getTrovesTbl
-                        INNER JOIN Instances ON
-                            getTrovesTbl.troveName == Instances.troveName AND
-                            getTrovesTbl.flavorId == Instances.flavorId AND
-                            getTrovesTbl.versionId == Instances.versionId AND
-                            Instances.isPresent == 1
+                        JOIN Instances ON
+                            Versions.versionId == Instances.versionId
+                        JOIN Versions ON (Instances.versionId = Versions.versionId)
+                        JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+                        WHERE Instances.troveName = getTrovesTbl.troveName
+                              AND isPresent=1
+                              AND Versions.version = getTrovesTbl.version
+                              AND (Flavors.flavor = getTrovesTbl.flavor or getTrovesTbl.flavor = '' and Flavors.flavorId=0)
                     """)
 
         r = [ None ] * len(troveList)
         for (idx, instanceId) in cu:
             r[idx] = instanceId
-
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
         return r
 
-    def _getTrove(self, pristine, troveName = None, troveInstanceId = None,
-		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None, withFiles = True,
-                  withDeps = True):
-	if not troveName:
-	    (troveName, troveVersionId, troveFlavorId) = \
-		    self.instances.getId(troveInstanceId,
-                                         justPresent = not pristine)[0:3]
+    def _iterTroves(self, pristine, instanceIds,
+		    withFiles = True, withDeps = True, errorOnMissing=True):
+        """
+        """
+        instanceIds = list(instanceIds)
 
-	if not troveVersionId:
-	    troveVersionId = self.versionTable[troveVersion]
+        cu = self.db.cursor()
+        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
+                                idx %(PRIMARYKEY)s,
+                                instanceId INT)
+                   """ % self.db.keywords, start_transaction = False)
 
-	if troveFlavorId is None:
-	    if troveFlavor is None:
-		troveFlavorId = 0
-	    else:
-		troveFlavorId = self.flavors[troveFlavor]
+        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)", 
+                       list(enumerate(instanceIds)), start_transaction=False)
 
-	if troveFlavor is 0:
-	    if troveFlavorId == 0:
-		troveFlavor = deps.deps.Flavor()
-	    else:
-		troveFlavor = self.flavors.getId(troveFlavorId)
+        cu.execute("""SELECT idx, troveName, version, flavor, timeStamps
+                      FROM getTrovesTbl
+                      JOIN Instances USING(instanceId)
+                      JOIN Versions USING(versionId)
+                      JOIN Flavors ON (Instances.flavorId = Flavors.flavorId)
+                  """)
 
-	if not troveInstanceId:
-	    troveInstanceId = self.instances.get((troveName,
-			    troveVersionId, troveFlavorId), None)
-	    if troveInstanceId is None:
-		raise KeyError, troveName
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
+        results = [ None for x in instanceIds ]
 
-	if not troveVersion or min(troveVersion.timeStamps()) == 0:
-	    troveVersion = self.instances.getVersion(troveInstanceId)
+        for idx, troveName, versionStr, flavorStr, timeStamps in cu:
+            troveFlavor = flavorCache.get(flavorStr)
+            troveVersion = versionCache.get(versionStr, timeStamps)
 
-	trv = trove.Trove(troveName, troveVersion, troveFlavor, None,
-                          setVersion = False)
+            trv = trove.Trove(troveName, troveVersion, troveFlavor, None,
+                              setVersion = False)
+            results[idx] = trv
 
-	# add all of the troves which are references from this trove; the
-	# flavor cache is already complete
-	cu = self.db.cursor()
+        # add all of the troves which are references from this trove; the
+        # flavor cache is already complete
+        cu = self.db.cursor()
         if pristine:
             pristineClause = "TroveTroves.inPristine = 1"
         else:
             pristineClause = "Instances.isPresent = 1"
 
-	cu.execute("""
-	    SELECT troveName, version, flags, timeStamps, flavor
-                FROM TroveTroves
+        cu.execute("""
+            SELECT idx, troveName, version, flags, timeStamps, flavor
+                FROM getTrovesTbl
+                JOIN TroveTroves USING(instanceId)
                 JOIN Instances
                 JOIN Versions ON
                     Versions.versionId = Instances.versionId
                 JOIN Flavors ON
-		    TroveTroves.includedId = Instances.instanceId AND
-		    Flavors.flavorId = Instances.flavorId
-		WHERE TroveTroves.instanceId = ? AND
-                      %s
-	""" % pristineClause, troveInstanceId)
+                    TroveTroves.includedId = Instances.instanceId AND
+                    Flavors.flavorId = Instances.flavorId
+                WHERE %s
+                ORDER BY idx
+        """ % pristineClause)
 
-        versionCache = VersionCache()
-        flavorCache = FlavorCache()
-	for name, versionStr, flags, timeStamps, flavorStr in cu:
+        for idx, name, versionStr, flags, timeStamps, flavorStr in cu:
             version = versionCache.get(versionStr, timeStamps)
             flavor = flavorCache.get(flavorStr)
 
             byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
             weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
 
-	    trv.addTrove(name, version, flavor, byDefault = byDefault,
-                         weakRef = weakRef)
-        if withDeps:
-            self.depTables.get(cu, trv, troveInstanceId)
+            results[idx].addTrove(name, version, flavor, byDefault = byDefault,
+                                  weakRef = weakRef)
 
-        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
+        for idx, instanceId in enumerate(instanceIds):
+            trv = results[idx]
 
-        if not withFiles:
-            return trv
+            if withDeps:
+                self.depTables.get(cu, trv, instanceId)
+            self.troveInfoTable.getInfo(cu, trv, instanceId)
+            if not withFiles:
+                yield trv
 
-        cu.execute("""SELECT pathId, path, version, fileId, isPresent
-                      FROM DBTroveFiles
-                      JOIN Versions ON
-                          Versions.versionId = DBTroveFiles.versionId
-                      WHERE instanceId = ?""", troveInstanceId)
-	for (pathId, path, version, fileId, isPresent) in cu:
-	    if not pristine and not isPresent:
-		continue
-	    version = versions.VersionFromString(version)
-	    trv.addFile(pathId, path, version, fileId)
+        if withFiles:
+            cu.execute("""SELECT idx, pathId, path, version, fileId, isPresent
+                          FROM getTrovesTbl
+                          JOIN DBTroveFiles USING(instanceId)
+                          JOIN Versions ON
+                              Versions.versionId = DBTroveFiles.versionId
+                          """)
+            curIdx = 0
+            for (idx, pathId, path, version, fileId, isPresent) in cu:
+                if not pristine and not isPresent:
+                    continue
+                version = versions.VersionFromString(version)
+                results[idx].addFile(pathId, path, version, fileId)
+                while idx != curIdx:
+                    yield results[curIdx]
+                    curIdx += 1
 
-	return trv
+            while curIdx < len(results):
+                yield results[curIdx]
+                curIdx += 1
+        cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
         cu = self.db.cursor()
@@ -1298,13 +1308,8 @@ order by
 	return False
 
     def iterFindByPath(self, path, pristine = False):
-	for instanceId in self.troveFiles.iterPath(path):
-	    if not self.instances.idIsPresent(instanceId):
-		continue
-
-	    trv = self._getTrove(troveInstanceId = instanceId,
-				 pristine = pristine)
-	    yield trv
+	return self._iterTroves(instanceIds=self.troveFiles.iterPath(path),
+                                pristine=pristine)
 
     def iterFindPathReferences(self, path, justPresent = False):
         cu = self.db.cursor()
