@@ -293,7 +293,7 @@ class AbstractCommand(object):
 
     docs = {} # add docs in the form 'long-option' : 'description'
               # or 'long-option' : ('description', 'KEYWORD').
-
+    hobbleShortOpts = None
     def __init__(self):
         self.parser = None
 
@@ -479,6 +479,10 @@ class MainHandler(object):
             return self.usage()
 
         thisCommand = self._supportedCommands[commandName]
+        if thisCommand.hobbleShortOpts is not None:
+            hobbleShortOpts = thisCommand.hobbleShortOpts
+        else:
+            hobbleShortOpts = self.hobbleShortOpts
         params, cfgMap = thisCommand.prepare()
         defaultGroup = thisCommand.defaultGroup
         if self.name:
@@ -495,7 +499,7 @@ class MainHandler(object):
                                         version=self.version,
                                         useHelp=True,
                                         defaultGroup=defaultGroup,
-                                        hobbleShortOpts=self.hobbleShortOpts)
+                                        hobbleShortOpts=hobbleShortOpts)
         except debuggerException, e:
             raise
         except OptionError, e:
