@@ -453,8 +453,7 @@ class DependencyChecker:
             if not depIdSet: return []
 
             schema.resetTable(cu, 'BrokenDeps')
-            for depNum in depIdSet:
-                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
+            cu.executemany("INSERT INTO BrokenDeps VALUES (?)", depIdSet,
                            start_transaction = False)
 
             cu.execute("""
@@ -920,16 +919,15 @@ class DependencyChecker:
                 self.workTables.removeTrove((job[0], job[1][0], job[1][1]), 
                                             nodeId)
             else:
-                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                                withFiles = False)
+                (provides, requires) = self.troveSource.getDepsForTroveList(
+                                        [ (job[0], job[2][0], job[2][1]) ])[0]
 
                 newNodeId = self._addJob(job)
 
-                provides = trv.getProvides()
                 # this reduces the size of our tables by removing things
                 # which this trove both provides and requires conary 1.0.11
                 # and later remove these from troves at build time
-                requires = trv.getRequires() - provides
+                requires = requires - provides
 
                 self.workTables._populateTmpTable(depList = self.depList,
                                                   troveNum = -newNodeId,
@@ -1000,7 +998,9 @@ class DependencyChecker:
             criticalUpdates = []
         if createGraph:
             depGraph = self._createDepGraph(result, brokenByErase, satisfied,
-                                            finalJobs, linkedJobSets=linkedJobs)
+                                            linkedJobSets=linkedJobs,
+                                            criticalJobs=criticalJobs,
+                                            finalJobs=finalJobs)
         else:
             depGraph = None
 
@@ -1025,7 +1025,7 @@ class DependencyChecker:
         return unsatisfiedList, unresolveableList, changeSetList, criticalUpdates
 
     def createDepGraph(self, linkedJobs=None):
-        unsatisfiedList, unresolveableList, changeSetList, depGraph = \
+        unsatisfiedList, unresolveableList, changeSetList, depGraph, criticalUpdates = \
                 self._check(findOrdering=False, linkedJobs=linkedJobs,
                             createGraph=True)
 
@@ -1229,39 +1229,30 @@ class DependencyTables:
             schema.resetTable(cu, "tmpInstances")
             schema.resetTable(cu, "tmpInstances2")
             instanceIds = []
-            for (n,v,f) in troveList:
-                itemId = cu.execute('SELECT itemId FROM Items'
-                                    ' WHERE item=?', n).next()[0]
-                versionId = cu.execute('SELECT versionId FROM Versions'
-                                       ' WHERE version=?', 
-                                       v.asString()).next()[0]
-                flavorId = cu.execute('SELECT flavorId FROM Flavors'
-                                      ' WHERE flavor=?', 
-                                      f.freeze()).next()[0]
-                instanceId = cu.execute('''SELECT instanceId FROM Instances 
-                                           WHERE itemId=?
-                                             AND versionId=?
-                                             AND flavorId=?''', itemId,
-                                        versionId, flavorId).next()[0]
-                cu.execute('''INSERT INTO tmpInstances VALUES (?)''',
-                           instanceId, start_transaction=False)
-                instanceIds.append(instanceId)
-            
-            for instanceId in instanceIds:
-                cu.execute('''INSERT INTO tmpInstances2 
-                                       SELECT DISTINCT includedId 
-                                       FROM TroveTroves
-                                       LEFT JOIN tmpInstances ON
-                                         includedId = tmpInstances.instanceId
-                                       WHERE
-                                         TroveTroves.instanceId=? AND
-                                         tmpInstances.instanceId IS NULL
-                           ''', instanceId, start_transaction=False)
-                cu.execute('''INSERT INTO tmpInstances 
-                              SELECT instanceId FROM tmpInstances2''',
-                              start_transaction=False)
-                cu.execute('''DELETE FROM tmpInstances2''',
-                              start_transaction=False)
+            cu.executemany('''
+                    INSERT INTO tmpInstances SELECT instanceId FROM Instances
+                        WHERE itemId=(SELECT itemId FROM Items
+                                        WHERE item=?)
+                          AND versionId=(SELECT versionId FROM Versions
+                                         WHERE version=?)
+                          AND flavorId=(SELECT flavorId FROM Flavors
+                                         WHERE flavor=?)
+                    ''', ( (n, v.asString(), f.freeze()) for (n, v, f)
+                           in troveList), start_transaction = False )
+            instanceIds = [ x[0] for x in
+                            cu.execute("SELECT instanceId FROM tmpInstances") ]
+
+            cu.execute('''INSERT INTO tmpInstances2 
+                                   SELECT DISTINCT includedId 
+                                   FROM TroveTroves
+                                   LEFT JOIN tmpInstances ON
+                                     includedId = tmpInstances.instanceId
+                                   WHERE
+                                     tmpInstances.instanceId IS NULL
+                       ''', start_transaction=False)
+            cu.execute('''INSERT INTO tmpInstances 
+                          SELECT instanceId FROM tmpInstances2''',
+                          start_transaction=False)
 
             restrictBy = None
             restrictor = self._restrictResolveByTrove

@@ -331,7 +331,7 @@ def getTrovesToDisplay(repos, troveSpecs, whatProvidesList, versionFilter,
             # must be done client side...
             flavor = None
             bestFlavor = False
-            affintyDb = None # XXX for now turn off.
+            affinityDb = None # XXX for now turn off.
 
         resultsDict = {}
 

@@ -311,7 +311,11 @@ class ServerCache:
                                                  serverName)
         elif userInfo:
             s = url.split('/')
-            assert(not s[1])
+            if s[1]:
+                # catch "http/server/"
+                raise errors.OpenError(
+                    'Invalid URL "%s" when trying access the %s repository. '
+                    'Check your repositoryMap entries' % (url, serverName))
             s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
             url = '/'.join(s)
             usedMap = True
@@ -762,6 +766,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.hasTroves([(name, version, flavor)])[name, version, flavor]
 
     def hasTroves(self, troveInfoList):
+        if not troveInfoList:
+            return {}
         byServer = {}
         for name, version, flavor in troveInfoList:
             l = byServer.setdefault(version.branch().label().getHost(), [])
@@ -788,6 +794,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return rc[0]
 
     def getTroves(self, troves, withFiles = True, callback = None):
+        if not troves:
+            return []
 	chgSetList = []
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))

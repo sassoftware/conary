@@ -181,8 +181,7 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
         troveTups.extend(itertools.chain(*results.itervalues()))
 
     if not (troveSpecs or pathList or whatProvidesList):
-        names = db.iterAllTroveNames()
-        troveTups = sorted(db.findByNames(names))
+        troveTups = sorted(db.iterAllTroves())
         primary = False
     else:
         results = db.findTroves(None, troveSpecs)

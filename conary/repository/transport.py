@@ -187,7 +187,9 @@ class XMLOpener(urllib.FancyURLopener):
 
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
-                fp = DecompressFileObj(fp)
+                # disable until performace is better
+                #fp = DecompressFileObj(fp)
+                fp = StringIO(zlib.decompress(fp.read()))
 
             return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
         else:

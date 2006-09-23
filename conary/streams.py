@@ -410,6 +410,14 @@ class StreamCollection(InfoStream):
     Stream class types.
     """
 
+    def getItems(self):
+        if self._data is not None:
+            self._thaw()
+
+        return self._thawedItems
+
+    _items = property(getItems)
+
     def __eq__(self, other, skipSet = {}):
         assert(self.__class__ == other.__class__)
         return self._items == other._items
@@ -418,6 +426,9 @@ class StreamCollection(InfoStream):
         return not self.__eq__(other)
 
     def freeze(self, skipSet = {}):
+        if self._data is not None:
+            return self._data
+
         l = []
         for typeId, itemDict in sorted(self._items.iteritems()):
             for item in sorted(itemDict):
@@ -428,15 +439,19 @@ class StreamCollection(InfoStream):
         return "".join(l)
 
     def thaw(self, data):
+        self._data = data
+
+    def _thaw(self):
         i = 0
-        self._items = dict([ (x, {}) for x in self.streamDict ])
+        self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
 
-        while (i < len(data)):
-            i, (typeId, s) = misc.unpack("!BSH", i, data)
+        while (i < len(self._data)):
+            i, (typeId, s) = misc.unpack("!BSH", i, self._data)
             item = self.streamDict[typeId](s)
-            self._items[typeId][item] = True
+            self._thawedItems[typeId][item] = True
 
-        assert(i == len(data))
+        assert(i == len(self._data))
+        self._data = None
 
     def addStream(self, typeId, item):
         assert(item.__class__ == self.streamDict[typeId])
@@ -493,7 +508,8 @@ class StreamCollection(InfoStream):
 	if data is not None:
 	    self.thaw(data)
         else:
-            self._items = dict([ (x, {}) for x in self.streamDict ])
+            self._data = None
+            self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
 
 class AbsoluteStreamCollection(StreamCollection):
     """

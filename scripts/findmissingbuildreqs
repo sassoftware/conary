@@ -1,0 +1,177 @@
+#!/usr/bin/python
+#
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+# Recursively compares troves specified on the commandline to a
+# conary database specified as the first argument on the commandline
+# and looks to see which troves in the new database satisfy the
+# soname-, python-, and perl-based requirements of the troves
+# specified on the commandline.
+
+import itertools
+import os
+import re
+import stat
+import sys
+
+from conary import conarycfg, conaryclient
+from conary.conaryclient import cmdline
+from conary.deps import deps
+from conary.local import database
+
+
+def main(argv):
+
+    if len(argv) < 3:
+        print 'usage: findmissingbuildreqs /path/to/conarydb troveSpec ...'
+        return 1
+
+    dbPath = argv[1]
+    if not os.path.isdir(dbPath):
+        print 'first argument must be a directory containing a conarydb'
+        return 1
+
+    troveSpecs = argv[2:]
+    cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
+    cfg.initializeFlavors()
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+    db = database.Database(cfg.root, dbPath)
+
+    # turn list of command-line incomplete troveSpecs into a list
+    # of trove objects
+    sys.stdout.write('initializing...\r')
+    sys.stdout.flush()
+    troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False)
+                   for x in troveSpecs ]
+    troveTups = repos.findTroves(cfg.installLabelPath, troveSpecs,
+                    cfg.flavor, getLeaves=True, acrossFlavors=False,
+                    acrossLabels=False, bestFlavor=True)
+    troveList = itertools.chain(*(repos.getTroves(troveTups[x],
+                                                  withFiles=False)
+                                 for x in troveSpecs))
+    infoList = itertools.chain(*(
+                    trove.iterTroveList(strongRefs=True, weakRefs=True)
+                    for trove in troveList))
+    # we want the length for progress reporting, but first cut out
+    # the components that we do not want to consider
+    infoList = [info for info in infoList
+                if ':' in info[0] and
+                not info[0].startswith('group-') and
+                not info[0].startswith('info-') and
+                not info[0].endswith(':source') and
+                not info[0].endswith(':doc') and
+                not info[0].endswith(':data') and
+                not info[0].endswith(':locale') and
+                not info[0].endswith(':debuginfo')]
+    infoListLen = len(infoList)
+
+    missingReqs = {}
+    sourceMap = {}
+
+    kw = {'withFiles': False}
+    index = 0
+    progressLen = 40 # enough to wipe out initialization message
+    for index in range(infoListLen):
+        info = infoList[index]
+        sys.stdout.write((' '*progressLen)+'\r')
+        progress = '%d of %d (%1.2f%%): %s\r' %(
+            index+1, infoListLen, (float(index)/infoListLen)*100, info[0])
+        sys.stdout.write(progress)
+        progressLen = len(progress)
+        sys.stdout.flush()
+
+        troveName = info[0].split(':', 1)[0] + ':'
+
+        trv = repos.getTrove(*info, **kw)
+        depSet = trv.getRequires()
+        reqDepSet = deps.DependencySet()
+        # add the critical dependency types only
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.SonameDependencies))
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.PythonDependencies))
+        reqDepSet.addDeps(deps.SonameDependencies,
+                          depSet.iterDepsByClass(deps.PerlDependencies))
+
+        if not reqDepSet.isEmpty():
+            # fetch the recorded build requirements
+            pkgInfo = (info[0].split(':')[0], info[1], info[2])
+            pkg = repos.getTrove(*pkgInfo, **kw)
+            buildReqs = set(x[0] for x in pkg.getBuildRequirements())
+
+            # find the items in the database that satisfy the
+            # dependency types we are looking for
+            # FIXME: when getTrovesWithProvides can handle a list
+            # with one large depSet in it, we can shorten this
+            depSetList = []
+            for depClass, dep in reqDepSet.iterDeps():
+                depSet = deps.DependencySet()
+                depSet.addDep(depClass, dep)
+                depSetList.append(depSet)
+            newDBProv = db.getTrovesWithProvides(depSetList)
+            newBuildReqs = set(x[0] for x in
+                               itertools.chain(*newDBProv.itervalues()))
+
+            # convert :lib to :devel or :devellib if possible, and
+            # ignore internal dependencies
+            fixedBuildReqs = set()
+            for req in newBuildReqs:
+                if req.startswith(troveName):
+                    continue
+                if req.endswith(':lib'):
+                    candidate = req.replace(':lib', ':devel')
+                    if db.hasTroveByName(candidate):
+                        fixedBuildReqs.add(candidate)
+                        continue
+                    candidate = req.replace(':lib', ':devellib')
+                    if db.hasTroveByName(candidate):
+                        fixedBuildReqs.add(candidate)
+                        continue
+                fixedBuildReqs.add(req)
+            newBuildReqs = fixedBuildReqs
+            addedReqs = newBuildReqs - buildReqs
+            
+            srcName = trv.getSourceName()
+            if srcName in sourceMap:
+                sourceMap[srcName].add(info[0])
+            else:
+                sourceMap[srcName] = set([info[0]])
+            if addedReqs:
+                if srcName in missingReqs:
+                    missingReqs[srcName].update(addedReqs)
+                else:
+                    missingReqs[srcName] = addedReqs
+
+
+    # finally, report
+    print '                               \r',
+    for srcName in sorted(missingReqs.keys()):
+        # Remove any other troves we've found built from the same source.
+        # Note that if A:source builds B and C, and you query B and C
+        # but not A, and something in B depends on C, then this will
+        # falsely report that A should have C:foo dependencies added.
+        # Fixing this corner case would require exhaustive repository
+        # search.
+        misses = missingReqs[srcName] - sourceMap[srcName]
+        mainName = srcName.split(':', 1)[0]+':'
+        misses = [x for x in misses if not x.startswith(mainName)]
+        if misses:
+            print '%s missing buildRequires %s' %(srcName, sorted(misses))
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -73,7 +73,7 @@ class CfgUserInfoItem(CfgType):
         if len(val) < 2 or len(val) > 3:
             raise ParseError, ("%s:%s: expected <hostglob> <user> "
                                "<password> for configuration value %s"
-                                            % (File, self.lineno, key))
+                                            % (file, self.lineno, key))
         elif len(val) == 2:
             return (val[0], val[1], None)
         else:
@@ -277,6 +277,7 @@ class ConaryConfiguration(SectionedConfigFile):
     debugExceptions       =  (CfgBool, False)
     debugRecipeExceptions =  (CfgBool, False)
     defaultMacros         =  (CfgPathList, ('/etc/conary/macros',
+                                            '/etc/conary/macros.d/*',
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)

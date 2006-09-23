@@ -1,53 +1,132 @@
 Changes in @NEW@:
+  o Optimizations:
+    * Getting a large number of troves (without files) from the local database
+      has been sped up by 30%.  (CNY-907).
+    * conary q --troves is 3 times faster, conary q is 2 times faster, and
+      and conary q --troves --recurse is 2 times faster on a test machine
+      (this, along with the speedups from 1.0.32 make conary q 4-6 times faster
+      now than it was earlier).
+
+Changes in 1.0.32:
+  o Optimizations
+    * Duplicate trove instantiations have been removed. Build requires are
+      no longer thawed out of abstract change sets, and methods were added
+      to get dependency and path hash information directly from trove
+      change set objects. These changes combined for a 50% speedup an
+      update --info of a large group into an empty root and saved a few
+      megs of memory as well (CNY-892)
+    * The changes in the previous version of Conary in how XML-RPC
+      responses are decompressed actually made Conary slower.  These
+      changes have been reverted.
+
+  o Build (cvc) Changes:
+    * The Requires() policy now reads pkg-config files and converts the
+      "Requires:" lines in them into trove dependencies, removing the
+      need to specify those dependencies manually. (CNY-896)
+    * Files in /etc/conary/macros.d/ are now loaded in sorted order
+      after initial macros are read from /etc/conary/macros. (CNY-878)
+
+  o Bug Fixes:
+    * Conary now runs tagscripts correctly when passed a relative root 
+      parameter (CNY-416).
+    * cvc log now works when there are multiple branches matching for the
+      same trove on the same label.
+    * Fixed resolveLevel 2 so that it does not try to update packages that
+      are already a part of the update. (CNY-886, CNY-780)
+    * Fixed resolveLevel 2 so that it does not repeatedly try to perform 
+      the same update. (CNY-887)
+    * cvc cook | less now leaves less in control of the terminal. (CNY-802)
+    * The download thread terminating during an update is now a fatal
+      error.
+    * The web interface to a conary repository will now print an error
+      message instead of a traceback when adding an entitlement class
+      with access to a group that does not exist.
+    * cvc cook group now limits the number of path conflicts displayed for 
+      one trove to 10. (CNY-910)
+    * Conary update now respects local changes when a group update occurs
+      along with the update of the switched trove.  For example, switch
+      foo to be installed from another branch instead of the default, 
+      and then update foo and its containing group at the same time would
+      cause conary to try to reinstall the original foo (resulting in path
+      conflicts). (CNY-915)
+    * loadRecipe now selects the most recent of two recipes available
+      in the case where there are multiple choices due to label
+      multiplicity. (CNY-918)
+    * Conary update now respects local changes when a group update occurs
+      along with the update of the switched trove.  For example, switch
+      foo to be installed from another branch instead of the default, 
+      and then update foo and its containing group at the same time would
+      cause conary to try to reinstall the original foo (resulting in path
+      conflicts). (CNY-915)
+
+Changes in 1.0.31:
   o Client Changes:
-    * Added the "cvc set" command to change files between binary and
-      text mode for files in source components.
-    * "cvc add" no longer assumes files it doesn't know to be binary
-      are text files; there are lists for both binary and text types,
-      and files which are added which aren't in either list need
-      to be added with "--text" or "--binary". (CNY-838)
+    * Conary now restarts itself after updating critical conary
+      components (currently, that consists of conary).  Hooks have
+      been added for other components using the conary api to specify
+      other troves as critical.  Also, hooks have been added for other
+      components to specify a trove to update last. (CNY-805, CNY-808)
+    * Conary now warns the user when they will be causing label
+      conflicts - that is when an operation would cause two different
+      branches of development for a single trove to end up with the
+      same trailing label.  Since most conary operations are label
+      based, such label conflicts can be confusing to work with and
+      are almost never desireable - except in those few cases where
+      they are necessary.  (CNY-796)
     * The conary repository client now retries when a DNS lookup of a
       server hostname fails with a "temporary failure in name
       resolution" error.
-    * "cvc annotate" no longer displays pathIds in the error message for the
-      specified path not being included in the source trove
-    * "cvc annotate" now gives an error when it is run on a binary file
-    * Conary now restarts itself after updating critical conary components
-      (currently, that consists of conary).  Hooks have been added for
-      other components using the conary api to specify other troves as
-      critical.  Also, hooks have been added for other components to specify
-      a trove to update last. (CNY-805, CNY-808)
-    * Conary now warns the user when they will be causing label conflicts -
-      that is when an operation would cause two different branches of 
-      development for a single trove to end up with the same trailing label.
-      Since most conary operations are label based, such label
-      conflicts can be confusing to work with and are almost never
-      desireable - except in those few cases where they are necessary.
-      (CNY-796)
-    * Conary no longer tries to display the contents of autosource files
-      in "cvc diff" (CNY-866)
+
+  o Optimizations
+    * The getFileContents() and getFileVersions() server side calls
+      have been optimized for faster execution.
+    * The SQL query in getTroveList() has been sped up by a 3-5x factor.
+    * dbstore now has support for executemany()
+    * Inserts into local database now use executemany().
+
+  o Server Changes
+    * Several SQL queries have been updated for PostgreSQL compatibility
 
   o Build (cvc) Changes:
-    * The new "cvc refresh" command allows you to request that cvc
-      fetch new upstream versions of files referenced by URL.  Thanks
-      to Pavel Volkovitskiy for the initial implementation of this
-      feature. (CNY-743)
-    * The PythonSetup() build action has been modified to be more consistent
-      with other build actions. The "setupName" paramater has been added, which
-      can specify a command to run (defaults to "setup.py"). The first
-      argument, similar to Configure(), passes arguments to the command being
-      specified by setupName. (CNY-355)
+    * The "cvc add" command no longer assumes files it doesn't know to
+      be binary are text files; there are lists for both binary and
+      text types, and files which are added which aren't in either
+      list need to be added with "--text" or "--binary". (CNY-838)
+    * A "cvc set" command has been added to change files between
+      binary and text mode for files in source components.
+    * The "cvc diff" command no longer tries to display the contents
+      of autosource files. (CNY-866)
+    * The "cvc annotate" command no longer displays pathIds in the
+      error message for the specified path not being included in the
+      source trove.  It displays the path name instead.
+    * The "cvc annotate" command now gives an error when it is run on
+      a binary file.
+    * A "cvc refresh" command has been added.  It allows you to
+      request that cvc fetch new upstream versions of files referenced
+      by URL.  Thanks to Pavel Volkovitskiy for the initial
+      implementation of this feature. (CNY-743)
     * The "cvc newpkg" command and the PackageSpec policy now disallow
-      certain potentially confusing characters in trove names. (CNY-842)
+      certain potentially confusing characters in trove
+      names. (CNY-842)
+    * The PythonSetup() build action has been modified to be more
+      consistent with other build actions. The "setupName" paramater
+      has been added, which can specify a command to run (defaults to
+      "setup.py"). The first argument, similar to Configure(), passes
+      arguments to the command being specified by setupName. (CNY-355)
+    * The "cvc commit" command now recognizes .html, .css, .kid, and .cfg
+      as extensions that identify text files. (CNY-891)
+    * The PythonSetup build action has been modified to make it
+      clearer what its "dir" and "rootDir" options specify. (CNY-328)
 
   o Bug Fixes:
-    * Conary commands do not perform an unnecessary database checks on the
-      local system. (CNY-571)
-    * Fixed a bug that could allow conary to consider a noop update as an
-      install (and could result in tracebacks in some situations). (CNY-845)
+    * Conary commands no longer perform an unnecessary database check
+      on the local system. (CNY-571)
+    * A bug that could allow conary to consider a no-op update as an
+      install (and could result in tracebacks in some situations) has
+      been fixed. (CNY-845)
     * If you've made a local modification to a package and then try to
-      downgrade it later, conary will downgrade included components as well.
-      (CNY-836)
+      downgrade it later, Conary will now downgrade included
+      components as well. (CNY-836)
     * The error message produced by "cvc cook" when a source component
       exists on multiple branches with the same trailing label has
       been improved. (CNY-714)
@@ -55,26 +134,29 @@ Changes in @NEW@:
       been improved. (CNY-692)
     * The usage message displayed when running "conary changeset" has
       been corrected. (CNY-864)
-    * Conary no longer tracebacks when a disconnected cook tries to load
-      a superclass.  Conary also gives better messages when the loaded recipe
-      has a traceback.  Thanks to David Coulthart for the core of this patch.
-      (CNY-518, CNY-713).
-    * Fixed a bug in dep scoring: dependency scoring when multiple sonames
-      were being scored would simply use the value of the last soname,
-      instead of the cumulative score (note that the deps that did not
-      match at all would still return as not matching, so this bug only
-      affected conary's ability to select the best match)
-    * Fixed a bug in dep scoring: matching architectures are now counted as
-      having a positive value, so that when performing dep resolution on 
-      an x86_64 machine, troves that have flavor is:x86_64 x86 will be 
-      preferred to those with flavor is:x86.
-    * The PythonSetup command ignored any C compiler macros that had been
-      set.  The template has been changed to use them in the same way that
-      Configure() uses them; as environment variables.
+    * Conary no longer tracebacks when a disconnected cook tries to
+      load a superclass.  Conary also gives better messages when the
+      loaded recipe has a traceback.  Thanks to David Coulthart for
+      the core of this patch. (CNY-518, CNY-713)
+    * A bug in soname dependency scoring has been fixed.  Dependency
+      scoring when multiple sonames were being scored would simply use
+      the value of the last soname, instead of the cumulative score.
+      Note that the dependencies that did not match at all would still
+      return as not matching, so this bug only affected Conary's
+      ability to select the best match.
+    * A bug in architecture dependency scoring has been fixed.
+      Matching architectures are now counted as having a positive
+      value, so that when performing dependency resolution on an
+      x86_64 machine, troves that have flavor "is: x86_64 x86" will be
+      preferred to those with flavor "is: x86".
+    * The PythonSetup command ignored any C compiler macros that had
+      been set.  The template has been changed to use them in the same
+      way that Configure() uses them; as environment variables.
     * The warning message produced when r.Replace() refuses to modify
-      a non-regular file now includes the path, as intended.  (CNY-844)
-    * A traceback that occurred when a resolveLevel 2 update resulted in a 
-      component being erased has been fixed. (CNY-879)
+      a non-regular file now includes the path, as intended.
+      (CNY-844)
+    * A traceback that occurred when a resolveLevel 2 update resulted
+      in a component being erased has been fixed. (CNY-879)
     * Conary now works around a possible threading deadlock when
       exceptions are raised in Threading.join().  The bug is in the
       standard Python threading library, and is fixed in 2.4.3.
@@ -85,30 +167,20 @@ Changes in @NEW@:
       the server.  This allows the main thread to terminate the
       changeset download thread if it is waiting for an XML-RPC
       response from the server.  (CNY-795)
-    * Fixed an as-of-yet untriggered bug for an unusual case when multiple
-      files being installed share the same content and one of the files
-      is erased locally.
-    * Fixed a traceback that occurred when a manually removed file switched
-      packages. (CNY-869)
-    * When you remove a file and replace it with a directory, conary
-      treats it as a removal (CNY-872).
+    * A bug in Conary's handling of an unusual case when multiple
+      files being installed share the same content, and one of the
+      files has been erased locally has been fixed.
+    * A traceback that occurred when a manually removed file switches
+      packages during an update has been fixed. (CNY-869)
+    * When you remove a file and replace it with a directory, Conary
+      now treats it as a removal. (CNY-872)
     * Conary's OpenPGP implementation now dynamically uses RIPEMD if
       it is available from PyCrpyto.  Some PyCrypto builds don't
-      include RIPEMD hash support.  (CNY-868)
+      include RIPEMD hash support. (CNY-868)
     * A bug that allowed merging changesets with conflicting file
       contents for configuration files with the same pathId has been
       fixed.  Applying the resulting merged changeset caused
-      IntegrityErrors.  (CNY-888).
-
-  o Optimizations
-    * The getFileContents and getFileVersions server side calls have
-      been optimized for faster execution
-    * The SQL query in getTroveList has been sped up by a 3-5x factor.
-    * dbstore now has support for executemany()
-    * Inserts into local database now use executemany().
-
-  o Server Changes
-    * Several SQL queries have been updated for PostgreSQL compatibility
+      IntegrityErrors.  (CNY-888)
 
 Changes in 1.0.30:
   o System Update Changes:

@@ -102,7 +102,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     labelConflicts = client._checkChangeSetForLabelConflicts(cs)
     if labelConflicts and not ignoreConflicts:
         print
-        print 'WARNING: performing this %s will create label conflicts:' % branchOps
+        print 'WARNING: performing these %s will create label conflicts:' % branchOps
         for troveTups in labelConflicts:
             print 
             print '%s=%s[%s]' % (troveTups[0])

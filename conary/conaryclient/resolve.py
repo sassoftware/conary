@@ -100,10 +100,10 @@ class DepResolutionMethod(object):
                             depSet = depSet[0:5] + ['...']
                         depSet = '\n               '.join(depSet)
                         log.debug('Resolved:\n' 
-                                  '    %s=%s[%s]\n'
+                                  '    %s=%s/%s[%s]\n'
                                   '    Required:  %s\n'
-                                  '    Adding: %s=%s[%s]',
-                                     troveTup[0], troveTup[1].trailingRevision(),troveTup[2], depSet, choice[0], choice[1].trailingRevision(), choice[2])
+                                  '    Adding: %s=%s/%s[%s]',
+                                     troveTup[0], troveTup[1].trailingLabel(), troveTup[1].trailingRevision(),troveTup[2], depSet, choice[0], choice[1].trailingLabel(), choice[1].trailingRevision(), choice[2])
 
                 troves.update([ (x[0], (None, None), x[1:], True)
                                 for x in suggList ])
@@ -477,6 +477,11 @@ class DependencySolver(object):
         for resolveInfo in cannotResolve:
             (reqInfo, depSet, provInfoList) = resolveInfo
 
+            if reqInfo in newIdx:
+                # The thing with the requirement is something we asked 
+                # to be installed - don't try to update it again!
+                continue
+
             found = False
             for provInfo in provInfoList:
                 if provInfo in ineligible:
@@ -490,6 +495,7 @@ class DependencySolver(object):
             if found:
                 continue
 
+            ineligible.update(provInfoList)
             for provInfo in provInfoList:
                 if provInfo not in oldIdx:
                     continue

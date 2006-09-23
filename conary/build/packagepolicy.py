@@ -2162,6 +2162,7 @@ class Requires(_addInfo):
 
     def preProcess(self):
         macros = self.macros
+        self.db = None
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
         # anything that any buildreqs have caused to go into ld.so.conf
@@ -2173,6 +2174,11 @@ class Requires(_addInfo):
         self.exceptDeps = [(filter.Filter(x, macros), re.compile(y % macros))
                           for x, y in self.exceptDeps]
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
+        self.PkgConfigRe = re.compile(
+            r'(%(libdir)s|%(datadir)s)/pkgconfig/.*\.pc$' %macros)
+
+    def _initializeDb(self):
+        self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
 
     def _ELFPathFixup(self, path, m, pkg):
         """
@@ -2439,6 +2445,91 @@ class Requires(_addInfo):
         reqlist = ['::'.join(x.split('/')).rsplit('.', 1)[0] for x in reqlist]
 
         return reqlist
+        
+    def _addPkgConfigRequirements(self, path, fullpath, pkg, macros):
+        # parse pkgconfig file
+        variables = {}
+        requirements = set()
+        preface = True
+        pcContents = [x.strip() for x in file(fullpath).readlines()]
+        for pcLine in pcContents:
+            for var in variables:
+                pcLine = pcLine.replace(var, variables[var])
+            if ':' in pcLine:
+                preface = False
+            if preface:
+                if '=' in pcLine:
+                    key, val = pcLine.split('=', 1)
+                    variables['${%s}' %key] = val
+            else:
+                if pcLine.startswith('Requires:'):
+                    reqList = pcLine.split(':', 1)[1].split()
+                    versionNext = False
+                    for req in reqList:
+                        if '>' in req:
+                            versionNext = True
+                        elif versionNext:
+                            pass
+                        else:
+                            requirements.add(req)
+
+        # find referenced pkgconfig files and add requirements
+        for req in requirements:
+            candidateFileNames = [
+                '%(destdir)s%(libdir)s/pkgconfig/'+req+'.pc',
+                '%(destdir)s%(datadir)s/pkgconfig/'+req+'.pc',
+                '%(libdir)s/pkgconfig/'+req+'.pc',
+                '%(datadir)s/pkgconfig/'+req+'.pc',
+            ]
+            candidateFileNames = [ x % macros for x in candidateFileNames ]
+            candidateFiles = [ util.exists(x) for x in candidateFileNames ]
+            if True in candidateFiles:
+                fileRequired = candidateFileNames[candidateFiles.index(True)]
+            else:
+                self.warn('pkg-config file %s.pc not found', req)
+                continue
+            if fileRequired.startswith(macros.destdir):
+                # find requirement in packaging
+                fileRequired = fileRequired[len(macros.destdir):]
+                autopkg = self.recipe.autopkg
+                troveName = autopkg.componentMap[fileRequired].name
+                if troveName.endswith(':devellib'):
+                    # prefer corresponding :devel to :devellib
+                    # if it exists
+                    develTroveName = troveName.replace(':devellib', ':devel')
+                    if develTroveName in autopkg.components and autopkg.components[develTroveName]:
+                        # found a non-empty :devel compoment
+                        troveName = develTroveName
+                self._addRequirement(path, troveName, [], pkg,
+                                     deps.TroveDependencies)
+            else:
+                if not self.db:
+                    self._initializeDb()
+                # find requirement on system
+                troveNames = [ x.getName() for x in 
+                               self.db.iterTrovesByPath(fileRequired) ]
+                if not troveNames:
+                    self.error('pkg-config file %s not managed by conary',
+                               fileRequired)
+                if len(troveNames) > 1:
+                    self.error('pkg-config file %s owned by more than one trove',
+                               fileRequired)
+                troveName = troveNames[0]
+                if troveName.endswith(':devellib'):
+                    # prefer corresponding :devel to :devellib
+                    # if it exists
+                    troveSpec = (
+                        troveName.replace(':devellib', ':devel'),
+                        None, None
+                    )
+                    results = self.db.findTroves(None, [troveSpec],
+                                                 allowMissing = True)
+                    if troveSpec in results:
+                        troveName = results[troveSpec][0][0]
+                self._addRequirement(path, troveName, [], pkg,
+                                     deps.TroveDependencies)
+
+
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -2507,6 +2598,9 @@ class Requires(_addInfo):
         elif self.CILPolicyRE.match(path):
             name, ver = self._CILPolicyProvides[path]
             self._addRequirement(path, name, [ver], pkg, deps.CILDependencies)
+
+        if self.PkgConfigRe.match(path):
+            self._addPkgConfigRequirements(path, fullpath, pkg, macros)
 
         if (m and (m.name == 'java' or m.name == 'jar')
             and m.contents['requires']):

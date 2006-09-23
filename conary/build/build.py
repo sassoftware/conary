@@ -1046,11 +1046,11 @@ class PythonSetup(BuildCommand):
     B{bootstrap} : (False) Avoids reporting errors that are unavoidable
     when building bootstrap packages.
 
-    B{dir} : (C{%(builddir)s}) Directory in which to find the setup.py file,
+    B{dir} : (C{%(builddir)s}) Directory in which to find the setup.py file;
     defaults to the build directory.
 
     B{rootDir} : (C{%(destdir)s}) The directory to pass to setup.py via the
-    C{--root} option
+    C{--root} option.
 
     B{purelib}, B{platlib}, and B{data} : allow overriding the choice
     of C{--purelib}, C{--platlib}, and C{--data} arguments, respectively.
@@ -1086,8 +1086,8 @@ class PythonSetup(BuildCommand):
         'platlib': None,
         'purePython': True,
         'allowNonPure': False,
-        'dir': '',
-        'rootDir': '',
+        'dir': '%(builddir)s',
+        'rootDir': '%(destdir)s',
         'setupName': 'setup.py',
     }
 
@@ -1097,17 +1097,17 @@ class PythonSetup(BuildCommand):
                 self.recipe.reportErrors(
                     "Must add 'python-setuptools:python' to buildRequires")
 	macros = macros.copy()
-        if self.dir:
+        if self.dir == '%(builddir)s':
+            rundir = macros.builddir # do not expand!
+	    macros.cdcmd = ''
+	else:
             rundir = action._expandOnePath(self.dir, macros)
             macros.cdcmd = 'cd %s; ' % rundir
-	else:
-            rundir = macros.builddir
-	    macros.cdcmd = ''
 
-        if self.rootDir:
-            macros.rootdir = '%(destdir)s/' + self.rootDir
-        else:
+        if self.rootDir == '%(destdir)s':
             macros.rootdir = '%(destdir)s'
+        else:
+            macros.rootdir = '%(destdir)s/' + self.rootDir
         
         macros.setupName = self.setupName
 
