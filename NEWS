@@ -1,3 +1,12 @@
+Changes in @NEW@:
+  o Optimizations:
+    * Getting a large number of troves (without files) from the local database
+      has been sped up by 30%.  (CNY-907).
+    * conary q --troves is 3 times faster, conary q is 2 times faster, and
+      and conary q --troves --recurse is 2 times faster on a test machine
+      (this, along with the speedups from 1.0.32 make conary q 4-6 times faster
+      now than it was earlier).
+
 Changes in 1.0.32:
   o Optimizations
     * Duplicate trove instantiations have been removed. Build requires are
@@ -34,6 +43,12 @@ Changes in 1.0.32:
       with access to a group that does not exist.
     * cvc cook group now limits the number of path conflicts displayed for 
       one trove to 10. (CNY-910)
+    * Conary update now respects local changes when a group update occurs
+      along with the update of the switched trove.  For example, switch
+      foo to be installed from another branch instead of the default, 
+      and then update foo and its containing group at the same time would
+      cause conary to try to reinstall the original foo (resulting in path
+      conflicts). (CNY-915)
     * loadRecipe now selects the most recent of two recipes available
       in the case where there are multiple choices due to label
       multiplicity. (CNY-918)

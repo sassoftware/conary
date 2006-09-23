@@ -187,6 +187,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def getTroves(self, troveList, pristine = True, withFiles = True,
                   withDeps = True):
+        if not troveList:
+            return []
         return self.db.getTroves(troveList, pristine, withFiles = withFiles,
                                  withDeps = withDeps)
 
@@ -228,6 +230,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
                     for x in self.db.iterVersionByName(name, True) ]
 
     def hasTroves(self, troves):
+        if not troves:
+            return []
         return self.db.hasTroves(troves)
 
     def hasTrove(self, troveName, version, flavor):

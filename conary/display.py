@@ -52,7 +52,7 @@ def displayTroves(dcfg, formatter, troveTups):
                          showFlags = dcfg.showTroveFlags)
 
     if dcfg.hideComponents():
-        iter = skipComponents(iter, dcfg.getPrimaryTroves())
+        iter = list(skipComponents(iter, dcfg.getPrimaryTroves()))
 
     allTups = list(iter)
     # let the formatter know what troves are going to be displayed
@@ -131,17 +131,37 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
     if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
+        troveCache = dict(itertools.izip(troveTups, troves))
     elif recurseAll or recurseOne:
         colls = [ x for x in troveTups if trove.troveIsCollection(x[0]) ]
         troves = troveSource.getTroves(colls, withFiles=False, **kw)
-        troveDict = dict(itertools.izip(colls, troves))
-        troves = [ troveDict.get(x, None) for x in troveTups ]
+        troveCache = dict(itertools.izip(colls, troves))
     else:
         troves = [None] * len(troveTups)
+        troveCache = {}
+
+    hasTroveCache = {}
+    if recurseAll or recurseOne:
+        # we're recursing, we can cache a lot of information -
+        # troves we'll need, hasTroves info we'll need.
+        # If we cache this now, we cut down significantly on the
+        # number of function calls we need.
+        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) for x in troves if x)))
+        if recurseAll:
+            colls = set(x for x in troveTups if trove.troveIsCollection(x[0]))
+            childColls = [ x for x in childTups if trove.troveIsCollection(x[0]) and x not in colls ]
+            troves = troveSource.getTroves(childColls, withFiles=False, **kw)
+            troveCache.update(itertools.izip(childColls, troves))
+        allTups = troveTups + childTups
+        if checkExists:
+            hasTroves = troveSource.hasTroves(allTups)
+            hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
+        troves = [ troveCache.get(x, None) for x in troveTups ]
+    elif checkExists:
+        hasTroves = troveSource.hasTroves(troveTups)
+        hasTrovesCache = dict(itertools.izip(troveTups, hasTroves))
 
     indent = 0
-    troveCache = {} # cached trove info
-    missing = set() # cached hasTrove info
     seen = set()  # cached info about what troves we've called hasTrove on.
 
     for troveTup, trv in itertools.izip(troveTups, troves):
@@ -181,8 +201,6 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
                     troveCache.update(x for x \
                         in itertools.izip(neededTroveTups, newTroves) if x[1])
-                    missing.update(x[0] for \
-                        x in itertools.izip(neededTroveTups, newTroves) if not x[1])
                     seen.update(neededTroveTups)
                 else:
                     newColls = [ x for x in trv.iterTroveList(weakRefs=True,
@@ -191,8 +209,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                                             and x not in troveCache ]
                     newTroves = troveSource.getTroves(newColls,
                                                       withFiles=False)
-                    troveCache.update(x for x in itertools.izip(newColls, newTroves) if x[1])
-                    missing.update(x[0] for x in itertools.izip(newColls, newTroves) if not x[1])
+                    troveCache.update(x for x in itertools.izip(newColls, newTroves))
                     seen.update(newColls)
 
                 if checkExists:
@@ -202,9 +219,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                         if newTrove is None:
                             continue
                         alsoToCheck.update(dict((x, newTrove) for x in \
-                                            newTrove.iterTroveList(True, True) if x not in toCheck and x not in seen))
-
-                    toCheck.difference_update(seen)
+                                        newTrove.iterTroveList(True, True) 
+                                        if x not in toCheck and x not in seen))
 
                     if not showNotByDefault:
                         newToCheck = []
@@ -228,9 +244,10 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                         toCheck = list(toCheck)
 
                     if toCheck:
-                        hasTroves = troveSource.hasTroves(toCheck)
-                        missing.update(x[0] for x in itertools.izip(toCheck, hasTroves) if not x[1])
                         seen.update(toCheck)
+                        toCheck = [ x for x in toCheck if x not in hasTrovesCache ]
+                        hasTroves = troveSource.hasTroves(toCheck)
+                        hasTrovesCache.update(x for x in itertools.izip(toCheck, hasTroves))
 
                 trovesToAdd = []
                 depth += 1
@@ -246,7 +263,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     flags = TROVE_STRONGREF
                     if installByDefault:
                         flags |= TROVE_BYDEFAULT
-                    if troveTup not in missing:
+                    if hasTrovesCache[troveTup]:
                         flags |= TROVE_HASTROVE
                     elif not showNotExists:
                         continue
@@ -281,7 +298,10 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     newTroves = [None] * len(newTroveTups)
 
                 if checkExists:
-                    hasTroves = troveSource.hasTroves([x[0] for x in newTroveTups])
+                    toAdd = [ x[0] for x in newTroveTups if x[0] not in hasTrovesCache ]
+                    hasTroves = troveSource.hasTroves(toAdd)
+                    hasTrovesCache.update(itertools.izip(toAdd, hasTroves))
+                    hasTroves = [ hasTrovesCache[x[0]] for x in newTroveTups ]
                 else:
                     hasTroves = [True] * len(newTroveTups)
 
