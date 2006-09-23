@@ -157,9 +157,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             hasTroves = troveSource.hasTroves(allTups)
             hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
         troves = [ troveCache.get(x, None) for x in troveTups ]
-    elif checkExists:
-        hasTroves = troveSource.hasTroves(troveTups)
-        hasTrovesCache = dict(itertools.izip(troveTups, hasTroves))
+    else:
+        hasTrovesCache = {}
 
     indent = 0
     seen = set()  # cached info about what troves we've called hasTrove on.
