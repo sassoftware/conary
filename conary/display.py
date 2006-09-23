@@ -132,23 +132,34 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
         troveCache = dict(itertools.izip(troveTups, troves))
-        hasTroves = troveSource.hasTroves(troveTups)
-        hasTrovesCache = dict(itertools.izip(troveTups, hasTroves))
     elif recurseAll or recurseOne:
         colls = [ x for x in troveTups if trove.troveIsCollection(x[0]) ]
         troves = troveSource.getTroves(colls, withFiles=False, **kw)
         troveCache = dict(itertools.izip(colls, troves))
-        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) for x in troves if x)))
-        allTups = troveTups + childTups
-        hasTroves = troveSource.hasTroves(allTups)
-        hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
-        troves = [ troveCache.get(x, None) for x in troveTups ]
     else:
         troves = [None] * len(troveTups)
         troveCache = {}
+
+    hasTroveCache = {}
+    if recurseAll or recurseOne:
+        # we're recursing, we can cache a lot of information -
+        # troves we'll need, hasTroves info we'll need.
+        # If we cache this now, we cut down significantly on the
+        # number of function calls we need.
+        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) for x in troves if x)))
+        colls = set(colls)
+        if recurseAll:
+            childColls = [ x for x in childTups if trove.troveIsCollection(x[0]) and x not in colls ]
+            troves = troveSource.getTroves(childColls, withFiles=False, **kw)
+            troveCache.update(itertools.izip(childColls, troves))
+        allTups = troveTups + childTups
+        if checkExists:
+            hasTroves = troveSource.hasTroves(allTups)
+            hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
+        troves = [ troveCache.get(x, None) for x in troveTups ]
+    elif checkExists:
         hasTroves = troveSource.hasTroves(troveTups)
         hasTrovesCache = dict(itertools.izip(troveTups, hasTroves))
-
 
     indent = 0
     seen = set()  # cached info about what troves we've called hasTrove on.
