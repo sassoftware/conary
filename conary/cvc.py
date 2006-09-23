@@ -292,10 +292,11 @@ class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
 
-    docs = {'message': 'Use MESSAGE to describe why the commit was performed',
-           'test':    ('Runs through all the steps of committing but does not'
-                        'modify the repository')}
-
+    docs = {'message':'Use MESSAGE to describe why the commit was performed',
+            'test':   ('Runs through all the steps of committing but does not '
+                       'modify the repository')}
+    # allow "cvc commit -m'foo bar'" to work
+    hobbleShortOpts = False
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["message"] = '-m', ONE_PARAM

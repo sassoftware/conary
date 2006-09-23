@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Build (cvc) Changes:
+    * "cvc commit -m'commit message'" is now accepted.  Previously, a
+      space was required between the -m and the message.
+
   o Optimizations:
     * Getting a large number of troves (without files) from the local database
       has been sped up by 30%.  (CNY-907).
