@@ -2,10 +2,9 @@ Changes in @NEW@:
   o Optimizations:
     * Getting a large number of troves (without files) from the local database
       has been sped up by 30%.  (CNY-907).
-    * conary q --troves is 3 times faster, conary q is 2 times faster, and
-      and conary q --troves --recurse is 2 times faster on a test machine
-      (this, along with the speedups from 1.0.32 make conary q 4-6 times faster
-      now than it was earlier).
+    * conary q --troves is 2 times faster, conary q, conary q --deps and 
+      --info  are 30% faster, and conary q --troves --recurse is 4-6 times 
+      faster on a test machine.
 
 Changes in 1.0.32:
   o Optimizations
