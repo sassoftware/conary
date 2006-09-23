@@ -423,7 +423,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
                                  subTroveList) in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
-                            None, isRedirect = True)
+                            None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
 
@@ -511,8 +511,7 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     built = []
     for group in recipeObj.iterGroupList():
         groupName = group.name
-        grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
-                             isRedirect = False)
+        grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
         grpTrv.setRequires(group.getRequires())
 
 	provides = deps.DependencySet()
