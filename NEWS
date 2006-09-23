@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Client Changes:
+    * cvc and conary now take -r to mean --root and -c to mean --config.
+      Commands that take --info now take -i as an alternative.
+
   o Build (cvc) Changes:
     * "cvc commit -m'commit message'" is now accepted.  Previously, a
       space was required between the -m and the message.
