@@ -147,8 +147,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
         # If we cache this now, we cut down significantly on the
         # number of function calls we need.
         childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) for x in troves if x)))
-        colls = set(colls)
         if recurseAll:
+            colls = set(x for x in troveTups if trove.troveIsCollection(x[0]))
             childColls = [ x for x in childTups if trove.troveIsCollection(x[0]) and x not in colls ]
             troves = troveSource.getTroves(childColls, withFiles=False, **kw)
             troveCache.update(itertools.izip(childColls, troves))
