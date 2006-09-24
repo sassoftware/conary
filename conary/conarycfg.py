@@ -233,45 +233,16 @@ class ConaryContext(ConfigSection):
         by the values in the context that have been set.  Values that are 
         unset in the context do not override the default config values.
     """
-
-    buildFlavor           =  CfgFlavor
-    buildLabel            =  CfgLabel
-    buildPath             =  None
-    contact               =  None
-    environment           =  CfgDict(CfgString)
-    excludeTroves         =  CfgRegExpList
-    flavor                =  CfgList(CfgFlavor)
-    lookaside             =  CfgPath
-    installLabelPath      =  CfgInstallLabelPath
-    name                  =  None
-    recipeTemplate        =  None
-    repositoryMap         =  CfgRepoMap
-    root                  =  CfgPath
-    signatureKey          =  CfgFingerPrint
-    signatureKeyMap       =  CfgFingerPrintMap
-    siteConfigPath        =  CfgPathList
-    user                  =  CfgUserInfo
-
-    def _resetSigMap(self):
-        self.signatureKeyMap = []
-
-    def __init__(self, *args, **kw):
-        ConfigSection.__init__(self, *args, **kw)
-        self.addListener('signatureKey', lambda *args: self._resetSigMap())
-
-    def displayKey(self, cfgItem, value, out=None):
-        if not value:
-            return 
-        cfgItem.write(out, value, self._displayOptions)
-
-class ConaryConfiguration(SectionedConfigFile):
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
+    buildFlavor           =  CfgFlavor
+    buildLabel            =  CfgLabel
     buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
+    contact               =  None
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, False)
@@ -283,9 +254,12 @@ class ConaryConfiguration(SectionedConfigFile):
     enforceManagedPolicy  =  (CfgBool, True)
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     environment           =  CfgDict(CfgString)
+    excludeTroves         =  CfgRegExpList
+    flavor                =  CfgList(CfgFlavor)
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
+    installLabelPath      =  CfgInstallLabelPath
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',
                                             '~/.conary/log',))
@@ -294,6 +268,7 @@ class ConaryConfiguration(SectionedConfigFile):
     mirrorDirs            =  (CfgPathList, ('~/.conary/mirrors',
                                             '/etc/conary/distro/mirrors',
                                             '/etc/conary/mirrors',))
+    name                  =  None
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
@@ -304,12 +279,17 @@ class ConaryConfiguration(SectionedConfigFile):
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
-    root                  =  (CfgPath, '/')
+
+    recipeTemplate        =  None
+    repositoryMap         =  CfgRepoMap
     resolveLevel          =  (CfgInt, 2)
+    root                  =  (CfgPath, '/')
     recipeTemplateDirs    =  (CfgPathList, ('~/.conary/recipeTemplates',
                                             '/etc/conary/recipeTemplates'))
     showLabels            =  CfgBool
     showComponents        =  CfgBool
+    signatureKey          =  CfgFingerPrint
+    signatureKeyMap       =  CfgFingerPrintMap
     siteConfigPath        =  (CfgPathList, ('/etc/conary/site',
                                             '/etc/conary/distro/site',
                                             '~/.conary/site'))
@@ -321,7 +301,22 @@ class ConaryConfiguration(SectionedConfigFile):
     useDirs               =  (CfgPathList, ('/etc/conary/use',
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
+    user                  =  CfgUserInfo
 
+
+    def _resetSigMap(self):
+        self.signatureKeyMap = []
+
+    def __init__(self, *args, **kw):
+        ConfigSection.__init__(self, *args, **kw)
+        self.addListener('signatureKey', lambda *args: self._resetSigMap())
+
+    def _writeKey(self, out, cfgItem, value, options):
+        if cfgItem.isDefault():
+            return 
+        ConfigSection._writeKey(self, out, cfgItem, value, options)
+
+class ConaryConfiguration(SectionedConfigFile):
 
     # this allows a new section to be created on the fly with the type 
     # ConaryContext
@@ -358,9 +353,7 @@ class ConaryConfiguration(SectionedConfigFile):
         context = self.getSection(name)
 
         for key, value in context.iteritems():
-            if isinstance(value, deps.Flavor):
-                    self.__dict__[key] = value
-            elif value:
+            if not context.isDefault(key):
                 if isinstance(value, dict):
                     self.__dict__[key].update(value)
                 else:

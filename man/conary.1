@@ -685,8 +685,7 @@ to \fBroot\fP (see below) and should normally not be changed.
 .B environment
 Provides an environment variable and its associated value to which to
 set it (or, if no value is provided, the environment variable to unset)
-while building packages.  These may be set within contexts, and the
-values may include macros.
+while building packages.  The values may include macros.
 .TP
 .B excludeTroves
 The regular expression of a trove name to exclude when doing updates.
@@ -792,12 +791,9 @@ shell globs, in which case all files matching the glob will be read in.
 .TP
 .B Configuration Contexts
 A Configuration context is a section of a config file delimited by a section
-name in square brackets, like \fI[foo]\fR.  Options that can be specified after
-the brackets are limited to \fBbuildFlavor, buildLabel, buildPath, contact,
-excludeTroves, flavor, lookaside, installLabelPath, name, recipeTemplates, 
-repositoryMap, root, signatureKey, signatureKeyMap, and user\fR.  When a 
-context is selected, the configuration values specified in the context 
-override the default values.
+name in square brackets, like \fI[foo]\fR.  All conary configuration options
+may be overridden in contexts.  When a context is selected, the configuration 
+values specified in the context override the default values.
    If any values are not specified, the values defined in the main 
 configuration section are used.  
 .RS 4

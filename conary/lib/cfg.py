@@ -120,6 +120,7 @@ class _Config:
 
         self._lowerCaseMap[key.lower()] = key
         self[key] = copy.deepcopy(self._options[key].default)
+        self._options[key].setIsDefault(True)
 
     def addListener(self, key, fn):
         """ 
@@ -165,6 +166,7 @@ class _Config:
             raise KeyError, 'No such attribute "%s"' % key
         key = self._lowerCaseMap[key.lower()]
         self.__dict__[key] = value
+        self._options[key].setIsDefault(False)
 
     def __contains__(self, key):
         if key[0] == '_' or key.lower() not in self._lowerCaseMap:
@@ -176,6 +178,9 @@ class _Config:
 
     def getDefaultValue(self, name):
         return self._options[name].getDefault()
+
+    def isDefault(self, key):
+        return self._options[key].isDefault()
 
     def keys(self):
         return self._options.keys()
@@ -471,6 +476,7 @@ class ConfigOption:
         self.valueType = valueType
         self.default = valueType.getDefault(default)
         self.__doc__ = doc
+        self._isDefault = True
         
         self.listeners = []
 
@@ -508,6 +514,12 @@ class ConfigOption:
 
     def getDefault(self):
         return self.default
+
+    def isDefault(self):
+        return self._isDefault
+
+    def setIsDefault(self, val):
+        self._isDefault = val
 
     def addListener(self, listenFn):
         self.listeners.append(listenFn)
