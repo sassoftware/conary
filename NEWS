@@ -3,6 +3,9 @@ Changes in @NEW@:
     * cvc and conary now take -r to mean --root and -c to mean --config.
       Commands that take --info now take -i as an alternative.
     * contexts may now override any configuration option. (CNY-812)
+    * The meaning of --components has changed hopefully to be more intuitive.
+      For example, conary q --components will show all the components for
+      all packages, indented as you'd expect (CNY-822).
 
   o Build (cvc) Changes:
     * "cvc commit -m'commit message'" is now accepted.  Previously, a

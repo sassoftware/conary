@@ -38,6 +38,12 @@ TROVE_VERSION=10
 def troveIsCollection(troveName):
     return not(":" in troveName or troveName.startswith("fileset-"))
 
+def troveIsPackage(troveName):
+    return troveIsCollection(troveName) and not troveName.startswith('group-')
+
+def troveIsComponent(troveName):
+    return ":" in troveName
+
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
