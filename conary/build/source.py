@@ -360,7 +360,7 @@ class Archive(_Source):
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:
-                _unpack = "tar -C %s -xSf -" % (destDir,)
+                _unpack = "tar -C %s -xSpf -" % (destDir,)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
             elif _uncompress != 'cat':
@@ -368,7 +368,7 @@ class Archive(_Source):
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xSf -" % (destDir,)
+                _unpack = "tar -C %s -xSpf -" % (destDir,)
             else:
                 raise SourceError, "unknown archive format: " + f
 
