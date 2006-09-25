@@ -12,6 +12,7 @@ Changes in @NEW@:
       space was required between the -m and the message.
     * Permissions are now preserved by tar when extracting a tar
       archive added with r.addArchive().
+    * The Requires policy now parses pkg-config files more reliably.
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database
