@@ -20,7 +20,7 @@ Changes in 1.0.32:
     * Duplicate trove instantiations have been removed. Build requires are
       no longer thawed out of abstract change sets, and methods were added
       to get dependency and path hash information directly from trove
-      change set objects. These changes combined for a 50% speedup an
+      change set objects. These changes combined for a 50% speedup on
       update --info of a large group into an empty root and saved a few
       megs of memory as well (CNY-892)
     * The changes in the previous version of Conary in how XML-RPC
@@ -60,12 +60,6 @@ Changes in 1.0.32:
     * loadRecipe now selects the most recent of two recipes available
       in the case where there are multiple choices due to label
       multiplicity. (CNY-918)
-    * Conary update now respects local changes when a group update occurs
-      along with the update of the switched trove.  For example, switch
-      foo to be installed from another branch instead of the default, 
-      and then update foo and its containing group at the same time would
-      cause conary to try to reinstall the original foo (resulting in path
-      conflicts). (CNY-915)
 
 Changes in 1.0.31:
   o Client Changes:
