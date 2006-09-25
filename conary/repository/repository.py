@@ -353,7 +353,7 @@ class ChangeSetJob:
             i += 1
 
 	    if callback:
-		callback.creatingDatabaseTransaction(i + 1, len(newList))
+		callback.creatingDatabaseTransaction(i, len(newList))
 
 	    newVersion = csTrove.getNewVersion()
 	    oldTroveVersion = csTrove.getOldVersion()
@@ -576,7 +576,7 @@ class ChangeSetJob:
             i += 1
 
             if callback:
-                callback.creatingDatabaseTransaction(i + 1, len(newList))
+                callback.creatingDatabaseTransaction(i, len(newList))
 
             self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
                                   csTrove.getNewFlavor())
