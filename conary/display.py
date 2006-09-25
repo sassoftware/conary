@@ -137,6 +137,11 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     else:
         kw = {}
 
+    if recurseOne: # when we recurse one level deep, always recurse packages
+                   # otherwise you might try conary q tmpwatch --troves and
+                   # have that give no result.
+        recursePackages = True
+
     if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
         troveCache = dict(itertools.izip(troveTups, troves))
