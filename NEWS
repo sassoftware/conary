@@ -13,6 +13,8 @@ Changes in @NEW@:
     * Permissions are now preserved by tar when extracting a tar
       archive added with r.addArchive().
     * The Requires policy now parses pkg-config files more reliably.
+    * "cvc cook" now has a --download option, which fetches the applicable
+      sources from upstream or from the repository and then stops (CNY-837)
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database

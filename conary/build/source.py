@@ -312,9 +312,13 @@ class Archive(_Source):
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 
-    def do(self):
+    def doDownload(self):
 	f = self._findSource(self.httpHeaders)
 	self._checkSignature(f)
+        return f
+
+    def do(self):
+        f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
 

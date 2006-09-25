@@ -394,6 +394,7 @@ class CookCommand(CvcCommand):
             'ignore-buildreqs' : 'do not check build requirements',
             'show-buildreqs': 'show build requirements for recipe',
             'prep'    : 'unpack, but do not build',
+            'download': 'download, but do not unpack or build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
             'unknown-flags' : optparse.SUPPRESS_HELP,
@@ -411,6 +412,7 @@ class CookCommand(CvcCommand):
         argDef['ignore-buildreqs'] = NO_PARAM
         argDef['show-buildreqs' ] = NO_PARAM
         argDef['prep'] = NO_PARAM
+        argDef['download'] = NO_PARAM
         argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
 
@@ -419,6 +421,7 @@ class CookCommand(CvcCommand):
         level = log.getVerbosity()
         macros = {}
         prep = 0
+        downloadOnly = False
         resume = None
         buildBranch = None
         if argSet.has_key('flavor'):
@@ -442,6 +445,13 @@ class CookCommand(CvcCommand):
             ignoreDeps = True
         else:
             ignoreDeps = False
+
+        if argSet.has_key('download'):
+            if argSet.has_key('prep') or prep==True:
+                log.warn('download and prep should not be used together... prefering download only')
+            del argSet['download']
+            ignoreDeps = True
+            downloadOnly = True
 
         showBuildReqs = argSet.pop('show-buildreqs', False)
 
@@ -495,7 +505,7 @@ class CookCommand(CvcCommand):
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
-                         crossCompile=crossCompile)
+                         crossCompile=crossCompile, downloadonly=downloadOnly)
         log.setVerbosity(level)
 _register(CookCommand)
 
