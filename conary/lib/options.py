@@ -309,14 +309,23 @@ class AbstractCommand(object):
         pass
 
     def addConfigOptions(self, cfgMap, argDef):
-        for name, (cfgName, paramType)  in cfgMap.items():
+        for name, data in cfgMap.items():
+            if len(data) == 3:
+                cfgName, paramType, shortOpt = data
+            else:
+                shortOpt = None
+                cfgName, paramType = data
+
             # if it's a NO_PARAM
             if paramType == NO_PARAM:
                 negName = 'no-' + name
                 argDef[self.defaultGroup][negName] = NO_PARAM, optparse.SUPPRESS_HELP
                 cfgMap[negName] = (cfgName, paramType)
 
-            argDef[self.defaultGroup][name] = paramType
+            if shortOpt:
+                argDef[self.defaultGroup][name] = shortOpt, paramType
+            else:
+                argDef[self.defaultGroup][name] = paramType
 
     def addDocs(self, argDef):
         """ Parse a docs dict assigned at the class level
@@ -365,17 +374,17 @@ class AbstractCommand(object):
         for line in configFileList:
             cfg.read(path, exception=True)
 
-        for (arg, (name, paramType)) in cfgMap.items():
+        for (arg, data) in cfgMap.items():
+            cfgName, paramType = data[0:2]
             value = argSet.pop(arg, None)
             if value is not None:
                 if arg.startswith('no-'):
                     value = not value
 
-                cfg.configLine("%s %s" % (name, value))
+                cfg.configLine("%s %s" % (cfgName, value))
 
         for line in argSet.pop('config', []):
             cfg.configLine(line)
-
 
 
     def runCommand(self, *args, **kw):

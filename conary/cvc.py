@@ -102,7 +102,7 @@ class CvcCommand(options.AbstractCommand):
 
     def addParameters(self, argDef):
         d = {}
-        d["config"] = MULT_PARAM
+        d["config"] = '-c', MULT_PARAM
         d["config-file"] = MULT_PARAM
         d["context"] = ONE_PARAM
         d["install-label"] = MULT_PARAM
@@ -117,7 +117,7 @@ class CvcCommand(options.AbstractCommand):
         cfgMap['flavors']       = 'fullFlavors', NO_PARAM
         cfgMap["pubring"]       = "pubRing", ONE_PARAM
         cfgMap["quiet"]         = "quiet", NO_PARAM,
-        cfgMap["root"]          = "root", ONE_PARAM,
+        cfgMap["root"]          = "root", ONE_PARAM, '-r'
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
@@ -196,7 +196,7 @@ class BranchShadowCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef["binary-only"] = NO_PARAM
         argDef["source-only"] = NO_PARAM
-        argDef["info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -262,7 +262,7 @@ class CloneCommand(CvcCommand):
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["skip-build-info"] = NO_PARAM
-        argDef["info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["message"] = '-m', ONE_PARAM
         argDef["full-recurse"] = NO_PARAM
@@ -700,6 +700,9 @@ class CvcMain(options.MainHandler):
         client = conaryclient.ConaryClient(cfg)
         repos = client.getRepos()
         callback = CheckinCallback(cfg)
+
+        if isinstance(thisCommand, CommitCommand):
+            self.hobbleShortOpts = False
 
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]

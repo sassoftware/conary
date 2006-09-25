@@ -121,7 +121,7 @@ class ConaryCommand(options.AbstractCommand):
 
     def addParameters(self, argDef):
         d = {}
-        d["config"] = MULT_PARAM
+        d["config"] = '-c', MULT_PARAM
         d["config-file"] = MULT_PARAM
         d["context"] = ONE_PARAM
         d["install-label"] = MULT_PARAM
@@ -135,7 +135,7 @@ class ConaryCommand(options.AbstractCommand):
         cfgMap["exclude-troves"] = "excludeTroves", ONE_PARAM
         cfgMap["trust-threshold"] = "trustThreshold", ONE_PARAM
         cfgMap["pubring"] = "pubRing", ONE_PARAM
-        cfgMap["root"] = "root", ONE_PARAM
+        cfgMap["root"] = "root", ONE_PARAM, '-r'
         cfgMap["quiet"] = "quiet", NO_PARAM
 
         cfgMap['interactive'] = 'interactive', NO_PARAM,
@@ -508,7 +508,7 @@ class _AbstractQueryCommand(ConaryCommand):
         d = {}
         d["buildreqs"] = NO_PARAM
         d["deps"] = NO_PARAM
-        d["info"] = NO_PARAM
+        d["info"] = '-i', NO_PARAM
         d["signatures"] = NO_PARAM
         d["trove-flags"] = NO_PARAM
         argDef['Info Display'] = d
@@ -763,7 +763,7 @@ class UpdateCommand(ConaryCommand):
         d["just-db"] = NO_PARAM
         d["keep-existing"] = NO_PARAM
         d["keep-required"] = NO_PARAM
-        d["info"] = NO_PARAM
+        d["info"] = '-i', NO_PARAM
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
@@ -890,7 +890,7 @@ class UpdateAllCommand(UpdateCommand):
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["items"] = NO_PARAM
-        argDef["info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
         argDef["keep-required"] = NO_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
