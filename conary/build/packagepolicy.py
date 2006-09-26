@@ -2462,7 +2462,7 @@ class Requires(_addInfo):
                     key, val = pcLine.split('=', 1)
                     variables['${%s}' %key] = val
             else:
-                if pcLine.startswith('Requires:'):
+                if pcLine.startswith('Requires') and ':' in pcLine:
                     pcLine = pcLine.split(':', 1)[1]
                     # split on ',' and ' '
                     reqList = itertools.chain(*[x.split(',')
