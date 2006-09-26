@@ -12,6 +12,9 @@ Changes in @NEW@:
       space was required between the -m and the message.
     * Permissions are now preserved by tar when extracting a tar
       archive added with r.addArchive().
+    * If cooking a group results in conflicts, the error message will now
+      show you the reason why the troves in conflict were included in the
+      group. (CNY-876)
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database

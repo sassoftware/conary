@@ -29,15 +29,18 @@ class BadRecipeNameError(RecipeFileError):
     pass
 
 class GroupPathConflicts(CookError):
-    def __init__(self, conflicts):
+    def __init__(self, conflicts, groupDict):
         self.conflicts = conflicts
         errStrings = []
         for groupName, conflictSets in conflicts.iteritems():
+            group = groupDict[groupName]
             errStrings.append('%s:' % groupName)
             for conflictSet, paths in conflictSets:
                 errStrings.append('  The following %s troves share %s conflicting paths:' % (len(conflictSet), len(paths)))
                 errStrings.append('\n    Troves:')
-                errStrings.extend('      %s=%s[%s]' % x for x in conflictSet)
+                for (n,v,f) in conflictSet:
+                    incReason = group.getReasonString(n,v,f)
+                    errStrings.append('     %s=%s[%s]\n       (%s)' % (n,v,f,incReason))
                 errStrings.append('\n    Conflicting Files:')
                 errStrings.extend('      %s' % x for x in sorted(paths)[0:11])
                 if len(paths) > 10:
