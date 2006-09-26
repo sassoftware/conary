@@ -12,6 +12,9 @@ Changes in @NEW@:
       space was required between the -m and the message.
     * Permissions are now preserved by tar when extracting a tar
       archive added with r.addArchive().
+    * The Requires policy now parses pkg-config files more reliably.
+    * "cvc cook" now has a --download option, which fetches the applicable
+      sources from upstream or from the repository and then stops (CNY-837)
     * If cooking a group results in conflicts, the error message will now
       show you the reason why the troves in conflict were included in the
       group. (CNY-876)
