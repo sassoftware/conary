@@ -2463,10 +2463,20 @@ class Requires(_addInfo):
                     variables['${%s}' %key] = val
             else:
                 if pcLine.startswith('Requires:'):
-                    reqList = pcLine.split(':', 1)[1].split(' ,<=>')
+                    pcLine = pcLine.split(':', 1)[1]
+                    # split on ',' and ' '
+                    reqList = itertools.chain(*[x.split(',')
+                                                for x in pcLine.split()])
+                    reqList = [x for x in reqList if x]
+                    versionNext = False
                     for req in reqList:
-                        if req:
-                            requirements.add(req)
+                        if [x for x in '<=>' if x in req]:
+                            versionNext = True
+                            continue
+                        if versionNext:
+                            versionNext = False
+                            continue
+                        requirements.add(req)
 
         # find referenced pkgconfig files and add requirements
         for req in requirements:
