@@ -432,7 +432,7 @@ class Patch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{package)=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package)=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -487,6 +487,12 @@ class Patch(_Source):
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
     actually unpacked or merely stored in the archive.
+
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
 
     B{package} : (None) If set, must be a string that specifies the package
     (C{package='packagename'}), component (C{package=':componentname'}), or
@@ -559,6 +565,8 @@ class Patch(_Source):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
+    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        when downloading the source code archive.
     @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
 	"""
