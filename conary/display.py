@@ -208,6 +208,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     # initially, in which case trying to recurse it will
                     # not work.
                     continue
+                if trove.troveIsPackage(troveTup[0]) and not recursePackages:
+                    continue
 
                 newTroveTups = trv.iterTroveList(strongRefs=True,
                                                  weakRefs=showWeakRefs)
