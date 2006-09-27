@@ -194,7 +194,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                allowUnknownFlags = False, allowMissingSource = False,
                ignoreDeps = False, logBuild = False,
                crossCompile = None, callback = None, 
-               requireCleanSources = False, downloadonly = False):
+               requireCleanSources = False, downloadOnly = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -215,9 +215,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
-    @param downloadonly: If true, the lookaside is populated, and the None is
+    @param downloadOnly: If true, the lookaside is populated, and the None is
     returned instead of a changeset.
-    @type downloadonly: boolean
+    @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
     @param targetLabel: label to use for the cooked troves; it is used
@@ -324,7 +324,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                 ignoreDeps = ignoreDeps, logBuild = logBuild,
                                 crossCompile = crossCompile,
                                 requireCleanSources = requireCleanSources,
-                                downloadonly = downloadonly)
+                                downloadOnly = downloadOnly)
     elif recipeClass.getType() == recipe.RECIPE_TYPE_REDIRECT:
 	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
@@ -341,7 +341,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     else:
         raise AssertionError
 
-    # cook*Object returns None if using prep or downloadonly
+    # cook*Object returns None if using prep or downloadOnly
     if ret is None:
         return []
     
@@ -657,7 +657,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                       resume = None, alwaysBumpCount=False, 
                       ignoreDeps=False, logBuild=False, crossCompile = None,
                       requireCleanSources = False,
-                      downloadonly = False):
+                      downloadOnly = False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -675,9 +675,9 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
-    @param downloadonly: If true, the lookaside is populated, and the None is
+    @param downloadOnly: If true, the lookaside is populated, and the None is
     returned instead of a changeset.
-    @type downloadonly: boolean
+    @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
     @param targetLabel: label to use for the cooked troves; if None (the
@@ -691,7 +691,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     # 1. create the desired files in destdir and package info
     enforceManagedPolicy = (cfg.enforceManagedPolicy
                             and targetLabel != versions.CookLabel()
-                            and not prep and not downloadonly)
+                            and not prep and not downloadOnly)
 
     result  = _cookPackageObject(repos, cfg, recipeClass, 
                                  sourceVersion, prep=prep,
@@ -701,7 +701,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                                  crossCompile=crossCompile,
                                  enforceManagedPolicy=enforceManagedPolicy,
                                  requireCleanSources = requireCleanSources,
-                                 downloadonly = downloadonly)
+                                 downloadOnly = downloadOnly)
     if type(result) is not tuple:
         return
 
@@ -720,7 +720,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 		       macros={}, resume = None, ignoreDeps=False, 
                        logBuild=False, crossCompile=None, 
                        enforceManagedPolicy=False,  requireCleanSources = False,
-                       downloadonly = False):
+                       downloadOnly = False):
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
@@ -840,10 +840,10 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if resume is True:
             resume = bldInfo.lastline
 
-        recipeObj.unpackSources(builddir, destdir, resume, downloadonly=downloadonly)
+        recipeObj.unpackSources(builddir, destdir, resume, downloadOnly=downloadOnly)
 
         # if we're only extracting or downloading, continue to the next recipe class.
-        if prep or downloadonly:
+        if prep or downloadOnly:
             return recipeObj
 
         cwd = os.getcwd()
@@ -1212,7 +1212,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
-             downloadonly = False):
+             downloadOnly = False):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1229,9 +1229,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
-    @param downloadonly: If true, the lookaside is populated, and the None is
+    @param downloadOnly: If true, the lookaside is populated, and the None is
     returned instead of a changeset.
-    @type downloadonly: boolean
+    @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
     """
@@ -1312,7 +1312,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                             crossCompile=crossCompile,
                             callback=callback,
                             requireCleanSources=requireCleanSources,
-                            downloadonly = downloadonly)
+                            downloadOnly = downloadOnly)
         if troves:
             built = (tuple(troves), changeSetFile)
     except errors.RepositoryError, e:
@@ -1326,7 +1326,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 resume = None, allowUnknownFlags = False,
                 showBuildReqs = False, ignoreDeps = False,
                 profile = False, logBuild = True,
-                crossCompile = None, cookIds=None, downloadonly=False):
+                crossCompile = None, cookIds=None, downloadOnly=False):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -1390,7 +1390,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              ignoreDeps = ignoreDeps, logBuild = logBuild,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
-                             downloadonly = downloadonly)
+                             downloadOnly = downloadOnly)
             if built is None:
                 # --prep or --download or perhaps an error was logged
                 if log.errorOccurred():

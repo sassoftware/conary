@@ -505,7 +505,7 @@ class CookCommand(CvcCommand):
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
-                         crossCompile=crossCompile, downloadonly=downloadOnly)
+                         crossCompile=crossCompile, downloadOnly=downloadOnly)
         log.setVerbosity(level)
 _register(CookCommand)
 
