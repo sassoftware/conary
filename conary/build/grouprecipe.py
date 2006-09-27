@@ -35,6 +35,7 @@ ADD_REASON_DEP = 1      # added to satisfy dep
 ADD_REASON_INCLUDED = 2 # added because it's in something else that was added
 ADD_REASON_ADDALL = 3   # added as part of an "addAll"
 ADD_REASON_REPLACE = 4  # added as part of a "replace" command.
+ADD_REASON_INCLUDED_GROUP = 5 # added because its in an included group
 
 class _BaseGroupRecipe(Recipe):
     """ Defines a group recipe as collection of groups and provides
@@ -1077,6 +1078,8 @@ class SingleGroup(object):
             return "Added to satisfy dep of %s=%s[%s]" % reason[1]
         elif reasonType == ADD_REASON_INCLUDED:
             return "Included by adding %s=%s[%s]" % reason[1]
+        elif reasonType == ADD_REASON_INCLUDED_GROUP:
+            return "Included by adding new group %s" % reason[1]
         elif reasonType == ADD_REASON_ADDALL:
             return "Included by adding all from %s=%s[%s]" % reason[1]
         elif reasonType == ADD_REASON_REPLACE:
@@ -1585,7 +1588,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                         childChildByDefault = False
 
                 group.addTrove(troveTup, False, childChildByDefault, [],
-                               reason=(ADD_REASON_INCLUDED, childGroup))
+                               reason=(ADD_REASON_INCLUDED_GROUP, 
+                                       childGroup.name))
 
         for (childChildName, childChildByDefault, _) \
                                         in childGroup.iterNewGroupList():
