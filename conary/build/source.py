@@ -195,7 +195,7 @@ class Archive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package)=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -248,6 +248,14 @@ class Archive(_Source):
     set Authorization credentials, fudge a Cookie, or, if direct links are
     not allowed for some reason (e.g. a click through EULA), a Referer can
     be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -309,6 +317,8 @@ class Archive(_Source):
         actually unpacked, or merely stored in the archive.
     @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package and
+        component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 
@@ -422,7 +432,7 @@ class Patch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{package)=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -478,12 +488,14 @@ class Patch(_Source):
     boolean values which determine whether the source code archive is
     actually unpacked or merely stored in the archive.
 
-    B{httpHeaders} : A dictionary containing a list of headers to send with
-    the http request to download the source archive.  For example, you could
-    set Authorization credentials, fudge a Cookie, or, if direct links are
-    not allowed for some reason (e.g. a click through EULA), a Referer can
-    be provided.
-
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+    
     EXAMPLES
     ========
 
@@ -547,8 +559,8 @@ class Patch(_Source):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
-    @keyword httpHeaders: A dictionary containing headers to add to an http request
-        when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
@@ -630,7 +642,7 @@ class Source(_Source):
     SYNOPSIS
     ========
 
-    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package)=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -651,7 +663,8 @@ class Source(_Source):
     specify directory information, but not both. Useful mainly  when fetching
     the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
-    An absolute C{dest} value will be considered relative to C{%(destdir)s},     whereas a relative C{dest} value will be considered relative to
+    An absolute C{dest} value will be considered relative to C{%(destdir)s}, 
+    whereas a relative C{dest} value will be considered relative to
     C{%(builddir)s}.
     
     B{dir} : The directory in which to store the file, relative to the build
@@ -688,6 +701,14 @@ class Source(_Source):
     set Authorization credentials, fudge a Cookie, or, if direct links are
     not allowed for some reason (e.g. a click through EULA), a Referer can
     be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -757,6 +778,8 @@ class Source(_Source):
         merely stored in the archive.
     @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:
@@ -830,7 +853,7 @@ class Action(action.RecipeAction):
     SYNOPSIS
     ========
 
-    C{r.addAction([I{action},] [I{dir}=,] [I{use}=,])}
+    C{r.addAction([I{action},] [I{dir}=,] [I{package)=,] [I{use}=,])}
 
     DESCRIPTION
     ===========
@@ -850,6 +873,14 @@ class Action(action.RecipeAction):
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
     actually unpacked or merely stored in the archive.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -885,6 +916,8 @@ class Action(action.RecipeAction):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked or merely stored in the archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]
