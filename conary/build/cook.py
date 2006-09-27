@@ -188,7 +188,7 @@ def signAbsoluteChangeset(cs, fingerprint=None):
         cs.newTrove(newTroveCs)
     return cs
 
-def getRecursiveRequirements(db, troveList):
+def getRecursiveRequirements(db, troveList, flavorPath):
     # gets the recursive requirements for the listed packages
     seen = set()
     while troveList:
@@ -204,7 +204,19 @@ def getRecursiveRequirements(db, troveList):
         troveList = set()
         for depSetSols in sols.itervalues():
             for depSols in depSetSols:
-                depSols = set(depSols)
+                bestChoices = []
+                # if any solution for a dep is satisfied by the installFlavor
+                # path, then choose the solutions that are satisfied as 
+                # early as possible on the flavor path.  Otherwise return
+                # all solutions.
+                for flavor in flavorPath:
+                    bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
+                    if bestChoices:
+                        break
+                if bestChoices:
+                    depSols = set(bestChoices)
+                else:
+                    depSols = set(depSols)
                 depSols.difference_update(seen)
                 troveList.update(depSols)
     return seen
@@ -953,7 +965,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
                     for x in recipeObj.buildReqMap.itervalues())
-    buildReqs = getRecursiveRequirements(db, buildReqs)
+    buildReqs = getRecursiveRequirements(db, buildReqs, cfg.flavor)
 
     # create all of the package troves we need, and let each package provide
     # itself
