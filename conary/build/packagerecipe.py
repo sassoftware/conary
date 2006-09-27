@@ -344,7 +344,7 @@ class _AbstractPackageRecipe(Recipe):
 		    if action.linenum == resumeBegin:
 			yield action
 
-    def unpackSources(self, builddir, destdir, resume=None, downloadonly=False):
+    def unpackSources(self, builddir, destdir, resume=None, downloadOnly=False):
 	self.macros.builddir = builddir
 	self.macros.destdir = destdir
 	if resume == 'policy':
@@ -356,7 +356,7 @@ class _AbstractPackageRecipe(Recipe):
 	    for source in self.iterResumeList(self._sources):
 		source.doPrep()
 		source.doAction()
-        elif downloadonly:
+        elif downloadOnly:
             for source in self._sources:
                 source.doPrep()
                 source.doDownload()
