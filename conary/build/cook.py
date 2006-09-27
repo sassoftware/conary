@@ -188,6 +188,27 @@ def signAbsoluteChangeset(cs, fingerprint=None):
         cs.newTrove(newTroveCs)
     return cs
 
+def getRecursiveRequirements(db, troveList):
+    # gets the recursive requirements for the listed packages
+    seen = set()
+    while troveList:
+        depSetList = []
+        for trv in db.getTroves(list(troveList), withFiles=False):
+            required = deps.DependencySet()
+            oldRequired = trv.getRequires()
+            [ required.addDep(*x) for x in oldRequired.iterDeps() 
+              if x[0] != deps.AbiDependency ]
+            depSetList.append(required)
+        seen.update(troveList)
+        sols = db.getTrovesWithProvides(depSetList)
+        troveList = set()
+        for depSetSols in sols.itervalues():
+            for depSols in depSetSols:
+                depSols = set(depSols)
+                depSols.difference_update(seen)
+                troveList.update(depSols)
+    return seen
+
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={},
                targetLabel = None, resume = None, alwaysBumpCount = False,
@@ -930,6 +951,10 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     buildTime = time.time()
     sourceName = recipeObj.__class__.name + ':source'
 
+    buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
+                    for x in recipeObj.buildReqMap.itervalues())
+    buildReqs = getRecursiveRequirements(db, buildReqs)
+
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
@@ -945,9 +970,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             if policyTroves:
                 grpMap[main].setPolicyProviders(policyTroves)
             grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
-            grpMap[main].setBuildRequirements(
-                     set((x.getName(), x.getVersion(), x.getFlavor())
-                             for x in recipeObj.buildReqMap.itervalues()) )
+            grpMap[main].setBuildRequirements(buildReqs)
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
