@@ -2133,7 +2133,7 @@ class Replace(BuildAction):
         return False
 
     def do(self, macros):
-        paths = action._expandPaths(self.paths, macros, error=True)
+        paths = action._expandPaths(self.paths, macros, error=False)
         log.info("Replacing '%s' in %s",
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
@@ -2151,6 +2151,10 @@ class Replace(BuildAction):
 
         unchanged = []
         for path in paths:
+            try:
+                os.lstat(path)
+            except OSError, e:
+                raise RuntimeError, "No such file(s) '%s'" %path
             if not util.isregular(path):
                 if path.startswith(macros.destdir):
                     path = path[len(macros.destdir):]

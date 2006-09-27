@@ -26,6 +26,13 @@ Changes in @NEW@:
       --info  are 30% faster, and conary q --troves --recurse is 4-6 times 
       faster on a test machine.
 
+  o Bug Fixes:
+    * r.Replace() no longer fails when a glob matches a dangling
+      symlink.  r.Replace() now reports that no action is taking on
+      the dangling symlink due to it being a non-regular file.  This
+      is the same behavior as running r.Replace() on non-dangling
+      symlinks.
+
 Changes in 1.0.32:
   o Optimizations
     * Duplicate trove instantiations have been removed. Build requires are
