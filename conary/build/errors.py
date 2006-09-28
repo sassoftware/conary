@@ -60,14 +60,14 @@ class GroupDependencyFailure(CookError):
             lns.append("\n" + name[0])
             lns.append('\n\t')
             lns.append("\n\t".join(str(depSet).split("\n")))
-        self.args = ''.join(lns)
+        self.args = (''.join(lns),)
 
 
 class GroupCyclesError(CookError):
     def __init__(self, cycles):
         lns = ['cycle in groups:']
         lns.extend(str(sorted(x)) for x in cycles)
-        self.args = '\n  '.join(lns)
+        self.args = ('\n  '.join(lns),)
 
 class GroupAddAllError(CookError):
     def __init__(self, parentGroup, troveTup, groupTups ):
@@ -81,7 +81,44 @@ class GroupAddAllError(CookError):
         lns.append('Multiple groups with the same name(s) %s' % repeatedGroups)
         lns.append('are included.')
             
-        self.args = '\n  '.join(lns)
+        self.args = ('\n  '.join(lns),)
+
+class GroupImplicitReplaceError(CookError):
+    def __init__(self, parentGroup, troveTups):
+        lns = ['Cannot replace the following troves in %s:\n\n' % parentGroup.name]
+        for troveTup in troveTups:
+            lns.append('   %s=%s[%s]\n' % troveTup)
+            lns.append('   (%s)\n' % parentGroup.getReasonString(*troveTup))
+        lns.append('\nYou are not building the containing group, so conary does not know where to add the replacement.\n')
+        lns.append('To resolve this problem, use r.addCopy for the containing group instead of r.add.\n')
+        self.args = (''.join(lns),)
+
+class _UnmatchedSpecs(CookError):
+    def __init__(self, msg, troveSpecs):
+        lns = [msg]
+        for troveSpec in troveSpecs:
+            ver = flavor = ''
+            if troveSpec[1]:
+                ver = '=%s' % troveSpec[1]
+            if troveSpec[2]:
+                flavor = '[%s]' % troveSpec[2]
+            lns.append('    %s%s%s\n' % (troveSpec[0], ver, flavor))
+        self.args = (''.join(lns),)
+
+class GroupUnmatchedRemoves(_UnmatchedSpecs):
+    def __init__(self, troveSpecs, group):
+        msg = 'Could not find troves to remove in %s:\n' % group.name
+        _UnmatchedSpecs.__init__(self, msg, troveSpecs)
+
+class GroupUnmatchedReplaces(_UnmatchedSpecs):
+    def __init__(self, troveSpecs, group):
+        msg = 'Could not find troves to replace in %s:\n' % group.name
+        _UnmatchedSpecs.__init__(self, msg, troveSpecs)
+
+class GroupUnmatchedGlobalReplaces(_UnmatchedSpecs):
+    def __init__(self, troveSpecs):
+        msg = 'Could not find troves to replace in any group:\n'
+        _UnmatchedSpecs.__init__(self, msg, troveSpecs)
 
 class MacroKeyError(KeyError):
     def __str__(self):

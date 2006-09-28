@@ -18,6 +18,13 @@ Changes in @NEW@:
     * If cooking a group results in conflicts, the error message will now
       show you the reason why the troves in conflict were included in the
       group. (CNY-876)
+    * If an r.replace or r.remove does nothing, a warning is output
+      unless the keyword allowNoMatches is added. (CNY-931)
+    * If an r.replace would match against a package included inside another
+      group that you are not building, conary will warn that that replace
+      cannot possibly do anything, and will suggest using r.addCopy()
+      to resolve the problem. (CNY-360)
+    * Added r.addCopy() group command. (CNY-360)
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database

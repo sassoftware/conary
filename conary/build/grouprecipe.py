@@ -17,7 +17,9 @@ from itertools import chain, izip
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
 from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
-from conary.build.errors import GroupAddAllError
+from conary.build.errors import GroupAddAllError, GroupImplicitReplaceError
+from conary.build.errors import GroupUnmatchedReplaces, GroupUnmatchedRemoves
+from conary.build.errors import GroupUnmatchedGlobalReplaces
 from conary.build import macros
 from conary.build import use
 from conary import conaryclient
@@ -342,7 +344,8 @@ class GroupRecipe(_BaseGroupRecipe):
     # maintain addTrove for backwards compatability
     addTrove = add
 
-    def remove(self, name, versionStr = None, flavor = None, groupName = None):
+    def remove(self, name, versionStr = None, flavor = None, groupName = None,
+               allowNoMatch=False):
         """
         NAME
         ====
@@ -400,7 +403,8 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
-            group.removeSpec(name, versionStr = versionStr, flavor = flavor)
+            group.removeSpec(name, versionStr = versionStr, flavor = flavor,
+                             allowNoMatch = allowNoMatch)
 
     def removeComponents(self, componentList, groupName = None):
         """
@@ -502,7 +506,7 @@ class GroupRecipe(_BaseGroupRecipe):
         DESCRIPTION
         ===========
 
-        The C{r.addAll()} command used to add all troves directly contained
+        The C{r.addAll()} command is used to add all troves directly contained
         in a given reference to B{groupName} to the recipe.
 
         For example, if the cooked I{group-foo} contains references to the
@@ -551,6 +555,81 @@ class GroupRecipe(_BaseGroupRecipe):
 
         for group in self._getGroups(groupName):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
+
+
+    def addCopy(self, name, versionStr = None, flavor = None, ref = None,
+                recurse=True, groupName = None, use = True):
+        """
+        NAME
+        ====
+
+        B{C{r.addCopy()}} - Create a copy of I{name} and add that copy
+        to groupName.
+
+        SYNOPSIS
+        ========
+
+        C{r.addCopy(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
+        [I{ref},] [I{versionStr}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addCopy()} command is used to create a copy of the group
+        with name I{name} and add that group to groupName.
+
+        For example, if the cooked I{group-foo} contains references to the
+        troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
+        entries followed by C{r.addCopy('group-foo')} would be
+        equivalent to adding the C{r.addTrove} lines:
+
+        C{r.createNewGroup('group-foo')}
+        C{r.add('foo1', <version>, groupName='group-foo')}
+        C{r.add('foo2', <version>, groupName='group-foo')}
+        C{r.addNewGroup('group-foo')}.
+
+        PARAMETERS
+        ==========
+
+        The C{r.addCopy()} command accepts the following parameters, with
+        default values shown in parentheses:
+
+        B{groupName} : (None) The group to add the copy to.
+
+        B{recurse} : (True) If True, and the trove you specify with B{addCopy}
+        contains groups, new groups will be created in the recipe that match
+        those contained groups, and the C{r.addCopy()} command is recursed on
+        those groups.
+
+        Note: If the subgroups already exist in the group, those preexisting
+        groups will be used.  Otherwise, the default settings will be used
+        when creating any new groups.
+
+        B{ref}: (None) Trove reference to search in for this trove. See
+        C{r.addReference()} for more information.
+
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are added to the
+        group
+
+        EXAMPLES
+        ========
+
+        C{r.addCopy('group-core', 'conary.rpath.com@rpl:1')}
+
+	Uses C{r.addCopy} to create a new group called C{group-core}, copy
+        all the troves from the old C{group-core} to the new group, and
+        then add the new C{group-core} to the current group.
+        """
+
+        if not use:
+            return
+        if name not in self.groups:
+            self.createGroup(name)
+        self.addAll(name, versionStr = versionStr, flavor = flavor, ref = ref,
+                    recurse=recurse, groupName = name)
+        for group in self._getGroups(groupName):
+            self.addNewGroup(name)
 
     def addNewGroup(self, name, groupName = None, byDefault = True, use = True):
         """
@@ -698,7 +777,7 @@ class GroupRecipe(_BaseGroupRecipe):
         return GroupReference(((name, versionStr, flavor),), ref)
 
     def replace(self, name, newVersionStr = None, newFlavor = None, ref = None,
-                groupName = None):
+                groupName = None, allowNoMatch = False):
         """
         NAME
         ====
@@ -745,10 +824,12 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         newFlavor = self._parseFlavor(newFlavor)
         if groupName is None:
-            self.replaceSpecs.append(((name, newVersionStr, newFlavor), ref))
+            self.replaceSpecs.append((((name, newVersionStr, newFlavor), ref),
+                                      allowNoMatch))
         else:
             for group in self._getGroups(groupName):
-                group.replaceSpec(name, newVersionStr, newFlavor, ref)
+                group.replaceSpec(name, newVersionStr, newFlavor, ref,
+                                  allowNoMatch=allowNoMatch)
 
     def iterReplaceSpecs(self):
         return iter(self.replaceSpecs)
@@ -917,15 +998,17 @@ class SingleGroup(object):
         self.addTroveList.append(((name, versionStr, flavor), source,
                                  byDefault, ref, components))
 
-    def removeSpec(self, name, versionStr = None, flavor = None):
-        self.removeTroveList.append((name, versionStr, flavor))
+    def removeSpec(self, name, versionStr = None, flavor = None,
+                    allowNoMatch = False):
+        self.removeTroveList.append(((name, versionStr, flavor), allowNoMatch))
 
     def removeComponents(self, componentList):
         self.removeComponentList.update(componentList)
 
     def replaceSpec(self, name, newVersionStr = None, newFlavor = None,
-                    ref = None):
-        self.replaceTroveList.append(((name, newVersionStr, newFlavor), ref))
+                    ref = None, allowNoMatch = False, isGlobal = False):
+        self.replaceTroveList.append((((name, newVersionStr, newFlavor), ref),
+                                      (allowNoMatch, isGlobal)))
 
     def addAll(self, name, versionStr, flavor, ref, recurse):
         self.addReferenceList.append(((name, versionStr, flavor), ref, recurse))
@@ -1271,7 +1354,7 @@ def buildGroups(recipeObj, cfg, repos, callback):
 
     # find all the groups needed for all groups in a few massive findTroves
     # calls.
-    replaceSpecs = list(recipeObj.iterReplaceSpecs())
+    replaceSpecs = dict(recipeObj.iterReplaceSpecs())
     log.info('Getting initial set of troves for'
              ' building all %s groups' % (len(recipeObj.iterGroupList())))
     troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(),
@@ -1287,9 +1370,12 @@ def buildGroups(recipeObj, cfg, repos, callback):
 
     groupList = _sortGroups(recipeObj.iterGroupList())
 
+    unmatchedGlobalReplaceSpecs = set()
     for group in groupList:
-        for (troveSpec, ref) in replaceSpecs:
-            group.replaceSpec(*(troveSpec + (ref,)))
+        for ((troveSpec, ref), allowNoMatch) in replaceSpecs.iteritems():
+            group.replaceSpec(isGlobal=True, allowNoMatch=allowNoMatch,
+                              ref=ref, *troveSpec)
+            unmatchedGlobalReplaceSpecs.add(troveSpec)
 
     for groupIdx, group in enumerate(groupList):
         log.info('Building %s (%s of %s)...' % (group.name, groupIdx + 1,
@@ -1312,7 +1398,8 @@ def buildGroups(recipeObj, cfg, repos, callback):
             continue
 
         # add troves to this group.
-        addTrovesToGroup(group, troveMap, cache, childGroups, repos)
+        unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap, cache,
+                                                    childGroups, repos)
 
         log.debug('Troves in %s:' % group.name)
         for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
@@ -1352,6 +1439,8 @@ def buildGroups(recipeObj, cfg, repos, callback):
         callback.groupBuilt()
         log.info('%s built.\n' % group.name)
 
+    if unmatchedGlobalReplaceSpecs:
+        log.warning(GroupUnmatchedGlobalReplaces(unmatchedGlobalReplaceSpecs))
     if groupsWithConflicts:
         raise GroupPathConflicts(groupsWithConflicts, recipeObj.getGroupDict())
 
@@ -1373,7 +1462,7 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath,
         for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
 
-        for (troveSpec, ref) in group.iterReplaceSpecs():
+        for (troveSpec, ref), _ in group.iterReplaceSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
 
     results = {}
@@ -1480,14 +1569,21 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                            reason=(ADD_REASON_ADDED,))
 
     # remove/replace explicit troves
-    removeSpecs = list(group.iterRemoveSpecs())
-    replaceSpecs = list(group.iterReplaceSpecs())
+    removeSpecs = dict(group.iterRemoveSpecs())
+    replaceSpecs = dict(group.iterReplaceSpecs())
+    unmatchedRemoveSpecs = set()
+    unmatchedReplaceSpecs = set()
+    unmatchedGlobalReplaceSpecs = set()
     if removeSpecs or replaceSpecs:
         groupAsSource = trovesource.GroupRecipeSource(repos, group)
         groupAsSource.searchAsDatabase()
 
+        unmatchedRemoveSpecs = set(x[0] for x in removeSpecs.items() 
+                                   if not x[1])
         # remove troves
         results = groupAsSource.findTroves(None, removeSpecs, allowMissing=True)
+        unmatchedRemoveSpecs.difference_update(
+                                (x[0] for x in results.iteritems() if x[1]))
 
         troveTups = chain(*results.itervalues())
         for troveTup in troveTups:
@@ -1496,10 +1592,14 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             groupAsSource.delTrove(*troveTup)
 
         # replace troves
+        unmatchedGlobalReplaceSpecs = set(x[0][0] for x in replaceSpecs.items()
+                                          if x[1] == (False, True))
+        unmatchedReplaceSpecs = set(x[0][0] for x in replaceSpecs.items()
+                                    if x[1] == (False, False))
         toReplaceSpecs = dict(((x[0][0], None, None), x) for x in replaceSpecs)
 
         toReplace = groupAsSource.findTroves(None, toReplaceSpecs,
-                                            allowMissing=True)
+                                             allowMissing=True)
         replaceSpecsByName = {}
         for troveSpec, ref in replaceSpecs:
             replaceSpecsByName.setdefault(troveSpec[0], []).append((troveSpec,
@@ -1527,6 +1627,9 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                 groupAsSource.delTrove(*troveTup)
 
             for troveSpec, ref in replaceSpecs:
+                if troveMap[ref][troveSpec]:
+                    unmatchedReplaceSpecs.discard(troveSpec)
+                    unmatchedGlobalReplaceSpecs.discard(troveSpec)
                 for newTup in troveMap[ref][troveSpec]:
                     log.info('Adding %s=%s[%s] due to replaceSpec' % newTup)
                     group.addTrove(newTup, True, byDefault, allComponents,
@@ -1571,6 +1674,36 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             group.addTrove(childTup, False, childByDefault, [],
                            reason=reason)
 
+    if replaceSpecs:
+        # find implicit troves that match the replace specs.
+        # we can't actually replace them, but we can give an error message
+        # to let folks know that their replace will fail.
+        groupAsSource = trovesource.GroupRecipeSource(repos, group)
+        groupAsSource.searchAsDatabase()
+        toReplace = groupAsSource.findTroves(None, toReplaceSpecs,
+                                             allowMissing=True)
+
+        replaceSpecsByName = {}
+        for troveSpec, ref in replaceSpecs:
+            replaceSpecsByName.setdefault(troveSpec[0], []).append((troveSpec,
+                                                                    ref))
+
+        implicitRemoved = []
+        for troveName, replaceSpecs in replaceSpecsByName.iteritems():
+            troveTups = toReplace.get((troveName, None, None), [])
+
+            if not troveTups:
+                continue
+            replaceSpecs = [x[0] for x in replaceSpecs]
+            for troveTup in troveTups:
+                if group.isExplicit(*troveTup):
+                    continue
+                implicitRemoved.append(troveTup)
+                unmatchedReplaceSpecs.difference_update(replaceSpecs)
+                unmatchedGlobalReplaceSpecs.difference_update(replaceSpecs)
+        if implicitRemoved:
+            log.warning(GroupImplicitReplaceError(group, implicitRemoved))
+
     # add implicit troves from new groups (added with r.addNewGroup())
     for childGroup, childByDefault, grpIsExplicit in childGroups:
         if grpIsExplicit:
@@ -1605,12 +1738,23 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     if removeSpecs:
         groupAsSource = trovesource.GroupRecipeSource(repos, group)
         groupAsSource.searchAsDatabase()
-        results = groupAsSource.findTroves(None, removeSpecs, allowMissing=True)
+
+        results = groupAsSource.findTroves(None, removeSpecs, 
+                                           allowMissing=True)
 
         troveTups = chain(*results.itervalues())
+        unmatchedRemoveSpecs.difference_update(
+                                (x[0] for x in results.iteritems() if x[1]))
         for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache,
                                                   childGroups):
             group.delTrove(*troveTup)
+
+    if unmatchedRemoveSpecs:
+        log.warning(GroupUnmatchedRemoves(unmatchedRemoveSpecs, group))
+
+    if unmatchedReplaceSpecs:
+        log.warning(GroupUnmatchedReplaces(unmatchedReplaceSpecs, group))
+    return unmatchedGlobalReplaceSpecs
 
 def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
     # we only remove weak troves if either a) they are primary 
