@@ -296,7 +296,7 @@ class GroupRecipe(_BaseGroupRecipe):
         default values shown in parentheses:
 
         B{byDefault} : (None, or value of B{createNewGroup}) Specifies whether
-        to include a trove  by defaultt. Defaults to the B{byDefault} setting
+        to include a trove  by default. Defaults to the B{byDefault} setting
         as  defined with B{createNewGroup}.
 
         B{components} : (None) Specify a set of trove components to include.
@@ -341,7 +341,7 @@ class GroupRecipe(_BaseGroupRecipe):
                           source = source, byDefault = byDefault, ref = ref,
                           components = components)
 
-    # maintain addTrove for backwards compatability
+    # maintain addTrove for backwards compatibility
     addTrove = add
 
     def remove(self, name, versionStr = None, flavor = None, groupName = None,
@@ -650,7 +650,7 @@ class GroupRecipe(_BaseGroupRecipe):
         DESCRIPTION
         ===========
 
-        The C{r.addNewGroup()} commmand is used to add one newly created group
+        The C{r.addNewGroup()} command is used to add one newly created group
         to another newly created group.
 
         PARAMETERS
