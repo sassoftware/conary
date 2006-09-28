@@ -64,7 +64,7 @@ def usage(rc = 1):
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
-    print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
+    print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]+"
     print "       cvc set <path>+"
     print '       cvc sign <trove>[=version][[flavor]]+'
     print "       cvc update [<version>]"
