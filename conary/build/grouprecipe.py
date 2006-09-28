@@ -355,7 +355,8 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}])}
+        C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}],
+                   [I{allowNoMatch}])}
 
         DESCRIPTION
         ===========
@@ -392,6 +393,9 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{versionStr} : (None) A version specifier like that passed to
         B{repquery} which determines the trove returned.
+
+        B{allowNoMatch} : (False) Silences the warning output if this remove
+        did not match anything.
 
         EXAMPLES
         ========
@@ -787,7 +791,8 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}])}
+        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}],
+        [I{allowNoMatch}])}
 
         DESCRIPTION
         ===========
@@ -813,6 +818,9 @@ class GroupRecipe(_BaseGroupRecipe):
         B{newVersionStr} : (None) The new version to add
 
         B{ref} : (None) The trove reference to search for the trove in
+
+        B{allowNoMatch} : (False) Silences the warning output if this replace
+        did not match anything.
 
         EXAMPLES
         ========
