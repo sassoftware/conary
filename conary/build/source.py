@@ -195,7 +195,7 @@ class Archive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package)=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -432,7 +432,7 @@ class Patch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package)=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -655,7 +655,7 @@ class Source(_Source):
     SYNOPSIS
     ========
 
-    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package)=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -873,7 +873,7 @@ class Action(action.RecipeAction):
     SYNOPSIS
     ========
 
-    C{r.addAction([I{action},] [I{dir}=,] [I{package)=,] [I{use}=,])}
+    C{r.addAction([I{action},] [I{dir}=,] [I{package})=,] [I{use}=,])}
 
     DESCRIPTION
     ===========

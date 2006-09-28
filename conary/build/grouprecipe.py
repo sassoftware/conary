@@ -355,8 +355,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}],
-                   [I{allowNoMatch}])}
+        C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}], [I{allowNoMatch}])}
 
         DESCRIPTION
         ===========
@@ -791,8 +790,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}],
-        [I{allowNoMatch}])}
+        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}])}
 
         DESCRIPTION
         ===========
