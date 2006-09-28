@@ -614,8 +614,13 @@ class Patch(_Source):
         log.error('could not apply patch %s in directory %s', f, destDir)
         raise SourceError, 'could not apply patch %s' % f
 
-    def do(self):
+    def doDownload(self):
 	f = self._findSource()
+        self._checkSignature(f)
+        return f
+
+    def do(self):
+        f = self.doDownload()
         # FIXME: we should probably read in the patch directly now
         # that we aren't just applying in a pipeline
 	provides = "cat"
@@ -818,6 +823,13 @@ class Source(_Source):
 	else:
 	    self.applymacros = False
 
+    def doDownload(self):
+        if self.contents is not None:
+            return
+        f = self._findSource()
+        self._checkSignature(f)
+        return f
+
     def do(self):
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
@@ -834,7 +846,7 @@ class Source(_Source):
 		pout.write(self.contents)
 	    pout.close()
 	else:
-            f = self._findSource()
+            f = self.doDownload()
 	    if self.applymacros:
 		log.info('applying macros to source %s' %f)
 		pin = file(f)
