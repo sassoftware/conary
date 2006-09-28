@@ -31,6 +31,7 @@ class BadRecipeNameError(RecipeFileError):
 class GroupPathConflicts(CookError):
     def __init__(self, conflicts, groupDict):
         self.conflicts = conflicts
+        self.groupDict = groupDict
         errStrings = []
         for groupName, conflictSets in conflicts.iteritems():
             group = groupDict[groupName]
