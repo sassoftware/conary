@@ -946,6 +946,9 @@ class Action(action.RecipeAction):
             self.package = self.package % recipe.macros
             self.manifest = Manifest(package=self.package, recipe=recipe)
 
+    def doDownload(self):
+        return None
+
     def do(self):
 	builddir = self.recipe.macros.builddir
         defaultDir = os.sep.join((builddir, self.recipe.theMainDir))
