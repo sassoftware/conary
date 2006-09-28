@@ -200,7 +200,7 @@ def getRecursiveRequirements(db, troveList, flavorPath):
               if x[0] != deps.AbiDependency ]
             depSetList.append(required)
         seen.update(troveList)
-        sols = db.getTrovesWithProvides(depSetList)
+        sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
         troveList = set()
         for depSetSols in sols.itervalues():
             for depSols in depSetSols:
