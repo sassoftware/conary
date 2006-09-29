@@ -327,9 +327,11 @@ class Automake(BuildCommand):
         if 'automake:runtime' not in self.recipe.buildRequires:
             self.recipe.reportErrors(
                 "Must add 'automake:runtime' to buildRequires")
+            self.recipe.reportMissingBuildRequires('automake:runtime')
         if 'autoconf:runtime' not in self.recipe.buildRequires:
             self.recipe.reportErrors(
                 "Must add 'autoconf:runtime' to buildRequires")
+            self.recipe.reportMissingBuildRequires('autoconf:runtime')
 
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.dir, macros,
@@ -1103,6 +1105,7 @@ class PythonSetup(BuildCommand):
             if not self.bootstrap:
                 self.recipe.reportErrors(
                     "Must add 'python-setuptools:python' to buildRequires")
+                self.recipe.reportMissingBuildRequires('python-setuptools:python')
 	macros = macros.copy()
         if self.dir == '%(builddir)s':
             rundir = macros.builddir # do not expand!
@@ -1397,6 +1400,7 @@ class Desktopfile(BuildCommand, _FileAction):
             self.recipe.reportErrors(
                 "Must add 'desktop-file-utils:runtime' to buildRequires"
                 " for file(s) %s", ', '.join(self.arglist))
+            self.recipe.reportMissingBuildRequires('desktop-file-utils:runtime')
 	macros = self.recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category
@@ -3195,6 +3199,7 @@ class XMLCatalogEntry(BuildCommand):
         if 'libxml2:runtime' not in self.recipe.buildRequires:
             self.recipe.reportErrors(
                 "Must add 'libxml2:runtime' to buildRequires")
+            self.recipe.reportMissingBuildRequires('libxml2:runtime')
         macros = macros.copy()
 
         catalogDirectory = "%%(destdir)s/%s" % self.catalogDir
@@ -3286,6 +3291,7 @@ class SGMLCatalogEntry(BuildCommand):
         if 'libxml2:runtime' not in self.recipe.buildRequires:
             self.recipe.reportErrors(
                 "Must add 'libxml2:runtime' to buildRequires")
+            self.recipe.reportMissingBuildRequires('libxml2:runtime')
 
         macros = macros.copy()
 

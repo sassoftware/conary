@@ -27,6 +27,8 @@ Changes in @NEW@:
     * Added r.addCopy() group command. (CNY-360)
     * The Autoconf() build action now enforces buildRequirements of
       automake:runtime and autoconf:runtime if used (CNY-672)
+    * All build actions that enforce buildRequires additions now report
+      them through the reportMissingBuildRequires summary policy.
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database
