@@ -25,6 +25,8 @@ Changes in @NEW@:
       cannot possibly do anything, and will suggest using r.addCopy()
       to resolve the problem. (CNY-360)
     * Added r.addCopy() group command. (CNY-360)
+    * The Autoconf() build action now enforces buildRequirements of
+      automake:runtime and autoconf:runtime if used (CNY-672)
 
   o Optimizations:
     * Getting a large number of troves (without files) from the local database

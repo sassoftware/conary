@@ -324,6 +324,13 @@ class Automake(BuildCommand):
                }
 
     def do(self, macros):
+        if 'automake:runtime' not in self.recipe.buildRequires:
+            self.recipe.reportErrors(
+                "Must add 'automake:runtime' to buildRequires")
+        if 'autoconf:runtime' not in self.recipe.buildRequires:
+            self.recipe.reportErrors(
+                "Must add 'autoconf:runtime' to buildRequires")
+
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.dir, macros,
              macros.builddir, error=not self.skipMissingDir)
