@@ -334,7 +334,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
             if not sourceVersion.isOnLocalHost():
                 log.warning('Could not open repository -- not attempting to'
                             ' share pathId information with the'
-                            ' repository.  This cook will not merge config'
+                            ' repository. This cook will create new versions'
+                            ' for all files on update.'
                             ' file information on update.')
                 time.sleep(3)
                 repos = None
