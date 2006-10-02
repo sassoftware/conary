@@ -1360,11 +1360,10 @@ class DependencyTables:
 
         result = {}
 
-        for depId, troveSet in enumerate(depSolutions):
-            if not troveSet: continue
-            depNum = depList[-depId][0]
-            depSet = depSetList[depNum]
-            result[depSet] = troveSet
+        for depId, sols in enumerate(depSolutions):
+            if not depId: continue
+            if not sols: continue
+            self._addResult(depId, sols, depList, depSetList, result)
         self.db.rollback()
         return result
 

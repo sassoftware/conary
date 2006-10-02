@@ -38,21 +38,21 @@ def displayTroves(dcfg, formatter, troveTups):
     @param troveTups: the trove tuples to display
     @type troveTups: ordered list of (n,v,f) tuples
     """
+    troveTups = list(filterComponents(troveTups, dcfg.getPrimaryTroves()))
 
     iter = iterTroveList(dcfg.getTroveSource(),
                          troveTups,
                          recurseAll=dcfg.recurseAll,
                          recurseOne=dcfg.recurseOne,
+                         recursePackages=not dcfg.hideComponents(),
                          needTroves = dcfg.needTroves(),
                          getPristine = dcfg.getPristine(),
                          showNotByDefault = dcfg.showNotByDefault,
                          showWeakRefs = dcfg.showWeakRefs,
                          checkExists = dcfg.checkExists,
                          showNotExists = dcfg.showNotExists,
-                         showFlags = dcfg.showTroveFlags)
-
-    if dcfg.hideComponents():
-        iter = list(skipComponents(iter, dcfg.getPrimaryTroves()))
+                         showFlags = dcfg.showTroveFlags,
+                         primaryTroves = dcfg.getPrimaryTroves())
 
     allTups = list(iter)
     # let the formatter know what troves are going to be displayed
@@ -75,25 +75,35 @@ def displayTroves(dcfg, formatter, troveTups):
             for ln in formatter.formatTroveFiles(trv, n, v, f, indent):
                 print ln
 
-def skipComponents(tupList, primaryTroves=[]):
+def filterComponents(tupList, primaryTroves=[]):
     tups = set()
     for item in tupList:
-        n, v, f = item[0]
-        if item[0] not in primaryTroves and (n.split(':')[0], v, f) in tups:
+        n, v, f = item
+        if item not in primaryTroves and (n.split(':')[0], v, f) in tups:
             continue
         yield item
         tups.add((n, v, f))
 
+
+def _sortTroves(a, b):
+    aPkg, aComp = (a[0].split(':') + [None])[0:2]
+    bPkg, bComp = (b[0].split(':') + [None])[0:2]
+    aIsSource = int(aComp == 'source')
+    bIsSource = int(bComp == 'source')
+
+    return cmp((aPkg, a[1], a[2], aIsSource, aComp),
+               (bPkg, b[1], b[2], bIsSource, bComp))
 
 TROVE_BYDEFAULT = 1 << 0
 TROVE_STRONGREF = 1 << 1
 TROVE_HASTROVE  = 1 << 2
 
 def iterTroveList(troveSource, troveTups, recurseAll=False,
-                  recurseOne=False, needTroves=False, getPristine=True,
+                  recurseOne=False, recursePackages=False,
+                  needTroves=False, getPristine=True,
                   showNotByDefault=False, showWeakRefs=False,
                   checkExists=False, showNotExists=False,
-                  showFlags=False):
+                  showFlags=False, primaryTroves=[]):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
@@ -120,8 +130,6 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     referenced) in this troveSource
     @type showNotExists: bool
 
-
-
     @rtype: yields (troveTup, troveObj, flags, indent) tuples
     """
     if not getPristine:
@@ -129,27 +137,45 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     else:
         kw = {}
 
+    if recurseOne: # when we recurse one level deep, always recurse packages
+                   # otherwise you might try conary q tmpwatch --troves and
+                   # have that give no result.
+        recursePackages = True
+
     if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
         troveCache = dict(itertools.izip(troveTups, troves))
-    elif recurseAll or recurseOne:
-        colls = [ x for x in troveTups if trove.troveIsCollection(x[0]) ]
+    elif recurseAll or recurseOne or recursePackages:
+        if recursePackages:
+            if recurseOne or recurseAll:
+                colls = [ x for x in troveTups if trove.troveIsCollection(x[0]) ]
+            else:
+                colls = [ x for x in troveTups if trove.troveIsPackage(x[0])]
+        else:
+            colls = [ x for x in troveTups if trove.troveIsCollection(x[0])
+                                           and not trove.troveIsPackage(x[0])]
         troves = troveSource.getTroves(colls, withFiles=False, **kw)
         troveCache = dict(itertools.izip(colls, troves))
     else:
         troves = [None] * len(troveTups)
         troveCache = {}
 
-    hasTroveCache = {}
-    if recurseAll or recurseOne:
+    hasTrovesCache = {}
+    if recurseAll or recurseOne or recursePackages:
         # we're recursing, we can cache a lot of information -
         # troves we'll need, hasTroves info we'll need.
         # If we cache this now, we cut down significantly on the
         # number of function calls we need.
-        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) for x in troves if x)))
+        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) 
+                         for x in troves if x)))
         if recurseAll:
-            colls = set(x for x in troveTups if trove.troveIsCollection(x[0]))
-            childColls = [ x for x in childTups if trove.troveIsCollection(x[0]) and x not in colls ]
+            if recursePackages:
+                _check = lambda x: trove.troveIsCollection(x[0])
+            else:
+                _check = lambda x: (trove.troveIsCollection(x[0])
+                                    and not trove.troveIsPackage(x[0]))
+            colls = set(x for x in troveTups if _check(x))
+            childColls = [ x for x in childTups if _check(x)]
             troves = troveSource.getTroves(childColls, withFiles=False, **kw)
             troveCache.update(itertools.izip(childColls, troves))
         allTups = troveTups + childTups
@@ -157,8 +183,6 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             hasTroves = troveSource.hasTroves(allTups)
             hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
         troves = [ troveCache.get(x, None) for x in troveTups ]
-    else:
-        hasTrovesCache = {}
 
     indent = 0
     seen = set()  # cached info about what troves we've called hasTrove on.
@@ -183,6 +207,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     # this could have been one of the troves we specified
                     # initially, in which case trying to recurse it will
                     # not work.
+                    continue
+                if trove.troveIsPackage(troveTup[0]) and not recursePackages:
                     continue
 
                 newTroveTups = trv.iterTroveList(strongRefs=True,
@@ -253,6 +279,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                 for troveTup in newTroveTups:
                     if not topTrove.hasTrove(*troveTup):
                         topTrove = trv
+                    if not recursePackages and trove.troveIsComponent(troveTup[0]):
+                        continue
                     installByDefault = topTrove.includeTroveByDefault(*troveTup)
 
 
@@ -262,7 +290,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     flags = TROVE_STRONGREF
                     if installByDefault:
                         flags |= TROVE_BYDEFAULT
-                    if hasTrovesCache[troveTup]:
+                    if not checkExists or hasTrovesCache[troveTup]:
                         flags |= TROVE_HASTROVE
                     elif not showNotExists:
                         continue
@@ -279,7 +307,9 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             # recurse one level or recurse no levels.
             yield troveTup, trv, TROVE_STRONGREF | TROVE_BYDEFAULT | TROVE_HASTROVE, 0
 
-            if recurseOne and trv:
+            if (trv and 
+                (recurseOne 
+                 or recursePackages and (trove.troveIsPackage(trv.getName())))):
                 newTroveTups = trv.iterTroveListInfo()
 
                 if not showWeakRefs:
@@ -335,8 +365,8 @@ class DisplayConfig:
 
     def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False,
                         digSigs=False, showLabels=False, fullVersions=False,
-                        fullFlavors=False, showComponents = False,
-                        baseFlavors=[]):
+                        fullFlavors=False, baseFlavors=[],
+                        showComponents=False):
         self.deps = deps
         self.info = info
         self.digSigs = digSigs
@@ -344,8 +374,9 @@ class DisplayConfig:
         self.fullVersions = fullVersions
         self.showLabels = showLabels
         self.fullFlavors = fullFlavors
-        self.showComponents = showComponents
         self.baseFlavors = baseFlavors
+        # FIXME: showComponents should really be in setChildDisplay.
+        self.showComponents = showComponents
 
     def setFileDisplay(self, ls = False, lsl = False, ids = False, 
                        sha1s = False, tags = False, fileDeps = False,
@@ -422,9 +453,8 @@ class DisplayConfig:
 
     def hideComponents(self):
         return (not self.showComponents
-                and not self.recurseOne
                 and not self.printFiles()
-                and not self.needTroves())
+                and not self.deps)
 
     #### Needed Data
     #### What the given display configuration implies that we need

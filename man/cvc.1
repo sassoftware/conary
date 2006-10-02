@@ -40,6 +40,9 @@ modify, and cook source components:
 .B cook \fI[\fR\-\-prep\fI] [\fR--macros file\fI] \e
 .PD 0
 .TP
+.B \ \ \ \ \ [\fR\-\-download\fI] \e
+.PD 0
+.TP
 .B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
 .PD 0
 .TP
@@ -65,9 +68,10 @@ modify, and cook source components:
 .PD
 
 Build a package.  If \fB\-\-prep\fP is specified, the souce code is
-unpacked, but is not built. if \fB\-\-macros\fP is specified, it
-names a file containing macro definitions to apply to the recipe
-macro set.  
+unpacked, but is not built. If \fB\-\-download\fP is specified, the source code
+is downloaded into your lookaside, but is not unpacked or built. If
+\fB\-\-macros\fP is specified, it names a file containing macro definitions to
+apply to the recipe macro set.  
 .IP
 If \fB\-\-resume <linenums>\fP is specified, 
 conary will cook the specified line numbers of the recipe.  The format of
@@ -168,7 +172,7 @@ Automatically clone the source for every package your are cloning.  So, for exam
 .B \-\-full-recurse
 For any group included in the clone operation, clone every package and subgroup included in that group.  (Note: cvc automatically clones any subgroups that were created from the same source component - there is no way to disable this.  Similarly, cvc automatically clones all components in a package when the package is selected for cloning.  This is why this option is called full-recurse instead of just recurse.
 .TP
-.B \-\-info
+.B \-\-info, \-i
 Determine the packages and groups that would be created by the clone and display that information, without actually cloning.
 .TP 4
 .B \-\-message MESSAGE

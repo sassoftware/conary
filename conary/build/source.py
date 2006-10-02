@@ -195,7 +195,7 @@ class Archive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -248,6 +248,14 @@ class Archive(_Source):
     set Authorization credentials, fudge a Cookie, or, if direct links are
     not allowed for some reason (e.g. a click through EULA), a Referer can
     be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -309,12 +317,18 @@ class Archive(_Source):
         actually unpacked, or merely stored in the archive.
     @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package and
+        component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 
-    def do(self):
+    def doDownload(self):
 	f = self._findSource(self.httpHeaders)
 	self._checkSignature(f)
+        return f
+
+    def do(self):
+        f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
 
@@ -360,7 +374,7 @@ class Archive(_Source):
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:
-                _unpack = "tar -C %s -xSf -" % (destDir,)
+                _unpack = "tar -C %s -xSpf -" % (destDir,)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
             elif _uncompress != 'cat':
@@ -368,7 +382,7 @@ class Archive(_Source):
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xSf -" % (destDir,)
+                _unpack = "tar -C %s -xSpf -" % (destDir,)
             else:
                 raise SourceError, "unknown archive format: " + f
 
@@ -418,7 +432,7 @@ class Patch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -480,6 +494,14 @@ class Patch(_Source):
     not allowed for some reason (e.g. a click through EULA), a Referer can
     be provided.
 
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+    
     EXAMPLES
     ========
 
@@ -545,6 +567,8 @@ class Patch(_Source):
         actually unpacked, or merely stored in the archive.
     @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
@@ -590,8 +614,13 @@ class Patch(_Source):
         log.error('could not apply patch %s in directory %s', f, destDir)
         raise SourceError, 'could not apply patch %s' % f
 
-    def do(self):
+    def doDownload(self):
 	f = self._findSource()
+        self._checkSignature(f)
+        return f
+
+    def do(self):
+        f = self.doDownload()
         # FIXME: we should probably read in the patch directly now
         # that we aren't just applying in a pipeline
 	provides = "cat"
@@ -626,7 +655,7 @@ class Source(_Source):
     SYNOPSIS
     ========
 
-    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -647,7 +676,8 @@ class Source(_Source):
     specify directory information, but not both. Useful mainly  when fetching
     the file from an source outside your direct control, such as a URL to a
     third-party web site, or copying a file out of an RPM package.
-    An absolute C{dest} value will be considered relative to C{%(destdir)s},     whereas a relative C{dest} value will be considered relative to
+    An absolute C{dest} value will be considered relative to C{%(destdir)s}, 
+    whereas a relative C{dest} value will be considered relative to
     C{%(builddir)s}.
     
     B{dir} : The directory in which to store the file, relative to the build
@@ -684,6 +714,14 @@ class Source(_Source):
     set Authorization credentials, fudge a Cookie, or, if direct links are
     not allowed for some reason (e.g. a click through EULA), a Referer can
     be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -753,6 +791,8 @@ class Source(_Source):
         merely stored in the archive.
     @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:
@@ -783,6 +823,13 @@ class Source(_Source):
 	else:
 	    self.applymacros = False
 
+    def doDownload(self):
+        if self.contents is not None:
+            return
+        f = self._findSource()
+        self._checkSignature(f)
+        return f
+
     def do(self):
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
@@ -799,7 +846,7 @@ class Source(_Source):
 		pout.write(self.contents)
 	    pout.close()
 	else:
-            f = self._findSource()
+            f = self.doDownload()
 	    if self.applymacros:
 		log.info('applying macros to source %s' %f)
 		pin = file(f)
@@ -826,7 +873,7 @@ class Action(action.RecipeAction):
     SYNOPSIS
     ========
 
-    C{r.addAction([I{action},] [I{dir}=,] [I{use}=,])}
+    C{r.addAction([I{action},] [I{dir}=,] [I{package})=,] [I{use}=,])}
 
     DESCRIPTION
     ===========
@@ -846,6 +893,14 @@ class Action(action.RecipeAction):
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
     actually unpacked or merely stored in the archive.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
 
     EXAMPLES
     ========
@@ -881,6 +936,8 @@ class Action(action.RecipeAction):
     @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked or merely stored in the archive.
+    @keyword package: A string that specifies the package, component, or package
+        and component in which to place the files added while executing this command
 	"""
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]
@@ -888,6 +945,9 @@ class Action(action.RecipeAction):
         if self.package:
             self.package = self.package % recipe.macros
             self.manifest = Manifest(package=self.package, recipe=recipe)
+
+    def doDownload(self):
+        return None
 
     def do(self):
 	builddir = self.recipe.macros.builddir

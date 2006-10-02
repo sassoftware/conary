@@ -102,7 +102,7 @@ class CvcCommand(options.AbstractCommand):
 
     def addParameters(self, argDef):
         d = {}
-        d["config"] = MULT_PARAM
+        d["config"] = '-c', MULT_PARAM
         d["config-file"] = MULT_PARAM
         d["context"] = ONE_PARAM
         d["install-label"] = MULT_PARAM
@@ -117,7 +117,7 @@ class CvcCommand(options.AbstractCommand):
         cfgMap['flavors']       = 'fullFlavors', NO_PARAM
         cfgMap["pubring"]       = "pubRing", ONE_PARAM
         cfgMap["quiet"]         = "quiet", NO_PARAM,
-        cfgMap["root"]          = "root", ONE_PARAM,
+        cfgMap["root"]          = "root", ONE_PARAM, '-r'
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
@@ -196,7 +196,7 @@ class BranchShadowCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef["binary-only"] = NO_PARAM
         argDef["source-only"] = NO_PARAM
-        argDef["info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -262,7 +262,7 @@ class CloneCommand(CvcCommand):
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["skip-build-info"] = NO_PARAM
-        argDef["info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["message"] = '-m', ONE_PARAM
         argDef["full-recurse"] = NO_PARAM
@@ -292,10 +292,11 @@ class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
 
-    docs = {'message': 'Use MESSAGE to describe why the commit was performed',
-           'test':    ('Runs through all the steps of committing but does not'
-                        'modify the repository')}
-
+    docs = {'message':'Use MESSAGE to describe why the commit was performed',
+            'test':   ('Runs through all the steps of committing but does not '
+                       'modify the repository')}
+    # allow "cvc commit -m'foo bar'" to work
+    hobbleShortOpts = False
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["message"] = '-m', ONE_PARAM
@@ -393,6 +394,7 @@ class CookCommand(CvcCommand):
             'ignore-buildreqs' : 'do not check build requirements',
             'show-buildreqs': 'show build requirements for recipe',
             'prep'    : 'unpack, but do not build',
+            'download': 'download, but do not unpack or build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
             'unknown-flags' : optparse.SUPPRESS_HELP,
@@ -410,6 +412,7 @@ class CookCommand(CvcCommand):
         argDef['ignore-buildreqs'] = NO_PARAM
         argDef['show-buildreqs' ] = NO_PARAM
         argDef['prep'] = NO_PARAM
+        argDef['download'] = NO_PARAM
         argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
 
@@ -418,6 +421,7 @@ class CookCommand(CvcCommand):
         level = log.getVerbosity()
         macros = {}
         prep = 0
+        downloadOnly = False
         resume = None
         buildBranch = None
         if argSet.has_key('flavor'):
@@ -441,6 +445,13 @@ class CookCommand(CvcCommand):
             ignoreDeps = True
         else:
             ignoreDeps = False
+
+        if argSet.has_key('download'):
+            if argSet.has_key('prep') or prep==True:
+                log.warn('download and prep should not be used together... prefering download only')
+            del argSet['download']
+            ignoreDeps = True
+            downloadOnly = True
 
         showBuildReqs = argSet.pop('show-buildreqs', False)
 
@@ -494,7 +505,7 @@ class CookCommand(CvcCommand):
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
-                         crossCompile=crossCompile)
+                         crossCompile=crossCompile, downloadOnly=downloadOnly)
         log.setVerbosity(level)
 _register(CookCommand)
 
@@ -699,6 +710,9 @@ class CvcMain(options.MainHandler):
         client = conaryclient.ConaryClient(cfg)
         repos = client.getRepos()
         callback = CheckinCallback(cfg)
+
+        if isinstance(thisCommand, CommitCommand):
+            self.hobbleShortOpts = False
 
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]

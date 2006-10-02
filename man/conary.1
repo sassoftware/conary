@@ -167,7 +167,7 @@ of the remaining troves to ensure those dependencies remain satisfied. If
 those dependencies are broken, a dependency error is generated. This option
 tells conary to try and leave troves in place to resolve those dependencies.
 .TP
-.B \-\-info
+.B \-\-info, \-i
 Display a summary of what troves will be affected by the update.
 .TP
 .B \-\-just-db
@@ -238,7 +238,7 @@ See \fBupdate \-\-apply-critical\fP
 .B \-\-exclude-troves <patterns>
 See \fBupdate \-\-exclude-troves\fP
 .TP
-.B \-\-info
+.B \-\-info, \-i
 Displays the list of update tasks that would be performed without
 doing the actual system update
 .TP
@@ -333,7 +333,7 @@ Displays the troves that fulfilled the build requirements of the trove.  (Turns 
 .B \-\-deps
 Displays full dependency information for the given trove.  (--recurse implied)
 .TP
-.B \-\-info
+.B \-\-info, \-i
 Displays information on the specified troves, including flavors, requirements, and metadata.
 .TP
 .B \-\-signatures
@@ -685,8 +685,7 @@ to \fBroot\fP (see below) and should normally not be changed.
 .B environment
 Provides an environment variable and its associated value to which to
 set it (or, if no value is provided, the environment variable to unset)
-while building packages.  These may be set within contexts, and the
-values may include macros.
+while building packages.  The values may include macros.
 .TP
 .B excludeTroves
 The regular expression of a trove name to exclude when doing updates.
@@ -792,12 +791,9 @@ shell globs, in which case all files matching the glob will be read in.
 .TP
 .B Configuration Contexts
 A Configuration context is a section of a config file delimited by a section
-name in square brackets, like \fI[foo]\fR.  Options that can be specified after
-the brackets are limited to \fBbuildFlavor, buildLabel, buildPath, contact,
-excludeTroves, flavor, lookaside, installLabelPath, name, recipeTemplates, 
-repositoryMap, root, signatureKey, signatureKeyMap, and user\fR.  When a 
-context is selected, the configuration values specified in the context 
-override the default values.
+name in square brackets, like \fI[foo]\fR.  All conary configuration options
+may be overridden in contexts.  When a context is selected, the configuration 
+values specified in the context override the default values.
    If any values are not specified, the values defined in the main 
 configuration section are used.  
 .RS 4

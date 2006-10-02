@@ -1,18 +1,55 @@
 Changes in @NEW@:
+  o Client Changes:
+    * cvc and conary now take -r to mean --root and -c to mean --config.
+      Commands that take --info now take -i as an alternative.
+    * contexts may now override any configuration option. (CNY-812)
+    * The meaning of --components has changed hopefully to be more intuitive.
+      For example, conary q --components will show all the components for
+      all packages, indented as you'd expect (CNY-822).
+
+  o Build (cvc) Changes:
+    * "cvc commit -m'commit message'" is now accepted.  Previously, a
+      space was required between the -m and the message.
+    * Permissions are now preserved by tar when extracting a tar
+      archive added with r.addArchive().
+    * The Requires policy now parses pkg-config files more reliably.
+    * "cvc cook" now has a --download option, which fetches the applicable
+      sources from upstream or from the repository and then stops (CNY-837)
+    * If cooking a group results in conflicts, the error message will now
+      show you the reason why the troves in conflict were included in the
+      group. (CNY-876)
+    * If an r.replace or r.remove does nothing, a warning is output
+      unless the keyword allowNoMatches is added. (CNY-931)
+    * If an r.replace would match against a package included inside another
+      group that you are not building, conary will warn that that replace
+      cannot possibly do anything, and will suggest using r.addCopy()
+      to resolve the problem. (CNY-360)
+    * Added r.addCopy() group command. (CNY-360)
+    * The Autoconf() build action now enforces buildRequirements of
+      automake:runtime and autoconf:runtime if used (CNY-672)
+    * All build actions that enforce buildRequires additions now report
+      them through the reportMissingBuildRequires summary policy.
+
   o Optimizations:
     * Getting a large number of troves (without files) from the local database
       has been sped up by 30%.  (CNY-907).
-    * conary q --troves is 3 times faster, conary q is 2 times faster, and
-      and conary q --troves --recurse is 2 times faster on a test machine
-      (this, along with the speedups from 1.0.32 make conary q 4-6 times faster
-      now than it was earlier).
+    * conary q --troves is 2 times faster, conary q, conary q --deps and 
+      --info  are 30% faster, and conary q --troves --recurse is 4-6 times 
+      faster on a test machine.
+
+  o Bug Fixes:
+    * r.Replace() no longer fails when a glob matches a dangling
+      symlink.  r.Replace() now reports that no action is taking on
+      the dangling symlink due to it being a non-regular file.  This
+      is the same behavior as running r.Replace() on non-dangling
+      symlinks.
 
 Changes in 1.0.32:
   o Optimizations
     * Duplicate trove instantiations have been removed. Build requires are
       no longer thawed out of abstract change sets, and methods were added
       to get dependency and path hash information directly from trove
-      change set objects. These changes combined for a 50% speedup an
+      change set objects. These changes combined for a 50% speedup on
       update --info of a large group into an empty root and saved a few
       megs of memory as well (CNY-892)
     * The changes in the previous version of Conary in how XML-RPC
@@ -52,12 +89,6 @@ Changes in 1.0.32:
     * loadRecipe now selects the most recent of two recipes available
       in the case where there are multiple choices due to label
       multiplicity. (CNY-918)
-    * Conary update now respects local changes when a group update occurs
-      along with the update of the switched trove.  For example, switch
-      foo to be installed from another branch instead of the default, 
-      and then update foo and its containing group at the same time would
-      cause conary to try to reinstall the original foo (resulting in path
-      conflicts). (CNY-915)
 
 Changes in 1.0.31:
   o Client Changes:

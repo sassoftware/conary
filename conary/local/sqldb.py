@@ -1061,7 +1061,7 @@ order by
         # handle missing troves.
         for i, instanceId in enumerate(instances):
             if instanceId is not None:
-                toFind[instanceId] = i
+                toFind.setdefault(instanceId, []).append(i)
 
         results = [ None for x in instances ]
         instances = list(self._iterTroves(pristine,
@@ -1069,7 +1069,8 @@ order by
                                           withFiles = withFiles,
                                           withDeps = withDeps))
         for instanceId, instance in itertools.izip(toFind, instances):
-            results[toFind[instanceId]] = instance
+            for slot in toFind[instanceId]:
+                results[slot] = instance
         return results
 
     def _lookupTroves(self, troveList):
