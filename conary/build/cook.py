@@ -335,8 +335,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                 log.warning('Could not open repository -- not attempting to'
                             ' share pathId information with the'
                             ' repository. This cook will create new versions'
-                            ' for all files on update.'
-                            ' file information on update.')
+                            ' for all files on update.')
                 time.sleep(3)
                 repos = None
 
