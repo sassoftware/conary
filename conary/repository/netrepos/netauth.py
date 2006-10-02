@@ -694,7 +694,7 @@ class NetworkAuthorization:
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # check for duplicates
-        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?"
+        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?",
                    (entGroupId, entitlement))
         if len(cu.fetchall()):
             raise errors.UserAlreadyExists
