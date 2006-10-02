@@ -18,7 +18,8 @@ python_files = __init__.py    \
 	       apachehooks.py \
 	       server.py      \
                http.py        \
-	       schema.py
+	       schema.py      \
+	       migrate.py
 
 extra_dist = Makefile
 
