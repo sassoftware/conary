@@ -797,7 +797,7 @@ class NetworkAuthorization:
         user = cu.fetchall()
         if not len(user):
             raise errors.GroupNotFound
-        return ent[0][0],, user[0][0]
+        return ent[0][0], user[0][0]
 
     def addEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
         """
