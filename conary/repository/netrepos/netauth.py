@@ -717,7 +717,7 @@ class NetworkAuthorization:
         entGroupId = self.__checkEntitlementOwner(cu, authGroupIds, entGroup)
 
         # if the entitlement doesn't exist, return an error
-        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?"
+        cu.execute("SELECT * FROM Entitlements WHERE entGroupId = ? AND entitlement = ?",
                    (entGroupId, entitlement))
         if not len(cu.fetchall()):
             raise errors.InvalidEntitlement
@@ -789,7 +789,7 @@ class NetworkAuthorization:
         cu.execute("SELECT entGroupId FROM entitlementGroups "
                    "WHERE entGroup = ?", entGroup)
         ent = cu.fetchall()
-        if not len(ret):
+        if not len(ent):
             raise errors.UnknownEntitlementGroup
 
         cu.execute("SELECT userGroupId FROM userGroups "
