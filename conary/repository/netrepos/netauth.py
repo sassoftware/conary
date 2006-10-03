@@ -526,6 +526,15 @@ class NetworkAuthorization:
             return ret[0][0]
         raise errors.GroupNotFound
 
+    def _checkDuplicates(self, cu, userGroupName):
+        # check for case insensitive user conflicts -- avoids race with
+        # other adders on case-differentiated names
+        cu.execute("SELECT userGroupId FROM UserGroups "
+                   "WHERE LOWER(UserGroup)=LOWER(?)", userGroupName)
+        if len(cu.fetchall()) > 1:
+            # undo our insert
+            self.db.rollback()
+            raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
 
     def _addGroup(self, cu, userGroupName):
         try:
@@ -535,14 +544,7 @@ class NetworkAuthorization:
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "group: %s" % userGroupName
-        # check for case insensitive user conflicts -- avoids race with
-        # other adders on case-differentiated names
-        cu.execute("SELECT userGroupId FROM UserGroups "
-                   "WHERE LOWER(UserGroup)=LOWER(?)", userGroupName)
-        if len(cu.fetchall()) > 1:
-            # undo our insert
-            self.db.rollback()
-            raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
+        self._checkDuplicates(cu, userGroupName)
         return ugid
 
     def addGroup(self, userGroupName):
@@ -555,16 +557,14 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         if currentGroupName == userGroupName:
             return True
-        # this will raise constraint violations if we have a case clash
         try:
-            cu.execute("UPDATE UserGroups SET userGroup=? "
-                       "WHERE LOWER(userGroup) = LOWER(?)",
+            cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroup=?",
                        (userGroupName, currentGroupName))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.GroupAlreadyExists, "usergroup: %s" % userGroupName
-        else:
-            self.db.commit()
+        self._checkDuplicates(cu, userGroupName)
+        self.db.commit()
         return True
 
     def updateGroupMembers(self, userGroup, members):
