@@ -431,11 +431,12 @@ class NetworkAuthorization:
     def groupCanMirror(self, userGroup):
         cu = self.db.cursor()
         cu.execute("SELECT canMirror FROM UserGroups "
-                   "WHERE userGroup=? AND canMirror != 0",
+                   "WHERE userGroup=?",
                    userGroup)
         ret = cu.fetchall()
         if len(ret):
-            return True
+            canMirror = ret[0][0]
+            return canMirror
         raise errors.GroupNotFound
 
     def setMirror(self, userGroup, canMirror):
