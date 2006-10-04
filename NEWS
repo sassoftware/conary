@@ -1,11 +1,14 @@
 Changes in @NEW@:
   o Client Changes:
-    * cvc and conary now take -r to mean --root and -c to mean --config.
-      Commands that take --info now take -i as an alternative.
-    * contexts may now override any configuration option. (CNY-812)
-    * The meaning of --components has changed hopefully to be more intuitive.
-      For example, conary q --components will show all the components for
-      all packages, indented as you'd expect (CNY-822).
+    * The "cvc" and "conary" command line programs have new command
+      line argument aliases.  They accept "-r" as an alias for
+      "--root" and "-c" as an alias for "--config".  Commands that
+      accept "--info" now accept "-i" as an alias.
+    * Contexts can now override any configuration option. (CNY-812)
+    * The meaning of the "--components" command line option has
+      changed to be more intuitive.  For example, "conary q
+      --components" will show all the components for all packages,
+      indented as expected. (CNY-822)
 
   o Build (cvc) Changes:
     * "cvc commit -m'commit message'" is now accepted.  Previously, a
@@ -13,35 +16,40 @@ Changes in @NEW@:
     * Permissions are now preserved by tar when extracting a tar
       archive added with r.addArchive().
     * The Requires policy now parses pkg-config files more reliably.
-    * "cvc cook" now has a --download option, which fetches the applicable
-      sources from upstream or from the repository and then stops (CNY-837)
+    * "cvc cook" now has a "--download" option, which fetches the
+      applicable sources from upstream or from the repository and then
+      stops. (CNY-837)
     * If cooking a group results in conflicts, the error message will now
       show you the reason why the troves in conflict were included in the
       group. (CNY-876)
-    * If an r.replace or r.remove does nothing, a warning is output
-      unless the keyword allowNoMatches is added. (CNY-931)
-    * If an r.replace would match against a package included inside another
-      group that you are not building, conary will warn that that replace
-      cannot possibly do anything, and will suggest using r.addCopy()
-      to resolve the problem. (CNY-360)
-    * Added r.addCopy() group command. (CNY-360)
+    * A new r.addCopy() command is now available to group recipes.  It
+      performs the actions required to create a new group, add all of
+      the troves from a different group, and add the new group to the
+      current group. (CNY-360)
+    * In a group recipe, if r.replace() or r.remove() does nothing, a
+      warning message is given unless the keyword allowNoMatches is
+      used. (CNY-931)
+    * In a group recipe, if r.replace() would match against a package
+      included inside another group that you are not building, conary
+      will warn that replace cannot possibly do anything and will
+      suggest using r.addCopy() to resolve the problem. (CNY-360)
     * The Autoconf() build action now enforces buildRequirements of
-      automake:runtime and autoconf:runtime if used (CNY-672)
+      automake:runtime and autoconf:runtime if used. (CNY-672)
     * All build actions that enforce buildRequires additions now report
       them through the reportMissingBuildRequires summary policy.
 
   o Optimizations:
-    * Getting a large number of troves (without files) from the local database
-      has been sped up by 30%.  (CNY-907).
-    * conary q --troves is 2 times faster, conary q, conary q --deps and 
-      --info  are 30% faster, and conary q --troves --recurse is 4-6 times 
-      faster on a test machine.
+    * Retrieving a large number of troves without files from the local
+      database has been sped up by 30%. (CNY-907)
+    * On one test machine: "conary q --troves" is 2 times
+      faster. "conary q", "conary q --deps" and "conary q --info" are
+      30% faster.  "conary q --troves --recurse" is 4-6 times faster.
 
   o Bug Fixes:
     * r.Replace() no longer fails when a glob matches a dangling
-      symlink.  r.Replace() now reports that no action is taking on
-      the dangling symlink due to it being a non-regular file.  This
-      is the same behavior as running r.Replace() on non-dangling
+      symlink.  It now reports that no action is taking on the
+      dangling symlink due to it being a non-regular file.  This is
+      the same behavior as running r.Replace() on non-dangling
       symlinks.
 
 Changes in 1.0.32:
