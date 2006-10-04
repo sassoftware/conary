@@ -380,6 +380,8 @@ class ConaryConfiguration(SectionedConfigFile):
         return self.getDisplayOption('showContexts', False)
 
     def requireInstallLabelPath(self):
+        # NOTE - conary doesn't use this check anymore.  Kept for
+        # backwards compatibility.
         if not self.installLabelPath:
             print >> sys.stderr, "installLabelPath is not set"
             sys.exit(1)

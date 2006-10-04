@@ -605,7 +605,6 @@ class RepQueryCommand(_AbstractQueryCommand):
         argDef['Trove Selection'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
-        cfg.requireInstallLabelPath()
         versionOpts = [argSet.pop(x, False) for x in ['all-versions',
                                                       'latest-versions',
                                                       'leaves']]
@@ -780,8 +779,6 @@ class UpdateCommand(ConaryCommand):
         argDef['Update Options'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
-        # NOTE: this code path is used by sync and migrate as well.
-        cfg.requireInstallLabelPath()
         kwargs = {}
 
         callback = updatecmd.UpdateCallback(cfg)
@@ -902,7 +899,6 @@ class UpdateAllCommand(UpdateCommand):
         argDef["apply-critical"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
-        cfg.requireInstallLabelPath()
         kwargs = {}
 
         if argSet.has_key('info'):
@@ -952,7 +948,6 @@ class UpdateConaryCommand(ConaryCommand):
     commands = ['updateconary']
 
     def runCommand(self, cfg, argSet, otherArgs):
-        cfg.requireInstallLabelPath()
         updatecmd.updateConary(cfg, constants.version)
 _register(UpdateConaryCommand)
 
