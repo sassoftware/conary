@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.33:
   o Client Changes:
     * The "cvc" and "conary" command line programs have new command
       line argument aliases.  They accept "-r" as an alias for
