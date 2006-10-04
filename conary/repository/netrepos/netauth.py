@@ -702,13 +702,9 @@ class NetworkAuthorization:
         # XXX: should we raise an error here or just go about it silently?
         if not len(ret):
             raise errors.UnknownEntitlementGroup
-<<<<<<< /home/devel/msw/hg/conary-1.1/conary/repository/netrepos/netauth.py
-
+        entGroupId = ret[0][0]
         cu.execute("DELETE FROM EntitlementAccessMap WHERE entGroupId=?",
                    entGroupId)
-=======
-        entGroupId = ret[0][0]
->>>>>>> /tmp/netauth.py~other.km-e59
         cu.execute("DELETE FROM Entitlements WHERE entGroupId=?",
                    entGroupId)
         cu.execute("DELETE FROM EntitlementOwners WHERE entGroupId=?",
@@ -788,8 +784,6 @@ class NetworkAuthorization:
                    "VALUES (?, ?)", entGroupId, userGroupId)
         self.db.commit()
 
-<<<<<<< /home/devel/msw/hg/conary-1.1/conary/repository/netrepos/netauth.py
-=======
     def getEntitlementPermGroup(self, authToken, entGroup):
         """
         Returns the user group which controls the permissions for a group.
@@ -807,7 +801,6 @@ class NetworkAuthorization:
             return ret[0][0]
         return None
 
->>>>>>> /tmp/netauth.py~other.km-e59
     def getEntitlementOwnerAcl(self, authToken, entGroup):
         """
         Returns the user group which owns the entitlement group
