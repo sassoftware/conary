@@ -1,3 +1,11 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Erases of critical troves is no longer considered a reason to restart
+      conary.
+  o Bug Fixes:
+    * Fixed a bug triggered when a critical update of a trove depended on 
+      an erase.
+
 Changes in 1.0.33:
   o Client Changes:
     * The "cvc" and "conary" command line programs have new command

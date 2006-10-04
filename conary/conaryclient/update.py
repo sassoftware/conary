@@ -41,7 +41,7 @@ class CriticalUpdateInfo(object):
         l = []
         for job in jobList:
             for regexp in regexpList:
-                if re.match(regexp, job[0]):
+                if job[2][0] and re.match(regexp, job[0]):
                     l.append(job)
         return l
 

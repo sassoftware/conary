@@ -669,7 +669,10 @@ class DependencyChecker:
             # return jobs that must be updated before or after job
             # due to dependencies in order to have a consistent system.
             jobs = []
-            nodeId = self.newInfoToNodeId[job[0], job[2][0], job[2][1]]
+            if job[2][0]:
+                nodeId = self.newInfoToNodeId[job[0], job[2][0], job[2][1]]
+            else:
+                nodeId = self.oldInfoToNodeId[job[0], job[1][0], job[1][1]]
 
             nodeIds= [ nodeId ]
             seen = set(nodeIds)
