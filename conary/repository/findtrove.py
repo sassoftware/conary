@@ -667,22 +667,6 @@ class TroveFinder:
         return finalMap
 
     def addQuery(self, troveTup):
-        (name, versionStr, flavor) = troveTup
-        if not self.labelPath:
-            hasLabelPath = False
-
-            # need a branch or a full label
-            if versionStr and (isinstance(versionStr, (versions.Branch, 
-                                                       versions.Version,
-                                                       versions.Label))
-                               or versionStr[0] == '/' or '@' in versionStr[1:]):
-                hasLabelPath = True
-
-            if not hasLabelPath and not self.allowNoLabel:
-                raise errors.TroveNotFound, \
-                    "fully qualified version or label " + \
-                    "expected instead of %s" % versionStr
-
         affinityTroves = []
         if self.affinityDatabase:
             try:
@@ -691,7 +675,28 @@ class TroveFinder:
                                                                   None, None))
             except errors.TroveNotFound:
                 pass
-        
+
+        (name, versionStr, flavor) = troveTup
+        if not self.labelPath:
+            hasLabelPath = False
+
+            # need a branch or a full label
+            if versionStr and (isinstance(versionStr, (versions.Branch,
+                                                       versions.Version,
+                                                       versions.Label))
+                              or ('@' in versionStr[1:] and ':' in versionStr)):
+
+                hasLabelPath = True
+
+            if (not hasLabelPath and not self.allowNoLabel):
+                if not versionStr:
+                    if not affinityTroves:
+                        raise errors.LabelPathNeeded("No search label path given and no label specified for trove %s - set the installLabelPath" % name)
+                elif ':' in versionStr:
+                    raise errors.LabelPathNeeded("No search label path given and partial label specified for trove %s=%s - set the installLabelPath" % (name, versionStr))
+                elif not affinityTroves or flavor:
+                    raise errors.LabelPathNeeded("No search label path given and no label specified for trove %s=%s - set the installLabelPath" % (name, versionStr))
+
         type = self._getVersionType(troveTup)
         sortFn = self.getVersionStrSortFn(type)
         sortFn(self, troveTup, affinityTroves) 
@@ -767,9 +772,10 @@ class TroveFinder:
     def _getLabelPath(self, troveTup):
         if self.labelPath:
             return self.labelPath
-        else:
-            return [ x.branch().label() \
-                     for x in self.troveSource.getTroveVersionList(troveTup[0],
+        if not self.allowNoLabel:
+            return []
+        return [ x.branch().label() \
+                 for x in self.troveSource.getTroveVersionList(troveTup[0],
                                                         troveTypes=self.troveTypes)]
 
     def sortNoVersion(self, troveTup, affinityTroves):

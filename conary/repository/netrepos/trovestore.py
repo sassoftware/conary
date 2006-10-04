@@ -623,7 +623,8 @@ class TroveStore:
                                 I.versionId = Versions.versionId AND
                                 I.flavorId = flavors.flavorId AND
                                 I.itemId = Nodes.itemId AND
-                                I.versionId = Nodes.versionId
+                                I.versionId = Nodes.versionId AND
+                                I.isPresent=1
                             ORDER BY
                                 gtl.idx""" % self.db.keywords)
 

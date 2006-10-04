@@ -1,3 +1,17 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Erases of critical troves is no longer considered a reason to restart
+      conary.
+    * You can now delete troves, update from changesets, and update with a
+      full version specified without an installLabelPath set (CNY-281).
+
+  o Bug Fixes:
+    * Fixed a bug triggered when a critical update of a trove depended on 
+      an erase.
+    * A bug that caused changesets to be invalidated from the
+      changeset cache when signatures were not modified by
+      setTroveSigs() has been fixed.
+
 Changes in 1.1.6:
   o Client Changes:
     * The "cvc" and "conary" command line programs have new command

@@ -2292,21 +2292,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             else:
                 currentSig = None
 
+            invalidate = False
             if not currentSig:
                 cu.execute("""
                 INSERT INTO TroveInfo (instanceId, infoType, data)
                 VALUES (?, ?, ?)
                 """, (instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig)))
                 updateCount += 1
+                invalidate = True
             elif currentSig != sig:
                 cu.execute("""
                 UPDATE TroveInfo SET data = ?
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 updateCount += 1
-            self.cache.invalidateEntry(self.repos, name,
-                                       self.toVersion(version),
-                                       self.toFlavor(flavor))
+                invalidate = True
+            if invalidate:
+                self.cache.invalidateEntry(self.repos, name,
+                                           self.toVersion(version),
+                                           self.toFlavor(flavor))
 
         return updateCount
 

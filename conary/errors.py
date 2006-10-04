@@ -71,6 +71,9 @@ class WebError(ConaryError):
 class TroveNotFound(ConaryError):
     """Returned from findTrove when no trove is matched"""
 
+class LabelPathNeeded(TroveNotFound):
+    """Returned from findTrove when a label path is required but wasn't given"""
+
 class DatabasePathConflicts(DatabaseError):
     """Occurs when multiple paths conflict inside of a job. This should
        always be handled internally."""
