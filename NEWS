@@ -8,6 +8,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * Fixed a bug triggered when a critical update of a trove depended on 
       an erase.
+    * A bug that caused changesets to be invalidated from the
+      changeset cache when signatures were not modified by
+      setTroveSigs() has been fixed.
 
 Changes in 1.0.33:
   o Client Changes:
