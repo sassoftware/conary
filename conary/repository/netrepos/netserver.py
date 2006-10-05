@@ -1210,21 +1210,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # return a changeset object that has all the changesets
         # requested in chgSetList.  Also returns a list of extra
         # troves needed and files needed.
-        trovesNeeded = []
-        filesNeeded = []
         cs = changeset.ReadOnlyChangeSet()
-	for jobEntry in chgSetList:
-            l = self._cvtJobEntry(authToken, jobEntry)
-            ret = self.repos.createChangeSet(
-                [ l ],
-                recurse = recurse,
-                withFiles = withFiles,
-                withFileContents = withFileContents,
-                excludeAutoSource = excludeAutoSource)
-            (newCs, neededTroves, neededFiles) = ret
-            filesNeeded += neededFiles
-            trovesNeeded += neededTroves
-            cs.merge(newCs)
+        l = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
+        ret = self.repos.createChangeSet(l,
+                                         recurse = recurse,
+                                         withFiles = withFiles,
+                                         withFileContents = withFileContents,
+                                         excludeAutoSource = excludeAutoSource)
+        (newCs, trovesNeeded, filesNeeded) = ret
+        cs.merge(newCs)
 
         return (cs, trovesNeeded, filesNeeded)
 
