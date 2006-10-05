@@ -31,6 +31,9 @@ class KeywordDict(BaseKeywordDict):
 
 # class for encapsulating binary strings for dumb drivers
 class Binary(BaseBinary):
+    __binary__ = True
+    def __quote__(self):
+        return self.s
     def __pg_repr__(self):
         return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
@@ -60,8 +63,12 @@ class Cursor(BaseCursor):
     binaryClass = Binary
     driver = "postgresql"
 
-    def frombinary(self, s):
-        return s.decode("string_escape")
+##     def binary(self, s):
+##         return s
+
+##     def frombinary(self, s):
+##         #return s.decode("string_escape")
+##         return s
 
     # execute with exception translation
     def _tryExecute(self, func, *params, **kw):
@@ -138,7 +145,15 @@ class Cursor(BaseCursor):
 
     # override this with the native version
     def fields(self):
-        return self._cursor.fiels
+        return self._cursor.fields
+
+    # pgsql has its own fetch*_dict methods
+    def fetchone_dict(self):
+        return self._cursor.fetchone_dict()
+    def fetchmany_dict(self, size):
+        return self._cursor.fetchmany_dict(size)
+    def fetchall_dict(self):
+        return self._cursor.fetchall_dict()
 
     # we have "our own" lastrowid
     def __getattr__(self, name):
