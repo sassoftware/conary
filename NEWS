@@ -11,6 +11,9 @@ Changes in @NEW@:
     * A bug that caused changesets to be invalidated from the
       changeset cache when signatures were not modified by
       setTroveSigs() has been fixed.
+    * A bug that caused an Internal Server Error (ISE) when attempting
+      to browse the files in a shadowed component via the Conary
+      repository browser has been fixed (CNY-926)
 
 Changes in 1.0.33:
   o Client Changes:

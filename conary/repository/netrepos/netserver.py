@@ -1186,6 +1186,48 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return r[pkgName].keys()[0]
 
+    def _cvtJobEntry(self, authToken, jobEntry):
+        (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
+
+        newVer = self.toVersion(new)
+
+        if not self.auth.check(authToken, write = False, trove = name,
+                               label = newVer.branch().label()):
+            raise errors.InsufficientPermission
+
+        if old == 0:
+            l = (name, (None, None),
+                       (self.toVersion(new), self.toFlavor(newFlavor)),
+                       absolute)
+        else:
+            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
+                       (self.toVersion(new), self.toFlavor(newFlavor)),
+                       absolute)
+        return l
+
+    def _getChangeSetObj(self, authToken, chgSetList, recurse,
+                         withFiles, withFileContents, excludeAutoSource):
+        # return a changeset object that has all the changesets
+        # requested in chgSetList.  Also returns a list of extra
+        # troves needed and files needed.
+        trovesNeeded = []
+        filesNeeded = []
+        cs = changeset.ReadOnlyChangeSet()
+	for jobEntry in chgSetList:
+            l = self._cvtJobEntry(authToken, jobEntry)
+            ret = self.repos.createChangeSet(
+                [ l ],
+                recurse = recurse,
+                withFiles = withFiles,
+                withFileContents = withFileContents,
+                excludeAutoSource = excludeAutoSource)
+            (newCs, neededTroves, neededFiles) = ret
+            filesNeeded += neededFiles
+            trovesNeeded += neededTroves
+            cs.merge(newCs)
+
+        return (cs, trovesNeeded, filesNeeded)
+
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
 
@@ -1251,24 +1293,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             recurse, withFiles, withFileContents))
         # XXX all of these cache lookups should be a single operation through a
         # temporary table
-	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
-	    newVer = self.toVersion(new)
-
-	    if not self.auth.check(authToken, write = False, trove = name,
-				   label = newVer.branch().label()):
-		raise errors.InsufficientPermission
-
-	    if old == 0:
-		l = (name, (None, None),
-			   (self.toVersion(new), self.toFlavor(newFlavor)),
-			   absolute)
-	    else:
-		l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-			   (self.toVersion(new), self.toFlavor(newFlavor)),
-			   absolute)
-
+	for jobEntry in chgSetList:
+            l = self._cvtJobEntry(authToken, jobEntry)
             cacheEntry = self.cache.getEntry(l, recurse, withFiles,
-                                        withFileContents, excludeAutoSource)
+                                             withFileContents, excludeAutoSource)
             if cacheEntry is None:
                 ret = self.repos.createChangeSet([ l ],
                                         recurse = recurse,
@@ -1283,7 +1311,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 trvCs = cs.getNewTroveVersion(*primary)
                 primary = (l[0], trvCs.getNewVersion(), l[2][1])
                 cs.addPrimaryTrove(*primary)
-
 
                 (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                                  suffix = '.tmp')
