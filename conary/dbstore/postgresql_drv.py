@@ -138,7 +138,12 @@ class Cursor(BaseCursor):
         return stmt
     def execstmt(self, stmt, *args):
         assert(isinstance(stmt, pgsql.PreparedCursor))
-        ret = self._tryExecute(stmt._source.execute, *args)
+        if not len(args):
+            ret = self._tryExecute(stmt._source.execute)
+        elif isinstance(args[0], (tuple, list)):
+            ret = self._tryExecute(stmt._source.execute, *args)
+        else:
+            ret = self._tryExecute(stmt._source.execute, args)
         if isinstance(ret, int):
             return ret
         return stmt
