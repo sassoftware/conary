@@ -417,7 +417,7 @@ class DependencySolver(object):
             # first: attempt to update packages that dependended on the missing
             # package.
             log.debug('Update breaks dependencies!')
-            for reqInfo, depSet, provInfo in cannotResolve:
+            for reqInfo, depSet, provInfo in sorted(cannotResolve):
                 depSet = '\n     '.join(str(depSet).split('\n'))
                 msg = (
                     'Broken dependency: (dep needed by the system but being removed):\n'
@@ -476,6 +476,8 @@ class DependencySolver(object):
 
         for resolveInfo in cannotResolve:
             (reqInfo, depSet, provInfoList) = resolveInfo
+            # reqInfo = the trove the requires the dependency
+            # provInfo = the troves that provide the dependency
 
             if reqInfo in newIdx:
                 # The thing with the requirement is something we asked 
@@ -495,7 +497,6 @@ class DependencySolver(object):
             if found:
                 continue
 
-            ineligible.update(provInfoList)
             for provInfo in provInfoList:
                 if provInfo not in oldIdx:
                     continue
@@ -507,6 +508,10 @@ class DependencySolver(object):
                     # use this method on erases.
                     continue
 
+                # we're trying to update this package.
+                # don't allow recursion to take place, where things that
+                # require the reqInfo are updated.
+                ineligible.add(reqInfo)
                 potentialUpdateList.append((reqInfo, depSet, provInfoList))
                 break
 
@@ -514,7 +519,7 @@ class DependencySolver(object):
             return cannotResolve, set()
 
         log.debug('Attempting to update the following packages in order to '
-                  'remove their dependency on something being erased:\n   %s', ('\n   '.join(x[0][0].split(':')[0] for x in potentialUpdateList)))
+                  'remove their dependency on something being erased:\n   %s', ('\n   '.join(sorted(x[0][0].split(':')[0] for x in potentialUpdateList))))
 
         # attempt to update the _package_ that has the requirement that
         # is now erased.
@@ -550,8 +555,6 @@ class DependencySolver(object):
                                      criticalJobs=[])
             if cannotResolve != newCannotResolve:
                 cannotResolve = newCannotResolve
-                ineligible.update((x[0], x[1][0], x[1][1])
-                                  for x in newJobSet)
             else:
                 newJobSet = set()
         except (errors.ClientError, errors.TroveNotFound):

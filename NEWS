@@ -3,7 +3,7 @@ Changes in @NEW@:
     * Erases of critical troves is no longer considered a reason to restart
       conary.
     * You can now delete troves, update from changesets, and update with a
-      full version specified without an installLabelPath set (CNY-281).
+      full version specified without an installLabelPath set. (CNY-281)
 
   o Bug Fixes:
     * Fixed a bug triggered when a critical update of a trove depended on 
@@ -11,6 +11,11 @@ Changes in @NEW@:
     * A bug that caused changesets to be invalidated from the
       changeset cache when signatures were not modified by
       setTroveSigs() has been fixed.
+    * A bug that affected the ability to update two troves due to the same
+      broken dependency with resolveLevel 2 has been fixed.  This bug
+      affected the ability to simply run "conary update conary" when 
+      conary-build and conary-repository will both installed. (CNY-949)
+ 
 
 Changes in 1.0.33:
   o Client Changes:
