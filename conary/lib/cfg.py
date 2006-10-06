@@ -531,7 +531,7 @@ class ConfigOption:
     def write(self, out, value, displayOptions=None):
         """ Writes a config option name and value.
         """
-        if value is None:
+        if self.isDefault():
             return
 
         # note that the value for a config item may only be reproducable

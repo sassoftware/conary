@@ -1128,6 +1128,11 @@ class SingleGroup(object):
         else:
             self.troves[name, version, flavor] = (False, False, comps,
                                                   childByDefaults)
+    def setByDefault(self, name, version, flavor, byDefault):
+        (explicit, oldByDefault, comps, childByDefaults) \
+                                        = self.troves[name, version, flavor]
+        self.troves[name, version, flavor] = (explicit, byDefault, comps,
+                                              childByDefaults)
 
     def setSize(self, size):
         self.size = size
@@ -1754,6 +1759,25 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
         for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache,
                                                   childGroups):
             group.delTrove(*troveTup)
+
+    # change packages to be by default False if all their components
+    # are by default False - this avoids having a package being installed
+    # w/o any components.
+    pkgs = {}
+    for troveTup, explicit, byDefault, comps in group.iterTroveListInfo():
+        if ':' in troveTup[0]:
+            pkgTup = troveTup[0].split(':', 1)[0], troveTup[1], troveTup[2]
+            if byDefault:
+                pkgs[pkgTup] = True
+            elif pkgTup not in pkgs:
+                pkgs[pkgTup] = False
+    toTurnOff = [ x[0] for x in pkgs.iteritems() if not x[1] ]
+    for pkgTup in toTurnOff:
+        if not group.hasTrove(*pkgTup):
+            continue
+        log.debug("Setting byDefault False for %s=%s[%s] because it doesn't"
+                  " contain any byDefault True components" % (pkgTup))
+        group.setByDefault(byDefault=False, *pkgTup)
 
     if unmatchedRemoveSpecs:
         log.warning(GroupUnmatchedRemoves(unmatchedRemoveSpecs, group))
