@@ -55,6 +55,8 @@ class CaselessDict(dict):
         for k in dict.itervalues(self):
             yield k[0]
     def __eq__(self, other):
+        if not isinstance(other, dict):
+            return False
         if dict.__len__(self) != len(other):
             return False
         for k, v in other.iteritems():
