@@ -17,10 +17,11 @@
 # a case-insensitive key dict
 class CaselessDict(dict):
     def __init__(self, d=None):
+        dict.__init__(self)
         if isinstance(d, list):
-            dict.__init__(self, d)
-        elif isinstance(d, dict):
-            dict.update(self, d)
+            d = dict(d)
+        if isinstance(d, dict):
+            self.update(d)
     # lowercase the key
     def __l(self, s):
         if isinstance(s, str):
