@@ -152,11 +152,9 @@ class Cursor(BaseCursor):
         ret = self._cursor.fetchone_dict()
         return sqllib.CaselessDict(ret)
     def fetchmany_dict(self, size):
-        ret = self._cursor.fetchmany_dict(size)
-        return sqllib.CaselessDict(ret)
+        return [ sqllib.CaselessDict(x) for x in self._cursor.fetchmany_dict(size) ]
     def fetchall_dict(self):
-        ret = self._cursor.fetchall_dict()
-        return sqllib.CaselessDict(ret)
+        return [ sqllib.CaselessDict(x) for x in self._cursor.fetchall_dict() ]
 
     # we have "our own" lastrowid
     def __getattr__(self, name):
