@@ -182,6 +182,10 @@ class _Config:
     def isDefault(self, key):
         return self._options[key].isDefault()
 
+    def resetToDefault(self, key):
+        self[key] = self.getDefaultValue(key)
+        return self._options[key].setIsDefault(True)
+
     def keys(self):
         return self._options.keys()
 
@@ -531,7 +535,7 @@ class ConfigOption:
     def write(self, out, value, displayOptions=None):
         """ Writes a config option name and value.
         """
-        if self.isDefault():
+        if self.isDefault() and value is None:
             return
 
         # note that the value for a config item may only be reproducable
