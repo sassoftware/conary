@@ -149,11 +149,14 @@ class Cursor(BaseCursor):
 
     # pgsql has its own fetch*_dict methods
     def fetchone_dict(self):
-        return self._cursor.fetchone_dict()
+        ret = self._cursor.fetchone_dict()
+        return sqllib.CaselessDict(ret)
     def fetchmany_dict(self, size):
-        return self._cursor.fetchmany_dict(size)
+        ret = self._cursor.fetchmany_dict(size)
+        return sqllib.CaselessDict(ret)
     def fetchall_dict(self):
-        return self._cursor.fetchall_dict()
+        ret = self._cursor.fetchall_dict()
+        return sqllib.CaselessDict(ret)
 
     # we have "our own" lastrowid
     def __getattr__(self, name):
@@ -168,6 +171,13 @@ class Cursor(BaseCursor):
         if ret is None:
             return 0
         return ret[0]
+
+# PostgreSQL lowercase everything automatically, so we need a special
+# "lowercase match" list type for matches like
+# idxname in db.tables[x]
+class Llist(list):
+    def __contains__(self, item):
+        return item.lower() in [x.lower() for x in list.__iter__(self)]
 
 class Database(BaseDatabase):
     driver = "postgresql"
@@ -200,7 +210,7 @@ class Database(BaseDatabase):
                                  'information_schema')
         """)
         for table, in c.fetchall():
-            self.tables[table] = []
+            self.tables[table] = Llist()
         if not len(self.tables):
             return self.version
         # views
@@ -220,7 +230,7 @@ class Database(BaseDatabase):
                                  'information_schema')
         """)
         for (name, table) in c.fetchall():
-            self.tables.setdefault(table, []).append(name)
+            self.tables.setdefault(table, Llist()).append(name)
         # sequences. I wish there was a better way...
         c.execute("""
         SELECT c.relname as name
