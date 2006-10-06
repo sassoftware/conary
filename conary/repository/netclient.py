@@ -262,7 +262,14 @@ class ServerCache:
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
 	    serverName = item.getHost()
 	elif isinstance(item, str):
-	    serverName = item
+            # Detect a label passed in as a string instead of a label object.
+            # This is only useful for misbehaving consumers of the ShimNetClient.
+            # That code should be fixed by passing in a Label object or a
+            # server name as a string, not a label as a string.
+            if '@' in item:
+                serverName = item.split('@')[0]
+            else:
+                serverName = item
         else:
             serverName = str(item)
 
