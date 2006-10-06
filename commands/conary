@@ -359,7 +359,7 @@ _register(PinCommand)
 
 
 class RemoveCommand(ConaryCommand):
-    commands = ['remove']
+    commands = ['remove', 'rm']
     paramHelp = "<path>+"
 
     def runCommand(self, cfg, argSet, otherArgs):
