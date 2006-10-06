@@ -19,12 +19,19 @@ import tempfile
 
 # this returns the same server for any server name or label
 # requested; because a shim can only refer to one server.
-class FakeServerCache:
-    def __init__(self, server):
+class FakeServerCache(netclient.ServerCache):
+    def __init__(self, server, repMap, userMap):
         self._server = server
+        netclient.ServerCache.__init__(self, repMap, userMap)
 
     def __getitem__(self, item):
-        return self._server
+        serverName = self._getServerName(item)
+        # return the proxy object for anything that matches the
+        # serverNames on this repository
+        if serverName in self._server._server.serverNameList:
+            return self._server
+        # otherwise get a real repository client
+        return netclient.ServerCache.__getitem__(self, item)
 
 class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
@@ -87,17 +94,19 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
     """
-    A subclass of NetworkRepositoryClient which can take a shimclient.NetworkRepositoryServer
-    instance (plus a few other pieces of information) and expose the netclient
-    interface without the overhead of XMLRPC.
+    A subclass of NetworkRepositoryClient which can take a
+    shimclient.NetworkRepositoryServer instance (plus a few other
+    pieces of information) and expose the netclient interface without
+    the overhead of XMLRPC.
 
-    If 'server' is a regular netserver.NetworkRepositoryServer instance, the shim won't be
-    able to return changesets. If 'server' is a shimclient.NetworkRepositoryServer, it will.
+    If 'server' is a regular netserver.NetworkRepositoryServer
+    instance, the shim won't be able to return changesets. If 'server'
+    is a shimclient.NetworkRepositoryServer, it will.
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap):
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap)
         proxy = ShimServerProxy(server, protocol, port, authToken)
-        self.c = FakeServerCache(proxy)
+        self.c = FakeServerCache(proxy, repMap, userMap)
 
 
 class _ShimMethod(netclient._Method):
@@ -132,6 +141,9 @@ class ShimServerProxy(netclient.ServerProxy):
 
     def setAbortCheck(self, *args):
         pass
+
+    def getChangeSetObj(self, *args):
+        return self._server._getChangeSetObj(self._authToken, *args)
 
     def __getattr__(self, name):
         return _ShimMethod(self._server,
