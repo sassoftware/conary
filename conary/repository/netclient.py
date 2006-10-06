@@ -240,8 +240,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__usedMap = usedMap
 
 class ServerCache:
-    def __init__(self, repMap, userMap, pwPrompt, entitlementDir,
-                 entitlements, callback=None):
+    def __init__(self, repMap, userMap, pwPrompt=None,
+                 entitlementDir=None, entitlements={}, callback=None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
@@ -256,7 +256,7 @@ class ServerCache:
         self.userMap.append((host, user, pw))
         return user, pw
 
-    def __getitem__(self, item):
+    def _getServerName(self, item):
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
 	    serverName = item.getHost()
 	elif isinstance(item, str):
@@ -269,7 +269,10 @@ class ServerCache:
              '\nError: Tried to access repository on reserved host name'
              ' "local" -- this host is reserved for troves compiled/created'
              ' locally, and cannot be queried.')
+        return serverName
 
+    def __getitem__(self, item):
+        serverName = self._getServerName(item)
         def _cleanseUrl(protocol, url):
             if url.find('@') != -1:
                 return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
@@ -995,6 +998,86 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return self.localRep.getTroves(troveList, pristine=True)
 
+        def _getCsFromRepos(target, cs, server, job, recurse,
+                            withFiles, withFileContents,
+                            excludeAutoSource, filesNeeded,
+                            chgSetList):
+            abortCheck = None
+            if callback:
+                callback.requestingChangeSet()
+                abortCheck = callback.checkAbort
+            server.setAbortCheck(abortCheck)
+            (url, sizes, extraTroveList, extraFileList) = \
+                  server.getChangeSet(job, recurse,
+                                      withFiles, withFileContents,
+                                      excludeAutoSource)
+            server.setAbortCheck(None)
+
+            chgSetList += _cvtTroveList(extraTroveList)
+            filesNeeded += _cvtFileList(extraFileList)
+            inF = urllib.urlopen(url)
+
+            if callback:
+                wrapper = callbacks.CallbackRateWrapper(
+                    callback, callback.downloadingChangeSet,
+                    sum(sizes))
+                copyCallback = wrapper.callback
+                abortCheck = callback.checkAbort
+            else:
+                copyCallback = None
+                abortCheck = None
+
+            try:
+                # seek to the end of the file
+                outFile.seek(0, 2)
+                start = outFile.tell()
+                totalSize = util.copyfileobj(inF, outFile,
+                                             callback = copyCallback,
+                                             abortCheck = abortCheck,
+                                             rateLimit = self.downloadRateLimit)
+
+                # attempt to remove temporary local files
+                # possibly created by a shim client
+                if os.path.exists(url) and os.access(url, os.W_OK):
+                    os.unlink(url)
+
+                if totalSize == None:
+                    sys.exit(0)
+                #assert(totalSize == sum(sizes))
+                inF.close()
+            except:
+                if target and os.path.exists(target):
+                    os.unlink(target)
+                elif os.path.exists(tmpName):
+                    os.unlink(tmpName)
+                raise
+
+            for size in sizes:
+                f = util.SeekableNestedFile(outFile, size, start)
+                newCs = changeset.ChangeSetFromFile(f)
+
+                if not cs:
+                    cs = newCs
+                else:
+                    cs.merge(newCs)
+
+                totalSize -= size
+                start += size
+
+            assert(totalSize == 0)
+            return cs
+
+        def _getCsFromShim(target, cs, server, job, recurse, withFiles,
+                           withFileContents, excludeAutoSource,
+                           filesNeeded, chgSetList):
+            (cs, extraTroveList, extraFileList) = \
+                  server.getChangeSetObj(job, recurse,
+                                         withFiles, withFileContents,
+                                         excludeAutoSource)
+            chgSetList += extraTroveList
+            filesNeeded += extraFileList
+            return cs
+
         if not chgSetList:
             # no need to work hard to find this out
             return changeset.ReadOnlyChangeSet()
@@ -1028,70 +1111,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             for serverName, job in serverJobs.iteritems():
                 server = self.c[serverName]
-                abortCheck = None
-                if callback:
-                    callback.requestingChangeSet()
-                    abortCheck = callback.checkAbort
-                server.setAbortCheck(abortCheck)
-                (url, sizes, extraTroveList, extraFileList) = \
-                      server.getChangeSet(job, recurse,
-                                          withFiles, withFileContents,
-                                          excludeAutoSource)
-                server.setAbortCheck(None)
 
-                chgSetList += _cvtTroveList(extraTroveList)
-                filesNeeded += _cvtFileList(extraFileList)
-
-                inF = urllib.urlopen(url)
-
-                if callback:
-                    wrapper = callbacks.CallbackRateWrapper(
-                        callback, callback.downloadingChangeSet,
-                        sum(sizes))
-                    copyCallback = wrapper.callback
-                    abortCheck = callback.checkAbort
+                args = (target, cs, server, job, recurse, withFiles,
+                        withFileContents, excludeAutoSource,
+                        filesNeeded, chgSetList)
+                if server.__class__ == ServerProxy:
+                    # this is a XML-RPC proxy for a remote repository
+                    cs = _getCsFromRepos(*args)
                 else:
-                    copyCallback = None
-                    abortCheck = None
-
-                try:
-                    # seek to the end of the file
-                    outFile.seek(0, 2)
-                    start = outFile.tell()
-                    totalSize = util.copyfileobj(inF, outFile,
-                                                 callback = copyCallback,
-                                                 abortCheck = abortCheck,
-                                                 rateLimit = self.downloadRateLimit)
-
-                    # attempt to remove temporary local files
-                    # possibly created by a shim client
-                    if os.path.exists(url) and os.access(url, os.W_OK):
-                        os.unlink(url)
-
-                    if totalSize == None:
-                        sys.exit(0)
-                    #assert(totalSize == sum(sizes))
-                    inF.close()
-                except:
-                    if target and os.path.exists(target):
-                        os.unlink(target)
-                    elif os.path.exists(tmpName):
-                        os.unlink(tmpName)
-                    raise
-
-                for size in sizes:
-                    f = util.SeekableNestedFile(outFile, size, start)
-                    newCs = changeset.ChangeSetFromFile(f)
-
-                    if not cs:
-                        cs = newCs
-                    else:
-                        cs.merge(newCs)
-
-                    totalSize -= size
-                    start += size
-
-                assert(totalSize == 0)
+                    # assume we are a shim repository
+                    cs = _getCsFromShim(*args)
 
             if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = changeset.ChangeSet()
