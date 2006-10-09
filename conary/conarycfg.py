@@ -355,9 +355,9 @@ class ConaryConfiguration(SectionedConfigFile):
         for key, value in context.iteritems():
             if not context.isDefault(key):
                 if isinstance(value, dict):
-                    self.__dict__[key].update(value)
+                    self[key].update(value)
                 else:
-                    self.__dict__[key] = value
+                    self[key] = value
         return True
 
     def getContext(self, name):
@@ -387,7 +387,7 @@ class ConaryConfiguration(SectionedConfigFile):
             sys.exit(1)
 
     def _resetSigMap(self):
-        self.signatureKeyMap = []
+        self.resetToDefault('signatureKeyMap')
 
     def initializeFlavors(self):
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
