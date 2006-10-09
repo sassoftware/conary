@@ -411,7 +411,9 @@ class DependencyChecker:
 
     def _gatherDependencyErrors(self, satisfied, brokenByErase, unresolveable, 
                                 wasIn):
-
+        from conary.local import sqldb
+        flavorCache = sqldb.FlavorCache()
+        versionCache = sqldb.VersionCache()
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
             failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
@@ -475,7 +477,7 @@ class DependencyChecker:
             for (troveName, troveVersion, troveFlavor, depClass, depName,
                             flag, depNum) in cu:
                 info = (troveName, versions.VersionFromString(troveVersion),
-                        deps.ThawFlavor(troveFlavor))
+                        flavorCache.get(troveFlavor))
 
                 if info not in failedSets:
                     failedSets[info] = (deps.DependencySet(), [])
@@ -513,7 +515,7 @@ class DependencyChecker:
                         flavor = ""
                     provideList.append((name,
                                         versions.VersionFromString(version),
-                                        deps.ThawFlavor(flavor)))
+                                        flavorCache.get(flavor)))
         # def _gatherDependencyErrors starts here
 
         # things which are listed in satisfied should be removed from
@@ -1356,9 +1358,8 @@ class DependencyTables:
         for (depId, troveName, versionStr, timeStamps, flavorStr) in cu:
             depId = -depId
             # remember the first version for each troveName/flavorStr pair
-            ts = [ float(x) for x in timeStamps.split(":") ]
-            v = versions.VersionFromString(versionStr, timeStamps=ts)
-            f = deps.ThawFlavor(flavorStr)
+            v = versionCache.get(versionStr, timeStamps)
+            f = flavorCache.get(flavorStr)
             depSolutions[depId].append((troveName, v, f))
 
         result = {}
