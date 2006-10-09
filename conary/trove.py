@@ -794,11 +794,11 @@ class Trove(streams.StreamSet):
             troveGroup = self.weakTroves
         else:
             troveGroup = self.strongTroves
-
-	if not presentOkay and troveGroup.has_key((name, version, flavor)):
+        key = (name, version, flavor)
+	if not presentOkay and key in troveGroup:
 	    raise TroveError, "duplicate trove included in %s" % self.name()
 
-        troveGroup[(name, version, flavor)] = byDefault
+        troveGroup[key] = byDefault
 
     def delTrove(self, name, version, flavor, missingOkay, weakRef = False):
 	"""
