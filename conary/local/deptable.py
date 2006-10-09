@@ -1325,6 +1325,9 @@ class DependencyTables:
 
     def getLocalProvides(self, depSetList):
         # dep set list must be unique and indexable.
+        from conary.local import sqldb
+        flavorCache = sqldb.FlavorCache()
+        versionCache = sqldb.VersionCache()
         depSetList = list(set(depSetList))
 
         cu = self.db.cursor()
