@@ -4,7 +4,8 @@ Changes in @NEW@:
       conary.
     * You can now delete troves, update from changesets, and update with a
       full version specified without an installLabelPath set. (CNY-281)
-    * added rm as an alias for remove.
+    * The "conary rm" command has been added as an alias for the
+      "conary remove" command. (CNY-952)
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component
