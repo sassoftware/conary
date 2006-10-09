@@ -846,8 +846,9 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 oldTrv = _findTroveObj(trovesAvailable, oldInfo)
                 if oldTrv is None:
                     remainder.append(job)
+                    continue
 
-            cs.newTrove(newTrv.diff(oldTrv)[0])
+            newCs.newTrove(newTrv.diff(oldTrv)[0])
 
         # we can't combine these (yet; we should work on that)
         assert(not changeSetJobs or not needsRooting)
