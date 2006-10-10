@@ -1224,7 +1224,7 @@ class MigrateTo_13(SchemaMigration):
             FROM FileStreams AS fs
             WHERE fs.fileId = ?
               AND fs.streamId != ?
-            """, (fileId, streamId))
+            """, (cu.binary(fileId), streamId))
             for (dupStreamId, dupStream) in cu2:
                 if file is None: # match None with None only
                     assert (dupStream is None)
