@@ -345,22 +345,23 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                                 (None, None), absolute))
 		continue
 
-            if (newVersion.getHost() not in self.serverNameList
-                or (oldVersion and oldVersion.getHost() not in self.serverNameList)):
-                # don't try to make changesets between repositories; the
-                # client can do that itself
-                externalTroveList.append((troveName, (oldVersion, oldFlavor),
-                                     (newVersion, newFlavor), absolute))
-                continue
-
 	    (troveChgSet, filesNeeded, pkgsNeeded) = \
 				new.diff(old, absolute = absolute)
 
-	    if recurse:
-                for (pkgName, (old, oldFlavor), (new, newFlavor),
-                                isAbsolute) in pkgsNeeded:
-		    troveWrapper.append((pkgName, (old, oldFlavor),
-					       (new, newFlavor), absolute))
+            if recurse:
+                for refJob in pkgsNeeded:
+                    refOldVersion = refJob[1][0]
+                    refNewVersion = refJob[2][0]
+                    if (refNewVersion and
+                           (refNewVersion.getHost() not in self.serverNameList)
+                        or (refOldVersion and 
+                            refOldVersion.getHost() not in self.serverNameList)
+                       ):
+                        # don't try to make changesets between repositories; the
+                        # client can do that itself
+                        externalTroveList.append(refJob)
+                    else:
+                        troveWrapper.append(refJob)
 
 	    cs.newTrove(troveChgSet)
 

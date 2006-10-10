@@ -642,13 +642,8 @@ class TroveStore:
                                 I.versionId = Versions.versionId AND
                                 I.flavorId = flavors.flavorId AND
                                 I.itemId = Nodes.itemId AND
-                                I.versionId = Nodes.versionId 
-                                /*I.isPresent=1 - FIXME: broken code on the
-                                  client createChangeset side falls into an
-                                  infinite loop when this check is added.
-                                  When that code is fixed we should add back
-                                  this check.
-                                */
+                                I.versionId = Nodes.versionId AND
+                                I.isPresent = 1
                             ORDER BY
                                 gtl.idx""" % self.db.keywords)
 
