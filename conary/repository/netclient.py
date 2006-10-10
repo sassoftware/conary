@@ -1063,7 +1063,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start += size
 
             assert(totalSize == 0)
-            return cs, extraTroveList, extraFileList
+            return (cs, _cvtTroveList(extraTroveList),
+                    _cvtFileList(extraFileList))
 
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,
