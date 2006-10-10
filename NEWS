@@ -6,6 +6,8 @@ Changes in @NEW@:
       full version specified without an installLabelPath set. (CNY-281)
     * The "conary rm" command has been added as an alias for the
       "conary remove" command. (CNY-952)
+    * Conary now produces an error message when an invalid context is
+      specified. (CNY-890)
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component

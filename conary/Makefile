@@ -23,6 +23,7 @@ python_files = __init__.py	\
 	changelog.py		\
 	checkin.py		\
 	clone.py		\
+	command.py		\
 	commit.py		\
 	conarycfg.py		\
 	constants.py		\

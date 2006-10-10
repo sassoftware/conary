@@ -41,7 +41,7 @@ import errno
 
 #conary
 import conary
-from conary import callbacks, commit, conarycfg, constants
+from conary import callbacks, command, commit, conarycfg, constants
 from conary import cscmd, deps, flavorcfg, query, repository
 from conary import queryrep, conaryclient, rollbacks, showchangeset, state
 from conary import trove, updatecmd, verify, versions
@@ -89,8 +89,7 @@ _commands = []
 def _register(cmd):
     _commands.append(cmd)
 
-class ConaryCommand(options.AbstractCommand):
-
+class ConaryCommand(command.ConaryCommand):
     paramHelp = ''
     defaultGroup = 'Common Options'
 
@@ -144,31 +143,6 @@ class ConaryCommand(options.AbstractCommand):
         cfgMap['flavors'] = 'fullFlavors', NO_PARAM,
         cfgMap['components'] = 'showComponents', NO_PARAM
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
-
-    def setContext(self, cfg, argSet):
-        context = cfg.context
-        if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
-            if conaryState.hasContext():
-                context = conaryState.getContext()
-
-        context = os.environ.get('CONARY_CONTEXT', context)
-        context = argSet.pop('context', context)
-
-        if context:
-            cfg.setContext(context)
-
-    def processConfigOptions(self, cfg, cfgMap, argSet):
-        self.setContext(cfg, argSet)
-        options.AbstractCommand.processConfigOptions(self, cfg, cfgMap, argSet)
-
-        l = []
-        for labelStr in argSet.get('install-label', []):
-            l.append(versions.Label(labelStr))
-        if l:
-            cfg.installLabelPath = l
-            del argSet['install-label']
-
 
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]

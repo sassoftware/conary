@@ -23,6 +23,7 @@ import sys
 
 from conary import branch
 from conary import checkin
+from conary import command
 from conary import conarycfg
 from conary import conaryclient
 from conary import constants
@@ -80,7 +81,7 @@ def _register(cmd):
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
 
-class CvcCommand(options.AbstractCommand):
+class CvcCommand(command.ConaryCommand):
 
     docs = {'build-label'        : ('Use build label LABEL as default search'
                                     ' loc', 'LABEL'),
@@ -120,37 +121,6 @@ class CvcCommand(options.AbstractCommand):
         cfgMap["root"]          = "root", ONE_PARAM, '-r'
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
-
-    def setContext(self, cfg, argSet):
-        context = cfg.context
-        if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
-            if conaryState.hasContext():
-                context = conaryState.getContext()
-
-        context = os.environ.get('CONARY_CONTEXT', context)
-        context = argSet.pop('context', context)
-
-        if context:
-            cfg.setContext(context)
-
-    def processConfigOptions(self, cfg, cfgMap, argSet):
-        self.setContext(cfg, argSet)
-
-        options.AbstractCommand.processConfigOptions(self, cfg, cfgMap, argSet)
-        l = []
-        for labelStr in argSet.get('install-label', []):
-            l.append(versions.Label(labelStr))
-        if l:
-            cfg.installLabelPath = l
-            del argSet['install-label']
-
-        for k,v in cfg.environment.items():
-            if v == '':
-                cfg.environment.pop(k)
-                os.environ.pop(k, None)
-                continue
-            os.environ[k] = v
 
 class AddCommand(CvcCommand):
     commands = ['add']
