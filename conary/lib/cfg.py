@@ -280,20 +280,28 @@ class ConfigFile(_Config):
         except EnvironmentError, err:
             raise CfgEnvironmentError(err.filename, err.strerror)
 
-    def read(self, path, exception=True):
+    def _openPath(self, path, exception=True):
         if os.path.exists(path):
             try:
-                f = open(path, "r")
+                return open(path, "r")
             except EnvironmentError, err:
                 if exception:
                     raise CfgEnvironmentError(err.strerror, err.filename)
                 else:
                     return
-            self.readObject(path, f)
         elif exception:
             raise CfgEnvironmentError(
                           "No such file or directory: '%s'" % path, 
                           path)
+
+
+    def read(self, path, exception=True):
+        f = self._openPath(path, exception=exception)
+        if f: self.readObject(path, f)
+
+    def readUrl(self, url):
+        f = self._openUrl(url)
+        self.readObject(url, f)
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
         origLine = line
@@ -335,17 +343,23 @@ class ConfigFile(_Config):
                                                             % (fileName,
                                                                lineno, msg, key)
 
-    def includeConfigFile(self, val, fileName = "override", lineno = '<No line>'):
-        if val.startswith("http://") or val.startswith("https://"):
-            try:
-                f = urllib2.urlopen(val)
-            except urllib2.HTTPError, err:
-                raise CfgEnvironmentError(err.filename, err.msg)
-            except urllib2.URLError, err:
-                raise CfgEnvironmentError(val, err.reason.args[1])
-            except EnvironmentError, err:
-                raise CfgEnvironmentError(err.filename, err.msg)
-            self.readObject(val, f)
+    def _openUrl(self, url):
+        try:
+            return urllib2.urlopen(val)
+        except urllib2.HTTPError, err:
+            raise CfgEnvironmentError(err.filename, err.msg)
+        except urllib2.URLError, err:
+            raise CfgEnvironmentError(val, err.reason.args[1])
+        except EnvironmentError, err:
+            raise CfgEnvironmentError(err.filename, err.msg)
+
+    def isUrl(self, val):
+        return val.startswith("http://") or val.startswith("https://")
+
+    def includeConfigFile(self, val, fileName = "override",
+                          lineno = '<No line>'):
+        if self.isUrl(val):
+            self.readUrl(val)
         else:
             for cfgfile in util.braceGlob(val):
                 self.read(cfgfile)
@@ -368,6 +382,8 @@ class ConfigSection(ConfigFile):
     def getDisplayOption(self, key):
         return self._parent.getDisplayOption(key)
 
+    def includeConfigFile(self, val):
+        return self._parent.includeConfigFile(val)
 
 class SectionedConfigFile(ConfigFile):
     """ 
@@ -448,14 +464,30 @@ class SectionedConfigFile(ConfigFile):
                 out.write("\n\n[%s]\n" % sectionName)
                 self._sections[sectionName]._write(out, options, includeDocs)
 
+    def includeConfigFile(self, val, fileName = "override",
+                          lineno = '<No line>'):
+        if self.isUrl(val):
+            self.readUrl(val, resetSection = False)
+        else:
+            for cfgfile in util.braceGlob(val):
+                self.read(cfgfile, resetSection = False)
+
     def read(self, *args, **kw):
         # when reading a new config file, reset the section.
         oldSection = self._sectionName
-        self._sectionName = None
+        if kw.pop('resetSection', True):
+            self._sectionName = None
         rv = ConfigFile.read(self, *args, **kw)
         self._sectionName = oldSection
         return rv
 
+    def readUrl(self, *args, **kw):
+        oldSection = self._sectionName
+        if kw.pop('resetSection', True):
+            self._sectionName = None
+        rv = ConfigFile.readUrl(self, *args, **kw)
+        self._sectionName = oldSection
+        return rv
 
 #----------------------------------------------------------
 
