@@ -35,6 +35,13 @@ Changes in @NEW@:
       configuration value but are set explicitly by the user. (CNY-959)
     * includeConfigFile within a context will now include the file also
       within that context. (CNY-622)
+    * A memory leak in conary.lib.misc.depSplit() has been fixed.
+    * The client no longer loops forever trying to create cross-repository
+      relative changesets when the trove is missing from one of the
+      repositories. (CNY-948)
+    * Repositories no longer return empty troves when createChangeSet() is
+      called on troves which are referenced within the repository but present
+      on a remote repository (CNY-948)
 
 Changes in 1.0.33:
   o Client Changes:

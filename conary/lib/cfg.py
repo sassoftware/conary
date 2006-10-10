@@ -345,11 +345,11 @@ class ConfigFile(_Config):
 
     def _openUrl(self, url):
         try:
-            return urllib2.urlopen(val)
+            return urllib2.urlopen(url)
         except urllib2.HTTPError, err:
             raise CfgEnvironmentError(err.filename, err.msg)
         except urllib2.URLError, err:
-            raise CfgEnvironmentError(val, err.reason.args[1])
+            raise CfgEnvironmentError(url, err.reason.args[1])
         except EnvironmentError, err:
             raise CfgEnvironmentError(err.filename, err.msg)
 
