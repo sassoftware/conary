@@ -187,6 +187,7 @@ class Database(BaseDatabase):
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
     keywords = KeywordDict()
+    basic_transaction = "START TRANSACTION"
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -207,33 +208,38 @@ class Database(BaseDatabase):
         c = self.cursor()
         # get tables
         c.execute("""
-        select tablename as name
+        select tablename as name, schemaname as schema
         from pg_tables
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
+        and ( schemaname !~ '^pg_temp_' OR schemaname = (pg_catalog.current_schemas(true))[1])
         """)
-        for table, in c.fetchall():
-            self.tables[table] = Llist()
+        for table, schema in c.fetchall():
+            if schema.startswith("pg_temp"):
+                self.tempTables[table] = Llist()
+            else:
+                self.tables[table] = Llist()
         if not len(self.tables):
             return self.version
         # views
         c.execute("""
         select viewname as name
         from pg_views
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
         """)
         for name, in c.fetchall():
             self.views[name] = True
         # indexes
         c.execute("""
-        select indexname as name, tablename as table
+        select indexname as name, tablename as table, schemaname as schema
         from pg_indexes
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
+        and ( schemaname !~ '^pg_temp_' OR schemaname = (pg_catalog.current_schemas(true))[1])
         """)
-        for (name, table) in c.fetchall():
-            self.tables.setdefault(table, Llist()).append(name)
+        for (name, table, schema) in c.fetchall():
+            if schema.startswith("pg_temp"):
+                self.tempTables.setdefault(table, Llist()).append(name)
+            else:
+                self.tables.setdefault(table, Llist()).append(name)
         # sequences. I wish there was a better way...
         c.execute("""
         SELECT c.relname as name
@@ -252,6 +258,7 @@ class Database(BaseDatabase):
         WHERE t.tgrelid = c.oid AND c.relnamespace = n.oid
         AND NOT tgisconstraint
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+        AND ( n.nspname !~ '^pg_temp_' OR n.nspname = (pg_catalog.current_schemas(true))[1])
         """)
         for (name, table) in c.fetchall():
             self.triggers[name] = table
