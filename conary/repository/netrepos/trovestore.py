@@ -374,7 +374,7 @@ class TroveStore:
         # This two step should work on everything though --gafton
         for (fileId, stream) in cu.fetchall():
             cu.execute("UPDATE FileStreams SET stream = ? "
-                       "WHERE fileId = ?", (stream, fileId))
+                       "WHERE fileId = ?", (cu.binary(stream), cu.binary(fileId)))
 
         # select the new non-NULL streams out of NewFiles and Insert
         # them in FileStreams
