@@ -29,6 +29,17 @@ DEP_REASON_COLLECTION = 5
 NO_FLAG_MAGIC = '-*none*-'
 
 class DependencyWorkTables:
+    def __init__(self, cu, removeTables = False):
+        self.cu = cu
+
+        schema.resetTable(self.cu, "DepCheck")
+        schema.resetTable(self.cu, "RemovedTroveIds")
+        schema.resetTable(self.cu, "TmpDependencies")
+        schema.resetTable(self.cu, "TmpProvides")
+        schema.resetTable(self.cu, "TmpRequires")
+
+        if removeTables:
+            schema.resetTable(self.cu, "RemovedTroveIds")
 
     def _mergeTmpTable(self, tmpName, depTable, reqTable, provTable,
                        dependencyTables, multiplier = 1):
@@ -63,47 +74,40 @@ class DependencyWorkTables:
             substDict['depId'] = "COALESCE(%s)" % \
                 ",".join(["%s.depId" % x for x in dependencyTables])
 
-        selectClause = """\
-""" % substDict
         selectClause = ""
         for depTable in dependencyTables:
             d = { 'tmpName' : substDict['tmpName'],
                   'depTable' : depTable }
-            selectClause += """\
-                        LEFT OUTER JOIN %(depTable)s ON
-                            %(tmpName)s.class = %(depTable)s.class AND
-                            %(tmpName)s.name = %(depTable)s.name AND
-                            %(tmpName)s.flag = %(depTable)s.flag
-""" % d
+            selectClause += """
+            LEFT OUTER JOIN %(depTable)s ON
+                %(tmpName)s.class = %(depTable)s.class AND
+                %(tmpName)s.name = %(depTable)s.name AND
+                %(tmpName)s.flag = %(depTable)s.flag """ % d
 
-        repQuery = """\
-                INSERT INTO %(reqTable)s
-                    (instanceId, depId, depNum, depCount)
-                    SELECT %(tmpName)s.troveId,
-                           %(depId)s,
-                           %(baseReqNum)d + %(tmpName)s.depNum,
-                           %(tmpName)s.flagCount
-                        FROM %(tmpName)s
-""" % substDict
+        repQuery = """
+        INSERT INTO %(reqTable)s
+            (instanceId, depId, depNum, depCount)
+        SELECT %(tmpName)s.troveId,
+               %(depId)s,
+               %(baseReqNum)d + %(tmpName)s.depNum,
+               %(tmpName)s.flagCount
+        FROM %(tmpName)s """ % substDict
         repQuery += selectClause
-        repQuery += """\
-                        WHERE
-                            %(tmpName)s.isProvides = 0""" % substDict
+        repQuery += """
+        WHERE %(tmpName)s.isProvides = 0 """ % substDict
         self.cu.execute(repQuery, start_transaction = False)
 
         if provTable is None:
             return
 
-        repQuery = """\
-                INSERT INTO %(provTable)s
-                    SELECT %(tmpName)s.troveId,
-                           %(depId)s
-                        FROM %(tmpName)s
-""" % substDict
+        repQuery = """
+        INSERT INTO %(provTable)s
+        SELECT %(tmpName)s.troveId,
+               %(depId)s
+        FROM %(tmpName)s """ % substDict
         repQuery += selectClause
-        repQuery += """\
-                        WHERE
-                            %(tmpName)s.isProvides = 1""" % substDict
+        repQuery += """
+        WHERE %(tmpName)s.isProvides = 1 """ % substDict
         self.cu.execute(repQuery, start_transaction = False)
 
     def _populateTmpTable(self, depList, troveNum, requires,
@@ -118,10 +122,10 @@ class DependencyWorkTables:
                             sorted(provides.getDepClasses().iteritems()) ]
 
         populateStmt = self.cu.compile("""
-            INSERT INTO DepCheck
-            (troveId, depNum, flagCount, isProvides, class, name, flag)
-            VALUES(?, ?, ?, ?, ?, ?, ?)
-            """)
+        INSERT INTO DepCheck
+        (troveId, depNum, flagCount, isProvides, class, name, flag)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+        """)
 
         for (isProvides, (classId, depClass)) in allDeps:
             # getDeps() returns sorted deps
@@ -161,20 +165,19 @@ class DependencyWorkTables:
                                 multiplier = -1)
 
     def mergeRemoves(self):
-        self.cu.execute("""INSERT INTO RemovedTroveIds
-                           SELECT instanceId, nodeId FROM
-                               RemovedTroves
-                           INNER JOIN Versions ON
-                               RemovedTroves.version = Versions.version
-                           INNER JOIN Flavors ON
-                               RemovedTroves.flavor = Flavors.flavor OR
-                               (RemovedTroves.flavor is NULL AND
-                                Flavors.flavor is NULL)
-                           INNER JOIN Instances ON
-                               Instances.troveName = RemovedTroves.name AND
-                               Instances.versionId = Versions.versionId AND
-                               Instances.flavorId  = Flavors.flavorId""")
-
+        self.cu.execute("""
+        INSERT INTO RemovedTroveIds
+        SELECT instanceId, nodeId
+        FROM RemovedTroves
+        JOIN Versions ON RemovedTroves.version = Versions.version
+        JOIN Flavors ON
+            RemovedTroves.flavor = Flavors.flavor OR
+            (RemovedTroves.flavor is NULL AND Flavors.flavor is NULL)
+        JOIN Instances ON
+            Instances.troveName = RemovedTroves.name AND
+            Instances.versionId = Versions.versionId AND
+            Instances.flavorId  = Flavors.flavorId
+        """)
         schema.resetTable(self.cu, "RemovedTroves")
 
         # Check the dependencies for anything which depends on things which
@@ -183,31 +186,26 @@ class DependencyWorkTables:
         # a positive depNum which mathes the depNum from the Requires table.
         self.cu.execute("DELETE FROM TmpRequires WHERE depNum > 0")
         self.cu.execute("""
-                INSERT INTO TmpRequires SELECT
-                    DISTINCT Requires.instanceId, Requires.depId,
-                             Requires.depNum, Requires.depCount
-                FROM
-                    RemovedTroveIds
-                INNER JOIN Provides ON
-                    RemovedTroveIds.troveId = Provides.instanceId
-                INNER JOIN Requires ON
-                    Provides.depId = Requires.depId
+        INSERT INTO TmpRequires
+        SELECT DISTINCT
+            Requires.instanceId, Requires.depId,
+            Requires.depNum, Requires.depCount
+        FROM RemovedTroveIds
+        JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
+        JOIN Requires ON Provides.depId = Requires.depId
         """)
 
         self.cu.execute("DELETE FROM DepCheck WHERE depNum > 0")
         self.cu.execute("""
-                INSERT INTO DepCheck SELECT
-                    Requires.instanceId, Requires.depNum,
-                    Requires.DepCount, 0, Dependencies.class,
-                    Dependencies.name, Dependencies.flag
-                FROM
-                    RemovedTroveIds
-                INNER JOIN Provides ON
-                    RemovedTroveIds.troveId = Provides.instanceId
-                INNER JOIN Requires ON
-                    Provides.depId = Requires.depId
-                INNER JOIN Dependencies ON
-                    Dependencies.depId = Requires.depId
+        INSERT INTO DepCheck
+        SELECT
+            Requires.instanceId, Requires.depNum,
+            Requires.DepCount, 0, Dependencies.class,
+            Dependencies.name, Dependencies.flag
+        FROM RemovedTroveIds
+        JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
+        JOIN Requires ON Provides.depId = Requires.depId
+        JOIN Dependencies ON Dependencies.depId = Requires.depId
         """)
 
     def removeTrove(self, (name, version, flavor), nodeId):
@@ -218,18 +216,6 @@ class DependencyWorkTables:
 
         self.cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
                         (name, version.asString(), flavor, nodeId))
-
-    def __init__(self, cu, removeTables = False):
-        self.cu = cu
-
-        schema.resetTable(self.cu, "DepCheck")
-        schema.resetTable(self.cu, "RemovedTroveIds")
-        schema.resetTable(self.cu, "TmpDependencies")
-        schema.resetTable(self.cu, "TmpProvides")
-        schema.resetTable(self.cu, "TmpRequires")
-
-        if removeTables:
-            schema.resetTable(self.cu, "RemovedTroveIds")
 
 class DependencyChecker:
 
@@ -286,7 +272,7 @@ class DependencyChecker:
                 self.g.addEdge(leafId, finalId, (DEP_REASON_FORCED_LAST, None))
 
         for leafId in self.g.getDisconnected():
-            # if nothing depends on a node and the node 
+            # if nothing depends on a node and the node
             # depends on nothing, tie the node to its
             # parent.  This will create a cycle and ensure that
             # they get installed together.
@@ -312,7 +298,7 @@ class DependencyChecker:
         for (reqNodeId, provNodeId, depId) in collectionEdges:
             self.g.addEdge(provNodeId, reqNodeId, (DEP_REASON_COLLECTION, None))
 
-    def _collapseEdges(self, oldOldEdges, oldNewEdges, newOldEdges, 
+    def _collapseEdges(self, oldOldEdges, oldNewEdges, newOldEdges,
                        newNewEdges):
         # these edges cancel each other out -- for example, if Foo
         # requires both the old and new versions of Bar the order between
@@ -322,7 +308,7 @@ class DependencyChecker:
 
     def _createCollectionEdges(self):
         edges = set()
-        
+
         nodes = iter(self.nodes)
         nodes.next()
 
@@ -409,12 +395,12 @@ class DependencyChecker:
 
         return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
 
-    def _gatherDependencyErrors(self, satisfied, brokenByErase, unresolveable, 
+    def _gatherDependencyErrors(self, satisfied, brokenByErase, unresolveable,
                                 wasIn):
 
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
-            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None) 
+            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None)
                     for x in self.iterNodes() ]
             ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
 
@@ -457,19 +443,16 @@ class DependencyChecker:
                            start_transaction = False)
 
             cu.execute("""
-                    SELECT DISTINCT troveName, version, flavor, class,
-                                    name, flag, BrokenDeps.depNum FROM
-                        BrokenDeps INNER JOIN Requires ON
-                            BrokenDeps.depNum = Requires.DepNum
-                        JOIN Dependencies ON
-                            Requires.depId = Dependencies.depId
-                        JOIN Instances ON
-                            Requires.instanceId = Instances.instanceId
-                        JOIN Versions ON
-                            Instances.versionId = Versions.versionId
-                        JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                """, start_transaction = False)
+            SELECT DISTINCT
+                troveName, version, flavor, class,
+                name, flag, BrokenDeps.depNum
+            FROM BrokenDeps
+            JOIN Requires ON BrokenDeps.depNum = Requires.DepNum
+            JOIN Dependencies ON Requires.depId = Dependencies.depId
+            JOIN Instances ON Requires.instanceId = Instances.instanceId
+            JOIN Versions ON Instances.versionId = Versions.versionId
+            JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+            """, start_transaction = False)
 
             failedSets = {}
             for (troveName, troveVersion, troveFlavor, depClass, depName,
@@ -498,14 +481,12 @@ class DependencyChecker:
                 for instanceId in provideList:
                     assert(instanceId > 0)
                 cu.execute("""
-                        SELECT DISTINCT troveName, version, flavor FROM
-                            Instances JOIN Versions ON
-                                Instances.versionId = Versions.versionId
-                            JOIN Flavors ON
-                                Instances.flavorId = Flavors.flavorId
-                            WHERE
-                                instanceId IN (%s)""" %
-                        ",".join(["%d" % x for x in provideList]))
+                SELECT DISTINCT troveName, version, flavor
+                FROM Instances
+                JOIN Versions ON Instances.versionId = Versions.versionId
+                JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+                WHERE instanceId IN (%s)""" %
+                           ",".join(["%d" % x for x in provideList]))
 
                 del provideList[:]
                 for name, version, flavor in cu:
@@ -593,9 +574,9 @@ class DependencyChecker:
             substTable = { 'requires' : requiresTable,
                            'deptable' : depTable }
 
-            depTableClause += """\
-                 LEFT OUTER JOIN %(deptable)s ON
-                      %(requires)s.depId = %(deptable)s.depId\n""" % substTable
+            depTableClause += """
+            LEFT OUTER JOIN %(deptable)s ON
+                %(requires)s.depId = %(deptable)s.depId """ % substTable
 
         for provTable in providesTableList:
             substTable = { 'provides' : provTable,
@@ -612,28 +593,26 @@ class DependencyChecker:
                 substTable[name] = s
 
             if subselect:
-                subselect += """\
-                     UNION ALL\n"""
+                subselect += """ UNION ALL """
 
-            subselect += """\
-                       SELECT %(requires)s.depId      AS reqDepId,
-                              %(requires)s.instanceId AS reqInstId,
-                              %(provides)s.depId      AS provDepId,
-                              %(provides)s.instanceId AS provInstId,
-                              %(class)s AS class,
-                              %(name)s AS name,
-                              %(flag)s AS flag
-                         FROM %(requires)s INNER JOIN %(provides)s ON
-                              %(requires)s.depId = %(provides)s.depId
-""" % substTable
+            subselect += """
+            SELECT %(requires)s.depId      AS reqDepId,
+                %(requires)s.instanceId AS reqInstId,
+                %(provides)s.depId      AS provDepId,
+                %(provides)s.instanceId AS provInstId,
+                %(class)s AS class,
+                %(name)s AS name,
+                %(flag)s AS flag
+            FROM %(requires)s
+            JOIN %(provides)s ON
+                %(requires)s.depId = %(provides)s.depId
+            """ % substTable
 
             if restrictor:
                 joinRestrict, whereRestrict = restrictor(restrictBy)
                 subselect += joinRestrict % substTable
 
-
-            subselect += """\
-%(depClause)s""" % substTable
+            subselect += """ %(depClause)s """ % substTable
 
             if restrictor:
                 subselect += whereRestrict % substTable
@@ -643,25 +622,23 @@ class DependencyChecker:
         # use aggregate functions on the others or rewrite with an
         # extra join
         return """
-                SELECT Matched.reqDepId as depId,
-                       depCheck.depNum as depNum,
-                       Matched.reqInstId as reqInstanceId,
-                       Matched.provInstId as provInstanceId,
-                       DepCheck.flagCount as flagCount
-                    FROM ( %s ) AS Matched
-                    INNER JOIN DepCheck ON
-                        Matched.reqInstId = DepCheck.troveId AND
-                        Matched.class = DepCheck.class AND
-                        Matched.name = DepCheck.name AND
-                        Matched.flag = DepCheck.flag
-                    WHERE
-                        DepCheck.isProvides = 0
-                    GROUP BY
-                        DepCheck.depNum,
-                        Matched.provInstId
-                    HAVING
-                        COUNT(DepCheck.troveId) = DepCheck.flagCount
-                """ % subselect
+        SELECT Matched.reqDepId as depId,
+            depCheck.depNum as depNum,
+            Matched.reqInstId as reqInstanceId,
+            Matched.provInstId as provInstanceId,
+            DepCheck.flagCount as flagCount
+        FROM ( %s ) AS Matched
+        JOIN DepCheck ON
+            Matched.reqInstId = DepCheck.troveId AND
+            Matched.class = DepCheck.class AND
+            Matched.name = DepCheck.name AND
+            Matched.flag = DepCheck.flag
+        WHERE DepCheck.isProvides = 0
+        GROUP BY
+            DepCheck.depNum,
+            Matched.provInstId
+        HAVING COUNT(DepCheck.troveId) = DepCheck.flagCount
+        """ % subselect
 
     def _getCriticalJobSets(self, jobSetList, criticalJobs):
 
@@ -706,11 +683,11 @@ class DependencyChecker:
 
             # convert back to lists for equality checks elsewhere.
             criticalJobsSets.append([ list(x) for x in criticalJobSet])
-        
+
         return criticalJobsSets
 
     def _orderJobSets(self, jobSets, criticalJobSetsList):
-        # sort jobSets so that critical jobs are first, then 
+        # sort jobSets so that critical jobs are first, then
         # info packages, then packages/groups, then sort alphabetically.
         # This ordering will determine how the jobs are ordered when there's
         # no dependency reason to order them a particular way.
@@ -759,7 +736,7 @@ class DependencyChecker:
         jobSets = [ sorted((self.nodes[nodeIdx][0], nodeIdx)
                            for nodeIdx in idxSet) for idxSet in compSets ]
 
-        # criticalJobSetsList will contain both the jobs and everything that 
+        # criticalJobSetsList will contain both the jobs and everything that
         # needs to be updated with them to keep consistent ordering -
         # it is a orderd list of list of jobSets.
         criticalJobSetsList = self._getCriticalJobSets(jobSets, criticalJobs)
@@ -782,8 +759,8 @@ class DependencyChecker:
         # create an ordering based on dependencies, and then, when forced
         # to choose between several choices, use the index order for jobSets
         # - that's the order we created by calling _orderJobSets above.
-        
-        # for debugging, remember, child nodes are ordered _after_ their 
+
+        # for debugging, remember, child nodes are ordered _after_ their
         # parents, so expect groups to be leaf nodes.
         orderedComponents = sccGraph.getTotalOrdering(
                                     nodeSort=lambda a, b: cmp(a[1],  b[1]))
@@ -804,7 +781,7 @@ class DependencyChecker:
         return (orderedComponents, criticalUpdates)
 
     def _createDepGraph(self, result, brokenByErase, satisfied,
-                        linkedJobSets, criticalJobs, finalJobs, 
+                        linkedJobSets, criticalJobs, finalJobs,
                         createCollectionEdges=False):
         # there are four kinds of edges -- old needs old, old needs new,
         # new needs new, and new needs old. Each edge carries a depId
@@ -869,10 +846,10 @@ class DependencyChecker:
         # a bit different, and defines the ordering for the operation, not
         # the order of the dependency
 
-        # for debugging, remember, child nodes are ordered _after_ their 
+        # for debugging, remember, child nodes are ordered _after_ their
         # parents, so expect groups to be leaf nodes in the graph
         self._buildEdges(oldOldEdges, newNewEdges,
-                         collectionEdges, linkedNodeLists, finalNodes, 
+                         collectionEdges, linkedNodeLists, finalNodes,
                          criticalJobs)
         del oldOldEdges
         del newNewEdges
@@ -916,7 +893,7 @@ class DependencyChecker:
         for job in jobSet:
             if job[2][0] is None:
                 nodeId = self._addJob(job)
-                self.workTables.removeTrove((job[0], job[1][0], job[1][1]), 
+                self.workTables.removeTrove((job[0], job[1][0], job[1][1]),
                                             nodeId)
             else:
                 (provides, requires) = self.troveSource.getDepsForTroveList(
@@ -956,17 +933,16 @@ class DependencyChecker:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         stmt = """
-                SELECT depId, depNum, reqInstanceId, Required.nodeId,
-                       provInstanceId, Provided.nodeId
-                    FROM
-                        (%s) AS Resolved
-                    LEFT OUTER JOIN RemovedTroveIds AS Required ON
-                        reqInstanceId = Required.troveId
-                    LEFT OUTER JOIN RemovedTroveIds AS Provided ON
-                        provInstanceId = Provided.troveId
-                """ % self._resolveStmt("TmpRequires",
-                                        ("Provides", "TmpProvides"),
-                                        ("Dependencies", "TmpDependencies"))
+        SELECT depId, depNum, reqInstanceId, Required.nodeId,
+        provInstanceId, Provided.nodeId
+        FROM (%s) AS Resolved
+        LEFT OUTER JOIN RemovedTroveIds AS Required ON
+            reqInstanceId = Required.troveId
+        LEFT OUTER JOIN RemovedTroveIds AS Provided ON
+            provInstanceId = Provided.troveId
+        """ % self._resolveStmt("TmpRequires",
+                                ("Provides", "TmpProvides"),
+                                ("Dependencies", "TmpDependencies"))
         self.cu.execute(stmt)
 
         # it's a shame we instantiate this, but merging _gatherResoltion
@@ -1012,7 +988,7 @@ class DependencyChecker:
                                                 unresolveable,
                                                 wasIn)
 
-        return (unsatisfiedList, unresolveableList, changeSetList, depGraph, 
+        return (unsatisfiedList, unresolveableList, changeSetList, depGraph,
                 criticalUpdates)
 
     def check(self, findOrdering = False, linkedJobs = None,
@@ -1035,7 +1011,7 @@ class DependencyChecker:
             job = self.nodes[nodeId][0]
             externalDepGraph.addNode(job)
         for fromNode, toNode in depGraph.iterEdges():
-            externalDepGraph.addEdge(self.nodes[fromNode][0], 
+            externalDepGraph.addEdge(self.nodes[fromNode][0],
                                      self.nodes[toNode][0])
 
         return unsatisfiedList, unresolveableList, externalDepGraph
@@ -1125,11 +1101,11 @@ class DependencyTables:
                    "FROM suspectDepsOrig")
 
         cu.execute("""
-                DELETE FROM Dependencies WHERE depId IN
-                (SELECT suspectDeps.depId FROM suspectDeps WHERE depId NOT IN
-                    (SELECT distinct depId AS depId1 FROM Requires UNION
-                     SELECT distinct depId AS depId1 FROM Provides))
-                 """)
+        DELETE FROM Dependencies WHERE depId IN
+            (SELECT suspectDeps.depId FROM suspectDeps WHERE depId NOT IN
+                (SELECT distinct depId AS depId1 FROM Requires UNION
+                 SELECT distinct depId AS depId1 FROM Provides))
+        """)
 
     def _restrictResolveByLabel(self, label):
         """ Restrict resolution by label
@@ -1142,22 +1118,17 @@ class DependencyTables:
             return "", ""
 
 
-        restrictJoin = """\
-                           INNER JOIN Instances ON
-                              %(provides)s.instanceId = Instances.instanceId
-                           INNER JOIN Nodes ON
-                              Instances.itemId = Nodes.itemId AND
-                              Instances.versionId = Nodes.versionId
-                           INNER JOIN LabelMap ON
-                              LabelMap.itemId = Nodes.itemId AND
-                              LabelMap.branchId = Nodes.branchId
-                           INNER JOIN Labels ON
-                              Labels.labelId = LabelMap.labelId
-"""
-        restrictWhere = """\
-                            WHERE
-                              Labels.label = '%s'
-""" % label
+        restrictJoin = """
+        JOIN Instances ON %(provides)s.instanceId = Instances.instanceId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+            LabelMap.itemId = Nodes.itemId AND
+            LabelMap.branchId = Nodes.branchId
+        JOIN Labels ON Labels.labelId = LabelMap.labelId """
+        # FIXME: avoid sprintf() here
+        restrictWhere = """ WHERE Labels.label = '%s' """ % label
 
         return restrictJoin, restrictWhere
 
@@ -1167,8 +1138,9 @@ class DependencyTables:
         """
         # LEFT join in case the instanceId we're given is not included in any
         # troves on this host and we wish to match it.
-        restrictJoin = """JOIN tmpInstances
-                            ON (%(provides)s.instanceId = tmpInstances.instanceId)"""
+        restrictJoin = """
+        JOIN tmpInstances ON
+            (%(provides)s.instanceId = tmpInstances.instanceId)"""
         return restrictJoin, ''
 
     def _resolve(self, depSetList, selectTemplate, restrictor=None,
@@ -1207,52 +1179,49 @@ class DependencyTables:
         # dep set list must be unique and indexable.
         depSetList = list(set(depSetList))
 
-        selectTemplate = """SELECT depNum, Items.item, Versions.version,
-                             Nodes.timeStamps, flavor FROM
-                            (%s) as DepsSelect
-                          INNER JOIN Instances ON
-                            provInstanceId = Instances.instanceId
-                          INNER JOIN Items ON
-                            Instances.itemId = Items.itemId
-                          INNER JOIN Versions ON
-                            Instances.versionId = Versions.versionId
-                          INNER JOIN Flavors ON
-                            Instances.flavorId = Flavors.flavorId
-                          INNER JOIN Nodes ON
-                            Instances.itemId = Nodes.itemId AND
-                            Instances.versionId = Nodes.versionId
-                          ORDER BY
-                            Nodes.finalTimestamp DESC
-                        """
+        selectTemplate = """
+        SELECT
+            depNum, Items.item, Versions.version,
+            Nodes.timeStamps, Flavors.flavor
+        FROM (%s) as DepsSelect
+        JOIN Instances ON DepsSelect.provInstanceId = Instances.instanceId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+        ORDER BY
+            Nodes.finalTimestamp DESC
+        """
         if troveList:
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
             schema.resetTable(cu, "tmpInstances2")
             instanceIds = []
-            cu.executemany('''
-                    INSERT INTO tmpInstances SELECT instanceId FROM Instances
-                        WHERE itemId=(SELECT itemId FROM Items
-                                        WHERE item=?)
-                          AND versionId=(SELECT versionId FROM Versions
-                                         WHERE version=?)
-                          AND flavorId=(SELECT flavorId FROM Flavors
-                                         WHERE flavor=?)
-                    ''', ( (n, v.asString(), f.freeze()) for (n, v, f)
-                           in troveList), start_transaction = False )
+            cu.executemany("""
+            INSERT INTO tmpInstances
+            SELECT instanceId
+            FROM Instances
+            JOIN Items ON Instances.itemId = Items.itemId
+            JOIN Versions ON Instances.versionId = Versions.versionId
+            JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+            WHERE Items.item = ? AND Versions.version = ? AND Flavors.flavor = ?
+            """, ( (n, v.asString(), f.freeze()) for (n, v, f) in troveList),
+                           start_transaction = False )
             instanceIds = [ x[0] for x in
                             cu.execute("SELECT instanceId FROM tmpInstances") ]
 
-            cu.execute('''INSERT INTO tmpInstances2 
-                                   SELECT DISTINCT includedId 
-                                   FROM TroveTroves
-                                   LEFT JOIN tmpInstances ON
-                                     includedId = tmpInstances.instanceId
-                                   WHERE
-                                     tmpInstances.instanceId IS NULL
-                       ''', start_transaction=False)
-            cu.execute('''INSERT INTO tmpInstances 
-                          SELECT instanceId FROM tmpInstances2''',
-                          start_transaction=False)
+            cu.execute("""
+            INSERT INTO tmpInstances2
+            SELECT DISTINCT includedId
+            FROM TroveTroves
+            LEFT JOIN tmpInstances ON includedId = tmpInstances.instanceId
+            WHERE tmpInstances.instanceId IS NULL
+            """, start_transaction=False)
+            cu.execute("INSERT INTO tmpInstances "
+                       "SELECT instanceId FROM tmpInstances2",
+                       start_transaction=False)
 
             restrictBy = None
             restrictor = self._restrictResolveByTrove
@@ -1275,11 +1244,11 @@ class DependencyTables:
 
         result = {}
         for depId, troveSet in enumerate(depSolutions):
-            # we are adding elements in the order of depIds, which 
+            # we are adding elements in the order of depIds, which
             # are ordered by dependency.  Thus, we should be guaranteed
             # that the return order of deps in a dependency set is consistent.
             # Note that some lists may be empty, they are still needed
-            # so that the slot in which the results for a dep is returned 
+            # so that the slot in which the results for a dep is returned
             # is not dependendent on the current contents of a repository.
             if not depId:
                 continue
@@ -1297,7 +1266,7 @@ class DependencyTables:
         # dep set list must be unique and indexable.
         depSetList = list(set(depSetList))
 
-        selectTemplate = """SELECT depNum, provInstanceId FROM (%s)"""
+        selectTemplate = "SELECT depNum, provInstanceId FROM (%s)"
         depList, cu = self._resolve(depSetList, selectTemplate)
 
         result = {}
@@ -1335,18 +1304,15 @@ class DependencyTables:
 
         workTables.merge(skipProvides = True)
 
-        full = """SELECT depNum, troveName, Versions.version,
-                         timeStamps, Flavors.flavor FROM
-                        (%s) as Resolved
-                      INNER JOIN Instances ON
-                        provInstanceId = Instances.instanceId
-                      INNER JOIN Versions USING(versionId)
-                      INNER JOIN Flavors
-                            ON (Instances.flavorId = Flavors.flavorId)
-                    """ % DependencyChecker._resolveStmt( "TmpRequires",
-                                ("Provides",), ("Dependencies",))
+        full = """
+        SELECT depNum, troveName, Versions.version, timeStamps, Flavors.flavor
+        FROM (%s) as Resolved
+        JOIN Instances ON provInstanceId = Instances.instanceId
+        JOIN Versions USING(versionId)
+        JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+        """ % DependencyChecker._resolveStmt("TmpRequires", ("Provides",), ("Dependencies",))
 
-        cu.execute(full,start_transaction = False)
+        cu.execute(full, start_transaction = False)
 
         depSolutions = [ [] for x in xrange(len(depList)) ]
 
