@@ -63,7 +63,9 @@ from conary.repository import filecontents
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 SUBFILE_MAGIC = 0x3FBB
 FILE_CONTAINER_VERSION = 2005101901
-READABLE_VERSIONS = [ FILE_CONTAINER_VERSION ]
+FILE_CONTAINER_VERSION_WITH_REMOVES = 2006071301
+READABLE_VERSIONS = [ FILE_CONTAINER_VERSION,
+                      FILE_CONTAINER_VERSION_WITH_REMOVES ]
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -80,10 +82,10 @@ class FileContainer:
 	version = self.file.read(4)
 	if len(version) != 4:
 	    raise BadContainer, "invalid container version"
-	version = struct.unpack("!I", version)[0]
-	if version not in READABLE_VERSIONS:
-	    raise BadContainer, "unsupported file container version %d" % \
-			version
+        self.version = struct.unpack("!I", version)[0]
+        if self.version not in READABLE_VERSIONS:
+            raise BadContainer, "unsupported file container version %d" % \
+                        self.version
 
 	self.contentsStart = self.file.tell()
 	self.next = self.contentsStart
@@ -174,7 +176,7 @@ class FileContainer:
 	if self.file:
 	    self.close()
 
-    def __init__(self, file):
+    def __init__(self, file, withRemoves = False):
         """
         Create a FileContainer object.
         
@@ -183,7 +185,12 @@ class FileContainer:
         file container is immediately initialized. A copy of the file
         is retained, so the caller may optionally close it.
         """
-        
+
+        if withRemoves:
+            version = FILE_CONTAINER_VERSION_WITH_REMOVES
+        else:
+            version = FILE_CONTAINER_VERSION
+
 	# make our own copy of this file which nobody can close underneath us
 	self.file = file
 
@@ -192,7 +199,7 @@ class FileContainer:
 	    self.file.seek(SEEK_SET, 0)
 	    self.file.truncate()
 	    self.file.write(FILE_CONTAINER_MAGIC)
-	    self.file.write(struct.pack("!I", FILE_CONTAINER_VERSION))
+	    self.file.write(struct.pack("!I", version))
 
 	    self.mutable = True
 	else:
