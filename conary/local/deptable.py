@@ -622,7 +622,7 @@ class DependencyChecker:
         # use aggregate functions on the others or rewrite with an
         # extra join
         return """
-        SELECT Matched.reqDepId as depId,
+        SELECT MAX(Matched.reqDepId) as depId,
             depCheck.depNum as depNum,
             Matched.reqInstId as reqInstanceId,
             Matched.provInstId as provInstanceId,
@@ -636,7 +636,9 @@ class DependencyChecker:
         WHERE DepCheck.isProvides = 0
         GROUP BY
             DepCheck.depNum,
-            Matched.provInstId
+            Matched.provInstId,
+            Matched.reqInstId,
+            DepCheck.flagCount
         HAVING COUNT(DepCheck.troveId) = DepCheck.flagCount
         """ % subselect
 
