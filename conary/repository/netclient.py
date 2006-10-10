@@ -864,6 +864,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     else:
                         workingJob.append(job)
 
+                if not brokenJob:
+                    # we can't figure out what exactly is broken -
+                    # it's included implicitly due to recurse.
+                    raise
+
                 allJobs.append( (brokenJob, True) )
                 allJobs.append( (workingJob, False) )
 
@@ -1159,9 +1164,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             allTrovesNeeded = []
             for (troveName, (oldVersion, oldFlavor),
                             (newVersion, newFlavor), absolute) in ourJobList:
-                # old version and new version are both set, otherwise
-                # we wouldn't need to generate the change set ourself
-                allTrovesNeeded.append((troveName, oldVersion, oldFlavor))
+                if oldVersion is not None:
+                    allTrovesNeeded.append((troveName, oldVersion, oldFlavor))
                 allTrovesNeeded.append((troveName, newVersion, newFlavor))
 
             troves = _getLocalTroves(allTrovesNeeded)
@@ -1182,9 +1186,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             i = 0
             for (troveName, (oldVersion, oldFlavor),
                             (newVersion, newFlavor), absolute) in ourJobList:
-                old = troves[i]
-                new = troves[i + 1]
-                i += 2
+                if oldVersion is not None:
+                    old = troves[i]
+                    i += 1
+                else:
+                    old = None
+
+                new = troves[i]
+                i += 1
 
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
