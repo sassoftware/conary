@@ -1236,7 +1236,6 @@ class DependencyTables:
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
             schema.resetTable(cu, "tmpInstances2")
-            instanceIds = []
             cu.executemany("""
             INSERT INTO tmpInstances
                 SELECT instanceId
