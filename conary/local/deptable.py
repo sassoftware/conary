@@ -1230,35 +1230,36 @@ class DependencyTables:
                             Nodes.finalTimestamp DESC
                         """
         if troveList:
+            # we need to extract the instanceids for the troves we
+            # were passed in, plus the instanceIds of their included
+            # troves
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
             schema.resetTable(cu, "tmpInstances2")
             instanceIds = []
-            cu.executemany('''
-                    INSERT INTO tmpInstances SELECT instanceId FROM Instances
-                        WHERE itemId=(SELECT itemId FROM Items
-                                        WHERE item=?)
-                          AND versionId=(SELECT versionId FROM Versions
-                                         WHERE version=?)
-                          AND flavorId=(SELECT flavorId FROM Flavors
-                                         WHERE flavor=?)
-                    ''', ( (n, v.asString(), f.freeze()) for (n, v, f)
+            cu.executemany("""
+            INSERT INTO tmpInstances
+                SELECT instanceId
+            FROM Instances
+            JOIN Items ON Instances.itemId = Items.itemId
+            JOIN Versions ON Instances.versionId = Versions.versionId
+            JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+            WHERE Items.item = ? AND Versions.version = ? AND Flavors.flavor = ?
+            """, ( (n, v.asString(), f.freeze()) for (n, v, f)
                            in troveList), start_transaction = False )
-            instanceIds = [ x[0] for x in
-                            cu.execute("SELECT instanceId FROM tmpInstances") ]
-
-            cu.execute('''INSERT INTO tmpInstances2 
-                                   SELECT DISTINCT includedId 
-                                   FROM TroveTroves
-                                   LEFT JOIN tmpInstances ON
-                                     includedId = tmpInstances.instanceId
-                                   WHERE
-                                     tmpInstances.instanceId IS NULL
-                       ''', start_transaction=False)
-            cu.execute('''INSERT INTO tmpInstances 
-                          SELECT instanceId FROM tmpInstances2''',
-                          start_transaction=False)
-
+            # now grab the instanceIds of their included troves, avoiding duplicates
+            # and the instanceIds that already exist
+            cu.execute("""
+            INSERT INTO tmpInstances2
+                SELECT DISTINCT TT.includedId
+            FROM tmpInstances AS TI
+            JOIN TroveTroves AS TT USING(instanceId)
+            LEFT JOIN tmpInstances as haveTI ON
+                TT.includedId = haveTI.instanceId
+            WHERE haveTI.instanceId IS NULL
+            """, start_transaction=False)
+            cu.execute("INSERT INTO tmpInstances SELECT instanceId FROM tmpInstances2",
+                       start_transaction=False)
             restrictBy = None
             restrictor = self._restrictResolveByTrove
         else:
