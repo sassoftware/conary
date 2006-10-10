@@ -655,7 +655,7 @@ class DependencyChecker:
                         Matched.name = DepCheck.name AND
                         Matched.flag = DepCheck.flag
                     WHERE
-                        NOT DepCheck.isProvides
+                        DepCheck.isProvides = 0
                     GROUP BY
                         DepCheck.depNum,
                         Matched.provInstId
