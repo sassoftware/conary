@@ -169,7 +169,7 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     ret = PyTuple_Pack(2, name, flags);
     Py_DECREF(name);
     Py_DECREF(flags);
-
+    free(data);
     return ret;
 }
 
