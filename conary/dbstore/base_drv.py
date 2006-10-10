@@ -139,7 +139,7 @@ class BaseCursor:
     def fields(self):
         if not self._cursor.description:
             return None
-        return ( x[0] for x in self._cursor.description )
+        return [ x[0] for x in self._cursor.description ]
 
     # return the column names of the current select
     def __rowDict(self, row):
