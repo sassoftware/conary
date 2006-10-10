@@ -14,6 +14,9 @@ Changes in @NEW@:
       to byDefault False, for a package, that will turn the package itself
       byDefault False.  This avoids installing empty shells of packages
       on the system. (CNY-774)
+    * Java files in which cvc fails to discover any provided or required
+      interfaces (for example, due to EAR dependencies) previously caused
+      a traceback, but no longer does. (CNY-964)
 
   o Bug Fixes:
     * Fixed a bug triggered when a critical update of a trove depended on 

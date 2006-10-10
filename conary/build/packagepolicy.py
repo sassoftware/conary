@@ -1928,7 +1928,7 @@ class Provides(policy.Policy):
                 self._addCILProvides(path, m, pkg, macros)
 
             elif (m and (m.name == 'java' or m.name == 'jar')
-                and m.contents['provides']):
+                and 'provides' in m.contents and m.contents['provides']):
                 self._addJavaProvides(path, m, pkg)
 
             elif path.endswith('.pm') or path.endswith('.pl'):
@@ -2608,7 +2608,7 @@ class Requires(_addInfo):
             self._addPkgConfigRequirements(path, fullpath, pkg, macros)
 
         if (m and (m.name == 'java' or m.name == 'jar')
-            and m.contents['requires']):
+            and 'requires' in m.contents and m.contents['requires']):
             for req in m.contents['requires']:
                 self._addRequirement(path, req, [], pkg,
                                      deps.JavaDependencies)
