@@ -1095,6 +1095,8 @@ class MigrateTo_11(SchemaMigration):
         cu2 = self.db.cursor()
 
 	logMe(1, "Rebuilding the Latest table...")
+        if "LatestView" in self.db.views:
+            cu.execute("DROP VIEW LatestView")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         createLatest(self.db)
@@ -1161,7 +1163,7 @@ class MigrateTo_11(SchemaMigration):
 	for (instanceId, data) in cu:
             cu2.execute("UPDATE TroveInfo SET data=? WHERE "
                        "infoType=? AND instanceId=?",
-                        (data, trove._TROVEINFO_TAG_PATH_HASHES, instanceId))
+                        (cu.binary(data), trove._TROVEINFO_TAG_PATH_HASHES, instanceId))
         cu.execute("DROP TABLE hashUpdatesTmp")
 
         return self.Version
