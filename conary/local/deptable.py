@@ -619,10 +619,6 @@ class DependencyChecker:
             if restrictor:
                 subselect += whereRestrict % substTable
 
-        # XXX: FIXME: this GROUP BY is invalid SQL, since we're
-        # selecting more fields than we're grouping for. We need to
-        # use aggregate functions on the others or rewrite with an
-        # extra join
         return """
         SELECT MAX(Matched.reqDepId) as depId,
             depCheck.depNum as depNum,
@@ -639,8 +635,8 @@ class DependencyChecker:
         GROUP BY
             DepCheck.depNum,
             Matched.provInstId,
-            Matched.reqInstId,
-            DepCheck.flagCount
+            DepCheck.flagCount,
+            Matched.reqInstId
         HAVING COUNT(DepCheck.troveId) = DepCheck.flagCount
         """ % subselect
 
