@@ -14,8 +14,7 @@
 
 import os, sys
 from conary.lib import options, log
-from conary import state
-
+from conary import state, versions
 
 class ConaryCommand(options.AbstractCommand):
     def setContext(self, cfg, argSet):
