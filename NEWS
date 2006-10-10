@@ -14,6 +14,9 @@ Changes in @NEW@:
       to byDefault False, for a package, that will turn the package itself
       byDefault False.  This avoids installing empty shells of packages
       on the system. (CNY-774)
+    * Java files in which cvc fails to discover any provided or required
+      interfaces (for example, due to EAR dependencies) previously caused
+      a traceback, but no longer does. (CNY-964)
 
   o Bug Fixes:
     * Fixed a bug triggered when a critical update of a trove depended on 
@@ -30,6 +33,8 @@ Changes in @NEW@:
       conary-build and conary-repository will both installed. (CNY-949)
     * Conary will now display config lines that are equivalent to the default
       configuration value but are set explicitly by the user. (CNY-959)
+    * includeConfigFile within a context will now include the file also
+      within that context. (CNY-622)
     * A memory leak in conary.lib.misc.depSplit() has been fixed.
 
 Changes in 1.0.33:
