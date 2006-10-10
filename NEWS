@@ -30,6 +30,8 @@ Changes in @NEW@:
       conary-build and conary-repository will both installed. (CNY-949)
     * Conary will now display config lines that are equivalent to the default
       configuration value but are set explicitly by the user. (CNY-959)
+    * includeConfigFile within a context will now include the file also
+      within that context. (CNY-622)
 
 Changes in 1.0.33:
   o Client Changes:
