@@ -175,6 +175,12 @@ class Cursor(BaseCursor):
             return 0
         return ret[0]
 
+# A cursor class that wraps PostgreSQL's server side cursors
+class IterCursor(Cursor):
+    def _getCursor(self):
+        assert(self.dbh)
+        return self.dbh.itercursor()
+
 # PostgreSQL lowercase everything automatically, so we need a special
 # "lowercase match" list type for matches like
 # idxname in db.tables[x]
@@ -186,6 +192,7 @@ class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
+    iterCursorClass = IterCursor
     keywords = KeywordDict()
     basic_transaction = "START TRANSACTION"
 
@@ -202,6 +209,10 @@ class Database(BaseDatabase):
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
         return True
+
+    def itercursor(self):
+        assert (self.dbh)
+        return self.iterCursorClass(self.dbh)
 
     def loadSchema(self):
         BaseDatabase.loadSchema(self)
