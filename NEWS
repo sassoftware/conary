@@ -21,8 +21,8 @@ Changes in @NEW@:
       a traceback, but no longer does. (CNY-964)
 
   o Bug Fixes:
-    * Fixed a bug triggered when a critical update of a trove depended on 
-      an erase.
+    * A bug triggered when a critical update of a trove depended on an
+      erase has been fixed.
     * A bug that caused changesets to be invalidated from the
       changeset cache when signatures were not modified by
       setTroveSigs() has been fixed.
@@ -31,13 +31,26 @@ Changes in @NEW@:
       repository browser has been fixed. (CNY-926)
     * A bug introduced 1.0.32 that affected the ability to update two troves
       due to the same broken dependency with resolveLevel 2 has been fixed.
-      This bug affected the ability to simply run "conary update conary" when 
+      This bug affected the ability to simply run "conary update conary" when
       conary-build and conary-repository will both installed. (CNY-949)
     * Conary will now display config lines that are equivalent to the default
       configuration value but are set explicitly by the user. (CNY-959)
     * includeConfigFile within a context will now include the file also
       within that context. (CNY-622)
     * A memory leak in conary.lib.misc.depSplit() has been fixed.
+    * The client no longer loops forever trying to create cross-repository
+      relative changesets when the trove is missing from one of the
+      repositories. (CNY-948)
+    * Repositories no longer return empty troves when createChangeSet() is
+      called on troves which are referenced within the repository but present
+      on a remote repository (CNY-948)
+    * Repository queries no longer return matches for troves which are
+      referenced by groups but are not present in the repository. (CNY-947)
+    * Specifying a root (through conaryrc configuration or the
+      "--root" command line parameter) that is not a directory no
+      longer results in an unhandled exception. (CNY-814)
+    * Renaming and changing a source file no longer results in tracebacks
+      on cvc update and cvc merge (CNY-944, CNY-967)
 
 Changes in 1.0.33:
   o Client Changes:
