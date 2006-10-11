@@ -31,6 +31,9 @@ class KeywordDict(BaseKeywordDict):
 
 # class for encapsulating binary strings for dumb drivers
 class Binary(BaseBinary):
+    __binary__ = True
+    def __quote__(self):
+        return self.s
     def __pg_repr__(self):
         return "decode('%s','hex')" % "".join("%02x" % ord(c) for c in self.s)
 
@@ -60,8 +63,12 @@ class Cursor(BaseCursor):
     binaryClass = Binary
     driver = "postgresql"
 
-    def frombinary(self, s):
-        return s.decode("string_escape")
+##     def binary(self, s):
+##         return s
+
+##     def frombinary(self, s):
+##         #return s.decode("string_escape")
+##         return s
 
     # execute with exception translation
     def _tryExecute(self, func, *params, **kw):
@@ -131,14 +138,28 @@ class Cursor(BaseCursor):
         return stmt
     def execstmt(self, stmt, *args):
         assert(isinstance(stmt, pgsql.PreparedCursor))
-        ret = self._tryExecute(stmt._source.execute, *args)
+        if not len(args):
+            ret = self._tryExecute(stmt._source.execute)
+        elif isinstance(args[0], (tuple, list)):
+            ret = self._tryExecute(stmt._source.execute, *args)
+        else:
+            ret = self._tryExecute(stmt._source.execute, args)
         if isinstance(ret, int):
             return ret
         return stmt
 
     # override this with the native version
     def fields(self):
-        return self._cursor.fiels
+        return self._cursor.fields
+
+    # pgsql has its own fetch*_dict methods
+    def fetchone_dict(self):
+        ret = self._cursor.fetchone_dict()
+        return sqllib.CaselessDict(ret)
+    def fetchmany_dict(self, size):
+        return [ sqllib.CaselessDict(x) for x in self._cursor.fetchmany_dict(size) ]
+    def fetchall_dict(self):
+        return [ sqllib.CaselessDict(x) for x in self._cursor.fetchall_dict() ]
 
     # we have "our own" lastrowid
     def __getattr__(self, name):
@@ -154,18 +175,29 @@ class Cursor(BaseCursor):
             return 0
         return ret[0]
 
+# PostgreSQL lowercase everything automatically, so we need a special
+# "lowercase match" list type for matches like
+# idxname in db.tables[x]
+class Llist(list):
+    def __contains__(self, item):
+        return item.lower() in [x.lower() for x in list.__iter__(self)]
+
 class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
     cursorClass = Cursor
     keywords = KeywordDict()
+    basic_transaction = "START TRANSACTION"
 
     def connect(self, **kwargs):
         assert(self.database)
         cdb = self._connectData()
         if not cdb.get("port", None):
             cdb["port"] = -1
-        self.dbh = pgsql.connect(**cdb)
+        try:
+            self.dbh = pgsql.connect(**cdb)
+        except pgsql.InternalError:
+            raise sqlerrors.DatabaseError("Could not connect to database", cdb)
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -176,33 +208,38 @@ class Database(BaseDatabase):
         c = self.cursor()
         # get tables
         c.execute("""
-        select tablename as name
+        select tablename as name, schemaname as schema
         from pg_tables
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
+        and ( schemaname !~ '^pg_temp_' OR schemaname = (pg_catalog.current_schemas(true))[1])
         """)
-        for table, in c.fetchall():
-            self.tables[table] = []
+        for table, schema in c.fetchall():
+            if schema.startswith("pg_temp"):
+                self.tempTables[table] = Llist()
+            else:
+                self.tables[table] = Llist()
         if not len(self.tables):
             return self.version
         # views
         c.execute("""
         select viewname as name
         from pg_views
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
         """)
         for name, in c.fetchall():
             self.views[name] = True
         # indexes
         c.execute("""
-        select indexname as name, tablename as table
+        select indexname as name, tablename as table, schemaname as schema
         from pg_indexes
-        where schemaname not in ('pg_catalog', 'pg_toast',
-                                 'information_schema')
+        where schemaname not in ('pg_catalog', 'pg_toast', 'information_schema')
+        and ( schemaname !~ '^pg_temp_' OR schemaname = (pg_catalog.current_schemas(true))[1])
         """)
-        for (name, table) in c.fetchall():
-            self.tables.setdefault(table, []).append(name)
+        for (name, table, schema) in c.fetchall():
+            if schema.startswith("pg_temp"):
+                self.tempTables.setdefault(table, Llist()).append(name)
+            else:
+                self.tables.setdefault(table, Llist()).append(name)
         # sequences. I wish there was a better way...
         c.execute("""
         SELECT c.relname as name
@@ -221,6 +258,7 @@ class Database(BaseDatabase):
         WHERE t.tgrelid = c.oid AND c.relnamespace = n.oid
         AND NOT tgisconstraint
         AND n.nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+        AND ( n.nspname !~ '^pg_temp_' OR n.nspname = (pg_catalog.current_schemas(true))[1])
         """)
         for (name, table) in c.fetchall():
             self.triggers[name] = table
