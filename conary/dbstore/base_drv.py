@@ -139,7 +139,7 @@ class BaseCursor:
     def fields(self):
         if not self._cursor.description:
             return None
-        return ( x[0] for x in self._cursor.description )
+        return [ x[0] for x in self._cursor.description ]
 
     # return the column names of the current select
     def __rowDict(self, row):
@@ -162,24 +162,12 @@ class BaseCursor:
 
     # { name_a : a, name_b : b }
     def fetchone_dict(self):
-        try:
-            return self.__rowDict(self.fetchone())
-        except:
-            pass
-        return None
+        return self.__rowDict(self.fetchone())
     # [ {name_a:a1, name_b:b1}, {name_a:a2, name_b:b2} ]
     def fetchall_dict(self):
-        try:
-            return [ self.__rowDict(row) for row in self.fetchall() ]
-        except:
-            pass
-        return None
+        return [ self.__rowDict(row) for row in self.fetchall() ]
     def fetchmany_dict(self, count=1):
-        try:
-            return [ self.__rowDict(row) for row in self.fetchmany(count) ]
-        except:
-            pass
-        return None
+        return [ self.__rowDict(row) for row in self.fetchmany(count) ]
 
     def __iter__(self):
         return self
