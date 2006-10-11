@@ -44,6 +44,8 @@ Changes in @NEW@:
       on a remote repository (CNY-948)
     * Repository queries no longer return matches for troves which are
       referenced by groups but are not present in the repository. (CNY-947)
+    * Renaming and changing a source file no longer results in tracebacks
+      on cvc update and cvc merge (CNY-944, CNY-967)
 
 Changes in 1.0.33:
   o Client Changes:
