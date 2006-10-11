@@ -8,6 +8,8 @@ Changes in @NEW@:
       "conary remove" command. (CNY-952)
     * Conary now produces an error message when an invalid context is
       specified. (CNY-890)
+    * --prep now warns about missing dependencies instead of raising an error.
+      --download does not work or error. (CNY-787)
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component
