@@ -42,6 +42,8 @@ Changes in @NEW@:
     * Repositories no longer return empty troves when createChangeSet() is
       called on troves which are referenced within the repository but present
       on a remote repository (CNY-948)
+    * Repository queries no longer return matches for troves which are
+      referenced by groups but are not present in the repository. (CNY-947)
 
 Changes in 1.0.33:
   o Client Changes:

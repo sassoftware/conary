@@ -696,7 +696,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             coreQdict["domain"] = """JOIN Latest AS Domain USING (itemId)
             JOIN Nodes USING (itemId, branchId, versionId)"""
         else:
-            coreQdict["domain"] = """JOIN Instances AS Domain USING (itemId)
+            coreQdict["domain"] = """\
+            JOIN Instances AS Domain ON
+                Items.itemId = Domain.itemId AND
+                Domain.isPresent = 1
             JOIN Nodes USING (itemId, versionid)"""
 
         coreQdict["ugid"] = ", ".join("%d" % x for x in userGroupIds)
