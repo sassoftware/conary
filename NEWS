@@ -49,6 +49,9 @@ Changes in @NEW@:
       longer results in an unhandled exception. (CNY-814)
     * Renaming and changing a source file no longer results in tracebacks
       on cvc update and cvc merge (CNY-944, CNY-967)
+    * Merging when the current version is already based on the parent version
+      now gives an error message instead of writing out an incorrect
+      CONARY file (CNY-968)
 
 Changes in 1.0.33:
   o Client Changes:
