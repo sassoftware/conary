@@ -1247,17 +1247,19 @@ class DependencyTables:
             """, ( (n, v.asString(), f.freeze()) for (n, v, f)
                            in troveList), start_transaction = False )
             # now grab the instanceIds of their included troves, avoiding duplicates
-            # and the instanceIds that already exist
             cu.execute("""
             INSERT INTO tmpInstances2
                 SELECT DISTINCT TT.includedId
             FROM tmpInstances AS TI
             JOIN TroveTroves AS TT USING(instanceId)
-            LEFT JOIN tmpInstances as haveTI ON
-                TT.includedId = haveTI.instanceId
-            WHERE haveTI.instanceId IS NULL
             """, start_transaction=False)
-            cu.execute("INSERT INTO tmpInstances SELECT instanceId FROM tmpInstances2",
+            # drop the ones we already have
+            cu.execute("DELETE FROM tmpInstances2 WHERE instanceId IN "
+                       "(SELECT instanceId FROM tmpInstances)",
+                       start_transaction=False)
+            # append the remaining instanceIds
+            cu.execute("INSERT INTO tmpInstances "
+                       "SELECT instanceId FROM tmpInstances2",
                        start_transaction=False)
             restrictBy = None
             restrictor = self._restrictResolveByTrove
