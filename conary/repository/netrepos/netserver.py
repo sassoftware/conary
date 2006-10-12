@@ -697,6 +697,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             JOIN Latest AS Domain USING (itemId)
             JOIN Nodes USING (itemId, branchId, versionId) """
         else:
+            # We're not using USING() here because of a MySQL bug
+            # http://bugs.mysql.com/bug.php?id=23223
             coreQdict["domain"] = """\
             JOIN Instances AS Domain ON
                 Items.itemId = Domain.itemId AND
@@ -714,7 +716,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             UP.acl as acl
         FROM %(trove)s
         %(domain)s
-        JOIN LabelMap USING (itemid, branchId)
+        JOIN LabelMap ON
+            Nodes.itemId = LabelMap.itemId AND
+            Nodes.branchId = LabelMap.branchId
         JOIN ( SELECT
                    Permissions.labelId as labelId,
                    PerItems.item as acl,
