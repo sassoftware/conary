@@ -10,6 +10,8 @@ Changes in @NEW@:
       specified. (CNY-890)
     * --prep now warns about missing dependencies instead of raising an error.
       --download does not warn or error. (CNY-787)
+    * User settings in a context will override but not remove user settings
+      from the main conary configuration file. (CNY-972) 
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component

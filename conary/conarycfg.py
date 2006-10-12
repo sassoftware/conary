@@ -94,6 +94,10 @@ class CfgUserInfo(CfgList):
         CfgList.__init__(self, CfgUserInfoItem, UserInformation,
                          default = default)
 
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
+
 class CfgLabel(CfgType):
 
     def format(self, val, displayOptions=None):
@@ -354,10 +358,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
         for key, value in context.iteritems():
             if not context.isDefault(key):
-                if isinstance(value, dict):
-                    self[key].update(value)
-                else:
-                    self[key] = value
+                self[key] = self._options[key].set(self[key], value)
         return True
 
     def getContext(self, name):

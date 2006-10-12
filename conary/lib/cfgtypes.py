@@ -81,6 +81,9 @@ class CfgType:
         """
         return self.parseString(str)
 
+    def set(self, curVal, newVal):
+        return self.copy(newVal)
+
     def getDefault(self, default=None):
         """ Get the default value for this CfgType
         """
@@ -360,6 +363,10 @@ class CfgDict(CfgType):
 
     def setFromString(self, val, str):
         return self.dictType(self.parseString(str))
+
+    def set(self, curVal, newVal):
+        curVal.update(newVal)
+        return curVal
 
     def updateFromString(self, val, str):
         # update the dict value -- don't just overwrite it, it might be
