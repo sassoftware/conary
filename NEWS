@@ -8,6 +8,10 @@ Changes in @NEW@:
       "conary remove" command. (CNY-952)
     * Conary now produces an error message when an invalid context is
       specified. (CNY-890)
+    * --prep now warns about missing dependencies instead of raising an error.
+      --download does not warn or error. (CNY-787)
+    * User settings in a context will override but not remove user settings
+      from the main conary configuration file. (CNY-972) 
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component
@@ -47,6 +51,11 @@ Changes in @NEW@:
     * Specifying a root (through conaryrc configuration or the
       "--root" command line parameter) that is not a directory no
       longer results in an unhandled exception. (CNY-814)
+    * Renaming and changing a source file no longer results in tracebacks
+      on cvc update and cvc merge (CNY-944, CNY-967)
+    * Merging when the current version is already based on the parent version
+      now gives an error message instead of writing out an incorrect
+      CONARY file (CNY-968)
 
 Changes in 1.0.33:
   o Client Changes:

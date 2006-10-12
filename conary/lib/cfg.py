@@ -221,7 +221,7 @@ class _Config:
         """
         self._write(out, dict(prettyPrint=False), includeDocs=includeDocs)
 
-    def displayKey(self, key, out):
+    def displayKey(self, key, out=None):
         if out is None:
             out = sys.stdout
         self._writeKey(out, self._options[key], self[key], self._displayOptions)
@@ -528,6 +528,9 @@ class ConfigOption:
             return self.valueType.setFromString(curVal, str)
         else:
             return self.valueType.updateFromString(curVal, str)
+
+    def set(self, curVal, newVal):
+        return self.valueType.set(curVal, newVal)
 
     def __deepcopy__(self, memo):
         # we implement deepcopy because this object keeps track of a 

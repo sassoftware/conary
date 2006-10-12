@@ -209,7 +209,7 @@ class _AbstractPackageRecipe(Recipe):
         return files
 
 
-    def checkBuildRequirements(self, cfg, sourceVersion, ignoreDeps=False):
+    def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
         """ Checks to see if the build requirements for the recipe
             are installed
         """
@@ -283,14 +283,17 @@ class _AbstractPackageRecipe(Recipe):
 
 
         if missingReqs:
-            if not ignoreDeps:
-                log.error("Could not find the following troves "
-                          "needed to cook this recipe:\n"
-                          "%s" % '\n'.join(sorted(missingReqs)))
-                raise errors.RecipeDependencyError, \
-                                            'unresolved build dependencies'
+            err = ("Could not find the following troves "
+                   "needed to cook this recipe:\n"
+                   "%s" % '\n'.join(sorted(missingReqs)))
+            if raiseError:
+                log.error(err)
+                raise errors.RecipeDependencyError(
+                                            'unresolved build dependencies')
+            else:
+                log.warning(err)
         self.buildReqMap = reqMap
-        self.ignoreDeps = ignoreDeps
+        self.ignoreDeps = not raiseError
 
     def extraSource(self, action):
 	"""
