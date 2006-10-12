@@ -15,7 +15,7 @@
 import re
 
 import MySQLdb as mysql
-from MySQLdb import converters
+from MySQLdb import converters, cursors
 from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseBinary
 from base_drv import BaseKeywordDict
 import sqlerrors, sqllib
@@ -36,6 +36,22 @@ class KeywordDict(BaseKeywordDict):
     keys['STRAIGHTJOIN'] = 'STRAIGHT_JOIN'
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
+
+# using the "StoreResult" mixin automatically retrieves and flushes
+# each cursor. The downside is increased memory footprint.
+# (this is the default in the mysql bindings)
+class StoreMySQLCursor(cursors.CursorStoreResultMixIn,
+                       cursors.CursorTupleRowsMixIn,
+                       cursors.BaseCursor):
+    pass
+
+# using the "UseResult" reduces the footprint of each "execute", as
+# the rows are extracted one by one from the serevr side, but you have
+# to make sure all cursors get properly flushed
+class UseMySQLCursor(cursors.CursorUseResultMixIn,
+                     cursors.CursorTupleRowsMixIn,
+                     cursors.BaseCursor):
+    pass
 
 class Cursor(BaseCursor):
     driver = "mysql"
@@ -198,11 +214,20 @@ class Sequence(BaseSequence):
             self.db.commit()
         self.db = self.cu = None
 
+class IterCursor(Cursor):
+    # this will need to be provided by each separate driver
+    def _getCursor(self):
+        assert(self.dbh)
+        return self.dbh.cursor(cursorclass = UseMySQLCursor)
+    def execute(self, *args):
+        while self._cursor.nextset(): pass
+        return Cursor.execute(self, *args)
 
 class Database(BaseDatabase):
     alive_check = "select version(), current_date()"
     basic_transaction = "begin"
     cursorClass = Cursor
+    iterCursorClass = IterCursor
     sequenceClass = Sequence
     driver = "mysql"
     MaxPacket = 1024 * 1024
@@ -224,9 +249,16 @@ class Database(BaseDatabase):
         name, size = cu.fetchall()[0]
         self.MaxPacket = size
 
-    # need to propagate the MAxPacket value to the cursors
+    # need to propagate the MaxPacket value to the cursors
     def cursor(self):
-        ret = BaseDatabase.cursor(self)
+        assert (self.dbh)
+        ret = self.cursorClass(self.dbh)
+        ret.MaxPacket = self.MaxPacket
+        return ret
+
+    def itercursor(self):
+        assert (self.dbh)
+        ret = self.iterCursorClass(self.dbh)
         ret.MaxPacket = self.MaxPacket
         return ret
 
