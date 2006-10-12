@@ -14,7 +14,6 @@
 
 import os
 import re
-import time
 
 from conary import sqlite3
 
@@ -31,7 +30,7 @@ def _regexp(pattern, item):
     return regexp.match(item) is not None
 # a timestamp function compatible with other backends
 def _timestamp():
-    return long(time.strftime("%Y%m%d%H%M%S", time.gmtime(time.time())))
+    return sqllib.toDatabaseTimestamp()
 
 class Cursor(BaseCursor):
     driver = "sqlite"
@@ -53,6 +52,8 @@ class Cursor(BaseCursor):
         except sqlite3.DatabaseError, e:
             if e.args[0].startswith('duplicate column name:'):
                 raise sqlerrors.DuplicateColumnName(str(e))
+            if e.args[0].startswith('database is locked'):
+                raise sqlerrors.DatabaseLocked(str(e))
             if e.args[0].startswith("no such table"):
                 raise sqlerrors.InvalidTable(str(e))
             raise sqlerrors.CursorError(e.args[0], e)
