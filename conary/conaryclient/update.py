@@ -1549,7 +1549,7 @@ conary erase '%s=%s[%s]'
         csSource = trovesource.stack(uJob.getSearchSource(),
                                      self.repos)
 
-        cs, notFound = csSource.createChangeSet(reposChangeSetList, 
+        cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                 withFiles = False,
                                                 recurse = recurse)
         self._replaceIncomplete(cs, csSource, 
@@ -1557,7 +1557,7 @@ conary erase '%s=%s[%s]'
         if notFound:
             nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
             if nonLocal:
-                troveList = '\n   '.join('%s=%s[%s]' % x for x in nonLocal)
+                troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) for x in nonLocal])
                 raise UpdateError(
                        'Failed to find required troves for update:\n   %s' 
                         % troveList)
