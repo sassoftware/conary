@@ -486,7 +486,7 @@ def createTroves(db):
             streamId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             pathId          %(BINARY16)s,
-            path            VARCHAR(767),
+            path            %(PATHTYPE)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
@@ -1362,7 +1362,7 @@ def setupTempTables(db):
             versionId   INTEGER,
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
-            path        VARCHAR(767)
+            path        %(PATHTYPE)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewFiles"] = True
         # since this is an index on a temp table, don't check the

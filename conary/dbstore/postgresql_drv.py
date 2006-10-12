@@ -22,9 +22,12 @@ import sqllib
 
 class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
-    keys.update( { 'BLOB' : 'BYTEA',
-                   'MEDIUMBLOB' : 'BYTEA',
-                   'PRIMARYKEY' : 'SERIAL PRIMARY KEY' } )
+    keys.update( {
+        'PRIMARYKEY' : 'SERIAL PRIMARY KEY',
+        'BLOB'       : 'BYTEA',
+        'MEDIUMBLOB' : 'BYTEA',
+        'PATHTYPE'   : 'BYTEA',
+        } )
 
     def binaryVal(self, len):
         return "BYTEA"
